@@ -1,4 +1,4 @@
-;;;; php84-features.lisp — PHP 8.0-8.4 feature implementations
+;;;; php84-features.lisp — PHP 8.0-8.5 feature implementations
 ;;;;
 ;;;; Covers:
 ;;;;   - PHP 8.4 Property Hooks (get/set, short and long forms)

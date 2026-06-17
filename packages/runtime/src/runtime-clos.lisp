@@ -339,10 +339,6 @@ descriptors; use %RT-METHOD-FUNCTION to obtain the callable."
                  (lambda (left right)
                    (%rt-specificity< left right args-list cpls)))))
 
-(defun compute-applicable-methods (gf args)
-  "Runtime-facing COMPUTE-APPLICABLE-METHODS shim."
-  (rt-compute-applicable-methods gf args))
-
 (defun rt-register-method (gf specs method &optional qualifier)
   "Register METHOD in GF under SPECS, optionally qualified by QUALIFIER.
 

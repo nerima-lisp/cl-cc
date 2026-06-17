@@ -83,6 +83,23 @@
                  (cl-cc/cli::%print-command-help "compile")))))
     (assert-true (search "--debug" out))))
 
+(deftest cli-print-repl-help-is-language-neutral
+  "REPL help no longer claims ANSI Common Lisp only and documents --lang."
+  (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "repl")))))
+    (assert-false (search "ANSI Common Lisp" out))
+    (assert-true (search "--lang lisp|elisp|php|js|javascript" out))))
+
+(deftest cli-print-eval-help-documents-elisp-language
+  "Eval help documents the expanded language selector."
+  (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "eval")))))
+    (assert-true (search "--lang lisp|elisp|php|js|javascript" out))))
+
 (deftest cli-print-unknown-command-falls-back
   "Unknown command help prints an error and falls back to global help."
   (let ((out (make-string-output-stream))
@@ -151,3 +168,97 @@
                      (assert-equal 2 (%with-captured-quit (cl-cc/cli:main)))))))
         (assert-true printed-help)
         (assert-true (search "boom" err))))))
+
+(deftest cli-do-repl-forwards-elisp-language
+  "repl passes the selected language through to run-string-repl and prints it."
+  (let ((captured-language :unset)
+        (captured-source :unset))
+    (%with-cli-function-overrides
+        ((uiop:command-line-arguments (lambda () '("repl" "--lang" "elisp")))
+         (cl-cc:reset-repl-state (lambda () nil))
+         (cl-cc:%ensure-repl-state (lambda () nil))
+         (cl-cc/cli::%initialize-repl-completeness-globals (lambda () nil))
+         (cl-cc/cli::%load-repl-history-file (lambda () nil))
+         (cl-cc/cli::%save-repl-history-file (lambda () nil))
+         (cl-cc/cli::%update-repl-completeness-globals (lambda (&rest args) (declare (ignore args)) nil))
+         (cl-cc:%repl-record-history (lambda (&rest args) (declare (ignore args)) nil))
+         (cl-cc:repl-edit-input-line (lambda (line) (values line nil nil)))
+         (cl-cc/vm:vm-values-list (lambda (&rest args) (declare (ignore args)) nil))
+         (cl-cc:run-string-repl (lambda (source &key language)
+                                  (setf captured-source source
+                                        captured-language language)
+                                  42)))
+      (let ((out (with-output-to-string (s)
+                    (let ((*standard-input* (make-string-input-stream (format nil "(+ 1 2)~%")))
+                         (*standard-output* s)
+                         (*error-output* s))
+                     (assert-equal 0 (%with-captured-quit (cl-cc/cli:main)))))))
+        (assert-equal :elisp captured-language)
+        (assert-string= "(+ 1 2)" captured-source)
+        (assert-true (search "Emacs Lisp" out))
+        (assert-true (search "=> 42" out))))))
+
+(deftest cli-do-eval-forwards-elisp-language
+  "eval forwards --lang elisp to compile-string and run-compiled."
+  (let ((captured-language :unset)
+        (captured-source :unset)
+        (run-called nil))
+    (%with-cli-function-overrides
+        ((cl-cc/cli::%call-with-runtime-sanitizer-flags (lambda (opts thunk &rest args)
+                                                          (declare (ignore opts args))
+                                                          (funcall thunk)))
+         (cl-cc:compile-string (lambda (source &rest args)
+                                 (setf captured-source source
+                                       captured-language (getf args :language))
+                                 (cl-cc/compile:make-compilation-result :program :dummy)))
+         (cl-cc:run-compiled (lambda (program &rest args)
+                               (declare (ignore args))
+                               (setf run-called program)
+                               99)))
+      (let ((result (cl-cc/cli::%compile-and-run-eval-form "(+ 1 2)" nil nil :elisp nil nil nil)))
+        (assert-equal 99 result)
+        (assert-string= "(+ 1 2)" captured-source)
+        (assert-equal :elisp captured-language)
+        (assert-equal :dummy run-called)))))
+
+(deftest cli-do-compile-dump-ir-forwards-elisp-language
+  "compile passes --lang elisp through the dump-ir path."
+  (let ((captured-language :unset)
+        (captured-source :unset))
+    (labels ((%run-dump-ir-compile-path (file language)
+               (let* ((source (cl-cc/cli::%read-command-source file))
+                      (result (cl-cc:compile-string source
+                                                    :target :vm
+                                                    :language language
+                                                    :source-file file))
+                      (stream (make-string-output-stream)))
+                 (cl-cc/cli::%dump-ir-phase :vm result stream t)
+                 (get-output-stream-string stream))))
+      (%with-cli-function-overrides
+          ((cl-cc/cli::%read-command-source (lambda (file)
+                                              (setf captured-source file)
+                                              "(+ 1 2)"))
+         (cl-cc/cli::%dump-ir-phase (lambda (&rest args)
+                                      (declare (ignore args))
+                                      nil))
+         (cl-cc:compile-string (lambda (source &rest args)
+                                 (setf captured-source source
+                                       captured-language (getf args :language))
+                                 (cl-cc:make-compilation-result :program :dummy))))
+        (%run-dump-ir-compile-path "input.el" :elisp)
+      (assert-string= "(+ 1 2)" captured-source)
+      (assert-equal :elisp captured-language)))))
+
+(deftest cli-wasm-helper-forwards-elisp-language
+  "wasm helper preserves elisp instead of downcasting it."
+  (let ((captured-language :unset)
+        (captured-source :unset))
+    (%with-cli-function-overrides
+        ((cl-cc:compile-string (lambda (source &rest args)
+                                 (setf captured-source source
+                                       captured-language (getf args :language))
+                                 (cl-cc:make-compilation-result :program :dummy))))
+      (let ((result (cl-cc/cli::%wasm-compile-source-to-vm-result "(+ 1 2)" "input.el" :elisp nil)))
+        (assert-equal :dummy (cl-cc:compilation-result-program result))
+        (assert-string= "(+ 1 2)" captured-source)
+        (assert-equal :elisp captured-language)))))

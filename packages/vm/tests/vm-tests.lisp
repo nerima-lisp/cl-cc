@@ -9,23 +9,6 @@
 (in-suite vm-suite)
 
 ;; SKIP (Nix sandbox): *features* initialization differs in sandbox
-#+nil (deftest vm-state-initial-globals
-  "vm-state seeds representative standard globals at initialization time."
-  (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
-    (assert-true (hash-table-p (cl-cc/vm::vm-global-vars state)))
-    (multiple-value-bind (features found-p)
-        (gethash 'cl-cc::*features* (cl-cc/vm::vm-global-vars state))
-      (assert-true found-p)
-      (assert-equal '(:common-lisp :cl-cc) features))
-    (multiple-value-bind (package found-p)
-        (gethash 'cl-cc::*package* (cl-cc/vm::vm-global-vars state))
-      (assert-true found-p)
-      (assert-eq (find-package :cl-user) package))
-    (multiple-value-bind (docs found-p)
-        (gethash 'cl-cc/expand::*documentation-table* (cl-cc/vm::vm-global-vars state))
-      (assert-true found-p)
-      (assert-null docs))))
-
 (deftest vm-heap-address-normalization
   "vm-heap-address normalizes integers, wrapped addresses, and nil."
   (let ((wrapped (cl-cc/vm::make-vm-heap-address :value 7)))

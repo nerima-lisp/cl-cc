@@ -127,10 +127,43 @@
   (assert-eq 'let (car (our-macroexpand-1 '(with-standard-io-syntax body))))
   (let ((bindings (second (our-macroexpand-1 '(with-standard-io-syntax body)))))
     (assert-= 10 (second (assoc '*print-base* bindings)))
-    (assert-= 10 (second (assoc '*read-base*  bindings))))
+    (assert-= 10 (second (assoc '*read-base*  bindings)))
+    (assert-eq 't (second (assoc '*print-readably* bindings)))
+    (assert-true (assoc '*print-pprint-dispatch* bindings))
+    (assert-true (assoc '*readtable* bindings)))
   (let* ((result (our-macroexpand-1 '(with-standard-io-syntax body)))
          (body   (cddr result)))
     (assert-true (member 'body body))))
+
+;;; ─── with-package-iterator ───────────────────────────────────────────────
+
+(deftest with-package-iterator-honors-requested-symbol-types
+  "WITH-PACKAGE-ITERATOR returns internal, external, and inherited symbols when requested."
+  (let ((cl-cc/runtime:*rt-package-registry* (make-hash-table :test #'equal)))
+    (let* ((lib (cl-cc/runtime:rt-make-package "WPI-LIB"))
+           (user (cl-cc/runtime:rt-make-package "WPI-USER"))
+           (internal-sym (cl-cc/runtime:rt-intern "INTERNAL" user))
+           (external-sym (cl-cc/runtime:rt-intern "EXTERNAL" user))
+           (inherited-sym (cl-cc/runtime:rt-intern "IMPORTED" lib))
+           (results nil))
+      (cl-cc/runtime:rt-export external-sym user)
+      (cl-cc/runtime:rt-export inherited-sym lib)
+      (cl-cc/runtime:rt-use-package lib user)
+      (assert-eq internal-sym (cl-cc/runtime:rt-intern "INTERNAL" user))
+      (with-package-iterator (next (list user) :internal :external :inherited)
+        (loop
+          (multiple-value-bind (more sym type pkg) (next)
+            (unless more
+              (return))
+            (push (list (cl-cc/runtime:rt-symbol-name sym)
+                        type
+                        (cl-cc/runtime:rt-package-name pkg))
+                  results))))
+      (assert-equal
+       '(("INTERNAL" :internal "WPI-USER")
+         ("EXTERNAL" :external "WPI-USER")
+         ("IMPORTED" :inherited "WPI-USER"))
+       (nreverse results)))))
 
 ;;; ─── define-compiler-macro ────────────────────────────────────────────────
 

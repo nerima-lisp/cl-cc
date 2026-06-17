@@ -6,7 +6,7 @@
 (defun %do-run (parsed)
   "Handle the `cl-cc run' subcommand using PARSED command-line arguments.
 
-Reads the required input file, detects Lisp/Emacs Lisp or PHP mode, compiles to the VM,
+Reads the required input file, detects the source language, compiles to the VM,
 executes the program, optionally emits trace/flamegraph/PGO artifacts, and
 exits with status 0 on success."
   (let* ((file (%required-file-arg parsed "run"))

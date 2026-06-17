@@ -7,11 +7,6 @@
     `(let ((,result (cl-cc:apply-prolog-peephole ,instructions)))
        (assert-equal ,expected ,result))))
 
-(defmacro assert-prolog-peephole-length= (instructions expected-length)
-  (let ((result (gensym "RESULT")))
-    `(let ((,result (cl-cc:apply-prolog-peephole ,instructions)))
-       (assert-= ,expected-length (length ,result)))))
-
 (defmacro assert-prolog-peephole-not-contains (instructions pattern)
   (let ((result (gensym "RESULT")))
     `(let ((,result (cl-cc:apply-prolog-peephole ,instructions)))
@@ -19,14 +14,16 @@
 
 (deftest prolog-type-of-integer-const
   "type-of/3: integer constant has type (integer-type)."
-  (let ((result (cl-cc:query-one '(type-of (const 42) nil ?t))))
+  (let ((result (cl-cc:query-one '(cl-cc/prolog::type-of (cl-cc/prolog::const 42) nil ?t))))
     (assert-true result)
-    (assert-equal '(type-of (const 42) nil (integer-type)) result)))
+    (assert-equal '(cl-cc/prolog::type-of (cl-cc/prolog::const 42) nil (cl-cc/prolog::integer-type)) result)))
 
 (deftest-each prolog-type-of-operation-types
   "type-of/3 resolves operation types: binop → integer-type, cmp → boolean-type."
-  :cases (("binop" '(type-of (binop + (const 1) (const 2)) nil ?t) '(integer-type))
-          ("cmp"   '(type-of (cmp < (const 1) (const 2)) nil ?t)   '(boolean-type)))
+  :cases (("binop" '(cl-cc/prolog::type-of (cl-cc/prolog::binop + (cl-cc/prolog::const 1) (cl-cc/prolog::const 2)) nil ?t)
+           '(cl-cc/prolog::integer-type))
+          ("cmp"   '(cl-cc/prolog::type-of (cl-cc/prolog::cmp < (cl-cc/prolog::const 1) (cl-cc/prolog::const 2)) nil ?t)
+           '(cl-cc/prolog::boolean-type)))
   (goal expected-type)
   (let ((result (cl-cc:query-one goal)))
     (assert-true result)
@@ -85,18 +82,15 @@
 
 (deftest prolog-peephole-multiple-pairs
   "Peephole: matching windows are rewritten in a single left-to-right pass; non-overlapping leftovers pass through."
-  (let ((result (cl-cc:apply-prolog-peephole '((:const :r0 1) (:move :r1 :r0) (:add :r2 :r1 :r1)))))
-    (assert-true (member (length result) '(2 3)))
-    (assert-equal '(:const :r1 1) (first result))
-    (assert-equal '(:add :r2 :r1 :r1) (second result))))
+  (assert-prolog-peephole-equal '((:const :r0 1) (:move :r1 :r0) (:add :r2 :r1 :r1))
+                                '((:const :r1 1) (:add :r2 :r1 :r1))))
 
 (deftest-each prolog-peephole-single-pair-reduction
   "Peephole rules that collapse a 2-instruction window into a single instruction."
   :cases (("jump-to-label" '((:jump "L0") (:label "L0")) '(:label "L0"))
           ("double-const"  '((:const :r0 1) (:const :r0 99)) '(:const :r0 99)))
   (input expected-first)
-  (assert-prolog-peephole-length= input 1)
-  (assert-equal expected-first (first (cl-cc:apply-prolog-peephole input))))
+  (assert-prolog-peephole-equal input (list expected-first)))
 
 (deftest-each prolog-peephole-terminal-sequence-rules
   "Peephole rule 5: in any terminal-instruction pair, only the first instruction is kept."
@@ -113,10 +107,8 @@
 
 (deftest prolog-peephole-move-chain-propagates-source
   "Peephole rule 4: (:move :r1 :r0)(:move :r2 :r1) — source propagated to end of chain."
-  (let ((result (cl-cc:apply-prolog-peephole '((:move :r1 :r0) (:move :r2 :r1)))))
-    (assert-= 2 (length result))
-    (assert-equal '(:move :r1 :r0) (first result))
-    (assert-equal '(:move :r2 :r0) (second result))))
+  (assert-prolog-peephole-equal '((:move :r1 :r0) (:move :r2 :r1))
+                                '((:move :r1 :r0) (:move :r2 :r0))))
 
 (deftest-each prolog-peephole-pair-preserved
   "Peephole: instruction pairs with different registers/labels are never merged."
@@ -124,7 +116,7 @@
           ("const-different-regs"  '((:const :r0 1) (:const :r1 2)))
           ("move-different-source" '((:move :r1 :r0) (:move :r3 :r2))))
   (insts)
-  (assert-prolog-peephole-length= insts 2))
+  (assert-prolog-peephole-equal insts insts))
 
 ;;; %peephole-walk unit tests (internal helper)
 
@@ -139,13 +131,10 @@
 
 (deftest peephole-walk-matching-pair-fused
   "%peephole-walk: a matching const→move pair is fused into a single const."
-  (let ((result (cl-cc/optimize::%peephole-walk '((:const :r0 99) (:move :r1 :r0)) nil)))
-    (assert-= 1 (length result))
-    (assert-equal '(:const :r1 99) (first result))))
+  (assert-equal '((:const :r1 99))
+                (cl-cc/optimize::%peephole-walk '((:const :r0 99) (:move :r1 :r0)) nil)))
 
 (deftest peephole-walk-out-accumulator-is-prepended
   "%peephole-walk: instructions in OUT are prepended (reversed) to the result."
-  (let ((result (cl-cc/optimize::%peephole-walk '((:const :r0 1)) '((:add :r2 :r1 :r1)))))
-    (assert-= 2 (length result))
-    (assert-equal '(:add :r2 :r1 :r1) (first result))
-    (assert-equal '(:const :r0 1)     (second result))))
+  (assert-equal '((:add :r2 :r1 :r1) (:const :r0 1))
+                (cl-cc/optimize::%peephole-walk '((:const :r0 1)) '((:add :r2 :r1 :r1)))))

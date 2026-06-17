@@ -602,23 +602,10 @@ evicted function will fall back to interpretation if called later."
   (backing nil)
   (refcount 1 :type integer))
 
-(defparameter *rt-cow-list-enabled* t
-  "When true, rt-copy-list returns copy-on-write wrappers for list values.")
-
 (defun %rt-cow-list-materialize (value)
   (if (rt-cow-list-p value)
       (rt-cow-list-backing value)
       value))
-
-(defun %rt-cow-list-share (value)
-  (if (rt-cow-list-p value)
-      (progn
-        (incf (rt-cow-list-refcount value))
-        (%make-rt-cow-list :backing (rt-cow-list-backing value)
-                           :refcount (rt-cow-list-refcount value)))
-      ;; Plain lists are assumed shared with at least one external owner.
-      ;; Start with refcount=2 so first write performs copy-on-write.
-      (%make-rt-cow-list :backing value :refcount 2)))
 
 (defun %rt-cow-list-ensure-writable (value)
   (if (rt-cow-list-p value)
@@ -652,9 +639,8 @@ evicted function will fall back to interpretation if called later."
 (defun rt-butlast (l) (butlast (%rt-cow-list-materialize l)))
 (defun rt-copy-list (l)
   (let ((materialized (%rt-cow-list-materialize l)))
-    (if *rt-cow-list-enabled*
-        (%rt-cow-list-share materialized)
-        (copy-list materialized))))
+    ;; Always return a COW wrapper so writes through rt-rplac* remain isolated.
+    (%make-rt-cow-list :backing materialized :refcount 2)))
 (defun rt-copy-tree (l) (copy-tree l))
 (defun rt-assoc (key alist) (assoc key alist))
 (defun rt-acons (key val alist) (acons key val alist))

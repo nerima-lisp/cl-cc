@@ -1,6 +1,70 @@
 (in-package :cl-cc/test)
 
 ;;; ------------------------------------------------------------
+;;; Shared registry helpers
+;;; ------------------------------------------------------------
+
+(defun %suite-registry-entry (name &key description parent (parallel t)
+                                   (before-each '())
+                                   (after-each '()))
+  "Build a suite registry entry plist for NAME."
+  (list :name name
+        :description description
+        :parent parent
+        :parallel parallel
+        :before-each before-each
+        :after-each after-each))
+
+(defun %test-registry-entry (name &key fn suite timeout depends-on tags docstring source-file)
+  "Build a test registry entry plist for NAME."
+  (list :name name
+        :fn fn
+        :suite suite
+        :timeout timeout
+        :depends-on depends-on
+        :tags tags
+        :docstring docstring
+        :source-file source-file))
+
+(defmacro with-suite-registry-entry ((name &rest initargs) &body body)
+  "Install a temporary suite registry entry named NAME while BODY runs."
+  (let ((saved (gensym "SAVED-SUITE-REGISTRY")))
+    `(let ((,saved *suite-registry*))
+       (unwind-protect
+            (progn
+              (setf *suite-registry*
+                    (persist-assoc *suite-registry* ,name
+                                   (%suite-registry-entry ,name ,@initargs)))
+              ,@body)
+         (setf *suite-registry* ,saved)))))
+
+(defmacro with-test-registry-entry ((name &rest initargs) &body body)
+  "Install a temporary test registry entry named NAME while BODY runs."
+  (let ((saved (gensym "SAVED-TEST-REGISTRY")))
+    `(let ((,saved *test-registry*))
+       (unwind-protect
+            (progn
+              (setf *test-registry*
+                    (persist-assoc *test-registry* ,name
+                                   (%test-registry-entry ,name ,@initargs)))
+              ,@body)
+         (setf *test-registry* ,saved)))))
+
+(defmacro with-fresh-registry-state (&body body)
+  "Run BODY with empty suite and test registries, restoring both afterward."
+  (let ((saved-suite (gensym "SAVED-SUITE-REGISTRY"))
+        (saved-test (gensym "SAVED-TEST-REGISTRY")))
+    `(let ((,saved-suite *suite-registry*)
+           (,saved-test *test-registry*))
+       (unwind-protect
+            (progn
+              (setf *suite-registry* (persist-empty))
+              (setf *test-registry* (persist-empty))
+              ,@body)
+         (setf *suite-registry* ,saved-suite)
+         (setf *test-registry* ,saved-test)))))
+
+;;; ------------------------------------------------------------
 ;;; Suite Definition
 ;;; ------------------------------------------------------------
 
@@ -10,12 +74,10 @@ Use :parallel NIL for suites that must always run sequentially."
   `(progn
      (setf *suite-registry*
            (persist-assoc *suite-registry* ',name
-                          (list :name ',name
-                                :description ,description
-                                :parent ',parent
-                                :parallel ,parallel
-                                :before-each '()
-                                :after-each '())))
+                          (%suite-registry-entry ',name
+                                                 :description ,description
+                                                 :parent ',parent
+                                                 :parallel ,parallel)))
      ',name))
 
 (defmacro in-suite (name)
@@ -59,14 +121,14 @@ Returns (values docstring timeout depends-on tags body-forms)."
     `(progn
        (setf *test-registry*
              (persist-assoc *test-registry* ',name
-                            (list :name ',name
-                                  :fn (lambda () ,@body-forms)
-                                  :suite *current-suite*
-                                  :timeout ,timeout
-                                  :depends-on ',depends-on
-                                  :tags ,tags
-                                  :docstring ,docstring
-                                  :source-file (or *compile-file-pathname* *load-pathname*))))
+                            (%test-registry-entry ',name
+                                                  :fn (lambda () ,@body-forms)
+                                                  :suite *current-suite*
+                                                  :timeout ,timeout
+                                                  :depends-on ',depends-on
+                                                  :tags ,tags
+                                                  :docstring ,docstring
+                                                  :source-file (or *compile-file-pathname* *load-pathname*))))
        ',name)))
 
 ;;; ------------------------------------------------------------

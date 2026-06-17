@@ -504,9 +504,7 @@
     (assert-true (member "127.0.0.1" addresses :test #'string=))
     (assert-true (plusp (length (cl-cc/vm:getaddrinfo "localhost" :service 80))))
     (let ((async (cl-cc/vm:dns-resolve-async "localhost")))
-      (loop repeat 100
-            until (cl-cc/vm:dns-async-result-done-p async)
-            do (sleep 0.01))
+      (sb-thread:join-thread (cl-cc/vm::dns-async-result-thread async))
       (assert-true (cl-cc/vm:dns-async-result-done-p async))
       (assert-equal nil (cl-cc/vm:dns-async-result-error async))
       (assert-true (member "127.0.0.1" (cl-cc/vm:dns-async-result-result async)

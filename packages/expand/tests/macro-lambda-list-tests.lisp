@@ -17,6 +17,13 @@
     (assert-true (cl-cc/expand::lambda-list-info-key-params info))
     (assert-equal '((count 0)) (cl-cc/expand::lambda-list-info-aux info))))
 
+(deftest macro-lambda-list-whole-section
+  "parse-lambda-list records &whole and resumes parsing required parameters."
+  (let ((info (cl-cc/expand:parse-lambda-list '(&whole whole-name x &optional y))))
+    (assert-eq 'whole-name (cl-cc/expand::lambda-list-info-whole info))
+    (assert-equal '(x) (cl-cc/expand::lambda-list-info-required info))
+    (assert-equal '((y nil nil)) (cl-cc/expand::lambda-list-info-optional info))))
+
 (deftest macro-lambda-list-bindings-shape
   "generate-lambda-bindings and destructure-lambda-list return bindings."
   (assert-true (assoc 'args (cl-cc/expand:generate-lambda-bindings '(&rest args) 'form)))
@@ -58,6 +65,12 @@
     (assert-true (assoc 'lim bindings))
     (assert-true (assoc 'lim-p bindings))
     (assert-true (assoc 'done bindings))))
+
+(deftest macro-lambda-list-destructure-whole
+  "destructure-lambda-list binds &whole to the full argument form."
+  (let ((bindings (cl-cc/expand:destructure-lambda-list '(&whole whole x) 'input-form)))
+    (assert-eq 'input-form (cdr (assoc 'whole bindings)))
+    (assert-true (assoc 'x bindings))))
 
 ;;; ── %push-required-bindings ──────────────────────────────────────────────
 
@@ -176,7 +189,8 @@
 
 (deftest-each lambda-list-keyword-transitions-completeness
   "*lambda-list-keyword-transitions* maps every standard lambda list keyword to a state."
-  :cases (("&optional"    '&optional    :optional)
+  :cases (("&whole"       '&whole       :whole)
+          ("&optional"    '&optional    :optional)
           ("&rest"        '&rest        :rest)
           ("&body"        '&body        :body)
           ("&key"         '&key         :key)

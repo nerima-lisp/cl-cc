@@ -45,8 +45,8 @@
 (defun %wasm-compile-source-to-vm-result (source file language kwargs)
   "Compile SOURCE to a VM compilation-result for wasm sidecar metadata."
   (if (member (or language :lisp) '(:lisp :elisp))
-      (apply #'compile-string source :source-file file :language :lisp :target :vm kwargs)
-      (apply #'compile-string source :language language :target :vm kwargs)))
+      (apply #'compile-string source :source-file file :language (or language :lisp) :target :vm kwargs)
+      (apply #'compile-string source :language (or language :lisp) :target :vm kwargs)))
 
 (defun %wasm-generate-streaming-js (output wasm-path content-hash integrity)
   "Write FR-232 instantiateStreaming + IndexedDB cache glue next to OUTPUT."

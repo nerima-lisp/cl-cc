@@ -2,10 +2,9 @@
 
 ;;;; packages/prolog/src/package.lisp - CL-CC Prolog Package
 ;;;;
-;;;; Phase 1.1 of the package-by-feature monorepo migration. This package owns
-;;;; the Prolog engine, DCG transformer, and peephole rule database. The facade
-;;;; :cl-cc package uses :cl-cc/prolog so compiler modules continue to see
-;;;; unify/solve-goal/query-* unqualified.
+;;;; This package owns the Prolog engine, DCG transformer, and peephole rule
+;;;; database. The facade :cl-cc package uses :cl-cc/prolog for all Prolog
+;;;; entry points.
 ;;;;
 ;;;; Bootstrap symbols (binop, const, var, cmp, integer-type, boolean-type,
 ;;;; env-lookup, make-cst-token, lexer-token-p/type/value, our-eval) are

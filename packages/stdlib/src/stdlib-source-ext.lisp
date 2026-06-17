@@ -237,13 +237,40 @@
                   (setter (list 'setf access store)))
              (values temps (cdr place) (list store) setter access))))"
 
+    ;; ── FR-971 / FR-398: expander-backed special forms ────────────────────
+    "(define-expander-for eval-when (form)
+       (expand-eval-when-form (second form) (cddr form)))"
+
+    "(define-expander-for symbol-macrolet (form)
+       (expand-symbol-macrolet-form (second form) (cddr form)))"
+
+    "(define-expander-for define-symbol-macro (form)
+       (let ((name (second form))
+             (expansion (third form)))
+         (setf (gethash name *symbol-macro-table*) expansion)
+         (list 'quote name)))"
+
 ;;; ── Missing ANSI functions (added for 100% coverage) ─────────────────────────
 
     ;; String
+    "(defun string-trim (bag string)
+       (cl:string-trim bag string))"
     "(defun string-left-trim (bag string)
-       (string-trim bag string))"
+       (cl:string-left-trim bag string))"
     "(defun string-right-trim (bag string)
-       (string-right-trim bag string))"
+       (cl:string-right-trim bag string))"
+    "(defun string-upcase (string &key start end)
+       (cl:string-upcase string :start start :end end))"
+    "(defun string-downcase (string &key start end)
+       (cl:string-downcase string :start start :end end))"
+    "(defun string-capitalize (string &key start end)
+       (cl:string-capitalize string :start start :end end))"
+    "(defun nstring-upcase (string &key start end)
+       (cl:nstring-upcase string :start start :end end))"
+    "(defun nstring-downcase (string &key start end)
+       (cl:nstring-downcase string :start start :end end))"
+    "(defun nstring-capitalize (string &key start end)
+       (cl:nstring-capitalize string :start start :end end))"
     "(defun char-not-equal (c &rest chars)
        (not (apply #'char= c chars)))"
     "(defun char-not-lessp (c &rest chars)
@@ -357,82 +384,34 @@
        *standard-output*)"
 
     ;; Pathname functions (CL pathname model mapped to strings)
-    "(defun pathname (x) (if (stringp x) x (princ-to-string x)))"
+    "(defun pathname (x) (cl:pathname x))"
     "(defun make-pathname (&key host device directory name type version defaults)
-       (declare (ignore host device version))
-       (let* ((base (if defaults (namestring defaults) \"\"))
-              (dir-str (cond ((null directory) \"\")
-                             ((stringp directory) directory)
-                             ((listp directory)
-                              (format nil \"~{~A~^/~}\" (if (eq (car directory) :absolute)
-                                                             (cons \"\" (cdr directory))
-                                                             (cdr directory))))
-                             (t \"\")))
-              (name-str (or name \"\"))
-              (type-str (if type (concatenate 'string \".\" type) \"\")))
-         (declare (ignore base))
-         (concatenate 'string dir-str (if (and (> (length dir-str) 0) (not (string= (subseq dir-str (1- (length dir-str))) \"/\"))) \"/\" \"\") name-str type-str)))"
-    "(defun namestring (x) (if (stringp x) x (princ-to-string x)))"
-    "(defun truename (x) (namestring x))"
-    "(defun probe-file (x)
-       (handler-case
-           (let ((p (namestring x)))
-             (when (open p :direction :probe :if-does-not-exist nil) p))
-         (error () nil)))"
-    "(defun %path-last-slash (s)
-       (or (search \"/\" s :from-end t) -1))"
-    "(defun pathname-name (x)
-       (let* ((s (namestring x))
-              (slash (%path-last-slash s))
-              (base (subseq s (1+ slash)))
-              (dot (search \".\" base :from-end t)))
-         (if dot (subseq base 0 dot) base)))"
-    "(defun pathname-type (x)
-       (let* ((s (namestring x))
-              (slash (%path-last-slash s))
-              (base (subseq s (1+ slash)))
-              (dot (search \".\" base :from-end t)))
-         (if dot (subseq base (1+ dot)) nil)))"
-    "(defun pathname-directory (x)
-       (let* ((s (namestring x))
-              (slash (%path-last-slash s)))
-         (if (>= slash 0)
-             (list :absolute (subseq s 0 slash))
-             (list :relative))))"
-    "(defun pathname-host (x) (declare (ignore x)) nil)"
-    "(defun pathname-device (x) (declare (ignore x)) nil)"
-    "(defun pathname-version (x) (declare (ignore x)) nil)"
+       (cl:make-pathname :host host :device device :directory directory
+                         :name name :type type :version version
+                         :defaults defaults))"
+    "(defun namestring (x) (cl:namestring x))"
+    "(defun truename (x) (cl:truename x))"
+    "(defun probe-file (x) (cl:probe-file x))"
+    "(defun pathname-name (x) (cl:pathname-name x))"
+    "(defun pathname-type (x) (cl:pathname-type x))"
+    "(defun pathname-directory (x) (cl:pathname-directory x))"
+    "(defun pathname-host (x) (cl:pathname-host x))"
+    "(defun pathname-device (x) (cl:pathname-device x))"
+    "(defun pathname-version (x) (cl:pathname-version x))"
     "(defun merge-pathnames (pathname &optional (defaults *default-pathname-defaults*) default-version)
-       (declare (ignore default-version))
-       (let ((p (namestring pathname))
-             (d (namestring defaults)))
-         (if (or (and (> (length p) 0) (string= (subseq p 0 1) \"/\"))
-                 (and (> (length p) 1) (string= (subseq p 1 2) \":\")))
-             p
-             (let* ((slash (%path-last-slash d))
-                    (dir (if (>= slash 0) (subseq d 0 (1+ slash)) \"\")))
-               (concatenate 'string dir p)))))"
+       (cl:merge-pathnames pathname defaults default-version))"
     "(defun enough-namestring (pathname &optional defaults)
-       (declare (ignore defaults))
-       (namestring pathname))"
+       (cl:enough-namestring pathname defaults))"
     "(defun file-namestring (pathname)
-       (let* ((s (namestring pathname))
-              (slash (%path-last-slash s)))
-         (subseq s (1+ slash))))"
+       (cl:file-namestring pathname))"
     "(defun directory-namestring (pathname)
-       (let* ((s (namestring pathname))
-              (slash (%path-last-slash s)))
-         (if (>= slash 0) (subseq s 0 (1+ slash)) \"\")))"
+       (cl:directory-namestring pathname))"
     "(defun wild-pathname-p (pathname &optional field-key)
-       (declare (ignore field-key))
-       (let ((s (namestring pathname)))
-         (or (search \"*\" s) (search \"?\" s))))"
+       (cl:wild-pathname-p pathname field-key))"
     "(defun pathname-match-p (pathname wildcard)
-       (declare (ignore pathname wildcard))
-       nil)"
+       (cl:pathname-match-p pathname wildcard))"
     "(defun translate-pathname (source from-wildcard to-wildcard)
-       (declare (ignore from-wildcard to-wildcard))
-       source)"
+       (cl:translate-pathname source from-wildcard to-wildcard))"
 
     ;; without-package-locks stub
     "(defmacro without-package-locks (&body body) `(progn ,@body))"

@@ -42,6 +42,7 @@
   (endpoint nil :type (or null string))
   (max-samples +rt-continuous-profile-default-max-samples+ :type integer)
   (sampler-thread nil)
+  (sample-ready-semaphore (rt-make-semaphore :name "cl-cc continuous-profile sample-ready" :count 0))
   (trace-id nil :type (or null string))
   (span-id nil :type (or null string))
   (perf-map nil :type list)
@@ -181,6 +182,9 @@
             (rt-profile-sample-count sample))
       (vector-push-extend sample (rt-continuous-profile-session-sample-log session))
       (%rt-profile-trim-samples session)
+      (let ((ready (rt-continuous-profile-session-sample-ready-semaphore session)))
+        (when ready
+          (rt-semaphore-signal ready)))
       key)))
 
 (defun %rt-profile-sample-once (session)
@@ -249,6 +253,11 @@ OpenTelemetry Profiling JSON to OUTPUT (:STDOUT, pathname string, or NIL)."
     (when (eq session *rt-continuous-profile-session*)
       (setf *rt-continuous-profile-session* nil)))
   session)
+
+(defun rt-wait-for-continuous-profile-sample (session &key (timeout 1))
+  "Wait for SESSION to record at least one sample."
+  (let ((ready (and session (rt-continuous-profile-session-sample-ready-semaphore session))))
+    (and ready (rt-semaphore-wait ready :timeout timeout))))
 
 (defun rt-record-profile-sample (stack &key (count 1) (session *rt-continuous-profile-session*)
                                    timestamp-nanos thread-id trace-id span-id)

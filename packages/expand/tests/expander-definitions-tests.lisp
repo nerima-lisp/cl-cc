@@ -25,6 +25,24 @@
       (assert-eq updater (car result))
       (assert-equal '(obj arg value) (cdr result)))))
 
+(deftest expander-defsetf-long-form-uses-full-lambda-list
+  "defsetf long form supports optional and keyword parameters in the place lambda-list."
+  (let ((accessor 'expander-defsetf-long-form-accessor))
+    (cl-cc/expand:compiler-macroexpand-all
+     '(defsetf expander-defsetf-long-form-accessor
+          (&optional (x 1 x-p) &key ((:scale scale) 2 scale-p))
+          (new-value)
+        (list x x-p scale scale-p new-value)))
+    (let* ((result (cl-cc/expand:compiler-macroexpand-all
+                    '(setf (expander-defsetf-long-form-accessor 10 :scale 7)
+                           42)))
+           (printed (format nil "~S" result)))
+      (assert-eq 'let (car result))
+      (assert-true (search "X-P" printed))
+      (assert-true (search "SCALE-P" printed))
+      (assert-true (search "NEW-VALUE" printed))
+      (assert-true (gethash accessor cl-cc/expand::*setf-compound-place-handlers*)))))
+
 (deftest expander-defconstant-populates-constant-table
   "defconstant side-effect: value is stored in *constant-table* for constant folding."
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(defconstant +expander-def-constant+ 42))))

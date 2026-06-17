@@ -420,6 +420,22 @@ sink/fold paths."
     (assert-null (cl-cc/compile:compilation-result-errors result))
     (assert-= 2 (length (cl-cc/compile:compilation-result-ast result)))))
 
+(deftest compile-toplevel-forms-skips-in-package-forms
+  "compile-toplevel-forms ignores leading in-package forms and compiles later forms normally."
+  (let* ((forms-with-package '((in-package :cl-user) (+ 2 3)))
+         (forms-without-package '((+ 2 3)))
+         (result-with-package (cl-cc/compile:compile-toplevel-forms forms-with-package :target :vm))
+         (result-without-package (cl-cc/compile:compile-toplevel-forms forms-without-package :target :vm))
+         (vm-types-with-package (mapcar (lambda (inst) (class-name (class-of inst)))
+                                        (cl-cc/compile:compilation-result-vm-instructions result-with-package)))
+         (vm-types-without-package (mapcar (lambda (inst) (class-name (class-of inst)))
+                                           (cl-cc/compile:compilation-result-vm-instructions result-without-package))))
+    (assert-null (cl-cc/compile:compilation-result-errors result-with-package))
+    (assert-null (cl-cc/compile:compilation-result-errors result-without-package))
+    (assert-= 1 (length (cl-cc/compile:compilation-result-ast result-with-package)))
+    (assert-= 1 (length (cl-cc/compile:compilation-result-ast result-without-package)))
+    (assert-equal vm-types-without-package vm-types-with-package)))
+
 (deftest compile-toplevel-forms-rolls-back-partial-if-emit-on-error
   "FR-506: failed forms do not leave partially emitted jumps or labels behind."
   (let* ((forms '((if t 1 missing-var) (+ 2 3)))

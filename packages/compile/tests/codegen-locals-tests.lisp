@@ -125,6 +125,39 @@
      ctx)
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-closure))))
 
+(deftest codegen-labels-restores-compiler-state-after-compilation
+  "compile-ast on labels restores ctx-env and *labels-boxed-fns* after emission."
+  (let* ((ctx (make-codegen-ctx))
+         (original-env (list (cons 'sentinel-env (cl-cc/compile:make-register ctx))))
+         (original-labels-boxed-fns '((sentinel-boxed-fn . sentinel-entry))))
+    (setf (cl-cc/compile:ctx-env ctx) original-env
+          cl-cc/compile:*labels-boxed-fns* original-labels-boxed-fns)
+    (compile-ast
+     (make-ast-labels
+      :bindings (list (list 'local-id '(x) (make-ast-var :name 'x)))
+      :body (list (make-ast-call :func 'local-id :args (list (make-ast-int :value 1)))))
+     ctx)
+    (assert-equal original-env (cl-cc/compile:ctx-env ctx))
+    (assert-equal original-labels-boxed-fns cl-cc/compile:*labels-boxed-fns*)))
+
+(deftest codegen-labels-restores-compiler-state-for-tail-scc-path
+  "Tail-SCC labels compilation restores ctx-env, *labels-boxed-fns*, and *local-tail-jump-fns*."
+  (let* ((ctx (make-codegen-ctx))
+         (original-env (list (cons 'sentinel-env (cl-cc/compile:make-register ctx))))
+         (original-labels-boxed-fns '((sentinel-boxed-fn . sentinel-entry)))
+         (original-local-tail-jump-fns '((sentinel-tail-fn . sentinel-tail-entry))))
+    (setf (cl-cc/compile:ctx-env ctx) original-env
+          cl-cc/compile:*labels-boxed-fns* original-labels-boxed-fns
+          cl-cc/compile:*local-tail-jump-fns* original-local-tail-jump-fns
+          (cl-cc/compile:ctx-tail-position ctx) t)
+    (compile-ast
+     (%mutual-tail-labels-fixture
+      (make-ast-call :func 'evenp-local :args (list (make-ast-int :value 4))))
+     ctx)
+    (assert-equal original-env (cl-cc/compile:ctx-env ctx))
+    (assert-equal original-labels-boxed-fns cl-cc/compile:*labels-boxed-fns*)
+    (assert-equal original-local-tail-jump-fns cl-cc/compile:*local-tail-jump-fns*)))
+
 ;;; ─── emit-assembly ───────────────────────────────────────────────────────────
 
 (deftest emit-assembly-vm-target-returns-empty-string

@@ -244,6 +244,14 @@ Signals a VM-level error (catchable by handler-case/ignore-errors) if undefined.
   "Return the host operating system version."
   (or (cl:software-version) "unknown"))
 
+(defun short-site-name ()
+  "Return the host short site name used by this VM instance."
+  (or (cl:short-site-name) "unknown"))
+
+(defun long-site-name ()
+  "Return the host long site name used by this VM instance."
+  (or (cl:long-site-name) "unknown"))
+
 (defun %room-state-summary (state stream)
   (let* ((heap (and state (ignore-errors (vm-state-heap state))))
          (globals (and state (ignore-errors (vm-global-vars state))))

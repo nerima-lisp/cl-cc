@@ -73,22 +73,27 @@
       (assert-equal :false (dap-test-get next "success"))
       (assert-true (search "not supported" (dap-test-get next "message") :test #'char=)))))
 
-#+nil (deftest dap-threads-evaluate-disconnect-and-sequencing
-  "FR-761/FR-797: core DAP request sequencing covers threads, evaluate, and disconnect behavior."
+(deftest dap-launch-infers-elisp-language-and-evaluate-uses-it
+  "DAP launch should infer :elisp from .el sources and reuse it for evaluate."
   :timeout 5
-  (let* ((server (cl-cc/tools/dap:make-dap-server :running-p t))
-         (threads (cl-cc/tools/dap:dap-handle-request
-                   server '( ("seq" . 10) ("type" . "request") ("command" . "threads"))))
-         (eval-response (cl-cc/tools/dap:dap-handle-request
-                         server '( ("seq" . 11) ("type" . "request") ("command" . "evaluate")
-                                  ("arguments" . (("expression" . "(+ 20 22)"))))))
-         (disconnect (cl-cc/tools/dap:dap-handle-request
-                      server '( ("seq" . 12) ("type" . "request") ("command" . "disconnect"))))
-         (thread-list (dap-test-get (dap-test-get threads "body") "threads")))
-    (assert-equal 1 (dap-test-get threads "seq"))
-    (assert-equal 10 (dap-test-get threads "request_seq"))
-    (assert-equal 2 (dap-test-get eval-response "seq"))
-    (assert-equal 3 (dap-test-get disconnect "seq"))
-    (assert-equal "main" (dap-test-get (first thread-list) "name"))
-    (assert-output-contains (dap-test-get (dap-test-get eval-response "body") "result") "42")
-    (assert-false (cl-cc/tools/dap:dap-server-running-p server))))
+  (let ((seen-language nil)
+        (orig-run (symbol-function 'cl-cc:run-string-repl)))
+    (unwind-protect
+         (progn
+           (sb-ext:without-package-locks
+             (setf (symbol-function 'cl-cc:run-string-repl)
+                   (lambda (expr &key language &allow-other-keys)
+                     (declare (ignore expr))
+                     (setf seen-language language)
+                     42)))
+           (let ((server (cl-cc/tools/dap:make-dap-server :running-p t)))
+             (cl-cc/tools/dap:dap-handle-request
+              server '(("seq" . 10) ("type" . "request") ("command" . "launch")
+                       ("arguments" . (("program" . "/tmp/sample.el")))))
+             (let ((response (cl-cc/tools/dap:dap-handle-request
+                              server '(("seq" . 11) ("type" . "request") ("command" . "evaluate")
+                                       ("arguments" . (("expression" . "(+ 20 22)")))))))
+               (assert-eq :elisp seen-language)
+               (assert-output-contains (dap-test-get (dap-test-get response "body") "result") "42"))))
+      (sb-ext:without-package-locks
+        (setf (symbol-function 'cl-cc:run-string-repl) orig-run)))))

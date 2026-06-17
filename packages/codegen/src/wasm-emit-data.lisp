@@ -19,50 +19,21 @@ When NIL, wasm tail-call lowering falls back to call_indirect.")
   "Feature gate for Wasm Exception Handling proposal (try/catch/throw).
 FR-204, FR-252, FR-262, FR-271, FR-289, FR-310.")
 
-(defparameter *wasm-typed-refs-enabled* nil
-  "Feature gate for Wasm Typed Function References (call_ref/ref.func).
-FR-212, FR-253. Default NIL to preserve call_indirect compatibility.")
-
-(defparameter *wasm-eh-v2-enabled* t
-  "Feature gate for Wasm Exception Handling v2 (try_table/throw_ref).
-FR-252, FR-271.")
-
-(defparameter *wasm-js-exception-bridge-enabled* t
-  "Feature gate for Wasm JS Exception Bridge (WebAssembly.Exception).
-FR-262.")
-
 (defparameter *wasm-exnref-enabled* t
   "Feature gate for Wasm exnref type (exception references).
 FR-271.")
-
-(defparameter *wasm-gc-exception-payload-enabled* t
-  "Feature gate for GC struct as exception payload.
-FR-289.")
 
 (defparameter *wasm-extended-const-ref-func-enabled* t
   "Feature gate for Extended Const Expressions with ref.func.
 FR-215, FR-291.")
 
-(defparameter *wasm-continuation-exceptions-enabled* t
-  "Feature gate for continuation exception injection (cont.throw).
-FR-301.")
-
-(defparameter *wasm-exception-tag-linking-enabled* t
-  "Feature gate for exception tag import/export across modules.
-FR-310.")
-
 (defparameter *wasm-catch-all-ref-enabled* t
   "Feature gate for catch_all_ref in try_table.
 Catch-all with reference capture.")
 
-(defparameter *wasm-simd-enabled* t
-  "Feature gate for Wasm SIMD128 proposal.
-FR-202, FR-214, FR-278, FR-298, FR-303, FR-304.
-Override: CLCC_WASM_SIMD=1|0")
-
 (defparameter *wasm-relaxed-simd-enabled* t
   "Feature gate for Wasm Relaxed SIMD (fused multiply-add, relaxed min/max).
-FR-214. Requires *wasm-simd-enabled* to be T.
+FR-214. Requires *wasm-simd128-enabled* to be T.
 Override: CLCC_WASM_RELAXED_SIMD=1|0")
 
 (defparameter *wasm-strict-nan* nil
@@ -118,10 +89,6 @@ FR-283.")
   "Feature gate for Wasm GC bulk array operations (array.fill/init_data/init_elem).
 FR-284, FR-281, FR-249.")
 
-(defparameter *wasm-gc-recursive-types-enabled* t
-  "Feature gate for Wasm GC recursive type groups.
-FR-254.")
-
 (defparameter *wasm-gc-null-safety-enabled* t
   "Feature gate for Wasm GC null safety (br_on_null/ref.as_non_null).
 FR-270.")
@@ -129,10 +96,6 @@ FR-270.")
 (defparameter *wasm-multi-value-enabled* nil
   "Feature gate for Wasm Multi-value returns.
   FR-235. Default NIL because this changes the public Wasm ABI.")
-
-(defparameter *wasm-bigint-enabled* nil
-  "Feature gate for JS BigInt ↔ i64 integration.
-FR-236. Default NIL for backward compatibility. Override: CLCC_WASM_BIGINT=1|0")
 
 (defparameter *wasm-bulk-table-enabled* t
   "Feature gate for Wasm Bulk Table Operations (table.init/copy/fill).

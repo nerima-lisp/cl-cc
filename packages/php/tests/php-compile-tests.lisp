@@ -1132,6 +1132,7 @@ consults *php-predefined-constants* and lowers a hit to its literal value."
   (assert-string= "8"       (%php-run-capture "<?php echo PHP_INT_SIZE;"))
   (assert-string= "3.14159" (%php-run-capture "<?php echo round(M_PI,5);"))
   (assert-string= "8.5.0"   (%php-run-capture "<?php echo PHP_VERSION;"))
+  (assert-string= "8.5.0"   (%php-run-capture "<?php echo phpversion();"))
   (assert-string= "2"       (%php-run-capture "<?php echo SORT_STRING;"))
   ;; PHP_EOL is a real newline
   (assert-string= "y" (%php-run-capture "<?php echo PHP_EOL===\"\\n\"?'y':'n';"))

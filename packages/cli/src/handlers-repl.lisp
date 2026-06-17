@@ -89,9 +89,21 @@ inside strings for REPL input balancing."
       (dolist (entry (cl-cc/repl:repl-history))
         (write-line entry out)))))
 
-(defun %repl-inspect (expr)
+(defun %repl-language (parsed watch-file)
+  "Return the REPL language selected by PARSED flags or WATCH-FILE."
+  (%detect-language watch-file (flag parsed "--lang")))
+
+(defun %repl-language-label (language)
+  "Render a user-facing label for LANGUAGE."
+  (ecase language
+    (:lisp "ANSI Common Lisp")
+    (:elisp "Emacs Lisp")
+    (:php "PHP")
+    (:javascript "JavaScript")))
+
+(defun %repl-inspect (expr language)
   "Evaluate EXPR and print object type plus slot/container details."
-  (let ((object (cl-cc:run-string-repl expr)))
+  (let ((object (cl-cc:run-string-repl expr :language language)))
     (format t "Type: ~S~%" (type-of object))
     (cond
       ((hash-table-p object)
@@ -104,10 +116,10 @@ inside strings for REPL input balancing."
        (format t "Value: ~S~%" object)))
     (force-output)))
 
-(defun %repl-describe (expr)
+(defun %repl-describe (expr language)
   "Describe a symbol or evaluated object and print available documentation."
   (let* ((form (read-from-string expr nil nil))
-         (object (if (symbolp form) form (cl-cc:run-string-repl expr))))
+         (object (if (symbolp form) form (cl-cc:run-string-repl expr :language language))))
     (format t "~&~S~%" object)
     (when (symbolp object)
       (dolist (kind '(function variable type))
@@ -120,41 +132,44 @@ inside strings for REPL input balancing."
 (defun %do-repl (parsed)
   "Handle the `cl-cc repl' subcommand using PARSED arguments.
 
-Resets persistent REPL state, optionally preloads the standard library, reads
-balanced forms from *STANDARD-INPUT*, evaluates them through RUN-STRING-REPL,
-prints non-NIL results, and exits cleanly on EOF or quit commands."
+  Resets persistent REPL state, optionally preloads the standard library, reads
+  balanced forms from *STANDARD-INPUT*, evaluates them through RUN-STRING-REPL,
+  prints non-NIL results, and exits cleanly on EOF or quit commands."
   (let ((stdlib (flag parsed "--stdlib"))
         (no-stdlib (flag parsed "--no-stdlib"))
         (timeout (%get-timeout parsed))
         (watch (flag parsed "--watch"))
-        (watch-file (car (parsed-args-positional parsed))))
+        (watch-file (car (parsed-args-positional parsed)))
+        (language (%repl-language parsed (car (parsed-args-positional parsed)))))
     (cl-cc:reset-repl-state)
     (cl-cc:%ensure-repl-state)
     (%initialize-repl-completeness-globals)
     (%load-repl-history-file)
     (when stdlib
-      (handler-case (cl-cc:run-string-repl cl-cc:*standard-library-source*)
+      (handler-case (cl-cc:run-string-repl cl-cc:*standard-library-source*
+                                           :language language)
         (error () nil)))
     (when (and watch watch-file)
       (let ((source (%read-command-source watch-file)))
         (%record-hot-reload-source watch-file source nil)
         (%start-watch-file-poll-thread watch-file cl-cc/repl::*repl-vm-state*)))
-    (format t "CL-CC ~A  —  ANSI Common Lisp~%" *version*)
-    (format t "Type a CL form and press Return. (exit) or Ctrl+D to quit.~%~%")
+    (format t "CL-CC ~A  —  ~A~%" *version* (%repl-language-label language))
+    (format t "Type a form and press Return. (exit) or Ctrl+D to quit.~%~%")
     (force-output)
     (let ((stdlib-loaded-p stdlib))
        (flet ((eval-and-print (form)
               (let* ((*terminal-io* *terminal-io*)
                      (*query-io* *query-io*)
                      (*debug-io* *debug-io*)
-                     (result (handler-case (cl-cc:run-string-repl form)
+                     (result (handler-case (cl-cc:run-string-repl form :language language)
                                (error (e)
                                  (if (or no-stdlib stdlib-loaded-p)
                                      (error e)
                                      (progn
-                                       (cl-cc:run-string-repl cl-cc:*standard-library-source*)
+                                       (cl-cc:run-string-repl cl-cc:*standard-library-source*
+                                                              :language language)
                                        (setf stdlib-loaded-p t)
-                                       (cl-cc:run-string-repl form))))))
+                                       (cl-cc:run-string-repl form :language language))))))
                      (values-list (or (cl-cc/vm:vm-values-list cl-cc/repl::*repl-vm-state*)
                                       (list result))))
                  (%update-repl-completeness-globals form values-list)
@@ -196,11 +211,13 @@ prints non-NIL results, and exits cleanly on EOF or quit commands."
                 (uiop:quit 0))
                ((uiop:string-prefix-p ":inspect " trimmed)
                 (handler-case
-                    (%repl-inspect (string-trim '(#\Space #\Tab) (subseq trimmed 9)))
+                    (%repl-inspect (string-trim '(#\Space #\Tab) (subseq trimmed 9))
+                                   language)
                   (error (e) (format t "; Error: ~A~%" e))))
                ((uiop:string-prefix-p ":describe " trimmed)
                 (handler-case
-                    (%repl-describe (string-trim '(#\Space #\Tab) (subseq trimmed 10)))
+                    (%repl-describe (string-trim '(#\Space #\Tab) (subseq trimmed 10))
+                                    language)
                   (error (e) (format t "; Error: ~A~%" e))))
                (t
                (cl-cc:%repl-record-history trimmed)

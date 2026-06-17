@@ -456,7 +456,7 @@
 
 (defun %php-php-version ()
   "PHP phpversion: return PHP version string."
-  "8.3.0")
+  "8.5.0")
 
 (defun %php-php-int-size ()
   "PHP PHP_INT_SIZE constant."
@@ -846,16 +846,28 @@
 
 ;;; ─── Type / class helpers ─────────────────────────────────────────────────────
 
+(defparameter *php-runtime-class-tags* (make-hash-table :test #'equal))
+
+(defun %php-defined-class-symbol-p (class-name)
+  (let ((sym (find-symbol (string-upcase (%php-stringify class-name)) :cl-cc/php)))
+    (and sym (fboundp sym))))
+
+(defun %php-register-runtime-class-tag (class-name)
+  (setf (gethash (string-upcase (%php-stringify class-name)) *php-runtime-class-tags*) t))
+
+(defun %php-runtime-class-tag-exists-p (class-name)
+  (gethash (string-upcase (%php-stringify class-name)) *php-runtime-class-tags*))
+
 (defun %php-class-exists (class-name &optional autoload)
   "PHP class_exists: check if class is defined."
   (declare (ignore autoload))
-  (let ((sym (find-symbol (string-upcase (%php-stringify class-name)) :cl-cc/php)))
-    (and sym (fboundp sym))))
+  (or (%php-defined-class-symbol-p class-name)
+      (%php-runtime-class-tag-exists-p class-name)))
 
 (defun %php-interface-exists (interface-name &optional autoload)
   "PHP interface_exists: check if interface is defined."
   (declare (ignore autoload))
-  (%php-class-exists interface-name))
+  (%php-defined-class-symbol-p interface-name))
 
 (defun %php-function-exists (function-name)
   "PHP function_exists: check if function is defined."

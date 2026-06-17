@@ -2,7 +2,7 @@
 
 (defpackage :cl-cc/runtime
   (:use :cl)
-  (:shadow #:compute-applicable-methods #:make-hash-table)
+  (:shadow #:make-hash-table)
   (:export
    ;; Tagged pointer constants (3-bit native tag values, used by runtime.lisp / heap.lisp)
    #:+tag-fixnum+ #:+rt-tag-cons+ #:+rt-tag-symbol+ #:+rt-tag-function+
@@ -108,7 +108,7 @@
    #:rt-defclass #:rt-make-instance #:rt-slot-value #:rt-slot-set
    #:rt-slot-boundp #:rt-slot-makunbound #:rt-slot-exists-p
      #:rt-class-name #:rt-class-of #:rt-find-class #:rt-register-method #:rt-call-generic
-     #:rt-compute-applicable-methods #:compute-applicable-methods
+    #:rt-compute-applicable-methods
      #:rt-make-instance-0
      #:*rt-class-registry* #:*rt-generic-function-registry*
     ;; Conditions
@@ -517,6 +517,7 @@
       #:rt-continuous-profile-session-running-p
       #:*rt-continuous-profile-session*
       #:rt-start-continuous-profile #:rt-stop-continuous-profile
+      #:rt-wait-for-continuous-profile-sample
       #:rt-record-profile-sample #:rt-continuous-profile->otel-span
       #:rt-continuous-profile-to-otel-json
       #:rt-continuous-profile-to-pprof-json
@@ -582,13 +583,9 @@
     #:rt-pinned-array-data-pointer #:rt-release-pinned-array
     #:rt-pinned-unboxed-array-buffer-released-p
     ;; ── Self-host portability facades (portable.lisp) ──
-    #:rt-unsupported-operation #:rt-unsupported-operation-name
-    #:rt-unsupported
-    #:rt-current-thread-token
     #:rt-make-lock #:rt-with-lock #:rt-lock #:rt-unlock #:rt-try-lock
     #:rt-thread-yield
-    #:rt-atomic-compare-and-swap-symbol
-    #:rt-getenv #:rt-with-timeout))
+    #:rt-getenv))
 
 (in-package :cl-cc/runtime)
 

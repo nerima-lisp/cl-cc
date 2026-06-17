@@ -176,7 +176,7 @@ existing generic function in the same compilation unit."
                               r)))
             (emit ctx (make-vm-make-obj :dst dst :class-reg class-reg
                                         :initarg-regs initarg-regs))
-            dst))))
+              dst)))))
 
 (defmethod compile-ast ((node ast-slot-value) ctx)
   "Compile slot-value access."
@@ -198,7 +198,7 @@ existing generic function in the same compilation unit."
       (let ((obj-reg (compile-ast obj-ast ctx)))
         (emit ctx (make-vm-slot-read
                    :dst dst :obj-reg obj-reg :slot-name slot-name))
-        dst)))
+          dst))))
 
 (defmethod compile-ast ((node ast-set-slot-value) ctx)
   "Compile (setf (slot-value obj 'slot) value)."
@@ -222,7 +222,7 @@ existing generic function in the same compilation unit."
                    :obj-reg obj-reg
                    :slot-name slot-name
                    :value-reg val-reg))
-        val-reg)))
+          val-reg))))
 
 (defmethod compile-ast ((node ast-set-gethash) ctx)
   "Compile (setf (gethash key table) value)."

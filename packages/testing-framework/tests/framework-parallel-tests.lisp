@@ -10,107 +10,93 @@
   "Serial suites and dependent tests are excluded from the parallel worker batch."
   (let ((serial-suite (gensym "ULW-SERIAL-SUITE-"))
         (parallel-suite (gensym "ULW-PARALLEL-SUITE-")))
-    (unwind-protect
-         (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* serial-suite
-                                (list :name serial-suite :description "tmp" :parent nil :parallel nil
-                                      :before-each '() :after-each '())))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* parallel-suite
-                                (list :name parallel-suite :description "tmp" :parent nil :parallel t
-                                      :before-each '() :after-each '())))
-           (assert-false (%test-parallel-safe-p
-                          (list :name 'serial-test :suite serial-suite :depends-on nil)))
-           (assert-false (%test-parallel-safe-p
-                          (list :name 'dependent-test :suite parallel-suite
-                                :depends-on 'other-test)))
-            (assert-true (%test-parallel-safe-p
-                         (list :name 'parallel-test :suite parallel-suite :depends-on nil))))
-      (setf *suite-registry* (persist-remove *suite-registry* parallel-suite))
-      (setf *suite-registry* (persist-remove *suite-registry* serial-suite)))))
+    (with-restored-binding (*suite-registry*)
+      (with-suite-registry-entry (serial-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel nil)
+        (with-suite-registry-entry (parallel-suite
+                                     :description "tmp"
+                                     :parent nil
+                                     :parallel t)
+          (assert-false (%test-parallel-safe-p
+                         (list :name 'serial-test :suite serial-suite :depends-on nil)))
+          (assert-false (%test-parallel-safe-p
+                         (list :name 'dependent-test :suite parallel-suite
+                               :depends-on 'other-test)))
+          (assert-true (%test-parallel-safe-p
+                        (list :name 'parallel-test :suite parallel-suite :depends-on nil))))))))
 
 (deftest effective-worker-count-falls-back-to-one-for-serial-batches
   "Worker reporting collapses to 1 when no test in the batch may run in parallel."
   (let ((serial-suite (gensym "ULW-SERIAL-SUITE-")))
-    (unwind-protect
-         (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* serial-suite
-                                (list :name serial-suite :description "tmp" :parent nil :parallel nil
-                                      :before-each '() :after-each '())))
-           (assert-= 1
-                     (%effective-worker-count
-                      (list (list :name 'serial-test :suite serial-suite :depends-on nil))
-                      t
-                      4))
-           (assert-= 1
-                     (%effective-worker-count
-                      (list (list :name 'serial-test :suite serial-suite :depends-on nil))
-                      nil
-                      4)))
-      (setf *suite-registry* (persist-remove *suite-registry* serial-suite)))))
+    (with-restored-binding (*suite-registry*)
+      (with-suite-registry-entry (serial-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel nil)
+        (assert-= 1
+                  (%effective-worker-count
+                   (list (list :name 'serial-test :suite serial-suite :depends-on nil))
+                   t
+                   4))
+        (assert-= 1
+                  (%effective-worker-count
+                   (list (list :name 'serial-test :suite serial-suite :depends-on nil))
+                   nil
+                   4))))))
 
 (deftest effective-worker-count-keeps-requested-workers-for-parallel-safe-batches
   "Worker reporting preserves the requested worker count when at least one test can run in parallel."
   (let ((parallel-suite (gensym "ULW-PARALLEL-SUITE-")))
-    (unwind-protect
-         (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* parallel-suite
-                                (list :name parallel-suite :description "tmp" :parent nil :parallel t
-                                      :before-each '() :after-each '())))
-           (assert-= 4
-                     (%effective-worker-count
-                      (list (list :name 'parallel-test :suite parallel-suite :depends-on nil))
-                      t
-                      4))
-            (assert-= 2
-                     (%effective-worker-count
-                      (list (list :name 'parallel-test :suite parallel-suite :depends-on nil))
-                      t
-                      2)))
-      (setf *suite-registry* (persist-remove *suite-registry* parallel-suite)))))
+    (with-restored-binding (*suite-registry*)
+      (with-suite-registry-entry (parallel-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel t)
+        (assert-= 4
+                  (%effective-worker-count
+                   (list (list :name 'parallel-test :suite parallel-suite :depends-on nil))
+                   t
+                   4))
+        (assert-= 2
+                  (%effective-worker-count
+                   (list (list :name 'parallel-test :suite parallel-suite :depends-on nil))
+                   t
+                   2))))))
 
 (deftest run-suite-reports-one-worker-for-serial-only-batch
   "run-suite reports one worker when the selected batch has no parallel-safe tests."
   (let ((root (gensym "ULW-ROOT-"))
         (serial-suite (gensym "ULW-SERIAL-"))
-        (test-name (gensym "ULW-TEST-"))
-        (original-warm-stdlib-cache (symbol-function 'cl-cc::warm-stdlib-cache)))
-    (unwind-protect
-         (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* root
-                                (list :name root :description "tmp" :parent nil :parallel t
-                                      :before-each '() :after-each '())))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* serial-suite
-                                (list :name serial-suite :description "tmp" :parent root :parallel nil
-                                      :before-each '() :after-each '())))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* test-name
-                                (list :name test-name
-                                      :suite serial-suite
-                                      :fn (lambda () t)
-                                      :skip nil
-                                      :xfail nil
-                                      :depends-on nil
-                                      :timeout nil
-                                      :tags nil)))
-           (setf (symbol-function 'cl-cc::warm-stdlib-cache) (lambda () nil))
-           ;; Use quit-p nil so run-suite returns any-fail directly without calling
-           ;; uiop:quit — avoids the need to mock uiop:quit and is immune to the
-           ;; mocked-quit-returns-NIL ambiguity when the killer thread is active.
-           (let ((output (with-output-to-string (s)
-                           (let ((*standard-output* s))
-                             (assert-false
-                              (run-suite root :parallel t :random nil :workers 4 :quit-p nil))))))
-             (assert-true (search "Workers: 1" output))))
-      (setf (symbol-function 'cl-cc::warm-stdlib-cache) original-warm-stdlib-cache)
-      (setf *test-registry* (persist-remove *test-registry* test-name))
-      (setf *suite-registry* (persist-remove *suite-registry* serial-suite))
-      (setf *suite-registry* (persist-remove *suite-registry* root)))))
+        (test-name (gensym "ULW-TEST-")))
+    (with-restored-bindings (*suite-registry*
+                             *test-registry*
+                             ((symbol-function 'cl-cc::warm-stdlib-cache)))
+      (with-fresh-registry-state
+        (with-suite-registry-entry (root
+                                     :description "tmp"
+                                     :parent nil
+                                     :parallel t)
+          (with-suite-registry-entry (serial-suite
+                                       :description "tmp"
+                                       :parent root
+                                       :parallel nil)
+            (with-test-registry-entry (test-name
+                                        :suite serial-suite
+                                        :fn (lambda () t)
+                                        :depends-on nil
+                                        :timeout nil
+                                        :tags nil)
+              (setf (symbol-function 'cl-cc::warm-stdlib-cache) (lambda () nil))
+              ;; Use quit-p nil so run-suite returns any-fail directly without calling
+              ;; uiop:quit — avoids the need to mock uiop:quit and is immune to the
+              ;; mocked-quit-returns-NIL ambiguity when the killer thread is active.
+              (let ((output (with-output-to-string (s)
+                              (let ((*standard-output* s))
+                                (assert-false
+                                 (run-suite root :parallel t :random nil :workers 4 :quit-p nil))))))
+                (assert-string-contains-all output '("Workers: 1"))))))))))
 
 (deftest-each canonical-suite-taxonomy-matches-runner-contract
   "The canonical runner exposes its top-level test classes under the root taxonomy."
@@ -125,38 +111,31 @@
 
 (deftest run-tests-excludes-non-unit-suites-by-default
   "The canonical runner keeps non-fast suites outside the default plan."
-  (let ((captured nil)
-        (saved-suites *suite-registry*))
-    (unwind-protect
-         (progn
-            (setf *suite-registry*
-                  (persist-assoc *suite-registry* 'cl-cc-e2e-suite
-                                 (list :name 'cl-cc-e2e-suite
-                                       :description "tmp"
-                                       :parent 'cl-cc-suite
-                                       :parallel nil
-                                      :before-each '()
-                                      :after-each '())))
-           (with-replaced-function (run-suite
-                                    (lambda (suite-name &key parallel random warm-stdlib tags exclude-tags exclude-suites filter &allow-other-keys)
-                                      (setf captured (list :suite-name suite-name
-                                                           :parallel parallel
-                                                           :random random
-                                                           :warm-stdlib warm-stdlib
-                                                           :tags tags
-                                                           :exclude-tags exclude-tags
-                                                           :exclude-suites exclude-suites
-                                                           :filter filter))
-                                      0))
-              (assert-equal 0 (run-tests :parallel nil :random nil :filter "static"))
-              (assert-eq 'cl-cc-suite (getf captured :suite-name))
-              (assert-string= "static" (getf captured :filter))
-              (assert-true (getf captured :warm-stdlib))
-              (assert-true (member 'cl-cc-integration-suite (getf captured :exclude-suites)))
-              (assert-true (member 'cl-cc-e2e-suite (getf captured :exclude-suites)))
-              (assert-true (member 'cl-cc-conformance-suite (getf captured :exclude-suites)))
-              (assert-true (member 'cl-cc-documentation-suite (getf captured :exclude-suites)))))
-      (setf *suite-registry* saved-suites))))
+  (let ((captured nil))
+    (with-restored-bindings (*suite-registry*)
+      (with-suite-registry-entry (cl-cc-e2e-suite
+                                   :description "tmp"
+                                   :parent 'cl-cc-suite
+                                   :parallel nil)
+        (with-replaced-function (run-suite
+                                 (lambda (suite-name &key parallel random warm-stdlib tags exclude-tags exclude-suites filter &allow-other-keys)
+                                   (setf captured (list :suite-name suite-name
+                                                        :parallel parallel
+                                                        :random random
+                                                        :warm-stdlib warm-stdlib
+                                                        :tags tags
+                                                        :exclude-tags exclude-tags
+                                                        :exclude-suites exclude-suites
+                                                        :filter filter))
+                                   0))
+          (assert-equal 0 (run-tests :parallel nil :random nil :filter "static"))
+          (assert-eq 'cl-cc-suite (getf captured :suite-name))
+          (assert-string= "static" (getf captured :filter))
+          (assert-true (getf captured :warm-stdlib))
+          (assert-true (member 'cl-cc-integration-suite (getf captured :exclude-suites)))
+          (assert-true (member 'cl-cc-e2e-suite (getf captured :exclude-suites)))
+          (assert-true (member 'cl-cc-conformance-suite (getf captured :exclude-suites)))
+          (assert-true (member 'cl-cc-documentation-suite (getf captured :exclude-suites))))))))
 
 (deftest run-tests-forwards-warm-stdlib-option
   "run-tests lets the Nix app skip pre-warming for focused non-stdlib runs."
@@ -193,24 +172,21 @@
 (deftest run-tests-does-not-load-e2e-system-implicitly
   "run-tests only dispatches the already-loaded fast suite taxonomy."
   (let ((loaded nil)
-        (run-called nil)
-        (saved-suites *suite-registry*))
-    (unwind-protect
-         (progn
-            (setf *suite-registry* (persist-remove *suite-registry* 'cl-cc-e2e-suite))
-            (with-replaced-function (asdf:load-system
-                                     (lambda (system &key &allow-other-keys)
-                                       (setf loaded system)
-                                      0))
-             (with-replaced-function (run-suite
-                                      (lambda (&rest args)
-                                        (declare (ignore args))
-                                         (setf run-called t)
-                                         0))
-                (assert-equal 0 (run-tests :parallel nil :random nil))
-                (assert-null loaded)
-                (assert-true run-called))))
-      (setf *suite-registry* saved-suites))))
+        (run-called nil))
+    (with-restored-bindings (*suite-registry*)
+      (setf *suite-registry* (persist-remove *suite-registry* 'cl-cc-e2e-suite))
+      (with-replaced-function (asdf:load-system
+                               (lambda (system &key &allow-other-keys)
+                                 (setf loaded system)
+                                 0))
+        (with-replaced-function (run-suite
+                                 (lambda (&rest args)
+                                   (declare (ignore args))
+                                   (setf run-called t)
+                                   0))
+          (assert-equal 0 (run-tests :parallel nil :random nil))
+          (assert-null loaded)
+          (assert-true run-called))))))
 
 (deftest fast-plan-filter-is-name-independent
   "Fast-plan selection is based on suite taxonomy, not a slow-name convention."
@@ -234,9 +210,9 @@
                          (list (list :name 'sometimes :status :fail)
                                (list :name 'always :status :pass)))
                    2)
-    (let ((output (get-output-stream-string *standard-output*)))
-      (assert-true (search "Flaky tests detected" output))
-      (assert-true (search "SOMETIMES" (string-upcase output))))))
+      (let ((output (get-output-stream-string *standard-output*)))
+        (assert-string-contains-all output '("Flaky tests detected"))
+        (assert-string-contains-all (string-upcase output) '("SOMETIMES")))))
 
 (deftest detect-flaky-is-silent-for-consistent-results
   "%detect-flaky emits nothing when every test is consistently pass or fail."
@@ -255,16 +231,21 @@
   (let* ((stop-flag nil)
          (lock (sb-thread:make-mutex :name "hb-test-lock"))
          (started 0)
+         (started-sem (sb-thread:make-semaphore :count 0))
+         (stop-sem (sb-thread:make-semaphore :count 0))
          (interval-original *heartbeat-interval-seconds*))
     (let ((*heartbeat-interval-seconds* 1))
-      (sb-thread:with-mutex (lock) (setf stop-flag t))
       (let ((th (sb-thread:make-thread
                  (lambda ()
                    (incf started)
+                   (sb-thread:signal-semaphore started-sem)
                    (loop
                      (when (sb-thread:with-mutex (lock) stop-flag) (return))
-                     (sleep *heartbeat-interval-seconds*)))
-                 :name "hb-mock")))
+                     (sb-thread:wait-on-semaphore stop-sem)))
+                   :name "hb-mock")))
+        (assert-true (sb-thread:wait-on-semaphore started-sem :timeout 1))
+        (sb-thread:with-mutex (lock) (setf stop-flag t))
+        (sb-thread:signal-semaphore stop-sem)
         (assert-true (%thread-joined-p th 5))
         (assert-eql 1 started)))
     (assert-eql interval-original *heartbeat-interval-seconds*)))
@@ -285,11 +266,13 @@
                         12 5 100 4 '(test-a test-b))
                 (finish-output *error-output*))))
          (line (string-trim '(#\Newline) s)))
-    (assert-true (search "# heartbeat:" line))
-    (assert-true (search "t=12s" line))
-    (assert-true (search "done=5/100" line))
-    (assert-true (search "workers=4" line))
-    (assert-true (search "inflight=" line))))
+    (assert-string-contains-all
+     line
+     '("# heartbeat:"
+       "t=12s"
+       "done=5/100"
+       "workers=4"
+       "inflight="))))
 
 ;;; ── Watchdog escalation (T-3) ──────────────────────────────────────────
 
@@ -363,23 +346,21 @@
             lock
             (make-escalation :worker-idx 0 :epoch 7 :deadline past))))
 
+(defun %make-parallel-blocked-test (name timeout)
+  (let ((blocker (sb-thread:make-semaphore :count 0)))
+    (list :name name
+          :fn (lambda () (sb-thread:wait-on-semaphore blocker))
+          :suite 'runner-regression-suite
+          :timeout timeout
+          :depends-on nil
+          :tags nil
+          :number 1)))
+
 (defun %make-parallel-timeout-demo-test ()
-  (list :name 'parallel-timeout-demo
-        :fn (lambda () (sleep 0.1))
-        :suite 'runner-regression-suite
-        :timeout 0.02
-        :depends-on nil
-        :tags nil
-        :number 1))
+  (%make-parallel-blocked-test 'parallel-timeout-demo 0.02))
 
 (defun %make-parallel-hung-suite-demo-test ()
-  (list :name 'parallel-hung-suite-demo
-        :fn (lambda () (loop (sleep 1)))
-        :suite 'runner-regression-suite
-        :timeout 5
-        :depends-on nil
-        :tags nil
-        :number 1))
+  (%make-parallel-blocked-test 'parallel-hung-suite-demo 5))
 
 (deftest check-escalations-triggers-exit-fn-when-epoch-matches-and-deadline-passed
   "%check-escalations fires *watchdog-exit-fn* when deadline has passed and epoch still matches."
@@ -413,63 +394,52 @@
 
 (deftest run-tests-parallel-timeout-does-not-escalate-after-worker-finishes
   "%run-tests-parallel stops the watchdog cleanly once a timed-out worker has already returned a failure result."
-  (let ((captured nil)
-         (saved-exit-fn *watchdog-exit-fn*)
-         (saved-kill-grace *kill-grace-seconds*)
-         (saved-heartbeat *heartbeat-interval-seconds*)
-         (saved-watchdog-poll *watchdog-poll-seconds*))
-    (unwind-protect
-         (progn
-            (setf *watchdog-exit-fn* (lambda (&key code &allow-other-keys)
-                                       (setf captured code))
-                  *kill-grace-seconds* 0.01
-                  *heartbeat-interval-seconds* 0
-                  *watchdog-poll-seconds* 0.01)
-            (with-replaced-function (%tap-print-result
-                                     (lambda (&rest args)
-                                       (declare (ignore args))
-                                       nil))
-              (let ((*error-output* (make-string-output-stream)))
-                (let ((results (%run-tests-parallel (list (%make-parallel-timeout-demo-test)) 1)))
-                  (assert-eq :fail (getf (first results) :status))
-                  (assert-true (search "timeout after 0.02 seconds"
-                                       (getf (first results) :detail)))
-                  (assert-null captured)))))
-      (setf *watchdog-exit-fn* saved-exit-fn
-            *kill-grace-seconds* saved-kill-grace
-            *heartbeat-interval-seconds* saved-heartbeat
-            *watchdog-poll-seconds* saved-watchdog-poll))))
+  (let ((captured nil))
+    (with-restored-bindings (*watchdog-exit-fn*
+                             *kill-grace-seconds*
+                             *heartbeat-interval-seconds*
+                             *watchdog-poll-seconds*)
+      (setf *watchdog-exit-fn* (lambda (&key code &allow-other-keys)
+                                 (setf captured code))
+            *kill-grace-seconds* 0.01
+            *heartbeat-interval-seconds* 0
+            *watchdog-poll-seconds* 0.01)
+      (with-replaced-function (%tap-print-result
+                               (lambda (&rest args)
+                                 (declare (ignore args))
+                                 nil))
+        (let ((*error-output* (make-string-output-stream)))
+          (let ((results (%run-tests-parallel (list (%make-parallel-timeout-demo-test)) 1)))
+            (assert-eq :fail (getf (first results) :status))
+            (assert-string-contains-all
+             (getf (first results) :detail)
+             '("timeout after 0.02 seconds"))
+            (assert-null captured)))))))
 
 (deftest run-tests-parallel-suite-deadline-terminates-hung-worker
   "%run-tests-parallel converts a stuck worker join into sb-ext:timeout when the suite deadline has passed."
   (let ((captured nil)
-        (timed-out nil)
-        (saved-exit-fn *watchdog-exit-fn*)
-        (saved-kill-grace *kill-grace-seconds*)
-        (saved-heartbeat *heartbeat-interval-seconds*)
-        (saved-watchdog-poll *watchdog-poll-seconds*))
-    (unwind-protect
-         (progn
-           (setf *watchdog-exit-fn* (lambda (&key code &allow-other-keys)
-                                      (setf captured code))
-                 *kill-grace-seconds* 0.01
-                 *heartbeat-interval-seconds* 0
-                 *watchdog-poll-seconds* 0.01)
-           (with-replaced-function (%tap-print-result
-                                    (lambda (&rest args)
-                                      (declare (ignore args))
-                                      nil))
-             (let ((*parallel-suite-deadline*
-                     (+ (get-internal-real-time)
-                        (round (* 0.05 internal-time-units-per-second))))
-                   (*error-output* (make-string-output-stream)))
-               (handler-case
-                   (%run-tests-parallel (list (%make-parallel-hung-suite-demo-test)) 1)
-                 (sb-ext:timeout ()
-                   (setf timed-out t)))))
-           (assert-true timed-out)
-           (assert-null captured))
-      (setf *watchdog-exit-fn* saved-exit-fn
-            *kill-grace-seconds* saved-kill-grace
-            *heartbeat-interval-seconds* saved-heartbeat
-            *watchdog-poll-seconds* saved-watchdog-poll))))
+        (timed-out nil))
+    (with-restored-bindings (*watchdog-exit-fn*
+                             *kill-grace-seconds*
+                             *heartbeat-interval-seconds*
+                             *watchdog-poll-seconds*)
+      (setf *watchdog-exit-fn* (lambda (&key code &allow-other-keys)
+                                 (setf captured code))
+            *kill-grace-seconds* 0.01
+            *heartbeat-interval-seconds* 0
+            *watchdog-poll-seconds* 0.01)
+      (with-replaced-function (%tap-print-result
+                               (lambda (&rest args)
+                                 (declare (ignore args))
+                                 nil))
+        (let ((*parallel-suite-deadline*
+                (+ (get-internal-real-time)
+                   (round (* 0.05 internal-time-units-per-second))))
+              (*error-output* (make-string-output-stream)))
+          (handler-case
+              (%run-tests-parallel (list (%make-parallel-hung-suite-demo-test)) 1)
+            (sb-ext:timeout ()
+              (setf timed-out t)))))
+      (assert-true timed-out)
+      (assert-null captured))))

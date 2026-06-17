@@ -3,7 +3,7 @@
 ;;;; Subcommands:
 ;;;;   run     <file> [--lang lisp|elisp|php|js|javascript] [--stdlib] [--verbose]
 ;;;;   compile <file> [-o out] [--arch x86-64|arm64] [--lang lisp|elisp|php|js|javascript] [--verbose]
-;;;;   eval    <expr> [--stdlib] [--verbose]
+;;;;   eval    <expr> [--lang lisp|elisp|php|js|javascript] [--stdlib] [--verbose]
 ;;;;   check   <file> [--lang lisp|elisp|php|js|javascript] [--strict] [--verbose]
 ;;;;   selfhost [file] [--profile]
 ;;;;   help    [command]
@@ -25,7 +25,7 @@ Commands:
   compile  <file>         Compile to native binary
   save-core <file>        Save a CL-CC native core image
   eval     <expr>         Evaluate an expression inline
-  repl                    Start interactive REPL
+  repl                    Start interactive REPL (use --lang to select language)
   check    <file>         Type-check only, no execution
   selfhost [file]         Run the self-hosting profile workload
   symbols  [path]         Index workspace symbols; use --fuzzy <query>
@@ -211,6 +211,7 @@ Options:
   Evaluate a CL-CC expression and print the result.
 
 Options:
+  --lang lisp|elisp|php|js|javascript Select eval language
   --stdlib   Eagerly prepend standard library
   --no-stdlib Disable lazy stdlib auto-require
   --opt-remarks <mode>  Print optimizer remarks: all, changed, missed
@@ -235,13 +236,14 @@ Options:
  ")
     ("repl" . "Usage: cl-cc repl [options]
 
-  Start an interactive ANSI Common Lisp REPL.
+  Start an interactive REPL.
   Definitions persist across expressions within the session.
-  ANSI REPL variables *, **, ***, +, ++, +++, /, //, /// are maintained.
+  REPL variables *, **, ***, +, ++, +++, /, //, /// are maintained.
 
 Options:
   --stdlib   Prepend standard library on startup
   --no-stdlib Disable lazy stdlib auto-require
+  --lang lisp|elisp|php|js|javascript Select REPL language
   --timeout <seconds>     Per-form execution timeout (default: 30 seconds)
   --no-timeout            Disable REPL form timeout for debugging
 

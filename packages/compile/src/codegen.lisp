@@ -1,6 +1,7 @@
 (in-package :cl-cc/compile)
 
 (declaim (special cl-cc/target:*x86-64-target*))
+(declaim (special *load-time-value-cells*))
 ;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;; Codegen — Entry Points + Calls + Exception Handling + Multiple Values
 ;;;
@@ -183,27 +184,24 @@ Returns the inferred type, or NIL on failure (structured warning recorded unless
                                    :error-code "W0002")
             nil)))))
 
-(defun %extend-type-env-for-defvar (ast type-env best-effort-type)
-  "If AST is a defvar with an initializer, extend TYPE-ENV with its inferred type."
-  (if (and (typep ast 'ast-defvar) (ast-defvar-value ast))
-      (let ((value-type (funcall best-effort-type (ast-defvar-value ast) type-env)))
-        (if value-type
-            (type-env-extend (ast-defvar-name ast)
-                                        (type-to-scheme value-type)
-                                        type-env)
-            type-env))
-      type-env))
-
-(defun %extend-type-env-for-defun (ast type-env best-effort-type)
-  "If AST is a defun, extend TYPE-ENV with its inferred function type."
-  (if (typep ast 'ast-defun)
-      (let ((fn-type (funcall best-effort-type ast type-env)))
-        (if fn-type
-            (type-env-extend (ast-defun-name ast)
-                                        (type-to-scheme fn-type)
-                                        type-env)
-            type-env))
-      type-env))
+(defun %extend-type-env-for-top-level-form (ast type-env best-effort-type)
+  "Extend TYPE-ENV for top-level AST forms that expose a type-bearing binding."
+  (labels ((%extend-if-typed (binding-name type)
+             (if type
+                 (type-env-extend binding-name (type-to-scheme type) type-env)
+                 type-env)))
+    (cond
+      ((typep ast 'ast-defvar)
+       (let ((value (ast-defvar-value ast)))
+         (if value
+             (%extend-if-typed (ast-defvar-name ast)
+                               (funcall best-effort-type value type-env))
+             type-env)))
+      ((typep ast 'ast-defun)
+       (%extend-if-typed (ast-defun-name ast)
+                         (funcall best-effort-type ast type-env)))
+      (t
+       type-env))))
 
 (defun %maybe-extend-ct-value-env (ast)
   "If AST is a defvar with a statically evaluable initializer, push it onto
@@ -340,6 +338,13 @@ Returns a compilation-result or NIL when AST should stay on the direct path."
                   (lower-sexp-to-ast expanded))))
     (optimize-ast ast)))
 
+(defun %declare-form-forward-references (form ctx)
+  "Declare any forward references found in FORM and return T when handled."
+  (let ((forward-reference-names (%forward-reference-names-from-form form)))
+    (when forward-reference-names
+      (%declare-forward-references-in-context forward-reference-names ctx)
+      t)))
+
 (defun %update-toplevel-type-state (ctx ast type-env type-check best-effort-type)
   "Return updated type metadata after visiting AST as a top-level form.
 Values: inferred-type, updated-type-env."
@@ -347,8 +352,7 @@ Values: inferred-type, updated-type-env."
         (next-type-env type-env))
     (when type-check
       (setf last-type (%type-check-form ctx ast type-env type-check)))
-    (setf next-type-env (%extend-type-env-for-defvar ast next-type-env best-effort-type))
-    (setf next-type-env (%extend-type-env-for-defun ast next-type-env best-effort-type))
+    (setf next-type-env (%extend-type-env-for-top-level-form ast next-type-env best-effort-type))
     (values last-type next-type-env)))
 
 (defun %compile-toplevel-ast-into-context (ast ctx target type-check opts)
@@ -370,6 +374,78 @@ Returns two values: result register and CPS form used for the AST."
                    (compilation-result-program cps-result))
                   last-cps))
         (values (compile-ast ast ctx) last-cps))))
+
+(defun %prepare-toplevel-ast-for-compilation (ast ctx safety opts)
+  "Apply AST side effects that must happen before type tracking and codegen."
+  (setf (ctx-safety ctx) (or (%global-optimize-quality 'safety) safety))
+  (%maybe-bump-opts-speed-from-ast opts ast)
+  (when (typep ast 'ast-defvar)
+    (setf (gethash (ast-defvar-name ast) (ctx-global-variables ctx)) t))
+  (let ((forward-names (%ast-forward-reference-names ast)))
+    (when forward-names
+      (%declare-forward-references-in-context forward-names ctx)))
+  (when (typep ast 'ast-defun)
+    (push (cons (ast-defun-name ast) ast) *compile-time-function-env*))
+  t)
+
+(defun %update-toplevel-compilation-state (ast ctx type-env type-check compiled-asts)
+  "Update type state and bookkeeping for a compiled top-level AST."
+  (push ast compiled-asts)
+  (multiple-value-bind (last-type updated-type-env)
+      (%update-toplevel-type-state ctx ast type-env type-check
+                                   (lambda (a e) (ignore-errors (type-check-ast a e))))
+    (setf (ctx-type-env ctx) updated-type-env)
+    (%maybe-extend-ct-value-env ast)
+    (values last-type updated-type-env compiled-asts)))
+
+(defmacro %with-toplevel-compilation-dynamic-env
+    ((werror werror-categories) &body body)
+  "Bind the dynamic state required while compiling top-level forms."
+  `(let ((*compile-time-value-env* nil)
+         (*compile-time-function-env* nil)
+         (*pending-exception-table-entries* nil)
+         (*next-exception-table-entry-order* 0)
+         (*forward-reference-patch-table* (make-hash-table :test #'equal))
+         (*forward-declared-functions* nil)
+         (*unresolved-forward-refs* nil)
+         (*load-time-value-cells* nil)
+         (*next-load-time-value-cell-id* 0)
+         (cl-cc/parse:*werror-p* ,werror)
+         (cl-cc/parse:*werror-categories*
+           (mapcar (lambda (category) (string-downcase (string category)))
+                   ,werror-categories)))
+     (declare (special *compile-time-value-env*
+                       *compile-time-function-env*
+                       *pending-exception-table-entries*
+                       *next-exception-table-entry-order*
+                       *forward-reference-patch-table*
+                       *forward-declared-functions*
+                       *unresolved-forward-refs*
+                       *load-time-value-cells*
+                       *next-load-time-value-cell-id*))
+     ,@body))
+
+(defun %toplevel-compilation-boundary-form-p (form)
+  "Return true when FORM marks a compilation boundary that should be skipped."
+  (and (consp form)
+       (eq (car form) 'in-package)))
+
+(defmacro %with-toplevel-form-compilation-recovery
+    ((ctx opts form form-index errors string-literal-pool-snapshot) &body body)
+  "Run BODY with per-form recovery state and restore it if BODY signals an error."
+  `(let ((snapshot (%snapshot-toplevel-compilation-state ,ctx ,opts))
+         (,string-literal-pool-snapshot
+           (%copy-string-literal-pool *string-literal-pool*)))
+     (handler-case
+         (progn ,@body)
+       (error (e)
+         (setf ,opts (%restore-toplevel-compilation-state ,ctx snapshot))
+         (setf *string-literal-pool* ,string-literal-pool-snapshot)
+         (push (list :form-index ,form-index
+                     :form ,form
+                     :condition e
+                     :message (princ-to-string e))
+               ,errors)))))
 
 (defmethod compile-ast ((node ast-handler-case) ctx)
   "Compile handler-case with a PC→handler side table instead of push/pop ops."
@@ -420,31 +496,16 @@ Returns two values: result register and CPS form used for the AST."
 (defun %process-toplevel-form (form ctx target type-env type-check safety opts compiled-asts)
   "Compile one top-level FORM and return updated compilation state.
 Values: last-reg, last-type, last-cps, updated-type-env, updated-compiled-asts."
-  (let ((forward-reference-names (%forward-reference-names-from-form form)))
-    (when forward-reference-names
-      (%declare-forward-references-in-context forward-reference-names ctx)
-      (return-from %process-toplevel-form
-        (values nil nil nil type-env compiled-asts))))
-  (let* ((ast (%lower-toplevel-form-to-ast form))
-          (last-reg nil) (last-type nil) (last-cps nil))
-     (setf (ctx-safety ctx) (or (%global-optimize-quality 'safety) safety))
-     (%maybe-bump-opts-speed-from-ast opts ast)
-    (when (typep ast 'ast-defvar)
-      (setf (gethash (ast-defvar-name ast) (ctx-global-variables ctx)) t))
-    (let ((forward-names (%ast-forward-reference-names ast)))
-      (when forward-names
-        (%declare-forward-references-in-context forward-names ctx)))
-    (when (typep ast 'ast-defun)
-      (push (cons (ast-defun-name ast) ast) *compile-time-function-env*))
-    (push ast compiled-asts)
-    (multiple-value-setq (last-type type-env)
-      (%update-toplevel-type-state ctx ast type-env type-check
-                                   (lambda (a e) (ignore-errors (type-check-ast a e)))))
-    (setf (ctx-type-env ctx) type-env)
-     (%maybe-extend-ct-value-env ast)
-     (multiple-value-setq (last-reg last-cps)
-       (%compile-toplevel-ast-into-context ast ctx target type-check opts))
-     (values last-reg last-type last-cps type-env compiled-asts)))
+  (when (%declare-form-forward-references form ctx)
+    (return-from %process-toplevel-form
+      (values nil nil nil type-env compiled-asts)))
+  (let ((ast (%lower-toplevel-form-to-ast form)))
+    (%prepare-toplevel-ast-for-compilation ast ctx safety opts)
+    (multiple-value-bind (last-type updated-type-env updated-compiled-asts)
+        (%update-toplevel-compilation-state ast ctx type-env type-check compiled-asts)
+      (multiple-value-bind (last-reg last-cps)
+          (%compile-toplevel-ast-into-context ast ctx target type-check opts)
+        (values last-reg last-type last-cps updated-type-env updated-compiled-asts)))))
 
 (defun %maybe-signal-strict-no-alloc-error (errors opts)
   (when (getf opts :strict-no-alloc)
@@ -495,32 +556,60 @@ Returns :internal when all conventions are :internal; :external otherwise."
                                                        (or optimized instructions))
                                     :result-register last-reg
                                     :leaf-p          leaf-p
-                                     :calling-convention program-convention
-                                     :function-conventions function-conventions
-                                      :deopt-info deopt-info
-                                      :osr-entry-points osr-entry-points
-                                      :load-time-value-cells (nreverse (copy-list *load-time-value-cells*))
-                                      :compilation-tier compilation-tier))
+                                    :calling-convention program-convention
+                                    :function-conventions function-conventions
+                                    :deopt-info deopt-info
+                                    :osr-entry-points osr-entry-points
+                                    :load-time-value-cells (nreverse (copy-list *load-time-value-cells*))
+                                    :compilation-tier compilation-tier))
     (cl-cc/vm::vm-register-program-exception-table
      program
      (%build-exception-table (vm-program-instructions program)))
-    (multiple-value-bind (warnings promoted-errors)
-        (%diagnostics-after-werror (nreverse (ctx-diagnostics ctx)) opts)
-      (let ((compiled-ast-list (nreverse compiled-asts)))
-        (make-compilation-result :program                program
-                               :assembly               (emit-assembly program :target target)
-                               :globals                (ctx-global-functions ctx)
-                               :type                   last-type
-                               :type-env               (ctx-type-env ctx)
-                                :cps                    last-cps
-                                :ast                    compiled-ast-list
-                                 :vm-instructions        instructions
-                                 :optimized-instructions optimized
-                                 :branch-probability-hints (mapcan #'%ast-branch-probability-hints (copy-list compiled-ast-list))
-                                 :code-placement-hints (mapcan #'%ast-code-placement-hints (copy-list compiled-ast-list))
-                                 :warnings               warnings
-                                 :errors                 (append (nreverse errors) promoted-errors))))))
+    (%build-toplevel-compilation-result ctx target program instructions optimized
+                                        last-type last-cps compiled-asts opts errors)))
 
+(defun %build-toplevel-compilation-result (ctx target program instructions optimized last-type last-cps
+                                              compiled-asts opts errors)
+  "Build the final compilation result from the accumulated top-level state."
+  (multiple-value-bind (warnings promoted-errors)
+      (%diagnostics-after-werror (nreverse (ctx-diagnostics ctx)) opts)
+    (let ((compiled-ast-list (nreverse compiled-asts)))
+      (make-compilation-result :program                  program
+                               :assembly                 (emit-assembly program :target target)
+                               :globals                  (ctx-global-functions ctx)
+                               :type                     last-type
+                               :type-env                 (ctx-type-env ctx)
+                               :cps                      last-cps
+                               :ast                      compiled-ast-list
+                               :vm-instructions          instructions
+                               :optimized-instructions   optimized
+                               :branch-probability-hints (mapcan #'%ast-branch-probability-hints
+                                                                 (copy-list compiled-ast-list))
+                               :code-placement-hints     (mapcan #'%ast-code-placement-hints
+                                                                 (copy-list compiled-ast-list))
+                               :warnings                 warnings
+                               :errors                   (append (nreverse errors) promoted-errors)))))
+
+
+(defun %compile-toplevel-forms-core (forms ctx target type-check safety opts werror werror-categories)
+  "Compile FORMS with per-form recovery and return the accumulated top-level state."
+  (let ((last-reg      nil)
+        (last-type     nil)
+        (last-cps      nil)
+        (compiled-asts nil)
+        (errors        nil)
+        (type-env      (type-env-empty)))
+    (%with-toplevel-compilation-dynamic-env (werror werror-categories)
+      (loop for form in forms
+            for form-index from 0
+            do (unless (%toplevel-compilation-boundary-form-p form)
+                 (%with-toplevel-form-compilation-recovery
+                     (ctx opts form form-index errors string-literal-pool-snapshot)
+                   (multiple-value-setq (last-reg last-type last-cps type-env compiled-asts)
+                     (%process-toplevel-form form ctx target type-env type-check safety opts compiled-asts)))))
+      (setf (ctx-type-env ctx) type-env)
+      (resolve-forward-references (ctx-global-functions ctx) :errorp t)
+      (values last-reg last-type last-cps compiled-asts errors))))
 
 (defun compile-toplevel-forms (forms &key (target :x86_64) type-check (safety 1)
                                           speed (inline-threshold-scale 1)
@@ -537,61 +626,25 @@ Security-mitigation keywords (:retpoline :spectre-mitigations :stack-protector
 :shadow-stack :asan :msan :tsan :ubsan :hwasan) are accepted via &allow-other-keys and ignored."
   (declare (ignore coverage verify-transforms))
   (let ((ctx           (make-instance 'compiler-context :safety safety :target target))
-        (last-reg      nil)
-        (last-type     nil)
-        (last-cps      nil)
-        (compiled-asts nil)
-        (errors        nil)
         (*string-literal-pool* (make-hash-table :test #'equal))
-         (type-env      (type-env-empty))
-         (opts          (%make-compile-opts :pass-pipeline pass-pipeline
-                                              :speed speed
-                                              :opt-bisect-limit opt-bisect-limit
-                                              :inline-threshold-scale inline-threshold-scale
-                                              :block-compile block-compile
-                                            :print-pass-timings print-pass-timings
-                                          :timing-stream timing-stream
-                                          :print-opt-remarks print-opt-remarks
-                                          :opt-remarks-stream opt-remarks-stream
+        (opts          (%make-compile-opts :pass-pipeline pass-pipeline
+                                           :speed speed
+                                           :opt-bisect-limit opt-bisect-limit
+                                           :inline-threshold-scale inline-threshold-scale
+                                           :block-compile block-compile
+                                           :print-pass-timings print-pass-timings
+                                           :timing-stream timing-stream
+                                           :print-opt-remarks print-opt-remarks
+                                           :opt-remarks-stream opt-remarks-stream
                                            :opt-remarks-mode opt-remarks-mode
-                                             :print-pass-stats print-pass-stats
-                                             :stats-stream stats-stream
-                                             :trace-json-stream trace-json-stream
-                                             :werror werror
-                                             :werror-categories werror-categories)))
-    (let ((*compile-time-value-env*    nil)
-           (*compile-time-function-env* nil)
-            (*pending-exception-table-entries* nil)
-             (*next-exception-table-entry-order* 0)
-             (*forward-reference-patch-table* (make-hash-table :test #'equal))
-             (*forward-declared-functions* nil)
-             (*unresolved-forward-refs* nil)
-             (*load-time-value-cells* nil)
-             (*next-load-time-value-cell-id* 0)
-             (cl-cc/parse:*werror-p* werror)
-             (cl-cc/parse:*werror-categories*
-               (mapcar (lambda (category) (string-downcase (string category)))
-                       werror-categories)))
-       (loop for form in forms
-             for form-index from 0
-             do (unless (and (consp form) (eq (car form) 'in-package))
-                   (let ((snapshot (%snapshot-toplevel-compilation-state ctx opts))
-                         (string-literal-pool-snapshot
-                           (%copy-string-literal-pool *string-literal-pool*)))
-                     (handler-case
-                         (multiple-value-setq (last-reg last-type last-cps type-env compiled-asts)
-                           (%process-toplevel-form form ctx target type-env type-check safety opts compiled-asts))
-                       (error (e)
-                         (setf opts (%restore-toplevel-compilation-state ctx snapshot))
-                          (setf *string-literal-pool* string-literal-pool-snapshot)
-                         (push (list :form-index form-index
-                                     :form form
-                                     :condition e
-                                     :message (princ-to-string e))
-                               errors))))))
-       (setf (ctx-type-env ctx) type-env)
-        (resolve-forward-references (ctx-global-functions ctx) :errorp t)
-          (%finalize-toplevel-compilation ctx target last-reg last-type last-cps compiled-asts opts errors compilation-tier))))
+                                           :print-pass-stats print-pass-stats
+                                           :stats-stream stats-stream
+                                           :trace-json-stream trace-json-stream
+                                           :werror werror
+                                           :werror-categories werror-categories)))
+    (multiple-value-bind (last-reg last-type last-cps compiled-asts errors)
+        (%compile-toplevel-forms-core forms ctx target type-check safety opts werror werror-categories)
+      (%finalize-toplevel-compilation ctx target last-reg last-type last-cps compiled-asts opts errors compilation-tier))))
 
 ;;; Function call compilation (%resolve-func-sym-reg, %try-compile-*,
 ;;; %compile-normal-call, compile-ast (ast-call)) is in codegen-calls.lisp (loads next).

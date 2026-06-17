@@ -3,7 +3,6 @@
 ;;; Public test framework API.
 ;;; Originally lines 623-678 of package.lisp.
 
-#-cl-cc-self-hosting
 (export '(run-tests
           enable-coverage
           disable-coverage

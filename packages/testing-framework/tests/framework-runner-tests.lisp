@@ -10,59 +10,79 @@
 
 (in-suite runner-regression-suite)
 
+(defun %make-blocked-test-plist (name timeout)
+  (let ((blocker (sb-thread:make-semaphore :count 0)))
+    (list :name name
+          :fn (lambda () (sb-thread:wait-on-semaphore blocker))
+          :suite 'cl-cc-unit-suite
+          :timeout timeout
+          :depends-on nil
+          :tags nil)))
+
+(defun %make-blocked-thread (name)
+  (let ((blocker (sb-thread:make-semaphore :count 0)))
+    (sb-thread:make-thread (lambda () (sb-thread:wait-on-semaphore blocker))
+                           :name name)))
+
+(defmacro with-clcc-test-timeout-env (&body body)
+  `(%with-preserved-env-var ("CLCC_TEST_TIMEOUT") ,@body))
+
+(defmacro with-clcc-suite-timeout-env (&body body)
+  `(%with-preserved-env-var ("CLCC_SUITE_TIMEOUT") ,@body))
+
 (deftest suite-parallel-policy-inherits-from-parent
   "Child suites inherit serial execution policy from ancestors."
   (let ((parent (gensym "ULW-PARENT-"))
         (child (gensym "ULW-CHILD-")))
-    (unwind-protect
-         (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* parent
-                                (list :name parent :description "tmp" :parent nil :parallel nil
-                                      :before-each '() :after-each '())))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* child
-                                (list :name child :description "tmp" :parent parent :parallel t
-                                      :before-each '() :after-each '())))
-           (assert-false (%suite-parallel-p child))
-           (assert-false (%test-parallel-safe-p (list :suite child :depends-on nil))))
-      (setf *suite-registry* (persist-remove *suite-registry* child))
-      (setf *suite-registry* (persist-remove *suite-registry* parent)))))
+    (with-restored-bindings (*suite-registry*)
+      (with-suite-registry-entry (parent
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel nil)
+        (with-suite-registry-entry (child
+                                     :description "tmp"
+                                     :parent parent
+                                     :parallel t)
+          (assert-false (%suite-parallel-p child))
+          (assert-false (%test-parallel-safe-p (list :suite child :depends-on nil))))))))
 
 (deftest suite-parent-cycle-does-not-hang-discovery-helpers
   "Suite parent cycles terminate in collection, fixture lookup, and parallel checks."
-  (let* ((*suite-registry* (persist-empty))
-         (*test-registry* (persist-empty))
-         (suite-a (gensym "ULW-CYCLE-A-"))
-         (suite-b (gensym "ULW-CYCLE-B-"))
-         (before-a (lambda () :before-a))
-         (before-b (lambda () :before-b))
-         (after-a (lambda () :after-a))
-         (after-b (lambda () :after-b)))
-    (setf *suite-registry*
-          (persist-assoc *suite-registry* suite-a
-                         (list :name suite-a :description "tmp" :parent suite-b :parallel t
-                               :before-each (list before-a) :after-each (list after-a))))
-    (setf *suite-registry*
-          (persist-assoc *suite-registry* suite-b
-                         (list :name suite-b :description "tmp" :parent suite-a :parallel t
-                               :before-each (list before-b) :after-each (list after-b))))
-    (setf *test-registry*
-          (persist-assoc *test-registry* 'ulw-cycle-test-a
-                         (list :name 'ulw-cycle-test-a :suite suite-a :tags nil)))
-    (setf *test-registry*
-          (persist-assoc *test-registry* 'ulw-cycle-test-b
-                         (list :name 'ulw-cycle-test-b :suite suite-b :tags nil)))
-    (assert-= 2 (length (%collect-all-suite-tests suite-a nil)))
-    (multiple-value-bind (before-chain after-chain) (%get-suite-fixtures suite-a)
-      (assert-= 2 (length before-chain))
-      (assert-= 2 (length after-chain))
-      (assert-true (member before-a before-chain :test #'eq))
-      (assert-true (member before-b before-chain :test #'eq))
-      (assert-true (member after-a after-chain :test #'eq))
-      (assert-true (member after-b after-chain :test #'eq)))
-    (assert-false (%suite-parallel-p suite-a))
-    (assert-false (%test-parallel-safe-p (list :suite suite-a :depends-on nil)))))
+  (let ((suite-a (gensym "ULW-CYCLE-A-"))
+        (suite-b (gensym "ULW-CYCLE-B-"))
+        (before-a (lambda () :before-a))
+        (before-b (lambda () :before-b))
+        (after-a (lambda () :after-a))
+        (after-b (lambda () :after-b)))
+    (with-fresh-registry-state
+      (with-suite-registry-entry (suite-a
+                                   :description "tmp"
+                                   :parent suite-b
+                                   :parallel t
+                                   :before-each (list before-a)
+                                   :after-each (list after-a))
+        (with-suite-registry-entry (suite-b
+                                     :description "tmp"
+                                     :parent suite-a
+                                     :parallel t
+                                     :before-each (list before-b)
+                                     :after-each (list after-b))
+          (with-test-registry-entry ('ulw-cycle-test-a
+                                      :suite suite-a
+                                      :tags nil)
+            (with-test-registry-entry ('ulw-cycle-test-b
+                                        :suite suite-b
+                                        :tags nil)
+              (assert-= 2 (length (%collect-all-suite-tests suite-a nil)))
+              (multiple-value-bind (before-chain after-chain) (%get-suite-fixtures suite-a)
+                (assert-= 2 (length before-chain))
+                (assert-= 2 (length after-chain))
+                (assert-true (member before-a before-chain :test #'eq))
+                (assert-true (member before-b before-chain :test #'eq))
+                (assert-true (member after-a after-chain :test #'eq))
+                (assert-true (member after-b after-chain :test #'eq)))
+              (assert-false (%suite-parallel-p suite-a))
+              (assert-false (%test-parallel-safe-p (list :suite suite-a :depends-on nil))))))))))
 
 (deftest dependency-ordering-moves-dependent-after-prerequisite
   "%order-tests-for-dependencies places a dependent test after its prerequisite."
@@ -104,7 +124,7 @@
                            :tags nil))
           (result (%run-single-test test-plist 1 '())))
     (assert-eq :pending (getf result :status))
-    (assert-true (search "later" (getf result :detail)))))
+    (assert-string-contains-all (getf result :detail) '("later"))))
 
 (deftest effective-test-timeout-bogus-normalizes-to-default
   "%effective-test-timeout returns the default when given a non-integer keyword."
@@ -124,18 +144,13 @@
 
 (deftest default-test-timeout-honors-env-var-and-falls-back-to-10
   "%default-test-timeout: unset→10; set to 14→14; set to bogus→10."
-  (let ((old (uiop:getenv "CLCC_TEST_TIMEOUT")))
-    (unwind-protect
-         (progn
-           (sb-posix:unsetenv "CLCC_TEST_TIMEOUT")
-           (assert-= 10 (%default-test-timeout))
-           (sb-posix:setenv "CLCC_TEST_TIMEOUT" "14" 1)
-           (assert-= 14 (%default-test-timeout))
-           (sb-posix:setenv "CLCC_TEST_TIMEOUT" "bogus" 1)
-           (assert-= 10 (%default-test-timeout)))
-      (if old
-          (sb-posix:setenv "CLCC_TEST_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_TEST_TIMEOUT")))))
+  (with-clcc-test-timeout-env
+    (sb-posix:unsetenv "CLCC_TEST_TIMEOUT")
+    (assert-= 10 (%default-test-timeout))
+    (sb-posix:setenv "CLCC_TEST_TIMEOUT" "14" 1)
+    (assert-= 14 (%default-test-timeout))
+    (sb-posix:setenv "CLCC_TEST_TIMEOUT" "bogus" 1)
+    (assert-= 10 (%default-test-timeout))))
 
 (deftest-each default-test-timeout-rejects-invalid-env-values
   "%default-test-timeout falls back to 10 for non-positive or malformed env values."
@@ -143,59 +158,37 @@
           ("negative" "-1")
           ("malformed" "1abc"))
   (value)
-  (let ((old (uiop:getenv "CLCC_TEST_TIMEOUT")))
-    (unwind-protect
-         (progn
-           (sb-posix:setenv "CLCC_TEST_TIMEOUT" value 1)
-           (assert-= 10 (%default-test-timeout)))
-      (if old
-          (sb-posix:setenv "CLCC_TEST_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_TEST_TIMEOUT")))))
+  (with-clcc-test-timeout-env
+    (sb-posix:setenv "CLCC_TEST_TIMEOUT" value 1)
+    (assert-= 10 (%default-test-timeout))))
 
 (deftest default-test-timeout-env-applies-to-slow-test
   "CLCC_TEST_TIMEOUT=0.05 is used as the per-test default and times out a slow sequential test."
-  (let ((old (uiop:getenv "CLCC_TEST_TIMEOUT")))
-    (unwind-protect
-         (let* ((*test-runner-mode* :sequential)
-                (test-plist (list :name 'env-slow-demo
-                                  :fn (lambda () (sleep 0.2))
-                                  :suite 'cl-cc-unit-suite
-                                  :timeout nil
-                                  :depends-on nil
-                                  :tags nil)))
-           (sb-posix:setenv "CLCC_TEST_TIMEOUT" "0.05" 1)
-           (let ((result (%run-single-test test-plist 1 '())))
-             (assert-eq :fail (getf result :status))
-             (assert-true (search "timeout after 0.05 seconds" (getf result :detail)))))
-      (if old
-          (sb-posix:setenv "CLCC_TEST_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_TEST_TIMEOUT")))))
+  (with-clcc-test-timeout-env
+    (let* ((*test-runner-mode* :sequential)
+           (test-plist (%make-blocked-test-plist 'env-slow-demo nil)))
+      (sb-posix:setenv "CLCC_TEST_TIMEOUT" "0.05" 1)
+      (let ((result (%run-single-test test-plist 1 '())))
+        (assert-eq :fail (getf result :status))
+        (assert-string-contains-all
+         (getf result :detail)
+         '("timeout after 0.05 seconds"))))))
 
 (deftest effective-test-timeout-explicit-value-overrides-env-default
   "A valid per-test :timeout overrides CLCC_TEST_TIMEOUT."
-  (let ((old (uiop:getenv "CLCC_TEST_TIMEOUT")))
-    (unwind-protect
-         (progn
-           (sb-posix:setenv "CLCC_TEST_TIMEOUT" "1" 1)
-           (assert-equal 3 (%effective-test-timeout (list :timeout 3))))
-      (if old
-          (sb-posix:setenv "CLCC_TEST_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_TEST_TIMEOUT")))))
+  (with-clcc-test-timeout-env
+    (sb-posix:setenv "CLCC_TEST_TIMEOUT" "1" 1)
+    (assert-equal 3 (%effective-test-timeout (list :timeout 3)))))
 
 (deftest default-suite-timeout-honors-env-var-and-falls-back-to-600
   "%default-suite-timeout: unset→600; set to 90→90; set to bogus→600."
-  (let ((old (uiop:getenv "CLCC_SUITE_TIMEOUT")))
-    (unwind-protect
-         (progn
-           (sb-posix:unsetenv "CLCC_SUITE_TIMEOUT")
-           (assert-= 600 (%default-suite-timeout))
-           (sb-posix:setenv "CLCC_SUITE_TIMEOUT" "90" 1)
-           (assert-= 90 (%default-suite-timeout))
-           (sb-posix:setenv "CLCC_SUITE_TIMEOUT" "bogus" 1)
-           (assert-= 600 (%default-suite-timeout)))
-      (if old
-          (sb-posix:setenv "CLCC_SUITE_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_SUITE_TIMEOUT")))))
+  (with-clcc-suite-timeout-env
+    (sb-posix:unsetenv "CLCC_SUITE_TIMEOUT")
+    (assert-= 600 (%default-suite-timeout))
+    (sb-posix:setenv "CLCC_SUITE_TIMEOUT" "90" 1)
+    (assert-= 90 (%default-suite-timeout))
+    (sb-posix:setenv "CLCC_SUITE_TIMEOUT" "bogus" 1)
+    (assert-= 600 (%default-suite-timeout))))
 
 (deftest-each default-suite-timeout-rejects-invalid-env-values
   "%default-suite-timeout falls back to 600 for non-positive or malformed env values."
@@ -203,33 +196,22 @@
           ("negative" "-1")
           ("malformed" "1abc"))
   (value)
-  (let ((old (uiop:getenv "CLCC_SUITE_TIMEOUT")))
-    (unwind-protect
-         (progn
-           (sb-posix:setenv "CLCC_SUITE_TIMEOUT" value 1)
-           (assert-= 600 (%default-suite-timeout)))
-      (if old
-          (sb-posix:setenv "CLCC_SUITE_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_SUITE_TIMEOUT")))))
+  (with-clcc-suite-timeout-env
+    (sb-posix:setenv "CLCC_SUITE_TIMEOUT" value 1)
+    (assert-= 600 (%default-suite-timeout))))
 
 (deftest default-suite-timeout-env-drives-suite-deadline
   "CLCC_SUITE_TIMEOUT=1 is accepted, and deadline joins terminate hung workers."
-  (let ((old (uiop:getenv "CLCC_SUITE_TIMEOUT"))
-        (thread nil))
-    (unwind-protect
-         (progn
-           (sb-posix:setenv "CLCC_SUITE_TIMEOUT" "1" 1)
-           (assert-= 1 (%default-suite-timeout))
-           (let ((deadline (+ (get-internal-real-time)
-                              (round (* 0.05 internal-time-units-per-second)))))
-             (setf thread (sb-thread:make-thread (lambda () (loop (sleep 1)))
-                                                 :name "suite-timeout-env-demo"))
-             (assert-eq :suite-timeout
-                        (%join-worker-threads-until-deadline (list thread) deadline))))
-      (when thread (%terminate-thread-safely thread))
-      (if old
-          (sb-posix:setenv "CLCC_SUITE_TIMEOUT" old 1)
-          (sb-posix:unsetenv "CLCC_SUITE_TIMEOUT")))))
+  (let (thread)
+    (with-clcc-suite-timeout-env
+      (sb-posix:setenv "CLCC_SUITE_TIMEOUT" "1" 1)
+      (assert-= 1 (%default-suite-timeout))
+      (let ((deadline (+ (get-internal-real-time)
+                         (round (* 0.05 internal-time-units-per-second)))))
+        (setf thread (%make-blocked-thread "suite-timeout-env-demo"))
+        (assert-eq :suite-timeout
+                   (%join-worker-threads-until-deadline (list thread) deadline))))
+    (when thread (%terminate-thread-safely thread))))
 
 (deftest suite-timeout-result-returns-true-when-quit-p-nil
   "%suite-timeout-result returns t and emits an error log when quit-p is nil."
@@ -238,8 +220,8 @@
          (result (%suite-timeout-result 'demo-suite 42 nil)))
     (assert-true result)
     (let ((log (get-output-stream-string err-out)))
-      (assert-true (search "DEMO-SUITE" (string-upcase log)))
-      (assert-true (search "42" log)))))
+      (assert-string-contains-all (string-upcase log) '("DEMO-SUITE"))
+      (assert-string-contains-all log '("42")))))
 
 (deftest suite-timeout-result-calls-quit-124-when-quit-p-true
   "%suite-timeout-result calls (uiop:quit 124) when quit-p is true."
@@ -249,7 +231,9 @@
       (let ((*error-output* err-out))
         (%suite-timeout-result 'other-suite 10 t)))
     (assert-eql 124 captured)
-    (assert-true (search "OTHER-SUITE" (string-upcase (get-output-stream-string err-out))))))
+    (assert-string-contains-all
+     (string-upcase (get-output-stream-string err-out))
+     '("OTHER-SUITE"))))
 
 (deftest run-single-test-skip-condition-returns-skip-with-reason
   "%run-single-test: a skip-condition signals :skip status with the reason in :detail."
@@ -261,32 +245,29 @@
                            :tags nil))
          (result (%run-single-test test-plist 1 '())))
     (assert-eq :skip (getf result :status))
-    (assert-true (search "not today" (getf result :detail)))))
+    (assert-string-contains-all (getf result :detail) '("not today"))))
 
 (deftest run-single-test-reports-fixture-setup-errors
   "A before-each fixture error is surfaced as a fixture error result."
   (let ((fixture-suite (gensym "ULW-FIXTURE-SUITE-")))
-    (unwind-protect
-         (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* fixture-suite
-                                (list :name fixture-suite
-                                      :description "tmp"
-                                      :parent nil
-                                      :parallel t
-                                      :before-each (list (lambda () (error "fixture boom")))
-                                      :after-each '())))
-           (let* ((test-plist (list :name 'fixture-demo
-                                    :fn (lambda () t)
-                                    :suite fixture-suite
-                                    :timeout nil
-                                    :depends-on nil
-                                    :tags nil))
-                  (result (%run-single-test test-plist 1 '())))
-             (assert-eq :fail (getf result :status))
-             (assert-true (search "fixture error" (getf result :detail)))
-             (assert-true (search "fixture boom" (getf result :detail)))))
-      (setf *suite-registry* (persist-remove *suite-registry* fixture-suite)))))
+    (with-restored-bindings (*suite-registry*)
+      (with-suite-registry-entry (fixture-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel t
+                                   :before-each (list (lambda () (error "fixture boom")))
+                                   :after-each '())
+        (let* ((test-plist (list :name 'fixture-demo
+                                 :fn (lambda () t)
+                                 :suite fixture-suite
+                                 :timeout nil
+                                 :depends-on nil
+                                 :tags nil))
+               (result (%run-single-test test-plist 1 '())))
+          (assert-eq :fail (getf result :status))
+          (assert-string-contains-all
+           (getf result :detail)
+           '("fixture error" "fixture boom")))))))
 
 (deftest run-single-test-times-out-sequentially
   "Sequential runner reports timeout failures when a test exceeds its budget."
@@ -294,15 +275,10 @@
   ;; The global mode is :parallel (set in apps.nix to suppress SIGALRM delivery
   ;; issues), but this test specifically exercises the sequential timeout path.
   (let* ((*test-runner-mode* :sequential)
-         (test-plist (list :name 'slow-demo
-                           :fn (lambda () (sleep 0.2))
-                           :suite 'cl-cc-unit-suite
-                           :timeout 0.05
-                           :depends-on nil
-                           :tags nil))
+         (test-plist (%make-blocked-test-plist 'slow-demo 0.05))
          (result (%run-single-test test-plist 1 '())))
     (assert-eq :fail (getf result :status))
-    (assert-true (search "timeout after 0.05 seconds" (getf result :detail)))))
+    (assert-string-contains-all (getf result :detail) '("timeout after 0.05 seconds"))))
 
 (deftest run-tests-sequential-returns-ordered-results
   "%run-tests-sequential preserves input order and records pass statuses."
@@ -354,8 +330,9 @@
         (%resolve-suite :cl-cc/test "MISSING-SUITE")
         (assert-false t))
     (error (e)
-      (assert-true (search "Suite CL-CC/TEST::MISSING-SUITE not found"
-                           (princ-to-string e))))))
+      (assert-string-contains-all
+       (princ-to-string e)
+       '("Suite CL-CC/TEST::MISSING-SUITE not found")))))
 
 ;;; ── New-helper coverage (added after %run-single-test decomposition) ─────
 
@@ -379,9 +356,10 @@
   :cases (("defaulted" nil nil)
           ("numeric"   5   "5 seconds"))
   (timeout expected-substr)
-  (assert-true (search (or expected-substr
-                           (format nil "~A seconds" (%default-test-timeout)))
-                       (%format-timeout-detail timeout))))
+  (assert-string-contains-all
+   (%format-timeout-detail timeout)
+   (list (or expected-substr
+             (format nil "~A seconds" (%default-test-timeout))))))
 
 (deftest-each count-results-by-status-counts-correctly
   "%count-results-by-status filters by exact status keyword."

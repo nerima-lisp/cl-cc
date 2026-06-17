@@ -12,40 +12,47 @@
 (deftest flake-test-app-runs-canonical-suite
   "The single test app dispatches run-tests (canonical fast plan) and exports CLCC timeout vars."
   (let ((text (%flake-text)))
-    (assert-true (search "test = mkSbclScript {" text))
-    (assert-true (search "CLCC_TEST_TIMEOUT" text))
-    (assert-true (search "CLCC_SUITE_TIMEOUT" text))
-    (assert-true (search "CLCC_TEST_TIMEOUT:-10" text))
-    (assert-true (search "CLCC_SUITE_TIMEOUT:-600" text))
-    (assert-true (search "case \"$CLCC_TEST_TIMEOUT\" in" text))
-    (assert-true (search "case \"$CLCC_SUITE_TIMEOUT\" in" text))
-    (assert-true (search "*[!0-9]*" text))
-    (assert-true (search "CLCC_TEST_TIMEOUT=10" text))
-    (assert-true (search "CLCC_SUITE_TIMEOUT=600" text))
-    (assert-true (search "run-tests" text))
-    (assert-true (search "starting fast test plan" text))
-    (assert-true (search "--kill-after=30" text))))
+    (assert-string-contains-all
+     text
+     '("test = mkSbclScript {"
+       "CLCC_TEST_TIMEOUT"
+       "CLCC_SUITE_TIMEOUT"
+       "CL_CC_TEST_WORKERS"
+       "CLCC_TEST_TIMEOUT:-10"
+       "CLCC_SUITE_TIMEOUT:-600"
+       "case \"$CLCC_TEST_TIMEOUT\" in"
+       "case \"$CLCC_SUITE_TIMEOUT\" in"
+       "*[!0-9]*"
+       "CLCC_TEST_TIMEOUT=10"
+       "CLCC_SUITE_TIMEOUT=600"
+       "(<= workers 1)"
+       "run-tests"
+       "starting fast test plan"
+       "--kill-after=30"))))
 
 (deftest flake-coverage-app-runs-instrumented-suite
   "The coverage app enables sb-cover before force-loading local test systems."
   (let ((text (%flake-text)))
-    (assert-true (search "coverage = mkSbclScript" text))
-    (assert-true (search "sb-cover:store-coverage-data" text))
-    (assert-true (search "initialize-source-registry" text))
-    (assert-true (search "initialize-output-translations" text))
-    (assert-true (search ":coverage t" text))))
+    (assert-string-contains-all
+     text
+     '("coverage = mkSbclScript"
+       "sb-cover:store-coverage-data"
+       "initialize-source-registry"
+       "initialize-output-translations"
+       ":coverage t"))))
 
 (deftest flake-deprecated-smoke-apps-removed
   "test-full / perf-smoke / stability-smoke entrypoints must be removed."
   (let ((text (%flake-text)))
-    (assert-false (search "test-full = mkSbclScript" text))
-    (assert-false (search "perf-smoke =" text))
-    (assert-false (search "stability-smoke =" text))
-    (assert-false (search "run-fast-tests" text))))
+    (assert-string-contains-none
+     text
+     '("test-full = mkSbclScript"
+       "perf-smoke ="
+       "stability-smoke ="
+       "run-fast-tests"))))
 
 (deftest flake-checks-tests-mirrors-test-app
   "checks.tests must delegate to the test app, ensuring CI matches `nix run .#test`."
   (let ((text (%checks-text)))
-    (assert-true (search "apps.test.program" text))
-    (assert-false (search "run-fast-tests" text))
-    (assert-false (search "cl-cc-test/clos" text))))
+    (assert-string-contains-all text '("apps.test.program"))
+    (assert-string-contains-none text '("run-fast-tests" "cl-cc-test/clos"))))

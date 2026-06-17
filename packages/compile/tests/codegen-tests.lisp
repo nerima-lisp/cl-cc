@@ -40,6 +40,15 @@ stable, isolated context."
   "Find the first instruction of TYPE in CTX's emitted instructions."
   (find-if (lambda (i) (typep i type)) (codegen-instructions ctx)))
 
+(defun %compile-expression-vm-instructions (expression)
+  "Compile EXPRESSION for the VM target and return its emitted instructions."
+  (cl-cc/compile:compilation-result-vm-instructions
+   (cl-cc:compile-expression expression :target :vm)))
+
+(defun %vm-instruction-present-p (instructions instruction-type)
+  "Return true when INSTRUCTIONS contains an instance of INSTRUCTION-TYPE."
+  (find-if (lambda (inst) (typep inst instruction-type)) instructions))
+
 ;;; ─── compile-ast: ast-int ───────────────────────────────────────────────
 
 (deftest codegen-integer-literal-returns-keyword-register
@@ -254,12 +263,16 @@ Note: identical non-string constants may coalesce to a single vm-const during co
       (assert-= 3 (cl-cc::vm-const-value const-inst)))
     (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-call))))
 
-(deftest codegen-call/cc-emits-dedicated-instruction
-  "FR-800: CALL/CC lowers to VM-CALL/CC instead of an ordinary call."
-  (let* ((result (cl-cc:compile-expression '(call/cc (lambda (k) (funcall k 42))) :target :vm))
-         (instructions (cl-cc/compile:compilation-result-vm-instructions result)))
-    (assert-true (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call/cc))
-                          instructions))))
+(deftest-each codegen-continuation-forms-emit-dedicated-instructions
+  "Continuation lowering emits the dedicated VM instruction for each form."
+  :cases (("call/cc" '(call/cc (lambda (k) (funcall k 42))) 'cl-cc/vm::vm-call/cc)
+          ("call-with-continuation-prompt"
+           '(call-with-continuation-prompt (lambda () 1) 'reset)
+           'cl-cc/vm::vm-call-with-prompt)
+          ("abort-to-prompt" '(abort-to-prompt 'reset 42) 'cl-cc/vm::vm-abort-to-prompt))
+  (expression expected-inst)
+  (let ((instructions (%compile-expression-vm-instructions expression)))
+    (assert-true (%vm-instruction-present-p instructions expected-inst))))
 
 (deftest codegen-block-return-from-keeps-direct-jump
   "FR-801: BLOCK/RETURN-FROM remains an escape-only direct jump path."

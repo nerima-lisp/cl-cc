@@ -244,7 +244,7 @@
   (%php-register-builtin "array_any"      '%php-array-any)
   (%php-register-builtin "array_all"      '%php-array-all)
 
-  ;; PHP 8.1 Fiber builtins are registered in php84-features.lisp (loaded later)
+  ;; PHP 8.1 Fiber builtins are registered in the late-loaded feature module.
   ;; after those functions are defined.
 
   ;; PHP Exception / Throwable helpers.

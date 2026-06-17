@@ -84,7 +84,6 @@
       (:file "continuous-profile")
       (:file "log")
                              (:file "metrics")
-     (:file "clock")
      (:file "consensus")
      (:file "crdt")
      (:file "cluster")

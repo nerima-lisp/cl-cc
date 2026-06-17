@@ -2,6 +2,39 @@
 
 (in-suite cl-cc-unit-suite)
 
+(defmacro %assert-failure-message-contains (message-form fragments &body body)
+  `(handler-case
+       (progn ,@body (assert-false t))
+     (test-failure (c)
+       (let ((message ,message-form)
+             (fragments ,fragments))
+         (dolist (fragment fragments)
+           (assert-true (search fragment message)))))))
+
+(defmacro assert-failure-message-contains (fragments &body body)
+  "Assert that BODY signals TEST-FAILURE whose message includes FRAGMENTS."
+  `(%assert-failure-message-contains (test-failure-message c) ,fragments ,@body))
+
+(defmacro assert-failure-message-contains-upcase (fragments &body body)
+  "Assert that BODY signals TEST-FAILURE whose uppercased message includes FRAGMENTS."
+  `(%assert-failure-message-contains (string-upcase (test-failure-message c))
+                                     ,fragments
+                                     ,@body))
+
+(defmacro assert-string-contains-all (haystack fragments)
+  "Assert that HAYSTACK contains every fragment in FRAGMENTS."
+  `(let ((haystack ,haystack)
+         (fragments ,fragments))
+     (dolist (fragment fragments)
+       (assert-true (search fragment haystack)))))
+
+(defmacro assert-string-contains-none (haystack fragments)
+  "Assert that HAYSTACK contains none of the fragments in FRAGMENTS."
+  `(let ((haystack ,haystack)
+         (fragments ,fragments))
+     (dolist (fragment fragments)
+       (assert-false (search fragment haystack)))))
+
 (deftest-each framework-meta-tree-map-cases
   "%tree-map applies leaf-fn to every atom, rebuilding cons structure unchanged."
   :cases (("atom-identity"    42                   :MAPPED)
@@ -64,13 +97,8 @@
 
 (deftest framework-meta-binary-assertion-failure-message-has-name-expected-actual
   "A failing assert-equal produces a message with the assertion name, expected, and actual values."
-  (handler-case
-      (progn (assert-equal 1 2) (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-equal failed" message))
-        (assert-true (search "expected: 1" message))
-        (assert-true (search "actual: 2" message))))))
+  (assert-failure-message-contains '("assert-equal failed" "expected: 1" "actual: 2")
+    (assert-equal 1 2)))
 
 (deftest framework-meta-binary-assertion-evaluates-each-operand-once
   "assert-equal evaluates both the expected and actual operands exactly once."
@@ -85,12 +113,8 @@
 
 (deftest framework-meta-unary-assertion-failure-message-has-name-and-actual
   "A failing assert-null produces a message with the assertion name and actual value."
-  (handler-case
-      (progn (assert-null :not-nil) (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-null failed" message))
-        (assert-true (search "actual: :NOT-NIL" message))))))
+  (assert-failure-message-contains '("assert-null failed" "actual: :NOT-NIL")
+    (assert-null :not-nil)))
 
 (deftest framework-meta-unary-assertion-macroexpands-through-assert-unary
   "assert-null macroexpands to %assert-unary with the null predicate."
@@ -100,12 +124,8 @@
 
 (deftest framework-meta-assert-run=-failure-message-is-readable
   "assert-run= produces a readable failure message including the expected value and source form."
-  (handler-case
-      (progn (assert-run= 7 "(+ 1 2)") (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-run=: expected 7" message))
-        (assert-true (search "(+ 1 2)" message))))))
+  (assert-failure-message-contains '("assert-run=: expected 7" "(+ 1 2)")
+    (assert-run= 7 "(+ 1 2)")))
 
 (deftest framework-meta-assert-run=-macroexpands-through-with-run-string-assertion
   "assert-run= macroexpands to %with-run-string-assertion."
@@ -128,56 +148,30 @@
 (deftest framework-meta-assert-run=-reports-host-errors-in-failure-message
   "assert-run= reports host-signaled errors as a readable TAP YAML failure."
   (flet ((run-string (expr) (declare (ignore expr)) (error "synthetic host failure")))
-    (handler-case
-        (progn (assert-run= 1 "(boom)") (assert-false t))
-      (test-failure (c)
-        (let ((message (test-failure-message c)))
-          (assert-true (search "run-string signaled" message))
-          (assert-true (search "form: (ASSERT-RUN= 1 (boom))" message)))))))
+      (assert-failure-message-contains '("run-string signaled" "form: (ASSERT-RUN= 1 (boom))")
+        (assert-run= 1 "(boom)"))))
 
 
 (deftest framework-meta-assert-compiles-to-behavior
   "assert-compiles-to succeeds when the requested VM op is present in the compiled stream; gives readable failure when absent."
   (assert-compiles-to "(+ 1 2)" :contains 'vm-const)
-  (handler-case
-      (progn
-        (assert-compiles-to "(+ 1 2)" :contains 'vm-sub)
-        (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-compiles-to" message))
-        (assert-true (search "VM-SUB" message))))))
+    (assert-failure-message-contains '("assert-compiles-to" "VM-SUB")
+      (assert-compiles-to "(+ 1 2)" :contains 'vm-sub)))
 
 (deftest framework-meta-assert-evaluates-to-reports-mismatch
   "assert-evaluates-to emits a readable failure when runtime results differ."
-  (handler-case
-      (progn
-        (assert-evaluates-to "(+ 1 2)" 99)
-        (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-evaluates-to" message))
-        (assert-true (search "expected 99" message))))))
+    (assert-failure-message-contains '("assert-evaluates-to" "expected 99")
+      (assert-evaluates-to "(+ 1 2)" 99)))
 
 (deftest framework-meta-assert-run-string=-failure-on-non-string-result
   "assert-run-string= fails with a readable message when the result is not a string."
-  (handler-case
-      (progn
-        (assert-run-string= "3" "(+ 1 2)")
-        (assert-false t))
-    (test-failure (c)
-      (assert-true (search "assert-run-string=" (test-failure-message c))))))
+    (assert-failure-message-contains '("assert-run-string=")
+      (assert-run-string= "3" "(+ 1 2)")))
 
 (deftest framework-meta-assert-macro-expands-to-reports-form-and-mismatch
   "assert-macro-expands-to failure message includes the original form and mismatch detail."
-  (handler-case
-      (progn
-        (assert-macro-expands-to '(when t 1) '(if nil 1 nil))
-        (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-macro-expands-to" message))
-        (assert-true (search "(WHEN T 1)" message))))))
+    (assert-failure-message-contains '("assert-macro-expands-to" "(WHEN T 1)")
+      (assert-macro-expands-to '(when t 1) '(if nil 1 nil))))
 
 (deftest framework-meta-assert-infers-type-succeeds-for-fixnum
   "assert-infers-type passes when the inferred type matches fixnum."
@@ -185,12 +179,8 @@
 
 (deftest framework-meta-assert-infers-type-failure-reports-mismatch
   "assert-infers-type failure message includes the assertion name and the expected type."
-  (handler-case
-      (progn (assert-infers-type "42" string) (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search "assert-infers-type" message))
-        (assert-true (search "STRING" message))))))
+    (assert-failure-message-contains '("assert-infers-type" "STRING")
+      (assert-infers-type "42" string)))
 
 (deftest-each framework-meta-assertion-name-in-failure-message
   "Failing assertions include their own name in the failure message."
@@ -199,12 +189,8 @@
           ("run-signals"    (lambda () (assert-run-signals error "42"))       "assert-run-signals"    nil)
           ("output-contains" (lambda () (assert-output-contains "abcdef" "zzz")) "assert-output-contains" "zzz"))
   (thunk name-fragment extra-fragment)
-  (handler-case
-      (progn (funcall thunk) (assert-false t))
-    (test-failure (c)
-      (let ((message (test-failure-message c)))
-        (assert-true (search name-fragment message))
-        (when extra-fragment (assert-true (search extra-fragment message)))))))
+  (assert-failure-message-contains (remove nil (list name-fragment extra-fragment))
+    (funcall thunk)))
 
 (deftest framework-meta-defmetamorphic-registers-relation
   "defmetamorphic adds a relation entry to *metamorphic-relations* with the given name."
@@ -229,7 +215,7 @@
     (handler-case
         (assert-equal nil (%print-coverage-report nil))
       (error (e)
-        (assert-true (search "Coverage report" (princ-to-string e)))))))
+        (assert-string-contains-all (princ-to-string e) '("Coverage report"))))))
 
 (deftest framework-meta-assert-evaluates-to-stdlib-path
   "assert-evaluates-to supports the stdlib execution path through a shared high-level assertion."
@@ -263,4 +249,4 @@
                       :cases (("basic" 3 "(+ 1 2)"))
                       :stdlib t))))
     (assert-eq 'progn (car expanded))
-    (assert-true (search "ASSERT-EVALUATES-TO" (prin1-to-string expanded)))))
+    (assert-string-contains-all (prin1-to-string expanded) '("ASSERT-EVALUATES-TO"))))

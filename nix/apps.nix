@@ -177,6 +177,8 @@ let
                  (filter (loop for rest on args
                                when (and (string= (first rest) "--filter") (second rest))
                                  collect (second rest)))
+                 (workers-env (uiop:getenv "CL_CC_TEST_WORKERS"))
+                 (workers (ignore-errors (and workers-env (parse-integer workers-env))))
                  (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
                  (warm-stdlib (and (not (member "--no-warm-stdlib" args :test #'string=))
                                    (not (and warm-env
@@ -191,7 +193,10 @@ let
                         (cl-cc:warm-stdlib-cache)
                         (format t "# stdlib cache ready~%"))
                       (format t "# stdlib cache warm skipped~%"))
+                  ;; Keep the fast path for 2+ workers, but fall back to the
+                  ;; serial runner when the caller explicitly asks for 1 worker.
                   (uiop:symbol-call :cl-cc/test (quote run-tests)
+                                    :parallel (not (and workers (<= workers 1)))
                                     :filter filter
                                     :warm-stdlib warm-stdlib))
               (error (e)

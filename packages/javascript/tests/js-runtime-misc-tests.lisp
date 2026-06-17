@@ -307,7 +307,8 @@
 
 (deftest js-rt-error-is-error
   "%js-error-is-error returns truthy for Error-like objects, nil for non-errors."
-  (let ((with-message (cl-cc/javascript::%js-make-object "message" "oops"))
+  (let ((with-message (cl-cc/javascript::%js-make-error-instance
+                       cl-cc/javascript::*js-error-class* "oops"))
         (plain-obj    (cl-cc/javascript::%js-make-object "x" 1)))
     (assert-true  (cl-cc/javascript::%js-error-is-error with-message))
     (assert-false (cl-cc/javascript::%js-error-is-error plain-obj))

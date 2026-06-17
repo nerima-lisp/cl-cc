@@ -235,22 +235,6 @@ Returns a function that takes a continuation."
     (assert-equal '(13 12 11)
                   (funcall (%eval-trmc-defun let*-rewritten 'trmc-let-star-wrapper) 3))))
 
-;; SKIP (CPS codegen): Mutual recursion TRMC is WIP
-#+nil (deftest cps-trmc-mutual-recursion-remains-untransformed
-  "FR-045: mutual recursion is intentionally not rewritten by the direct self-call TRMC pass."
-  (let* ((source '(defun trmc-mutual-entry (n)
-                   (if (<= n 0)
-                       nil
-                       (cons n (trmc-mutual-other (- n 1))))))
-         (rewritten (cl-cc/cps::trmc-transform-defun-form source)))
-    (assert-equal source rewritten)
-    (eval '(defun trmc-mutual-other (n)
-            (if (<= n 0)
-                nil
-                (cons (- n) (trmc-mutual-entry (- n 1))))))
-    (assert-equal '(3 -2 1)
-                  (funcall (%eval-trmc-defun rewritten 'trmc-mutual-entry) 3))))
-
 (deftest optimizer-trmc-rewrites-list-star-termination-pattern
   "FR-045: the optimizer TRMC layer rewrites LIST* heads ending in a self call."
   (let* ((source '(defun trmc-list-star (n)

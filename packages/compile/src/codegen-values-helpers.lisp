@@ -73,19 +73,6 @@
           (emit ctx (make-vm-mv-bind :dst-regs var-regs))
           var-regs))))
 
-(defun %resolve-apply-function-register (func-node ctx)
-  "Compile or resolve the function designator used by APPLY."
-  (cond
-    ((typep func-node 'ast-function)
-     (compile-ast func-node ctx))
-    ((and (typep func-node 'ast-quote)
-          (symbolp (ast-quote-value func-node)))
-     (%resolve-func-sym-reg (ast-quote-value func-node) ctx))
-    ((symbolp func-node)
-     (%resolve-func-sym-reg func-node ctx))
-    (t
-     (compile-ast func-node ctx))))
-
 (defun %apply-argument-plan (args)
   "Return a data plist describing APPLY's leading args and final spread arg."
   (labels ((walk (tail leading)

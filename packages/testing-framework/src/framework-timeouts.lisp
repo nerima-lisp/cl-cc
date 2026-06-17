@@ -58,50 +58,55 @@ When OVERWRITE is NIL, explicit positive timeouts already on PLIST are preserved
           (setf (getf new-plist :timeout) timeout)
           new-plist))))
 
-(defun set-test-timeouts! (test-names timeout &key overwrite)
-  "Set TIMEOUT for each registered test named in TEST-NAMES.
-TIMEOUT must be a positive real number. By default, existing explicit per-test
-timeouts are preserved."
+(defun %set-test-timeouts-by-selector! (selector timeout &key overwrite)
+  "Set TIMEOUT for each registered test selected by SELECTOR.
+SELECTOR is a function of TEST-NAME and TEST-PLIST."
   (let ((normalized (%normalize-positive-timeout timeout)))
     (unless normalized
       (error "Timeout must be a positive real number: ~S" timeout))
     (%map-test-registry
      (lambda (name plist)
-       (if (member name test-names :test #'eq)
+       (if (funcall selector name plist)
            (%apply-timeout-to-test-plist plist normalized overwrite)
            plist)))))
+
+(defun set-test-timeouts! (test-names timeout &key overwrite)
+  "Set TIMEOUT for each registered test named in TEST-NAMES.
+TIMEOUT must be a positive real number. By default, existing explicit per-test
+timeouts are preserved."
+  (%set-test-timeouts-by-selector!
+   (lambda (name _plist)
+     (declare (ignore _plist))
+     (member name test-names :test #'eq))
+   timeout
+   :overwrite overwrite))
 
 (defun set-test-timeouts-by-prefix! (prefix timeout &key overwrite)
   "Set TIMEOUT for every registered test whose symbol-name starts with PREFIX.
 TIMEOUT must be a positive real number. By default, existing explicit per-test
 timeouts are preserved."
-  (let ((normalized (%normalize-positive-timeout timeout)))
-    (unless normalized
-      (error "Timeout must be a positive real number: ~S" timeout))
-    (%map-test-registry
-     (lambda (name plist)
-       (if (and (symbolp name)
-                (let ((name-str (symbol-name name))
-                      (prefix-len (length prefix)))
-                  (and (<= prefix-len (length name-str))
-                       (string= prefix name-str :end2 prefix-len))))
-           (%apply-timeout-to-test-plist plist normalized overwrite)
-           plist)))))
+  (%set-test-timeouts-by-selector!
+   (lambda (name _plist)
+     (declare (ignore _plist))
+     (and (symbolp name)
+          (let ((name-str (symbol-name name))
+                (prefix-len (length prefix)))
+            (and (<= prefix-len (length name-str))
+                 (string= prefix name-str :end2 prefix-len)))))
+   timeout
+   :overwrite overwrite))
 
 (defun set-suite-test-timeout! (suite-name timeout &key recursive overwrite)
   "Set TIMEOUT for tests directly in SUITE-NAME.
 TIMEOUT must be a positive real number. When RECURSIVE is true, descendant
 suite tests are updated as well. By default, existing explicit per-test
 timeouts are preserved."
-  (let ((normalized (%normalize-positive-timeout timeout)))
-    (unless normalized
-      (error "Timeout must be a positive real number: ~S" timeout))
-    (%map-test-registry
-     (lambda (_name plist)
-       (declare (ignore _name))
-       (let ((suite (getf plist :suite)))
-         (if (if recursive
-                 (%suite-descends-from-p suite suite-name)
-                 (eq suite suite-name))
-             (%apply-timeout-to-test-plist plist normalized overwrite)
-             plist))))))
+  (%set-test-timeouts-by-selector!
+   (lambda (_name plist)
+     (declare (ignore _name))
+     (let ((suite (getf plist :suite)))
+       (if recursive
+           (%suite-descends-from-p suite suite-name)
+           (eq suite suite-name))))
+   timeout
+   :overwrite overwrite))

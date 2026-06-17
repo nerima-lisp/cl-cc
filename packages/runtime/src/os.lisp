@@ -266,12 +266,6 @@ redirection on POSIX hosts and the platform process API elsewhere."
 
 (defun rt-gettime-monotonic () (rt-gettime :monotonic))
 (defun rt-gettime-real () (rt-gettime :realtime))
-(defun rt-probe-file (p) (probe-file p))
-(defun rt-delete-file (p) (delete-file p) t)
-(defun rt-rename-file (old new) (rename-file old new))
-(defun rt-file-write-date (p) (file-write-date p))
-(defun rt-ensure-directories-exist (p &key verbose) (ensure-directories-exist p :verbose verbose))
-(defun rt-directory (p &key) (directory p))
 
 (defun rt-os-init (&key argv)
   (setf *rt-saved-argv* argv)

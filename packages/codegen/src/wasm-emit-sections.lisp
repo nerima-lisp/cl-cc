@@ -32,23 +32,18 @@ Environment override: CLCC_WASM_TAILCALL=1|0"
 
 (defun wasm-typed-refs-feature-enabled-p ()
   "FR-212: Return T when Wasm Typed Function References is enabled."
-  (wasm-feature-enabled-p
-   "CLCC_WASM_TYPED_REFS"
-   (or (and (boundp '*wasm-typed-func-refs-enabled*)
-            *wasm-typed-func-refs-enabled*)
-       *wasm-typed-refs-enabled*)))
+  (wasm-feature-enabled-p "CLCC_WASM_TYPED_REFS"
+                          *wasm-typed-func-refs-enabled*))
 
 (defun wasm-eh-v2-feature-enabled-p ()
   "FR-252: Return T when Wasm EH v2 (try_table/throw_ref) is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_EH_V2"
-                          (or *wasm-eh-v2-enabled*
-                              *wasm-exception-handling-v2-enabled*)))
+                          *wasm-exception-handling-v2-enabled*))
 
 (defun wasm-js-exception-bridge-feature-enabled-p ()
   "FR-262: Return T when Wasm JS Exception Bridge is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_JS_EXCEPTION_BRIDGE"
-                          (or *wasm-js-exception-bridge-enabled*
-                              *wasm-exception-js-api-enabled*)))
+                          *wasm-exception-js-api-enabled*))
 
 (defun wasm-exnref-feature-enabled-p ()
   "FR-271: Return T when Wasm exnref support is enabled."
@@ -57,8 +52,7 @@ Environment override: CLCC_WASM_TAILCALL=1|0"
 (defun wasm-gc-exception-payload-feature-enabled-p ()
   "FR-289: Return T when GC struct exception payload is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_GC_EXCEPTION_PAYLOAD"
-                          (or *wasm-gc-exception-payload-enabled*
-                              *wasm-struct-exception-payload-enabled*)))
+                          *wasm-struct-exception-payload-enabled*))
 
 (defun wasm-extended-const-ref-func-feature-enabled-p ()
   "FR-215/FR-291: Return T when Extended Const with ref.func is enabled."
@@ -67,14 +61,12 @@ Environment override: CLCC_WASM_TAILCALL=1|0"
 (defun wasm-continuation-exceptions-feature-enabled-p ()
   "FR-301: Return T when continuation exception injection is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_CONTINUATION_EXCEPTIONS"
-                          (or *wasm-continuation-exceptions-enabled*
-                              *wasm-cont-throw-enabled*)))
+                          *wasm-cont-throw-enabled*))
 
 (defun wasm-exception-tag-linking-feature-enabled-p ()
   "FR-310: Return T when exception tag import/export is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_EXCEPTION_TAG_LINKING"
-                          (or *wasm-exception-tag-linking-enabled*
-                              *wasm-exception-tag-import-export-enabled*)))
+                          *wasm-exception-tag-import-export-enabled*))
 
 (defun wasm-catch-all-ref-feature-enabled-p ()
   "Return T when catch_all_ref support is enabled."
@@ -87,7 +79,7 @@ Default is NIL to preserve existing standalone modules."
 
 (defun wasm-simd-feature-enabled-p ()
   "FR-202: Return T when Wasm SIMD128 is enabled."
-  (wasm-feature-enabled-p "CLCC_WASM_SIMD" *wasm-simd-enabled*))
+  (wasm-feature-enabled-p "CLCC_WASM_SIMD" *wasm-simd128-enabled*))
 
 (defun wasm-strict-nan-enabled-p ()
   "Return T when strict IEEE 754 NaN semantics are enforced."
@@ -162,11 +154,8 @@ Default is NIL to preserve existing standalone modules."
 
 (defun wasm-gc-recursive-types-feature-enabled-p ()
   "FR-254: Return T when GC recursive types are enabled."
-  (wasm-feature-enabled-p
-   "CLCC_WASM_GC_RECURSIVE_TYPES"
-   (if (boundp '*wasm-gc-recursive-types-enabled*)
-       *wasm-gc-recursive-types-enabled*
-       *wasm-gc-rec-types-enabled*)))
+  (wasm-feature-enabled-p "CLCC_WASM_GC_RECURSIVE_TYPES"
+                          *wasm-gc-rec-types-enabled*))
 
 (defun wasm-gc-null-safety-feature-enabled-p ()
   "FR-270: Return T when GC null safety instructions are enabled."
@@ -179,8 +168,7 @@ Default is NIL to preserve existing standalone modules."
 (defun wasm-bigint-feature-enabled-p ()
   "FR-236: Return T when JS BigInt integration is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_BIGINT"
-                          (or *wasm-bigint-enabled*
-                              *wasm-js-bigint-i64-enabled*)))
+                          *wasm-js-bigint-i64-enabled*))
 
 (defun wasm-bulk-table-feature-enabled-p ()
   "FR-237: Return T when Bulk Table Operations are enabled."

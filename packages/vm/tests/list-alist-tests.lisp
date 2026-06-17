@@ -6,6 +6,13 @@
 (in-package :cl-cc/test)
 (in-suite cl-cc-unit-suite)
 
+(defun %prepare-vm-list-predicate-input (state value)
+  (if (eq value :cow-list)
+      (progn
+        (cl-cc:vm-reg-set state 2 '(a b))
+        (exec1 (cl-cc:make-vm-copy-list :dst 1 :src 2) state))
+      (cl-cc:vm-reg-set state 1 value)))
+
 ;;; ─── Association lists ──────────────────────────────────────────────────────
 
 (deftest-each vm-list-assoc-hit-miss
@@ -29,6 +36,15 @@
     (let ((result (cl-cc:vm-reg-get s 0)))
       (assert-equal '(x . 99) (first result))
       (assert-= 2 (length result)))))
+
+(deftest vm-list-assoc-on-copy-list-alist
+  "vm-assoc accepts alists produced by vm-copy-list."
+  (let ((s (make-test-vm)))
+    (cl-cc:vm-reg-set s 1 'b)
+    (cl-cc:vm-reg-set s 2 '((a . 1) (b . 2) (c . 3)))
+    (exec1 (cl-cc:make-vm-copy-list :dst 3 :src 2) s)
+    (exec1 (cl-cc:make-vm-assoc :dst 0 :key 1 :alist 3) s)
+    (assert-equal '(b . 2) (cl-cc:vm-reg-get s 0))))
 
 ;;; ─── equal / nconc / copy-list / copy-tree / subst ──────────────────────────
 
@@ -112,11 +128,19 @@
   :cases (("listp/cons"   #'cl-cc:make-vm-listp '(a) 1)
           ("listp/nil"    #'cl-cc:make-vm-listp nil  1)
           ("listp/atom"   #'cl-cc:make-vm-listp 42   0)
+          ("listp/cow-list"
+           #'cl-cc:make-vm-listp
+           :cow-list
+           1)
           ("atom/number"  #'cl-cc:make-vm-atom  42   1)
-          ("atom/cons"    #'cl-cc:make-vm-atom  '(a) 0))
+          ("atom/cons"    #'cl-cc:make-vm-atom  '(a) 0)
+          ("atom/cow-list"
+           #'cl-cc:make-vm-atom
+           :cow-list
+           0))
   (constructor value expected)
   (let ((s (make-test-vm)))
-    (cl-cc:vm-reg-set s 1 value)
+    (%prepare-vm-list-predicate-input s value)
     (exec1 (funcall constructor :dst 0 :src 1) s)
     (assert-= expected (cl-cc:vm-reg-get s 0))))
 

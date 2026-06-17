@@ -73,15 +73,13 @@ RESOLVE-FORWARD-REFERENCES once NAME is defined."
     ((null resolver) (values nil nil))
     (t (values resolver t))))
 
-(defun resolve-forward-references (&optional resolver &key (errorp t))
-  "Resolve all pending forward references using RESOLVER.
-RESOLVER may be a hash table, alist, function, or a single replacement value.
-Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
+(defun %resolve-forward-references (resolver errorp)
+  "Resolve all pending forward references using RESOLVER."
   (when (and (null resolver)
              (zerop (hash-table-count *forward-reference-patch-table*))
              (boundp 'cl-cc/vm::*vm-current-state*)
              cl-cc/vm::*vm-current-state*)
-    (return-from resolve-forward-references
+    (return-from %resolve-forward-references
       (cl-cc/vm:vm-resolve-forward-references cl-cc/vm::*vm-current-state*)))
   (let ((unresolved nil)
         (resolved nil))
@@ -102,6 +100,23 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
     (when (and errorp unresolved)
       (error 'unresolved-forward-reference-error :references (nreverse unresolved)))
     (values (nreverse resolved) (nreverse unresolved))))
+
+(defun resolve-forward-references (&rest args)
+  "Resolve all pending forward references using RESOLVER.
+RESOLVER may be a hash table, alist, function, or a single replacement value.
+Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
+  (let ((resolver nil)
+        (errorp t)
+        (rest args))
+    (when (and rest (not (keywordp (first rest))))
+      (setf resolver (pop rest)))
+    (loop while rest do
+      (let ((key (pop rest))
+            (value (pop rest)))
+        (case key
+          (:errorp (setf errorp value))
+          (otherwise nil))))
+    (%resolve-forward-references resolver errorp)))
 
 (defun %record-load-time-value-cell (form read-only-p)
   "Record FORM for load-time execution and return its cell id."

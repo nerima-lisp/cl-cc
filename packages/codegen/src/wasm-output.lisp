@@ -67,8 +67,6 @@
     (format stream "~%  ;; FR-257: WASI 0.3 async I/O stubs use suspend/resume around wasi:io/streams"))
   (when *wasm-wasi-worlds-full-enabled*
     (format stream "~%  ;; FR-274: WASI world definitions enabled: wasi:nn, wasi:http, wasi:cli"))
-  (when *wasm-wasi-p1-compat-enabled*
-    (format stream "~%  ;; FR-321: WASI Preview 1 compatibility shim imports fd_read/fd_write/path_open"))
   (when *wasm-stack-switching-enabled*
     (format stream "~%  ;; FR-205 helpers: ~A | ~A | ~A"
             (wasm-cont-new-wat "$main_func_t" "(ref.func $main)")

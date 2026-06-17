@@ -201,6 +201,67 @@
                    (lambda (x &rest _) (declare (ignore _)) (%jr-arr x (* x 10)))))))
     (assert-equal '(1 10 2 20 3 30) (%jr-list result))))
 
+(deftest js-rt-iterator-zip
+  "Iterator.zip combines iterables row-wise."
+  (let* ((rows (cl-cc/javascript::%js-iterator-to-array
+                (cl-cc/javascript::%js-iterator-zip
+                 (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2 3))
+                          (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10 20)))))))
+         (lists (mapcar #'%jr-list (%jr-list rows))))
+    (assert-equal '((1 10) (2 20)) lists))
+
+(deftest js-rt-iterator-zip-longest
+  "Iterator.zip longest mode continues until every iterator is exhausted."
+  (let* ((rows (cl-cc/javascript::%js-iterator-to-array
+                (cl-cc/javascript::%js-iterator-zip
+                 (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2 3))
+                          (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10 20)))
+                 (cl-cc/javascript::%js-make-object
+                  "mode" "longest"
+                  "padding" (%jr-arr 0 9)))))
+         (lists (mapcar #'%jr-list (%jr-list rows))))
+    (assert-equal '((1 10) (2 20) (3 9)) lists)))
+
+(deftest js-rt-iterator-zip-strict-signals
+  "Iterator.zip strict mode rejects uneven iterables."
+  (let ((iter (cl-cc/javascript::%js-iterator-zip
+               (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2))
+                        (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10)))
+               (cl-cc/javascript::%js-make-object "mode" "strict"))))
+    (multiple-value-bind (row done) (cl-cc/javascript::%js-iter-next iter)
+      (declare (ignore row))
+      (assert-false done))
+    (assert-signals error
+      (cl-cc/javascript::%js-iter-next iter))))
+
+(deftest js-rt-iterator-zip-keyed
+  "Iterator.zipKeyed combines object-valued iterables and preserves null prototype."
+  (let* ((sources (cl-cc/javascript::%js-make-object
+                   "left" (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2))
+                   "right" (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10))))
+         (rows (cl-cc/javascript::%js-iterator-to-array
+                (cl-cc/javascript::%js-iterator-zip-keyed
+                 sources
+                 (cl-cc/javascript::%js-make-object
+                  "mode" "longest"
+                  "padding" (cl-cc/javascript::%js-make-object "left" 0 "right" 9)))))
+         (first (aref rows 0))
+         (second (aref rows 1)))
+    (assert-eql +js-null+ (cl-cc/javascript::%js-object-get-prototype-of first))
+    (assert-= 1 (gethash "left" first))
+    (assert-= 10 (gethash "right" first))
+    (assert-= 2 (gethash "left" second))
+    (assert-= 9 (gethash "right" second))))
+
+(deftest js-rt-iterator-zip-keyed-undefined-source
+  "Iterator.zipKeyed rejects present properties whose value is undefined."
+  (assert-signals error
+    (cl-cc/javascript::%js-iterator-zip-keyed
+     (cl-cc/javascript::%js-make-object
+      "left" +js-undefined+
+      "right" (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10)))
+     (cl-cc/javascript::%js-make-object "mode" "shortest"))))
+
 ;;; ─── Promise built-ins ───────────────────────────────────────────────────────
 
 (deftest js-rt-promise-resolve-await
@@ -310,6 +371,38 @@
     (cl-cc/javascript::%js-map-set m "a" 1)
     (cl-cc/javascript::%js-map-clear m)
     (assert-= 0 (cl-cc/javascript::%js-map-size m))))
+
+(deftest js-rt-map-get-or-insert
+  "Map.getOrInsert returns an existing value or installs the default."
+  (let ((m (cl-cc/javascript::%js-make-map)))
+    (cl-cc/javascript::%js-map-set m "a" 1)
+    (assert-= 1 (cl-cc/javascript::%js-map-get-or-insert m "a" 99))
+    (assert-= 1 (cl-cc/javascript::%js-map-get m "a"))
+    (assert-= 7 (cl-cc/javascript::%js-map-get-or-insert m "b" 7))
+    (assert-= 7 (cl-cc/javascript::%js-map-get m "b"))))
+
+(deftest js-rt-map-get-or-insert-computed
+  "Map.getOrInsertComputed only calls the callback for missing entries."
+  (let ((m (cl-cc/javascript::%js-make-map))
+        (calls 0))
+    (cl-cc/javascript::%js-map-set m "a" 1)
+    (assert-= 1
+              (cl-cc/javascript::%js-map-get-or-insert-computed
+               m "a"
+               (lambda (k)
+                 (declare (ignore k))
+                 (incf calls)
+                 99)))
+    (assert-= 0 calls)
+    (assert-= 10
+              (cl-cc/javascript::%js-map-get-or-insert-computed
+               m "b"
+               (lambda (k)
+                 (declare (ignore k))
+                 (incf calls)
+                 10)))
+    (assert-= 1 calls)
+    (assert-= 10 (cl-cc/javascript::%js-map-get m "b"))))
 
 (deftest js-rt-map-group-by
   "Map.groupBy groups iterable items by key-fn result."
@@ -483,6 +576,39 @@ plain number via truncate — the key invariant behind define-js-bigint-binop."
     (assert-false (cl-cc/javascript::%js-weak-map-has wm key))
     (assert-eq cl-cc/javascript::+js-undefined+
                (cl-cc/javascript::%js-weak-map-get wm key))))
+
+(deftest js-rt-weak-map-get-or-insert
+  "WeakMap.getOrInsert returns an existing value or installs the default."
+  (let* ((wm  (cl-cc/javascript::%js-make-weak-map))
+         (key (cl-cc/javascript::%js-make-object "x" 1)))
+    (cl-cc/javascript::%js-weak-map-set wm key 12)
+    (assert-= 12 (cl-cc/javascript::%js-weak-map-get-or-insert wm key 99))
+    (assert-= 12 (cl-cc/javascript::%js-weak-map-get wm key))))
+
+(deftest js-rt-weak-map-get-or-insert-computed
+  "WeakMap.getOrInsertComputed only calls the callback for missing entries."
+  (let* ((wm  (cl-cc/javascript::%js-make-weak-map))
+         (key (cl-cc/javascript::%js-make-object "x" 1))
+         (calls 0))
+    (cl-cc/javascript::%js-weak-map-set wm key 3)
+    (assert-= 3
+              (cl-cc/javascript::%js-weak-map-get-or-insert-computed
+               wm key
+               (lambda (k)
+                 (declare (ignore k))
+                 (incf calls)
+                 99)))
+    (assert-= 0 calls)
+    (let ((other-key (cl-cc/javascript::%js-make-object "y" 2)))
+      (assert-= 10
+                (cl-cc/javascript::%js-weak-map-get-or-insert-computed
+                 wm other-key
+                 (lambda (k)
+                   (declare (ignore k))
+                   (incf calls)
+                   10)))
+      (assert-= 1 calls)
+      (assert-= 10 (cl-cc/javascript::%js-weak-map-get wm other-key)))))
 
 ;;; ─── WeakSet ─────────────────────────────────────────────────────────────────
 

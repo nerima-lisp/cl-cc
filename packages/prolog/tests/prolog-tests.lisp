@@ -2,24 +2,10 @@
 
 (in-package :cl-cc/test)
 
-;; These tests mutate or depend on the global Prolog DB, so they run under the
-;; serial integration tree with explicit DB reset/restore around each example.
+;; These tests run under the serial integration tree.
 (defsuite cl-cc-prolog-integration-suite
   :description "Serial Prolog integration tests with isolated rule DB state"
   :parent cl-cc-integration-serial-suite)
-
-(defparameter *prolog-integration-db-snapshot* nil)
-
-(defbefore :each (cl-cc-prolog-integration-suite)
-  (setf *prolog-integration-db-snapshot*
-        (%snapshot-hash-table cl-cc/prolog:*prolog-rules*))
-  (clrhash cl-cc/prolog:*prolog-rules*))
-
-(defafter :each (cl-cc-prolog-integration-suite)
-  (clrhash cl-cc/prolog:*prolog-rules*)
-  (%restore-hash-table cl-cc/prolog:*prolog-rules*
-                       *prolog-integration-db-snapshot*)
-  (setf *prolog-integration-db-snapshot* nil))
 
 (in-suite cl-cc-prolog-integration-suite)
 
@@ -29,7 +15,9 @@
 
 (deftest prolog-builtin-unification-succeeds
   "Built-in = unifies and calls continuation once"
-  (assert-prolog-binding= '(= ?x 42) '?x 42))
+  (with-prolog-goal-results (solutions '(= ?x 42))
+    (assert-= 1 (length solutions))
+    (assert-= 42 (cl-cc:logic-substitute '?x (car solutions)))))
 
 (deftest-each prolog-non-unification-cases
   "Built-in /=: succeeds when terms differ, fails when equal"
@@ -40,9 +28,11 @@
 
 (deftest prolog-builtin-conjunction
   "Built-in 'and' chains goals and accumulates bindings"
-  (with-prolog-single-solution (env '(and (= ?x 1) (= ?y 2)))
-    (assert-= 1 (cl-cc:logic-substitute '?x env))
-    (assert-= 2 (cl-cc:logic-substitute '?y env))))
+  (with-prolog-goal-results (solutions '(and (= ?x 1) (= ?y 2)))
+    (assert-= 1 (length solutions))
+    (let ((env (car solutions)))
+      (assert-= 1 (cl-cc:logic-substitute '?x env))
+      (assert-= 2 (cl-cc:logic-substitute '?y env)))))
 
 (deftest prolog-builtin-disjunction
   "Built-in 'or' tries each alternative"
@@ -59,18 +49,19 @@
   (goal expected-count)
   (assert-prolog-query-count= goal expected-count))
 
+(deftest prolog-builtin-when-quotes-symbol-bindings
+  "Built-in :when preserves symbol bindings by quoting substituted symbols for CL eval."
+  (assert-prolog-query-count= '(and (= ?x foo) (:when (eq ?x 'foo))) 1))
+
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Cut operator
 ;;; ─────────────────────────────────────────────────────────────────────────
 
 (deftest prolog-cut-stops-backtracking
   "Cut (!) stops further alternatives in the parent clause"
-  (with-fresh-prolog
-    (cl-cc/prolog:def-fact (color red))
-    (cl-cc/prolog:def-fact (color green))
-    (cl-cc/prolog:def-fact (color blue))
-    (cl-cc:def-rule (first-color ?c) (color ?c) !)
-    (assert-prolog-query-count= '(first-color ?c) 1)))
+  (with-prolog-facts ((color red) (color green) (color blue))
+    (with-prolog-rules (((first-color ?c) (color ?c) !))
+      (assert-prolog-query-count= '(first-color ?c) 1))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Standard database predicates — cons-functor notation
@@ -111,17 +102,20 @@
 
 (deftest prolog-solve-conjunction-empty-succeeds-once
   "solve-conjunction with no goals calls the continuation exactly once"
-  (let ((count 0))
-    (cl-cc/prolog::solve-conjunction nil nil (lambda (env) (declare (ignore env)) (incf count)))
-    (assert-= 1 count)))
+  (with-prolog-results (results
+                        (lambda (emit)
+                          (cl-cc/prolog::solve-conjunction nil nil emit)))
+    (assert-= 1 (length results))))
 
 (deftest prolog-solve-conjunction-accumulates-bindings
   "solve-conjunction chains goals, accumulating bindings"
-  (let ((envs nil))
-    (cl-cc/prolog::solve-conjunction '((= ?x 10) (= ?y 20)) nil (lambda (env) (push env envs)))
-    (assert-= 1 (length envs))
-    (assert-= 10 (cl-cc:logic-substitute '?x (car envs)))
-    (assert-= 20 (cl-cc:logic-substitute '?y (car envs)))))
+    (with-prolog-goal-projections (results
+                                   (lambda (emit)
+                                     (cl-cc/prolog::solve-conjunction '((= ?x 10) (= ?y 20))
+                                                                      nil
+                                                                      emit))
+                                   (list ?x ?y))
+      (assert-equal '((10 20)) results)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; query-one / query-all / query-first-n
@@ -157,17 +151,13 @@
 
 (deftest prolog-def-rule-one-level
   "def-rule resolves one inference step"
-  (with-fresh-prolog
-    (cl-cc/prolog:def-fact (parent tom mary))
-    (cl-cc/prolog:def-fact (parent tom john))
-    (cl-cc:def-rule (child ?c ?p) (parent ?p ?c))
-    (assert-prolog-query-count= '(child ?c tom) 2)))
+  (with-prolog-facts ((parent tom mary) (parent tom john))
+    (with-prolog-rules (((child ?c ?p) (parent ?p ?c)))
+      (assert-prolog-query-count= '(child ?c tom) 2))))
 
 (deftest prolog-def-rule-transitive
   "def-rule supports multi-hop inference"
-  (with-fresh-prolog
-    (cl-cc/prolog:def-fact (parent tom mary))
-    (cl-cc/prolog:def-fact (parent mary ann))
-    (cl-cc:def-rule (ancestor ?a ?d) (parent ?a ?d))
-    (cl-cc:def-rule (ancestor ?a ?d) (parent ?a ?m) (ancestor ?m ?d))
-    (assert-prolog-query-count= '(ancestor tom ?d) 2)))
+  (with-prolog-facts ((parent tom mary) (parent mary ann))
+    (with-prolog-rules (((ancestor ?a ?d) (parent ?a ?d))
+                        ((ancestor ?a ?d) (parent ?a ?m) (ancestor ?m ?d)))
+      (assert-prolog-query-count= '(ancestor tom ?d) 2))))

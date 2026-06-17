@@ -167,6 +167,227 @@
 ;;; Iterators are represented as closures that return (:value v :done nil/t)
 ;;; or as JS objects with a "next" method.
 
+(defun %js-zip-type-error (message)
+  (%js-throw
+   (%js-make-error-instance
+    *js-type-error-class*
+    message)))
+
+(defun %js-zip-primitive-p (value)
+  (or (null value)
+      (stringp value)
+      (numberp value)
+      (eq value t)
+      (eq value nil)
+      (typep value 'js-symbol)
+      (typep value 'js-bigint)))
+
+(defun %js-zip-normalize-iterable (value)
+  "Normalize VALUE to a JS iterator for Iterator.zip / zipKeyed."
+  (cond
+    ((%js-zip-primitive-p value)
+     (%js-zip-type-error "Iterator.zip expects iterable objects"))
+    ((%js-vec-p value)
+     (%js-vec-to-iter value))
+    ((typep value 'js-map)
+     (%js-map-entries value))
+    ((typep value 'js-set)
+     (%js-set-keys value))
+    ((%js-ht-p value)
+     (multiple-value-bind (next present-p) (gethash "next" value)
+       (cond
+         ((and present-p (functionp next))
+          value)
+         ((multiple-value-bind (iter-fn iter-present-p) (gethash "@@iterator" value)
+            (when (and iter-present-p (functionp iter-fn))
+              (%js-zip-normalize-iterable (%js-funcall iter-fn)))))
+         (t (%js-zip-type-error "Iterator.zip expects iterable objects")))))
+    (t
+     (%js-zip-type-error "Iterator.zip expects iterable objects"))))
+
+(defun %js-zip-normalize-options (options)
+  (when (and options (not (hash-table-p options)))
+    (%js-zip-type-error "Iterator.zip options must be an object")))
+
+(defun %js-zip-collect-source-iterators (iterables)
+  (let ((outer (%js-zip-normalize-iterable iterables))
+        (sources nil))
+    (%js-doiter (value outer)
+      (push (%js-zip-normalize-iterable value) sources))
+    (nreverse sources)))
+
+(defun %js-zip-collect-padding (padding-option iter-count)
+  (cond
+    ((null padding-option)
+      (loop repeat iter-count collect +js-undefined+))
+    ((%js-zip-primitive-p padding-option)
+     (%js-zip-type-error "Iterator.zip padding must be iterable"))
+    (t
+     (let ((padding-iter (%js-zip-normalize-iterable padding-option))
+           (padding nil)
+           (count 0))
+       (block padding-limit
+         (%js-doiter (value padding-iter nil)
+           (push value padding)
+           (incf count)
+           (when (>= count iter-count)
+             (return-from padding-limit))))
+       (let ((result (nreverse padding)))
+         (loop repeat (max 0 (- iter-count count))
+               do (setf result (append result (list +js-undefined+))))
+         result)))))
+
+(defun %js-zip-collect-keyed-padding (padding-option keys)
+  (cond
+    ((null padding-option)
+     (loop for _ in keys collect +js-undefined+))
+    ((not (hash-table-p padding-option))
+     (%js-zip-type-error "Iterator.zip padding must be an object"))
+    (t
+     (loop for key in keys
+           collect (multiple-value-bind (value present-p) (gethash key padding-option)
+                     (if present-p value +js-undefined+))))))
+
+(defun %js-zip-strict-remaining-exhausted-p (sources)
+  (dolist (iter sources t)
+    (when iter
+      (multiple-value-bind (value done) (%js-iter-next iter)
+        (declare (ignore value))
+        (unless done
+          (return-from %js-zip-strict-remaining-exhausted-p nil))))))
+
+(defun %js-zip-read-mode (options)
+  (let ((mode "shortest")
+        (padding-option nil))
+    (when options
+      (multiple-value-bind (value present-p) (gethash "mode" options)
+        (when present-p
+          (setf mode value))))
+    (unless (member mode '("shortest" "longest" "strict") :test #'string=)
+      (%js-zip-type-error "Iterator.zip mode must be shortest, longest, or strict"))
+    (when (string= mode "longest")
+      (when options
+        (multiple-value-bind (value present-p) (gethash "padding" options)
+          (when present-p
+            (setf padding-option value)))))
+    (values mode padding-option)))
+
+(defun %js-iterator-zip (iterables &optional options)
+  "Iterator.zip(iterables[, options]) → iterator of arrays."
+  (%js-zip-normalize-options options)
+  (multiple-value-bind (mode padding-option) (%js-zip-read-mode options)
+    (let* ((sources (%js-zip-collect-source-iterators iterables))
+           (padding (if (string= mode "longest")
+                        (%js-zip-collect-padding padding-option (length sources))
+                        (loop repeat (length sources) collect +js-undefined+)))
+           (done-p nil))
+      (%js-make-cl-iterator
+       (lambda ()
+         (block step
+           (when done-p
+             (return-from step :done))
+           (when (null sources)
+             (setf done-p t)
+             (return-from step :done))
+           (let ((results nil)
+                 (any-done-p nil)
+                 (all-done-p t))
+             (loop for idx from 0
+                   for iter in sources
+                   for pad in padding
+                   do (cond
+                        ((null iter)
+                         (push pad results))
+                        (t
+                         (multiple-value-bind (value exhausted-p) (%js-iter-next iter)
+                           (if exhausted-p
+                             (progn
+                                 (setf any-done-p t)
+                                 (setf (nth idx sources) nil)
+                                 (push pad results))
+                               (progn
+                                 (setf all-done-p nil)
+                                 (push value results)))))))
+             (when any-done-p
+               (cond
+                 ((and (string= mode "strict") (not all-done-p))
+                  (%js-zip-type-error "Iterator.zip strict mode requires equal-length iterables"))
+                 ((not (string= mode "longest"))
+                  (setf done-p t)
+                  (return-from step :done))
+                 (all-done-p
+                  (setf done-p t)
+                  (return-from step :done))))
+             (when all-done-p
+               (setf done-p t)
+               (return-from step :done))
+             (cons (%js-make-array (nreverse results)) nil))))))))
+
+(defun %js-iterator-zip-keyed (iterables &optional options)
+  "Iterator.zipKeyed(iterables[, options]) → iterator of null-prototype objects."
+  (%js-zip-normalize-options options)
+  (multiple-value-bind (mode padding-option) (%js-zip-read-mode options)
+    (unless (hash-table-p iterables)
+      (%js-zip-type-error "Iterator.zipKeyed expects an object"))
+    (let* ((keys nil)
+           (sources nil)
+           (all-keys (%js-object-own-string-property-keys iterables))
+           (padding (if (string= mode "longest")
+                        nil
+                        (loop repeat (length all-keys) collect +js-undefined+)))
+           (done-p nil))
+        (loop for key across all-keys do
+          (multiple-value-bind (value present-p) (gethash key iterables)
+            (when present-p
+              (push key keys)
+              (push (%js-zip-normalize-iterable value) sources))))
+      (setf keys (nreverse keys)
+            sources (nreverse sources))
+      (when (string= mode "longest")
+        (setf padding (%js-zip-collect-keyed-padding padding-option keys)))
+      (%js-make-cl-iterator
+       (lambda ()
+         (block step
+           (when done-p
+             (return-from step :done))
+           (when (null sources)
+             (setf done-p t)
+             (return-from step :done))
+           (let ((results (%js-object-create +js-null+))
+                 (any-done-p nil)
+                 (all-done-p t))
+             (loop for idx from 0
+                   for key in keys
+                   for iter in sources
+                   for pad in padding
+                   do (cond
+                        ((null iter)
+                         (setf (gethash key results) pad))
+                        (t
+                         (multiple-value-bind (value exhausted-p) (%js-iter-next iter)
+                           (if exhausted-p
+                             (progn
+                                 (setf any-done-p t)
+                                 (setf (nth idx sources) nil)
+                                 (setf (gethash key results) pad))
+                               (progn
+                                 (setf all-done-p nil)
+                                 (setf (gethash key results) value)))))))
+             (when any-done-p
+               (cond
+                 ((and (string= mode "strict") (not all-done-p))
+                  (%js-zip-type-error "Iterator.zip strict mode requires equal-length iterables"))
+                 ((not (string= mode "longest"))
+                  (setf done-p t)
+                  (return-from step :done))
+                 (all-done-p
+                  (setf done-p t)
+                  (return-from step :done))))
+             (when all-done-p
+               (setf done-p t)
+               (return-from step :done))
+             (cons results nil))))))))
+
 (defun %js-iter-next (iter)
   "Advance iter; return (values value done-p)."
   (let* ((result (if (functionp iter)
@@ -297,6 +518,21 @@ BODY runs for each element; DONE-RESULT is returned when the iterator exhausts."
 (defun %js-iterator-find (iter fn)
   (%js-doiter (val iter +js-undefined+)
     (when (%js-truthy (%js-funcall fn val)) (return val))))
+
+(defun %js-iterator-concat (&rest items)
+  "Iterator.concat(...items): lazily chain normalized iterables in order."
+  (let ((sources (mapcar #'%js-iterator-from-iterable items))
+        (current nil))
+    (%js-make-cl-iterator
+     (lambda ()
+       (loop
+         (when current
+           (multiple-value-bind (val done) (%js-iter-next current)
+             (unless done (return (cons val nil)))
+             (setf current nil)))
+         (when (null sources)
+           (return :done))
+         (setf current (pop sources)))))))
 
 ;;; ─── ES2025 Iterator.prototype helpers ────────────────────────────────────────
 

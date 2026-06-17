@@ -10,6 +10,12 @@
 (declaim (ftype function subst-for-eval eval-lisp-condition
                       solve-conjunction solve-goal our-eval))
 
+(defmacro def-binary-prolog-handler (name (left right) &body body)
+  "Define a binary builtin handler with ARGS destructured once at the top."
+  `(defun ,name (args env k)
+     (destructuring-bind (,left ,right) args
+       ,@body)))
+
 (defun prolog-cut-handler (args env k)
   (declare (ignore args))
   (funcall k env)
@@ -22,14 +28,13 @@
   (dolist (alt args)
     (solve-goal alt env k)))
 
-(defun prolog-unify-handler (args env k)
-  (let ((new-env (unify (first args) (second args) env)))
-    (unless (unify-failed-p new-env)
-      (funcall k new-env))))
+(def-binary-prolog-handler prolog-unify-handler (left right)
+  (when-unify-succeeds (new-env left right env)
+    (funcall k new-env)))
 
-(defun prolog-not-unify-handler (args env k)
-  (let ((v1 (logic-substitute (first args) env))
-        (v2 (logic-substitute (second args) env)))
+(def-binary-prolog-handler prolog-not-unify-handler (left right)
+  (let ((v1 (logic-substitute left env))
+        (v2 (logic-substitute right env)))
     (when (not (equal v1 v2))
       (funcall k env))))
 
@@ -42,12 +47,12 @@
    (quote ...) so they survive CL eval, and skips (quote ...) forms."
   (cond
     ((logic-var-p form)
-     (let ((val (logic-substitute form env)))
-       (if (logic-var-p val)
-           val
-           (if (and (symbolp val) val (not (keywordp val)))
-               `(quote ,val)
-               val))))
+      (let ((val (logic-substitute form env)))
+        (if (logic-var-p val)
+            val
+            (if (and (symbolp val) val (not (keywordp val)))
+                `(quote ,val)
+                val))))
     ((and (consp form) (eq (car form) 'quote))
      form)
     ((consp form)

@@ -89,21 +89,23 @@ Gensym-hygienic expansions are never cached."
   (and (not (%contains-uninterned-symbol-p form))
        (not (%side-effecting-macro-form-p form))))
 
+(defun %register-expander (table name expander)
+  "Register NAME in TABLE and invalidate macroexpansion caches."
+  (setf (gethash name table) expander)
+  (%reset-macroexpansion-caches)
+  name)
+
 (defun register-macro (name expander)
   "Register NAME as a macro with EXPANDER in the global environment.
 EXPANDER may be either a host function or a descriptor consumed by
 `invoke-registered-expander'."
-  (setf (gethash name (macro-env-table *macro-environment*)) expander)
-  (%reset-macroexpansion-caches)
-  name)
+  (%register-expander (macro-env-table *macro-environment*) name expander))
 
 (defun register-compiler-macro (name expander)
   "Register NAME as a compiler macro expander in the global environment.
 EXPANDER may be either a host function or a descriptor consumed by
 `invoke-registered-expander'."
-  (setf (gethash name *compiler-macro-table*) expander)
-  (%reset-macroexpansion-caches)
-  name)
+  (%register-expander *compiler-macro-table* name expander))
 
 (defparameter *expander-descriptor-kinds*
   '(:macro-expander :compiler-macro-expander :register-macro-expander)

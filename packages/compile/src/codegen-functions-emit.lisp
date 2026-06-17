@@ -39,8 +39,9 @@
   (emit ctx (make-vm-label :name end-label)))
 
 (defmethod compile-ast ((node ast-lambda) ctx)
-  (%with-no-tail-position ctx
-    (let* ((raw-params (ast-lambda-params node))
+  (%call-with-no-tail-position ctx
+    (lambda ()
+      (let* ((raw-params (ast-lambda-params node))
            (params (%plain-required-params raw-params))
            (body (ast-lambda-body node))
            (func-label (make-label ctx "lambda"))
@@ -99,7 +100,7 @@
                                type-bindings nil nil
                                (and (no-allocation-declared-p (ast-lambda-declarations node))
                                     node))))
-        closure-reg))))
+        closure-reg)))))
 
 (defun %static-values-arity-from-body (body)
   "Return statically known VALUES arity for BODY's final form, limited to 2-3."
@@ -110,8 +111,9 @@
 
 (defmethod compile-ast ((node ast-defun) ctx)
   "Compile a top-level function definition."
-  (%with-no-tail-position ctx
-    (let* ((name (ast-defun-name node))
+  (%call-with-no-tail-position ctx
+    (lambda ()
+      (let* ((name (ast-defun-name node))
            (raw-params (ast-defun-params node))
            (params (%plain-required-params raw-params))
            (body (ast-defun-body node))
@@ -189,7 +191,7 @@
                                  type-bindings name func-label
                                  (and (no-allocation-declared-p (ast-defun-declarations node))
                                       node)))))
-        closure-reg))))
+        closure-reg)))))
 
 ;;; ── defvar / defparameter ────────────────────────────────────────────────
 
@@ -199,8 +201,9 @@ Global variables are stored in the VM's global variable store so they
 persist across function calls.
 FR-600: defvar only sets the value if the variable is not already bound;
         defparameter always sets the value."
-  (%with-no-tail-position ctx
-    (let* ((name (ast-defvar-name node))
+  (%call-with-no-tail-position ctx
+    (lambda ()
+      (let* ((name (ast-defvar-name node))
            (kind (ast-defvar-kind node))  ; 'defvar or 'defparameter
            (value-form (ast-defvar-value node))
            (result-reg (make-register ctx)))
@@ -238,4 +241,4 @@ FR-600: defvar only sets the value if the variable is not already bound;
            ;; DONE: result is the variable name (ANSI: defvar returns the name)
            (emit ctx (make-vm-label :name label-done))
            (emit ctx (make-vm-const :dst result-reg :value name))
-           result-reg))))))
+           result-reg)))))))

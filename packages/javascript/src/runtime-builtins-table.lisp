@@ -110,6 +110,8 @@
     ("JSON.parse"              . ,(lambda (str &optional _reviver)
                                     (declare (ignore _reviver))
                                     (%js-json-parse str)))
+    ("JSON.rawJSON"            . ,#'%js-json-raw-json)
+    ("JSON.isRawJSON"          . ,#'%js-json-is-raw-json)
     ;; Symbol global (callable object)
     ("Symbol.for"              . ,#'%js-symbol-for)
     ("Symbol.keyFor"           . ,#'%js-symbol-key-for)
@@ -191,6 +193,11 @@
     ("Object.getPrototypeOf" . ,#'%js-object-get-prototype-of)
     ;; ES2024: Iterator.from (TC39 iterator protocol)
     ("Iterator.from"     . ,#'%js-iterator-from-iterable)
+    ;; ES2026: Iterator.zip / Iterator.zipKeyed
+    ("Iterator.zip"      . ,#'%js-iterator-zip)
+    ("Iterator.zipKeyed" . ,#'%js-iterator-zip-keyed)
+    ;; ES2026: Iterator.concat
+    ("Iterator.concat"   . ,#'%js-iterator-concat)
     ;; ES2025: Promise.try
     ("Promise.try"          . ,#'%js-promise-try)
     ;; ES2026: Math.sumPrecise
@@ -253,7 +260,7 @@
                               (format t "Trace: ~{~A~^ ~}~%" (mapcar #'%js-to-string args))
                               +js-undefined+))
     ;; globalThis extras
-    ("Atomics"           . ,(lambda () +js-undefined+))
+    ("Atomics"           . ,(%js-make-atomics))
     ("SharedArrayBuffer" . ,(lambda (n) (%js-make-typed-array "Uint8Array" n)))
     ;; URL / URLSearchParams
     ("URL"               . ,#'%js-make-url)

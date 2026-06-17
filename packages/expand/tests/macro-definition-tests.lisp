@@ -45,6 +45,17 @@
     (let ((result (cl-cc/expand:compiler-macroexpand-all `(,name 2))))
       (assert-equal 3 result))))
 
+(deftest our-defmacro-binds-whole-form
+  "our-defmacro binds &whole to the full macro call before destructuring."
+  (let ((name (gensym "M-WHOLE-")))
+    (our-macroexpand-1
+     `(our-defmacro ,name (&whole whole x)
+        (if (equal whole (list ,name 2))
+            (+ x 10)
+            whole)))
+    (assert-equal '(+ 2 10)
+                  (our-macroexpand-1 `(,name 2)))))
+
 (deftest invoke-registered-expander-supports-descriptor-backed-compiler-macros
   "Descriptor-backed compiler macro expanders still execute through invoke-registered-expander."
   (let ((cl-cc/expand:*macro-eval-fn* #'eval)

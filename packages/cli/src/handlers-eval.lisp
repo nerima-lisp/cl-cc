@@ -3,14 +3,15 @@
 
 (in-package :cl-cc/cli)
 
-(defun %compile-and-run-eval-form (expr stdlib no-stdlib kwargs vm-state opts)
+(defun %compile-and-run-eval-form (expr stdlib no-stdlib language kwargs vm-state opts)
   "Compile and run EXPR for the eval command.
 STDLIB selects whether the stdlib-aware compiler may be used. KWARGS are
-forwarded to the compiler, VM-STATE is passed to RUN-COMPILED, and OPTS supply
-runtime sanitizer flags. Returns two values: the evaluated result and the
-compilation-result object used to produce it."
+forwarded to the compiler, LANGUAGE selects the parser/compiler language,
+VM-STATE is passed to RUN-COMPILED, and OPTS supply runtime sanitizer flags.
+Returns two values: the evaluated result and the compilation-result object
+used to produce it."
   (labels ((compile-and-run (compile-fn)
-             (let* ((compiled (apply compile-fn expr :target :vm kwargs))
+             (let* ((compiled (apply compile-fn expr :target :vm :language language kwargs))
                     (result (%call-with-runtime-sanitizer-flags
                              opts
                              (lambda ()
@@ -46,6 +47,8 @@ status 0 on success or 2 when the expression is missing."
       (%print-help "eval")
       (uiop:quit 2))
     (let* ((stdlib (flag parsed "--stdlib"))
+            (lang-flag (or (flag parsed "--lang") ""))
+            (language (%detect-language nil lang-flag))
             (verbose (flag parsed "--verbose"))
             (no-stdlib (flag parsed "--no-stdlib"))
            (timeout (%get-timeout parsed))
@@ -66,7 +69,7 @@ status 0 on success or 2 when the expression is missing."
                       (compiled nil))
                 (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
                 (multiple-value-setq (result compiled)
-                   (%compile-and-run-eval-form expr stdlib no-stdlib kwargs vm-state opts))
+                   (%compile-and-run-eval-form expr stdlib no-stdlib language kwargs vm-state opts))
                 (%maybe-write-pgo-profile opts compiled vm-state)
                 (when (compile-opts-profile opts)
                   (print-profile vm-state))

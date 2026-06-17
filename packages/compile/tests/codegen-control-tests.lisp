@@ -51,24 +51,25 @@
 
 ;;; ─── lookup-block ────────────────────────────────────────────────────────────
 
-(deftest lookup-block-finds-single-block
-  "lookup-block returns exit-label and register for a single registered block."
+(deftest-each lookup-block-finds-block
+  "lookup-block returns exit-label and result register for registered blocks."
+  :cases (("single-block"
+           (list (cons 'my-block (cons "exit_0" :R3)))
+           'my-block
+           "exit_0"
+           :R3)
+          ("multi-block"
+           (list (cons 'outer (cons "outer_exit" :R0))
+                 (cons 'inner (cons "inner_exit" :R1)))
+           'inner
+           "inner_exit"
+           :R1))
+  (env name expected-exit expected-reg)
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (setf (cl-cc/compile:ctx-block-env ctx)
-          (list (cons 'my-block (cons "exit_0" :R3))))
-    (let ((info (cl-cc/compile::lookup-block ctx 'my-block)))
-      (assert-equal "exit_0" (car info))
-      (assert-eq :R3 (cdr info)))))
-
-(deftest lookup-block-finds-correct-in-multi-block-env
-  "lookup-block finds the inner block by name in a multi-block environment."
-  (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (setf (cl-cc/compile:ctx-block-env ctx)
-          (list (cons 'outer (cons "outer_exit" :R0))
-                (cons 'inner (cons "inner_exit" :R1))))
-    (let ((info (cl-cc/compile::lookup-block ctx 'inner)))
-      (assert-equal "inner_exit" (car info))
-      (assert-eq :R1 (cdr info)))))
+    (setf (cl-cc/compile:ctx-block-env ctx) env)
+    (let ((info (cl-cc/compile::lookup-block ctx name)))
+      (assert-equal expected-exit (car info))
+      (assert-eq expected-reg (cdr info)))))
 
 (deftest lookup-block-signals-for-unknown-name
   "lookup-block signals an error when no block with the given name is in the environment."
@@ -78,28 +79,33 @@
 
 ;;; ─── lookup-tag ──────────────────────────────────────────────────────────────
 
-(deftest lookup-tag-returns-label-for-known-tag
+(deftest-each lookup-tag-returns-label
   "lookup-tag returns the label string for each known tag name."
+  :cases (("first-tag"
+           (list (cons 'loop-start "tag_0")
+                 (cons 'loop-end   "tag_1"))
+           'loop-start
+           "tag_0")
+          ("second-tag"
+           (list (cons 'loop-start "tag_0")
+                 (cons 'loop-end   "tag_1"))
+           'loop-end
+           "tag_1")
+          ("shadowed-tag"
+           (list (cons 'retry "inner_tag_5")
+                 (cons 'retry "outer_tag_1"))
+           'retry
+           "inner_tag_5"))
+  (env tag expected-label)
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (setf (cl-cc/compile:ctx-tagbody-env ctx)
-          (list (cons 'loop-start "tag_0")
-                (cons 'loop-end   "tag_1")))
-    (assert-equal "tag_0" (cl-cc/compile::lookup-tag ctx 'loop-start))
-    (assert-equal "tag_1" (cl-cc/compile::lookup-tag ctx 'loop-end))))
+    (setf (cl-cc/compile:ctx-tagbody-env ctx) env)
+    (assert-equal expected-label (cl-cc/compile::lookup-tag ctx tag))))
 
 (deftest lookup-tag-signals-for-unknown-tag
   "lookup-tag signals an error when the tag name is not in the environment."
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     (assert-signals error
       (cl-cc/compile::lookup-tag ctx 'missing-tag))))
-
-(deftest lookup-tag-shadowed-returns-innermost
-  "lookup-tag returns the innermost (first) label when the same tag name appears multiple times."
-  (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (setf (cl-cc/compile:ctx-tagbody-env ctx)
-          (list (cons 'retry "inner_tag_5")
-                (cons 'retry "outer_tag_1")))
-    (assert-equal "inner_tag_5" (cl-cc/compile::lookup-tag ctx 'retry))))
 
 ;;; ─── FR-920 / FR-902 utility hooks ──────────────────────────────────────────
 
@@ -205,6 +211,27 @@
     (let ((jumps (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-jump))
                                 (codegen-instructions ctx))))
       (assert-true (>= (length jumps) 2)))))
+
+(deftest codegen-block-restores-block-env
+  "Compiling an ast-block restores the caller's block environment."
+  (let ((ctx (make-codegen-ctx))
+        (old-env (list (cons 'outer (cons "outer_exit" :R0)))))
+    (setf (cl-cc/compile:ctx-block-env ctx) old-env)
+    (compile-ast (make-ast-block
+                  :name 'inner
+                  :body (list (make-ast-int :value 1)))
+                 ctx)
+    (assert-equal old-env (cl-cc/compile:ctx-block-env ctx))))
+
+(deftest codegen-tagbody-restores-tagbody-env
+  "Compiling an ast-tagbody restores the caller's tagbody environment."
+  (let ((ctx (make-codegen-ctx))
+        (old-env (list (cons 'outer "outer_tag"))))
+    (setf (cl-cc/compile:ctx-tagbody-env ctx) old-env)
+    (compile-ast (make-ast-tagbody
+                  :tags (list (cons 'inner (list (make-ast-int :value 1)))))
+                 ctx)
+    (assert-equal old-env (cl-cc/compile:ctx-tagbody-env ctx))))
 
 ;;; ─── %emit-the-runtime-assertion ─────────────────────────────────────────────
 

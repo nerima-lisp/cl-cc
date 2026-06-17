@@ -20,6 +20,38 @@
     (let ((result (run-string-repl "42")))
       (assert-= 42 result))))
 
+(deftest pipeline-repl-elisp-language-argument
+  "run-string-repl forwards an explicit :elisp language setting through parsing and compilation."
+  (let ((seen-parse-language nil)
+        (seen-compile-language nil)
+        (orig-parse (symbol-function 'cl-cc/parse:parse-source-for-language))
+        (orig-compile (symbol-function 'cl-cc::compile-string))
+        (orig-run (symbol-function 'cl-cc::%run-form-repl-impl)))
+    (unwind-protect
+         (progn
+           (sb-ext:without-package-locks
+             (setf (symbol-function 'cl-cc/parse:parse-source-for-language)
+                   (lambda (source language)
+                     (declare (ignore source))
+                     (setf seen-parse-language language)
+                     '((+ 1 2))))
+             (setf (symbol-function 'cl-cc::compile-string)
+                   (lambda (source &rest args &key target language &allow-other-keys)
+                     (declare (ignore source target args))
+                     (setf seen-compile-language language)
+                     :compiled))
+             (setf (symbol-function 'cl-cc::%run-form-repl-impl)
+                   (lambda (&rest args)
+                     (declare (ignore args))
+                     123)))
+           (assert-= 123 (run-string-repl "ignored" :language :elisp))
+           (assert-eq :elisp seen-parse-language)
+           (assert-eq :elisp seen-compile-language))
+      (sb-ext:without-package-locks
+        (setf (symbol-function 'cl-cc/parse:parse-source-for-language) orig-parse
+              (symbol-function 'cl-cc::compile-string) orig-compile
+              (symbol-function 'cl-cc::%run-form-repl-impl) orig-run)))))
+
 (deftest-each pipeline-repl-persistence
   "run-string-repl persists defun and defvar definitions across REPL calls."
   :cases (("defun"   "(defun repl-test-double (x) (* x 2))"  "(repl-test-double 21)"  42)

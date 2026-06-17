@@ -114,14 +114,15 @@ Uses the hand-written CL lexer and recursive-descent parser (no host reader)."
 
 (defun parse-compiler-lambda-list (params)
   "Parse a lambda list into required, optional, rest, key, and aux parameters.
-Returns (values required optional rest key aux) where:
+Returns (values required optional rest key aux whole environment) where:
   required = list of symbols
   optional = list of (name default-sexp) pairs
   rest = symbol or nil
   key = list of (name default-sexp supplied-p explicit-keyword) entries
-  aux = list of (name init-sexp) entries"
+  aux = list of (name init-sexp) entries
+  whole/environment are accepted and returned as binding symbols when present."
   (let ((required nil) (optional nil) (rest-param nil) (key-params nil)
-        (aux-params nil)
+        (aux-params nil) (whole-param nil) (environment-param nil)
         (state :required))
     (labels ((parse-aux-param (param)
                (cond
@@ -134,6 +135,8 @@ Returns (values required optional rest key aux) where:
                  (t (error "Invalid &aux parameter: ~S" param)))))
       (dolist (p params)
         (cond
+          ((eq p '&whole)     (setf state :whole))
+          ((eq p '&environment) (setf state :environment))
           ((eq p '&optional) (setf state :optional))
           ((eq p '&rest)     (setf state :rest))
           ((eq p '&body)     (setf state :rest))
@@ -141,6 +144,14 @@ Returns (values required optional rest key aux) where:
           ((eq p '&aux)      (setf state :aux))
           ((eq p '&allow-other-keys) nil)  ; skip
           (t (case state
+               (:whole (unless (symbolp p)
+                         (error "&whole parameter must be a symbol: ~S" p))
+                       (setf whole-param p)
+                       (setf state :required))
+               (:environment (unless (symbolp p)
+                               (error "&environment parameter must be a symbol: ~S" p))
+                             (setf environment-param p)
+                             (setf state :required))
                (:required (unless (symbolp p)
                             (error "Required parameter must be a symbol: ~S" p))
                           (push p required))
@@ -169,12 +180,14 @@ Returns (values required optional rest key aux) where:
               (nreverse optional)
               rest-param
               (nreverse key-params)
-              (nreverse aux-params)))))
+              (nreverse aux-params)
+              whole-param
+              environment-param))))
 
 (defun lambda-list-has-extended-p (params)
-  "Return T if PARAMS contains &optional, &rest, &body, &key, or &aux."
+  "Return T if PARAMS contains extended lambda-list keywords."
   (and (listp params)
-       (some (lambda (p) (member p '(&optional &rest &body &key &aux &allow-other-keys)))
+       (some (lambda (p) (member p '(&whole &environment &optional &rest &body &key &aux &allow-other-keys)))
              params)))
 
 (defun parse-slot-spec (spec)

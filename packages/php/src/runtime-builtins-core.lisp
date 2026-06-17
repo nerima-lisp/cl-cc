@@ -50,6 +50,7 @@ cached by this runtime helper."
 
 cl-cc models the persistent share handle as a stable PHP object-like
 hash-table. Repeated calls with the same ID return the same handle."
+  (%php-register-runtime-class-tag "CurlSharePersistentHandle")
   (let ((key (%php-stringify id)))
     (multiple-value-bind (handle foundp)
         (gethash key *php-curl-persistent-share-handles*)

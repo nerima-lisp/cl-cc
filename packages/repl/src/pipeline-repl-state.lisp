@@ -314,15 +314,16 @@ was replaced or completed."
     (run-program-slice *repl-pool-instructions* *repl-pool-labels*
                        start-pc *repl-vm-state*)))
 
-(defun run-string-repl (source)
+(defun run-string-repl (source &key (language :lisp))
   "Compile and run SOURCE using the persistent REPL state.
 Unlike run-string, this reuses the VM state (function-registry, class-registry,
 heap) across calls so that top-level definitions persist into later expressions.
 Cross-expression closure calls work because all instructions share one pool.
+LANGUAGE selects the parser and downstream compiler mode.
 
 Example:
-  (run-string-repl "(defun double (x) (* x 2))")
-  (run-string-repl "(double 21)")  ; => 42"
+  (run-string-repl \"(defun double (x) (* x 2))\")
+  (run-string-repl \"(double 21)\")  ; => 42"
   (%ensure-repl-state)
   (let* ((*package* *package*)
           (*macro-eval-fn* #'our-eval)
@@ -334,7 +335,7 @@ Example:
            (*labels-boxed-fns* nil)
           (*repl-global-variables* *repl-global-vars-persistent*)
           (*repl-capture-label-counter* t))
-    (let ((forms (parse-source-for-language source :lisp)))
+    (let ((forms (parse-source-for-language source language)))
       (when (and (= (length forms) 1)
                  (consp (first forms))
                  (symbolp (caar forms))
@@ -346,4 +347,4 @@ Example:
           (return-from run-string-repl (second (first forms)))))
       (dolist (form forms)
         (%remember-host-global-definition form))
-      (%run-form-repl-impl (compile-string source :target :vm)))))
+      (%run-form-repl-impl (compile-string source :target :vm :language language)))))

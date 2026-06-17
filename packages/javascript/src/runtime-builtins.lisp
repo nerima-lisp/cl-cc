@@ -823,3 +823,8 @@
   (%js-make-object
    "getRandomValues" #'%js-crypto-get-random-values
    "randomUUID" #'%js-crypto-random-uuid))
+
+(defun %js-make-atomics ()
+  "Atomics global object (pause)."
+  (%js-make-object
+   "pause" (lambda (&rest _) (declare (ignore _)) +js-undefined+)))

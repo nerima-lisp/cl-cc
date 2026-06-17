@@ -99,7 +99,7 @@
                                                     :output-file #P"out.bin"
                                                     :language :lisp))
           (assert-true helper-called)
-          (assert-true compile-toplevel-called)))))
+          (assert-true compile-toplevel-called))))))
 
 (deftest pipeline-native-compile-to-native-string-single-form-elisp-uses-direct-path
   "compile-to-native routes single-form Elisp strings through the direct native compile path while native CPS is disabled."
@@ -121,7 +121,7 @@
                                                     :output-file #P"out.bin"
                                                     :language :elisp))
           (assert-true helper-called)
-          (assert-true compile-toplevel-called)))))
+          (assert-true compile-toplevel-called))))))
 
 (deftest pipeline-native-compile-file-single-safe-form-uses-direct-path
   "compile-file-to-native routes a single Lisp top-level form through the direct native top-level path while native CPS is disabled."
@@ -145,8 +145,8 @@
             (assert-equal #P"out.bin"
                           (cl-cc::compile-file-to-native input :output-file #P"out.bin" :language :lisp))
             (assert-equal '(+ 1 2) helper-form)
-            (assert-true compile-toplevel-called)))))
-       (ignore-errors (delete-file input)))))
+            (assert-true compile-toplevel-called))))))
+        (ignore-errors (delete-file input)))
 
 (deftest pipeline-native-compile-file-elisp-single-safe-form-auto-detects-extension
   "compile-file-to-native auto-detects .el files as Elisp and routes them through the direct native top-level path while native CPS is disabled."
@@ -170,8 +170,8 @@
             (assert-equal #P"out.bin"
                           (cl-cc::compile-file-to-native input :output-file #P"out.bin"))
             (assert-equal '(+ 1 2) helper-form)
-            (assert-true compile-toplevel-called))))
-       (ignore-errors (delete-file input)))))
+             (assert-true compile-toplevel-called)))))
+       (ignore-errors (delete-file input)))
 
 (deftest pipeline-native-compile-file-multi-form-uses-cps-aware-toplevel
   "compile-file-to-native routes multi-form Lisp files through the CPS-aware top-level compilation path."
@@ -195,5 +195,5 @@
             (assert-equal #P"out.bin"
                           (cl-cc::compile-file-to-native input :output-file #P"out.bin" :language :lisp))
             (assert-false helper-called)
-            (assert-true compile-toplevel-called))))
+             (assert-true compile-toplevel-called)))))
        (ignore-errors (delete-file input)))))

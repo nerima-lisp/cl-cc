@@ -110,6 +110,8 @@
         (cons "has"     #'%js-map-has)
         (cons "delete"  #'%js-map-delete)
         (cons "clear"   #'%js-map-clear)
+        (cons "getOrInsert" #'%js-map-get-or-insert)
+        (cons "getOrInsertComputed" #'%js-map-get-or-insert-computed)
         (cons "forEach" #'%js-map-for-each)
         (cons "keys"    #'%js-map-keys)
         (cons "values"  #'%js-map-values)
@@ -120,7 +122,9 @@
   (list (cons "set"    #'%js-weak-map-set)
         (cons "get"    #'%js-weak-map-get)
         (cons "has"    #'%js-weak-map-has)
-        (cons "delete" #'%js-weak-map-delete))
+        (cons "delete" #'%js-weak-map-delete)
+        (cons "getOrInsert" #'%js-weak-map-get-or-insert)
+        (cons "getOrInsertComputed" #'%js-weak-map-get-or-insert-computed))
   "Alist: JS WeakMap.prototype method name -> host helper.")
 
 (defparameter *js-weak-set-method-table*

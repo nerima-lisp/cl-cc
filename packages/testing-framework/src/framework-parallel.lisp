@@ -185,6 +185,16 @@ Returns the pruned escalation list (resolved entries removed)."
                          (escalation-epoch esc)))))
              escalations))
 
+(defun %make-parallel-failure-result (test-plist start-time detail)
+  "Build a failure result plist for TEST-PLIST with shared timing metadata."
+  (list :name        (getf test-plist :name)
+        :status      :fail
+        :detail      detail
+        :number      (getf test-plist :number)
+        :suite       (getf test-plist :suite)
+        :source-file (getf test-plist :source-file)
+        :duration-ns (%compute-duration-ns start-time (get-internal-real-time))))
+
 (defun %run-test-with-timeout (test-plist worker-idx start-time
                                watchdog-slots worker-epochs current-tests watchdog-lock)
   "Execute TEST-PLIST under watchdog supervision. Returns a result plist."
@@ -204,23 +214,15 @@ Returns the pruned escalation list (resolved entries removed)."
          (handler-case
              (%run-single-test test-plist number nil)
            (sb-ext:timeout ()
-             (list :name        (getf test-plist :name)
-                   :status      :fail
-                   :detail      (format nil "  ---~%  message: \"timeout after ~A seconds (watchdog)\"~%  ..."
-                                        timeout)
-                   :number      number
-                   :suite       (getf test-plist :suite)
-                   :source-file (getf test-plist :source-file)
-                   :duration-ns (%compute-duration-ns start-time (get-internal-real-time))))
+             (%make-parallel-failure-result
+              test-plist start-time
+              (format nil "  ---~%  message: \"timeout after ~A seconds (watchdog)\"~%  ..."
+                      timeout)))
            (condition (e)
              ;; Keep worker alive when tests intentionally signal custom conditions.
-             (list :name        (getf test-plist :name)
-                   :status      :fail
-                   :detail      (format nil "  ---~%  message: ~S~%  ..." e)
-                   :number      number
-                   :suite       (getf test-plist :suite)
-                   :source-file (getf test-plist :source-file)
-                   :duration-ns (%compute-duration-ns start-time (get-internal-real-time)))))
+             (%make-parallel-failure-result
+              test-plist start-time
+              (format nil "  ---~%  message: ~S~%  ..." e))))
       ;; Increment epoch first (invalidates any pending interrupt lambda),
       ;; then clear the slot. without-interrupts prevents a watchdog interrupt
       ;; from landing inside this cleanup path.

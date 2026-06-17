@@ -258,6 +258,21 @@
       (let ((entry (assoc (string name) (funcall fn package) :test #'string=)))
         (when entry (cdr entry))))))
 
+(defun %vm-package-operation-result (pkg runtime-fn host-fn &rest args)
+  (if (and cl-cc/runtime::*rt-package-registry* (hash-table-p pkg))
+      (apply runtime-fn args)
+      (apply host-fn args)))
+
+(defun %vm-package-result (pkg runtime-fn host-fn &rest args)
+  (if (hash-table-p pkg)
+      (apply runtime-fn args)
+      (apply host-fn args)))
+
+(defun %vm-registry-result (runtime-fn host-fn &rest args)
+  (if cl-cc/runtime::*rt-package-registry*
+      (apply runtime-fn args)
+      (apply host-fn args)))
+
 (defmethod execute-instruction ((inst vm-intern-symbol) state pc labels)
   (declare (ignore labels))
   (let* ((name (%vm-host-string (vm-reg-get state (vm-src inst))))
@@ -375,13 +390,10 @@
   (declare (ignore labels))
   (let* ((symbols (vm-reg-get state (vm-export-symbols inst)))
          (pkg (vm-reg-get state (vm-export-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (and cl-cc/runtime::*rt-package-registry*
-                          (hash-table-p pkg))
-                     (cl-cc/runtime::rt-export symbols pkg)
-                     (export symbols pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-export symbols pkg)))
+         (result (%vm-package-operation-result pkg
+                                               #'cl-cc/runtime::rt-export
+                                               #'export
+                                               symbols pkg)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 
@@ -397,13 +409,10 @@
   (declare (ignore labels))
   (let* ((symbols (vm-reg-get state (vm-import-symbols inst)))
          (pkg (vm-reg-get state (vm-import-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (and cl-cc/runtime::*rt-package-registry*
-                          (hash-table-p pkg))
-                     (cl-cc/runtime::rt-import symbols pkg)
-                     (import symbols pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-import symbols pkg)))
+         (result (%vm-package-operation-result pkg
+                                               #'cl-cc/runtime::rt-import
+                                               #'import
+                                               symbols pkg)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 
@@ -419,13 +428,10 @@
   (declare (ignore labels))
   (let* ((pkgs (vm-reg-get state (vm-use-packages inst)))
          (pkg (vm-reg-get state (vm-use-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (and cl-cc/runtime::*rt-package-registry*
-                          (hash-table-p pkg))
-                     (cl-cc/runtime::rt-use-package pkgs pkg)
-                     (use-package pkgs pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-use-package pkgs pkg)))
+         (result (%vm-package-operation-result pkg
+                                               #'cl-cc/runtime::rt-use-package
+                                               #'use-package
+                                               pkgs pkg)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 
@@ -441,13 +447,10 @@
   (declare (ignore labels))
   (let* ((pkgs (vm-reg-get state (vm-unuse-packages inst)))
          (pkg (vm-reg-get state (vm-unuse-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (and cl-cc/runtime::*rt-package-registry*
-                          (hash-table-p pkg))
-                     (cl-cc/runtime::rt-unuse-package pkgs pkg)
-                     (unuse-package pkgs pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-unuse-package pkgs pkg)))
+         (result (%vm-package-operation-result pkg
+                                               #'cl-cc/runtime::rt-unuse-package
+                                               #'unuse-package
+                                               pkgs pkg)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 
@@ -463,13 +466,10 @@
   (declare (ignore labels))
   (let* ((names (vm-reg-get state (vm-shadow-names inst)))
          (pkg (vm-reg-get state (vm-shadow-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (and cl-cc/runtime::*rt-package-registry*
-                          (hash-table-p pkg))
-                     (cl-cc/runtime::rt-shadow names pkg)
-                     (shadow names pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-shadow names pkg)))
+         (result (%vm-package-operation-result pkg
+                                               #'cl-cc/runtime::rt-shadow
+                                               #'shadow
+                                               names pkg)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 
@@ -485,13 +485,10 @@
   (declare (ignore labels))
   (let* ((sym (vm-reg-get state (vm-unintern-symbol inst)))
          (pkg (vm-reg-get state (vm-unintern-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (and cl-cc/runtime::*rt-package-registry*
-                          (hash-table-p pkg))
-                     (cl-cc/runtime::rt-unintern sym pkg)
-                     (unintern sym pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-unintern sym pkg)))
+         (result (%vm-package-operation-result pkg
+                                               #'cl-cc/runtime::rt-unintern
+                                               #'unintern
+                                               sym pkg)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 
@@ -505,12 +502,10 @@
 (defmethod execute-instruction ((inst vm-package-name-inst) state pc labels)
   (declare (ignore labels))
   (let* ((pkg (vm-reg-get state (vm-package-name-pkg inst)))
-         (result #-cl-cc-self-hosting
-                 (if (hash-table-p pkg)
-                     (cl-cc/runtime::rt-package-name pkg)
-                     (package-name pkg))
-                 #+cl-cc-self-hosting
-                 (cl-cc/runtime::rt-package-name pkg)))
+         (result (%vm-package-result pkg
+                                     #'cl-cc/runtime::rt-package-name
+                                     #'package-name
+                                     pkg)))
     (vm-reg-set state (vm-dst inst)
                 (%vm-maybe-sso-string result))
     (values (1+ pc) nil nil)))
@@ -523,12 +518,8 @@
 
 (defmethod execute-instruction ((inst vm-list-all-packages-inst) state pc labels)
   (declare (ignore labels))
-  (let ((result #-cl-cc-self-hosting
-                (if cl-cc/runtime::*rt-package-registry*
-                    (cl-cc/runtime::rt-list-all-packages)
-                    (list-all-packages))
-                #+cl-cc-self-hosting
-                (cl-cc/runtime::rt-list-all-packages)))
+  (let ((result (%vm-registry-result #'cl-cc/runtime::rt-list-all-packages
+                                     #'list-all-packages)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
 

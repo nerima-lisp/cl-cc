@@ -11,6 +11,7 @@
   (variables (make-hash-table :test #'eql) :type hash-table)
   (next-variable-reference 2 :type integer)
   (vm-state nil)
+  (language :lisp)
   (running-p nil))
 
 (defun read-jsonrpc-message (&optional (stream *standard-input*))
@@ -34,6 +35,20 @@
 
 (defun %source-path (arguments)
   (%assoc= "path" (%assoc= "source" arguments)))
+
+(defun %path-language (path)
+  (when (stringp path)
+    (let ((lower (string-downcase path)))
+      (cond ((or (search ".elisp" lower :from-end t)
+                 (search ".el" lower :from-end t))
+             :elisp)
+            (t :lisp)))))
+
+(defun %launch-language (arguments)
+  (or (%path-language (%assoc= "program" arguments))
+      (%path-language (%assoc= "sourcePath" arguments))
+      (%path-language (%source-path arguments))
+      :lisp))
 
 (defun %set-breakpoints (server request)
   (let* ((arguments (%assoc= "arguments" request))
@@ -99,6 +114,7 @@
                               ("supportsEvaluateForHovers" . :true)
                               ("supportsSetVariable" . :false))))
       ((string= command "launch")
+       (setf (dap-server-language server) (%launch-language (%assoc= "arguments" request)))
        (%dap-response server request :body '()))
       ((string= command "setBreakpoints")
        (%set-breakpoints server request))
@@ -129,7 +145,7 @@
        (let* ((arguments (%assoc= "arguments" request))
               (expr (or (%assoc= "expression" arguments) "")))
          (%dap-response server request
-                        :body `(("result" . ,(handler-case (prin1-to-string (cl-cc:run-string-repl expr))
+                        :body `(("result" . ,(handler-case (prin1-to-string (cl-cc:run-string-repl expr :language (dap-server-language server)))
                                               (error (e) (format nil "Error: ~A" e))))
                                 ("variablesReference" . 0)))))
       ((string= command "disconnect")

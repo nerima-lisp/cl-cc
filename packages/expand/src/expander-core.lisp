@@ -120,15 +120,20 @@ host CL closure."
 
 (defun make-host-macro-expander (lambda-list body)
   "Build a host-evaluated macro expander for local MACROLET bindings."
-  (lambda (form env)
-    (declare (ignore env))
-    (let* ((form-var  (gensym "FORM"))
-           (eval-form `(let ((,form-var ',form))
-                         ,(%nest-let-bindings
-                           (generate-lambda-bindings lambda-list form-var)
-                           body))))
-      (handler-bind ((style-warning #'muffle-warning))
-        (eval eval-form)))))
+  (let ((environment-sym (lambda-list-info-environment
+                          (parse-lambda-list lambda-list))))
+    (lambda (form env)
+      (let* ((form-var (gensym "FORM"))
+             (macro-body (if environment-sym
+                             `((let ((,environment-sym ',env))
+                                 ,@body))
+                             body))
+             (eval-form `(let ((,form-var ',form))
+                           ,(%nest-let-bindings
+                             (generate-lambda-bindings lambda-list form-var)
+                             macro-body))))
+        (handler-bind ((style-warning #'muffle-warning))
+          (eval eval-form))))))
 
 (defun make-compiler-macro-expander (lambda-list body)
   "Build a compiler-macro expander for a function LAMBDA-LIST and BODY."

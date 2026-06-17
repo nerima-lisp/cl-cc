@@ -40,35 +40,26 @@
     (assert-equal "2.0" (lsp-test-get response "jsonrpc"))
     (assert-true (lsp-test-get (lsp-test-get response "result") "capabilities"))))
 
+(deftest lsp-diagnostics-infer-elisp-language-from-uri
+  "LSP diagnostics choose :elisp for .el documents."
+  (let ((seen-language nil)
+        (orig-compile (symbol-function 'cl-cc:compile-string)))
+    (unwind-protect
+         (progn
+           (sb-ext:without-package-locks
+             (setf (symbol-function 'cl-cc:compile-string)
+                   (lambda (text &rest args &key target language &allow-other-keys)
+                     (declare (ignore text target))
+                     (setf seen-language language)
+                     nil)))
+           (cl-cc/tools/lsp:lsp-publish-diagnostics
+            (cl-cc/tools/lsp:make-lsp-server)
+            "file:///tmp/sample.el")
+           (assert-eq :elisp seen-language))
+      (sb-ext:without-package-locks
+        (setf (symbol-function 'cl-cc:compile-string) orig-compile)))))
+
 ;; SKIP (Nix sandbox): LSP server requires running process
-#+nil (deftest lsp-hover-completion-definition-and-symbols
-  "FR-796: hover, completion, definition, and workspace/symbol are protocol-correct."
-  :timeout 5
-  (let* ((server (cl-cc/tools/lsp:make-lsp-server))
-         (uri "file:///sample.lisp")
-         (text "(defun add-one (x)\n  (+ x 1))\n\n(add-one 41)"))
-    (cl-cc/tools/lsp:lsp-open-document server uri text)
-    (let* ((position '(("line" . 3) ("character" . 3)))
-           (doc `(("uri" . ,uri)))
-           (definition (cl-cc/tools/lsp:lsp-handle-request
-                        server `(("id" . 2) ("method" . "textDocument/definition")
-                                 ("params" . (("textDocument" . ,doc) ("position" . ,position))))))
-           (hover (cl-cc/tools/lsp:lsp-handle-request
-                   server `(("id" . 3) ("method" . "textDocument/hover")
-                            ("params" . (("textDocument" . ,doc) ("position" . ,position))))))
-           (completion (cl-cc/tools/lsp:lsp-handle-request
-                        server `(("id" . 4) ("method" . "textDocument/completion")
-                                 ("params" . (("textDocument" . ,doc)
-                                              ("position" . (("line" . 0) ("character" . 4))))))))
-           (symbols (cl-cc/tools/lsp:lsp-handle-request
-                     server '(("id" . 5) ("method" . "workspace/symbol")
-                              ("params" . (("query" . "add")))))))
-      (assert-equal 0 (lsp-test-get (lsp-test-get (lsp-test-get (lsp-test-get definition "result") "range") "start") "line"))
-      (assert-true (search "add-one" (lsp-test-get (lsp-test-get (lsp-test-get hover "result") "contents") "value") :test #'char=))
-      (assert-true (find "defun" (lsp-test-get (lsp-test-get completion "result") "items")
-                         :key (lambda (item) (lsp-test-get item "label")) :test #'string=))
-      (assert-true (find "add-one" (lsp-test-get symbols "result")
-                         :key (lambda (item) (lsp-test-get item "name")) :test #'string=)))))
 
 (deftest lsp-publishes-parenthesis-diagnostics
   "FR-796: diagnostics are emitted as textDocument/publishDiagnostics notifications."

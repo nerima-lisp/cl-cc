@@ -95,13 +95,29 @@
 
 (deftest-each vm-execute-vm-list-to-lisp-list
   "vm-list-to-lisp-list converts VM list values to proper Lisp lists."
-  :cases (("nil"        nil       nil)
-          ("proper-list" '(1 2 3) '(1 2 3))
-          ("atom-wraps" 42        '(42))
-          ("string-wraps" "hi"   '("hi")))
-  (input expected)
+  :cases (("nil"        nil       nil       nil)
+          ("proper-list" '(1 2 3) '(1 2 3) nil)
+          ("atom-wraps" 42        '(42)     nil)
+          ("string-wraps" "hi"    '("hi")   nil)
+          ("plain-integer-ignores-heap-slots"
+           12
+           '(12)
+           (lambda (state)
+             (cl-cc/vm::vm-heap-set
+              state 12
+              (make-instance 'cl-cc/vm::vm-cons-cell :car 99 :cdr nil)))))
+  (input expected setup)
   (let ((s (make-test-vm)))
+    (when setup
+      (funcall setup s))
     (assert-equal expected (cl-cc/vm::vm-list-to-lisp-list s input))))
+
+(deftest vm-execute-vm-list-to-lisp-list-cow-list
+  "vm-list-to-lisp-list materializes copy-on-write list wrappers."
+  (let ((s (make-test-vm)))
+    (cl-cc:vm-reg-set s 1 '(1 2 3))
+    (exec1 (cl-cc:make-vm-copy-list :dst 0 :src 1) s)
+    (assert-equal '(1 2 3) (cl-cc/vm::vm-list-to-lisp-list s (cl-cc:vm-reg-get s 0)))))
 
 ;;; ─── execute-instruction: vm-const ──────────────────────────────────────────
 

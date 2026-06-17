@@ -72,7 +72,7 @@
     (if (%vm-managed-cons-pointer-p value)
         (progn
           (vm-reg-set state (vm-dst inst)
-                      (reverse (%vm-managed-tree-materialize state value)))
+                      (reverse (%vm-managed-cons-materialize state value)))
           (values (1+ pc) nil nil))
         (call-next-method))))
 
@@ -84,8 +84,8 @@
             (%vm-managed-cons-pointer-p rhs))
         (progn
           (vm-reg-set state (vm-dst inst)
-                      (append (%vm-managed-tree-materialize state lhs)
-                              (%vm-managed-tree-materialize state rhs)))
+                      (append (%vm-managed-cons-materialize state lhs)
+                              (%vm-managed-cons-materialize state rhs)))
           (values (1+ pc) nil nil))
         (call-next-method))))
 
@@ -172,7 +172,7 @@
     (if (%vm-managed-cons-pointer-p value)
         (progn
           (vm-reg-set state (vm-dst inst)
-                      (last (%vm-managed-tree-materialize state value)))
+                      (last (%vm-managed-cons-materialize state value)))
           (values (1+ pc) nil nil))
         (call-next-method))))
 
@@ -182,7 +182,7 @@
     (if (%vm-managed-cons-pointer-p value)
         (progn
           (vm-reg-set state (vm-dst inst)
-                      (butlast (%vm-managed-tree-materialize state value)))
+                      (butlast (%vm-managed-cons-materialize state value)))
           (values (1+ pc) nil nil))
         (call-next-method))))
 
@@ -192,20 +192,10 @@
   (backing nil)
   (refcount 1 :type integer))
 
-(defparameter *vm-cow-list-enabled* t)
-
 (defun %vm-cow-list-materialize (value)
   (if (vm-cow-list-p value)
       (vm-cow-list-backing value)
       value))
-
-(defun %vm-cow-list-share (value)
-  (if (vm-cow-list-p value)
-      (progn
-        (incf (vm-cow-list-refcount value))
-        (%make-vm-cow-list :backing (vm-cow-list-backing value)
-                           :refcount (vm-cow-list-refcount value)))
-      (%make-vm-cow-list :backing value :refcount 2)))
 
 (defun %vm-cow-list-ensure-writable (value)
   (if (vm-cow-list-p value)
@@ -368,9 +358,7 @@
   (declare (ignore labels))
   (let* ((key (vm-reg-get state (vm-key inst)))
          (alist (vm-reg-get state (vm-alist inst)))
-         (alist-value (if (%vm-managed-cons-pointer-p alist)
-                          (%vm-managed-tree-materialize state alist)
-                          alist))
+         (alist-value (%vm-list-structure-materialize state alist))
          (result (assoc key alist-value)))
     (vm-reg-set state (vm-dst inst) result)
     (values (1+ pc) nil nil)))
@@ -387,12 +375,8 @@
   (declare (ignore labels))
   (let* ((lhs (vm-reg-get state (vm-lhs inst)))
          (rhs (vm-reg-get state (vm-rhs inst)))
-         (lhs-value (if (%vm-managed-cons-pointer-p lhs)
-                        (%vm-managed-tree-materialize state lhs)
-                        (%vm-cow-list-materialize lhs)))
-         (rhs-value (if (%vm-managed-cons-pointer-p rhs)
-                        (%vm-managed-tree-materialize state rhs)
-                        (%vm-cow-list-materialize rhs))))
+         (lhs-value (%vm-list-structure-materialize state lhs))
+         (rhs-value (%vm-list-structure-materialize state rhs)))
     (vm-reg-set state (vm-dst inst) (if (equal lhs-value rhs-value) 1 0))
     (values (1+ pc) nil nil)))
 (defmethod execute-instruction ((inst vm-nconc) state pc labels)
@@ -407,15 +391,13 @@
   (declare (ignore labels))
   (let ((list-val (vm-reg-get state (vm-src inst))))
     (vm-reg-set state (vm-dst inst)
-                (copy-list (%vm-cow-list-materialize list-val)))
+                (copy-list (%vm-list-structure-materialize state list-val)))
     (values (1+ pc) nil nil)))
 (defmethod execute-instruction ((inst vm-copy-tree) state pc labels)
   (declare (ignore labels))
   (let ((value (vm-reg-get state (vm-src inst))))
     (vm-reg-set state (vm-dst inst)
-                (copy-tree (if (%vm-managed-cons-pointer-p value)
-                               (%vm-managed-tree-materialize state value)
-                               value)))
+                (copy-tree (%vm-list-structure-materialize state value)))
     (values (1+ pc) nil nil)))
 
 (defmethod execute-instruction ((inst vm-subst) state pc labels)
@@ -425,19 +407,14 @@
         (tree (vm-reg-get state (vm-tree inst))))
     (vm-reg-set state (vm-dst inst)
                 (subst new-val old-val
-                       (if (%vm-managed-cons-pointer-p tree)
-                           (%vm-managed-tree-materialize state tree)
-                           tree)))
+                       (%vm-list-structure-materialize state tree)))
     (values (1+ pc) nil nil)))
 
 (defmethod execute-instruction ((inst vm-listp) state pc labels)
   (declare (ignore labels))
   (let ((value (vm-reg-get state (vm-src inst))))
     (vm-reg-set state (vm-dst inst)
-                (if (or (listp value)
-                        (vm-cow-list-p value)
-                        (%vm-managed-nil-p value)
-                        (%vm-managed-cons-pointer-p value))
+                (if (listp (%vm-list-structure-materialize state value))
                     1
                     0))
     (values (1+ pc) nil nil)))
@@ -446,8 +423,5 @@
   (declare (ignore labels))
   (let ((value (vm-reg-get state (vm-src inst))))
     (vm-reg-set state (vm-dst inst)
-                (if (or (%vm-managed-cons-pointer-p value)
-                        (consp (%vm-cow-list-materialize value)))
-                    0
-                    1))
+                (if (consp (%vm-list-structure-materialize state value)) 0 1))
     (values (1+ pc) nil nil)))

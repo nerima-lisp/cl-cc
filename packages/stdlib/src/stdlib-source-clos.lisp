@@ -176,51 +176,147 @@
                           (setf (gethash slot instance) value))))))
          instance))"
 
-     "(defgeneric compute-applicable-methods (gf args))"
+    "(defun %eql-specializer-p (key)
+       (and (consp key) (eq (car key) 'eql)))"
+
+    "(defun %mop-method-value->list (value)
+       (cond
+         ((null value) nil)
+         ((and (listp value) (not (%eql-specializer-p value))) (copy-list value))
+         (t (list value))))"
+
+    "(defun %mop-class-cpl (class)
+       (let ((cpl (cond ((hash-table-p class) (or (gethash :__cpl__ class)
+                                                  (list (gethash :__name__ class))))
+                        ((symbolp class) (list class))
+                        (t (list t)))))
+         (if (member t cpl :test #'eq) cpl (append cpl (list t)))))"
+
+    "(defun %mop-arg-class (arg)
+       (cond ((and (vectorp arg) (plusp (length arg)) (hash-table-p (aref arg 0)))
+              (aref arg 0))
+             ((hash-table-p arg) (or (gethash :__class__ arg) 'hash-table))
+             ((integerp arg) 'integer)
+             ((stringp arg) 'string)
+             ((symbolp arg) 'symbol)
+             (t t)))"
+
+    "(defun %mop-specializer-matches-arg-p (specializer arg)
+       (cond ((eq specializer t) t)
+             ((%eql-specializer-p specializer) (eql (second specializer) arg))
+             (t (member specializer (%mop-class-cpl (%mop-arg-class arg)) :test #'eq))))"
+
+    "(defun %mop-method-applicable-to-args-p (method args)
+       (let ((specializers (method-specializers method)))
+         (and (= (length specializers) (length args))
+              (every #'%mop-specializer-matches-arg-p specializers args))))"
+
+    "(defun %mop-method-applicable-to-classes-p (method classes)
+       (let ((specializers (method-specializers method)))
+         (and (= (length specializers) (length classes))
+              (every (lambda (specializer class)
+                       (and (not (%eql-specializer-p specializer))
+                            (or (eq specializer t)
+                                (member specializer (%mop-class-cpl class) :test #'eq))))
+                     specializers classes))))"
+
+    "(defun %mop-normalize-specializer-key (specializers)
+       (if (and (listp specializers) (= (length specializers) 1))
+           (first specializers)
+           specializers))"
+
+    "(defun %mop-qualified-table-key (qualifiers)
+       (if qualifiers
+           (intern (format nil \"__~A__\" (string-upcase (string (first qualifiers)))) :keyword)
+           :__methods__))"
+
+    "(defun %mop-ensure-method-table (gf qualifiers)
+       (let ((key (%mop-qualified-table-key qualifiers)))
+         (or (gethash key gf)
+             (setf (gethash key gf) (make-hash-table :test #'equal)))))"
+
+    "(defun %mop-invalidate-gf (gf)
+       (setf (gethash :__satiated__ gf) nil
+             (gethash :__cache-version__ gf) (1+ (or (gethash :__cache-version__ gf) 0)))
+       (remhash :__dispatch-cache__ gf)
+       gf)"
+
+    "(defgeneric compute-applicable-methods (gf args))"
     "(defmethod compute-applicable-methods ((gf t) args)
-       (declare (ignore args))
-       nil)"
+       (remove-if-not (lambda (method) (%mop-method-applicable-to-args-p method args))
+                      (generic-function-methods gf)))"
+
+    "(defgeneric compute-applicable-methods-using-classes (gf classes))"
+    "(defmethod compute-applicable-methods-using-classes ((gf t) classes)
+       (let* ((methods (generic-function-methods gf))
+              (has-eql-p (some (lambda (method)
+                                 (some #'%eql-specializer-p (method-specializers method)))
+                               methods)))
+         (values (remove-if-not (lambda (method)
+                                  (%mop-method-applicable-to-classes-p method classes))
+                                methods)
+                 (not has-eql-p))))"
 
     "(defgeneric find-method (gf qualifiers specializers &optional errorp))"
     "(defmethod find-method ((gf t) qualifiers specializers &optional errorp)
-       (let* ((methods-ht (gethash :__methods__ gf))
-              (spec-key (if (and (listp specializers) (= (length specializers) 1))
-                            (let ((s (first specializers)))
-                              (if (symbolp s) (symbol-name s) s))
-                            specializers))
-              (method (when methods-ht (gethash spec-key methods-ht))))
-         (if method
-             method
-             (if errorp
-                 (error (format nil \"No method on ~A with qualifiers ~A and specializers ~A\"
-                                gf qualifiers specializers))
-                 nil))))"
+       (let* ((table (and (hash-table-p gf) (gethash (%mop-qualified-table-key qualifiers) gf)))
+              (key (%mop-normalize-specializer-key specializers))
+              (candidates (%mop-method-value->list (and table (gethash key table))))
+              (method (find-if (lambda (method)
+                                 (and (equal (method-qualifiers method) qualifiers)
+                                      (equal (method-specializers method) specializers)))
+                               candidates)))
+         (cond (method method)
+               (errorp (error \"No method on ~S with qualifiers ~S and specializers ~S\"
+                              gf qualifiers specializers))
+               (t nil))))"
 
-     "(defgeneric add-method (gf method))"
-      "(defmethod add-method ((gf t) method)
-         (let ((methods-ht (gethash :__methods__ gf)))
-          (when methods-ht
-            (setf (gethash (if (functionp method) \"T\" \"T\") methods-ht) method))
-           gf))"
+    "(defgeneric add-method (gf method))"
+    "(defmethod add-method ((gf t) method)
+       (let* ((qualifiers (method-qualifiers method))
+              (specializers (method-specializers method))
+              (table (%mop-ensure-method-table gf qualifiers))
+              (key (%mop-normalize-specializer-key specializers)))
+         (when (hash-table-p method)
+           (setf (gethash :gf method) gf
+                 (gethash :generic-function method) gf
+                 (gethash :specializer method) key
+                 (gethash :specializers method) specializers))
+         (if qualifiers
+             (pushnew method (gethash key table) :test #'eq)
+             (setf (gethash key table) method))
+         (%mop-invalidate-gf gf)))"
 
-      "(defun sealed-class-p (class)
-         (if (and (hash-table-p class) (gethash :__sealed__ class)) t nil))"
+    "(defun sealed-class-p (class)
+       (if (and (hash-table-p class) (gethash :__sealed__ class)) t nil))"
 
-      "(defgeneric satiated-generic-function-p (gf))"
-     "(defmethod satiated-generic-function-p ((gf t))
-        (if (and (hash-table-p gf) (gethash :__satiated__ gf))
-            t
-            nil))"
+    "(defgeneric satiated-generic-function-p (gf))"
+    "(defmethod satiated-generic-function-p ((gf t))
+       (if (and (hash-table-p gf) (gethash :__satiated__ gf))
+           t
+           nil))"
 
-     "(defgeneric remove-method (gf method))"
+    "(defgeneric remove-method (gf method))"
     "(defmethod remove-method ((gf t) method)
-       (let ((methods-ht (gethash :__methods__ gf)))
-         (when methods-ht
-           (maphash (lambda (k v)
-                      (when (eq v method)
-                        (remhash k methods-ht)))
-                    methods-ht))
-          gf))"
+       (dolist (table-key '(:__methods__ :__BEFORE__ :__AFTER__ :__AROUND__))
+         (let ((table (gethash table-key gf)))
+           (when (hash-table-p table)
+             (let (updates removals)
+               (maphash (lambda (key value)
+                          (let ((remaining (remove method (%mop-method-value->list value) :test #'eq)))
+                            (if remaining
+                                (push (cons key (if (or (eq table-key :__methods__)
+                                                        (= (length remaining) 1))
+                                                    (first remaining)
+                                                    remaining))
+                                      updates)
+                                (push key removals))))
+                        table)
+               (dolist (key removals)
+                 (remhash key table))
+               (dolist (update updates)
+                 (setf (gethash (car update) table) (cdr update)))))))
+       (%mop-invalidate-gf gf))"
 
 ;;; ── MOP Method Protocol ────────────────────────────────────────────────
 

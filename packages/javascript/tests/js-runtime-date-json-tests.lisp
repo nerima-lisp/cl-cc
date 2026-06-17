@@ -212,6 +212,17 @@ line2"))
     (assert-true (cl-cc/javascript::%js-string-includes result "{"))
     (assert-true (cl-cc/javascript::%js-string-includes result "\"a\":1"))))
 
+(deftest js-rt-json-raw-json
+  "JSON.rawJSON produces a wrapper that stringify emits verbatim."
+  (let* ((raw (cl-cc/javascript::%js-json-raw-json "{\"x\":1}"))
+         (obj (cl-cc/javascript::%js-make-object "payload" raw)))
+    (assert-true (cl-cc/javascript::%js-json-is-raw-json raw))
+    (assert-true (not (cl-cc/javascript::%js-json-is-raw-json obj)))
+    (assert-eq cl-cc/javascript::+js-undefined+
+               (cl-cc/javascript::%js-object-get-own-property-descriptor raw "__raw_json__"))
+    (assert-string= "{\"payload\":{\"x\":1}}"
+                    (cl-cc/javascript::%js-json-stringify obj))))
+
 ;;; ─── JSON parse ──────────────────────────────────────────────────────────────
 
 (deftest-each js-rt-json-parse-non-undefined

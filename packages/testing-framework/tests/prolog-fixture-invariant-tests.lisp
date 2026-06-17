@@ -2,68 +2,6 @@
 
 (in-suite cl-cc-unit-suite)
 
-(defun copy-prolog-rules-table (table)
-  (let ((copy (make-hash-table :test 'eq)))
-    (maphash (lambda (k v) (setf (gethash k copy) (copy-list v))) table)
-    copy))
-
-(defparameter *baseline-prolog-rules*
-  (copy-prolog-rules-table cl-cc:*prolog-rules*)
-  "Baseline Prolog rule database captured for integration and fixture tests.")
-
-(defmacro with-baseline-prolog (&body body)
-  "Run BODY with the original built-in Prolog rule database restored."
-  (let ((saved (gensym "SAVED")))
-    `(let ((,saved (copy-prolog-rules-table cl-cc:*prolog-rules*)))
-       (cl-cc:clear-prolog-database)
-       (maphash (lambda (k v)
-                  (setf (gethash k cl-cc:*prolog-rules*) (copy-list v)))
-                *baseline-prolog-rules*)
-       (unwind-protect
-            (progn ,@body)
-         (cl-cc:clear-prolog-database)
-         (maphash (lambda (k v)
-                    (setf (gethash k cl-cc:*prolog-rules*) (copy-list v)))
-                  ,saved)))))
-
-(defun all-envs (goal)
-  "Collect all environments yielded while solving GOAL."
-  (let ((results nil))
-    (handler-case
-        (cl-cc:solve-goal goal nil (lambda (env) (push env results)))
-      (cl-cc::prolog-cut ()))
-    (nreverse results)))
-
-(defun all-prolog-substitutions (goal term)
-  "Collect TERM after substituting each environment yielded while solving GOAL."
-  (let ((results nil))
-    (handler-case
-        (cl-cc:solve-goal goal nil
-                          (lambda (env)
-                            (push (cl-cc:logic-substitute term env)
-                                  results)))
-      (cl-cc/prolog:prolog-cut ()))
-    (nreverse results)))
-
-(defun prolog-solution-count (goal)
-  "Return the number of solutions for GOAL."
-  (length (all-envs goal)))
-
-(defmacro assert-prolog-query-count= (goal expected-count)
-  (let ((count (gensym "COUNT")))
-    `(let ((,count (prolog-solution-count ,goal)))
-       (assert-= ,expected-count ,count))))
-
-(defmacro with-prolog-single-solution ((env goal) &body body)
-  `(let ((solutions (all-envs ,goal)))
-     (assert-= 1 (length solutions))
-     (let ((,env (car solutions)))
-       ,@body)))
-
-(defmacro assert-prolog-binding= (goal var expected)
-  `(with-prolog-single-solution (env ,goal)
-     (assert-= ,expected (cl-cc:logic-substitute ,var env))))
-
 ;;;; Invariant tests for with-fresh-prolog (framework-fixtures.lisp).
 ;;;;
 ;;;; The fixture snapshots cl-cc/prolog::*prolog-rules*, clears the DB,
@@ -76,7 +14,7 @@
   (let ((keys '()))
     (maphash (lambda (k v) (declare (ignore v)) (push k keys))
              cl-cc/prolog::*prolog-rules*)
-    (sort keys #'string< :key #'symbol-name)))
+    (sort keys #'string< :key #'prin1-to-string)))
 
 (defun %assert-prolog-state-restored (thunk &key absent-key)
   "Run THUNK and assert the global Prolog DB matches its pre-run state."

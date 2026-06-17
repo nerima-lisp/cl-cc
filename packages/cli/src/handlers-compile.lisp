@@ -55,7 +55,7 @@ For files: compiles a single source file to native binary or IR dump."
                                :source-file (if (compile-opts-deterministic opts)
                                                 (normalize-build-path file)
                                                 file)
-                               :language :lisp kwargs)
+                               :language (or language :lisp) kwargs)
                         (apply #'compile-string source :language (or language :lisp) kwargs))))
              (let ((cl-cc/codegen::*x86-64-omit-frame-pointer*
                      (if (or debug (compile-opts-stack-protector opts))

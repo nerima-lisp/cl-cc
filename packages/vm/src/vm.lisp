@@ -3,7 +3,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (shadow '(lisp-implementation-type lisp-implementation-version
             machine-type machine-version machine-instance
-            software-type software-version room apropos apropos-list)))
+            software-type software-version short-site-name long-site-name
+            room apropos apropos-list)))
 
 ;;; VM Heap Object Base Class
 
@@ -625,6 +626,8 @@ Tests should dynamically bind this to T for OSR coverage.")
 (defun machine-instance () (cl:machine-instance))
 (defun software-type () (cl:software-type))
 (defun software-version () (cl:software-version))
+(defun short-site-name () (or (cl:short-site-name) "unknown"))
+(defun long-site-name () (or (cl:long-site-name) "unknown"))
 
 (defun room (&optional (stream cl:*standard-output*))
   (cl:format stream "; CL-CC ~A ~A on ~A ~A~%"

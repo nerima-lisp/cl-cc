@@ -298,7 +298,9 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
 (define-fr-existence-test runtime-subsystem-environment-loaded
   "FR-612: Environment introspection is loaded in VM."
   (:f cl-cc/vm:lisp-implementation-type)
-  (:f cl-cc/vm:lisp-implementation-version))
+  (:f cl-cc/vm:lisp-implementation-version)
+  (:f cl-cc/vm::short-site-name)
+  (:f cl-cc/vm::long-site-name))
 
 (define-fr-existence-test runtime-subsystem-conditions-loaded
   "FR-643-646: Condition system is loaded in VM."
@@ -363,20 +365,20 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
       (cl-cc/runtime:rt-scheduler-run)
       (assert-equal '(:low :normal :high) events))))
 
-(deftest runtime-subsystem-scheduler-sleep-task-delays-execution
+(deftest runtime-subsystem-scheduler-sleep-task-records-wake-time
   "FR-257: Sleep-task records a future wake time for the current task."
   (let ((cl-cc/runtime::*rt-global-scheduler* (cl-cc/runtime:rt-make-scheduler)))
-    (let ((scheduled-in-future-p nil))
-      (cl-cc/runtime:rt-spawn
-       (lambda ()
-         (let ((before (get-internal-real-time)))
-           (cl-cc/runtime::rt-sleep-task 0.01)
-           (setf scheduled-in-future-p
-                 (> (cl-cc/runtime::rt-green-thread-wake-time
-                     cl-cc/runtime::*rt-current-green-thread*)
-                    before)))))
-      (cl-cc/runtime:rt-scheduler-run :once t)
-      (assert-true scheduled-in-future-p))))
+    (sb-ext:without-package-locks
+      (with-replaced-function (get-internal-real-time (lambda () 1000))
+        (let ((observed-wake-time nil))
+          (cl-cc/runtime:rt-spawn
+           (lambda ()
+             (cl-cc/runtime::rt-sleep-task 1)
+             (setf observed-wake-time
+                   (cl-cc/runtime::rt-green-thread-wake-time
+                    cl-cc/runtime::*rt-current-green-thread*))))
+          (cl-cc/runtime:rt-scheduler-run :once t)
+          (assert-= (+ 1000 internal-time-units-per-second) observed-wake-time))))))
 
 (deftest runtime-subsystem-channel-buffered-preserves-order
   "FR-282: Buffered channels receive values in send order."
@@ -695,13 +697,6 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
   (let ((c (cl-cc/runtime:rt-make-raft-cluster '("n1" "n2" "n3"))))
     (assert-true (gethash "n1" (cl-cc/runtime:rt-raft-cluster-nodes c)))))
 
-#+nil (deftest runtime-subsystem-image-roundtrip
-  "FR-350: Basic image save/load round-trip."
-  (let ((path "/tmp/cl-cc-test-image.bin"))
-    (cl-cc/runtime:rt-save-image path)
-    (assert-true (probe-file path))
-    (assert-true (cl-cc/runtime:rt-load-image path))
-    (delete-file path)))
 
 ;;; =================================================================
 ;;; FR Coverage Verification

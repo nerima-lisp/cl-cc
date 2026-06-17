@@ -155,7 +155,7 @@
       ;;   core:     shared helpers + basic programs + destructuring + JSON/Math/operators
       ;;   ast:      parse-only AST shape tests (FizzBuzz, Fibonacci, classes, generators…)
       ;;   advanced: optional chaining, typeof, class features, for-in/of, Map/Set
-      ;;   modern:   ES2022+ (private fields, Promise, WeakMap, ES2023-2026 built-ins)
+      ;;   modern:   ES2022 syntax + ES2023-2026 built-ins
       (:file "js-e2e-core-tests")
       (:file "js-e2e-ast-tests")
       (:file "js-e2e-advanced-tests")

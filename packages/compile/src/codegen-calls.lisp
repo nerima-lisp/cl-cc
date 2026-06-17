@@ -5,6 +5,7 @@
 ;;; Extracted from codegen.lisp.
 ;;; Contains:
 ;;;   - %resolve-func-sym-reg     — resolve a symbol to a function register
+;;;   - %resolve-apply-function-register — resolve APPLY's function designator
 ;;;   - %try-compile-funcall      — handle (funcall fn arg...)
 ;;;   - %try-compile-apply        — handle (apply fn arg...)
 ;;;   - %try-compile-noescape-closure — inline noescape lambda closures
@@ -44,6 +45,19 @@
           (emit ctx (make-vm-const :dst reg :value sym))
           reg)))))
 
+(defun %resolve-apply-function-register (func-node ctx)
+  "Compile or resolve the function designator used by APPLY."
+  (cond
+    ((typep func-node 'ast-function)
+     (compile-ast func-node ctx))
+    ((and (typep func-node 'ast-quote)
+          (symbolp (ast-quote-value func-node)))
+     (%resolve-func-sym-reg (ast-quote-value func-node) ctx))
+    ((symbolp func-node)
+     (%resolve-func-sym-reg func-node ctx))
+    (t
+     (compile-ast func-node ctx))))
+
 (defun %ast-var-function-value-p (name ctx)
   "Return T when NAME in function position should be treated as a variable value.
 Global functions/generics stay symbolic; only local lexical bindings count as
@@ -61,6 +75,41 @@ saves/restores it instead of clobbering it."
   (let ((regs nil))
     (dolist (arg args (nreverse regs))
       (push (%compile-operand-protecting arg ctx regs) regs))))
+
+(defun %maybe-unbox-labels-boxed-function (name raw-func-reg ctx)
+  "Return RAW-FUNC-REG or its boxed closure payload for NAME."
+  (if (and name (%codegen-call-assoc name *labels-boxed-fns*))
+      (let ((unboxed (make-register ctx)))
+        (emit ctx (make-vm-car :dst unboxed :src raw-func-reg))
+        unboxed)
+      raw-func-reg))
+
+(defun %resolve-call-function-register (func-expr ctx)
+  "Resolve FUNC-EXPR to the register used for a normal call."
+  (cond ((symbolp func-expr)
+         (%resolve-func-sym-reg func-expr ctx))
+        ((typep func-expr 'ast-var)
+         (if (%ast-var-function-value-p (ast-var-name func-expr) ctx)
+             (compile-ast func-expr ctx)
+             (%resolve-func-sym-reg (ast-var-name func-expr) ctx)))
+        (t
+         (compile-ast func-expr ctx))))
+
+(defun %maybe-emit-simple-tail-call (tail func-expr func-sym args result-reg ctx)
+  "Lower a self-recursive simple tail call into parameter rebinding + jump."
+  (when (and tail
+             (ctx-current-function-simple-p ctx)
+             func-sym
+             (symbolp func-expr)
+             (eq func-sym (ctx-current-function-name ctx))
+             (= (length args) (length (ctx-current-function-params ctx))))
+    (let ((arg-regs (%compile-call-arg-registers args ctx)))
+      (%emit-argument-rebinds-and-jump arg-regs
+                                       (ctx-current-function-params ctx)
+                                       nil
+                                       (ctx-current-function-label ctx)
+                                       ctx)
+      result-reg)))
 
 (defun %emit-call-like-instruction (tail result-reg func-reg arg-regs ctx)
   "Emit either a normal call or a tail call and return RESULT-REG."
@@ -121,11 +170,7 @@ saves/restores it instead of clobbering it."
     (let* ((func-arg (first args))
            (local-func-name (and (typep func-arg 'ast-var) (ast-var-name func-arg)))
            (raw-func-reg (compile-ast func-arg ctx))
-           (func-reg0 (if (and local-func-name (%codegen-call-assoc local-func-name *labels-boxed-fns*))
-                          (let ((unboxed (make-register ctx)))
-                            (emit ctx (make-vm-car :dst unboxed :src raw-func-reg))
-                            unboxed)
-                          raw-func-reg))
+           (func-reg0 (%maybe-unbox-labels-boxed-function local-func-name raw-func-reg ctx))
            (func-reg (make-register ctx)))
       (emit ctx (make-vm-move :dst func-reg :src func-reg0))
       (let ((arg-regs (%compile-call-arg-registers (rest args) ctx)))
@@ -137,21 +182,8 @@ saves/restores it instead of clobbering it."
     (let* ((func-arg (first args))
            (apply-args (rest args))
            (local-func-name (and (typep func-arg 'ast-var) (ast-var-name func-arg)))
-           (raw-func-reg (cond
-                           ((typep func-arg 'ast-function)
-                            (compile-ast func-arg ctx))
-                           ((typep func-arg 'ast-var)
-                            (compile-ast func-arg ctx))
-                           ((symbolp func-arg)
-                            (%resolve-func-sym-reg func-arg ctx))
-                           (t
-                            (compile-ast func-arg ctx))))
-           (func-reg0 (if (and local-func-name
-                               (%codegen-call-assoc local-func-name *labels-boxed-fns*))
-                          (let ((unboxed (make-register ctx)))
-                            (emit ctx (make-vm-car :dst unboxed :src raw-func-reg))
-                            unboxed)
-                          raw-func-reg))
+           (raw-func-reg (%resolve-apply-function-register func-arg ctx))
+           (func-reg0 (%maybe-unbox-labels-boxed-function local-func-name raw-func-reg ctx))
            (func-reg (make-register ctx)))
       (emit ctx (make-vm-move :dst func-reg :src func-reg0))
       (let ((spread-plan (%apply-spread-plan apply-args ctx)))
@@ -201,46 +233,47 @@ saves/restores it instead of clobbering it."
   "Return element register list from typed noescape-array ENTRY payload."
   (cdr (cddr entry)))
 
+(defun %noescape-array-entry-for-var (node ctx)
+  "Return the noescape-array binding ENTRY for AST variable NODE, if any."
+  (when (typep node 'ast-var)
+    (%codegen-call-assoc (ast-var-name node) (ctx-noescape-array-bindings ctx))))
+
 (defun %try-compile-noescape-array (func-sym args result-reg ctx)
   "Optimise ARRAY-LENGTH / AREF / ASET on noescape arrays to moves/consts."
   (when func-sym
-    (let ((sname (symbol-name func-sym)))
-      (cond
-        ((and (string= sname "ARRAY-LENGTH")
-              (= (length args) 1)
-              (typep (first args) 'ast-var))
-           (let* ((arg-name (ast-var-name (first args)))
-                  (entry    (%codegen-call-assoc arg-name (ctx-noescape-array-bindings ctx))))
-             (when entry
-              (emit ctx (make-vm-const :dst result-reg :value (%noescape-array-entry-size entry)))
-               result-reg)))
-        ((and (eq func-sym 'aref)
-              (= (length args) 2)
-              (typep (first args) 'ast-var))
-          (let* ((arg-name (ast-var-name (first args)))
-                 (entry    (%codegen-call-assoc arg-name (ctx-noescape-array-bindings ctx))))
-             (when entry
-               (if (typep (second args) 'ast-int)
-                   (let ((index (ast-int-value (second args))))
-                     (when (and (<= 0 index) (< index (%noescape-array-entry-size entry)))
-                       (emit ctx (make-vm-move :dst result-reg
-                                               :src (nth index (%noescape-array-entry-element-regs entry))))))
-                   (%emit-noescape-array-read entry (second args) result-reg ctx))
-               result-reg)))
-        ((and (string= sname "ASET")
-              (= (length args) 3)
-              (typep (first args) 'ast-var))
-          (let* ((arg-name (ast-var-name (first args)))
-                 (entry    (%codegen-call-assoc arg-name (ctx-noescape-array-bindings ctx))))
-             (when entry
-               (if (typep (second args) 'ast-int)
-                   (let ((index (ast-int-value (second args))))
-                     (when (and (<= 0 index) (< index (%noescape-array-entry-size entry)))
-                       (let ((val-reg (compile-ast (third args) ctx)))
-                        (setf (nth index (%noescape-array-entry-element-regs entry)) val-reg)
-                         (emit ctx (make-vm-move :dst result-reg :src val-reg)))))
-                   (%emit-noescape-array-write entry (second args) (third args) result-reg ctx))
-                result-reg)))))))
+    (let* ((sname (symbol-name func-sym))
+           (first-arg (first args))
+           (entry (%noescape-array-entry-for-var first-arg ctx)))
+      (when entry
+        (cond
+          ((and (string= sname "ARRAY-LENGTH")
+                (= (length args) 1))
+           (emit ctx (make-vm-const :dst result-reg
+                                    :value (%noescape-array-entry-size entry)))
+           result-reg)
+          ((and (eq func-sym 'aref)
+                (= (length args) 2))
+           (let ((index-arg (second args)))
+             (if (typep index-arg 'ast-int)
+                 (let ((index (ast-int-value index-arg)))
+                   (when (and (<= 0 index) (< index (%noescape-array-entry-size entry)))
+                     (emit ctx (make-vm-move :dst result-reg
+                                             :src (nth index
+                                                       (%noescape-array-entry-element-regs entry))))))
+                 (%emit-noescape-array-read entry index-arg result-reg ctx)))
+           result-reg)
+          ((and (string= sname "ASET")
+                (= (length args) 3))
+           (let ((index-arg (second args))
+                 (value-arg (third args)))
+             (if (typep index-arg 'ast-int)
+                 (let ((index (ast-int-value index-arg)))
+                   (when (and (<= 0 index) (< index (%noescape-array-entry-size entry)))
+                     (let ((val-reg (compile-ast value-arg ctx)))
+                       (setf (nth index (%noescape-array-entry-element-regs entry)) val-reg)
+                       (emit ctx (make-vm-move :dst result-reg :src val-reg)))))
+                 (%emit-noescape-array-write entry index-arg value-arg result-reg ctx)))
+           result-reg))))))
 
 (defun %emit-argument-rebinds-and-jump (arg-regs params param-regs target-label ctx)
   "Snapshot ARG-REGS, move them into PARAM-REGS/PARAMS, then jump to TARGET-LABEL."
@@ -266,6 +299,25 @@ saves/restores it instead of clobbering it."
               (%emit-argument-rebinds-and-jump arg-regs params param-regs target-label ctx)
                 result-reg)))))))
 
+(defun %emit-vm-call/cc (args result-reg ctx)
+  (let ((fn-reg (compile-ast (first args) ctx)))
+    (emit ctx (make-vm-call/cc :dst result-reg :func fn-reg))
+    result-reg))
+
+(defun %emit-vm-call-with-prompt (args result-reg ctx)
+  (let ((fn-reg (compile-ast (first args) ctx))
+        (prompt-reg (compile-ast (second args) ctx)))
+    (emit ctx (make-vm-call-with-prompt :dst result-reg
+                                        :func fn-reg
+                                        :prompt prompt-reg))
+    result-reg))
+
+(defun %emit-vm-abort-to-prompt (args result-reg ctx)
+  (let ((prompt-reg (compile-ast (first args) ctx))
+        (value-reg (compile-ast (second args) ctx)))
+    (emit ctx (make-vm-abort-to-prompt :prompt prompt-reg :value value-reg))
+    result-reg))
+
 (defun %try-compile-continuation-operator (func-sym args result-reg ctx)
   "Lower continuation operators to dedicated VM control instructions."
   (when func-sym
@@ -273,23 +325,13 @@ saves/restores it instead of clobbering it."
       (cond
         ((and (member name '("CALL-WITH-CURRENT-CONTINUATION" "CALL/CC") :test #'string=)
               (= (length args) 1))
-         (let ((fn-reg (compile-ast (first args) ctx)))
-           (emit ctx (make-vm-call/cc :dst result-reg :func fn-reg))
-           result-reg))
+         (%emit-vm-call/cc args result-reg ctx))
         ((and (string= name "CALL-WITH-CONTINUATION-PROMPT")
               (= (length args) 2))
-         (let ((fn-reg (compile-ast (first args) ctx))
-               (prompt-reg (compile-ast (second args) ctx)))
-           (emit ctx (make-vm-call-with-prompt :dst result-reg
-                                               :func fn-reg
-                                               :prompt prompt-reg))
-           result-reg))
+         (%emit-vm-call-with-prompt args result-reg ctx))
         ((and (string= name "ABORT-TO-PROMPT")
               (= (length args) 2))
-         (let ((prompt-reg (compile-ast (first args) ctx))
-               (value-reg (compile-ast (second args) ctx)))
-           (emit ctx (make-vm-abort-to-prompt :prompt prompt-reg :value value-reg))
-           result-reg))))))
+         (%emit-vm-abort-to-prompt args result-reg ctx))))))
 
 (defun %try-compile-equality-predicate (func-sym args result-reg ctx)
   "Lower EQ/EQL/EQUAL through a type-specialized equality constructor when possible."
@@ -366,36 +408,17 @@ VM-style predicate calls use VM-NOT to invert their 0/NIL falsey result."
 (defun %compile-normal-call (func-expr func-sym args result-reg tail ctx)
   "Emit a normal (non-special-cased) function call."
   (let* ((local-func-name (and (typep func-expr 'ast-var) (ast-var-name func-expr)))
-         (raw-func-reg
-            (cond ((symbolp func-expr)        (%resolve-func-sym-reg func-expr ctx))
-                  ((typep func-expr 'ast-var)
-                   (if (%ast-var-function-value-p (ast-var-name func-expr) ctx)
-                       (compile-ast func-expr ctx)
-                       (%resolve-func-sym-reg (ast-var-name func-expr) ctx)))
-                  (t                           (compile-ast func-expr ctx))))
+         (raw-func-reg (%resolve-call-function-register func-expr ctx))
           ;; Unbox labels-boxed functions: extract closure from cons-cell box
-          (func-reg0 (if (let ((name (or func-sym local-func-name)))
-                           (and name (%codegen-call-assoc name *labels-boxed-fns*)))
-                         (let ((unboxed (make-register ctx)))
-                           (emit ctx (make-vm-car :dst unboxed :src raw-func-reg))
-                           unboxed)
-                         raw-func-reg))
+          (func-reg0 (%maybe-unbox-labels-boxed-function (or func-sym local-func-name)
+                                                        raw-func-reg
+                                                        ctx))
           (func-reg (make-register ctx)))
     (emit ctx (make-vm-move :dst func-reg :src func-reg0))
     (let ((arg-regs (%compile-call-arg-registers args ctx)))
      (cond
       ;; Self-recursive simple tail call → update params + jump (loop lowering)
-       ((and tail
-             (ctx-current-function-simple-p ctx)
-             func-sym
-             (symbolp func-expr)
-             (eq func-sym (ctx-current-function-name ctx))
-             (= (length args) (length (ctx-current-function-params ctx))))
-        (%emit-argument-rebinds-and-jump arg-regs
-                                         (ctx-current-function-params ctx)
-                                         nil
-                                         (ctx-current-function-label ctx)
-                                         ctx))
+      ((%maybe-emit-simple-tail-call tail func-expr func-sym args result-reg ctx))
       ;; Generic function dispatch
       ((and func-sym (gethash func-sym (ctx-global-generics ctx)))
        (emit ctx (make-vm-generic-call :dst result-reg :gf-reg func-reg :args arg-regs)))
@@ -435,17 +458,20 @@ Each handler form must return RESULT-REG on success or NIL to continue."
 (defmethod compile-ast ((node ast-call) ctx)
   "Compile a function call via priority-ordered fast-path dispatch.
    Each %try-compile-* returns RESULT-REG on success, NIL to fall through."
-  (let* ((tail      (ctx-tail-position ctx))
-         (func-expr (%with-no-tail-position ctx (ast-call-func node)))
-         (func-sym  (cond ((symbolp func-expr) func-expr)
-                          ((and (typep func-expr 'ast-var)
-                                (not (%ast-var-function-value-p (ast-var-name func-expr) ctx)))
-                           (ast-var-name func-expr))
-                          (t nil)))
-         (args       (ast-call-args node))
-         (result-reg (make-register ctx)))
-    (or (%try-compile-call-fast-paths func-expr func-sym args result-reg tail ctx)
-        (%compile-normal-call          func-expr func-sym args result-reg tail ctx))))
+  (%call-with-no-tail-position
+   ctx
+   (lambda ()
+     (let* ((tail      (ctx-tail-position ctx))
+            (func-expr (ast-call-func node))
+            (func-sym  (cond ((symbolp func-expr) func-expr)
+                             ((and (typep func-expr 'ast-var)
+                                   (not (%ast-var-function-value-p (ast-var-name func-expr) ctx)))
+                              (ast-var-name func-expr))
+                             (t nil)))
+            (args       (ast-call-args node))
+            (result-reg (make-register ctx)))
+       (or (%try-compile-call-fast-paths func-expr func-sym args result-reg tail ctx)
+           (%compile-normal-call          func-expr func-sym args result-reg tail ctx))))))
 
 (defmethod compile-ast ((node ast-list) ctx)
   "Compile a runtime list-construction AST node through the normal LIST call path."

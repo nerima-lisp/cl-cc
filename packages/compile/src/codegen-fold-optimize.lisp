@@ -17,21 +17,6 @@
 
 ;;; ── AST constant fold pass ───────────────────────────────────────────────────
 
-(defparameter *optimize-ast-rebuilder-table*
-  '((ast-progn       . %optimize-ast-progn-node)
-     (ast-let         . %optimize-ast-let-node)
-     (ast-if          . %optimize-ast-if-node)
-     (ast-lambda      . %optimize-ast-lambda-node)
-     (ast-defun       . %optimize-ast-defun-node)
-     (ast-defclass    . %optimize-ast-defclass-node)
-     (ast-defvar      . %optimize-ast-defvar-node)
-     (ast-block       . %optimize-ast-block-node)
-     (ast-return-from . %optimize-ast-return-from-node)
-     (ast-setq        . %optimize-ast-setq-node)
-     (ast-the         . %optimize-ast-the-node))
-  "Type symbol → rebuilder function symbol for optimize-ast's simple recursive cases.
-Special folding nodes like ast-binop and ast-call stay in optimize-ast directly.")
-
 (defun %optimize-ast-list (nodes &optional lexical-bound)
   "Optimize every AST node in NODES, preserving list order."
   (if (consp nodes)

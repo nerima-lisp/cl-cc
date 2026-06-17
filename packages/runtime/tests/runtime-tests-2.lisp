@@ -9,6 +9,10 @@
 
 ;;; ─── List Operations ───────────────────────────────────────────────────────
 
+(defun %prepare-rt-copy-list-fixture ()
+  (let ((base '(1 2 3)))
+    (values base (cl-cc/runtime:rt-copy-list base))))
+
 (deftest rt-cons-creation-and-mutation
   "rt-cons/car/cdr create cons; rt-rplaca/rt-rplacd mutate in place."
   (let ((c (cl-cc/runtime:rt-cons 1 2)))
@@ -21,16 +25,15 @@
 
 (deftest rt-copy-list-cow-read-path
   "rt-copy-list returns a COW-capable value that preserves list reads."
-  (let* ((base '(1 2 3))
-         (copy (cl-cc/runtime:rt-copy-list base)))
+  (multiple-value-bind (base copy) (%prepare-rt-copy-list-fixture)
+    (declare (ignore base))
     (assert-= 1 (cl-cc/runtime:rt-car copy))
     (assert-equal '(2 3) (cl-cc/runtime:rt-cdr copy))
     (assert-= 3 (cl-cc/runtime:rt-list-length copy))))
 
 (deftest rt-copy-list-cow-write-does-not-mutate-base-list
-  "Mutating a copied COW list does not mutate the original shared list." 
-  (let* ((base '(1 2 3))
-         (copy (cl-cc/runtime:rt-copy-list base)))
+  "Mutating a copied COW list does not mutate the original shared list."
+  (multiple-value-bind (base copy) (%prepare-rt-copy-list-fixture)
     (cl-cc/runtime:rt-rplaca copy 99)
     (assert-= 99 (cl-cc/runtime:rt-car copy))
     (assert-= 1 (car base))))

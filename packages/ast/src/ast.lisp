@@ -1,8 +1,8 @@
 ;;;; packages/ast/src/ast.lisp - AST Node Struct Definitions
 ;;;;
-;;;; This module provides AST node defstructs with source location tracking.
-;;;; ast-children, ast-bound-names, source utilities, and error reporting
-;;;; are in ast-functions.lisp (loaded immediately after this file).
+;;;; This module provides the base AST node defstructs with source location tracking.
+;;;; The concrete expression/control/CLOS variants are kept here so the ASDF
+;;;; source snapshot stays self-contained.
 
 (in-package :cl-cc/ast)
 
@@ -32,7 +32,41 @@
   (bindings nil :type list)
   (body nil :type list))
 
-;;; Core AST Structs
+;;; Function and Lambda AST Structs
+
+(defstruct (ast-lambda (:include ast-callable))
+  "Lambda expression AST node."
+  (env nil))
+
+(defstruct (ast-function (:include ast-node))
+  "Function reference AST node for #'var."
+  (name nil))
+
+(defstruct (ast-flet (:include ast-local-fns))
+  "Local non-recursive function bindings AST node.")
+
+(defstruct (ast-labels (:include ast-local-fns))
+  "Local recursive function bindings AST node.")
+
+(defstruct (ast-defun (:include ast-callable))
+  "Top-level function definition AST node."
+  (name nil :type symbol)
+  (documentation nil :type (or null string)))
+
+(defstruct (ast-defvar (:include ast-node))
+  "Top-level variable definition AST node (defvar/defparameter)."
+  (name nil)
+  (value nil)
+  (kind 'defparameter)  ; 'defvar or 'defparameter — controls conditional-init semantics
+  )
+
+(defstruct (ast-defmacro (:include ast-node))
+  "Top-level macro definition AST node."
+  (name nil)
+  (lambda-list nil)
+  (body nil :type list))
+
+;;; Core expression AST Structs
 
 (defstruct (ast-int (:include ast-node))
   "Integer literal AST node."
@@ -71,41 +105,7 @@
   (declarations nil :type list)
   (body nil :type list))
 
-;;; Function and Lambda AST Structs
-
-(defstruct (ast-lambda (:include ast-callable))
-  "Lambda expression AST node."
-  (env nil))
-
-(defstruct (ast-function (:include ast-node))
-  "Function reference AST node for #'var."
-  (name nil))
-
-(defstruct (ast-flet (:include ast-local-fns))
-  "Local non-recursive function bindings AST node.")
-
-(defstruct (ast-labels (:include ast-local-fns))
-  "Local recursive function bindings AST node.")
-
-(defstruct (ast-defun (:include ast-callable))
-  "Top-level function definition AST node."
-  (name nil :type symbol)
-  (documentation nil :type (or null string)))
-
-(defstruct (ast-defvar (:include ast-node))
-  "Top-level variable definition AST node (defvar/defparameter)."
-  (name nil)
-  (value nil)
-  (kind 'defparameter)  ; 'defvar or 'defparameter — controls conditional-init semantics
-  )
-
-(defstruct (ast-defmacro (:include ast-node))
-  "Top-level macro definition AST node."
-  (name nil)
-  (lambda-list nil)
-  (body nil :type list))
-
-;;; Block and Control Flow AST Structs
+;;; Block and control flow AST Structs
 
 (defstruct (ast-block (:include ast-node))
   "Named block AST node."
@@ -125,14 +125,14 @@
   "Go to tag AST node."
   (tag nil))
 
-;;; Assignment and Variables AST Structs
+;;; Assignment and variables AST Structs
 
 (defstruct (ast-setq (:include ast-node))
   "Variable assignment AST node."
   (var nil)
   (value nil))
 
-;;; Multiple Values AST Structs
+;;; Multiple values AST Structs
 
 (defstruct (ast-multiple-value-call (:include ast-node) (:conc-name ast-mv-call-))
   "Multiple-value-call special form AST node."
@@ -159,7 +159,7 @@
   (func nil)
   (args nil :type list))
 
-;;; Exception Handling AST Structs
+;;; Exception handling AST Structs
 
 (defstruct (ast-catch (:include ast-node))
   "Catch block AST node."
@@ -261,6 +261,3 @@
   (key nil)
   (table nil)
   (value nil))
-
-;;; ast-children, ast-bound-names, source location utilities, and error reporting
-;;; are in ast-functions.lisp (loaded immediately after this file).

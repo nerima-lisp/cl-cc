@@ -315,9 +315,6 @@
 (defparameter *wasm-wasi-p3-enabled* nil
   "FR-257: WASI 0.3 async-first I/O. Phase 2, experimental.")
 
-(defparameter *wasm-wasi-p1-compat-enabled* nil
-  "FR-321: WASI Preview 1 compatibility shim layer.")
-
 (defparameter *wasm-startup-snapshots-enabled* nil
   "FR-287: Use V8 heap serialization for fast startup. Phase 0, experimental.")
 

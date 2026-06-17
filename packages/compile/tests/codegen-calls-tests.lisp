@@ -121,6 +121,17 @@
       (assert-eq result-reg ret)
       (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-apply)))))
 
+(deftest try-compile-apply-quoted-function-symbol-uses-function-designator-helper
+  "%try-compile-apply resolves a quoted function symbol through the APPLY helper."
+  (let* ((ctx (make-codegen-ctx))
+         (result-reg (cl-cc/compile:make-register ctx)))
+    (let ((ret (cl-cc/compile::%try-compile-apply
+                'apply
+                (list (make-ast-quote :value 'f) (make-ast-int :value 1))
+                result-reg nil ctx)))
+      (assert-eq result-reg ret)
+      (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-apply)))))
+
 (deftest try-compile-apply-list-call-spread-emits-vm-call
   "FR-044: %try-compile-apply lowers a final (LIST ...) spread to vm-call."
   (let* ((ctx (make-codegen-ctx))

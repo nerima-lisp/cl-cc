@@ -12,25 +12,22 @@
   head
   (body nil))
 
-(defun %rename-prolog-term (term renaming)
-  "Rename TERM's logic variables via RENAMING hash table."
-  (%walk-prolog-term term
-                     (lambda (node)
-                       (or (gethash node renaming)
-                           (setf (gethash node renaming)
-                                 (gensym (symbol-name node)))))
-                     #'identity
-                     (lambda (node)
-                       (cons (%rename-prolog-term (car node) renaming)
-                             (%rename-prolog-term (cdr node) renaming)))))
-
 (defun rename-variables (rule)
   "Rename all logic variables in RULE to fresh ones for recursive calls."
   (let ((renaming (make-hash-table :test 'eq)))
-    (make-prolog-rule :head (%rename-prolog-term (rule-head rule) renaming)
-                      :body (mapcar (lambda (b)
-                                      (%rename-prolog-term b renaming))
-                                    (rule-body rule)))))
+    (labels ((rename-term (term)
+               (%walk-prolog-term term
+                                  (lambda (node)
+                                    (or (gethash node renaming)
+                                        (setf (gethash node renaming)
+                                              (gensym (symbol-name node)))))
+                                  #'identity
+                                  (lambda (node)
+                                    (cons (rename-term (car node))
+                                          (rename-term (cdr node)))))))
+      (make-prolog-rule :head (rename-term (rule-head rule))
+                        :body (mapcar #'rename-term
+                                      (rule-body rule))))))
 
 ;;; Prolog database state
 
@@ -52,25 +49,6 @@
     (add-rule (car head) rule)
     rule))
 
-(defun %register-declarative-rule-spec (spec)
-  "Register a declarative rule SPEC in the Prolog database."
-  (destructuring-bind (head &optional body) spec
-    (register-prolog-rule head body)))
-
-(defun %register-type-rule-spec (spec)
-  "Register one or more type inference rules from SPEC."
-  (destructuring-bind (result-type expr-kind operators) spec
-    (dolist (op operators)
-      (register-prolog-rule
-       `(type-of (,expr-kind ,op ?a ?b) ?env (,result-type))
-       '((type-of ?a ?env (integer-type))
-         (type-of ?b ?env (integer-type)))))))
-
-(defun %register-rule-specs (specs registrar)
-  "Apply REGISTRAR to each SPEC in SPECS."
-  (dolist (spec specs)
-    (funcall registrar spec)))
-
 (defmacro def-fact (head)
   "Define a Prolog fact. Usage: (def-fact (parent tom mary))"
   `(register-prolog-rule ',head))
@@ -89,7 +67,14 @@
 ;;; Register them directly so this file stays data-driven without one-off
 ;;; expansion macros.
 
-(%register-rule-specs *prolog-declarative-rule-specs*
-                      #'%register-declarative-rule-spec)
-(%register-rule-specs *prolog-type-rule-specs*
-                      #'%register-type-rule-spec)
+(dolist (spec *prolog-declarative-rule-specs*)
+  (destructuring-bind (head &optional body) spec
+    (register-prolog-rule head body)))
+
+(dolist (spec *prolog-type-rule-specs*)
+  (destructuring-bind (result-type expr-kind operators) spec
+    (dolist (op operators)
+      (register-prolog-rule
+       `(type-of (,expr-kind ,op ?a ?b) ?env (,result-type))
+       '((type-of ?a ?env (integer-type))
+         (type-of ?b ?env (integer-type)))))))

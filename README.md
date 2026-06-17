@@ -499,7 +499,8 @@ PHP 8.5 predefined constants include `PHP_VERSION` / `PHP_VERSION_ID`,
 cl-cc includes a JavaScript frontend that lowers JavaScript source through the
 same CL AST and backend pipeline used by the other frontends. `.js` and `.mjs`
 files are auto-detected; `--lang js` and `--lang javascript` select it
-explicitly for any command.
+explicitly for any command. The JavaScript frontend tracks ECMAScript 2026 as
+the latest supported target.
 
 ```bash
 cl-cc run file.js

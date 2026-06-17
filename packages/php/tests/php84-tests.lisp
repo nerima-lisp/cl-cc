@@ -343,6 +343,12 @@
                  (%php-run-capture
                   "<?php $a=curl_share_init_persistent('cache'); $b=curl_share_init_persistent('cache'); echo ($a === $b ? 'same' : 'diff') . ':' . gettype($a);")))
 
+(deftest php85-curl-share-init-persistent-registers-its-class-tag
+  "The persistent cURL share handle is visible to class_exists after it is created."
+  (assert-string= "Y"
+                 (%php-run-capture
+                  "<?php curl_share_init_persistent('cache'); echo class_exists('CurlSharePersistentHandle') ? 'Y' : 'N';")))
+
 (deftest php85-filter-throw-on-failure-constant-is-defined
   "PHP 8.5 defines FILTER_THROW_ON_FAILURE for filter functions."
   (multiple-value-bind (value found)
@@ -596,7 +602,12 @@
   ;; PHP 8.1 allows `new ClassName()` as a default parameter value.
   ;; The parser produces an ast-defun where a parameter default is ast-make-instance.
   (let* ((ast (%php84-first
-               "<?php function process($config = null) { return $config; }"))
-         (body (cl-cc:ast-defun-body ast)))
+               "<?php function process(Logger $logger = new FileLogger()) { return $logger; }"))
+         (optionals (cl-cc:ast-defun-optional-params ast))
+         (default-ast (second (first optionals))))
     (assert-true (cl-cc:ast-defun-p ast))
-    (assert-true (plusp (length body)))))
+    (assert-= 1 (length optionals))
+    (assert-true (cl-cc:ast-make-instance-p default-ast))
+    (assert-string= "FILELOGGER"
+                    (symbol-name (cl-cc:ast-var-name
+                                  (cl-cc:ast-make-instance-class default-ast))))))
