@@ -230,6 +230,12 @@ gensym-named class and makes an instance of it."
   (and (ast-var-p obj)
        (string= (string-upcase (symbol-name (ast-var-name obj))) "LOCALE")))
 
+(defun %php-predefined-class-constant-class-ast-p (obj)
+  (and (ast-var-p obj)
+       (member (string-upcase (symbol-name (ast-var-name obj)))
+               '("INTLLISTFORMATTER" "NUMBERFORMATTER" "PDO\\SQLITE")
+               :test #'string=)))
+
 (defun %php-fiber-new-ast (args)
   (make-ast-call
    :func (make-ast-var :name 'cl-cc/php::%php-fiber-make)
@@ -452,6 +458,18 @@ ordering only applies to user-visible parameters."
                                       (error "PHP parse error: Locale::isRightToLeft() expects exactly 1 argument"))
                                     (%php-call 'cl-cc/php::%php-locale-is-right-to-left
                                                (first args)))
+                                   ((and (%php-locale-class-ast-p obj)
+                                         (string= (symbol-name member) "ADDLIKELYSUBTAGS"))
+                                    (unless (= (length args) 1)
+                                      (error "PHP parse error: Locale::addLikelySubtags() expects exactly 1 argument"))
+                                    (%php-call 'cl-cc/php::%php-locale-add-likely-subtags
+                                               (first args)))
+                                   ((and (%php-locale-class-ast-p obj)
+                                         (string= (symbol-name member) "MINIMIZESUBTAGS"))
+                                    (unless (= (length args) 1)
+                                      (error "PHP parse error: Locale::minimizeSubtags() expects exactly 1 argument"))
+                                    (%php-call 'cl-cc/php::%php-locale-minimize-subtags
+                                               (first args)))
                                    ((and (%php-fiber-class-ast-p obj)
                                          (string= (symbol-name member) "SUSPEND"))
                                     (apply #'%php-call 'cl-cc/php::%php-fiber-suspend args))
@@ -462,7 +480,11 @@ ordering only applies to user-visible parameters."
                                      args)))
                              rest rest4
                              kv kv4))
-                     (setf obj (make-ast-slot-value :object obj :slot member)
+                     (setf obj (if (%php-predefined-class-constant-class-ast-p obj)
+                                   (%php-call 'cl-cc/php::%php-predefined-class-constant
+                                              (make-ast-quote :value (symbol-name (ast-var-name obj)))
+                                              (make-ast-quote :value (symbol-name member)))
+                                   (make-ast-slot-value :object obj :slot member))
                            rest rest3))))))
           ;; Postfix ++/-- — yield the ORIGINAL value, then adjust by ±1.
           ((and (eq type :T-OP) (member (php-peek-value rest) '("++" "--") :test #'equal))
@@ -626,10 +648,6 @@ to simple variables and avoids reading an unbound variable on first use."
 (defun php-parse-unary (stream known-vars)
   "Parse unary expressions: prefix ++/--, !, -, +, ~."
   (cond
-    ((%php-void-cast-start-p stream)
-      (let ((rest (cdddr stream)))
-        (multiple-value-bind (expr rest2 kv2) (php-parse-unary rest known-vars)
-          (values (%php-void-cast-ast expr) rest2 kv2))))
     ((%php-reference-token-p stream)
       ;; PHP reference operator (&expr): keep an internal marker so assignment
       ;; lowering can model $b = &$a with the same ref-box machinery used by

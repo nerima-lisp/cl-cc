@@ -811,14 +811,19 @@ After php-finish-let-bindings, $x let wraps $y let in its body."
     (assert-true (cl-cc:ast-lambda-p (second (cl-cc:ast-call-args ast))))))
 
 (deftest php-parser-void-cast-lowers-to-progn
-  "PHP 8.5 (void) casts parse as a progn that discards the value and returns null."
-  (let ((value (%php-first-binding-value "<?php $x = (void) foo();")))
+  "PHP 8.5 (void) statements parse as a progn that discards the value and returns null."
+  (let ((value (%php-first "<?php (void) foo();")))
     (assert-true (cl-cc:ast-progn-p value))
     (assert-= 2 (length (cl-cc:ast-progn-forms value)))
     (assert-true (cl-cc:ast-call-p (first (cl-cc:ast-progn-forms value))))
     (assert-true (cl-cc:ast-quote-p (second (cl-cc:ast-progn-forms value))))
     (assert-eq cl-cc/php:+php-null+
                (cl-cc:ast-quote-value (second (cl-cc:ast-progn-forms value))))))
+
+(deftest php-parser-void-cast-is-statement-only
+  "PHP 8.5 (void) is statement syntax, not a general expression."
+  (assert-signals error
+    (cl-cc/php:parse-php-source "<?php $x = (void) foo();")))
 
 (deftest php-parser-clone-with-lowers-to-helper-call
   "PHP 8.5 clone-with syntax lowers through the parser to the clone-with helper."
@@ -1029,6 +1034,12 @@ Enum defclass is first; $x/$y/$z assignments nest (php-finish-let-bindings)."
                                (member :public (getf (cl-cc:ast-imports slot) :php-modifiers))
                                (getf (cl-cc:ast-imports slot) :php-class-constant)))
                         slots))))
+
+(deftest php-parser-attribute-grouped-class-constants-signal-error
+  "PHP 8.5 attributes on grouped class const declarations are rejected."
+  (assert-signals error
+    (cl-cc/php:parse-php-source
+     "<?php class C { #[Deprecated] public const A = 1, B = 2; }")))
 
 (defun %php-node-attributes (node)
   "Return PHP attribute metadata attached to NODE."

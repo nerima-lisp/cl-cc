@@ -33,8 +33,12 @@
 
 (defun %php-parse-expr-stmt (stream known-vars)
   "Parse an expression statement."
-  (multiple-value-bind (expr rest kv) (php-parse-expr stream known-vars)
-    (values expr (php-skip-semis rest) kv)))
+  (if (%php-void-cast-start-p stream)
+      (let ((rest (cdddr stream)))
+        (multiple-value-bind (expr rest2 kv2) (php-parse-expr rest known-vars)
+          (values (%php-void-cast-ast expr) (php-skip-semis rest2) kv2)))
+      (multiple-value-bind (expr rest kv) (php-parse-expr stream known-vars)
+        (values expr (php-skip-semis rest) kv))))
 
 (defvar *php-loop-continue-target* nil
   "Dynamically bound innermost loop continue target.")

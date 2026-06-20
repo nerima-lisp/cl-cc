@@ -112,6 +112,7 @@
       (c "CURLINFO_CONN_ID" 2097283)
       (c "CURLINFO_QUEUE_TIME_T" 6291476)
       (c "CURLOPT_INFILESIZE_LARGE" 30115)
+      (c "CURLOPT_SSL_SIGNATURE_ALGORITHMS" 10328)
       (c "CURLFOLLOW_ALL" 1)
       (c "CURLFOLLOW_OBEYCODE" 2)
       (c "CURLFOLLOW_FIRSTONLY" 3)
@@ -240,6 +241,46 @@ else (values NIL NIL)."
           (if sep
               (gethash (subseq name (1+ sep)) *php-predefined-constants*)
               (values nil nil))))))
+
+(defparameter *php-predefined-class-constants*
+  (make-hash-table :test #'equal)
+  "Class/constant-name pair to value for runtime-visible PHP class constants.")
+
+(defun %php-class-constant-key (class-name constant-name)
+  (cons (string-upcase (princ-to-string class-name))
+        (string-upcase (princ-to-string constant-name))))
+
+(defun %php-register-predefined-class-constant (class-name constant-name value)
+  (setf (gethash (%php-class-constant-key class-name constant-name)
+                 *php-predefined-class-constants*)
+        value))
+
+(defun %php-predefined-class-constant (class-name constant-name)
+  "Return a predefined PHP class constant value or signal an undefined-constant error."
+  (multiple-value-bind (value foundp)
+      (gethash (%php-class-constant-key class-name constant-name)
+               *php-predefined-class-constants*)
+    (if foundp
+        value
+        (error "Undefined PHP class constant ~A::~A" class-name constant-name))))
+
+(dolist (entry '(("IntlListFormatter" "TYPE_AND" 0)
+                 ("IntlListFormatter" "TYPE_OR" 1)
+                 ("IntlListFormatter" "TYPE_UNITS" 2)
+                 ("IntlListFormatter" "WIDTH_WIDE" 0)
+                 ("IntlListFormatter" "WIDTH_SHORT" 1)
+                 ("IntlListFormatter" "WIDTH_NARROW" 2)
+                 ("NumberFormatter" "CURRENCY_ISO" 10)
+                 ("NumberFormatter" "CURRENCY_ACCOUNTING" 12)
+                 ("NumberFormatter" "DECIMAL_COMPACT_SHORT" 14)
+                 ("NumberFormatter" "DECIMAL_COMPACT_LONG" 15)
+                 ("NumberFormatter" "CURRENCY_STANDARD" 16)
+                 ("Pdo\\Sqlite" "OPEN_READONLY" 1)
+                 ("Pdo\\Sqlite" "OPEN_READWRITE" 2)
+                 ("Pdo\\Sqlite" "OPEN_CREATE" 4)
+                 ("Pdo\\Sqlite" "DETERMINISTIC" 2048)))
+  (destructuring-bind (class-name constant-name value) entry
+    (%php-register-predefined-class-constant class-name constant-name value)))
 
 (defun %php-array-empty-p (ht)
   "Return true when PHP ordered array HT contains no user entries."

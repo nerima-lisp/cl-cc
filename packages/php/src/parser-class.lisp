@@ -87,6 +87,8 @@
                 slots)))
       (unless (and current (eq (php-peek-type current) :T-COMMA))
         (return))
+      (when attributes
+        (error "PHP parse error: attributes on grouped const declarations require exactly one constant"))
       (setf current (cdr current)))
     (let ((ordered-slots (nreverse slots)))
       (values (first ordered-slots)
@@ -385,8 +387,7 @@ to %php-parse-expr-stmt for expression statements."
                   (when (and attributes
                              (eq (php-tok-value _) :const)
                              (ast-progn-p stmt))
-                    (dolist (form (ast-progn-forms stmt))
-                      (%php-attach-attributes-to-node form attributes target-type)))
+                    (error "PHP parse error: attributes on grouped const declarations require exactly one constant"))
                   (values (%php-attach-attributes-to-node
                            stmt attributes target-type)
                           rest2 kv2))))

@@ -333,18 +333,11 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
     (assert-true (cl-cc:ast-quote-p arg))
     (assert-string= "use NEW" (cl-cc:ast-quote-value arg)))))
 
-(%php85-register-test 'php85-attribute-preserved-on-multiple-top-level-constants
-  "PHP 8.5 attributes on const A, B attach to each declared constant."
+(%php85-register-test 'php85-attribute-grouped-top-level-constants-signal-error
+  "PHP 8.5 attributes on grouped top-level const declarations are rejected."
   (lambda ()
-(let* ((ast (%php84-first "<?php #[Deprecated] const A = 1, B = 2;"))
-         (forms (cl-cc:ast-progn-forms ast)))
-    (assert-true (cl-cc:ast-progn-p ast))
-    (assert-= 2 (length forms))
-    (dolist (form forms)
-      (let ((attr (first (getf (cl-cc:ast-imports form) :php-attributes))))
-        (assert-true (cl-cc:ast-defvar-p form))
-        (assert-string= "Deprecated" (cl-cc/php:php-attribute-name attr))
-        (assert-eq :constant (cl-cc/php:php-attribute-target-type attr)))))))
+    (assert-signals error
+      (cl-cc/php:parse-php-source "<?php #[Deprecated] const A = 1, B = 2;"))))
 
 (%php85-register-test 'php85-no-discard-attribute-preserved-on-enum-method
   "PHP 8.5 #[NoDiscard] on enum methods survives enum classlike parsing."
@@ -368,21 +361,21 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
         (assert-eq :method (cl-cc/php:php-attribute-target-type attr))))))
 
 (%php85-register-test 'php85-void-cast-lowers-to-discarding-progn
-  "The PHP 8.5 (void) cast evaluates its operand and returns PHP null."
+  "The PHP 8.5 (void) statement evaluates its operand and returns PHP null."
   (lambda ()
-(let* ((value (%php-first-binding-value "<?php $x = (void) 123;"))
+(let* ((value (%php84-first "<?php (void) 123;"))
          (forms (cl-cc:ast-progn-forms value)))
     (assert-true (cl-cc:ast-progn-p value))
     (assert-= 2 (length forms))
     (assert-eq cl-cc/php:+php-null+
                (cl-cc:ast-quote-value (second forms))))))
 
-(%php85-register-test 'php85-void-cast-executes-side-effects-and-returns-null
-  "The PHP 8.5 (void) cast still evaluates the discarded expression."
+(%php85-register-test 'php85-void-cast-executes-side-effects
+  "The PHP 8.5 (void) statement still evaluates the discarded expression."
   (lambda ()
-(assert-string= "1:null"
+(assert-string= "1"
                  (%php-run-capture
-                  "<?php $x=0; $y=(void)($x=1); echo $x . ':' . ($y === null ? 'null' : 'bad');"))))
+                  "<?php $x=0; (void)($x=1); echo $x;"))))
 
 (%php85-register-test 'php85-get-error-handler-reports-current-handler
   "get_error_handler() returns the active handler and null when none is installed."
@@ -458,6 +451,13 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                  (%php-run-capture
                   "<?php echo function_exists('curl_multi_get_handles') ? 'Y' : 'N';"))))
 
+(%php85-register-test 'php85-locale-likely-subtags-static-methods-lower-to-helpers
+  "The PHP 8.5 Locale likely-subtag static methods lower to runtime helpers."
+  (lambda ()
+    (assert-string= "en-Latn-US:en"
+                    (%php-run-capture
+                     "<?php echo Locale::addLikelySubtags('en') . ':' . Locale::minimizeSubtags('en_Latn_US');"))))
+
 (%php85-register-test 'php85-new-runtime-symbols-are-pre-registered
   "PHP 8.5 runtime-visible classes, exceptions, and enums are visible to class_exists."
   (lambda ()
@@ -466,6 +466,10 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                       "CurlSharePersistentHandle"
                       "Filter\\FilterException"
                       "Filter\\FilterFailedException"
+                      "IntlListFormatter"
+                      "Locale"
+                      "NumberFormatter"
+                      "Pdo\\Sqlite"
                       "Uri\\UriError"
                       "Uri\\UriException"
                       "Uri\\InvalidUriException"
@@ -476,6 +480,13 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                       "Uri\\WhatWg\\UrlValidationError"
                       "Uri\\WhatWg\\Url"))
     (assert-true (cl-cc/php::%php-class-exists class-name)))))
+
+(%php85-register-test 'php85-intl-and-pdo-class-constants-lower-to-runtime-values
+  "PHP 8.5 IntlListFormatter, NumberFormatter, and Pdo\\Sqlite class constants resolve."
+  (lambda ()
+    (assert-string= "0:1:10:12:1:2048"
+                    (%php-run-capture
+                     "<?php echo IntlListFormatter::TYPE_AND . ':' . IntlListFormatter::TYPE_OR . ':' . NumberFormatter::CURRENCY_ISO . ':' . NumberFormatter::CURRENCY_ACCOUNTING . ':' . Pdo\\Sqlite::OPEN_READONLY . ':' . Pdo\\Sqlite::DETERMINISTIC;"))))
 
 (%php85-register-test 'php85-new-constants-are-predefined
   "PHP 8.5 predefined constants are available through constant lookup."
@@ -488,6 +499,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                     "CURLINFO_CONN_ID"
                     "CURLINFO_QUEUE_TIME_T"
                     "CURLOPT_INFILESIZE_LARGE"
+                    "CURLOPT_SSL_SIGNATURE_ALGORITHMS"
                     "CURLFOLLOW_ALL"
                     "CURLFOLLOW_OBEYCODE"
                     "CURLFOLLOW_FIRSTONLY"
@@ -523,6 +535,33 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
         (cl-cc/php::%php-lookup-constant constant)
       (declare (ignore value))
       (assert-true found)))))
+
+(%php85-register-test 'php85-extension-new-free-functions-are-registered
+  "New PHP 8.5 extension-level free functions are registered as builtins."
+  (lambda ()
+    (dolist (function-name '("enchant_dict_remove_from_session"
+                             "enchant_dict_remove"
+                             "pg_close_stmt"
+                             "pg_service"))
+      (assert-true (cl-cc/php::%php-function-exists function-name)))))
+
+(%php85-register-test 'php85-extension-new-free-function-helpers-update-modeled-state
+  "PHP 8.5 enchant and pgsql compatibility helpers update modeled runtime state."
+  (lambda ()
+    (let ((dict (make-hash-table :test #'equal))
+          (words (make-hash-table :test #'equal)))
+      (setf (gethash "words" dict) words
+            (gethash "hello" words) t)
+      (assert-true (cl-cc/php:%php-enchant-dict-remove dict "hello"))
+      (assert-false (gethash "hello" words)))
+    (let ((connection (make-hash-table :test #'equal))
+          (statements (make-hash-table :test #'equal)))
+      (setf (gethash "statements" connection) statements
+            (gethash "stmt1" statements) t
+            (gethash "service" connection) "analytics")
+      (assert-string= "analytics" (cl-cc/php:%php-pg-service connection))
+      (assert-true (cl-cc/php:%php-pg-close-stmt connection "stmt1"))
+      (assert-false (gethash "stmt1" statements)))))
 
 (%php85-register-test 'php85-filter-throw-on-failure-constant-is-defined
   "PHP 8.5 defines FILTER_THROW_ON_FAILURE for filter functions."

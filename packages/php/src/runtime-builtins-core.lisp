@@ -76,6 +76,45 @@ hash-table. Repeated calls with the same ID return the same handle."
       ((listp handles) (%php-list-to-array handles))
       (t (%php-list-to-array (list handles))))))
 
+(defun %php-hash-field (table &rest keys)
+  (when (hash-table-p table)
+    (loop for key in keys
+          do (multiple-value-bind (value foundp) (gethash key table)
+               (when foundp
+                 (return value))))))
+
+(defun %php-enchant-remove-word (dict word)
+  (let* ((needle (%php-stringify word))
+         (words (%php-hash-field dict
+                                  "session_words" :session-words
+                                  "words" :words)))
+    (when (hash-table-p words)
+      (remhash needle words)
+      (remhash word words)))
+  t)
+
+(defun %php-enchant-dict-remove-from-session (dict word)
+  "PHP 8.5 enchant_dict_remove_from_session() compatibility helper."
+  (%php-enchant-remove-word dict word))
+
+(defun %php-enchant-dict-remove (dict word)
+  "PHP 8.5 enchant_dict_remove() compatibility helper."
+  (%php-enchant-remove-word dict word))
+
+(defun %php-pg-close-stmt (connection statement-name)
+  "PHP 8.5 pg_close_stmt() compatibility helper."
+  (let ((statements (%php-hash-field connection "statements" :statements)))
+    (when (hash-table-p statements)
+      (let ((key (%php-stringify statement-name)))
+        (remhash key statements)
+        (remhash statement-name statements))))
+  t)
+
+(defun %php-pg-service (&optional connection)
+  "PHP 8.5 pg_service() compatibility helper."
+  (or (%php-hash-field connection "service" :service)
+      nil))
+
 (defun %php-gettype (value)
   "Return VALUE's PHP type name as a string."
   ;; (%php-gettype 1) => "integer"

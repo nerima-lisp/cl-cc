@@ -673,6 +673,34 @@
         while pos
         do (setf start (1+ pos))))
 
+(defparameter *php-locale-likely-subtags*
+  '(("en" . "en-Latn-US")
+    ("ja" . "ja-Jpan-JP")
+    ("zh" . "zh-Hans-CN")
+    ("fr" . "fr-Latn-FR")
+    ("de" . "de-Latn-DE")
+    ("ar" . "ar-Arab-EG")
+    ("he" . "he-Hebr-IL")
+    ("fa" . "fa-Arab-IR")
+    ("ur" . "ur-Arab-PK"))
+  "Deterministic likely-subtag sample used by PHP 8.5 Locale helpers.")
+
+(defun %php-locale-add-likely-subtags (locale)
+  "PHP 8.5 Locale::addLikelySubtags compatibility helper."
+  (let ((id (%php-locale-normalized-id locale)))
+    (or (cdr (assoc id *php-locale-likely-subtags* :test #'string=))
+        (if (position #\- id)
+            id
+            (format nil "~A-Latn-US" id)))))
+
+(defun %php-locale-minimize-subtags (locale)
+  "PHP 8.5 Locale::minimizeSubtags compatibility helper."
+  (let* ((id (%php-locale-normalized-id locale))
+         (likely (rassoc id *php-locale-likely-subtags* :test #'string-equal)))
+    (or (car likely)
+        (first (%php-locale-subtags id))
+        id)))
+
 (defun %php-locale-is-right-to-left (locale)
   "PHP 8.5 locale_is_right_to_left / Locale::isRightToLeft helper."
   (let* ((id (%php-locale-normalized-id locale))
@@ -874,6 +902,10 @@
                         "CurlSharePersistentHandle"
                         "Filter\\FilterException"
                         "Filter\\FilterFailedException"
+                        "IntlListFormatter"
+                        "Locale"
+                        "NumberFormatter"
+                        "Pdo\\Sqlite"
                         "Uri\\UriError"
                         "Uri\\UriException"
                         "Uri\\InvalidUriException"
