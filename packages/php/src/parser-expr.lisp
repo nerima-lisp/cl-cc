@@ -70,6 +70,48 @@ T-TYPE.  Returns (values name-string rest)."
   (make-ast-progn
    :forms (list expr (make-ast-quote :value +php-null+))))
 
+(defun %php-cast-token-name (tok)
+  "Return TOK's value as a lowercase PHP cast/type spelling."
+  (let ((value (php-tok-value tok)))
+    (string-downcase
+     (typecase value
+       (string value)
+       (symbol (symbol-name value))
+       (t (princ-to-string value))))))
+
+(defun %php-cast-token-kind (tok)
+  "Return the canonical cast kind represented by TOK, or NIL."
+  (when (and tok
+             (member (php-tok-type tok) '(:T-TYPE :T-KEYWORD :T-IDENT) :test #'eq))
+    (let ((name (%php-cast-token-name tok)))
+      (cond
+        ((member name '("int" "integer") :test #'string=) :int)
+        ((member name '("float" "double" "real") :test #'string=) :float)
+        ((member name '("string" "binary") :test #'string=) :string)
+        ((member name '("bool" "boolean") :test #'string=) :bool)
+        ((string= name "array") :array)
+        ((string= name "object") :object)))))
+
+(defun %php-cast-start-p (stream)
+  "Return true when STREAM starts with a PHP scalar/array/object cast prefix."
+  (and (eq (php-peek-type stream) :T-LPAREN)
+       (eq (php-peek-type (cddr stream)) :T-RPAREN)
+       (%php-cast-token-kind (second stream))))
+
+(defun %php-cast-helper-symbol (kind)
+  "Map a canonical cast KIND to the runtime helper used to perform it."
+  (ecase kind
+    (:int 'cl-cc/php::%php-intval)
+    (:float 'cl-cc/php::%php-floatval)
+    (:string 'cl-cc/php::%php-strval)
+    (:bool 'cl-cc/php::%php-boolval)
+    (:array 'cl-cc/php::%php-settype-array-value)
+    (:object 'cl-cc/php::%php-settype-object-value)))
+
+(defun %php-cast-ast (kind expr)
+  "Lower a PHP cast expression to the corresponding runtime conversion helper."
+  (%php-call (%php-cast-helper-symbol kind) expr))
+
 ;;; ─── Expression Parser ──────────────────────────────────────────────────────
 
 (defun php-parse-primary (stream known-vars)
@@ -678,8 +720,12 @@ to simple variables and avoids reading an unbound variable on first use."
                                        (make-ast-var :name old-level))))))))
 
 (defun php-parse-unary (stream known-vars)
-  "Parse unary expressions: prefix ++/--, !, -, +, ~."
+  "Parse unary expressions: casts, prefix ++/--, !, -, +, ~."
   (cond
+    ((%php-cast-start-p stream)
+     (let ((kind (%php-cast-token-kind (second stream))))
+       (multiple-value-bind (expr rest2 kv2) (php-parse-unary (cdddr stream) known-vars)
+         (values (%php-cast-ast kind expr) rest2 kv2))))
     ((%php-reference-token-p stream)
       ;; PHP reference operator (&expr): keep an internal marker so assignment
       ;; lowering can model $b = &$a with the same ref-box machinery used by

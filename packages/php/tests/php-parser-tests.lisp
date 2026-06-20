@@ -825,6 +825,38 @@ After php-finish-let-bindings, $x let wraps $y let in its body."
   (assert-signals error
     (cl-cc/php:parse-php-source "<?php $x = (void) foo();")))
 
+(deftest php-parser-scalar-casts-lower-to-runtime-helpers
+  "PHP cast expressions lower to the runtime conversion helpers."
+  (flet ((cast-call-name (src)
+           (%php-call-name (%php-first-binding-value src))))
+    (assert-string= "%PHP-INTVAL" (cast-call-name "<?php $x = (int) \"42\";"))
+    (assert-string= "%PHP-STRVAL" (cast-call-name "<?php $x = (string) 7;"))
+    (assert-string= "%PHP-FLOATVAL" (cast-call-name "<?php $x = (float) \"1.5\";"))
+    (assert-string= "%PHP-BOOLVAL" (cast-call-name "<?php $x = (bool) \"x\";"))))
+
+(deftest php-parser-cast-aliases-lower-to-canonical-runtime-helpers
+  "PHP cast aliases lower to the same canonical conversion helpers."
+  (flet ((cast-call-name (src)
+           (%php-call-name (%php-first-binding-value src))))
+    (assert-string= "%PHP-INTVAL" (cast-call-name "<?php $x = (integer) \"42\";"))
+    (assert-string= "%PHP-BOOLVAL" (cast-call-name "<?php $x = (boolean) \"x\";"))
+    (assert-string= "%PHP-FLOATVAL" (cast-call-name "<?php $x = (double) \"1.5\";"))
+    (assert-string= "%PHP-STRVAL" (cast-call-name "<?php $x = (binary) 7;"))))
+
+(deftest php-parser-array-and-object-casts-lower-to-runtime-helpers
+  "PHP array and object cast expressions lower to the runtime conversion helpers."
+  (flet ((cast-call-name (src)
+           (%php-call-name (%php-first-binding-value src))))
+    (assert-string= "%PHP-SETTYPE-ARRAY-VALUE" (cast-call-name "<?php $x = (array) 7;"))
+    (assert-string= "%PHP-SETTYPE-OBJECT-VALUE" (cast-call-name "<?php $x = (object) [\"x\" => 1];"))))
+
+(deftest php-parser-clone-function-accepts-single-argument
+  "PHP 8.5 clone($object) function-style syntax lowers to the clone helper."
+  (let* ((value (%php-first-binding-value "<?php $b = clone($a);"))
+         (clone-call (cdr (first (cl-cc:ast-let-bindings value)))))
+    (assert-true (cl-cc:ast-let-p value))
+    (assert-string= "%PHP-CLONE" (%php-call-name clone-call))))
+
 (deftest php-parser-clone-with-lowers-to-helper-call
   "PHP 8.5 clone-with syntax lowers through the parser to the clone-with helper."
   (let* ((value (%php-first-binding-value "<?php $b = clone($a, ['x' => 9]);"))

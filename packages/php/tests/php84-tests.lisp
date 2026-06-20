@@ -759,6 +759,27 @@ echo $u->getScheme() . ':' . $u->getHost() . ':' . $u->getPath() . ':' . $u->get
     (assert-eq 'cl-cc/php::%php-clone-with
                (cl-cc:ast-var-name (cl-cc:ast-call-func with-call))))))
 
+(%php85-register-test 'php85-cast-expressions-execute
+  "PHP cast expressions execute through the runtime conversion helpers."
+  (lambda ()
+    (assert-string= "42:7:1"
+                    (%php-run-capture
+                     "<?php echo (int) '42' . ':' . (string) 7 . ':' . ((bool) 'x' ? 1 : 0);"))))
+
+(%php85-register-test 'php85-cast-expressions-work-in-constant-expressions
+  "PHP 8.5 permits scalar casts in constant expressions."
+  (lambda ()
+    (assert-string= "42:7:1"
+                    (%php-run-capture
+                     "<?php const I = (int) '42'; const S = (string) 7; const B = (bool) 'x'; echo I . ':' . S . ':' . (B ? 1 : 0);"))))
+
+(%php85-register-test 'php85-clone-function-single-argument-executes
+  "PHP 8.5 clone($object) function-style syntax clones without overrides."
+  (lambda ()
+    (assert-string= "1:2"
+                    (%php-run-capture
+                     "<?php class C{ public $x=1; } $a=new C(); $b=clone($a); $b->x=2; echo $a->x.':'.$b->x;"))))
+
 (%php85-register-test 'php85-clone-with-executes-property-overrides
   "Clone-with applies property overrides without mutating the original object."
   (lambda ()

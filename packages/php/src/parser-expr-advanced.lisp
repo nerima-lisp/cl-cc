@@ -1502,9 +1502,11 @@ marker."
                    (cdddr rest) known-vars)
            (if (eq (php-peek-type rest) :T-LPAREN)
                (multiple-value-bind (args rest2 kv2) (php-parse-arglist rest known-vars)
-                 (unless (= (length args) 2)
-                   (error "PHP parse error: clone-with expects object and override array"))
-                 (values (%php-clone-expression-ast (first args) (second args)) rest2 kv2))
+                 (case (length args)
+                   (1 (values (%php-clone-expression-ast (first args)) rest2 kv2))
+                   (2 (values (%php-clone-expression-ast (first args) (second args)) rest2 kv2))
+                   (otherwise
+                    (error "PHP parse error: clone() expects object or object and override array"))))
                (multiple-value-bind (expr rest2 kv2) (php-parse-unary rest known-vars)
                  (values (%php-clone-expression-ast expr) rest2 kv2)))))
       (:fn
