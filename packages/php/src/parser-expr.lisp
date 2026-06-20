@@ -159,6 +159,18 @@ T-TYPE.  Returns (values name-string rest)."
            (multiple-value-bind (tok2 rest3) (php-expect :T-RPAREN rest2)
              (declare (ignore tok2))
              (values expr rest3 kv2)))))
+      ((and (eq type :T-BACKSLASH)
+            (let ((next-type (php-peek-type (cdr stream)))
+                  (next-value (php-peek-value (cdr stream))))
+              (and (member next-type '(:T-IDENT :T-KEYWORD :T-TYPE) :test #'eq)
+                   (string= "clone"
+                            (string-downcase
+                             (if (stringp next-value)
+                                 next-value
+                                 (symbol-name next-value))))
+                   (eq (php-peek-type (cddr stream)) :T-LPAREN))))
+       (multiple-value-bind (args rest2 kv2) (php-parse-arglist (cddr stream) known-vars)
+         (values (%php-clone-call-ast args) rest2 kv2)))
        ((member type '(:T-IDENT :T-BACKSLASH) :test #'eq)
         ;; Could be a function call, a predefined constant, or a user constant.
         (multiple-value-bind (qualified-name rest) (php-parse-qualified-name stream)

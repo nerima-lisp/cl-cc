@@ -1129,6 +1129,38 @@ echo $u->getScheme() . ':' . $u->getHost() . ':' . $u->getPath() . ':' . $u->get
     (assert-eq :private (getf imports :php-set-visibility))
     (assert-true (member :public (getf imports :php-modifiers) :test #'eq)))))
 
+(%php85-register-test 'php85-class-static-asymmetric-visibility-metadata
+  "PHP 8.5 static properties preserve asymmetric set visibility metadata."
+  (lambda ()
+    (dolist (case '(("<?php class Config { final public static private(set) string $name; }"
+                     :private)
+                    ("<?php class Config { final public static protected(set) string $name; }"
+                     :protected)))
+      (let* ((ast (%php84-first (first case)))
+             (slot (first (cl-cc:ast-defclass-slots ast)))
+             (imports (cl-cc:ast-imports slot))
+             (modifiers (getf imports :php-modifiers)))
+        (assert-eq :class (cl-cc:ast-slot-allocation slot))
+        (assert-eq (second case) (getf imports :php-set-visibility))
+        (assert-true (member :final modifiers :test #'eq))
+        (assert-true (member :public modifiers :test #'eq))
+        (assert-true (member :static modifiers :test #'eq))))))
+
+(%php85-register-test 'php85-final-promoted-property-preserves-final-modifier
+  "PHP 8.5 constructor promotion preserves final property metadata."
+  (lambda ()
+(let* ((ast (%php84-first
+               "<?php class Token { public function __construct(final string $id) {} }"))
+         (slots (cl-cc:ast-defclass-slots ast))
+         (slot (find-if (lambda (candidate)
+                           (string= "ID" (symbol-name (cl-cc:ast-slot-name candidate))))
+                        slots)))
+    (assert-true slot)
+    (let* ((imports (cl-cc:ast-imports slot))
+           (modifiers (getf imports :php-modifiers)))
+      (assert-eq :instance (cl-cc:ast-slot-allocation slot))
+      (assert-true (member :final modifiers :test #'eq))))))
+
 (%php85-register-test 'php84-function-intersection-type-annotation-preserved
   "Intersection type A&B in a function declaration is preserved as a type annotation string."
   (lambda ()

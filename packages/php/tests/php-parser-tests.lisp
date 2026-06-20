@@ -867,6 +867,23 @@ After php-finish-let-bindings, $x let wraps $y let in its body."
     (assert-eq 'cl-cc/php::%php-clone-with
                (cl-cc:ast-var-name (cl-cc:ast-call-func with-call)))))
 
+(deftest php-parser-qualified-clone-function-accepts-single-argument
+  "PHP 8.5 \\clone($object) fully qualified syntax lowers to the clone helper."
+  (let* ((value (%php-first-binding-value "<?php $b = \\clone($a);"))
+         (clone-call (cdr (first (cl-cc:ast-let-bindings value)))))
+    (assert-true (cl-cc:ast-let-p value))
+    (assert-string= "%PHP-CLONE" (%php-call-name clone-call))))
+
+(deftest php-parser-qualified-clone-with-lowers-to-helper-call
+  "PHP 8.5 \\clone($object, overrides) lowers to the clone-with helper."
+  (let* ((value (%php-first-binding-value "<?php $b = \\clone($a, ['x' => 9]);"))
+         (body (cl-cc:ast-let-body value))
+         (with-call (second body)))
+    (assert-true (cl-cc:ast-let-p value))
+    (assert-true (cl-cc:ast-call-p with-call))
+    (assert-eq 'cl-cc/php::%php-clone-with
+               (cl-cc:ast-var-name (cl-cc:ast-call-func with-call)))))
+
 (deftest php-parser-function-type-annotation-preservation
   "Characterization: function parameter and return type annotations should be preserved as declarations."
   (let ((ast (%php-first "<?php function add(int $a, ?string $b = null, int|string $c): bool { return true; }")))

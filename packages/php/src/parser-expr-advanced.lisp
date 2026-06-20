@@ -1490,6 +1490,14 @@ marker."
                 :args (list (make-ast-var :name clone-sym) overrides))))
             (list (make-ast-var :name clone-sym))))))
 
+(defun %php-clone-call-ast (args)
+  "Lower PHP 8.5 function-style clone call arguments."
+  (case (length args)
+    (1 (%php-clone-expression-ast (first args)))
+    (2 (%php-clone-expression-ast (first args) (second args)))
+    (otherwise
+     (error "PHP parse error: clone() expects object or object and override array"))))
+
 (defun %php-parse-keyword-expr (stream kw known-vars)
   "Dispatch keyword-led expression to the appropriate handler."
   (multiple-value-bind (tok rest) (php-consume stream)
@@ -1502,11 +1510,7 @@ marker."
                    (cdddr rest) known-vars)
            (if (eq (php-peek-type rest) :T-LPAREN)
                (multiple-value-bind (args rest2 kv2) (php-parse-arglist rest known-vars)
-                 (case (length args)
-                   (1 (values (%php-clone-expression-ast (first args)) rest2 kv2))
-                   (2 (values (%php-clone-expression-ast (first args) (second args)) rest2 kv2))
-                   (otherwise
-                    (error "PHP parse error: clone() expects object or object and override array"))))
+                 (values (%php-clone-call-ast args) rest2 kv2))
                (multiple-value-bind (expr rest2 kv2) (php-parse-unary rest known-vars)
                  (values (%php-clone-expression-ast expr) rest2 kv2)))))
       (:fn
