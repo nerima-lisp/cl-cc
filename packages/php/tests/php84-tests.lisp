@@ -55,6 +55,8 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
     (nreverse results)))
 
 (defun %php85-register-php84-tests ()
+  nil)
+
 (%php85-register-test 'php84-named-args-to-positional-lowers-named
   "Named arg descriptors from %php-parse-named-args lower to plain positional AST exprs."
   (lambda ()
@@ -188,7 +190,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
       (assert-true (cl-cc/php::%php-array-all arr (lambda (v) (declare (ignore v)))))
       (assert-false
        (cl-cc/php::%php-array-all (cl-cc/php:%php-array (list nil nil 1))
-                                  (lambda (v) (declare (ignore v)) nil)))))))
+                                  (lambda (v) (declare (ignore v)) nil))))))
 
 (%php85-register-test 'php85-pipe-operator-lowers-to-helper-call
   "The PHP 8.5 pipe operator lowers to the runtime pipe helper."
@@ -429,11 +431,98 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                   "<?php $a=curl_share_init_persistent('cache'); $b=curl_share_init_persistent('cache'); echo ($a === $b ? 'same' : 'diff') . ':' . gettype($a);"))))
 
 (%php85-register-test 'php85-curl-share-init-persistent-registers-its-class-tag
-  "The persistent cURL share handle is visible to class_exists after it is created."
+  "The persistent cURL share handle is visible to class_exists before it is created."
   (lambda ()
 (assert-string= "Y"
                  (%php-run-capture
-                  "<?php curl_share_init_persistent('cache'); echo class_exists('CurlSharePersistentHandle') ? 'Y' : 'N';"))))
+                  "<?php echo class_exists('CurlSharePersistentHandle') ? 'Y' : 'N';"))))
+
+(%php85-register-test 'php85-curl-multi-get-handles-returns-php-array
+  "curl_multi_get_handles() exposes a multi-handle's child handles as a PHP array."
+  (lambda ()
+(let* ((multi (make-hash-table :test #'equal))
+         (a (make-hash-table :test #'equal))
+         (b (make-hash-table :test #'equal)))
+    (setf (gethash "__class__" a) "CurlHandle"
+          (gethash "__class__" b) "CurlHandle"
+          (gethash "handles" multi) (list a b))
+    (let ((result (cl-cc/php:%php-curl-multi-get-handles multi)))
+      (assert-= 2 (cl-cc/php:%php-count result))
+      (assert-eq a (cl-cc/php:%php-array-ref result 0))
+      (assert-eq b (cl-cc/php:%php-array-ref result 1))))))
+
+(%php85-register-test 'php85-curl-multi-get-handles-executes-as-builtin
+  "curl_multi_get_handles() is registered as a PHP 8.5 builtin."
+  (lambda ()
+(assert-string= "Y"
+                 (%php-run-capture
+                  "<?php echo function_exists('curl_multi_get_handles') ? 'Y' : 'N';"))))
+
+(%php85-register-test 'php85-new-runtime-symbols-are-pre-registered
+  "PHP 8.5 runtime-visible classes, exceptions, and enums are visible to class_exists."
+  (lambda ()
+(dolist (class-name '("NoDiscard"
+                      "DelayedTargetValidation"
+                      "CurlSharePersistentHandle"
+                      "Filter\\FilterException"
+                      "Filter\\FilterFailedException"
+                      "Uri\\UriError"
+                      "Uri\\UriException"
+                      "Uri\\InvalidUriException"
+                      "Uri\\UriComparisonMode"
+                      "Uri\\Rfc3986\\Uri"
+                      "Uri\\WhatWg\\InvalidUrlException"
+                      "Uri\\WhatWg\\UrlValidationErrorType"
+                      "Uri\\WhatWg\\UrlValidationError"
+                      "Uri\\WhatWg\\Url"))
+    (assert-true (cl-cc/php::%php-class-exists class-name)))))
+
+(%php85-register-test 'php85-new-constants-are-predefined
+  "PHP 8.5 predefined constants are available through constant lookup."
+  (lambda ()
+(dolist (constant '("PHP_BUILD_DATE"
+                    "PHP_BUILD_PROVIDER"
+                    "CURLINFO_USED_PROXY"
+                    "CURLINFO_HTTPAUTH_USED"
+                    "CURLINFO_PROXYAUTH_USED"
+                    "CURLINFO_CONN_ID"
+                    "CURLINFO_QUEUE_TIME_T"
+                    "CURLOPT_INFILESIZE_LARGE"
+                    "CURLFOLLOW_ALL"
+                    "CURLFOLLOW_OBEYCODE"
+                    "CURLFOLLOW_FIRSTONLY"
+                    "FILTER_THROW_ON_FAILURE"
+                    "DECIMAL_COMPACT_SHORT"
+                    "DECIMAL_COMPACT_LONG"
+                    "OPENSSL_PKCS1_PSS_PADDING"
+                    "PKCS7_NOSMIMECAP"
+                    "PKCS7_CRLFEOL"
+                    "PKCS7_NOCRL"
+                    "PKCS7_NO_DUAL_CONTENT"
+                    "POSIX_SC_OPEN_MAX"
+                    "IPPROTO_ICMP"
+                    "IPPROTO_ICMPV6"
+                    "TCP_FUNCTION_BLK"
+                    "TCP_FUNCTION_ALIAS"
+                    "TCP_REUSPORT_LB_NUMA"
+                    "TCP_REUSPORT_LB_NUMA_NODOM"
+                    "TCP_REUSPORT_LB_NUMA_CURDOM"
+                    "TCP_BBR_ALGORITHM"
+                    "AF_PACKET"
+                    "IP_BINDANY"
+                    "SO_BUSY_POLL"
+                    "UDP_SEGMENT"
+                    "SHUT_RD"
+                    "SHUT_WR"
+                    "SHUT_RDWR"
+                    "T_VOID_CAST"
+                    "T_PIPE"
+                    "IMAGETYPE_HEIF"
+                    "IMAGETYPE_SVG"))
+    (multiple-value-bind (value found)
+        (cl-cc/php::%php-lookup-constant constant)
+      (declare (ignore value))
+      (assert-true found)))))
 
 (%php85-register-test 'php85-filter-throw-on-failure-constant-is-defined
   "PHP 8.5 defines FILTER_THROW_ON_FAILURE for filter functions."
@@ -958,8 +1047,6 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
         (funcall (getf excluded-entry :fn))
         (assert-= 1 symbol-run-count)
         (assert-true excluded-ran)))))
-)
-
 (eval-when (:load-toplevel :execute)
   (%php85-register-php84-tests)
   (%run-registered-tests-from-source-file

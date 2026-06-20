@@ -105,6 +105,16 @@
       (c "PHP_SAPI" "cli")
       (c "DIRECTORY_SEPARATOR" "/")
       (c "PATH_SEPARATOR" ":")
+      ;; cURL
+      (c "CURLINFO_USED_PROXY" 2097280)
+      (c "CURLINFO_HTTPAUTH_USED" 2097281)
+      (c "CURLINFO_PROXYAUTH_USED" 2097282)
+      (c "CURLINFO_CONN_ID" 2097283)
+      (c "CURLINFO_QUEUE_TIME_T" 6291476)
+      (c "CURLOPT_INFILESIZE_LARGE" 30115)
+      (c "CURLFOLLOW_ALL" 1)
+      (c "CURLFOLLOW_OBEYCODE" 2)
+      (c "CURLFOLLOW_FIRSTONLY" 3)
       ;; math
       (c "M_PI" pi)
       (c "M_E" (exp 1.0d0))
@@ -140,6 +150,39 @@
       (c "FILTER_VALIDATE_URL" 273) (c "FILTER_VALIDATE_EMAIL" 274)
       (c "FILTER_NULL_ON_FAILURE" 134217728)
       (c "FILTER_THROW_ON_FAILURE" 268435456)
+      ;; intl
+      (c "DECIMAL_COMPACT_SHORT" 1)
+      (c "DECIMAL_COMPACT_LONG" 2)
+      ;; openssl
+      (c "OPENSSL_PKCS1_PSS_PADDING" 6)
+      (c "PKCS7_NOSMIMECAP" 512)
+      (c "PKCS7_CRLFEOL" 2048)
+      (c "PKCS7_NOCRL" 8192)
+      (c "PKCS7_NO_DUAL_CONTENT" 16384)
+      ;; posix
+      (c "POSIX_SC_OPEN_MAX" 4)
+      ;; sockets
+      (c "IPPROTO_ICMP" 1)
+      (c "IPPROTO_ICMPV6" 58)
+      (c "TCP_FUNCTION_BLK" 0)
+      (c "TCP_FUNCTION_ALIAS" 1)
+      (c "TCP_REUSPORT_LB_NUMA" 1026)
+      (c "TCP_REUSPORT_LB_NUMA_NODOM" 1027)
+      (c "TCP_REUSPORT_LB_NUMA_CURDOM" 1028)
+      (c "TCP_BBR_ALGORITHM" 4)
+      (c "AF_PACKET" 17)
+      (c "IP_BINDANY" 24)
+      (c "SO_BUSY_POLL" 46)
+      (c "UDP_SEGMENT" 103)
+      (c "SHUT_RD" 0)
+      (c "SHUT_WR" 1)
+      (c "SHUT_RDWR" 2)
+      ;; tokenizer
+      (c "T_VOID_CAST" 402)
+      (c "T_PIPE" 403)
+      ;; standard
+      (c "IMAGETYPE_HEIF" 18)
+      (c "IMAGETYPE_SVG" 19)
       ;; str_pad
       (c "STR_PAD_RIGHT" 1) (c "STR_PAD_LEFT" 0) (c "STR_PAD_BOTH" 2)
       ;; htmlspecialchars

@@ -28,6 +28,6 @@
              for index from 0
              collect (destructuring-bind (expected-head expected-body)
                          expected-rule
-                       `(assert-prolog-rule= (nth ,index ,rules)
-                                             ,expected-head
-                                             ,expected-body)))))
+                           `(assert-prolog-rule= (nth ,index ,rules)
+                                                 ',expected-head
+                                                 ',expected-body)))))

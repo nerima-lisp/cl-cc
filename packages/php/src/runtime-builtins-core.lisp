@@ -63,6 +63,19 @@ hash-table. Repeated calls with the same ID return the same handle."
             (setf (gethash key *php-curl-persistent-share-handles*) new-handle)
             new-handle)))))
 
+(defun %php-curl-multi-get-handles (multi-handle)
+  "PHP 8.5 curl_multi_get_handles() helper."
+  (let ((handles (and (hash-table-p multi-handle)
+                      (or (gethash "handles" multi-handle)
+                          (gethash :handles multi-handle)))))
+    (cond
+      ((null handles) (%php-array))
+      ((and (hash-table-p handles)
+            (nth-value 1 (gethash +php-array-order-key+ handles)))
+       handles)
+      ((listp handles) (%php-list-to-array handles))
+      (t (%php-list-to-array (list handles))))))
+
 (defun %php-gettype (value)
   "Return VALUE's PHP type name as a string."
   ;; (%php-gettype 1) => "integer"

@@ -441,6 +441,7 @@
   (%php-register-builtin "error_reporting" '%php-error-reporting)
   (%php-register-builtin "opcache_is_script_cached_in_file_cache" '%php-opcache-is-script-cached-in-file-cache)
   (%php-register-builtin "curl_share_init_persistent" '%php-curl-share-init-persistent)
+  (%php-register-builtin "curl_multi_get_handles" '%php-curl-multi-get-handles)
   (%php-register-builtin "trigger_error" '%php-trigger-error)
   (%php-register-builtin "user_error" '%php-trigger-error)
   (%php-register-builtin "exit" '%php-exit)

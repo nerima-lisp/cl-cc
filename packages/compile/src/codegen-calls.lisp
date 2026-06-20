@@ -57,6 +57,10 @@
     ((and (typep func-node 'ast-quote)
           (symbolp (ast-quote-value func-node)))
      (%resolve-func-sym-reg (ast-quote-value func-node) ctx))
+    ((typep func-node 'ast-var)
+     (if (%ast-var-function-value-p (ast-var-name func-node) ctx)
+         (compile-ast func-node ctx)
+         (%resolve-func-sym-reg (ast-var-name func-node) ctx)))
     ((symbolp func-node)
      (%resolve-func-sym-reg func-node ctx))
     (t

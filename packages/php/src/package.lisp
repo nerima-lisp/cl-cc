@@ -80,9 +80,11 @@
    #:%php-get-error-handler
    #:%php-get-exception-handler
    #:%php-current-closure
+   #:%php-grapheme-levenshtein
    #:%php-locale-is-right-to-left
    #:%php-opcache-is-script-cached-in-file-cache
    #:%php-curl-share-init-persistent
+   #:%php-curl-multi-get-handles
    #:%php-filter-var
    ;; Reference / by-ref semantics
    #:php-ref-p

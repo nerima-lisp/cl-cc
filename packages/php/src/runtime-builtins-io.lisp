@@ -847,16 +847,45 @@
 ;;; ─── Type / class helpers ─────────────────────────────────────────────────────
 
 (defparameter *php-runtime-class-tags* (make-hash-table :test #'equal))
+(defparameter *php-runtime-interface-tags* (make-hash-table :test #'equal))
+
+(defun %php-runtime-type-key (type-name)
+  (string-upcase (%php-stringify type-name)))
 
 (defun %php-defined-class-symbol-p (class-name)
-  (let ((sym (find-symbol (string-upcase (%php-stringify class-name)) :cl-cc/php)))
+  (let ((sym (find-symbol (%php-runtime-type-key class-name) :cl-cc/php)))
     (and sym (fboundp sym))))
 
 (defun %php-register-runtime-class-tag (class-name)
-  (setf (gethash (string-upcase (%php-stringify class-name)) *php-runtime-class-tags*) t))
+  (setf (gethash (%php-runtime-type-key class-name) *php-runtime-class-tags*) t))
+
+(defun %php-register-runtime-interface-tag (interface-name)
+  (setf (gethash (%php-runtime-type-key interface-name) *php-runtime-interface-tags*) t))
 
 (defun %php-runtime-class-tag-exists-p (class-name)
-  (gethash (string-upcase (%php-stringify class-name)) *php-runtime-class-tags*))
+  (gethash (%php-runtime-type-key class-name) *php-runtime-class-tags*))
+
+(defun %php-runtime-interface-tag-exists-p (interface-name)
+  (gethash (%php-runtime-type-key interface-name) *php-runtime-interface-tags*))
+
+(defun %php-register-php85-runtime-types ()
+  (dolist (class-name '("NoDiscard"
+                        "DelayedTargetValidation"
+                        "CurlSharePersistentHandle"
+                        "Filter\\FilterException"
+                        "Filter\\FilterFailedException"
+                        "Uri\\UriError"
+                        "Uri\\UriException"
+                        "Uri\\InvalidUriException"
+                        "Uri\\UriComparisonMode"
+                        "Uri\\Rfc3986\\Uri"
+                        "Uri\\WhatWg\\InvalidUrlException"
+                        "Uri\\WhatWg\\UrlValidationErrorType"
+                        "Uri\\WhatWg\\UrlValidationError"
+                        "Uri\\WhatWg\\Url"))
+    (%php-register-runtime-class-tag class-name)))
+
+(%php-register-php85-runtime-types)
 
 (defun %php-class-exists (class-name &optional autoload)
   "PHP class_exists: check if class is defined."
@@ -867,7 +896,8 @@
 (defun %php-interface-exists (interface-name &optional autoload)
   "PHP interface_exists: check if interface is defined."
   (declare (ignore autoload))
-  (%php-defined-class-symbol-p interface-name))
+  (or (%php-defined-class-symbol-p interface-name)
+      (%php-runtime-interface-tag-exists-p interface-name)))
 
 (defun %php-function-exists (function-name)
   "PHP function_exists: check if function is defined."
