@@ -375,6 +375,8 @@
   (%php-register-builtin "strval" '%php-strval)
   (%php-register-builtin "boolval" '%php-boolval)
   (%php-register-builtin "filter_var" '%php-filter-var)
+  (%php-register-builtin "token_get_all" '%php-token-get-all)
+  (%php-register-builtin "token_name" '%php-token-name)
   (%php-register-builtin "settype" '%php-settype)
   (%php-seed-by-ref-param-registry *php-by-ref-param-registry*)
   (%php-register-builtin "get_debug_type" '%php-gettype)

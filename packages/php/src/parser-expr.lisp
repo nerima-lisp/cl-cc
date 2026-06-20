@@ -241,6 +241,30 @@ gensym-named class and makes an instance of it."
    :func (make-ast-var :name 'cl-cc/php::%php-fiber-make)
    :args args))
 
+(defun %php-uri-class-kind (class-name)
+  (let ((name (string-upcase (symbol-name class-name))))
+    (cond
+      ((string= name "URI\\RFC3986\\URI") :rfc3986)
+      ((string= name "URI\\WHATWG\\URL") :whatwg))))
+
+(defun %php-uri-class-ast-kind (obj)
+  (and (ast-var-p obj)
+       (%php-uri-class-kind (ast-var-name obj))))
+
+(defun %php-uri-new-ast (class-name args)
+  (make-ast-call
+   :func (make-ast-var :name (ecase (%php-uri-class-kind class-name)
+                               (:rfc3986 'cl-cc/php::%php-uri-rfc3986-new)
+                               (:whatwg 'cl-cc/php::%php-uri-whatwg-new)))
+   :args args))
+
+(defun %php-uri-parse-ast (kind args)
+  (make-ast-call
+   :func (make-ast-var :name (ecase kind
+                               (:rfc3986 'cl-cc/php::%php-uri-rfc3986-parse)
+                               (:whatwg 'cl-cc/php::%php-uri-whatwg-parse)))
+   :args args))
+
 (defun php-parse-new (stream known-vars)
   "Parse 'new ClassName(args)' or 'new class [(args)] [extends/implements] { ... }'."
   (multiple-value-bind (tok rest) (php-consume stream) ; consume 'new'
@@ -258,6 +282,9 @@ gensym-named class and makes an instance of it."
           (when (%php-fiber-class-p class-name)
             (return-from php-parse-new
               (values (%php-fiber-new-ast args) rest3 kv3)))
+          (when (%php-uri-class-kind class-name)
+            (return-from php-parse-new
+              (values (%php-uri-new-ast class-name args) rest3 kv3)))
           ;; new C(args): allocate the instance (properties default-init from their
           ;; initforms), then run __construct($this, args) via %php-construct, and
           ;; yield the instance. (Previously the args were passed as :ARGn CLOS
@@ -470,6 +497,11 @@ ordering only applies to user-visible parameters."
                                       (error "PHP parse error: Locale::minimizeSubtags() expects exactly 1 argument"))
                                     (%php-call 'cl-cc/php::%php-locale-minimize-subtags
                                                (first args)))
+                                   ((and (%php-uri-class-ast-kind obj)
+                                         (string= (symbol-name member) "PARSE"))
+                                    (when (null args)
+                                      (error "PHP parse error: Uri::parse() expects at least 1 argument"))
+                                    (%php-uri-parse-ast (%php-uri-class-ast-kind obj) args))
                                    ((and (%php-fiber-class-ast-p obj)
                                          (string= (symbol-name member) "SUSPEND"))
                                     (apply #'%php-call 'cl-cc/php::%php-fiber-suspend args))

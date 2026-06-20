@@ -460,8 +460,9 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 
 (%php85-register-test 'php85-new-runtime-symbols-are-pre-registered
   "PHP 8.5 runtime-visible classes, exceptions, and enums are visible to class_exists."
-  (lambda ()
+(lambda ()
 (dolist (class-name '("NoDiscard"
+                      "Closure"
                       "DelayedTargetValidation"
                       "CurlSharePersistentHandle"
                       "Filter\\FilterException"
@@ -493,6 +494,10 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
   (lambda ()
     (dolist (case '(("Dom\\Element" "getElementsByClassName")
                     ("Dom\\Element" "insertAdjacentHTML")
+                    ("Closure" "getCurrent")
+                    ("Locale" "addLikelySubtags")
+                    ("Locale" "isRightToLeft")
+                    ("Locale" "minimizeSubtags")
                     ("Pdo\\Sqlite" "setAuthorizer")
                     ("SQLite3Stmt" "busy")
                     ("ReflectionConstant" "getFileName")
@@ -519,6 +524,41 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                     (cl-cc/php::%php-get-class-methods "Uri\\WhatWg\\Url"))))
       (assert-true (find "toAsciiString" methods :test #'string=))
       (assert-true (find "withUsername" methods :test #'string=)))))
+
+(%php85-register-test 'php85-uri-runtime-object-parses-and-clones-components
+  "PHP 8.5 URI objects expose parsed components and with* cloning."
+  (lambda ()
+    (let* ((uri (cl-cc/php::%php-uri-rfc3986-new "https://user:pw@example.com/a?b=1#frag"))
+           (copy (cl-cc/php::%php-uri-with-user-info uri "ada")))
+      (assert-string= "https" (cl-cc/php::%php-uri-get-scheme uri))
+      (assert-string= "example.com" (cl-cc/php::%php-uri-get-host uri))
+      (assert-string= "/a" (cl-cc/php::%php-uri-get-path uri))
+      (assert-string= "b=1" (cl-cc/php::%php-uri-get-query uri))
+      (assert-string= "frag" (cl-cc/php::%php-uri-get-fragment uri))
+      (assert-string= "user" (cl-cc/php::%php-uri-get-username uri))
+      (assert-string= "ada" (cl-cc/php::%php-uri-get-username copy))
+      (assert-string= "user" (cl-cc/php::%php-uri-get-username uri)))))
+
+(%php85-register-test 'php85-get-class-methods-accepts-runtime-object
+  "PHP 8.5 method introspection accepts runtime objects."
+  (lambda ()
+    (let* ((uri (cl-cc/php::%php-uri-rfc3986-new "https://example.com/"))
+           (methods (cl-cc/php::%php-array-values-list
+                     (cl-cc/php::%php-get-class-methods uri))))
+      (assert-true (find "toRawString" methods :test #'string=))
+      (assert-true (find "withUserInfo" methods :test #'string=)))))
+
+(%php85-register-test 'php85-uri-constructor-and-static-parse-execute-from-php-source
+  "PHP 8.5 URI constructor and static parse helpers execute from PHP source."
+  (lambda ()
+    (assert-string= "https:example.com:/a:b=1:frag:user:ada:https://example.com/p"
+                    (%php-run-capture
+                     "<?php
+$u = new Uri\\Rfc3986\\Uri('https://user@example.com/a?b=1#frag');
+$v = $u->withUserInfo('ada');
+$w = Uri\\WhatWg\\Url::parse('https://example.com/p');
+echo $u->getScheme() . ':' . $u->getHost() . ':' . $u->getPath() . ':' . $u->getQuery() . ':' . $u->getFragment() . ':' . $u->getUsername() . ':' . $v->getUsername() . ':' . $w->toAsciiString();
+"))))
 
 (%php85-register-test 'php85-new-constants-are-predefined
   "PHP 8.5 predefined constants are available through constant lookup."
@@ -559,6 +599,20 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
                     "SHUT_RD"
                     "SHUT_WR"
                     "SHUT_RDWR"
+                    "TOKEN_PARSE"
+                    "T_LNUMBER"
+                    "T_DNUMBER"
+                    "T_STRING"
+                    "T_VARIABLE"
+                    "T_CONSTANT_ENCAPSED_STRING"
+                    "T_OBJECT_OPERATOR"
+                    "T_DOUBLE_ARROW"
+                    "T_COMMENT"
+                    "T_DOC_COMMENT"
+                    "T_OPEN_TAG"
+                    "T_OPEN_TAG_WITH_ECHO"
+                    "T_WHITESPACE"
+                    "T_DOUBLE_COLON"
                     "T_VOID_CAST"
                     "T_PIPE"
                     "IMAGETYPE_HEIF"
@@ -567,6 +621,57 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
         (cl-cc/php::%php-lookup-constant constant)
       (declare (ignore value))
       (assert-true found)))))
+
+(%php85-register-test 'php85-token-name-reports-tokenizer-constants
+  "PHP 8.5 tokenizer constants have token_name mappings."
+  (lambda ()
+    (multiple-value-bind (pipe pipe-found)
+        (cl-cc/php::%php-lookup-constant "T_PIPE")
+      (assert-true pipe-found)
+      (assert-string= "T_PIPE" (cl-cc/php::%php-token-name pipe)))
+    (multiple-value-bind (void-cast void-found)
+        (cl-cc/php::%php-lookup-constant "T_VOID_CAST")
+      (assert-true void-found)
+      (assert-string= "T_VOID_CAST" (cl-cc/php::%php-token-name void-cast)))
+    (assert-string= "UNKNOWN" (cl-cc/php::%php-token-name -1))))
+
+(%php85-register-test 'php85-token-get-all-exposes-pipe-and-void-cast
+  "PHP 8.5 token_get_all exposes pipe and void-cast tokens."
+  (lambda ()
+    (multiple-value-bind (pipe-id pipe-found)
+        (cl-cc/php::%php-lookup-constant "T_PIPE")
+      (assert-true pipe-found)
+      (multiple-value-bind (void-id void-found)
+          (cl-cc/php::%php-lookup-constant "T_VOID_CAST")
+        (assert-true void-found)
+        (let* ((tokens (cl-cc/php::%php-token-get-all "<?php $x = (void) $y |> strlen;"))
+               (entries (cl-cc/php::%php-array-values-list tokens)))
+          (flet ((entry-id (entry)
+                   (and (hash-table-p entry)
+                        (cl-cc/php::%php-array-ref entry 0)))
+                 (entry-text (entry)
+                   (cl-cc/php::%php-array-ref entry 1))
+                 (entry-line (entry)
+                   (cl-cc/php::%php-array-ref entry 2)))
+            (let ((pipe-token (find-if (lambda (entry)
+                                         (eql pipe-id (entry-id entry)))
+                                       entries))
+                  (void-token (find-if (lambda (entry)
+                                         (eql void-id (entry-id entry)))
+                                       entries)))
+              (assert-true pipe-token)
+              (assert-true void-token)
+              (assert-string= "|>" (entry-text pipe-token))
+              (assert-string= "(void)" (entry-text void-token))
+              (assert-equal 1 (entry-line pipe-token))
+              (assert-equal 1 (entry-line void-token)))))))))
+
+(%php85-register-test 'php85-tokenizer-builtins-execute-from-php-source
+  "PHP 8.5 tokenizer builtins are callable from PHP code."
+  (lambda ()
+    (assert-string= "T_PIPE:T_VOID_CAST"
+                    (%php-run-capture
+                     "<?php echo token_name(T_PIPE) . ':' . token_name(T_VOID_CAST);"))))
 
 (%php85-register-test 'php85-extension-new-free-functions-are-registered
   "New PHP 8.5 extension-level free functions are registered as builtins."

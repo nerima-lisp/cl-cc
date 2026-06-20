@@ -939,6 +939,7 @@
 (defun %php-register-php85-runtime-types ()
   (dolist (class-name '("NoDiscard"
                         "DelayedTargetValidation"
+                        "Closure"
                         "CurlSharePersistentHandle"
                         "Dom\\Element"
                         "Filter\\FilterException"
@@ -963,6 +964,12 @@
   (%php-register-runtime-class-methods
    "Dom\\Element"
    '("getElementsByClassName" "insertAdjacentHTML"))
+  (%php-register-runtime-class-methods
+   "Closure"
+   '("getCurrent"))
+  (%php-register-runtime-class-methods
+   "Locale"
+   '("addLikelySubtags" "isRightToLeft" "minimizeSubtags"))
   (%php-register-runtime-class-methods
    "Pdo\\Sqlite"
    '("setAuthorizer"))
@@ -1066,11 +1073,34 @@
           (%php-array-set result (car pair) (cdr pair))))
       result)))
 
-(defun %php-get-class-methods (class-name)
+(defun %php-method-table-methods (methods)
+  (let ((names nil))
+    (when (hash-table-p methods)
+      (dolist (pair (%php-array-pairs methods))
+        (let ((value (cdr pair)))
+          (when (stringp value)
+            (push value names)))))
+    (nreverse names)))
+
+(defun %php-get-class-methods (class-or-object)
   "PHP get_class_methods: get class method names."
-  (let ((result (%php-make-array)))
-    (dolist (method (%php-runtime-class-methods class-name) result)
-      (%php-array-set result (%php-array-next-auto-index result) method))))
+  (let ((object-methods nil)
+        (class-name class-or-object))
+    (when (hash-table-p class-or-object)
+      (setf object-methods
+            (%php-method-table-methods (%php-array-ref class-or-object "__methods__")))
+      (let ((cls (%php-array-ref class-or-object "__class__")))
+        (setf class-name (unless (%php-null-p cls) cls))))
+    (let ((result (%php-make-array))
+          (seen (make-hash-table :test #'equal)))
+      (dolist (method (append object-methods
+                              (when class-name
+                                (%php-runtime-class-methods class-name)))
+               result)
+        (let ((name (%php-stringify method)))
+          (unless (gethash name seen)
+            (setf (gethash name seen) t)
+            (%php-array-set result (%php-array-next-auto-index result) name)))))))
 
 (defun %php-reflection-class-descriptor-p (value)
   (and (hash-table-p value)
@@ -1486,6 +1516,350 @@
     (:SPLFIXEDARRAY (apply #'%php-spl-fixed-array args))
     (otherwise (error "Unknown SPL class: ~A" class-name))))
 
+;;; ─── URI objects ─────────────────────────────────────────────────────────────
+
+(defparameter +php-uri-rfc3986-methods+ nil)
+(defparameter +php-uri-whatwg-methods+ nil)
+
+(defun %php-uri-class-name (name)
+  (let ((s (%php-stringify name)))
+    (cond
+      ((string-equal s "Uri\\Rfc3986\\Uri") "Uri\\Rfc3986\\Uri")
+      ((string-equal s "Uri\\WhatWg\\Url") "Uri\\WhatWg\\Url")
+      (t s))))
+
+(defun %php-uri-null-or-string (value)
+  (if (or (null value) (%php-null-p value))
+      +php-null+
+      (%php-stringify value)))
+
+(defun %php-uri-find-any (text chars &optional (start 0))
+  (loop for i from start below (length text)
+        when (find (char text i) chars :test #'char=)
+          do (return i)))
+
+(defun %php-uri-split-before (text ch)
+  (let ((pos (position ch text :test #'char=)))
+    (if pos
+        (values (subseq text 0 pos) (subseq text (1+ pos)) t)
+        (values text nil nil))))
+
+(defun %php-uri-parse-components (uri)
+  (let* ((text (%php-stringify uri))
+         (scheme +php-null+)
+         (username +php-null+)
+         (password +php-null+)
+         (host +php-null+)
+         (port +php-null+)
+         (path "")
+         (query +php-null+)
+         (fragment +php-null+)
+         (rest text))
+    (let ((colon (position #\: rest :test #'char=))
+          (special (%php-uri-find-any rest '(#\/ #\? #\#))))
+      (when (and colon (or (null special) (< colon special)))
+        (setf scheme (subseq rest 0 colon)
+              rest (subseq rest (1+ colon)))))
+    (when (and (>= (length rest) 2)
+               (string= rest "//" :start1 0 :end1 2))
+      (setf rest (subseq rest 2))
+      (let* ((auth-end (or (%php-uri-find-any rest '(#\/ #\? #\#))
+                           (length rest)))
+             (authority (subseq rest 0 auth-end)))
+        (setf rest (subseq rest auth-end))
+        (multiple-value-bind (userinfo hostport has-userinfo)
+            (%php-uri-split-before authority #\@)
+          (when has-userinfo
+            (multiple-value-bind (user pass has-pass)
+                (%php-uri-split-before userinfo #\:)
+              (setf username user)
+              (when has-pass
+                (setf password pass))))
+          (let ((target (if has-userinfo hostport userinfo)))
+            (multiple-value-bind (h p has-port)
+                (%php-uri-split-before target #\:)
+              (setf host (if (string= h "") +php-null+ h))
+              (when has-port
+                (setf port p)))))))
+    (multiple-value-bind (before-frag frag has-frag)
+        (%php-uri-split-before rest #\#)
+      (when has-frag
+        (setf fragment frag))
+      (multiple-value-bind (before-query qry has-query)
+          (%php-uri-split-before before-frag #\?)
+        (when has-query
+          (setf query qry))
+        (setf path before-query)))
+    (list :scheme scheme :username username :password password :host host
+          :port port :path path :query query :fragment fragment)))
+
+(defun %php-uri-field (uri key)
+  (let ((value (gethash key uri)))
+    (if (or (null value) (%php-null-p value)) +php-null+ value)))
+
+(defun %php-uri-field-text (uri key)
+  (let ((value (%php-uri-field uri key)))
+    (unless (%php-null-p value)
+      (%php-stringify value))))
+
+(defun %php-uri-set-field (uri key value)
+  (setf (gethash key uri) (%php-uri-null-or-string value))
+  uri)
+
+(defun %php-uri-copy (uri)
+  (let ((copy (make-hash-table :test #'equal)))
+    (maphash (lambda (key value)
+               (setf (gethash key copy) value))
+             uri)
+    copy))
+
+(defun %php-uri-build-string (uri)
+  (with-output-to-string (out)
+    (let ((scheme (%php-uri-field-text uri "__scheme__"))
+          (username (%php-uri-field-text uri "__username__"))
+          (password (%php-uri-field-text uri "__password__"))
+          (host (%php-uri-field-text uri "__host__"))
+          (port (%php-uri-field-text uri "__port__"))
+          (path (%php-uri-field-text uri "__path__"))
+          (query (%php-uri-field-text uri "__query__"))
+          (fragment (%php-uri-field-text uri "__fragment__")))
+      (when scheme
+        (format out "~A:" scheme))
+      (when host
+        (write-string "//" out)
+        (when username
+          (write-string username out)
+          (when password
+            (format out ":~A" password))
+          (write-char #\@ out))
+        (write-string host out)
+        (when port
+          (format out ":~A" port)))
+      (write-string (or path "") out)
+      (when query
+        (format out "?~A" query))
+      (when fragment
+        (format out "#~A" fragment)))))
+
+(defun %php-uri-components-array (uri)
+  (let ((result (%php-make-array)))
+    (dolist (pair '(("scheme" "__scheme__")
+                    ("username" "__username__")
+                    ("password" "__password__")
+                    ("host" "__host__")
+                    ("port" "__port__")
+                    ("path" "__path__")
+                    ("query" "__query__")
+                    ("fragment" "__fragment__"))
+             result)
+      (%php-array-set result (first pair) (%php-uri-field uri (second pair))))))
+
+(defun %php-uri-object (class-name uri)
+  (destructuring-bind (&key scheme username password host port path query fragment)
+      (%php-uri-parse-components uri)
+    (let* ((canonical (%php-uri-class-name class-name))
+           (object (%php-spl-object canonical
+                                    (apply #'%php-spl-make-methods
+                                           (%php-runtime-class-methods canonical)))))
+      (setf (gethash "__scheme__" object) scheme
+            (gethash "__username__" object) username
+            (gethash "__password__" object) password
+            (gethash "__host__" object) host
+            (gethash "__port__" object) port
+            (gethash "__path__" object) path
+            (gethash "__query__" object) query
+            (gethash "__fragment__" object) fragment)
+      (%php-spl-install-methods object
+                                (if (string-equal canonical "Uri\\WhatWg\\Url")
+                                    +php-uri-whatwg-methods+
+                                    +php-uri-rfc3986-methods+))
+      object)))
+
+(defun %php-uri-to-raw-string (self) (%php-uri-build-string self))
+(defun %php-uri-to-string (self) (%php-uri-build-string self))
+(defun %php-uri-to-ascii-string (self) (%php-uri-build-string self))
+(defun %php-uri-to-unicode-string (self) (%php-uri-build-string self))
+(defun %php-uri-get-scheme (self) (%php-uri-field self "__scheme__"))
+(defun %php-uri-get-raw-scheme (self) (%php-uri-get-scheme self))
+(defun %php-uri-get-username (self) (%php-uri-field self "__username__"))
+(defun %php-uri-get-raw-username (self) (%php-uri-get-username self))
+(defun %php-uri-get-password (self) (%php-uri-field self "__password__"))
+(defun %php-uri-get-raw-password (self) (%php-uri-get-password self))
+(defun %php-uri-get-host (self) (%php-uri-field self "__host__"))
+(defun %php-uri-get-raw-host (self) (%php-uri-get-host self))
+(defun %php-uri-get-ascii-host (self) (%php-uri-get-host self))
+(defun %php-uri-get-unicode-host (self) (%php-uri-get-host self))
+(defun %php-uri-get-port (self) (%php-uri-field self "__port__"))
+(defun %php-uri-get-path (self) (%php-uri-field self "__path__"))
+(defun %php-uri-get-raw-path (self) (%php-uri-get-path self))
+(defun %php-uri-get-query (self) (%php-uri-field self "__query__"))
+(defun %php-uri-get-raw-query (self) (%php-uri-get-query self))
+(defun %php-uri-get-fragment (self) (%php-uri-field self "__fragment__"))
+(defun %php-uri-get-raw-fragment (self) (%php-uri-get-fragment self))
+
+(defun %php-uri-get-user-info (self)
+  (let ((username (%php-uri-field-text self "__username__"))
+        (password (%php-uri-field-text self "__password__")))
+    (cond
+      ((and username password) (format nil "~A:~A" username password))
+      (username username)
+      (t +php-null+))))
+
+(defun %php-uri-get-raw-user-info (self)
+  (%php-uri-get-user-info self))
+
+(defun %php-uri-with-field (self key value)
+  (let ((copy (%php-uri-copy self)))
+    (%php-uri-set-field copy key value)
+    copy))
+
+(defun %php-uri-with-scheme (self value) (%php-uri-with-field self "__scheme__" value))
+(defun %php-uri-with-host (self value) (%php-uri-with-field self "__host__" value))
+(defun %php-uri-with-port (self value) (%php-uri-with-field self "__port__" value))
+(defun %php-uri-with-path (self value) (%php-uri-with-field self "__path__" value))
+(defun %php-uri-with-query (self value) (%php-uri-with-field self "__query__" value))
+(defun %php-uri-with-fragment (self value) (%php-uri-with-field self "__fragment__" value))
+
+(defun %php-uri-with-user-info (self username &optional password)
+  (let ((copy (%php-uri-copy self)))
+    (%php-uri-set-field copy "__username__" username)
+    (%php-uri-set-field copy "__password__" (or password +php-null+))
+    copy))
+
+(defun %php-uri-with-username (self username)
+  (let ((copy (%php-uri-copy self)))
+    (%php-uri-set-field copy "__username__" username)
+    copy))
+
+(defun %php-uri-with-password (self password)
+  (let ((copy (%php-uri-copy self)))
+    (%php-uri-set-field copy "__password__" password)
+    copy))
+
+(defun %php-uri-as-object (value &optional (class-name "Uri\\Rfc3986\\Uri"))
+  (if (hash-table-p value)
+      value
+      (%php-uri-object class-name value)))
+
+(defun %php-uri-equals (self other &optional mode)
+  (declare (ignore mode))
+  (string= (%php-uri-build-string self)
+           (%php-uri-build-string
+            (%php-uri-as-object other (%php-uri-class-name (%php-array-ref self "__class__"))))))
+
+(defun %php-uri-resolve (self reference)
+  (let* ((class-name (%php-uri-class-name (%php-array-ref self "__class__")))
+         (ref (%php-uri-as-object reference class-name)))
+    (if (or (not (%php-null-p (%php-uri-field ref "__scheme__")))
+            (not (%php-null-p (%php-uri-field ref "__host__"))))
+        ref
+        (let ((copy (%php-uri-copy self)))
+          (dolist (key '("__path__" "__query__" "__fragment__"))
+            (let ((value (%php-uri-field ref key)))
+              (unless (%php-null-p value)
+                (%php-uri-set-field copy key value))))
+          copy))))
+
+(defun %php-uri-debug-info (self) (%php-uri-components-array self))
+(defun %php-uri-serialize (self) (%php-uri-components-array self))
+
+(defun %php-uri-unserialize (self data)
+  (when (hash-table-p data)
+    (dolist (pair '(("scheme" "__scheme__")
+                    ("username" "__username__")
+                    ("password" "__password__")
+                    ("host" "__host__")
+                    ("port" "__port__")
+                    ("path" "__path__")
+                    ("query" "__query__")
+                    ("fragment" "__fragment__")))
+      (%php-uri-set-field self (second pair) (%php-array-ref data (first pair)))))
+  +php-null+)
+
+(defun %php-uri-rfc3986-new (uri)
+  (%php-uri-object "Uri\\Rfc3986\\Uri" uri))
+
+(defun %php-uri-whatwg-new (uri &optional base)
+  (declare (ignore base))
+  (%php-uri-object "Uri\\WhatWg\\Url" uri))
+
+(defun %php-uri-rfc3986-parse (uri &optional base)
+  (declare (ignore base))
+  (%php-uri-rfc3986-new uri))
+
+(defun %php-uri-whatwg-parse (uri &optional base)
+  (declare (ignore base))
+  (%php-uri-whatwg-new uri))
+
+(defun %php-uri-rfc3986-instance-parse (self uri &optional base)
+  (declare (ignore self))
+  (%php-uri-rfc3986-parse uri base))
+
+(defun %php-uri-whatwg-instance-parse (self uri &optional base)
+  (declare (ignore self))
+  (%php-uri-whatwg-parse uri base))
+
+(setf +php-uri-rfc3986-methods+
+      '(("__debugInfo" %php-uri-debug-info)
+        ("equals" %php-uri-equals)
+        ("getFragment" %php-uri-get-fragment)
+        ("getHost" %php-uri-get-host)
+        ("getPassword" %php-uri-get-password)
+        ("getPath" %php-uri-get-path)
+        ("getPort" %php-uri-get-port)
+        ("getQuery" %php-uri-get-query)
+        ("getRawFragment" %php-uri-get-raw-fragment)
+        ("getRawHost" %php-uri-get-raw-host)
+        ("getRawPassword" %php-uri-get-raw-password)
+        ("getRawPath" %php-uri-get-raw-path)
+        ("getRawQuery" %php-uri-get-raw-query)
+        ("getRawScheme" %php-uri-get-raw-scheme)
+        ("getRawUserInfo" %php-uri-get-raw-user-info)
+        ("getRawUsername" %php-uri-get-raw-username)
+        ("getScheme" %php-uri-get-scheme)
+        ("getUserInfo" %php-uri-get-user-info)
+        ("getUsername" %php-uri-get-username)
+        ("parse" %php-uri-rfc3986-instance-parse)
+        ("resolve" %php-uri-resolve)
+        ("__serialize" %php-uri-serialize)
+        ("toRawString" %php-uri-to-raw-string)
+        ("toString" %php-uri-to-string)
+        ("__unserialize" %php-uri-unserialize)
+        ("withFragment" %php-uri-with-fragment)
+        ("withHost" %php-uri-with-host)
+        ("withPath" %php-uri-with-path)
+        ("withPort" %php-uri-with-port)
+        ("withQuery" %php-uri-with-query)
+        ("withScheme" %php-uri-with-scheme)
+        ("withUserInfo" %php-uri-with-user-info)))
+
+(setf +php-uri-whatwg-methods+
+      '(("__debugInfo" %php-uri-debug-info)
+        ("equals" %php-uri-equals)
+        ("getAsciiHost" %php-uri-get-ascii-host)
+        ("getFragment" %php-uri-get-fragment)
+        ("getPassword" %php-uri-get-password)
+        ("getPath" %php-uri-get-path)
+        ("getPort" %php-uri-get-port)
+        ("getQuery" %php-uri-get-query)
+        ("getScheme" %php-uri-get-scheme)
+        ("getUnicodeHost" %php-uri-get-unicode-host)
+        ("getUsername" %php-uri-get-username)
+        ("parse" %php-uri-whatwg-instance-parse)
+        ("resolve" %php-uri-resolve)
+        ("__serialize" %php-uri-serialize)
+        ("toAsciiString" %php-uri-to-ascii-string)
+        ("toUnicodeString" %php-uri-to-unicode-string)
+        ("__unserialize" %php-uri-unserialize)
+        ("withFragment" %php-uri-with-fragment)
+        ("withHost" %php-uri-with-host)
+        ("withPassword" %php-uri-with-password)
+        ("withPath" %php-uri-with-path)
+        ("withPort" %php-uri-with-port)
+        ("withQuery" %php-uri-with-query)
+        ("withScheme" %php-uri-with-scheme)
+        ("withUsername" %php-uri-with-username)))
+
 ;;; ─── Misc utility ────────────────────────────────────────────────────────────
 
 (defun %php-array-map-keys (callback array)
@@ -1500,6 +1874,183 @@
                           row)))
       (return-from %php-array-map-keys result)))
   (%php-array-map callback array))
+
+(defparameter +php-tokenizer-token-names+
+  '("T_LNUMBER"
+    "T_DNUMBER"
+    "T_STRING"
+    "T_VARIABLE"
+    "T_CONSTANT_ENCAPSED_STRING"
+    "T_OBJECT_OPERATOR"
+    "T_DOUBLE_ARROW"
+    "T_COMMENT"
+    "T_DOC_COMMENT"
+    "T_OPEN_TAG"
+    "T_OPEN_TAG_WITH_ECHO"
+    "T_WHITESPACE"
+    "T_DOUBLE_COLON"
+    "T_VOID_CAST"
+    "T_PIPE"))
+
+(defun %php-token-id (name)
+  (%php-lookup-constant name))
+
+(defun %php-token-entry (name text line)
+  (multiple-value-bind (id found) (%php-token-id name)
+    (declare (ignore found))
+    (let ((entry (%php-make-array)))
+      (%php-array-set entry 0 id)
+      (%php-array-set entry 1 text)
+      (%php-array-set entry 2 line)
+      entry)))
+
+(defun %php-token-name (token)
+  (let ((id (%php-to-integer token)))
+    (or (loop for name in +php-tokenizer-token-names+
+              for value = (multiple-value-bind (constant found)
+                              (%php-token-id name)
+                            (and found constant))
+              when (and value (= id value))
+                do (return name))
+        "UNKNOWN")))
+
+(defun %php-token-get-all (source &optional flags)
+  (declare (ignore flags))
+  (let* ((code (%php-stringify source))
+         (len (length code))
+         (tokens (%php-make-array))
+         (i 0)
+         (line 1))
+    (labels ((push-value (value)
+               (%php-array-set tokens (%php-array-next-auto-index tokens) value))
+             (newline-count (text)
+               (loop for ch across text
+                     count (char= ch #\Newline)))
+             (advance-line (text)
+               (incf line (newline-count text)))
+             (emit-token (name text token-line)
+               (push-value (%php-token-entry name text token-line))
+               (advance-line text))
+             (emit-string (text)
+               (push-value text)
+               (advance-line text))
+             (starts-with-p (needle &key ignore-case)
+               (let ((end-pos (+ i (length needle))))
+                 (and (<= end-pos len)
+                      (if ignore-case
+                          (string-equal needle code :start2 i :end2 end-pos)
+                          (string= needle code :start2 i :end2 end-pos)))))
+             (identifier-start-p (ch)
+               (or (alpha-char-p ch) (char= ch #\_)))
+             (identifier-part-p (ch)
+               (or (identifier-start-p ch) (digit-char-p ch)))
+             (whitespace-p (ch)
+               (member ch '(#\Space #\Tab #\Newline #\Return #\Page) :test #'char=))
+             (scan-while (predicate)
+               (loop while (and (< i len)
+                                (funcall predicate (char code i)))
+                     do (incf i)))
+             (scan-block-comment ()
+               (let ((start i))
+                 (incf i 2)
+                 (loop while (< i len)
+                       do (if (and (< (1+ i) len)
+                                   (char= (char code i) #\*)
+                                   (char= (char code (1+ i)) #\/))
+                              (progn
+                                (incf i 2)
+                                (return))
+                              (incf i)))
+                 (subseq code start i)))
+             (scan-quoted-string ()
+               (let ((start i)
+                     (quote (char code i)))
+                 (incf i)
+                 (loop while (< i len)
+                       for ch = (char code i)
+                       do (cond
+                            ((char= ch #\\)
+                             (incf i (if (< (1+ i) len) 2 1)))
+                            ((char= ch quote)
+                             (incf i)
+                             (return))
+                            (t
+                             (incf i))))
+                 (subseq code start i))))
+      (loop while (< i len)
+            do (let ((token-line line)
+                     (ch (char code i)))
+                 (cond
+                   ((starts-with-p "<?=")
+                    (emit-token "T_OPEN_TAG_WITH_ECHO" "<?=" token-line)
+                    (incf i 3))
+                   ((starts-with-p "<?php" :ignore-case t)
+                    (emit-token "T_OPEN_TAG" "<?php" token-line)
+                    (incf i 5))
+                   ((starts-with-p "<?")
+                    (emit-token "T_OPEN_TAG" "<?" token-line)
+                    (incf i 2))
+                   ((whitespace-p ch)
+                    (let ((start i))
+                      (scan-while #'whitespace-p)
+                      (emit-token "T_WHITESPACE" (subseq code start i) token-line)))
+                   ((or (starts-with-p "//") (char= ch #\#))
+                    (let ((start i))
+                      (incf i (if (char= ch #\#) 1 2))
+                      (loop while (and (< i len)
+                                       (not (char= (char code i) #\Newline)))
+                            do (incf i))
+                      (emit-token "T_COMMENT" (subseq code start i) token-line)))
+                   ((starts-with-p "/*")
+                    (emit-token (if (starts-with-p "/**") "T_DOC_COMMENT" "T_COMMENT")
+                                (scan-block-comment)
+                                token-line))
+                   ((and (char= ch #\$)
+                         (< (1+ i) len)
+                         (identifier-start-p (char code (1+ i))))
+                    (let ((start i))
+                      (incf i)
+                      (scan-while #'identifier-part-p)
+                      (emit-token "T_VARIABLE" (subseq code start i) token-line)))
+                   ((starts-with-p "(void)" :ignore-case t)
+                    (emit-token "T_VOID_CAST" "(void)" token-line)
+                    (incf i 6))
+                   ((starts-with-p "|>")
+                    (emit-token "T_PIPE" "|>" token-line)
+                    (incf i 2))
+                   ((starts-with-p "->")
+                    (emit-token "T_OBJECT_OPERATOR" "->" token-line)
+                    (incf i 2))
+                   ((starts-with-p "::")
+                    (emit-token "T_DOUBLE_COLON" "::" token-line)
+                    (incf i 2))
+                   ((starts-with-p "=>")
+                    (emit-token "T_DOUBLE_ARROW" "=>" token-line)
+                    (incf i 2))
+                   ((identifier-start-p ch)
+                    (let ((start i))
+                      (scan-while #'identifier-part-p)
+                      (emit-token "T_STRING" (subseq code start i) token-line)))
+                   ((digit-char-p ch)
+                    (let ((start i)
+                          (has-dot nil))
+                      (scan-while #'digit-char-p)
+                      (when (and (< i len)
+                                 (char= (char code i) #\.)
+                                 (< (1+ i) len)
+                                 (digit-char-p (char code (1+ i))))
+                        (setf has-dot t)
+                        (incf i)
+                        (scan-while #'digit-char-p))
+                      (emit-token (if has-dot "T_DNUMBER" "T_LNUMBER")
+                                  (subseq code start i)
+                                  token-line)))
+                   ((or (char= ch #\') (char= ch #\"))
+                    (emit-token "T_CONSTANT_ENCAPSED_STRING" (scan-quoted-string) token-line))
+                   (t
+                    (emit-string (string ch))
+                    (incf i))))))
+    tokens))
 
 (defun %php-list-assign (&rest values)
   "PHP list() — returns the values as a PHP array for destructuring."
