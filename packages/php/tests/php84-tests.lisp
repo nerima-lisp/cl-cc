@@ -484,9 +484,41 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-intl-and-pdo-class-constants-lower-to-runtime-values
   "PHP 8.5 IntlListFormatter, NumberFormatter, and Pdo\\Sqlite class constants resolve."
   (lambda ()
-    (assert-string= "0:1:10:12:1:2048"
+    (assert-string= "0:1:10:11:12:13:14:15:16:1000:1:2:4:1001:1002:1003:1004:0:1:2:1005:0:1:2:2048"
                     (%php-run-capture
-                     "<?php echo IntlListFormatter::TYPE_AND . ':' . IntlListFormatter::TYPE_OR . ':' . NumberFormatter::CURRENCY_ISO . ':' . NumberFormatter::CURRENCY_ACCOUNTING . ':' . Pdo\\Sqlite::OPEN_READONLY . ':' . Pdo\\Sqlite::DETERMINISTIC;"))))
+                     "<?php echo IntlListFormatter::TYPE_AND . ':' . IntlListFormatter::TYPE_OR . ':' . NumberFormatter::CURRENCY_ISO . ':' . NumberFormatter::CURRENCY_PLURAL . ':' . NumberFormatter::CURRENCY_ACCOUNTING . ':' . NumberFormatter::CASH_CURRENCY . ':' . NumberFormatter::DECIMAL_COMPACT_SHORT . ':' . NumberFormatter::DECIMAL_COMPACT_LONG . ':' . NumberFormatter::CURRENCY_STANDARD . ':' . Pdo\\Sqlite::ATTR_OPEN_FLAGS . ':' . Pdo\\Sqlite::OPEN_READONLY . ':' . Pdo\\Sqlite::OPEN_READWRITE . ':' . Pdo\\Sqlite::OPEN_CREATE . ':' . Pdo\\Sqlite::ATTR_READONLY_STATEMENT . ':' . Pdo\\Sqlite::ATTR_EXTENDED_RESULT_CODES . ':' . Pdo\\Sqlite::ATTR_BUSY_STATEMENT . ':' . Pdo\\Sqlite::ATTR_EXPLAIN_STATEMENT . ':' . Pdo\\Sqlite::EXPLAIN_MODE_PREPARED . ':' . Pdo\\Sqlite::EXPLAIN_MODE_EXPLAIN . ':' . Pdo\\Sqlite::EXPLAIN_MODE_EXPLAIN_QUERY_PLAN . ':' . Pdo\\Sqlite::ATTR_TRANSACTION_MODE . ':' . Pdo\\Sqlite::TRANSACTION_MODE_DEFERRED . ':' . Pdo\\Sqlite::TRANSACTION_MODE_IMMEDIATE . ':' . Pdo\\Sqlite::TRANSACTION_MODE_EXCLUSIVE . ':' . Pdo\\Sqlite::DETERMINISTIC;"))))
+
+(%php85-register-test 'php85-new-method-surface-is-runtime-visible
+  "PHP 8.5 built-in class method additions are visible to method_exists."
+  (lambda ()
+    (dolist (case '(("Dom\\Element" "getElementsByClassName")
+                    ("Dom\\Element" "insertAdjacentHTML")
+                    ("Pdo\\Sqlite" "setAuthorizer")
+                    ("SQLite3Stmt" "busy")
+                    ("ReflectionConstant" "getFileName")
+                    ("ReflectionConstant" "getExtension")
+                    ("ReflectionConstant" "getExtensionName")
+                    ("ReflectionConstant" "getAttributes")
+                    ("ReflectionProperty" "getMangledName")
+                    ("Uri\\Rfc3986\\Uri" "parse")
+                    ("Uri\\Rfc3986\\Uri" "withUserInfo")
+                    ("Uri\\WhatWg\\Url" "toAsciiString")
+                    ("Uri\\WhatWg\\Url" "withUsername")
+                    ("Uri\\WhatWg\\UrlValidationError" "__construct")))
+      (destructuring-bind (class method) case
+        (assert-true (cl-cc/php::%php-method-exists class method))))))
+
+(%php85-register-test 'php85-uri-class-method-list-is-runtime-visible
+  "PHP 8.5 URI class methods are listed for runtime class-name introspection."
+  (lambda ()
+    (let ((methods (cl-cc/php::%php-array-values-list
+                    (cl-cc/php::%php-get-class-methods "Uri\\Rfc3986\\Uri"))))
+      (assert-true (find "toRawString" methods :test #'string=))
+      (assert-true (find "withUserInfo" methods :test #'string=)))
+    (let ((methods (cl-cc/php::%php-array-values-list
+                    (cl-cc/php::%php-get-class-methods "Uri\\WhatWg\\Url"))))
+      (assert-true (find "toAsciiString" methods :test #'string=))
+      (assert-true (find "withUsername" methods :test #'string=)))))
 
 (%php85-register-test 'php85-new-constants-are-predefined
   "PHP 8.5 predefined constants are available through constant lookup."
@@ -591,6 +623,20 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (assert-signals cl-cc/php:php-exception
     (cl-cc/php:%php-filter-var "abc" 257 268435456))))
 
+(%php85-register-test 'php85-filter-var-throws-filter-failed-exception
+  "FILTER_THROW_ON_FAILURE reports the PHP 8.5 Filter\\FilterFailedException class."
+  (lambda ()
+    (let ((condition (handler-case
+                         (progn
+                           (cl-cc/php:%php-filter-var "abc" 257 268435456)
+                           nil)
+                       (cl-cc/php:php-exception (e) e))))
+      (assert-true condition)
+      (assert-true
+       (cl-cc/php:%php-exception-matches-p
+        condition
+        (intern "FILTER\\FILTERFAILEDEXCEPTION" :cl-cc/php))))))
+
 (%php85-register-test 'php85-filter-var-rejects-null-and-throw-flags-together
   "FILTER_THROW_ON_FAILURE cannot be combined with FILTER_NULL_ON_FAILURE."
   (lambda ()
@@ -646,79 +692,81 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-file-io-helpers-cover-offset-append-and-metadata-paths
   "File helpers cover offset reads, append writes, and basic metadata lookups."
   (lambda ()
-(let* ((tmp-dir (uiop:temporary-directory))
-         (file-path (merge-pathnames (format nil "cl-cc-php85-~a.txt" (gensym "file-")) tmp-dir))
-         (file (namestring file-path))
-         (dir-path (merge-pathnames (format nil "cl-cc-php85-~a/" (gensym "dir-")) tmp-dir))
-         (dir (namestring dir-path)))
-    (unwind-protect
-         (progn
-           (with-open-file (stream file-path
-                                   :direction :output
-                                   :if-exists :supersede
-                                   :if-does-not-exist :create)
-             (write-string "abcdef" stream))
-           (assert-string= "cdef"
-                           (cl-cc/php::%php-file-get-contents file nil nil 2 nil))
-           (assert-string= "cde"
-                           (cl-cc/php::%php-file-get-contents file nil nil 2 3))
-           (assert-= 2 (cl-cc/php::%php-file-put-contents file "gh" 8))
-           (assert-string= "abcdefgh"
-                           (cl-cc/php::%php-file-get-contents file))
-           (assert-true (cl-cc/php::%php-file-exists file))
-           (assert-true (cl-cc/php::%php-is-file file))
-           (assert-true (cl-cc/php::%php-is-readable file))
-           (assert-true (cl-cc/php::%php-is-writable file))
-           (assert-true (cl-cc/php::%php-is-executable file))
-           (assert-= 8 (cl-cc/php::%php-filesize file))
-           (assert-string= "file" (cl-cc/php::%php-filetype file))
-           (assert-true (search (namestring tmp-dir)
-                                (cl-cc/php::%php-realpath file)
-                                :test #'char=))
-           (assert-string= "txt" (cl-cc/php::%php-pathinfo file 4))
-           (assert-true (search "cl-cc-php85-" (cl-cc/php::%php-basename file) :test #'char=))
-           (assert-string= (string-right-trim "/" (namestring tmp-dir))
-                            (cl-cc/php::%php-dirname file))
-           (ensure-directories-exist dir-path)
-           (assert-true (cl-cc/php::%php-mkdir (merge-pathnames "nested/" dir-path) nil nil))
-           (assert-true (cl-cc/php::%php-mkdir (merge-pathnames "recursive/a/b/" dir-path) nil t))
-           (assert-true (cl-cc/php::%php-is-dir dir-path))
-           (let ((sorted-up (cl-cc/php::%php-scandir dir 0))
-                 (sorted-down (cl-cc/php::%php-scandir dir 1)))
-             (assert-true (hash-table-p sorted-up))
-             (assert-true (hash-table-p sorted-down))
-             (assert-= 4 (cl-cc/php:%php-count sorted-up))
-             (assert-= 4 (cl-cc/php:%php-count sorted-down))))
-      (ignore-errors (delete-file file-path))
-      (ignore-errors (uiop:delete-directory-tree dir-path :validate t :if-does-not-exist :ignore))))))
+    (let* ((tmp-dir (uiop:temporary-directory))
+           (unique-base (cl-cc/php::%php-tempnam tmp-dir "cl-cc-php85-"))
+           (file (format nil "~A.txt" unique-base))
+           (file-path (pathname file))
+           (dir (format nil "~A-dir/" file))
+           (dir-path (pathname dir)))
+      (unwind-protect
+           (progn
+             (with-open-file (stream file-path
+                                     :direction :output
+                                     :if-exists :supersede
+                                     :if-does-not-exist :create)
+               (write-string "abcdef" stream))
+             (assert-string= "cdef"
+                             (cl-cc/php::%php-file-get-contents file nil nil 2 nil))
+             (assert-string= "cde"
+                             (cl-cc/php::%php-file-get-contents file nil nil 2 3))
+             (assert-= 2 (cl-cc/php::%php-file-put-contents file "gh" 8))
+             (assert-string= "abcdefgh"
+                             (cl-cc/php::%php-file-get-contents file))
+             (assert-true (cl-cc/php::%php-file-exists file))
+             (assert-true (cl-cc/php::%php-is-file file))
+             (assert-true (cl-cc/php::%php-is-readable file))
+             (assert-true (cl-cc/php::%php-is-writable file))
+             (assert-true (cl-cc/php::%php-is-executable file))
+             (assert-= 8 (cl-cc/php::%php-filesize file))
+             (assert-string= "file" (cl-cc/php::%php-filetype file))
+             (assert-true (search (namestring tmp-dir)
+                                  (cl-cc/php::%php-realpath file)
+                                  :test #'char=))
+             (assert-string= "txt" (cl-cc/php::%php-pathinfo file 4))
+             (assert-true (search "cl-cc-php85-" (cl-cc/php::%php-basename file) :test #'char=))
+             (assert-string= (string-right-trim "/" (namestring tmp-dir))
+                              (cl-cc/php::%php-dirname file))
+             (ensure-directories-exist dir-path)
+             (assert-true (cl-cc/php::%php-mkdir (merge-pathnames "nested/" dir-path) nil nil))
+             (assert-true (cl-cc/php::%php-mkdir (merge-pathnames "recursive/a/b/" dir-path) nil t))
+             (assert-true (cl-cc/php::%php-is-dir dir-path))
+             (let ((sorted-up (cl-cc/php::%php-scandir dir 0))
+                   (sorted-down (cl-cc/php::%php-scandir dir 1)))
+               (assert-true (hash-table-p sorted-up))
+               (assert-true (hash-table-p sorted-down))
+               (assert-= 4 (cl-cc/php:%php-count sorted-up))
+               (assert-= 4 (cl-cc/php:%php-count sorted-down))))
+        (ignore-errors (delete-file unique-base))
+        (ignore-errors (delete-file file-path))
+        (ignore-errors (uiop:delete-directory-tree dir-path :validate t :if-does-not-exist :ignore))))))
 
 (%php85-register-test 'php85-file-copy-rename-unlink-and-tempnam-cover-mutating-paths
   "File mutation helpers cover copy, rename, unlink, and tempnam."
   (lambda ()
-(let* ((tmp-dir (uiop:temporary-directory))
-         (source (merge-pathnames (format nil "cl-cc-php85-src-~a.txt" (gensym "file-")) tmp-dir))
-         (copy (merge-pathnames (format nil "cl-cc-php85-copy-~a.txt" (gensym "file-")) tmp-dir))
-         (renamed (merge-pathnames (format nil "cl-cc-php85-renamed-~a.txt" (gensym "file-")) tmp-dir))
-         (tempnam (cl-cc/php::%php-tempnam tmp-dir "cl-cc-php85-")))
-    (unwind-protect
-         (progn
-           (with-open-file (stream source
-                                   :direction :output
-                                   :if-exists :supersede
-                                   :if-does-not-exist :create)
-             (write-string "source" stream))
-           (assert-true (cl-cc/php::%php-copy source copy))
-           (assert-string= "source" (cl-cc/php::%php-file-get-contents copy))
-           (assert-true (cl-cc/php::%php-rename copy renamed))
-           (assert-false (probe-file copy))
-           (assert-string= "source" (cl-cc/php::%php-file-get-contents renamed))
-           (assert-true (cl-cc/php::%php-unlink renamed))
-           (assert-false (probe-file renamed))
-           (assert-true (probe-file tempnam)))
-      (ignore-errors (delete-file source))
-      (ignore-errors (delete-file copy))
-      (ignore-errors (delete-file renamed))
-      (ignore-errors (delete-file tempnam))))))
+    (let* ((tmp-dir (uiop:temporary-directory))
+           (source (pathname (cl-cc/php::%php-tempnam tmp-dir "cl-cc-php85-src-")))
+           (copy (pathname (format nil "~A.copy" (namestring source))))
+           (renamed (pathname (format nil "~A.renamed" (namestring source))))
+           (tempnam (cl-cc/php::%php-tempnam tmp-dir "cl-cc-php85-")))
+      (unwind-protect
+           (progn
+             (with-open-file (stream source
+                                     :direction :output
+                                     :if-exists :supersede
+                                     :if-does-not-exist :create)
+               (write-string "source" stream))
+             (assert-true (cl-cc/php::%php-copy source copy))
+             (assert-string= "source" (cl-cc/php::%php-file-get-contents copy))
+             (assert-true (cl-cc/php::%php-rename copy renamed))
+             (assert-false (probe-file copy))
+             (assert-string= "source" (cl-cc/php::%php-file-get-contents renamed))
+             (assert-true (cl-cc/php::%php-unlink renamed))
+             (assert-false (probe-file renamed))
+             (assert-true (probe-file tempnam)))
+        (ignore-errors (delete-file source))
+        (ignore-errors (delete-file copy))
+        (ignore-errors (delete-file renamed))
+        (ignore-errors (delete-file tempnam))))))
 
 (%php85-register-test 'php85-empty-helper-follows-php-truthiness
   "The %php-empty helper mirrors PHP truthiness for empty values."

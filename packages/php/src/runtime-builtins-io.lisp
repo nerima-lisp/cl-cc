@@ -4,11 +4,16 @@
 
 ;;; ─── File I/O ────────────────────────────────────────────────────────────────
 
+(defun %php-path-string (value)
+  (if (pathnamep value)
+      (namestring value)
+      (%php-stringify value)))
+
 (defun %php-file-get-contents (filename &optional use-include-path context offset length)
   "PHP file_get_contents: read file into string."
   (declare (ignore use-include-path context))
   (handler-case
-      (let* ((path (%php-stringify filename))
+      (let* ((path (%php-path-string filename))
              (content (with-open-file (s path :direction :input :external-format :utf-8)
                         (let ((result (make-string (file-length s))))
                           (read-sequence result s)
@@ -22,7 +27,7 @@
   "PHP file_put_contents: write data to file."
   (declare (ignore context))
   (handler-case
-      (let* ((path (%php-stringify filename))
+      (let* ((path (%php-path-string filename))
              (text (%php-stringify data))
              (append-p (and flags (not (%php-null-p flags)) (logtest flags 8))))
         (with-open-file (s path :direction :output
@@ -38,7 +43,7 @@
   (declare (ignore flags context))
   (handler-case
       (let ((result (%php-make-array)))
-        (with-open-file (s (%php-stringify filename) :direction :input :external-format :utf-8)
+        (with-open-file (s (%php-path-string filename) :direction :input :external-format :utf-8)
           (loop for line = (read-line s nil nil)
                 while line
                 do (%php-array-set result (%php-array-next-auto-index result)
@@ -56,27 +61,27 @@
 
 (defun %php-file-exists (filename)
   "PHP file_exists: check if file or directory exists."
-  (probe-file (%php-stringify filename)))
+  (probe-file (%php-path-string filename)))
 
 (defun %php-is-file (filename)
   "PHP is_file: check if path is a regular file."
-  (let ((p (probe-file (%php-stringify filename))))
+  (let ((p (probe-file (%php-path-string filename))))
     (and p (or (pathname-name p) (pathname-type p)))))
 
 (defun %php-is-dir (path)
   "PHP is_dir: check if path is a directory."
-  (let* ((s (%php-stringify path))
+  (let* ((s (%php-path-string path))
          (s (if (and (> (length s) 0) (char= (char s (1- (length s))) #\/)) s (concatenate 'string s "/")))
          (p (probe-file s)))
     (and p t)))
 
 (defun %php-is-readable (filename)
   "PHP is_readable: check if file is readable."
-  (not (null (probe-file (%php-stringify filename)))))
+  (not (null (probe-file (%php-path-string filename)))))
 
 (defun %php-is-writable (filename)
   "PHP is_writable: check if file is writable (simplified)."
-  (not (null (probe-file (%php-stringify filename)))))
+  (not (null (probe-file (%php-path-string filename)))))
 
 (defun %php-is-writeable (filename)
   "PHP is_writeable: alias for is_writable."
@@ -116,14 +121,14 @@
   "PHP unlink: delete a file."
   (declare (ignore context))
   (handler-case
-      (progn (cl:delete-file (%php-stringify filename)) t)
+      (progn (cl:delete-file (%php-path-string filename)) t)
     (error () nil)))
 
 (defun %php-rename (oldname newname &optional context)
   "PHP rename: rename a file or directory."
   (declare (ignore context))
   (handler-case
-      (progn (rename-file (%php-stringify oldname) (%php-stringify newname)) t)
+      (progn (rename-file (%php-path-string oldname) (%php-path-string newname)) t)
     (error () nil)))
 
 (defun %php-copy (source dest &optional context)
@@ -189,10 +194,15 @@
       (namestring (truename (%php-stringify path)))
     (error () nil)))
 
+(defun %php-path-tail (path)
+  (let* ((p (%php-path-string path))
+         (pos (or (position #\/ p :from-end t)
+                  (position #\\ p :from-end t))))
+    (if pos (subseq p (1+ pos)) p)))
+
 (defun %php-basename (path &optional suffix)
   "PHP basename: return trailing name component of path."
-  (let* ((p (%php-stringify path))
-         (base (file-namestring p)))
+  (let ((base (%php-path-tail path)))
     (if (and suffix (not (%php-null-p suffix)))
         (let ((s (%php-stringify suffix)))
           (if (and (>= (length base) (length s))
@@ -214,35 +224,52 @@
 
 (defun %php-pathinfo (path &optional (option nil))
   "PHP pathinfo: return path components."
-  (let* ((p (%php-stringify path))
+  (let* ((p (%php-path-string path))
          (dirname (let ((pos (or (position #\/ p :from-end t) (position #\\ p :from-end t))))
                     (if pos (subseq p 0 pos) ".")))
-         (filename (file-namestring p))
+         (filename (%php-path-tail p))
          (ext (let ((dot (position #\. filename :from-end t)))
                 (if dot (subseq filename (1+ dot)) "")))
-         (basename (let ((dot (position #\. filename :from-end t)))
-                     (if dot (subseq filename 0 dot) filename))))
+         (filename-without-extension (let ((dot (position #\. filename :from-end t)))
+                                       (if dot (subseq filename 0 dot) filename))))
     (cond ((or (null option) (%php-null-p option))
            (let ((r (%php-make-array)))
              (%php-array-set r "dirname" dirname)
              (%php-array-set r "basename" filename)
              (%php-array-set r "extension" ext)
-             (%php-array-set r "filename" basename)
+             (%php-array-set r "filename" filename-without-extension)
              r))
           ((= option 1) dirname)
           ((= option 2) filename)
           ((= option 4) ext)
-          ((= option 8) basename)
+          ((= option 8) filename-without-extension)
           (t nil))))
 
 (defun %php-tempnam (dir &optional (prefix ""))
   "PHP tempnam: create file with unique name."
-  (let ((tmp (concatenate 'string
-                          (if (and dir (not (%php-null-p dir))) (%php-stringify dir) "/tmp")
-                          "/" (%php-stringify prefix)
-                          (format nil "~8,'0X" (random #xFFFFFFFF)))))
-    (%php-file-put-contents tmp "")
-    tmp))
+  (let* ((base (if (and dir (not (%php-null-p dir))) (%php-path-string dir) "/tmp"))
+         (base (string-right-trim "/" base))
+         (prefix (%php-stringify prefix)))
+    (loop for attempt from 0 below 1024
+          for tmp = (format nil "~A/~A~8,'0X~8,'0X~4,'0X"
+                            base
+                            prefix
+                            (logand (sxhash (list (get-universal-time)
+                                                   (get-internal-real-time)
+                                                   (gensym)))
+                                    #xffffffff)
+                            (random #xffffffff)
+                            attempt)
+          when (handler-case
+                   (with-open-file (s tmp :direction :output
+                                           :if-exists nil
+                                           :if-does-not-exist :create
+                                           :external-format :utf-8)
+                     (declare (ignore s))
+                     t)
+                 (error () nil))
+            do (return tmp)
+          finally (return nil))))
 
 (defun %php-sys-get-temp-dir ()
   "PHP sys_get_temp_dir: return temp directory path."
@@ -876,6 +903,7 @@
 
 (defparameter *php-runtime-class-tags* (make-hash-table :test #'equal))
 (defparameter *php-runtime-interface-tags* (make-hash-table :test #'equal))
+(defparameter *php-runtime-class-methods* (make-hash-table :test #'equal))
 
 (defun %php-runtime-type-key (type-name)
   (string-upcase (%php-stringify type-name)))
@@ -890,22 +918,38 @@
 (defun %php-register-runtime-interface-tag (interface-name)
   (setf (gethash (%php-runtime-type-key interface-name) *php-runtime-interface-tags*) t))
 
+(defun %php-register-runtime-class-methods (class-name methods)
+  (setf (gethash (%php-runtime-type-key class-name) *php-runtime-class-methods*)
+        (mapcar #'%php-stringify methods)))
+
 (defun %php-runtime-class-tag-exists-p (class-name)
   (gethash (%php-runtime-type-key class-name) *php-runtime-class-tags*))
 
 (defun %php-runtime-interface-tag-exists-p (interface-name)
   (gethash (%php-runtime-type-key interface-name) *php-runtime-interface-tags*))
 
+(defun %php-runtime-class-methods (class-name)
+  (gethash (%php-runtime-type-key class-name) *php-runtime-class-methods*))
+
+(defun %php-runtime-class-method-exists-p (class-name method)
+  (not (null (find (%php-stringify method)
+                   (%php-runtime-class-methods class-name)
+                   :test #'string-equal))))
+
 (defun %php-register-php85-runtime-types ()
   (dolist (class-name '("NoDiscard"
                         "DelayedTargetValidation"
                         "CurlSharePersistentHandle"
+                        "Dom\\Element"
                         "Filter\\FilterException"
                         "Filter\\FilterFailedException"
                         "IntlListFormatter"
                         "Locale"
                         "NumberFormatter"
                         "Pdo\\Sqlite"
+                        "ReflectionConstant"
+                        "ReflectionProperty"
+                        "SQLite3Stmt"
                         "Uri\\UriError"
                         "Uri\\UriException"
                         "Uri\\InvalidUriException"
@@ -915,7 +959,42 @@
                         "Uri\\WhatWg\\UrlValidationErrorType"
                         "Uri\\WhatWg\\UrlValidationError"
                         "Uri\\WhatWg\\Url"))
-    (%php-register-runtime-class-tag class-name)))
+    (%php-register-runtime-class-tag class-name))
+  (%php-register-runtime-class-methods
+   "Dom\\Element"
+   '("getElementsByClassName" "insertAdjacentHTML"))
+  (%php-register-runtime-class-methods
+   "Pdo\\Sqlite"
+   '("setAuthorizer"))
+  (%php-register-runtime-class-methods
+   "SQLite3Stmt"
+   '("busy"))
+  (%php-register-runtime-class-methods
+   "ReflectionConstant"
+   '("getFileName" "getExtension" "getExtensionName" "getAttributes"))
+  (%php-register-runtime-class-methods
+   "ReflectionProperty"
+   '("getMangledName"))
+  (%php-register-runtime-class-methods
+   "Uri\\Rfc3986\\Uri"
+   '("__construct" "__debugInfo" "equals" "getFragment" "getHost"
+     "getPassword" "getPath" "getPort" "getQuery" "getRawFragment"
+     "getRawHost" "getRawPassword" "getRawPath" "getRawQuery"
+     "getRawScheme" "getRawUserInfo" "getRawUsername" "getScheme"
+     "getUserInfo" "getUsername" "parse" "resolve" "__serialize"
+     "toRawString" "toString" "__unserialize" "withFragment" "withHost"
+     "withPath" "withPort" "withQuery" "withScheme" "withUserInfo"))
+  (%php-register-runtime-class-methods
+   "Uri\\WhatWg\\Url"
+   '("__construct" "__debugInfo" "equals" "getAsciiHost" "getFragment"
+     "getPassword" "getPath" "getPort" "getQuery" "getScheme"
+     "getUnicodeHost" "getUsername" "parse" "resolve" "__serialize"
+     "toAsciiString" "toUnicodeString" "__unserialize" "withFragment"
+     "withHost" "withPassword" "withPath" "withPort" "withQuery"
+     "withScheme" "withUsername"))
+  (%php-register-runtime-class-methods
+   "Uri\\WhatWg\\UrlValidationError"
+   '("__construct")))
 
 (%php-register-php85-runtime-types)
 
@@ -936,11 +1015,17 @@
   (not (null (%php-lookup-builtin (%php-stringify function-name)))))
 
 (defun %php-method-exists (object method)
-  "PHP method_exists: check if method exists on object."
-  (when (hash-table-p object)
-    (let ((methods (%php-array-ref object "__methods__")))
-      (when (hash-table-p methods)
-        (not (%php-null-p (%php-array-ref methods (%php-stringify method))))))))
+  "PHP method_exists: check if method exists on object or runtime class name."
+  (cond
+    ((hash-table-p object)
+     (let ((methods (%php-array-ref object "__methods__"))
+           (class-name (%php-array-ref object "__class__")))
+       (or (and (hash-table-p methods)
+                (not (%php-null-p (%php-array-ref methods (%php-stringify method)))))
+           (and (not (%php-null-p class-name))
+                (%php-runtime-class-method-exists-p class-name method)))))
+    ((or (stringp object) (symbolp object))
+     (%php-runtime-class-method-exists-p object method))))
 
 (defun %php-property-exists (object property)
   "PHP property_exists: check if property exists."
@@ -983,8 +1068,9 @@
 
 (defun %php-get-class-methods (class-name)
   "PHP get_class_methods: get class method names."
-  (declare (ignore class-name))
-  (%php-make-array))
+  (let ((result (%php-make-array)))
+    (dolist (method (%php-runtime-class-methods class-name) result)
+      (%php-array-set result (%php-array-next-auto-index result) method))))
 
 (defun %php-reflection-class-descriptor-p (value)
   (and (hash-table-p value)
