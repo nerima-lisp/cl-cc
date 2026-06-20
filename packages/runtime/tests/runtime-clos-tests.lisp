@@ -30,7 +30,8 @@
 
 (deftest rt-register-method-and-call-generic
   "rt-register-method stores a method; rt-call-generic dispatches it."
-  (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
+  (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq))
+        (cl-cc/runtime:*rt-generic-function-registry* (make-hash-table :test #'equal)))
     (let* ((klass (cl-cc/runtime:rt-defclass 'rt-node '() '(value)))
            (obj   (make-hash-table :test #'eq))
            (gf    (make-hash-table :test #'equal)))
@@ -43,7 +44,8 @@
 
 (deftest rt-compute-applicable-methods-returns-primary-descriptor
   "rt-compute-applicable-methods returns the registered primary descriptor."
-  (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
+  (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq))
+        (cl-cc/runtime:*rt-generic-function-registry* (make-hash-table :test #'equal)))
     (let* ((klass (cl-cc/runtime:rt-defclass 'rt-node '() '(value)))
            (obj   (make-hash-table :test #'eq))
            (gf    (make-hash-table :test #'equal)))

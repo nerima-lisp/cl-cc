@@ -156,7 +156,7 @@
       (and (typep closure 'vm-closure-object)
            (eq (vm-closure-entry-label closure) :func)))))
 
-(defproperty closure-ref-accesses-captured-values
+(defproperty closure-ref-accesses-captured-vals
     (env-val1 (gen-integer :min 0 :max 100)
      env-val2 (gen-integer :min 0 :max 100)
      env-val3 (gen-integer :min 0 :max 100))

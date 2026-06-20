@@ -5,7 +5,7 @@
 
 (deftest fr-682-loop-peel-peels-array-boundary-first-iteration
   "FR-682: a counted loop with an array access on the IV is peeled once before the header."
-  (let* ((aref (make-vm-aref :dst :elt :array-reg :arr :index-reg :i))
+(let* ((aref (cl-cc:make-vm-aref :dst :elt :array-reg :arr :index-reg :i))
          (insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :limit :value 8)
                       (make-vm-const :dst :one :value 1)

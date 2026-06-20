@@ -248,14 +248,16 @@ representations may use hash tables with structured metadata."
 
 (defun generic-function-methods (gf)
   "Return the registered method objects for GF."
-  (let ((methods-ht (and (hash-table-p gf) (gethash :__methods__ gf))))
+  (let ((methods-ht (and (hash-table-p gf)
+                         (nth-value 1 (gethash :__methods__ gf))
+                         (gethash :__methods__ gf))))
     (when methods-ht
       (loop for value in (hash-table-values methods-ht)
             append (%vm-method-value->list value)))))
 
 (defun generic-function-method-combination (gf)
   "Return the method-combination metadata for GF, defaulting to STANDARD."
-  (if (and (hash-table-p gf) (gethash :__method-combination__ gf))
+  (if (and (hash-table-p gf) (nth-value 1 (gethash :__method-combination__ gf)))
       (gethash :__method-combination__ gf)
       'standard))
 

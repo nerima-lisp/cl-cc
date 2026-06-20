@@ -173,7 +173,7 @@ surface."
 
 (defmacro with-fresh-prolog (&body body)
   "Run BODY with an empty Prolog rule database and restore the prior state."
-  `(with-cleared-hash-table (cl-cc/prolog:*prolog-rules*)
+  `(with-cleared-hash-table (cl-cc/prolog::*prolog-rules*)
      ,@body))
 
 (defun make-test-vm ()

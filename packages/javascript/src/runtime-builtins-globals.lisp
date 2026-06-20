@@ -128,6 +128,10 @@
   "Iterator.from(iterable): wrap any iterable/iterator in the Iterator protocol."
   (%js-add-iterator-helpers!
    (cond
+     ((typep iterable 'js-map)
+      (%js-map-entries iterable))
+     ((typep iterable 'js-set)
+      (%js-vec-to-iter (%js-set-keys iterable)))
      ((and (%js-ht-p iterable) (gethash "next" iterable))
       iterable)
      ((and (%js-ht-p iterable) (gethash "@@iterator" iterable))

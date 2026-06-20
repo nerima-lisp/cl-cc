@@ -35,6 +35,25 @@
       (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read))
       (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move)))))
 
+(deftest codegen-noescape-make-instance-slot-value-bypasses-heap-object-through-ast-the
+  "Transparent ast-the wrappers around the object designator still hit the noescape slot path."
+  (let ((ctx (make-codegen-ctx)))
+    (let ((reg (compile-ast
+                (cl-cc/ast:make-ast-let
+                 :bindings (list (cons 'obj (cl-cc/ast:make-ast-make-instance
+                                            :class (cl-cc/ast:make-ast-quote :value 'my-dog)
+                                            :initargs (list (cons :name (cl-cc/ast:make-ast-quote :value 'rex))))))
+                 :body (list (cl-cc/ast:make-ast-slot-value
+                              :object (cl-cc/ast:make-ast-the
+                                       :type 't
+                                       :value (cl-cc/ast:make-ast-var :name 'obj))
+                              :slot 'name)))
+                ctx)))
+      (assert-true (keywordp reg))
+      (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj))
+      (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read))
+      (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move)))))
+
 (deftest codegen-escaped-make-instance-slot-value-falls-back
   "Captured make-instance bindings keep the normal heap-backed slot path."
   (let ((ctx (make-codegen-ctx)))
@@ -80,6 +99,48 @@
                           :object (cl-cc/ast:make-ast-var :name 'obj)
                           :slot 'name)
                    :else (cl-cc/ast:make-ast-int :value 0)))))
+
+    (setf reg (compile-ast ast ctx))
+    (setf insts (codegen-instructions ctx)
+          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts)
+          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read))
+    (assert-true jump-pos)
+    (assert-true cons-pos)
+    (assert-true (> cons-pos jump-pos))))
+
+(deftest codegen-branch-local-make-instance-sinks-initarg-evaluation-through-ast-the
+  "Transparent ast-the wrappers around make-instance still let branch sinking delay initarg evaluation."
+  (let* ((ctx (make-codegen-ctx))
+         (ast nil)
+         (reg nil)
+         (insts nil)
+         (jump-pos nil)
+         (cons-pos nil))
+    (setf (cl-cc/compile:ctx-env ctx) (list (cons 'flag :R10)))
+    (setf ast
+          (cl-cc/ast:make-ast-let
+           :bindings
+           (list (cons 'obj
+                       (cl-cc/ast:make-ast-the
+                        :type 'my-dog
+                        :value (cl-cc/ast:make-ast-make-instance
+                                :class (cl-cc/ast:make-ast-quote :value 'my-dog)
+                                :initargs
+                                (list (cons :name
+                                            (cl-cc/ast:make-ast-call
+                                             :func 'cons
+                                             :args (list (cl-cc/ast:make-ast-int :value 1)
+                                                         (cl-cc/ast:make-ast-int :value 2)))))))))
+           :body
+           (list (cl-cc/ast:make-ast-if
+                  :cond (cl-cc/ast:make-ast-var :name 'flag)
+                  :then (cl-cc/ast:make-ast-slot-value
+                         :object (cl-cc/ast:make-ast-var :name 'obj)
+                         :slot 'name)
+                  :else (cl-cc/ast:make-ast-int :value 0)))))
 
     (setf reg (compile-ast ast ctx))
     (setf insts (codegen-instructions ctx)
@@ -193,6 +254,30 @@
                                             :initargs (list (cons :weight (cl-cc/ast:make-ast-int :value 1))))))
                  :body (list (cl-cc/ast:make-ast-set-slot-value
                               :object (cl-cc/ast:make-ast-var :name 'obj)
+                              :slot 'weight
+                              :value (cl-cc/ast:make-ast-int :value 42))
+                             (cl-cc/ast:make-ast-slot-value
+                              :object (cl-cc/ast:make-ast-var :name 'obj)
+                              :slot 'weight)))
+                ctx)))
+      (assert-true (keywordp reg))
+      (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj))
+      (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write))
+      (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read))
+      (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move)))))
+
+(deftest codegen-noescape-make-instance-set-slot-value-bypasses-slot-write-through-ast-the
+  "Transparent ast-the wrappers around the object designator still hit the noescape slot-write path."
+  (let ((ctx (make-codegen-ctx)))
+    (let ((reg (compile-ast
+                (cl-cc/ast:make-ast-let
+                 :bindings (list (cons 'obj (cl-cc/ast:make-ast-make-instance
+                                            :class (cl-cc/ast:make-ast-quote :value 'my-dog)
+                                            :initargs (list (cons :weight (cl-cc/ast:make-ast-int :value 1))))))
+                 :body (list (cl-cc/ast:make-ast-set-slot-value
+                              :object (cl-cc/ast:make-ast-the
+                                       :type 't
+                                       :value (cl-cc/ast:make-ast-var :name 'obj))
                               :slot 'weight
                               :value (cl-cc/ast:make-ast-int :value 42))
                              (cl-cc/ast:make-ast-slot-value

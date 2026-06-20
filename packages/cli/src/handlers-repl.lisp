@@ -109,7 +109,7 @@ inside strings for REPL input balancing."
       ((hash-table-p object)
        (format t "Hash table count: ~D~%" (hash-table-count object))
        (maphash (lambda (k v) (format t "  ~S => ~S~%" k v)) object))
-      ((standard-object-p object)
+      ((typep object 'standard-object)
        (format t "Object: ~S~%" object)
        (describe object *standard-output*))
       (t

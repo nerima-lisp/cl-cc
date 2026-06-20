@@ -8,9 +8,6 @@
 (defvar *jit-threshold* 100
   "Call count threshold before triggering JIT compilation.")
 
-(defvar *jit-enabled* t
-  "Master switch for JIT compilation.")
-
 ;;; ──── Type Feedback Table ────
 ;; Inline Cache (IC) based type profiling.
 ;; Each call site / operation has a type profile slot.
@@ -23,6 +20,18 @@
   (site-id nil)               ; unique identifier for the site
   (type-counts (make-hash-table :test #'eq)) ; type → count
   (total-samples 0 :type fixnum))
+
+(defstruct (jit-compiled-code (:conc-name jcc-))
+  "Safe baseline JIT artifact.
+ENTRY-ADDRESS remains NIL until a native backend installs executable code."
+  (func-name nil)
+  (bytecode nil)
+  (tier 1 :type fixnum)
+  (type-feedback nil)
+  (entry-address nil)
+  (native-code nil)
+  (guards nil)
+  (compiled-at 0 :type integer))
 
 (defun record-type-feedback (func-name site-id observed-type)
   "Record an observed TYPE at SITE-ID in FUNC-NAME.
@@ -55,15 +64,46 @@ Returns (values type fraction) or NIL."
           (when (>= fraction min-fraction)
             (values best-type fraction)))))))
 
+(defun snapshot-type-feedback (func-name)
+  "Return a stable plist snapshot of collected type feedback for FUNC-NAME."
+  (let ((func-table (gethash func-name *type-feedback-table*))
+        (sites nil))
+    (when func-table
+      (maphash
+       (lambda (site-id entry)
+         (let ((types nil))
+           (maphash (lambda (type count)
+                      (push (cons type count) types))
+                    (tfe-type-counts entry))
+           (push (list :site-id site-id
+                       :samples (tfe-total-samples entry)
+                       :types (sort types #'> :key #'cdr))
+                 sites)))
+       func-table))
+    (sort sites #'string<
+          :key (lambda (site) (prin1-to-string (getf site :site-id))))))
+
+(defun jit-compiled-code-entry-address (compiled-code)
+  "Return a native entry address for COMPILED-CODE, or NIL for safe artifacts."
+  (cond
+    ((jit-compiled-code-p compiled-code)
+     (jcc-entry-address compiled-code))
+    ((integerp compiled-code)
+     compiled-code)
+    (t
+     nil)))
+
 ;;; ──── JIT Tier Compilation ────
 (defun jit-baseline-compile (func-name bytecode &key (tier 1))
   "Compile BYTECODE for FUNC-NAME at JIT tier TIER.
 Tier 1: Simple template-based compilation (baseline).
 Tier 2: Optimizing compilation with type feedback."
-  (declare (ignore func-name bytecode tier))
-  ;; In production: emit native code, register in code cache.
-  ;; This function is the entry point called by the call stub.
-  (values))
+  (make-jit-compiled-code
+   :func-name func-name
+   :bytecode bytecode
+   :tier tier
+   :type-feedback (snapshot-type-feedback func-name)
+   :compiled-at (get-universal-time)))
 
 (defun jit-tier-compile (func-name bytecode)
   "Full JIT compilation pipeline for FUNC-NAME.
@@ -137,6 +177,6 @@ Uses a global type feedback cache shared across call sites."
 (defun aot-pre-warm (hot-functions)
   "Pre-compile HOT-FUNCTIONS (list of function names) at startup.
 Eliminates JIT warmup time for known-hot server code paths."
-  (dolist (fn hot-functions)
-    (jit-tier-compile fn nil))
-  (values))
+  (loop for fn in hot-functions
+        for artifact = (jit-tier-compile fn nil)
+        when artifact collect artifact))

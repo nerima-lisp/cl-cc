@@ -46,7 +46,7 @@ This is an optimizer policy gate, not Prolog engine state.")
 (defun %maybe-apply-prolog-rewrite (instructions)
   "Apply the Prolog rewrite stage when enabled, preserving INSTRUCTIONS otherwise.
 The stage first applies the instruction-level Prolog peephole rules and then runs
-the e-graph rewrite engine whose builtin rule set is also sourced from Prolog facts."
+the e-graph rewrite engine whose builtin rule set is also sourced from Prolog rules."
   (if *enable-prolog-peephole*
       (optimize-with-egraph
        (mapcar #'sexp->instruction

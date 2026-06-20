@@ -113,7 +113,9 @@
            (result-reg (make-register ctx))
            (args (ast-mv-call-args node)))
        (emit ctx (make-vm-move :dst func-reg
-                               :src (compile-ast (ast-mv-call-func node) ctx)))
+                               :src (compile-ast (%callable-designator-node
+                                                  (ast-mv-call-func node))
+                                                 ctx)))
        (cond
          ((null args)
           (emit ctx (make-vm-call :dst result-reg :func func-reg :args nil)))

@@ -8,7 +8,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,13 @@
 (defun %make-float64-ta (&rest values)
   "Build a Float64Array TypedArray filled with VALUES."
   (let ((ta (cl-cc/javascript::%js-make-typed-array "Float64Array" (length values))))
+    (loop for v in values for i from 0
+          do (cl-cc/javascript::%js-ta-set ta i v))
+    ta))
+
+(defun %make-bigint-ta (type-name &rest values)
+  "Build a BigInt TypedArray filled with VALUES."
+  (let ((ta (cl-cc/javascript::%js-make-typed-array type-name (length values))))
     (loop for v in values for i from 0
           do (cl-cc/javascript::%js-ta-set ta i v))
     ta))
@@ -131,6 +138,47 @@
     (cl-cc/javascript::%js-ta-copy-within ta 0 3 5)
     (assert-equal '(4 5 3 4 5) (%ta-to-list ta))))
 
+(deftest js-rt-ta-slice-non-mutating
+  "TypedArray.slice(start, end) returns a new copy of the selected range."
+  (let* ((ta  (%make-int32-ta 1 2 3 4 5))
+         (out (cl-cc/javascript::%js-ta-slice ta 1 4)))
+    (assert-false (eq ta out))
+    (assert-equal '(1 2 3 4 5) (%ta-to-list ta))
+    (assert-equal '(2 3 4) (%ta-to-list out))))
+
+(deftest js-rt-ta-fill-mutating
+  "TypedArray.fill(value, start, end) mutates the receiver and returns it."
+  (let* ((ta  (%make-int32-ta 1 2 3 4 5))
+         (out (cl-cc/javascript::%js-ta-fill ta 9 1 4)))
+    (assert-true (eq ta out))
+    (assert-equal '(1 9 9 9 5) (%ta-to-list ta))))
+
+(deftest js-rt-ta-negative-ranges-and-clamping
+  "TypedArray negative bounds and Uint8ClampedArray / BigInt coercion branches are covered."
+  (let ((ta (%make-int32-ta 1 2 3 4 5)))
+    (let ((sub (cl-cc/javascript::%js-ta-subarray ta -4 -1)))
+      (assert-equal '(2 3 4) (%ta-to-list sub)))
+    (let ((slice (cl-cc/javascript::%js-ta-slice ta -4 -1)))
+      (assert-equal '(2 3 4) (%ta-to-list slice)))
+    (cl-cc/javascript::%js-ta-fill ta 9 -3 -1)
+    (assert-equal '(1 2 9 9 5) (%ta-to-list ta)))
+  (let ((ta (cl-cc/javascript::%js-make-typed-array "Uint8ClampedArray" 4)))
+    (cl-cc/javascript::%js-ta-set ta 0 -12.5d0)
+    (cl-cc/javascript::%js-ta-set ta 1 127.6d0)
+    (cl-cc/javascript::%js-ta-set ta 2 300)
+    (cl-cc/javascript::%js-ta-set ta 3 255.9d0)
+    (assert-equal '(0 127 255 255) (%ta-to-list ta)))
+  (let ((signed   (%make-bigint-ta "BigInt64Array"
+                                    (cl-cc/javascript::%make-js-bigint -1)
+                                    9223372036854775808))
+        (unsigned (%make-bigint-ta "BigUint64Array"
+                                    (cl-cc/javascript::%make-js-bigint -1)
+                                    18446744073709551616)))
+    (assert-= -1 (cl-cc/javascript::%js-ta-get signed 0))
+    (assert-= -9223372036854775808 (cl-cc/javascript::%js-ta-get signed 1))
+    (assert-= 18446744073709551615 (cl-cc/javascript::%js-ta-get unsigned 0))
+    (assert-= 0 (cl-cc/javascript::%js-ta-get unsigned 1))))
+
 ;;; ─── lastIndexOf ─────────────────────────────────────────────────────────────
 
 (deftest-each js-rt-ta-last-index-of
@@ -231,6 +279,89 @@
     (assert-false (eq orig clone))
     (assert-string= "Int32Array" (cl-cc/javascript::js-ta-type-name clone))
     (assert-= 2 (cl-cc/javascript::js-ta-length clone))))
+
+;;; ─── constructor / methods ──────────────────────────────────────────────────
+
+(deftest-each js-rt-ta-make-typed-array-from-arg
+  "%js-make-typed-array covers the main argument shapes."
+  :cases (("undefined" cl-cc/javascript::+js-undefined+ 0 '())
+          ("null" cl-cc/javascript::+js-null+ 0 '())
+          ("number" 3.9d0 3 '(0 0 0))
+          ("vector" #(4 5 6) 3 '(4 5 6))
+          ("typed-array" (%make-int32-ta 1 2 3) 3 '(1 2 3))
+          ("fallback" :oops 0 '()))
+  (arg expected-len expected-values)
+  (let ((ta (cl-cc/javascript::%js-make-typed-array "Int32Array" arg)))
+    (assert-= expected-len (cl-cc/javascript::js-ta-length ta))
+    (assert-equal expected-values (%ta-to-list ta))))
+
+(deftest js-rt-ta-set-from-vector-and-typed-array
+  "%js-ta-set-from copies from vectors and typed arrays."
+  (let ((from-vector (%make-int32-ta 0 0 0 0))
+        (from-ta     (%make-int32-ta 0 0 0 0)))
+    (cl-cc/javascript::%js-ta-set-from from-vector #(7 8) 1)
+    (cl-cc/javascript::%js-ta-set-from from-ta (%make-int32-ta 9 10) 2)
+    (assert-equal '(0 7 8 0) (%ta-to-list from-vector))
+    (assert-equal '(0 0 9 10) (%ta-to-list from-ta))))
+
+(deftest js-rt-ta-get-set-and-to-array
+  "%js-ta-get, %js-ta-set, and %js-ta-to-array handle out-of-range access and array conversion."
+  (let ((ta (%make-int32-ta 10 20)))
+    (assert-eq cl-cc/javascript::+js-undefined+ (cl-cc/javascript::%js-ta-get ta 2))
+    (assert-eq cl-cc/javascript::+js-undefined+ (cl-cc/javascript::%js-ta-get ta -1))
+    (assert-= 99.0d0 (cl-cc/javascript::%js-ta-set ta 5 99))
+    (assert-equal '(10 20) (%ta-to-list ta))
+    (assert-true (equalp #(10.0d0 20.0d0) (cl-cc/javascript::%js-ta-to-array ta)))))
+
+(deftest js-rt-ta-join
+  "%js-ta-join returns a separator-joined string."
+  (let ((ta (%make-int32-ta 1 2 3)))
+    (assert-string= "1-2-3" (cl-cc/javascript::%js-ta-join ta "-"))))
+
+(deftest js-rt-ta-for-each
+  "%js-ta-for-each visits each element in order."
+  (let ((ta (%make-int32-ta 1 2 3))
+        (seen nil))
+    (cl-cc/javascript::%js-ta-for-each
+     ta
+     (lambda (v i source &rest _)
+       (declare (ignore i source _))
+       (push v seen)))
+    (assert-equal '(1.0d0 2.0d0 3.0d0) (nreverse seen))))
+
+(deftest js-rt-ta-map
+  "%js-ta-map returns a new typed array with mapped values."
+  (let* ((ta (%make-int32-ta 1 2 3))
+         (mapped (cl-cc/javascript::%js-ta-map
+                  ta
+                  (lambda (v i source &rest _)
+                    (declare (ignore i source _))
+                    (* v 2)))))
+    (assert-equal '(2 4 6) (%ta-to-list mapped))))
+
+(deftest js-rt-ta-filter
+  "%js-ta-filter returns only matching values."
+  (let* ((ta (%make-int32-ta 1 2 3))
+         (filtered (cl-cc/javascript::%js-ta-filter
+                    ta
+                    (lambda (v i source &rest _)
+                      (declare (ignore i source _))
+                      (> v 1)))))
+    (assert-equal '(2 3) (%ta-to-list filtered))))
+
+(deftest-each js-rt-ta-reduce
+  "%js-ta-reduce handles implicit and explicit initial values."
+  :cases (("implicit-init" nil 6)
+          ("explicit-init" 10 16))
+  (init expected)
+  (let ((ta (%make-int32-ta 1 2 3)))
+    (if init
+        (assert-= expected
+                  (cl-cc/javascript::%js-ta-reduce
+                   ta (lambda (acc v &rest _) (+ acc v)) init))
+        (assert-= expected
+                  (cl-cc/javascript::%js-ta-reduce
+                   ta (lambda (acc v &rest _) (+ acc v)))))))
 
 ;;; ─── ES2025 Uint8Array hex / base64 ─────────────────────────────────────────
 

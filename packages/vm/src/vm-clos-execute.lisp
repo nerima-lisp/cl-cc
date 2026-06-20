@@ -223,8 +223,7 @@ descriptor already carries its effective inherited initforms."
                                     (setf matched candidate)))
                                 (vm-global-vars state))
                        matched)))))
-    (when (and (hash-table-p value)
-               (gethash :__methods__ value))
+    (when (vm-generic-function-p value)
       value)))
 
 (defun %vm-call-generic-sync (gf-ht state args &key default)
@@ -252,8 +251,10 @@ VM primitives that need protocol hooks without introducing new instructions."
 
 (defun %vm-direct-primary-method-p (gf-ht key)
   "Return T when GF-HT has a primary method registered exactly for KEY."
-  (let ((methods-ht (and (hash-table-p gf-ht) (gethash :__methods__ gf-ht))))
-    (and methods-ht (gethash key methods-ht) t)))
+  (let ((methods-ht (and (hash-table-p gf-ht)
+                         (nth-value 1 (gethash :__methods__ gf-ht))
+                         (gethash :__methods__ gf-ht))))
+    (and methods-ht (nth-value 1 (gethash key methods-ht)) t)))
 
 (defun %vm-class-direct-slot-p (class-ht slot-name)
   "Return T when CLASS-HT directly declares SLOT-NAME."
@@ -647,7 +648,9 @@ VM primitives that need protocol hooks without introducing new instructions."
 (defmethod execute-instruction ((inst vm-register-method) state pc labels)
   (declare (ignore labels))
   (let* ((gf-ht (vm-reg-get state (vm-gf-reg inst)))
-         (methods-ht (when (hash-table-p gf-ht) (gethash :__methods__ gf-ht)))
+         (methods-ht (when (and (hash-table-p gf-ht)
+                                (nth-value 1 (gethash :__methods__ gf-ht)))
+                       (gethash :__methods__ gf-ht)))
          (eql-index (when (hash-table-p gf-ht) (gethash :__eql-index__ gf-ht)))
          (specializer (vm-method-specializer inst))
          (qualifier (vm-method-qualifier inst))

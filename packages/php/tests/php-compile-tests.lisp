@@ -719,7 +719,8 @@ list."
   (assert-string= "5"  (%php-run-capture "<?php function add($a,$b){ return $a+$b; } $args=[2,3]; echo add(...$args);"))
   (assert-string= "6"  (%php-run-capture "<?php function add3($a,$b,$c){ return $a+$b+$c; } $x=[1,2,3]; echo add3(...$x);"))
   (assert-string= "xyz" (%php-run-capture "<?php function f($a,$b,$c){ return $a.$b.$c; } $r=['y','z']; echo f('x',...$r);"))
-  (assert-string= "3"  (%php-run-capture "<?php $a=[3,1,2]; echo max(...$a);")))
+  (assert-string= "3"  (%php-run-capture "<?php $a=[3,1,2]; echo max(...$a);"))
+  (assert-string= "1"  (%php-run-capture "<?php $a=[3,1,2]; echo min(...$a);")))
 
 (deftest php-e2e-named-args-after-dynamic-spread
   "Named arguments after a runtime-width spread are merged using function
@@ -1792,3 +1793,7 @@ intersect with a user comparison callback) — all were missing."
   (assert-string= "[2,4]"      (%php-run-capture "<?php echo json_encode(array_values(array_uintersect([1,2,3,4],[2,4,5],fn($a,$b)=>$a-$b)));"))
   ;; callback-driven (case-insensitive) comparison
   (assert-string= "[\"C\"]"    (%php-run-capture "<?php echo json_encode(array_values(array_udiff(['A','b','C'],['a','B'],fn($x,$y)=>strcasecmp($x,$y))));")))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

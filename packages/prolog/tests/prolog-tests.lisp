@@ -10,29 +10,30 @@
 (in-suite cl-cc-prolog-integration-suite)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
-;;; solve-goal — built-in predicates
+;;; solver helpers — built-in predicates
 ;;; ─────────────────────────────────────────────────────────────────────────
 
 (deftest prolog-builtin-unification-succeeds
   "Built-in = unifies and calls continuation once"
-  (with-prolog-goal-results (solutions '(= ?x 42))
-    (assert-= 1 (length solutions))
-    (assert-= 42 (cl-cc:logic-substitute '?x (car solutions)))))
+  (assert-prolog-goal-results=
+   '(= ?x 42)
+   '(42)
+   ?x))
 
 (deftest-each prolog-non-unification-cases
   "Built-in /=: succeeds when terms differ, fails when equal"
   :cases (("succeeds" '(/= 1 2) 1)
-          ("fails"    '(/= 1 1) 0))
+          ("fails"    '(/= 1 1) 0)
+          ("unbound vars" '(/= ?x ?y) 0))
   (goal expected-count)
   (assert-prolog-query-count= goal expected-count))
 
 (deftest prolog-builtin-conjunction
   "Built-in 'and' chains goals and accumulates bindings"
-  (with-prolog-goal-results (solutions '(and (= ?x 1) (= ?y 2)))
-    (assert-= 1 (length solutions))
-    (let ((env (car solutions)))
-      (assert-= 1 (cl-cc:logic-substitute '?x env))
-      (assert-= 2 (cl-cc:logic-substitute '?y env)))))
+  (assert-prolog-goal-results=
+   '(and (= ?x 1) (= ?y 2))
+   '((1 2))
+   (list ?x ?y)))
 
 (deftest prolog-builtin-disjunction
   "Built-in 'or' tries each alternative"
@@ -64,7 +65,7 @@
       (assert-prolog-query-count= '(first-color ?c) 1))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
-;;; Standard database predicates — cons-functor notation
+;;; Standard rule predicates — cons-functor notation
 ;;; ─────────────────────────────────────────────────────────────────────────
 
 (deftest-each prolog-member-behavior
@@ -102,50 +103,34 @@
 
 (deftest prolog-solve-conjunction-empty-succeeds-once
   "solve-conjunction with no goals calls the continuation exactly once"
-  (with-prolog-results (results
-                        (lambda (emit)
-                          (cl-cc/prolog::solve-conjunction nil nil emit)))
-    (assert-= 1 (length results))))
+  (assert-prolog-goal-results= nil '(nil)))
 
 (deftest prolog-solve-conjunction-accumulates-bindings
   "solve-conjunction chains goals, accumulating bindings"
-    (with-prolog-goal-projections (results
-                                   (lambda (emit)
-                                     (cl-cc/prolog::solve-conjunction '((= ?x 10) (= ?y 20))
-                                                                      nil
-                                                                      emit))
-                                   (list ?x ?y))
-      (assert-equal '((10 20)) results)))
+  (assert-prolog-goal-results=
+   '((= ?x 10) (= ?y 20))
+   '((10 20))
+   (list ?x ?y)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
-;;; query-one / query-all / query-first-n
+;;; query-all
 ;;; ─────────────────────────────────────────────────────────────────────────
-
-(deftest-each prolog-query-one-result
-  "query-one returns the first substitution on success, nil when no solution exists."
-  :cases (("success"  '(member ?x (cons a (cons b nil)))  t)
-          ("failure"  '(member z  (cons a (cons b nil)))  nil))
-  (goal expected-truthy)
-  (let ((result (cl-cc:query-one goal)))
-    (assert-equal expected-truthy (not (null result)))))
 
 (deftest prolog-query-all-count
   "query-all returns every solution"
   (assert-prolog-query-count= '(member ?x (cons 1 (cons 2 (cons 3 (cons 4 nil))))) 4))
 
-(deftest-each prolog-query-first-n
-  "query-first-n returns exactly N solutions"
-  :cases (("n=1" 1) ("n=2" 2) ("n=3" 3))
-  (n)
-  (let ((results (cl-cc:query-first-n '(member ?x (cons a (cons b (cons c (cons d (cons e nil)))))) n)))
-    (assert-= n (length results))))
+(deftest prolog-solve-goal-accepts-raw-list-goals
+  "solve-goal handles raw list goals through the solver path."
+  (with-prolog-facts ((goal-shape 1 1))
+    (assert-prolog-query-count= '(goal-shape 1 1) 1)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
-;;; User-defined predicates via def-fact / def-rule
+;;; User-defined predicates via def-rule
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest prolog-def-fact-queryable
-  "def-fact registers a ground fact that query-all can find"
+(deftest prolog-def-rule-fact-queryable
+  "def-rule with an empty body registers a ground fact that query-all can find"
   (with-prolog-facts ((likes alice bob) (likes bob carol))
     (assert-prolog-query-count= '(likes ?who bob) 1)))
 

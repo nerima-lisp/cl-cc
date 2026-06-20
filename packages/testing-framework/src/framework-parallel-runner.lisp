@@ -5,15 +5,12 @@
   "Timeout in seconds for external CPU-count detection commands.")
 
 (defparameter *suite-killer-exit-fn*
-  (lambda (&rest args &key code &allow-other-keys)
-    (declare (ignore args))
+  (lambda (&key code)
     (sb-ext:exit :code code :abort t))
   "Indirection for the suite-deadline-killer exit action so tests can rebind to a recorder.
 Default uses sb-ext:exit :code code :abort t.  The :abort t flag calls _exit(2) directly,
 bypassing the SBCL thread join that plain (sb-ext:exit) would perform; without :abort t a
 GC-safepoint-blocked main thread cannot be terminated by the killer.
-&allow-other-keys lets callers pass forward-compatible keyword arguments without error (the
-same reason *watchdog-exit-fn* in framework-parallel.lisp uses it).
 Mirrors *watchdog-exit-fn* in framework-parallel.lisp.")
 
 ;;; ------------------------------------------------------------
@@ -21,10 +18,10 @@ Mirrors *watchdog-exit-fn* in framework-parallel.lisp.")
 ;;; ------------------------------------------------------------
 
 (defun %copy-prolog-rules (src)
-  "Return a shallow copy of the Prolog fact DB SRC (hash-table).
-Per-thread rebinding of `cl-cc/prolog:*prolog-rules*` needs a fresh
-table per worker so concurrent add-rule / clear-prolog-database calls
-do not race through the global binding."
+  "Return a shallow copy of the Prolog rule DB SRC (hash-table).
+Per-thread rebinding of `cl-cc/prolog::*prolog-rules*` needs a fresh
+table per worker so concurrent test-side rebindings do not race through
+the global binding."
   (let ((dst (make-hash-table :test 'eq)))
     (when src
       (maphash (lambda (k v) (setf (gethash k dst) v)) src))

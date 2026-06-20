@@ -32,6 +32,25 @@ sink/fold paths."
     (assert-true (keywordp reg))
     (assert-= 3 (length consts))))
 
+(deftest codegen-mvb-the-wrapped-function-keeps-register-mv-bind
+  "multiple-value-bind keeps the register mv-bind fast path when the callee is ast-the-wrapped."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (progn
+                (setf (gethash 'floor (cl-cc/compile::ctx-global-function-mv-arities ctx)) 2)
+                (compile-ast (cl-cc/ast:make-ast-multiple-value-bind
+                              :vars '(a b)
+                              :values-form (cl-cc/ast:make-ast-call
+                                            :func (make-ast-the
+                                                   :type 'function
+                                                   :value (make-ast-function :name 'floor))
+                                            :args (list (make-ast-int :value 17)
+                                                        (make-ast-int :value 5)))
+                              :body (list (make-ast-var :name 'a)))
+                             ctx))))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind))
+    (assert-true (keywordp reg))))
+
 (deftest-each ast-constant-folding-before-codegen
   "optimize-ast folds literal arithmetic and pure string-length calls to an integer node."
   :cases (("arithmetic"    6 '(+ 1 2 3))
@@ -115,6 +134,26 @@ sink/fold paths."
     (assert-= 0 (length cars))
     (assert-true (> (length moves) 0))))
 
+(deftest codegen-let-noescape-cons-car-through-ast-the-bypasses-vm-car
+  "Transparent ast-the wrappers around cons still let car read the original component register."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (make-ast-let
+                             :bindings (list (cons 'p (make-ast-the
+                                                        :type 'cons
+                                                        :value (make-ast-call
+                                                                :func 'cons
+                                                                :args (list (make-ast-int :value 1)
+                                                                            (make-ast-int :value 2))))))
+                             :body (list (make-ast-call :func 'car
+                                                        :args (list (make-ast-var :name 'p)))))
+                           ctx))
+         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-car))
+                              (codegen-instructions ctx))))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-car))
+    (assert-= 0 (length cars))))
+
 (deftest-each codegen-let-dynamic-extent-cons-declaration-controls-noescape
   "A captured cons binding only takes the noescape path when declared dynamic-extent."
   :cases (("no-declaration"        nil                  nil)
@@ -174,6 +213,25 @@ sink/fold paths."
     (assert-true (keywordp reg))
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-car))))
+
+(deftest codegen-let-dynamic-extent-closure-the-wrapped-call-keeps-noescape
+  "A dynamic-extent closure binding still avoids heap closure allocation when the call designator is ast-the-wrapped."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast
+               (make-ast-let
+                :bindings (list (cons 'reader
+                                      (make-ast-lambda
+                                       :params '(x)
+                                       :body (list (make-ast-var :name 'x)))))
+                :declarations '((dynamic-extent reader))
+                :body (list (make-ast-call
+                             :func (make-ast-the
+                                    :type 'function
+                                    :value (make-ast-var :name 'reader))
+                             :args (list (make-ast-int :value 1)))))
+               ctx)))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-closure))))
 
 (deftest codegen-let-escaped-cons-car-falls-back-to-vm-car
   "Captured cons bindings are not treated as non-escaping car/cdr shortcuts."
@@ -256,6 +314,23 @@ sink/fold paths."
                                                         :args (list (make-ast-int :value 3)))))
                              :body (list (make-ast-call :func 'array-length
                                                         :args (list (make-ast-var :name 'arr)))))
+                           ctx)))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-const))))
+
+(deftest codegen-let-noescape-array-length-through-ast-the-bypasses-vm-make-array
+  "Typed function-position wrappers still let array-length hit the noescape array path."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (make-ast-let
+                             :bindings (list (cons 'arr (make-ast-call
+                                                        :func 'make-array
+                                                        :args (list (make-ast-int :value 3)))))
+                             :body (list (make-ast-call
+                                          :func (make-ast-the
+                                                 :type 'function
+                                                 :value (make-ast-var :name 'array-length))
+                                          :args (list (make-ast-var :name 'arr)))))
                            ctx)))
     (assert-true (keywordp reg))
     (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))

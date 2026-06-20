@@ -171,6 +171,25 @@ Returns the updated CURRENT-ARG cursor and BINDINGS list."
       (push (list aux-name init) bindings)))
   bindings)
 
+(defun %proper-list-p (object)
+  "Return true when OBJECT is a proper list."
+  (loop for tail = object then (cdr tail)
+        when (null tail) return t
+        unless (consp tail) return nil))
+
+(defun %let-binding-form (binding)
+  "Normalize public lambda-list binding pairs for LET/LET*."
+  (if (and (consp binding)
+           (symbolp (car binding))
+           (not (and (%proper-list-p binding)
+                     (<= (length binding) 2))))
+      (list (car binding) (cdr binding))
+      binding))
+
+(defun %normalize-let-bindings (bindings)
+  "Return BINDINGS in LET/LET* binding syntax."
+  (mapcar #'%let-binding-form bindings))
+
 (defun %strip-lambda-list-keywords (lambda-list keywords)
   "Return LAMBDA-LIST without KEYWORDS and their following binding names."
   (let ((result nil)
@@ -262,36 +281,36 @@ are bound explicitly by the expander runtime."
         (gensym-local (%make-gensym-local)))
     (push (list arg-var arg) bindings)
     (when (lambda-list-info-whole info)
-      (push (list (lambda-list-info-whole info) arg-var) bindings))
+      (push (cons (lambda-list-info-whole info) arg) bindings))
 
-      (let ((current-arg arg-var))
-        (setf bindings (%push-destructured-required-bindings
-                        (lambda-list-info-required info)
-                        current-arg bindings gensym-local))
+    (let ((current-arg arg-var))
+      (setf bindings (%push-destructured-required-bindings
+                      (lambda-list-info-required info)
+                      current-arg bindings gensym-local))
 
-        (push (list remaining-var current-arg) bindings))
+      (push (list remaining-var current-arg) bindings))
 
-      (let ((opt-remaining remaining-var))
-        (setf bindings (%push-destructured-optional-bindings
-                        (lambda-list-info-optional info)
-                        opt-remaining bindings gensym-local))
+    (let ((opt-remaining remaining-var))
+      (setf bindings (%push-destructured-optional-bindings
+                      (lambda-list-info-optional info)
+                      opt-remaining bindings gensym-local))
 
-        (setf remaining-var opt-remaining))
+      (setf remaining-var opt-remaining))
 
-      (when (or (lambda-list-info-rest info)
-                (lambda-list-info-body info))
-        (let ((rest-sym (or (lambda-list-info-rest info)
-                             (lambda-list-info-body info))))
-          (push (list rest-sym remaining-var) bindings)))
+    (when (or (lambda-list-info-rest info)
+              (lambda-list-info-body info))
+      (let ((rest-sym (or (lambda-list-info-rest info)
+                          (lambda-list-info-body info))))
+        (push (list rest-sym remaining-var) bindings)))
 
-      (when (lambda-list-info-key-params info)
-        (let ((key-remaining remaining-var))
-          (setf bindings (%push-destructured-key-bindings
-                          (lambda-list-info-key-params info)
-                          key-remaining bindings gensym-local))))
+    (when (lambda-list-info-key-params info)
+      (let ((key-remaining remaining-var))
+        (setf bindings (%push-destructured-key-bindings
+                        (lambda-list-info-key-params info)
+                        key-remaining bindings gensym-local))))
 
-      (setf bindings (%push-aux-bindings (lambda-list-info-aux info) bindings))
+    (setf bindings (%push-aux-bindings (lambda-list-info-aux info) bindings))
 
-      (nreverse bindings)))
+    (nreverse bindings)))
 
 ) ; end eval-when

@@ -126,15 +126,12 @@
 
 (defun %do-symbols (parsed)
   "Handle `cl-cc symbols' workspace symbol indexing and fuzzy search."
-  (let* ((root (or (car (parsed-args-positional parsed)) (%default-workspace-source-root)))
-         (query (flag parsed "--fuzzy"))
-         (timeout (%get-timeout parsed)))
-    (%with-cli-error-handler
-      (%call-with-cli-timeout timeout
-        (lambda ()
-          (%print-symbol-index (%filter-symbol-index (%build-symbol-index root) query))
-          (uiop:quit 0))
-        "symbols"))))
+  (%with-cli-timeout (parsed "symbols")
+    (let* ((root (or (car (parsed-args-positional parsed)) (%default-workspace-source-root)))
+           (query (flag parsed "--fuzzy")))
+      (%with-cli-error-handler
+        (%print-symbol-index (%filter-symbol-index (%build-symbol-index root) query))
+        (uiop:quit 0)))))
 
 (defun %json-escape (text)
   "Return TEXT escaped for JSON string literals."
@@ -180,27 +177,21 @@
 
 (defun %do-compile-commands (parsed)
   "Handle `cl-cc compile-commands'."
-  (let ((timeout (%get-timeout parsed))
-        (root (or (car (parsed-args-positional parsed)) (%default-workspace-source-root)))
-        (output (or (flag-or parsed "--output" "-o") "compile_commands.json")))
-    (%with-cli-error-handler
-      (%call-with-cli-timeout timeout
-        (lambda ()
-          (format t "~A~%" (%generate-compile-commands :root root :output output))
-          (uiop:quit 0))
-        "compile-commands"))))
+  (%with-cli-timeout (parsed "compile-commands")
+    (let ((root (or (car (parsed-args-positional parsed)) (%default-workspace-source-root)))
+          (output (or (flag-or parsed "--output" "-o") "compile_commands.json")))
+      (%with-cli-error-handler
+        (format t "~A~%" (%generate-compile-commands :root root :output output))
+        (uiop:quit 0)))))
 
 (defun %do-profile (parsed)
   "Handle `cl-cc profile' folded-stack to SVG flame graph generation."
-  (let ((timeout (%get-timeout parsed))
-        (input (car (parsed-args-positional parsed)))
-        (output (flag parsed "--flamegraph")))
-    (unless output
-      (%quit-command-usage-error "profile" "profile requires --flamegraph <out.svg>."))
-    (%with-cli-error-handler
-      (%call-with-cli-timeout timeout
-        (lambda ()
-          (%write-flamegraph-from-perf-data output :input-path input)
-          (format t "~A~%" output)
-          (uiop:quit 0))
-        "profile"))))
+  (%with-cli-timeout (parsed "profile")
+    (let ((input (car (parsed-args-positional parsed)))
+          (output (flag parsed "--flamegraph")))
+      (unless output
+        (%quit-command-usage-error "profile" "profile requires --flamegraph <out.svg>."))
+      (%with-cli-error-handler
+        (%write-flamegraph-from-perf-data output :input-path input)
+        (format t "~A~%" output)
+        (uiop:quit 0)))))

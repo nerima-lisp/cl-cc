@@ -242,6 +242,12 @@ CL-CC/VM:*OSR-ENABLED* is true."
          (entry  (cfg-entry cfg)))
     (unless entry (return-from cfg-compute-dominators nil))
 
+    ;; Dominator computation is called by multiple analyses; keep the tree
+    ;; idempotent instead of appending duplicate children across recomputes.
+    (loop for b across (cfg-blocks cfg)
+          do (setf (bb-idom b) nil
+                   (bb-dom-children b) nil))
+
     ;; Initialize: entry dominates itself; all others are undefined (nil)
     (setf (bb-idom entry) entry)
 

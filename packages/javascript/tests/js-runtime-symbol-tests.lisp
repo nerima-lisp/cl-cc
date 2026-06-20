@@ -6,7 +6,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Symbol predicate ────────────────────────────────────────────────────────
 
@@ -80,6 +80,11 @@
     (assert-eq cl-cc/javascript::+js-undefined+
                (cl-cc/javascript::%js-symbol-key-for local))))
 
+(deftest js-rt-symbol-key-for-non-symbol
+  "Symbol.keyFor returns +js-undefined+ for non-symbol inputs."
+  (assert-eq cl-cc/javascript::+js-undefined+
+             (cl-cc/javascript::%js-symbol-key-for "not-a-symbol")))
+
 ;;; ─── Symbol as property key ──────────────────────────────────────────────────
 
 (deftest js-rt-symbol-as-key-format
@@ -88,7 +93,12 @@
          (key (cl-cc/javascript::%js-symbol-as-key sym)))
     (assert-true (stringp key))
     (assert-true (string= key "__sym_" :end1 6))
-    (assert-true (string= key "__" :start1 (- (length key) 2)))))
+    (assert-true (string= key "__" :start1 (- (length key) 2)))
+    (assert-true (cl-cc/javascript::%js-symbol-storage-key-p key))
+    (assert-eq sym (cl-cc/javascript::%js-symbol-from-storage-key key))
+    (assert-false (cl-cc/javascript::%js-symbol-storage-key-p "not-a-symbol-key"))
+    (assert-eq cl-cc/javascript::+js-undefined+
+               (cl-cc/javascript::%js-symbol-from-storage-key "not-a-symbol-key"))))
 
 ;;; ─── Well-known symbols ──────────────────────────────────────────────────────
 

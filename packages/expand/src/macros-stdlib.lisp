@@ -184,7 +184,8 @@ the synchronous HANDLER-CASE fallback."
    Supports: required, &optional, &rest, &body, &key, &aux."
   (let ((expr-var (gensym "EXPR")))
     `(let ((,expr-var ,expr))
-       (let* ,(destructure-lambda-list pattern expr-var)
+       (let* ,(%normalize-let-bindings
+               (destructure-lambda-list pattern expr-var))
          ,@body))))
 
 ;; PROG macro - let + tagbody + block

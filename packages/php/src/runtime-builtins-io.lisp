@@ -61,7 +61,7 @@
 (defun %php-is-file (filename)
   "PHP is_file: check if path is a regular file."
   (let ((p (probe-file (%php-stringify filename))))
-    (and p (not (cl:directory-namestring p)))))
+    (and p (or (pathname-name p) (pathname-type p)))))
 
 (defun %php-is-dir (path)
   "PHP is_dir: check if path is a directory."

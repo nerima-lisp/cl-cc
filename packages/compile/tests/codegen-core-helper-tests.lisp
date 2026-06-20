@@ -133,6 +133,16 @@
     (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
       (assert-true (typep inst 'cl-cc/vm::vm-float-add)))))
 
+(deftest numeric-binop-constructor-float-path-through-ast-the
+  "%numeric-binop-constructor still picks the float specialization when float literals are wrapped in ast-the."
+  (let* ((ctx (make-codegen-ctx))
+         (lhs (make-ast-the :type 'float :value (make-ast-quote :value 3.0)))
+         (rhs (make-ast-the :type 'float :value (make-ast-quote :value 2.0)))
+         (fn  (cl-cc/compile::%numeric-binop-constructor '+ lhs rhs ctx)))
+    (assert-true (functionp fn))
+    (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
+      (assert-true (typep inst 'cl-cc/vm::vm-float-add)))))
+
 (deftest numeric-binop-constructor-generic-fallback
   "%numeric-binop-constructor falls back to the generic constructor for unknown operand types."
   (let* ((ctx (make-codegen-ctx))

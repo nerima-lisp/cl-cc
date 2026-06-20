@@ -310,6 +310,20 @@ let
         cl-cc-tools
       ];
     };
+    "cl-cc-javascript-test" = sbcl.buildASDFSystem {
+      pname = "cl-cc-javascript-test";
+      version = "0.1.0";
+      src = pkgSrc testSrc;
+      systems = [ "cl-cc-javascript-test" ];
+      lispLibs = with productionAsdfSystems; [
+        cl-cc
+        cl-cc-cli
+        cl-cc-testing-framework
+        cl-cc-tools
+        cl-cc-php
+        cl-cc-javascript
+      ];
+    };
     "cl-cc-test/e2e" = sbcl.buildASDFSystem {
       pname = "cl-cc-test-e2e";
       version = "0.1.0";
@@ -329,5 +343,8 @@ in
   sbclWithCLCC = sbcl.withPackages (_: lib.attrValues productionAsdfSystems);
   sbclWithTests = sbcl.withPackages (
     _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-test" ]
+  );
+  sbclWithJavascriptTests = sbcl.withPackages (
+    _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-javascript-test" ]
   );
 }

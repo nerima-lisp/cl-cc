@@ -12,143 +12,110 @@ with a source caret and type trace on failure."
   (let* ((file (%required-file-arg parsed "check"))
          (strict (flag parsed "--strict"))
          (verbose (flag parsed "--verbose"))
-         (timeout (%get-timeout parsed))
          (mode (if strict :strict :warn))
          (source (%read-command-source file)))
     (when verbose
       (format *error-output* "; cl-cc check: ~A  mode=~A~%" file mode))
-    (%call-with-cli-timeout timeout
-     (lambda ()
-       (handler-case
-           (progn
-             (multiple-value-bind (result inferred-type)
-                 (run-string-typed source :mode mode)
-               (declare (ignore result))
-               (if inferred-type
-                   (format t "~A~%" (type-to-string inferred-type))
-                   (format t "<no type inferred>~%")))
-             (uiop:quit 0))
-         (error (e)
-           (let* ((message (princ-to-string e))
-                  (location (and (typep e 'cl-cc/ast:ast-compilation-error)
-                                 (cl-cc/ast:ast-error-location e)))
-                  (line-number nil)
-                  (column-number nil))
-             (multiple-value-setq (line-number column-number)
-               (%extract-line-column-from-location location))
-             (let* ((line-text (%source-line-at source line-number))
-                    (snippet (cl-cc/optimize:opt-build-diagnostic-caret-line
-                              line-text
-                              (or column-number 1)))
-                    (trace (cl-cc/optimize:opt-format-type-trace
-                            (list message))))
-               (format *error-output* "~A~%"
-                       (cl-cc/optimize:opt-format-diagnostic-reason
-                        "type-check"
-                        "failed"
-                        message))
-               (when location
-                 (format *error-output* "at ~A~%" location))
-               (format *error-output* "~A~%" snippet)
-               (format *error-output* "~A~%" trace)))
-           (uiop:quit 1))))
-      "check")))
+    (%with-cli-timeout (parsed "check")
+      (handler-case
+          (progn
+            (multiple-value-bind (result inferred-type)
+                (run-string-typed source :mode mode)
+              (declare (ignore result))
+              (if inferred-type
+                  (format t "~A~%" (type-to-string inferred-type))
+                  (format t "<no type inferred>~%")))
+            (uiop:quit 0))
+        (error (e)
+          (let* ((message (princ-to-string e))
+                 (location (and (typep e 'cl-cc/ast:ast-compilation-error)
+                                (cl-cc/ast:ast-error-location e)))
+                 (line-number nil)
+                 (column-number nil))
+            (multiple-value-setq (line-number column-number)
+              (%extract-line-column-from-location location))
+            (let* ((line-text (%source-line-at source line-number))
+                   (snippet (cl-cc/optimize:opt-build-diagnostic-caret-line
+                             line-text
+                             (or column-number 1)))
+                   (trace (cl-cc/optimize:opt-format-type-trace
+                           (list message))))
+              (format *error-output* "~A~%"
+                      (cl-cc/optimize:opt-format-diagnostic-reason
+                       "type-check"
+                       "failed"
+                       message))
+              (when location
+                (format *error-output* "at ~A~%" location))
+              (format *error-output* "~A~%" snippet)
+              (format *error-output* "~A~%" trace)))
+            (uiop:quit 1))))))
 
 ;;; ──── Phase 129-160: Advanced Compilation III Handlers ────
 
 (defun %do-fuzz (parsed)
   "Compiler fuzzing: FR-794. Generate and test random CL expressions."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Fuzzing with seed ~A...~%"
-                (or (flag parsed "--seed") 42))
-        (format t "Fuzz completed.~%"))
-      "fuzz")))
+  (%with-cli-timeout (parsed "fuzz")
+    (format t "Fuzzing with seed ~A...~%"
+            (or (flag parsed "--seed") 42))
+    (format t "Fuzz completed.~%")))
 
 (defun %do-reduce (parsed)
   "Test case reduction: FR-796. Delta-debug failing test cases."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let ((file (car (parsed-args-positional parsed))))
-          (format t "Reducing ~A...~%" (or file "bug.lisp"))
-          (format t "Reduction complete.~%")))
-      "reduce")))
+  (%with-cli-timeout (parsed "reduce")
+    (let ((file (car (parsed-args-positional parsed))))
+      (format t "Reducing ~A...~%" (or file "bug.lisp"))
+      (format t "Reduction complete.~%"))))
 
 (defun %do-audit (parsed)
   "Dependency auditing: FR-814. Scan dependencies for known CVEs."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Auditing dependencies...~%")
-        (format t "Audit complete. No known vulnerabilities found.~%"))
-      "audit")))
+  (%with-cli-timeout (parsed "audit")
+    (format t "Auditing dependencies...~%")
+    (format t "Audit complete. No known vulnerabilities found.~%")))
 
 (defun %do-doc (parsed)
   "API documentation generation: FR-321. Extract docstrings to Markdown."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let ((file (%required-file-arg parsed "doc"))
-              (output-path (flag-or parsed "--output" "-o")))
-          (if output-path
-              (progn
-                (generate-api-docs file :output-path output-path)
-                (format t "Documentation generated: ~A~%" output-path))
-              (write-string (generate-api-docs file) *standard-output*))))
-      "doc")))
+  (%with-cli-timeout (parsed "doc")
+    (let ((file (%required-file-arg parsed "doc"))
+          (output-path (flag-or parsed "--output" "-o")))
+      (if output-path
+          (progn
+            (generate-api-docs file :output-path output-path)
+            (format t "Documentation generated: ~A~%" output-path))
+          (write-string (generate-api-docs file) *standard-output*)))))
 
 (defun %do-doctest (parsed)
   "Doctest runner: FR-903. Execute docstring code examples."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Running doctests...~%")
-        (format t "Doctests: 0 failures.~%"))
-      "doctest")))
+  (%with-cli-timeout (parsed "doctest")
+    (format t "Running doctests...~%")
+    (format t "Doctests: 0 failures.~%")))
 
 (defun %do-show-types (parsed)
   "Type signature display: FR-904. Show inferred types."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Inferred type signatures:~%")
-        (format t "(no file specified)~%"))
-      "show-types")))
+  (%with-cli-timeout (parsed "show-types")
+    (format t "Inferred type signatures:~%")
+    (format t "(no file specified)~%")))
 
 (defun %do-assert-density (parsed)
   "Assertion density analysis: FR-905. Measure code defense level."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Assertion density: 0.0 assertions/LOC~%"))
-      "assert-density")))
+  (%with-cli-timeout (parsed "assert-density")
+    (format t "Assertion density: 0.0 assertions/LOC~%")))
 
 (defun %do-abi-dump (parsed)
   "ABI dump: FR-777. Dump public API surface."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "ABI dump complete.~%"))
-      "abi-dump")))
+  (%with-cli-timeout (parsed "abi-dump")
+    (format t "ABI dump complete.~%")))
 
 (defun %do-abi-check (parsed)
   "ABI compatibility check: FR-777. Compare ABI manifests."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "ABI check: compatible.~%"))
-      "abi-check")))
+  (%with-cli-timeout (parsed "abi-check")
+    (format t "ABI check: compatible.~%")))
 
 (defun %do-demangle (parsed)
   "Name demangling: FR-776. Demangle C++ ABI symbols."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let ((name (car (parsed-args-positional parsed))))
-          (format t "Demangled: ~A~%" (or name ""))))
-      "demangle")))
+  (%with-cli-timeout (parsed "demangle")
+    (let ((name (car (parsed-args-positional parsed))))
+      (format t "Demangled: ~A~%" (or name "")))))
 
 (defun %run-wasm-tool-command (tool args unavailable-message)
   "Run TOOL with ARGS, printing stdout; report graceful unavailability."
@@ -161,91 +128,67 @@ with a source caret and type trace on failure."
 
 (defun %do-disasm (parsed)
   "FR-322: Disassemble a Wasm module using wabt tools when available."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let ((file (%required-file-arg parsed "disasm")))
-          (cond
-            ((flag parsed "--decompile")
-             (%run-wasm-tool-command "wasm-decompile" (list file)
-                                     "wasm-decompile is not available in this environment."))
-            ((or (flag parsed "--wat") t)
-             (%run-wasm-tool-command "wasm2wat" (list file)
-                                     "wasm2wat is not available in this environment.")))))
-      "disasm")))
+  (%with-cli-timeout (parsed "disasm")
+    (let ((file (%required-file-arg parsed "disasm")))
+      (cond
+        ((flag parsed "--decompile")
+         (%run-wasm-tool-command "wasm-decompile" (list file)
+                                 "wasm-decompile is not available in this environment."))
+        ((or (flag parsed "--wat") t)
+         (%run-wasm-tool-command "wasm2wat" (list file)
+                                 "wasm2wat is not available in this environment."))))))
 
 (defun %do-inspect (parsed)
   "FR-322: Inspect a Wasm module with wasm-objdump and optional decompile output."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let ((file (%required-file-arg parsed "inspect")))
-          (%run-wasm-tool-command "wasm-objdump" (list "-x" "-d" file)
-                                  "wasm-objdump is not available in this environment.")
-          (when (flag parsed "--decompile")
-            (%run-wasm-tool-command "wasm-decompile" (list file)
-                                    "wasm-decompile is not available in this environment."))))
-      "inspect")))
+  (%with-cli-timeout (parsed "inspect")
+    (let ((file (%required-file-arg parsed "inspect")))
+      (%run-wasm-tool-command "wasm-objdump" (list "-x" "-d" file)
+                              "wasm-objdump is not available in this environment.")
+      (when (flag parsed "--decompile")
+        (%run-wasm-tool-command "wasm-decompile" (list file)
+                                "wasm-decompile is not available in this environment.")))))
 
 (defun %do-objdump (parsed)
   "Binary analysis: FR-808. Inspect binary internals."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let ((file (car (parsed-args-positional parsed))))
-          (format t "Objdump of ~A:~%" (or file "(none)"))
-          (format t "  Sections: .text .data .bss~%")))
-      "objdump")))
+  (%with-cli-timeout (parsed "objdump")
+    (let ((file (car (parsed-args-positional parsed))))
+      (format t "Objdump of ~A:~%" (or file "(none)"))
+      (format t "  Sections: .text .data .bss~%"))))
 
 (defun %do-macrostep (parsed)
   "Macro debugger: FR-836. Step through macro expansion."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Macro stepping...~%")
-        (format t "Expansion complete.~%"))
-      "macrostep")))
+  (%with-cli-timeout (parsed "macrostep")
+    (format t "Macro stepping...~%")
+    (format t "Expansion complete.~%")))
 
 (defun %do-bisect (parsed)
   "Regression bisection: FR-809. Find regression-introducing commit."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Bisecting...~%")
-        (format t "Bisection complete. Regression found at HEAD.~%"))
-      "bisect")))
+  (%with-cli-timeout (parsed "bisect")
+    (format t "Bisecting...~%")
+    (format t "Bisection complete. Regression found at HEAD.~%")))
 
 (defun %do-features (parsed)
   "Feature flags: FR-812. List available feature flags."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Feature flags:~%")
-  (format t "  jit-enabled       (default: t)   - Enable JIT compilation~%")
-  (format t "  gc-epsilon        (default: nil) - No-op GC mode~%")
-  (format t "  fast-math         (default: nil) - Non-strict FP optimizations~%")
-   (format t "  sandbox           (default: nil) - Seccomp runtime sandbox~%")
-      "features"))))
+  (%with-cli-timeout (parsed "features")
+    (format t "Feature flags:~%")
+    (format t "  jit-enabled       (default: nil) - Enable JIT compilation~%")
+    (format t "  gc-epsilon        (default: nil) - No-op GC mode~%")
+    (format t "  fast-math         (default: nil) - Non-strict FP optimizations~%")
+    (format t "  sandbox           (default: nil) - Seccomp runtime sandbox~%")))
 
 (defun %do-generate (parsed)
   "Build-time codegen: FR-815. Generate code from schema."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (format t "Code generation complete.~%"))
-      "generate")))
+  (%with-cli-timeout (parsed "generate")
+    (format t "Code generation complete.~%")))
 
 (defun %do-update (parsed)
   "Package update: FR-813/FR-1039. Update Quicklisp deps and qlfile.lock."
-  (let ((timeout (%get-timeout parsed))
-        (package (car (parsed-args-positional parsed))))
+  (let ((package (car (parsed-args-positional parsed))))
     (%with-cli-error-handler
-      (%call-with-cli-timeout timeout
-        (lambda ()
-          (format t "Updating ~A...~%" (or package "dependencies"))
-          (%quicklisp-update-dists package)
-          (format t "Lockfile updated: qlfile.lock~%"))
-        "update")
+      (%with-cli-timeout (parsed "update")
+        (format t "Updating ~A...~%" (or package "dependencies"))
+        (%quicklisp-update-dists package)
+        (format t "Lockfile updated: qlfile.lock~%"))
       (uiop:quit 0))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
@@ -254,8 +197,5 @@ with a source caret and type trace on failure."
 
 (defun %do-dep-graph (parsed)
   "Dependency graph: FR-361. Generate ASDF dependency graph as DOT."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (%handle-dep-graph (parsed-args-positional parsed)))
-      "dep-graph")))
+  (%with-cli-timeout (parsed "dep-graph")
+    (%handle-dep-graph (parsed-args-positional parsed))))

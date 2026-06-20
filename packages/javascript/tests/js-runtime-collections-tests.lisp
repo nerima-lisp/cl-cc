@@ -6,7 +6,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list, %jr-set)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Set built-ins ───────────────────────────────────────────────────────────
 
@@ -201,14 +201,31 @@
                    (lambda (x &rest _) (declare (ignore _)) (%jr-arr x (* x 10)))))))
     (assert-equal '(1 10 2 20 3 30) (%jr-list result))))
 
+(deftest js-rt-iterator-concat
+  "Iterator.concat lazily chains normalized iterables in order."
+  (let* ((result (cl-cc/javascript::%js-iterator-to-array
+                  (cl-cc/javascript::%js-iterator-concat
+                   (%jr-arr 1 2)
+                   "ab"
+                   (%jr-set 9))))
+         (values (%jr-list result)))
+    (assert-equal '(1 2 "a" "b" 9) values)))
+
+(deftest js-rt-iterator-concat-empty
+  "Iterator.concat with no sources is already done."
+  (multiple-value-bind (value done)
+      (cl-cc/javascript::%js-iter-next (cl-cc/javascript::%js-iterator-concat))
+    (declare (ignore value))
+    (assert-true done)))
+
 (deftest js-rt-iterator-zip
   "Iterator.zip combines iterables row-wise."
   (let* ((rows (cl-cc/javascript::%js-iterator-to-array
                 (cl-cc/javascript::%js-iterator-zip
                  (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2 3))
-                          (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10 20)))))))
+                           (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10 20))))))
          (lists (mapcar #'%jr-list (%jr-list rows))))
-    (assert-equal '((1 10) (2 20)) lists))
+    (assert-equal '((1 10) (2 20)) lists)))
 
 (deftest js-rt-iterator-zip-longest
   "Iterator.zip longest mode continues until every iterator is exhausted."
@@ -222,6 +239,44 @@
          (lists (mapcar #'%jr-list (%jr-list rows))))
     (assert-equal '((1 10) (2 20) (3 9)) lists)))
 
+(deftest js-rt-iterator-zip-longest-default-padding
+  "Iterator.zip longest mode fills missing positions with undefined by default."
+  (let* ((rows (cl-cc/javascript::%js-iterator-to-array
+                (cl-cc/javascript::%js-iterator-zip
+                 (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2))
+                          (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10)))
+                 (cl-cc/javascript::%js-make-object "mode" "longest"))))
+         (first (aref rows 0))
+         (second (aref rows 1)))
+    (assert-= 1 (aref first 0))
+    (assert-= 10 (aref first 1))
+    (assert-= 2 (aref second 0))
+    (assert-eq cl-cc/javascript::+js-undefined+ (aref second 1))))
+
+(deftest js-rt-iterator-zip-invalid-options
+  "Iterator.zip rejects non-object options."
+  (assert-signals cl-cc/javascript:js-exception
+    (cl-cc/javascript::%js-iterator-zip
+     (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1)))
+     42.0d0)))
+
+(deftest js-rt-iterator-zip-invalid-mode
+  "Iterator.zip rejects unsupported modes."
+  (assert-signals cl-cc/javascript:js-exception
+    (cl-cc/javascript::%js-iterator-zip
+     (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1)))
+     (cl-cc/javascript::%js-make-object "mode" "middle"))))
+
+(deftest js-rt-iterator-zip-primitive-padding
+  "Iterator.zip rejects primitive padding values in longest mode."
+  (assert-signals cl-cc/javascript:js-exception
+    (cl-cc/javascript::%js-iterator-zip
+     (%jr-arr (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2))
+              (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10)))
+     (cl-cc/javascript::%js-make-object
+      "mode" "longest"
+      "padding" 1.0d0))))
+
 (deftest js-rt-iterator-zip-strict-signals
   "Iterator.zip strict mode rejects uneven iterables."
   (let ((iter (cl-cc/javascript::%js-iterator-zip
@@ -231,7 +286,7 @@
     (multiple-value-bind (row done) (cl-cc/javascript::%js-iter-next iter)
       (declare (ignore row))
       (assert-false done))
-    (assert-signals error
+    (assert-signals cl-cc/javascript:js-exception
       (cl-cc/javascript::%js-iter-next iter))))
 
 (deftest js-rt-iterator-zip-keyed
@@ -247,19 +302,44 @@
                   "padding" (cl-cc/javascript::%js-make-object "left" 0 "right" 9)))))
          (first (aref rows 0))
          (second (aref rows 1)))
-    (assert-eql +js-null+ (cl-cc/javascript::%js-object-get-prototype-of first))
+    (assert-eql cl-cc/javascript::+js-null+ (cl-cc/javascript::%js-object-get-prototype-of first))
     (assert-= 1 (gethash "left" first))
     (assert-= 10 (gethash "right" first))
     (assert-= 2 (gethash "left" second))
     (assert-= 9 (gethash "right" second))))
 
+(deftest js-rt-iterator-zip-keyed-longest-missing-padding
+  "Iterator.zipKeyed longest mode treats missing padding keys as undefined."
+  (let* ((sources (cl-cc/javascript::%js-make-object
+                   "left" (cl-cc/javascript::%js-vec-to-iter (%jr-arr 1 2))
+                   "right" (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10))))
+         (rows (cl-cc/javascript::%js-iterator-to-array
+                (cl-cc/javascript::%js-iterator-zip-keyed
+                 sources
+                 (cl-cc/javascript::%js-make-object
+                  "mode" "longest"
+                  "padding" (cl-cc/javascript::%js-make-object "left" 0)))))
+         (first (aref rows 0))
+         (second (aref rows 1)))
+    (assert-= 1 (gethash "left" first))
+    (assert-= 10 (gethash "right" first))
+    (assert-= 2 (gethash "left" second))
+    (assert-eq cl-cc/javascript::+js-undefined+ (gethash "right" second))))
+
 (deftest js-rt-iterator-zip-keyed-undefined-source
   "Iterator.zipKeyed rejects present properties whose value is undefined."
-  (assert-signals error
+  (assert-signals cl-cc/javascript:js-exception
     (cl-cc/javascript::%js-iterator-zip-keyed
      (cl-cc/javascript::%js-make-object
-      "left" +js-undefined+
+      "left" cl-cc/javascript::+js-undefined+
       "right" (cl-cc/javascript::%js-vec-to-iter (%jr-arr 10)))
+     (cl-cc/javascript::%js-make-object "mode" "shortest"))))
+
+(deftest js-rt-iterator-zip-keyed-non-object
+  "Iterator.zipKeyed rejects non-object sources."
+  (assert-signals cl-cc/javascript:js-exception
+    (cl-cc/javascript::%js-iterator-zip-keyed
+     42.0d0
      (cl-cc/javascript::%js-make-object "mode" "shortest"))))
 
 ;;; ─── Promise built-ins ───────────────────────────────────────────────────────
@@ -404,12 +484,26 @@
     (assert-= 1 calls)
     (assert-= 10 (cl-cc/javascript::%js-map-get m "b"))))
 
+(deftest js-rt-map-get-or-insert-computed-reentrant
+  "Map.getOrInsertComputed re-reads the key if the callback inserts it."
+  (let ((m (cl-cc/javascript::%js-make-map))
+        (calls 0))
+    (assert-= 20
+              (cl-cc/javascript::%js-map-get-or-insert-computed
+               m "a"
+               (lambda (k)
+                 (incf calls)
+                 (cl-cc/javascript::%js-map-set m k 20)
+                 99)))
+    (assert-= 1 calls)
+    (assert-= 20 (cl-cc/javascript::%js-map-get m "a"))))
+
 (deftest js-rt-map-group-by
   "Map.groupBy groups iterable items by key-fn result."
   (let* ((arr (%jr-arr 1 2 3 4 6))
          (result (cl-cc/javascript::%js-map-group-by
                   arr
-                  (lambda (x) (if (evenp x) "even" "odd"))))
+                  (lambda (x) (svref #("even" "odd") (mod x 2)))))
          (evens (cl-cc/javascript::%js-map-get result "even"))
          (odds  (cl-cc/javascript::%js-map-get result "odd")))
     (assert-= 3 (length evens))
@@ -609,6 +703,21 @@ plain number via truncate — the key invariant behind define-js-bigint-binop."
                    10)))
       (assert-= 1 calls)
       (assert-= 10 (cl-cc/javascript::%js-weak-map-get wm other-key)))))
+
+(deftest js-rt-weak-map-get-or-insert-computed-reentrant
+  "WeakMap.getOrInsertComputed re-reads the key if the callback inserts it."
+  (let* ((wm  (cl-cc/javascript::%js-make-weak-map))
+         (key (cl-cc/javascript::%js-make-object "x" 1))
+         (calls 0))
+    (assert-= 20
+              (cl-cc/javascript::%js-weak-map-get-or-insert-computed
+               wm key
+               (lambda (k)
+                 (incf calls)
+                 (cl-cc/javascript::%js-weak-map-set wm k 20)
+                 99)))
+    (assert-= 1 calls)
+    (assert-= 20 (cl-cc/javascript::%js-weak-map-get wm key))))
 
 ;;; ─── WeakSet ─────────────────────────────────────────────────────────────────
 

@@ -9,10 +9,18 @@
     (compile-ast (make-call 'string=
                             (make-quoted "hello")
                             (make-quoted "yellow")
-                            (make-var :start1) (make-int 1)
-                            (make-var :end1)   (make-int 4)
-                            (make-var :start2) (make-int 1)
-                            (make-var :end2)   (make-int 4))
+                            (make-ast-the :type 'keyword
+                                          :value (make-var :start1))
+                            (make-int 1)
+                            (make-ast-the :type 'keyword
+                                          :value (make-var :end1))
+                            (make-int 4)
+                            (make-ast-the :type 'keyword
+                                          :value (make-var :start2))
+                            (make-int 1)
+                            (make-ast-the :type 'keyword
+                                          :value (make-var :end2))
+                            (make-int 4))
                  ctx)
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-subseq))
     (assert-true (codegen-find-inst ctx 'cl-cc::vm-string=))))
@@ -22,8 +30,12 @@
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'string-upcase
                             (make-quoted "hello")
-                            (make-var :start) (make-int 1)
-                            (make-var :end)   (make-int 4))
+                            (make-ast-the :type 'keyword
+                                          :value (make-var :start))
+                            (make-int 1)
+                            (make-ast-the :type 'keyword
+                                          :value (make-var :end))
+                            (make-int 4))
                  ctx)
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-subseq))
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate))

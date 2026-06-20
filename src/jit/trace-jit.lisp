@@ -5,7 +5,7 @@
 (in-package :cl-cc/jit)
 
 ;;; ──── Configuration ────
-(defvar *trace-jit-enabled* t
+(defvar *trace-jit-enabled* nil
   "Master switch for trace JIT compilation.")
 
 (defvar *trace-threshold* 50
@@ -65,10 +65,13 @@ If the guard fails at runtime, execution side-exits to the interpreter."
   "Compile a recorded TRACE into native code.
 The trace is a linear sequence (no control flow) with guards.
 Returns the entry address of the compiled trace."
+  (unless *trace-jit-enabled*
+    (return-from compile-trace nil))
+  (ensure-jit-native-code-enabled "compile a trace")
   (let ((instructions (getf trace :instructions))
         (guards (getf trace :guards))
         (entry-pc (getf trace :entry-pc)))
-    (declare (ignore entry-pc))
+    (declare (ignore entry-pc guards))
     ;; In production:
     ;; 1. Allocate executable memory for the trace
     ;; 2. Emit guard checking code: check each guard, side-exit if failed
@@ -121,10 +124,11 @@ Each side exit spawns a child trace."
 ;;; ──── Trace memory allocation ────
 (defun allocate-trace-memory (size)
   "Allocate SIZE bytes of executable memory for a compiled trace."
+  (ensure-jit-native-code-enabled "allocate trace memory")
   (sb-posix:mmap nil (max size 4096)
                  (logior sb-posix:prot-read
                          sb-posix:prot-write
                          sb-posix:prot-exec)
                  (logior sb-posix:map-private
-                         sb-posix:map-anonymous)
-                 -1 0)
+                         (sb-posix-map-anonymous-flag))
+                 -1 0))

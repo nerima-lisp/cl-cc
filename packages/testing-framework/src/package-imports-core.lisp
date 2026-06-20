@@ -79,7 +79,6 @@
           cl-cc:vm-closure-object
           cl-cc:vm-closure-entry-label
           cl-cc:vm-closure-params
-          cl-cc:vm-closure-captured-values
           ;; VM Instruction classes
           cl-cc:vm-instruction
           cl-cc:vm-const

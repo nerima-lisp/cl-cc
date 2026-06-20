@@ -2,15 +2,11 @@
 
 ;;; FR-503 — Whole-program CLOS devirtualization.
 ;;;
-;;; The older opt-pass-devirtualize already handles local direct-call discovery
+;;; The local `%opt-pass-devirtualize-local` pass handles direct-call discovery
 ;;; and sealed+satiated generic calls.  This file extends it with a small
 ;;; whole-program Class Hierarchy Analysis (CHA) used after LTO has merged all
 ;;; module IR.  It refuses open-world class hierarchies and only rewrites when a
 ;;; sealed concrete receiver has a single primary method target.
-
-(defparameter *opt-legacy-devirtualize-function*
-  (and (fboundp 'opt-pass-devirtualize) (symbol-function 'opt-pass-devirtualize))
-  "The pre-FR-503 devirtualization pass captured before this file overrides it.")
 
 (defstruct opt-cha
   classes
@@ -123,8 +119,6 @@
             (push inst result))))))
 
 (defun opt-pass-devirtualize (instructions)
-  "Run whole-program CHA devirtualization, then the legacy local devirt pass."
+  "Run whole-program CHA devirtualization, then the local devirt pass."
   (let ((after-cha (%opt-cha-pass instructions)))
-    (if *opt-legacy-devirtualize-function*
-        (funcall *opt-legacy-devirtualize-function* after-cha)
-        after-cha)))
+    (%opt-pass-devirtualize-local after-cha)))

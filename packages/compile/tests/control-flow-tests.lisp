@@ -62,6 +62,12 @@
   (expected source)
   (assert-= expected (run-string source)))
 
+(deftest if-condition-clears-tail-position-before-compiling
+  "Compiling an IF condition must not evaluate the condition register as a thunk."
+  (let ((source "(IF 65 48 (LET ((V0 -83)) V0))"))
+    (assert-true (is-compile-string source :target :vm))
+    (assert-true (is-compile-string source :target :x86_64))))
+
 ;; ----------------------------------------------------------------------------
 ;; block/return-from tests
 ;; ----------------------------------------------------------------------------

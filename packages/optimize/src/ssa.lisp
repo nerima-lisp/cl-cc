@@ -58,10 +58,12 @@
 (defstruct (ssa-phi (:conc-name phi-))
   "A phi-function inserted at the entry of a basic block.
    DST is the SSA-versioned destination register.
-   ARGS is an alist of (predecessor-block . versioned-source-register)."
+   ARGS is an alist of (predecessor-block . versioned-source-register).
+   KIND distinguishes normal Cytron phis from LCSSA loop-boundary phis."
   (dst  nil)                           ; versioned SSA register keyword
   (args nil :type list)                ; ((bb . versioned-reg) ...)
-  (reg  nil))                          ; original (pre-SSA) register name
+  (reg  nil)                           ; original (pre-SSA) register name
+  (kind :normal))                      ; :normal or :lcssa
 
 (defun %ssa-block-use-def (block)
   "Return two lists: registers used before local definition, and definitions."
@@ -155,39 +157,48 @@
 
     phi-map))
 
+(defun %ssa-ensure-phi (phi-map block reg &optional (kind :normal))
+  (unless (find-if (lambda (p) (eq (phi-reg p) reg))
+                   (gethash block phi-map))
+    (push (make-ssa-phi :reg reg :kind kind) (gethash block phi-map))))
+
+(defun %ssa-loop-defined-regs (loop-blocks)
+  (let ((defined (make-hash-table :test #'eq)))
+    (dolist (b loop-blocks defined)
+      (dolist (inst (bb-instructions b))
+        (let ((dst (ignore-errors (vm-dst inst))))
+          (when dst
+            (setf (gethash dst defined) t)))))))
+
+(defun %ssa-loop-exit-blocks (loop-blocks)
+  (let ((members (make-hash-table :test #'eq))
+        (exits nil))
+    (dolist (b loop-blocks)
+      (setf (gethash b members) t))
+    (dolist (b loop-blocks)
+      (dolist (s (bb-successors b))
+        (unless (gethash s members)
+          (pushnew s exits :test #'eq))))
+    (nreverse exits)))
+
 (defun ssa-place-lcssa-phis (cfg phi-map)
-  "Insert conservative LCSSA phi stubs at loop exits.
+  "Insert LCSSA phi stubs at natural-loop exits.
 
-Subset policy:
-- compute loop depths once
-- if a block outside loops reads a register that is defined in any loop block,
-  insert a phi stub for that register at that block unless one already exists.
-
-This is conservative and may insert extra phis, which are later cleaned by
-trivial-phi elimination." 
-  (cfg-compute-loop-depths cfg)
-  (let ((loop-defined-regs (make-hash-table :test #'eq)))
-    (loop for b across (cfg-blocks cfg)
-          do (when (> (bb-loop-depth b) 0)
-               (dolist (inst (bb-instructions b))
-                 (let ((dst (ignore-errors (vm-dst inst))))
-                   (when dst
-                     (setf (gethash dst loop-defined-regs) t))))))
-    (loop for b across (cfg-blocks cfg)
-          do (when (= (bb-loop-depth b) 0)
-               (let ((reads (make-hash-table :test #'eq)))
-                 (dolist (inst (bb-instructions b))
-                   (dolist (r (opt-inst-read-regs inst))
-                     (when r
-                       (setf (gethash r reads) t))))
-                 (maphash
-                  (lambda (reg _)
-                    (declare (ignore _))
-                    (when (and (gethash reg loop-defined-regs)
-                               (not (find-if (lambda (p) (eq (phi-reg p) reg))
-                                             (gethash b phi-map))))
-                      (push (make-ssa-phi :reg reg) (gethash b phi-map))))
-                  reads))))
+For each backedge tail -> header, place a phi for every loop-defined register
+that is live-in at an exit block. This keeps loop-carried values represented at
+the loop boundary instead of delaying the phi to a later outside-loop use."
+  (let ((live-in (%ssa-compute-live-in cfg)))
+    (loop for tail across (cfg-blocks cfg)
+          do (dolist (header (bb-successors tail))
+               (when (cfg-dominates-p header tail)
+                 (let* ((loop-blocks (cfg-collect-natural-loop header tail))
+                        (defined-regs (%ssa-loop-defined-regs loop-blocks))
+                        (exit-blocks (%ssa-loop-exit-blocks loop-blocks)))
+                   (dolist (exit exit-blocks)
+                     (let ((exit-live-in (gethash exit live-in)))
+                       (loop for reg being the hash-keys of defined-regs
+                             do (when (member reg exit-live-in :test #'eq)
+                                  (%ssa-ensure-phi phi-map exit reg :lcssa)))))))))
     phi-map))
 
 ;;; ─── SSA Renaming (DFS over dominator tree) ──────────────────────────────

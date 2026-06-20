@@ -28,6 +28,12 @@
     (("TYPE-LAMBDA")     . ,#'make-type-lambda))
   "Maps lists of equivalent name strings to (var body) → type-node constructors.")
 
+(defun %normalize-refinement-predicate (predicate)
+  "Normalize symbol predicate syntax to the lambda-form contract used downstream."
+  (if (symbolp predicate)
+      `(lambda (value) (,predicate value))
+      predicate))
+
 (defun %binding-quantifier-ctor (hn)
   "Return the constructor for quantifier name HN (case-sensitive), or nil."
   (cdr (assoc hn *binding-quantifier-table*
@@ -231,10 +237,10 @@ Supported bound operators are <:/extends/subtype-of and >:/supertype-of."
 
       ;; ─── Refinement: (Refine T pred) ─────────────────────────────────
       ((and hn (string= hn "REFINE"))
-       (unless (= (length args) 2)
-         (type-parse-error "Refine requires (Refine base-type predicate)"))
-       (make-type-refinement :base (parse-type-specifier (first args))
-                             :predicate (second args)))
+      (unless (= (length args) 2)
+        (type-parse-error "Refine requires (Refine base-type predicate)"))
+      (make-type-refinement :base (parse-type-specifier (first args))
+                            :predicate (%normalize-refinement-predicate (second args))))
 
       ;; ─── Graded modal: (! q T) or (!1 T) or (!ω T) / (!Ω T) ────────
       ;; Match any symbol starting with "!" — handles Unicode-uppercased !ω → !Ω

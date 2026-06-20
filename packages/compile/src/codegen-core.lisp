@@ -29,6 +29,19 @@
                  pool)
       copy)))
 
+(defun %call-with-no-tail-position (ctx thunk)
+  "Call THUNK with CTX tail-position cleared, then restore the previous value."
+  (let ((old-tail (ctx-tail-position ctx)))
+    (unwind-protect
+         (progn
+           (setf (ctx-tail-position ctx) nil)
+           (funcall thunk))
+      (setf (ctx-tail-position ctx) old-tail))))
+
+(defmacro %with-no-tail-position (ctx &body body)
+  "Clear tail-position tracking while evaluating BODY."
+  `(%call-with-no-tail-position ,ctx (lambda () ,@body)))
+
 (defun %poolable-literal-p (value)
   "Return T when VALUE is a literal kind safe to deduplicate in the constant pool."
   (or (integerp value)
@@ -164,6 +177,8 @@ Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table.
 
 (defun %float-literal-node-p (node)
   "Return T if NODE is a quoted float literal."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node)))
   (and (typep node 'ast-quote) (floatp (ast-quote-value node))))
 
 (defun %numeric-binop-constructor (op lhs rhs ctx)

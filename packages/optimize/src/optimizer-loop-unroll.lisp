@@ -9,9 +9,12 @@
   "Maximum compile-time trip count eligible for full FR-601 unrolling.")
 
 (defun %loop-unroll-copy-inst (inst)
-  "Return a structural copy of INST when the VM sexp codec supports it."
+  "Return a structural copy of INST when the VM sexp codec preserves its class."
   (handler-case
-      (sexp->instruction (instruction->sexp inst))
+      (let ((copy (sexp->instruction (instruction->sexp inst))))
+        (if (eq (type-of copy) (type-of inst))
+            copy
+            inst))
     (error () inst)))
 
 (defun %loop-unroll-safe-body-p (body)

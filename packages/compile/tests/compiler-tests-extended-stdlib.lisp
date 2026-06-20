@@ -118,8 +118,8 @@
 
 (deftest-each compile-nstring-case-bounds
   "nstring-upcase, nstring-downcase, and nstring-capitalize return the mutated string."
-  :cases (("upcase"      "HELLO" "(nstring-upcase \"hello\" :start 1 :end 4)")
-          ("downcase"    "hello" "(nstring-downcase \"HELLO\" :start 1 :end 4)")
+  :cases (("upcase"      "hELLo" "(nstring-upcase \"hello\" :start 1 :end 4)")
+          ("downcase"    "HellO" "(nstring-downcase \"HELLO\" :start 1 :end 4)")
           ("capitalize"  "hEllo" "(nstring-capitalize \"hELLo\" :start 1 :end 4)"))
   (expected form)
   (assert-string= expected (run-string form :stdlib t)))

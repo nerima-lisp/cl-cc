@@ -17,10 +17,27 @@
     (assert-eq 'args (third result))))
 
 (deftest expand-apply-named-fn-variadic-plus
-  "expand-apply-named-fn for + generates a fold loop (not (apply #'+ ...))."
-  (let* ((result (cl-cc/expand::expand-apply-named-fn '+ 'args))
-         (str    (format nil "~S" result)))
-    (assert-false (search "(APPLY" str))))
+  "expand-apply-named-fn for + keeps APPLY visible to codegen."
+  (let ((result (cl-cc/expand::expand-apply-named-fn '+ 'args)))
+    (assert-eq 'apply (car result))
+    (assert-eq 'function (caadr result))
+    (assert-eq '+ (cadadr result))
+    (assert-eq 'args (third result))))
+
+(deftest expand-apply-preserves-function-designator
+  "compiler-macroexpand-all preserves APPLY function designators instead of lambda-wrapping them."
+  (let ((result (cl-cc/expand:compiler-macroexpand-all '(apply #'+ '(1 2 3)))))
+    (assert-eq 'apply (car result))
+    (assert-eq 'function (caadr result))
+    (assert-eq '+ (cadadr result))
+    (assert-equal '(quote (1 2 3)) (third result))))
+
+(deftest expand-apply-expands-dynamic-function-operand
+  "compiler-macroexpand-all still expands dynamic APPLY function operands."
+  (let ((result (cl-cc/expand:compiler-macroexpand-all
+                 '(apply (funcall 'identity #'+) '(1 2)))))
+    (assert-eq 'apply (car result))
+    (assert-eq 'identity (caadr result))))
 
 (deftest-each expander-function-builtin-wraps-lambda
   "#'builtin always expands to a lambda; arity matches the builtin type."

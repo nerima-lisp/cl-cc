@@ -3,7 +3,10 @@
 ;;;; Token format: (:type :T-XXX :value val)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(defsuite cl-cc-javascript-suite
+  :description "JavaScript frontend tests"
+  :parent cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -156,11 +159,51 @@
     (assert-= 1 (length types))
     (assert-eq :T-EOF (first types))))
 
+(deftest lex-line-comment-newline-consumed
+  "// line comment consumes the terminating newline before the next token."
+  (let ((tokens (%js-lex (format nil "// comment~%foo"))))
+    (assert-eq :T-IDENT (getf (first tokens) :type))
+    (assert-string= "foo" (getf (first tokens) :value))))
+
 (deftest lex-block-comment-skipped
   "/* block comment */ is skipped; the identifier after it is the first real token."
   (let ((tokens (%js-lex "/* skip me */ foo")))
     (assert-eq :T-IDENT (getf (first tokens) :type))
     (assert-string= "foo" (getf (first tokens) :value))))
+
+(deftest lex-block-comment-unterminated
+  "An unterminated block comment signals an error."
+  (assert-signals error
+    (%js-lex "/* unterminated")))
+
+(deftest lex-hashbang-skipped-at-start
+  "#! hashbang at the beginning is skipped as a line comment."
+  (let ((tokens (%js-lex (format nil "#!/usr/bin/env js~%foo"))))
+    (assert-eq :T-IDENT (getf (first tokens) :type))
+    (assert-string= "foo" (getf (first tokens) :value))))
+
+(deftest-each lex-string-escape-branches
+  "String escape handling covers unicode, hex, standard escapes, and normal characters."
+  :cases (("standard" "\\n\\r\\t\\\\\\'\\\"\\0z'"
+           (coerce (list #\Newline #\Return #\Tab #\\ #\' #\" #\Null #\z) 'string))
+          ("unicode-short" "\\u0041'" "A")
+          ("unicode-braced" "\\u{263A}'" (string (code-char #x263A)))
+          ("hex" "\\x41'" "A")
+          ("normal" "abc'" "abc"))
+  (src expected)
+  (multiple-value-bind (value new-pos)
+      (cl-cc/javascript::lex-js-string src 0 #\')
+    (assert-string= expected value)
+    (assert-= (length src) new-pos)))
+
+(deftest-each lex-string-error-branches
+  "String lexing rejects trailing escapes, newline-containing strings, and unterminated strings."
+  :cases (("trailing-backslash" "\\")
+          ("newline" (format nil "line1~%line2'"))
+          ("unterminated" "abc"))
+  (src)
+  (assert-signals error
+    (cl-cc/javascript::lex-js-string src 0 #\')))
 
 ;;; ─── Multi-token sequence ─────────────────────────────────────────────────────
 
@@ -189,3 +232,81 @@
   (let ((types (%js-lex-types "a / b")))
     (assert-true  (member :T-OP    types))
     (assert-false (member :T-REGEX types))))
+
+;;; ─── Template literals ───────────────────────────────────────────────────────
+
+(deftest lex-template-simple
+  "A plain template literal lexes to :T-TEMPLATE-PARTS with a single cooked part."
+  (let* ((tok (first (%js-lex "`hello`")))
+         (parts (getf tok :value)))
+    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
+    (assert-equal '("hello") parts)))
+
+(deftest lex-template-escaped-cook
+  "Template escape sequences are cooked before being stored in the template part."
+  (let* ((tok (first (%js-lex "`a\\n\\r\\t\\\\\\`\\$\\0z`")))
+         (parts (getf tok :value))
+         (expected (coerce (list #\a #\Newline #\Return #\Tab #\\ #\` #\$ #\Null #\z)
+                           'string)))
+    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
+    (assert-equal (list expected) parts)))
+
+(deftest lex-template-interpolated
+  "An interpolated template preserves literal text and an inner token list."
+  (let* ((tok (first (%js-lex "`hi ${name + 1}!`")))
+         (parts (getf tok :value))
+         (expr-part (second parts))
+         (inner (second expr-part))
+         (inner-types (mapcar (lambda (tk) (getf tk :type))
+                              inner)))
+    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
+    (assert-string= "hi " (first parts))
+    (assert-true (and (consp expr-part)
+                      (eq (first expr-part) :template-expr)))
+    (assert-string= "!" (third parts))
+    (assert-equal '(:T-IDENT :T-OP :T-NUMBER) inner-types)))
+
+(deftest lex-template-nested-interpolation
+  "Template interpolation scanning skips strings and nested template literals."
+  (let* ((tok (first (%js-lex "`a ${\"{\" + `inner ${x}` + \"}\"} b`")))
+         (parts (getf tok :value))
+         (inner (second (second parts)))
+         (inner-types (mapcar (lambda (tk) (getf tk :type)) inner)))
+    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
+    (assert-equal "a " (first parts))
+    (assert-equal " b" (third parts))
+    (assert-true (member :T-TEMPLATE-PARTS inner-types))))
+
+(deftest-each lex-template-escape-processor
+  "Internal template escape handling covers cooked, fallback, and error branches."
+  :cases (("newline" "n" 0 #\Newline 1)
+          ("return" "r" 0 #\Return 1)
+          ("tab" "t" 0 #\Tab 1)
+          ("backslash" "\\" 0 #\\ 1)
+          ("backtick" "`" 0 #\` 1)
+          ("dollar" "$" 0 #\$ 1)
+          ("null" "0" 0 #\Null 1)
+          ("unicode-short" "u0041" 0 #\A 5)
+          ("unicode-braced" "u{1F600}" 0 (code-char #x1F600) 8)
+          ("hex" "x41" 0 #\A 3)
+          ("fallback" "a" 0 #\a 1))
+  (src pos expected-char expected-pos)
+  (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (assert-eq expected-char ch)
+    (assert-= expected-pos new-pos)))
+
+(deftest-each lex-template-escape-errors
+  "Malformed template escapes signal errors."
+  :cases (("trailing-backslash" "")
+          ("incomplete-unicode" "u")
+          ("empty-braced-unicode" "u{}")
+          ("unterminated-braced-unicode" "u{1F4")
+          ("missing-brace" "u{1F4x")
+          ("out-of-range" "u{110000}")
+          ("short-hex" "x4")
+          ("bad-unicode-digit" "u12x4")
+          ("bad-hex-digit" "xg1"))
+  (src)
+  (assert-signals error
+    (cl-cc/javascript::js-lex-template-escape src 0)))

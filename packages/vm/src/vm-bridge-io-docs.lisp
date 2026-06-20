@@ -324,6 +324,14 @@
      (lambda (&rest args)
        (apply (%vm-runtime-callable runtime-name) args)))))
 
+(let* ((package (find-package :cl-cc/php))
+       (symbol (and package (find-symbol "%PHP-CURRENT-CLOSURE" package))))
+  (when symbol
+    (vm-register-host-bridge
+     symbol
+     (lambda (&rest args)
+       (apply (%vm-runtime-callable "PHP-CURRENT-CLOSURE") args)))))
+
 ;; Cross-package cl-cc symbols: resolve via find-symbol so we use the canonical
 ;; symbol from each defining package (avoids interning cl-cc/vm:: duplicates).
 ;;

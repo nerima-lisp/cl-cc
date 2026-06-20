@@ -256,7 +256,7 @@ Supports :start, :end, and :index keyword arguments."
   (let ((requested-types (%package-iterator-requested-types symbol-types))
         (entries nil))
     (dolist (package (%package-iterator-designator-list packages))
-      (let* ((pkg (rt-find-package package))
+      (let* ((pkg (cl-cc/runtime::%rt-package-metadata package))
              (symbols (and pkg (gethash :symbols pkg)))
              (exports (and pkg (gethash :exports pkg)))
              (inherited (and pkg (gethash :inherited pkg))))

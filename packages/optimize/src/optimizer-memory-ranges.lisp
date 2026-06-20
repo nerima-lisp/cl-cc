@@ -653,9 +653,9 @@ Returns VALUE and a second value indicating whether anything changed."
          (when car-changed-p (setf (car value) new-car))
          (when cdr-changed-p (setf (cdr value) new-cdr))
          (values value (or car-changed-p cdr-changed-p)))))
-    ((opt-register-keyword-p value)
-     (let ((replacement (gethash value copies)))
-       (if replacement
+    ((keywordp value)
+     (multiple-value-bind (replacement present-p) (gethash value copies)
+       (if present-p
            (values replacement (not (eq replacement value)))
            (values value nil))))
     (t (values value nil))))
@@ -722,7 +722,9 @@ Single destination slots are preserved to match the historical sexp rewrite."
   "Return INST with all source registers replaced by their canonical copies.
    Uses registered direct slot metadata when available to avoid sexp allocation.
    Falls back to the historical sexp roundtrip for unregistered instructions."
-  (let ((c (lambda (x) (if (opt-register-keyword-p x) (or (gethash x copies) x) x))))
+  (let ((c (lambda (x)
+             (multiple-value-bind (replacement present-p) (gethash x copies)
+               (if present-p replacement x)))))
     (handler-case
         (let ((slots (gethash (type-of inst) *opt-register-slot-table*)))
           (if slots

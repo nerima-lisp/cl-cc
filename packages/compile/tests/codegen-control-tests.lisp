@@ -280,6 +280,27 @@
     (compile-ast (cl-cc:make-ast-the :type 'integer :value (make-ast-int :value 42)) ctx)
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-typep))))
 
+(deftest codegen-the-nested-transparent-value-emits-no-extra-typep
+  "Nested (the integer (the integer x)) does not emit redundant vm-typep checks when x is already proven integer."
+  (let* ((ctx (make-codegen-ctx))
+         (reg :R1)
+         (env (cl-cc/type:type-env-extend 'x
+                                          (cl-cc/type:type-to-scheme
+                                           (cl-cc/type:parse-type-specifier 'integer))
+                                          (cl-cc/type:type-env-empty))))
+    (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x reg))
+          (cl-cc/compile:ctx-type-env ctx) env)
+    (compile-ast (make-ast-the
+                  :type 'integer
+                  :value (make-ast-the
+                          :type 'integer
+                          :value (make-ast-var :name 'x)))
+                 ctx)
+    (assert-= 0
+              (length (remove-if-not (lambda (inst)
+                                       (typep inst 'cl-cc/vm::vm-typep))
+                                     (codegen-instructions ctx))))))
+
 (deftest codegen-the-with-local-defun-safety-zero-skips-typep
   "A defun-local (optimize (safety 0)) suppresses runtime vm-typep assertions."
   (let ((ctx (make-codegen-ctx)))

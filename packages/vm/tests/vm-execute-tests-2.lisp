@@ -62,6 +62,34 @@
       (assert-false halted)
       (assert-= 100 (cl-cc:vm-reg-get s :R0)))))
 
+(deftest vm-execute-vm-apply-spreads-php-array-final-list
+  "vm-apply accepts a PHP array hash table as the final spread argument."
+  (let* ((s (make-test-vm))
+         (array (make-hash-table :test #'equal))
+         (order-key (let ((package (find-package :cl-cc/php)))
+                      (when package
+                        (multiple-value-bind (symbol status)
+                            (find-symbol "+PHP-ARRAY-ORDER-KEY+" package)
+                          (declare (ignore status))
+                          (when symbol (symbol-value symbol)))))))
+    (assert-true order-key)
+    (setf (gethash order-key array) '(a b c))
+    (setf (gethash 'a array) 10
+          (gethash 'b array) 20
+          (gethash 'c array) 30)
+    (cl-cc:vm-reg-set s :R1 #'+)
+    (cl-cc:vm-reg-set s :R2 1)
+    (cl-cc:vm-reg-set s :R3 2)
+    (cl-cc:vm-reg-set s :R4 array)
+    (multiple-value-bind (next-pc halted result)
+        (cl-cc/vm::execute-instruction
+         (cl-cc:make-vm-apply :dst :R0 :func :R1 :args '(:R2 :R3 :R4))
+         s 9 (make-hash-table :test #'equal))
+      (declare (ignore result))
+      (assert-= 10 next-pc)
+      (assert-false halted)
+      (assert-= 33 (cl-cc:vm-reg-get s :R0)))))
+
 (deftest vm-execute-vm-values-buffer-management
   "vm-clear-values resets values-list; vm-ensure-values initialises it from src when nil."
   (let ((s (make-test-vm)))
@@ -107,7 +135,8 @@
     (let ((closure (make-instance 'cl-cc/vm::vm-closure-object
                                   :entry-label "myfn"
                                   :params nil
-                                  :captured-values nil)))
+                                  :captured-regs #()
+                                  :captured-vals #())))
       (cl-cc:vm-reg-set s :R0 closure)
        (cl-cc/vm::execute-instruction
         (cl-cc:make-vm-register-function :name 'myfn :src :R0) s 0 (make-hash-table :test #'equal))
@@ -121,11 +150,13 @@
     (let* ((registered (make-instance 'cl-cc/vm::vm-closure-object
                                       :entry-label "fn-registered"
                                       :params nil
-                                      :captured-values nil))
+                                      :captured-regs #()
+                                      :captured-vals #()))
            (placeholder (make-instance 'cl-cc/vm::vm-closure-object
                                        :entry-label "fn-placeholder"
                                        :params nil
-                                       :captured-values nil
+                                       :captured-regs #()
+                                       :captured-vals #()
                                        :dispatch-tag '(:known-function . myfn))))
       (setf (gethash 'myfn (cl-cc/vm::vm-function-registry s)) registered)
       (assert-eq registered (cl-cc/vm::%vm-defunctionalized-dispatch s placeholder)))))
@@ -140,8 +171,8 @@
      s 0 (%labels))
     (let* ((addr (cl-cc:vm-reg-get s :R0))
            (closure (cl-cc:vm-heap-get s addr)))
-      (assert-true (vectorp (cl-cc/vm::vm-closure-captured-values closure)))
-      (assert-= 2 (length (cl-cc/vm::vm-closure-captured-values closure)))
+      (assert-true (vectorp (cl-cc/vm::vm-closure-captured-vals closure)))
+      (assert-= 2 (length (cl-cc/vm::vm-closure-captured-vals closure)))
       (cl-cc:vm-reg-set s :R3 addr)
       (cl-cc:execute-instruction
        (cl-cc:make-vm-closure-ref-idx :dst :R4 :closure :R3 :index 1)

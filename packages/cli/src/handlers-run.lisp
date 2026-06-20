@@ -9,64 +9,61 @@
 Reads the required input file, detects the source language, compiles to the VM,
 executes the program, optionally emits trace/flamegraph/PGO artifacts, and
 exits with status 0 on success."
-  (let* ((file (%required-file-arg parsed "run"))
-         (lang-flag (or (flag parsed "--lang") ""))
-         (language (%detect-language file lang-flag))
-         (stdlib (flag parsed "--stdlib"))
-          (verbose (flag parsed "--verbose"))
-          (timeout (%get-timeout parsed))
-          (opts (%parse-compile-opts parsed))
+  (%with-cli-timeout (parsed "run")
+    (let* ((file (%required-file-arg parsed "run"))
+           (lang-flag (or (flag parsed "--lang") ""))
+           (language (%detect-language file lang-flag))
+           (stdlib (flag parsed "--stdlib"))
+           (verbose (flag parsed "--verbose"))
+           (opts (%parse-compile-opts parsed))
            (core-path (flag parsed "--core"))
            (source (%read-command-source file))
            (no-stdlib (flag parsed "--no-stdlib"))
            (watch (flag parsed "--watch")))
-    (when verbose
-      (format *error-output* "; cl-cc run: ~A  lang=~A  stdlib=~A~%"
-              file language (if stdlib "yes" "no")))
-     (%with-cli-error-handler
-       (%call-with-cli-timeout timeout
-        (lambda ()
-          (when core-path
-            (cl-cc/runtime:rt-load-core core-path))
-          (%call-with-optional-output-file
-          (compile-opts-trace-json-path opts)
-          (lambda (stream)
-            (let* ((vm-state (or (%maybe-make-profiled-vm-state opts)
-                                 (cl-cc/vm:make-vm-state :output-stream *standard-output*)))
-                   (kwargs (%compile-opts-kwargs opts stream)))
-              (cond
-                ((member language '(:lisp :elisp))
-                  (let ((result (%compile-lisp-with-auto-stdlib source kwargs stdlib no-stdlib)))
-                    (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
-                    (let ((ret (%run-compiled-result result vm-state opts)))
-                      (%record-hot-reload-source file source ret)
-                      (%maybe-write-pgo-profile opts result vm-state)
-                      (if watch
-                          (%watch-file-poll file vm-state)
-                          ret))))
-                ((eq language :php)
-                  (let ((result (apply #'compile-string source :target :vm :language :php kwargs)))
-                    (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
-                    (let ((ret (%run-compiled-result result vm-state opts)))
-                      (%maybe-write-pgo-profile opts result vm-state)
-                      ret)))
-                ((eq language :javascript)
-                  (let ((result (apply #'compile-string source :target :vm :language :javascript kwargs)))
-                    (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
-                    ;; The JS prelude binds standard globals (Symbol, Infinity, the
-                    ;; error classes, …) to the values of host *js-* specials, which
-                    ;; compile to vm-get-global; seed them so they resolve at runtime.
-                    (cl-cc/pipeline:seed-js-runtime-globals vm-state)
-                    (let ((ret (%run-compiled-result result vm-state opts)))
-                      (%maybe-write-pgo-profile opts result vm-state)
-                      ret)))
-                  (t
-                   (let ((result (apply #'compile-string source :target :vm kwargs)))
-                    (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
-                    (let ((ret (%run-compiled-result result vm-state opts)))
-                      (%maybe-write-pgo-profile opts result vm-state)
-                      (if watch
-                          (%watch-file-poll file vm-state)
-                          ret)))))
-              (uiop:quit 0)))))
-       "run"))))
+      (when verbose
+        (format *error-output* "; cl-cc run: ~A  lang=~A  stdlib=~A~%"
+                file language (if stdlib "yes" "no")))
+      (%with-cli-error-handler
+        (when core-path
+          (cl-cc/runtime:rt-load-core core-path))
+        (%call-with-optional-output-file
+         (compile-opts-trace-json-path opts)
+         (lambda (stream)
+           (let* ((vm-state (or (%maybe-make-profiled-vm-state opts)
+                                (cl-cc/vm:make-vm-state :output-stream *standard-output*)))
+                  (kwargs (%compile-opts-kwargs opts stream)))
+             (cond
+               ((member language '(:lisp :elisp))
+                (let ((result (%compile-lisp-with-auto-stdlib source kwargs stdlib no-stdlib)))
+                  (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
+                  (let ((ret (%run-compiled-result result vm-state opts)))
+                    (%record-hot-reload-source file source ret)
+                    (%maybe-write-pgo-profile opts result vm-state)
+                    (if watch
+                        (%watch-file-poll file vm-state)
+                        ret))))
+               ((eq language :php)
+                (let ((result (apply #'compile-string source :target :vm :language :php kwargs)))
+                  (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
+                  (let ((ret (%run-compiled-result result vm-state opts)))
+                    (%maybe-write-pgo-profile opts result vm-state)
+                    ret)))
+               ((eq language :javascript)
+                (let ((result (apply #'compile-string source :target :vm :language :javascript kwargs)))
+                  (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
+                  ;; The JS prelude binds standard globals (Symbol, Infinity, the
+                  ;; error classes, …) to the values of host *js-* specials, which
+                  ;; compile to vm-get-global; seed them so they resolve at runtime.
+                  (cl-cc/pipeline:seed-js-runtime-globals vm-state)
+                  (let ((ret (%run-compiled-result result vm-state opts)))
+                    (%maybe-write-pgo-profile opts result vm-state)
+                    ret)))
+               (t
+                (let ((result (apply #'compile-string source :target :vm kwargs)))
+                  (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
+                  (let ((ret (%run-compiled-result result vm-state opts)))
+                    (%maybe-write-pgo-profile opts result vm-state)
+                    (if watch
+                        (%watch-file-poll file vm-state)
+                        ret))))))
+           (uiop:quit 0)))))))

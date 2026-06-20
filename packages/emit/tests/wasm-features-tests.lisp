@@ -117,8 +117,8 @@
         (let ((count 0))
           (loop for line = (read-line f nil nil)
                 while line
-                when (and (>= (length line) 7)
-                          (string= (subseq line 0 7) "#### FR-"))
+                  when (and (>= (length line) 8)
+                            (string= (subseq line 0 8) "#### FR-"))
                   do (incf count))
           (assert-equal 130 count))))))
 
@@ -170,13 +170,12 @@
           (setf fr-ids
                 (loop for line = (read-line f nil nil)
                       while line
-                      when (and (>= (length line) 7)
-                                (string= (subseq line 0 7) "#### FR-"))
-                        collect (let* ((rest (subseq line 7))
-                                       (space-pos (position #\Space rest)))
-                                  (if space-pos
-                                      (parse-integer rest :end space-pos :junk-allowed t)
-                                      0)))))
+                  when (and (>= (length line) 8)
+                            (string= (subseq line 0 8) "#### FR-"))
+                        collect (let* ((rest (subseq line 8))
+                                       (id-end (or (position-if-not #'digit-char-p rest)
+                                                   (length rest))))
+                                  (parse-integer rest :end id-end)))))
         (let ((missing nil))
           (with-open-file (ff features-file :direction :input)
             (let ((ff-content (make-string (file-length ff))))

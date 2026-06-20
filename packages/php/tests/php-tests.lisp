@@ -155,3 +155,7 @@
   (let ((ast (first (cl-cc/php:parse-php-source "<?php \"hello\";"))))
     (assert-true (ast-quote-p ast))
     (assert-equal "hello" (ast-quote-value ast))))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

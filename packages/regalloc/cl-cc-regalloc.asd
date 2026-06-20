@@ -1,9 +1,8 @@
-;;;; cl-cc-regalloc.asd — skeleton for the regalloc feature package
+;;;; cl-cc-regalloc.asd — register allocation feature package
 ;;;;
-;;;; Phase 1 of the ideal package-by-feature redesign (post 2026-05-01 plan).
-;;;; This system is intentionally empty — files will migrate here in
-;;;; subsequent phases. Currently NOT wired into root cl-cc.asd, so loading
-;;;; this system as part of `:cl-cc` is a no-op.
+;;;; This system owns the current regalloc package, defs/uses analysis, and
+;;;; allocation entry points. Keep tests aligned with these production files
+;;;; rather than duplicate source fragments in package-local test harnesses.
 
 (asdf:defsystem :cl-cc-regalloc
   :description "Register allocation passes (linear scan, spilling, live-range)"

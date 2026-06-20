@@ -47,9 +47,13 @@
 
 (defun %resolve-apply-function-register (func-node ctx)
   "Compile or resolve the function designator used by APPLY."
+  (setf func-node (%callable-designator-node func-node))
   (cond
     ((typep func-node 'ast-function)
-     (compile-ast func-node ctx))
+     (let ((name (ast-function-name func-node)))
+       (if (symbolp name)
+           (%resolve-func-sym-reg name ctx)
+           (compile-ast func-node ctx))))
     ((and (typep func-node 'ast-quote)
           (symbolp (ast-quote-value func-node)))
      (%resolve-func-sym-reg (ast-quote-value func-node) ctx))
@@ -66,6 +70,12 @@ first-class function values here."
         (is-global-function (gethash name (ctx-global-functions ctx)))
         (is-global-generic (gethash name (ctx-global-generics ctx))))
     (and entry (not is-global-function) (not is-global-generic))))
+
+(defun %callable-designator-node (node)
+  "Return NODE with transparent AST-THE wrappers stripped from function position."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node))
+        finally (return node)))
 
 (defun %compile-call-arg-registers (args ctx)
   "Compile ARGS left-to-right and return their result registers.
@@ -86,6 +96,7 @@ saves/restores it instead of clobbering it."
 
 (defun %resolve-call-function-register (func-expr ctx)
   "Resolve FUNC-EXPR to the register used for a normal call."
+  (setf func-expr (%callable-designator-node func-expr))
   (cond ((symbolp func-expr)
          (%resolve-func-sym-reg func-expr ctx))
         ((typep func-expr 'ast-var)
@@ -356,8 +367,9 @@ saves/restores it instead of clobbering it."
 
 (defun %vm-falsey-predicate-call-p (node)
   "Return T when NODE is a predicate call lowered to a VM falsey result."
+  (setf node (%callable-designator-node node))
   (and (typep node 'ast-call)
-       (let ((func (ast-call-func node)))
+       (let ((func (%callable-designator-node (ast-call-func node))))
          (and (typep func 'ast-var)
               (member (symbol-name (ast-var-name func))
                       *vm-falsey-predicate-call-names*
@@ -449,29 +461,32 @@ Each handler form must return RESULT-REG on success or NIL to continue."
   (%try-compile-noescape-array   func-sym  args result-reg      ctx)
   (%try-compile-local-tail-jump  func-sym  args result-reg tail ctx)
   (%try-compile-continuation-operator func-sym args result-reg ctx)
-  (and (member (symbol-name func-sym) '("LOAD-TIME-VALUE" "%LOAD-TIME-VALUE") :test #'string=)
+  (and func-sym
+       (member (symbol-name func-sym) '("LOAD-TIME-VALUE" "%LOAD-TIME-VALUE") :test #'string=)
        (%compile-load-time-value-call args result-reg ctx))
-  (and (member (symbol-name func-sym) '("NTH-VALUE" "%NTH-VALUE") :test #'string=)
+  (and func-sym
+       (member (symbol-name func-sym) '("NTH-VALUE" "%NTH-VALUE") :test #'string=)
        (%compile-nth-value-call args result-reg ctx))
   (%try-compile-builtin          func-sym  args result-reg      ctx))
 
 (defmethod compile-ast ((node ast-call) ctx)
   "Compile a function call via priority-ordered fast-path dispatch.
-   Each %try-compile-* returns RESULT-REG on success, NIL to fall through."
-  (%call-with-no-tail-position
-   ctx
-   (lambda ()
-     (let* ((tail      (ctx-tail-position ctx))
-            (func-expr (ast-call-func node))
-            (func-sym  (cond ((symbolp func-expr) func-expr)
-                             ((and (typep func-expr 'ast-var)
-                                   (not (%ast-var-function-value-p (ast-var-name func-expr) ctx)))
-                              (ast-var-name func-expr))
-                             (t nil)))
-            (args       (ast-call-args node))
-            (result-reg (make-register ctx)))
-       (or (%try-compile-call-fast-paths func-expr func-sym args result-reg tail ctx)
-           (%compile-normal-call          func-expr func-sym args result-reg tail ctx))))))
+Each %try-compile-* returns RESULT-REG on success, NIL to fall through."
+  (let ((tail (ctx-tail-position ctx)))
+    (%call-with-no-tail-position
+     ctx
+     (lambda ()
+       (let* ((func-expr (ast-call-func node))
+              (callable-expr (%callable-designator-node func-expr))
+              (func-sym  (cond ((symbolp callable-expr) callable-expr)
+                               ((and (typep callable-expr 'ast-var)
+                                     (not (%ast-var-function-value-p (ast-var-name callable-expr) ctx)))
+                                (ast-var-name callable-expr))
+                               (t nil)))
+              (args       (ast-call-args node))
+              (result-reg (make-register ctx)))
+         (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
+             (%compile-normal-call          callable-expr func-sym args result-reg tail ctx)))))))
 
 (defmethod compile-ast ((node ast-list) ctx)
   "Compile a runtime list-construction AST node through the normal LIST call path."

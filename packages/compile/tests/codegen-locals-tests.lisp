@@ -110,6 +110,26 @@
     (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call))
     (assert-true
      (some (lambda (inst)
+                 (and (typep inst 'cl-cc/vm::vm-jump)
+                      (search "labels_tail_fn" (cl-cc/vm::vm-label-name inst))))
+           (codegen-instructions ctx)))))
+
+(deftest codegen-labels-the-wrapped-local-call-keeps-tail-scc
+  "labels tail-SCC detection treats ast-the-wrapped local call designators transparently."
+  (let ((ctx (make-codegen-ctx)))
+    (setf (cl-cc/compile:ctx-tail-position ctx) t)
+    (compile-ast
+     (%mutual-tail-labels-fixture
+      (make-ast-call
+       :func (make-ast-the
+              :type 'function
+              :value 'evenp-local)
+       :args (list (make-ast-int :value 4))))
+     ctx)
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-closure))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call))
+    (assert-true
+     (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-jump)
                   (search "labels_tail_fn" (cl-cc/vm::vm-label-name inst))))
            (codegen-instructions ctx)))))

@@ -203,12 +203,13 @@ captured lambdas/local forms."
                 (let ((func (ast-call-func node))
                       (args (ast-call-args node)))
                   (cond
-                    ((and (typep func 'ast-var)
-                          (eq (ast-var-name func) binding-name)
+                    ((and (%ast-callable-binding-name-p func binding-name)
                           (= (length args) arity)
                           (ok-list args))
                      t)
-                    (t (and (if (typep func 'ast-node) (okp func) t)
+                    (t (and (if (typep func 'ast-node)
+                                (okp (%ast-transparent-designator-node func))
+                                t)
                             (ok-list args))))))
                (t (ok-list (ast-children node))))))
     (ok-list body-forms)))
@@ -216,6 +217,8 @@ captured lambdas/local forms."
 (defun %let-noescape-closure (name expr declarations mutated captured body-forms)
   "Return EXPR if the binding can be inlined as a noescape closure, else NIL."
   (let ((dynamic-extent-p (%let-dynamic-extent-declared-p name declarations)))
+    (loop while (typep expr 'ast-the)
+          do (setf expr (ast-the-value expr)))
     (and (typep expr 'ast-lambda)
          (null (ast-lambda-optional-params expr))
          (null (ast-lambda-rest-param expr))
@@ -232,6 +235,7 @@ captured lambdas/local forms."
 
 (defun %let-noescape-instance-slots (name expr mutated captured body-forms ctx)
   "Return compiled slot alist when the binding can skip heap allocation, else NIL."
+  (setf expr (%ast-transparent-designator-node expr))
   (if (and (typep expr 'ast-make-instance)
            (not (%member-eq-p name mutated))
            (not (%member-eq-p name captured)))
@@ -246,18 +250,17 @@ captured lambdas/local forms."
 (defun %let-noescape-array-size (name expr declarations mutated captured body-forms)
   "Return the array size integer when the binding can skip heap allocation, else NIL."
   (let ((dynamic-extent-p (%let-dynamic-extent-declared-p name declarations)))
-    (and (or (%ast-make-array-noescape-call-p expr)
-             (and (typep expr 'ast-the)
-                  (%ast-make-array-noescape-call-p (ast-the-value expr))))
-         (not (%member-eq-p name mutated))
-         (or dynamic-extent-p
-             (not (%member-eq-p name captured)))
-         (let* ((call-node (if (typep expr 'ast-the) (ast-the-value expr) expr))
-                (size (ast-int-value (first (ast-call-args call-node)))))
-             (and (if dynamic-extent-p
-                     (%let-dynamic-extent-array-direct-access-p body-forms name)
-                     (%array-binding-static-access-p body-forms name size))
-                 size)))))
+    (when (%ast-make-array-noescape-call-p expr)
+      (loop while (typep expr 'ast-the)
+            do (setf expr (ast-the-value expr)))
+      (let ((size (ast-int-value (first (ast-call-args expr)))))
+        (and (not (%member-eq-p name mutated))
+             (or dynamic-extent-p
+                 (not (%member-eq-p name captured)))
+             (if dynamic-extent-p
+                 (%let-dynamic-extent-array-direct-access-p body-forms name)
+                 (%array-binding-static-access-p body-forms name size))
+             size)))))
 
 (defun %let-noescape-cons-p (name expr declarations mutated captured body-forms)
   "T when the cons binding never escapes (only CAR/CDR consumers)."

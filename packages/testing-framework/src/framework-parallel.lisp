@@ -32,17 +32,14 @@ Tests may rebind this to a smaller positive real to keep timeout regression
 coverage fast without changing the production polling cadence.")
 
 (defparameter *watchdog-exit-fn*
-  (lambda (&rest args &key code &allow-other-keys)
-    (declare (ignore args))
+  (lambda (&key code)
     (sb-ext:exit :code code :abort t))
   "Indirection for the hard-kill action so tests can rebind to a recorder.
 Default uses sb-ext:exit with :abort t for IMMEDIATE process termination
 without unwinding stuck worker threads. The :abort flag is critical: a
 plain (sb-ext:exit :code N) does an orderly shutdown that joins all threads,
 which would block forever on the very threads the watchdog is trying to
- kill. The lambda accepts &allow-other-keys so watchdog call sites can pass
- extra signal arguments without changing test helpers. Tests rebind to a lambda that records
- the code without killing.")
+kill. Tests rebind to a lambda that records the code without killing.")
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Watchdog state structs
@@ -258,7 +255,7 @@ Correctness invariants:
          (work-queue     (coerce tests 'vector))
          (queue-index    0)
          (queue-lock     (sb-thread:make-mutex :name "queue-lock"))
-         (prolog-snapshot cl-cc/prolog:*prolog-rules*)
+         (prolog-snapshot cl-cc/prolog::*prolog-rules*)
          (watchdog-slots  (make-array workers :initial-element nil))
          (worker-epochs   (make-array workers :initial-element 0))
          (current-tests   (make-array workers :initial-element nil))
@@ -308,11 +305,11 @@ Correctness invariants:
 
          (make-worker (worker-idx)
            ;; SBCL worker threads do not inherit parent dynamic bindings;
-           ;; *test-runner-mode* and *prolog-rules* are explicitly rebound.
+           ;; *test-runner-mode* and the Prolog rule table are explicitly rebound.
            (lambda ()
-             (let ((*test-runner-mode* :parallel)
-                   (cl-cc/prolog:*prolog-rules*
-                     (%copy-prolog-rules prolog-snapshot)))
+               (let ((*test-runner-mode* :parallel)
+                     (cl-cc/prolog::*prolog-rules*
+                       (%copy-prolog-rules prolog-snapshot)))
                (loop
                  (let ((task nil) (idx nil))
                    (sb-thread:with-mutex (queue-lock)

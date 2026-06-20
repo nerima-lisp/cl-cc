@@ -339,6 +339,24 @@
       (assert-true ok)
       (assert-true value))))
 
+(deftest compile-time-eval-call-ast-function-folds
+  "%compile-time-eval-call also accepts AST-FUNCTION designators."
+  (%with-clean-ct-env
+    (multiple-value-bind (value ok)
+        (cl-cc/compile::%compile-time-eval-call
+         (cl-cc/ast:make-ast-function :name 'not) (list nil) 10)
+      (assert-true ok)
+      (assert-true value))))
+
+(deftest compile-time-eval-call-quoted-function-designator-folds
+  "%compile-time-eval-call also accepts quoted function designators."
+  (%with-clean-ct-env
+    (multiple-value-bind (value ok)
+        (cl-cc/compile::%compile-time-eval-call
+         (cl-cc/ast:make-ast-quote :value '+) (list 1 2 3) 10)
+      (assert-true ok)
+      (assert-= 6 value))))
+
 (deftest compile-time-eval-call-lambda-application-folds
   "%compile-time-eval-call evaluates an inline lambda application at compile time."
   (%with-clean-ct-env
@@ -347,6 +365,20 @@
          (cl-cc/ast:make-ast-lambda :params '(x)
                                      :body (list (cl-cc/ast:make-ast-var :name 'x))
                                      :optional-params nil :rest-param nil :key-params nil)
+         (list 7) 10)
+      (assert-true ok)
+      (assert-= 7 value))))
+
+(deftest compile-time-eval-call-ast-the-wrapped-lambda-application-folds
+  "%compile-time-eval-call unwraps AST-THE before evaluating an inline lambda application."
+  (%with-clean-ct-env
+    (multiple-value-bind (value ok)
+        (cl-cc/compile::%compile-time-eval-call
+         (cl-cc/ast:make-ast-the
+          :type 'function
+          :value (cl-cc/ast:make-ast-lambda :params '(x)
+                                            :body (list (cl-cc/ast:make-ast-var :name 'x))
+                                            :optional-params nil :rest-param nil :key-params nil))
          (list 7) 10)
       (assert-true ok)
       (assert-= 7 value))))

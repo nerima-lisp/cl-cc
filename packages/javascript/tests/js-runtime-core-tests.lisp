@@ -7,7 +7,7 @@
 ;;;; and available to all subsequently-loaded js-runtime-* test files.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Shared helpers (used across all js-runtime-* test files) ─────────────────
 

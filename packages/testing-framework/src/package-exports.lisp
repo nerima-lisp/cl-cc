@@ -16,6 +16,7 @@
           coverage-report-empty-p
            cl-cc-suite
            cl-cc-unit-suite
+           cl-cc-javascript-suite
            cl-cc-integration-suite
            cl-cc-integration-serial-suite
            cl-cc-e2e-suite

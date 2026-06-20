@@ -15,7 +15,6 @@
     vm-closure-params
      vm-closure-captured-regs
      vm-closure-captured-vals
-     vm-closure-captured-values
      vm-closure-invocation-count
      vm-closure-compilation-tier
      vm-closure-program-flat

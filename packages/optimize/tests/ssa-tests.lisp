@@ -194,6 +194,66 @@
                    (gethash exit-block phi-map)))
     (assert-true has-i-phi)))
 
+(deftest ssa-lcssa-places-phi-on-exit-not-later-use
+  "LCSSA places loop-defined value phis on loop exits, not delayed use blocks."
+  (let* ((insts (list (make-vm-const :dst :i :value 0)
+                      (make-vm-const :dst :one :value 1)
+                      (make-vm-const :dst :lim :value 2)
+                      (make-vm-label :name "Lh")
+                      (make-vm-lt :dst :c :lhs :i :rhs :lim)
+                      (make-vm-jump-zero :reg :c :label "Lexit")
+                      (make-vm-add :dst :i :lhs :i :rhs :one)
+                      (make-vm-jump :label "Lh")
+                      (make-vm-label :name "Lexit")
+                      (make-vm-jump :label "Lpost")
+                      (make-vm-label :name "Lpost")
+                      (make-vm-ret :reg :i)))
+         (cfg (cl-cc/optimize:cfg-build insts))
+         (phi-map nil)
+         (exit-block nil)
+         (post-block nil))
+    (cl-cc/optimize:cfg-compute-dominators cfg)
+    (cl-cc/optimize:cfg-compute-dominance-frontiers cfg)
+    (setf phi-map (cl-cc/optimize:ssa-place-phis cfg))
+    (setf phi-map (cl-cc/optimize::ssa-place-lcssa-phis cfg phi-map))
+    (setf exit-block (cl-cc/optimize:cfg-get-block-by-label cfg "Lexit")
+          post-block (cl-cc/optimize:cfg-get-block-by-label cfg "Lpost"))
+    (assert-true
+     (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+              (gethash exit-block phi-map)))
+    (assert-false
+     (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+              (gethash post-block phi-map)))))
+
+(deftest ssa-lcssa-construct-preserves-exit-phi
+  "LCSSA exit phis survive trivial phi elimination and feed outside-loop uses."
+  (let ((insts (list (make-vm-const :dst :i :value 0)
+                     (make-vm-const :dst :one :value 1)
+                     (make-vm-const :dst :lim :value 2)
+                     (make-vm-label :name "Lh")
+                     (make-vm-lt :dst :c :lhs :i :rhs :lim)
+                     (make-vm-jump-zero :reg :c :label "Lexit")
+                     (make-vm-add :dst :i :lhs :i :rhs :one)
+                     (make-vm-jump :label "Lh")
+                     (make-vm-label :name "Lexit")
+                     (make-vm-jump :label "Lpost")
+                     (make-vm-label :name "Lpost")
+                     (make-vm-ret :reg :i))))
+    (multiple-value-bind (cfg phi-map renamed)
+        (cl-cc/optimize:ssa-construct insts)
+      (let* ((exit-block (cl-cc/optimize:cfg-get-block-by-label cfg "Lexit"))
+             (post-block (cl-cc/optimize:cfg-get-block-by-label cfg "Lpost"))
+             (exit-phi (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+                                (gethash exit-block phi-map)))
+             (post-reads (loop for inst in (gethash post-block renamed)
+                               append (cl-cc/optimize::opt-inst-read-regs inst))))
+        (assert-true exit-phi)
+        (assert-eq :lcssa (cl-cc:phi-kind exit-phi))
+        (assert-true (member (cl-cc:phi-dst exit-phi) post-reads :test #'eq))
+        (assert-false
+         (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+                  (gethash post-block phi-map)))))))
+
 (deftest ssa-trivial-phi-elimination-rewrites-uses
   "Trivial phi elimination removes dead phis and rewrites downstream uses."
   (let* ((pred-a (make-ssa-test-block 1))

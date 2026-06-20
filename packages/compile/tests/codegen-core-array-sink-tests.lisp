@@ -51,6 +51,30 @@
     (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aset))
     (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
 
+(deftest codegen-let-noescape-array-make-array-function-wrapper-still-sinks
+  "An ast-the-wrapped make-array function designator still takes the noescape array sink path."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast
+               (make-ast-let
+                :bindings (list (cons 'arr (make-ast-call
+                                           :func (make-ast-the
+                                                  :type 'function
+                                                  :value (make-ast-var :name 'make-array))
+                                           :args (list (make-ast-int :value 2)))))
+                :body (list (make-ast-call :func 'aset
+                                           :args (list (make-ast-var :name 'arr)
+                                                       (make-ast-int :value 0)
+                                                       (make-ast-int :value 42)))
+                            (make-ast-call :func 'aref
+                                           :args (list (make-ast-var :name 'arr)
+                                                       (make-ast-int :value 0))))
+                :declarations nil)
+               ctx)))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aset))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
+
 (deftest codegen-let-noescape-typed-array-character-default-init
   "Typed character noescape arrays initialize slot registers with #\\Nul by default."
   (let ((ctx (make-codegen-ctx)))
@@ -82,6 +106,60 @@
                                            :func 'make-array
                                            :args (list (make-ast-int :value 2)
                                                        (make-ast-var :name :element-type)
+                                                       (make-ast-quote :value 'character)))))
+                :body (list (make-ast-call :func 'aref
+                                           :args (list (make-ast-var :name 'arr)
+                                                       (make-ast-int :value 0))))
+                :declarations nil)
+               ctx)))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
+    (assert-true
+     (some (lambda (inst)
+             (and (typep inst 'cl-cc/vm::vm-const)
+                  (characterp (cl-cc/vm::vm-value inst))
+                  (char= #\Nul (cl-cc/vm::vm-value inst))))
+           (codegen-instructions ctx)))))
+
+(deftest codegen-let-noescape-array-element-type-keyword-through-ast-the-still-sinks
+  "Transparent ast-the wrappers around the element-type quote still take the noescape sink path."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast
+               (make-ast-let
+                :bindings (list (cons 'arr (make-ast-call
+                                           :func 'make-array
+                                           :args (list (make-ast-int :value 2)
+                                                       (make-ast-var :name :element-type)
+                                                       (make-ast-the
+                                                        :type 'character
+                                                        :value (make-ast-quote :value 'character))))))
+                :body (list (make-ast-call :func 'aref
+                                           :args (list (make-ast-var :name 'arr)
+                                                       (make-ast-int :value 0))))
+                :declarations nil)
+               ctx)))
+    (assert-true (keywordp reg))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
+    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
+    (assert-true
+     (some (lambda (inst)
+             (and (typep inst 'cl-cc/vm::vm-const)
+                  (characterp (cl-cc/vm::vm-value inst))
+                  (char= #\Nul (cl-cc/vm::vm-value inst))))
+           (codegen-instructions ctx)))))
+
+(deftest codegen-let-noescape-array-element-type-keyword-node-through-ast-the-still-sinks
+  "Transparent ast-the wrappers around the :element-type keyword node still take the noescape sink path."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast
+               (make-ast-let
+                :bindings (list (cons 'arr (make-ast-call
+                                           :func 'make-array
+                                           :args (list (make-ast-int :value 2)
+                                                       (make-ast-the
+                                                        :type 'keyword
+                                                        :value (make-ast-var :name :element-type))
                                                        (make-ast-quote :value 'character)))))
                 :body (list (make-ast-call :func 'aref
                                            :args (list (make-ast-var :name 'arr)

@@ -178,9 +178,20 @@ Falls through to an oob error when no index matches."
 (defun %binding-body (bindings name)
   (cddr (assoc name bindings :test #'eq)))
 
+(defun %local-call-name (func)
+  "Return the local function name designator for FUNC, if any."
+  (loop while (typep func 'ast-the)
+        do (setf func (ast-the-value func)))
+  (typecase func
+    (symbol func)
+    (ast-var (ast-var-name func))
+    (ast-function (ast-function-name func))
+    (t nil)))
+
 (defun %record-local-call (func names tail calls)
-  (when (and (symbolp func) (member func names :test #'eq))
-    (push (cons func tail) (gethash func calls))))
+  (let ((name (%local-call-name func)))
+    (when (and name (member name names :test #'eq))
+      (push (cons name tail) (gethash name calls)))))
 
 (defun %collect-local-calls-in-forms (forms names tail calls)
   (loop for rest on forms

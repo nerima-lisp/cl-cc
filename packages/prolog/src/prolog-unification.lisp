@@ -63,13 +63,17 @@
        ,@body)))
 
 (defun %unify-logic-vars (term1 term2 env)
-  "Unify two logic variables after resolving any existing bindings."
-  (let ((v1 (assoc term1 env))
-        (v2 (assoc term2 env)))
-    (cond ((and v1 v2) (unify (cdr v1) (cdr v2) env))
-          (v1 (unify (cdr v1) term2 env))
-          (v2 (unify term1 (cdr v2) env))
-          (t (acons term1 term2 env)))))
+  "Unify TERM1 and TERM2 after resolving any existing bindings."
+  (let ((binding1 (assoc term1 env))
+        (binding2 (assoc term2 env)))
+    (cond ((and binding1 binding2)
+           (unify (cdr binding1) (cdr binding2) env))
+          (binding1
+           (unify (cdr binding1) term2 env))
+          (binding2
+           (unify term1 (cdr binding2) env))
+          (t
+           (acons term1 term2 env)))))
 
 (defun %unify-logic-var (var term env)
   "Unify VAR with TERM, applying the occurs check before extending ENV."
@@ -81,11 +85,11 @@
             (acons var term env)))))
 
 (defun %unify-conses (term1 term2 env)
-  "Unify two cons cells by unifying car first, then cdr with the updated env."
-  (let ((env1 (unify (car term1) (car term2) env)))
-    (if (unify-failed-p env1)
+  "Unify two cons cells by unifying the car before recursing on the cdr."
+  (let ((head-env (unify (car term1) (car term2) env)))
+    (if (unify-failed-p head-env)
         :unify-fail
-        (unify (cdr term1) (cdr term2) env1))))
+        (unify (cdr term1) (cdr term2) head-env))))
 
 (defun unify (term1 term2 &optional (env nil))
   "Unify two terms, returning updated environment or :UNIFY-FAIL on failure.

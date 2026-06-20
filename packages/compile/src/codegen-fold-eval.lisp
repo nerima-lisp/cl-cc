@@ -105,15 +105,27 @@ Returns only INTERN's primary value, matching ordinary single-value call context
                   (1- depth))
                  (values nil nil))))))))
 
+(defun %compile-time-callable-func-node (node)
+  (typecase node
+    (ast-the (%compile-time-callable-func-node (ast-the-value node)))
+    (t node)))
+
 (defun %compile-time-eval-call (func args depth)
-  (typecase func
-    (ast-var    (%compile-time-eval-var-call (ast-var-name func) args depth))
-    (ast-lambda (%evaluate-ast-sequence
-                 (ast-lambda-body func)
-                 (%compile-time-pair-bindings (ast-lambda-params func) args)
-                 *compile-time-function-env*
-                 (1- depth)))
-    (t (values nil nil))))
+  (let ((callable-func (%compile-time-callable-func-node func)))
+    (typecase callable-func
+      (ast-var    (%compile-time-eval-var-call (ast-var-name callable-func) args depth))
+      (ast-function (%compile-time-eval-var-call (ast-function-name callable-func) args depth))
+      (ast-quote
+       (let ((func-name (%callable-designator-function-name callable-func)))
+         (if func-name
+             (%compile-time-eval-var-call func-name args depth)
+             (values nil nil))))
+      (ast-lambda (%evaluate-ast-sequence
+                   (ast-lambda-body callable-func)
+                   (%compile-time-pair-bindings (ast-lambda-params callable-func) args)
+                   *compile-time-function-env*
+                   (1- depth)))
+      (t (values nil nil)))))
 
 (defun %evaluate-ast-sequence (forms value-env function-env depth)
   "Evaluate FORMS left-to-right under VALUE-ENV and FUNCTION-ENV.

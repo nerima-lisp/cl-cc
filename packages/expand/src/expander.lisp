@@ -97,17 +97,17 @@ Dispatch order: (1) atoms — symbol macros expanded, others pass through;
                                                (when (cl-cc/vm::package-locked-p pkg)
                                                  (cl-cc/vm::check-package-lock pkg :intern))
                                                (intern (symbol-name (car form)) pkg))))
-                                 (and local (gethash local *expander-head-table*)))))))
+                                 (and local (gethash local *expander-head-table*))))))
+           (compiler-macro-expansion nil))
        (cond
          (handler
           (let ((expanded (funcall handler form)))
             (if (equal expanded form)
                 form
                 expanded)))
-          ((let ((compiler-macro-expansion
-                   (and (symbolp (car form))
-                        (%expand-compiler-macro-call (car form) form))))
-             compiler-macro-expansion)
+          ((and (symbolp (car form))
+                (setf compiler-macro-expansion
+                      (%expand-compiler-macro-call (car form) form)))
            (compiler-macroexpand-all compiler-macro-expansion))
           (t
             (multiple-value-bind (transformed transformed-p)

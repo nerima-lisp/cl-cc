@@ -1,5 +1,5 @@
 ;;;; packages/optimize/tests/optimizer-scheduler-tests.lisp
-;;;; Unit tests for packages/optimize/src/optimizer-scheduler.lisp
+;;;; Unit tests for the scheduling passes in packages/optimize/src/optimizer-pipeline.lisp
 ;;;;
 ;;;; Covers:
 ;;;;   %opt-scheduler-barrier-p  — returns T for each barrier type, NIL for pure

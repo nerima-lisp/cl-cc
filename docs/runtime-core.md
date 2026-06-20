@@ -31,7 +31,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 - **対象**: `packages/vm/src/vm.lisp:19-31, 550-572`
 - **内容**:
-  - 現状: captured-values を alist `((reg . val) ...)` で格納、復元時に `dolist` で走査
+  - 現状: `captured-regs` と `captured-vals` を並列ベクタで格納
   - 平坦ベクタ化: `captured-regs` = vector + `captured-vals` = vector に変換
   - インデックスアクセスで car/cdr 操作を除去、キャッシュ局所性を改善
 - **難易度**: Medium

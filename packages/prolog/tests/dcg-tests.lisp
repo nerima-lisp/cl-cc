@@ -15,36 +15,26 @@
 
 (deftest dcg-token-match-value-binds-scalar-token-values
   "dcg-token-match-value binds the token value and preserves the remaining stream."
-    (with-fresh-prolog
-      (with-prolog-goal-projections (results
-                                     (dcg-goal cl-cc/prolog::dcg-token-match-value
-                                               :T-INT '?value
-                                               (dcg-input :T-INT 42 :T-EOF nil)
-                                               '?out)
-                                     (list ?value ?out))
-        (assert-true results)
-        (assert-equal '((42 ((:T-EOF . nil)))) results))))
-
-(deftest dcg-builtins-registered-via-shared-table
-  "DCG builtins are registered through the shared builtin predicate table."
-  (dolist (spec cl-cc/prolog::*dcg-builtin-specs*)
-    (destructuring-bind (predicate handler) spec
-      (assert-eq (symbol-function handler)
-                 (gethash predicate cl-cc/prolog::*builtin-predicates*)))))
+  (%with-prolog-fixture
+    (assert-prolog-goal-results=
+     (dcg-goal cl-cc/prolog::dcg-token-match-value
+               :T-INT '?value
+               (dcg-input :T-INT 42 :T-EOF nil)
+               '?out)
+     '((42 ((:T-EOF . nil))))
+     (list ?value ?out))))
 
 ;;; ─── phrase ─────────────────────────────────────────────────────────────────
 
 (deftest phrase-returns-remaining-input-after-match
   "phrase returns the remaining token list after a successful rule match."
   (with-prolog-facts ((consume-one (?h . ?rest) ?rest))
-    (let* ((input  (dcg-input :T-INT 1 :T-INT 2))
-           (result (cl-cc/prolog:phrase 'consume-one input)))
-      (assert-equal 1 (length result))
-      (assert-equal :T-INT (caar result))
-      (assert-equal 2     (cdar result)))))
+    (assert-dcg-phrase= 'consume-one
+                        (dcg-input :T-INT 1 :T-INT 2)
+                        '((:T-INT . 2)))))
 
 (deftest phrase-returns-nil-when-no-rule-matches
-  "phrase returns nil when no rule in the database matches the input."
+  "phrase returns nil when no rule matches the input."
   (with-prolog-facts ((never-match impossible-sentinel ?rest))
     (assert-null (cl-cc/prolog:phrase 'never-match (dcg-input :T-INT 1)))))
 
@@ -52,17 +42,17 @@
   "phrase-all returns all possible parse results."
   (with-prolog-facts ((flexible (?h . ?rest) ?rest)
                       (flexible (?a ?b . ?rest) ?rest))
-    (let* ((input (dcg-input :T-INT 1 :T-INT 2 :T-INT 3))
-           (results (cl-cc/prolog:phrase-all 'flexible input)))
-      (assert-true (>= (length results) 2)))))
+    (assert-dcg-phrase-all= 'flexible
+                            (dcg-input :T-INT 1 :T-INT 2 :T-INT 3)
+                            '((( :T-INT . 3))
+                              ((:T-INT . 2) (:T-INT . 3))))))
 
 (deftest dcg-rule-helpers-roundtrip
   "def-dcg-rule, phrase, and phrase-all agree on a simple rule."
   (with-dcg-rules ((accept-all))
     (let ((input (dcg-input :T-INT 1 :T-EOF nil)))
-      (assert-equal input (cl-cc:phrase 'accept-all input))
-      (assert-equal (list input)
-                    (cl-cc:phrase-all 'accept-all input)))))
+      (assert-dcg-phrase= 'accept-all input input)
+      (assert-dcg-phrase-all= 'accept-all input (list input)))))
 
 (deftest dcg-rule-terminal-and-brace-forms
   "def-dcg-rule compiles terminal and brace bodies into a working parser."
@@ -71,8 +61,9 @@
                     (brace t)
                     (terminal :T-IDENT)))
     (let ((input (dcg-input :T-INT 1 :T-IDENT "x" :T-EOF nil)))
-      (assert-equal (list (cons :T-EOF nil))
-                    (cl-cc:phrase 'accept-token-and-check input)))))
+      (assert-dcg-phrase= 'accept-token-and-check
+                          input
+                          (list (cons :T-EOF nil))))))
 
 (deftest dcg-fresh-counter-resets
   "dcg-fresh-var is deterministic after dcg-reset-counter."
@@ -83,73 +74,61 @@
     (cl-cc/prolog::dcg-reset-counter)
     (assert-eq first (cl-cc/prolog::dcg-fresh-var))))
 
-;;; ─── DCG Builtins via solve-goal ───────────────────────────────────────────
+;;; ─── DCG Builtins via solver helpers ───────────────────────────────────────
 
-(deftest dcg-alt-matches-first-rule
-  "dcg-alt succeeds via the first rule when input matches it; remaining stream is nil."
-  (with-dcg-token-rules ((rule-a :T-INT) (rule-b :T-IDENT))
-    (assert-dcg-first-result=
-     (dcg-goal cl-cc/prolog::dcg-alt 'rule-a 'rule-b (dcg-input :T-INT 42) '?out)
-     nil
-     '?out)))
+(deftest-each dcg-alt-matches-first-or-second-rule
+  "dcg-alt succeeds via the first matching rule and falls through to the second."
+  :cases (("first rule matches" :result= (dcg-input :T-INT 42) (list nil))
+          ("second rule matches" :solves  (dcg-input :T-IDENT "x") nil))
+  (assertion input expected)
+  (assert-dcg-token-case (assertion goal ((rule-a :T-INT) (rule-b :T-IDENT))
+                                   (dcg-goal cl-cc/prolog::dcg-alt
+                                             'rule-a 'rule-b input '?out))
+    (:result= (assert-prolog-goal-results= goal expected '?out))
+    (:solves  (assert-dcg-solves goal '?out))))
 
-(deftest dcg-alt-matches-second-rule
-  "dcg-alt succeeds via the second rule when only that rule matches the input."
-  (with-dcg-token-rules ((rule-a :T-INT) (rule-b :T-IDENT))
-    (assert-dcg-solves (dcg-goal cl-cc/prolog::dcg-alt 'rule-a 'rule-b (dcg-input :T-IDENT "x") '?out)
-                       '?out)))
+(deftest-each dcg-opt-succeeds-with-match-or-epsilon
+  "dcg-opt includes nil on a match and leaves the stream unchanged on a mismatch."
+  :cases (("match"   :contains (dcg-input :T-INT 1) nil)
+          ("mismatch" :solves   (dcg-input :T-IDENT "x") nil))
+  (assertion input expected)
+  (assert-dcg-token-case (assertion goal ((tok-int :T-INT))
+                                   (dcg-goal cl-cc/prolog::dcg-opt
+                                             'tok-int input '?out))
+    (:contains (assert-dcg-result-contains goal expected '?out))
+    (:solves   (assert-dcg-solves goal '?out))))
 
-(deftest dcg-opt-succeeds-with-match
-  "dcg-opt includes nil (empty remaining) in results when the sub-rule matches."
-  (with-dcg-token-rules ((tok-int :T-INT))
-    (assert-dcg-result-contains
-     (dcg-goal cl-cc/prolog::dcg-opt 'tok-int (dcg-input :T-INT 1) '?out)
-     nil
-     '?out)))
+(deftest-each dcg-star-succeeds-or-collects-matches
+  "dcg-star succeeds with zero matches and collects all consecutive matches."
+  :cases (("zero matches"   :solves   (dcg-input :T-IDENT "x") nil)
+          ("many matches"    :contains (dcg-input :T-INT 1 :T-INT 2 :T-INT 3) nil))
+  (assertion input expected)
+  (assert-dcg-token-case (assertion goal ((tok-int :T-INT))
+                                   (dcg-goal cl-cc/prolog::dcg-star
+                                             'tok-int input '?out))
+    (:solves   (assert-dcg-solves goal '?out))
+    (:contains (assert-dcg-result-contains goal expected '?out))))
 
-(deftest dcg-opt-provides-epsilon-on-mismatch
-  "dcg-opt succeeds with epsilon (unchanged stream) when the sub-rule does not match."
-  (with-dcg-token-rules ((tok-int :T-INT))
-    (assert-dcg-solves (dcg-goal cl-cc/prolog::dcg-opt 'tok-int (dcg-input :T-IDENT "x") '?out)
-                       '?out)))
-
-(deftest dcg-star-succeeds-with-zero-matches
-  "dcg-star (zero-or-more) succeeds even when the sub-rule does not match at all."
-  (with-dcg-token-rules ((tok-int :T-INT))
-    (assert-dcg-solves (dcg-goal cl-cc/prolog::dcg-star 'tok-int (dcg-input :T-IDENT "x") '?out)
-                       '?out)))
-
-(deftest dcg-star-collects-multiple-matches
-  "dcg-star collects all consecutive matches; nil (empty stream) appears in results."
-  (with-dcg-token-rules ((tok-int :T-INT))
-    (assert-dcg-result-contains
-     (dcg-goal cl-cc/prolog::dcg-star 'tok-int
-               (dcg-input :T-INT 1 :T-INT 2 :T-INT 3) '?out)
-     nil
-     '?out)))
-
-(deftest dcg-plus-succeeds-with-one-match
-  "dcg-plus (one-or-more) succeeds when there is at least one matching token."
-  (with-dcg-token-rules ((tok-int :T-INT))
-    (assert-dcg-solves (dcg-goal cl-cc/prolog::dcg-plus 'tok-int (dcg-input :T-INT 42) '?out)
-                       '?out)))
-
-(deftest dcg-plus-fails-on-zero-matches
-  "dcg-plus returns no solutions when the sub-rule does not match at all."
-  (with-dcg-token-rules ((tok-int :T-INT))
-    (assert-dcg-no-results
-     (dcg-goal cl-cc/prolog::dcg-plus 'tok-int (dcg-input :T-IDENT "x") '?out)
-     '?out)))
+(deftest-each dcg-plus-succeeds-or-fails
+  "dcg-plus succeeds with at least one match and fails when there are none."
+  :cases (("one match"   :solves (dcg-input :T-INT 42))
+          ("zero matches" :fails  (dcg-input :T-IDENT "x")))
+  (assertion input)
+  (assert-dcg-token-case (assertion goal ((tok-int :T-INT))
+                                  (dcg-goal cl-cc/prolog::dcg-plus
+                                            'tok-int input '?out))
+    (:solves (assert-dcg-solves goal '?out))
+    (:fails  (assert-prolog-query-count= goal 0))))
 
 ;;; ─── dcg-error-recovery ─────────────────────────────────────────────────────
 
 (deftest dcg-error-recovery-skips-to-sync-token
   "dcg-error-recovery skips tokens until it finds a sync token (:T-RPAREN)."
-  (assert-dcg-first-result=
+  (assert-prolog-goal-results=
    (dcg-goal cl-cc/prolog::dcg-error-recovery
              (dcg-input :T-INT 1 :T-IDENT "x" :T-RPAREN ")")
              '?out)
-   (list (cons :T-RPAREN ")"))
+   (list (list (cons :T-RPAREN ")")))
    '?out))
 
 (deftest dcg-error-recovery-handles-empty-input

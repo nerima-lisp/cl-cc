@@ -80,9 +80,9 @@ Gensym-hygienic expansions are never cached."
   (and (consp form)
        (symbolp (car form))
        (member (symbol-name (car form))
-                 '("DECLAIM" "DEFINE-COMPILER-MACRO" "DEFINE-DEFTRANSFORM"
-                   "AWAIT" "ASYNC-HANDLER")
-                 :test #'string=)))
+               '("DECLAIM" "DEFINE-COMPILER-MACRO" "DEFINE-DEFTRANSFORM"
+                 "OUR-DEFMACRO" "AWAIT" "ASYNC-HANDLER")
+               :test #'string=)))
 
 (defun %cacheable-macroexpansion-p (form)
   "Return T when FORM is safe to reuse from the macroexpansion cache."
@@ -127,7 +127,7 @@ EXPANDER may be either a host function or a descriptor consumed by
 (defun %nest-let-bindings (bindings body)
   "Build nested LET forms from BINDINGS ending in BODY forms."
   (reduce (lambda (binding inner) (list 'let (list binding) inner))
-          bindings
+          (%normalize-let-bindings bindings)
           :from-end t
           :initial-value (cons 'locally body)))
 
@@ -360,7 +360,8 @@ Folds static (list ...) parts together and eliminates nil splices."
          (env-var  (gensym "ENV"))
          (info     (parse-lambda-list lambda-list))
          (env-sym  (lambda-list-info-environment info))
-         (bindings (generate-lambda-bindings lambda-list form-var))
+         (bindings (%normalize-let-bindings
+                    (generate-lambda-bindings lambda-list form-var)))
          (expander-body
            (if env-sym
                `((let ((,env-sym ,env-var))

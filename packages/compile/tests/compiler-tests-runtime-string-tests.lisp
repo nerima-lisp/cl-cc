@@ -108,6 +108,7 @@
   "Hash table operations return the expected numeric values; gethash returns nil when missing with no default."
   :cases (("hash-table-p"   1  "(let ((ht (make-hash-table))) (hash-table-p ht))")
           ("gethash-get"    42 "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
+          ("gethash-the-binding" 42 "(let ((ht (the hash-table (make-hash-table)))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
           ("gethash-default" 99 "(let ((ht (make-hash-table))) (gethash 'missing ht 99))")
           ("count"           2 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (hash-table-count ht))")
           ("remhash"         1 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (remhash 'a ht) (hash-table-count ht))")

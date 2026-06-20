@@ -64,6 +64,38 @@
          (setf *suite-registry* ,saved-suite)
          (setf *test-registry* ,saved-test)))))
 
+(defun %canonical-test-source-file (pathname)
+  "Return a canonical pathname for PATHNAME when possible."
+  (when pathname
+    (or (ignore-errors (uiop:truenamize pathname))
+        pathname)))
+
+(defun %test-source-file= (left right)
+  "Return true when LEFT and RIGHT refer to the same source file."
+  (let ((left-path (%canonical-test-source-file left))
+        (right-path (%canonical-test-source-file right)))
+    (and left-path
+         right-path
+         (string= (namestring left-path)
+                  (namestring right-path)))))
+
+(defun %run-registered-tests-from-source-file (source-file &key exclude)
+  "Run registered tests whose :source-file matches SOURCE-FILE.
+EXCLUDE is a list of test symbols to skip."
+  (let ((results '()))
+    (persist-each *test-registry*
+                  (lambda (name plist)
+                    (when (and (symbolp name)
+                               (not (member name exclude :test #'eq))
+                               (%test-source-file= source-file
+                                                   (getf plist :source-file)))
+                      (let ((entry (persist-lookup *test-registry* name)))
+                        (unless entry
+                          (error "Missing registered test entry for ~S." name))
+                        (push (funcall (getf entry :fn))
+                              results)))))
+    (nreverse results)))
+
 ;;; ------------------------------------------------------------
 ;;; Suite Definition
 ;;; ------------------------------------------------------------

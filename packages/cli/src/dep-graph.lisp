@@ -13,7 +13,7 @@
           (string-downcase (string to))
           label))
 
-(defun %dep-graph-edge-json (from to edges-seen)
+(defun %dep-graph-edge-json (from edges-seen)
   (unless (gethash from edges-seen)
     (format t "  ~S: []~%" (string-downcase (string from)))
     (setf (gethash from edges-seen) t)))

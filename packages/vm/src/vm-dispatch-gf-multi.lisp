@@ -159,7 +159,9 @@ still use the single-dispatch path."
   "Resolve the applicable method closure for GF-HT.
 Dispatches via composite keys when ALL-ARGS is provided and the table uses
 list keys; otherwise falls back to single dispatch on FIRST-ARG."
-  (let* ((methods-ht (gethash :__methods__ gf-ht))
+  (let* ((methods-ht (when (and (hash-table-p gf-ht)
+                                (nth-value 1 (gethash :__methods__ gf-ht)))
+                       (gethash :__methods__ gf-ht)))
          (composite-p (and all-args (%vm-gf-uses-composite-keys-p methods-ht))))
     (if composite-p
         (let* ((arg-classes (mapcar (lambda (a) (vm-classify-arg a state)) all-args))

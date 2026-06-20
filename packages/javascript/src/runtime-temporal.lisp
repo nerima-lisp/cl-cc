@@ -15,14 +15,26 @@
 (defun %temporal-now-unix-seconds ()
   (- (get-universal-time) (%temporal-epoch-offset)))
 
+(defun %temporal-normalize-number (n &optional (default 0))
+  "Normalize Temporal numeric fields before passing them to CL time primitives."
+  (if (numberp n)
+      (truncate n)
+      default))
+
 (defun %temporal-decode (unix-seconds)
   "Decode Unix seconds to (values sec min hour day month year dow)."
-  (let ((ut (+ unix-seconds (%temporal-epoch-offset))))
+  (let ((ut (+ (%temporal-normalize-number unix-seconds) (%temporal-epoch-offset))))
     (multiple-value-bind (s mn h d m y dow) (decode-universal-time ut 0)
       (values s mn h d m y dow))))
 
 (defun %temporal-encode (year month day &optional (hour 0) (min 0) (sec 0))
-  (- (encode-universal-time sec min hour day month year 0)
+  (- (encode-universal-time (%temporal-normalize-number sec)
+                            (%temporal-normalize-number min)
+                            (%temporal-normalize-number hour)
+                            (%temporal-normalize-number day)
+                            (%temporal-normalize-number month)
+                            (%temporal-normalize-number year)
+                            0)
      (%temporal-epoch-offset)))
 
 (defun %temporal-pad (n width)
@@ -104,7 +116,7 @@
      "month"      (coerce m 'double-float)
      "day"        (coerce d 'double-float)
      "calendarId" "iso8601"
-     "dayOfWeek"  (coerce (nth-value 6 (%temporal-decode (%temporal-encode y m d))) 'double-float)
+     "dayOfWeek"  (coerce (1+ (nth-value 6 (%temporal-decode (%temporal-encode y m d)))) 'double-float)
      "toString"   (lambda () (format nil "~A-~A-~A"
                                      (%temporal-pad y 4) (%temporal-pad m 2) (%temporal-pad d 2)))
      "toPlainDateTime" (lambda (&optional plain-time)
@@ -245,7 +257,13 @@
 (defun %js-temporal-duration (&key (years 0) (months 0) (weeks 0) (days 0)
                                     (hours 0) (minutes 0) (seconds 0)
                                     (milliseconds 0) (microseconds 0) (nanoseconds 0))
-  (let ((y years) (mo months) (w weeks) (d days) (h hours) (mn minutes) (s seconds))
+  (let ((y (%temporal-normalize-number years))
+        (mo (%temporal-normalize-number months))
+        (w (%temporal-normalize-number weeks))
+        (d (%temporal-normalize-number days))
+        (h (%temporal-normalize-number hours))
+        (mn (%temporal-normalize-number minutes))
+        (s (%temporal-normalize-number seconds)))
     (declare (ignore milliseconds microseconds nanoseconds))
     (%js-make-object
      "__type__"   "Temporal.Duration"

@@ -908,7 +908,9 @@ top-level, and optimization stages."
                            (%call-with-tiered-optimizer-policy
                             opts
                             (lambda ()
-                              (apply #'compile-toplevel-forms forms (%opts->compile-kwargs opts)))))))))
+                              (apply #'compile-toplevel-forms
+                                     forms
+                                     (%opts->compile-kwargs opts)))))))))
       (%pgo-apply-type-feedback-to-result result opts)
       (setf (cl-cc/vm:vm-program-compilation-tier
              (cl-cc/compile:compilation-result-program result))

@@ -1,8 +1,8 @@
 ;;;; cl-cc-prolog.asd — independent ASDF system for the Prolog engine
 ;;;;
 ;;;; Phase 1.1 of the package-by-feature monorepo migration. Files live in
-;;;; the :cl-cc/prolog package; the facade :cl-cc (:use :cl-cc/prolog) so
-;;;; downstream compiler modules see unify/solve-goal/query-* unqualified.
+;;;; the :cl-cc/prolog package; the facade :cl-cc (:use :cl-cc/prolog) keeps
+;;;; downstream compiler modules seeing unify/query-all unqualified.
 
 (asdf:defsystem :cl-cc-prolog
   :description "cl-cc Prolog engine — terms, unification, solver, DCG, peephole rules"
@@ -14,7 +14,6 @@
   :serial t
   :components
   ((:file "package")
-   (:file "prolog-data")
    (:file "prolog-unification")
    (:file "prolog-rules")
    (:file "prolog-builtins")

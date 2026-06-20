@@ -18,23 +18,6 @@
                  last-reg)))
     (scan body nil)))
 
-(defun %call-with-no-tail-position (ctx thunk)
-  "Call THUNK with CTX tail-position cleared."
-  (let ((old-tail (ctx-tail-position ctx)))
-    (unwind-protect
-         (progn
-           (setf (ctx-tail-position ctx) nil)
-           (funcall thunk))
-      (setf (ctx-tail-position ctx) old-tail))))
-
-(defmacro %with-no-tail-position (ctx &body body)
-  "Clear tail-position tracking for BODY without restoring the prior value."
-  `(%call-with-no-tail-position ,ctx (lambda () ,@body)))
-
-(defun %with-no-tail-position (ctx thunk)
-  "Function fallback for already-compiled call sites."
-  (%call-with-no-tail-position ctx thunk))
-
 (defmacro %with-restored-tail-position (ctx &body body)
   "Run BODY with CTX tail-position restored afterward."
   `(let ((old-tail (ctx-tail-position ,ctx)))
@@ -61,7 +44,7 @@
 ;;; Codegen — Control Flow, Assignment, and Type Assertions
 ;;;
 ;;; Contains: %compile-body/k, %compile-body-with-tail, %compile-body-with-tail-ret,
-;;; %with-no-tail-position, %with-restored-tail-position,
+;;; %with-restored-tail-position,
 ;;; lookup-block, compile-ast for ast-block/ast-return-from,
 ;;; lookup-tag, compile-ast for ast-tagbody/ast-go,
 ;;; compile-ast for ast-setq/ast-quote/ast-the,
@@ -133,10 +116,9 @@
         (loop for tag-entry in tags
               do (let* ((tag   (car tag-entry))
                         (forms (cdr tag-entry))
-                        (label (cdr (%lookup-associated-entry tag-labels tag "Unknown tag: ~S"))))
+                        (label (%lookup-associated-entry tag-labels tag "Unknown tag: ~S")))
                    (emit ctx (make-vm-label :name label))
-                   (dolist (form forms) (compile-ast form ctx))
-                   (when forms (emit ctx (make-vm-jump :label end-label))))))
+                   (dolist (form forms) (compile-ast form ctx)))))
       (emit ctx (make-vm-label :name end-label))
       (emit ctx (make-vm-const :dst result-reg :value nil))
       result-reg)))
@@ -144,7 +126,7 @@
 (defmethod compile-ast ((node ast-go) ctx)
   (let ((label (lookup-tag ctx (ast-go-tag node))))
     (emit ctx (make-vm-jump :label label)))
-  (make-register ctx))
+  (%emit-constant ctx nil))
 
 ;;; ── Assignment: setq / quote / the ──────────────────────────────────────
 
@@ -220,32 +202,32 @@ When EMIT-FAILURE-P is NIL, keep the lightweight type check but omit failure han
 
 (defmethod compile-ast ((node ast-the) ctx)
   "Compile a type declaration. In typed-function mode, verifies the type at compile time."
-  (let ((reg (compile-ast (ast-the-value node) ctx)))
-    (let* ((declared (ast-the-type node))
-           (declared-spec (and declared (parse-type-specifier declared))))
-      (when *compiling-typed-fn*
-        (when (and declared-spec
-                   (not (and (typep (ast-the-value node) 'ast-var)
-                             (let ((proven (%ast-proven-type ctx (ast-the-value node))))
-                               (and proven
-                                    (type-equal-p proven declared-spec))))))
-          (handler-case
-              (check (ast-the-value node) declared-spec
-                                (or (ctx-type-env ctx)
-                                    (type-env-empty)))
-            (type-mismatch-error (e)
-              (error 'ast-compilation-error
-                     :location (format nil "~A:~A"
-                                       (ast-source-file node)
-                                       (ast-source-line node))
-                     :format-control "Type error in ~A: ~A"
-                     :format-arguments (list *compiling-typed-fn*
-                                             (type-error-message-from-mismatch e))))
-            (type-inference-error () nil))))
-      (if (and declared-spec
-               (typep (ast-the-value node) 'ast-var)
-               (let ((proven (%ast-proven-type ctx (ast-the-value node))))
-                 (and proven (type-equal-p proven declared-spec))))
-           (%emit-the-runtime-assertion ctx reg declared :emit-failure-p nil)
-           (%emit-the-runtime-assertion ctx reg declared))
-      reg)))
+  (let* ((value (ast-the-value node))
+         (transparent-value (%ast-transparent-designator-node value))
+         (reg (compile-ast value ctx))
+         (declared (ast-the-type node))
+         (declared-spec (and declared (parse-type-specifier declared)))
+         (proven-type (and (typep transparent-value 'ast-var)
+                           (%ast-proven-type ctx transparent-value)))
+         (proven-type-matches-p (and proven-type
+                                     declared-spec
+                                     (type-equal-p proven-type declared-spec))))
+    (when *compiling-typed-fn*
+      (when (and declared-spec
+                 (not proven-type-matches-p))
+        (handler-case
+            (check transparent-value declared-spec
+                   (or (ctx-type-env ctx)
+                       (type-env-empty)))
+          (type-mismatch-error (e)
+            (error 'ast-compilation-error
+                   :location (format nil "~A:~A"
+                                     (ast-source-file node)
+                                     (ast-source-line node))
+                   :format-control "Type error in ~A: ~A"
+                   :format-arguments (list *compiling-typed-fn*
+                                           (type-error-message-from-mismatch e))))
+          (type-inference-error () nil))))
+    (unless proven-type-matches-p
+      (%emit-the-runtime-assertion ctx reg declared))
+    reg))

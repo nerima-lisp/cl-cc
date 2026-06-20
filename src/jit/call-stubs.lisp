@@ -16,6 +16,7 @@
   "Install a call stub for FUNC-NAME that triggers JIT compilation on first call.
 The stub is a 5-byte x86-64 trampoline: CALL compile_stub.
 When bytecode is compiled, the stub is patched to JMP compiled_code."
+  (ensure-jit-native-code-enabled "install a call stub")
   (let ((stub-addr (allocate-executable-memory *call-stub-size*)))
     ;; Emit CALL rel32 to compile_stub handler
     #+x86-64
@@ -36,10 +37,13 @@ When bytecode is compiled, the stub is patched to JMP compiled_code."
   "Patch the call stub for FUNC-NAME to jump directly to COMPILED-CODE-ADDR.
 Replaces the 5-byte CALL with a 5-byte JMP.
 Uses atomic 8-byte write for thread safety."
+  #-x86-64
+  (declare (ignore compiled-code-addr))
+  (ensure-jit-native-code-enabled "patch a call stub")
   (let ((entry (gethash func-name *call-stub-table*)))
     (when entry
+      #+x86-64
       (let ((stub-addr (car entry)))
-        #+x86-64
         (progn
           ;; Write JMP rel32: E9 XX XX XX XX
           (setf (sb-sys:sap-ref-8 stub-addr 0) #xE9) ; JMP rel32 opcode
@@ -48,23 +52,32 @@ Uses atomic 8-byte write for thread safety."
                 (- compiled-code-addr
                    (sb-sys:sap-int stub-addr)
                    5))))
-        ;; Remove from table (now compiled)
-        (remhash func-name *call-stub-table*)
-        (values)))))
+      ;; Remove from table (now compiled)
+      (remhash func-name *call-stub-table*)
+      (values))))
 
 ;;; ──── Compile stub (called by trampoline) ────
 (defun compile-stub-handler (func-name)
   "Called by the call stub when an uncompiled function is invoked.
 Triggers JIT compilation and patches the stub for future calls."
+  (unless *jit-enabled*
+    (return-from compile-stub-handler nil))
   (let ((entry (gethash func-name *call-stub-table*)))
     (when entry
       (destructuring-bind (stub-addr . bytecode) entry
+        (declare (ignore stub-addr))
         ;; Trigger JIT compilation (background or synchronous)
         (let ((compiled-code (jit-baseline-compile func-name bytecode)))
-          ;; Patch stub to jump directly to compiled code
-          (patch-stub-to-direct func-name compiled-code)
+          ;; Patch only after a native backend provides an executable entry address.
+          (let ((entry-address (jit-compiled-code-entry-address compiled-code)))
+            (when entry-address
+              (patch-stub-to-direct func-name entry-address)))
           ;; Execute the compiled code
           compiled-code)))))
+
+(defun jit-compile-stub (func-name)
+  "Public entry point for compiling a call stub target."
+  (compile-stub-handler func-name))
 
 ;;; ──── Background compilation ────
 (defvar *background-compile-queue* nil
@@ -85,15 +98,17 @@ The interpreter continues executing while compilation happens."
 (defun allocate-executable-memory (size)
   "Allocate SIZE bytes of executable memory for code stubs.
 Uses mmap with PROT_READ | PROT_WRITE | PROT_EXEC."
+  (ensure-jit-native-code-enabled "allocate executable stub memory")
   (sb-posix:mmap nil size
                  (logior sb-posix:prot-read
                          sb-posix:prot-write
                          sb-posix:prot-exec)
                  (logior sb-posix:map-private
-                         sb-posix:map-anonymous)
-                 -1 0)
+                         (sb-posix-map-anonymous-flag))
+                 -1 0))
 
 (defun get-compile-stub-address ()
   "Return the address of the compile-stub-handler entry point."
+  (ensure-jit-native-code-enabled "resolve compile stub address")
   (sb-sys:sap-int (sb-sys:vector-sap
-                   (sb-sys:make-array 1 :element-type '(unsigned-byte 8))))
+                   (make-array 1 :element-type '(unsigned-byte 8)))))

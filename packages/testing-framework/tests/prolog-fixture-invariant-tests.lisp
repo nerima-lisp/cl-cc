@@ -32,26 +32,21 @@
   (%assert-prolog-state-restored
    (lambda ()
      (with-fresh-prolog
-       (cl-cc/prolog:add-rule
-         'prolog-fixture-invariant-dummy
-         (cl-cc/prolog::make-prolog-rule
-           :head '(prolog-fixture-invariant-dummy ?x)
-           :body nil))
+       (cl-cc/prolog:def-rule (prolog-fixture-invariant-dummy ?x))
        ;; Inside the fixture, the DB is isolated and only our dummy key lives.
        (assert-= 1 (hash-table-count cl-cc/prolog::*prolog-rules*)))))
    :absent-key 'prolog-fixture-invariant-dummy)
 
 (deftest prolog-fixture-restores-keys-when-body-retracts
   "with-fresh-prolog restores the exact key set after BODY mutates the DB.
-   The public :cl-cc/prolog API exposes clear-prolog-database and add-rule,
-   but no retract-rule symbol; we emulate a retraction by clearing inside
-   the fixture, which is the most aggressive mutation the public API
-   allows. The post-state must still equal the pre-state."
+   The fixture contract is checked by clearing the isolated hash table
+   directly, which is the strongest mutation available in the test setup.
+   The post-state must still equal the pre-state."
   (%assert-prolog-state-restored
    (lambda ()
      (with-fresh-prolog
        ;; Simulate a wholesale retract by clearing the isolated copy.
-       (cl-cc/prolog:clear-prolog-database)
+       (clrhash cl-cc/prolog::*prolog-rules*)
        (assert-= 0 (hash-table-count cl-cc/prolog::*prolog-rules*))))))
 
 (deftest prolog-fixture-restores-on-non-local-exit
@@ -60,11 +55,7 @@
    (lambda ()
      (handler-case
          (with-fresh-prolog
-           (cl-cc/prolog:add-rule
-             'prolog-fixture-invariant-nle
-             (cl-cc/prolog::make-prolog-rule
-               :head '(prolog-fixture-invariant-nle ?x)
-               :body nil))
+           (cl-cc/prolog:def-rule (prolog-fixture-invariant-nle ?x))
            (error "intentional non-local exit from with-fresh-prolog body"))
        (error () nil)))
    :absent-key 'prolog-fixture-invariant-nle))

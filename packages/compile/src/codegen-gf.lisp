@@ -151,6 +151,12 @@ existing generic function in the same compilation unit."
 
 ;;; ── Object instantiation and slot access ─────────────────────────────────
 
+(defun %transparent-gf-designator (node)
+  "Return NODE with transparent ast-the wrappers removed."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node))
+        finally (return node)))
+
 (defmethod compile-ast ((node ast-make-instance) ctx)
   "Compile make-instance."
   (%with-no-tail-position ctx
@@ -158,6 +164,7 @@ existing generic function in the same compilation unit."
           (initargs (ast-make-instance-initargs node))
           (dst (make-register ctx))
           (initarg-regs nil))
+      (setf class-ast (%transparent-gf-designator class-ast))
       (setq initarg-regs
             (loop for entry in initargs
                   collect (cons (car entry) (compile-ast (cdr entry) ctx))))
@@ -184,6 +191,7 @@ existing generic function in the same compilation unit."
     (let ((obj-ast (ast-slot-value-object node))
           (slot-name (ast-slot-value-slot node))
           (dst (make-register ctx)))
+      (setf obj-ast (%transparent-gf-designator obj-ast))
       (if (typep obj-ast (quote ast-var))
           (let* ((entry (%assoc-eq (ast-var-name obj-ast)
                                    (ctx-noescape-instance-bindings ctx)))
@@ -206,6 +214,7 @@ existing generic function in the same compilation unit."
     (let ((obj-ast (ast-set-slot-value-object node))
           (slot-name (ast-set-slot-value-slot node))
           (val-reg (compile-ast (ast-set-slot-value-value node) ctx)))
+      (setf obj-ast (%transparent-gf-designator obj-ast))
       (if (typep obj-ast (quote ast-var))
           (let* ((entry (%assoc-eq (ast-var-name obj-ast)
                                    (ctx-noescape-instance-bindings ctx)))

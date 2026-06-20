@@ -184,15 +184,21 @@
       (:file "js-runtime-symbol-tests")
       (:file "js-runtime-typed-array-methods-tests")
       (:file "js-runtime-misc-tests")))
-   (:module "prolog-tests"
-    :pathname "packages/prolog/tests"
-    :serial t
-    :components
-    ((:file "test-support")
-     (:file "prolog-data-tests")
-     (:file "prolog-peephole-tests")
-     (:file "dcg-tests")
-     (:file "prolog-tests")))
+     (:module "prolog-tests"
+      :pathname "packages/prolog/tests"
+      :serial t
+      :components
+      ((:file "test-support")
+       (:file "prolog-test-support-core")
+       (:file "prolog-test-support-fixtures")
+       (:file "prolog-test-support-projections")
+       (:file "prolog-test-support-dcg")
+       (:file "prolog-test-support-unify")
+       (:file "prolog-test-support-peephole")
+       (:file "prolog-data-tests")
+       (:file "prolog-peephole-tests")
+       (:file "dcg-tests")
+       (:file "prolog-tests")))
    (:module "expand-tests"
     :pathname "packages/expand/tests"
     :serial t
@@ -484,7 +490,17 @@
      (:file "optimizer-dataflow-passes-tests")
       (:file "optimizer-store-analysis-tests")
       (:file "native-advanced-optimizer-tests")
-      (:file "optimizer-strength-inline-tests")))
+      (:file "optimizer-strength-inline-tests")
+      (:file "optimizer-jump-threading-tests")
+      (:file "optimizer-loop-peel-tests")
+      (:file "optimizer-loop-rotate-tests")
+      (:file "optimizer-loop-unroll-tests")
+      (:file "optimizer-loop-unswitch-tests")
+      (:file "optimizer-dead-loop-tests")
+      (:file "optimizer-dae-tests")
+      (:file "optimizer-div-const-tests")
+      (:file "optimizer-strength-reduce-tests")
+      (:file "optimizer-idiom-tests")))
    (:module "emit-tests"
     :pathname "packages/emit/tests"
     :serial t

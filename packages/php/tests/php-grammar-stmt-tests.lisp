@@ -156,3 +156,7 @@
                                           (cl-cc:cst-interior-children node)))))
         (assert-true (member :try-body kinds))
         (assert-true (member :catch kinds))))))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

@@ -2,6 +2,7 @@
   pkgs,
   lib,
   sbclWithCLCC,
+  sbclWithJavascriptTests,
   sbclWithTests,
   sbclBootstrap,
   dispatchSemFix ? null,
@@ -213,6 +214,7 @@ let
       enableDispatchSemFix = true;
       enablePbtSanitize = true;
       enableFaslCacheCleaner = true;
+      forwardArgs = true;
       forceReload = true;
       extraTimeoutSeconds = 600;
       lispPreLoadEvalForms = [
@@ -224,9 +226,94 @@ let
       ];
       lispPostLoadEvalForms = [
         ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
-        "(asdf:load-system :cl-cc-test :force t)"
+        ''(format t "# enabling coverage before reloading :cl-cc-test~%")''
+        "(cl-cc/test:enable-coverage)"
+        ''(handler-case
+              (asdf:load-system :cl-cc-test :force t)
+            (error (e)
+              (format *error-output* "~&FATAL: ~A~%" e)
+              (uiop:quit 1)))''
         ''(format t "# starting coverage test plan (sb-cover + unit)~%")''
-        ''(handler-case (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-suite) :parallel nil :random nil :coverage t :exclude-suites (quote (cl-cc/test:cl-cc-integration-suite cl-cc/test:cl-cc-e2e-suite)) :quit-p nil))) (declaim (optimize (sb-cover:store-coverage-data 0))) (uiop:quit (if failed 1 0))) (error (e) (format t "~&not ok - coverage fatal error: ~A~%" e) (format *error-output* "~&FATAL: ~A~%" e) (uiop:quit 1)))''
+        ''(let* ((args (uiop:command-line-arguments))
+                 (filter (loop for rest on args
+                               when (and (string= (first rest) "--filter") (second rest))
+                                 collect (second rest))))
+            (handler-case
+                (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-suite)
+                                                    :parallel nil
+                                                    :random nil
+                                                    :coverage t
+                                                    :exclude-suites (quote (cl-cc/test:cl-cc-integration-suite cl-cc/test:cl-cc-e2e-suite))
+                                                    :filter filter
+                                                    :quit-p nil)))
+                  (declaim (optimize (sb-cover:store-coverage-data 0)))
+                  (uiop:quit (if failed 1 0)))
+              (error (e)
+                (format t "~&not ok - coverage fatal error: ~A~%" e)
+                (format *error-output* "~&FATAL: ~A~%" e)
+                (uiop:quit 1))))''
+      ];
+    };
+
+    coverage-js = mkSbclScript {
+      name = "coverage-js";
+      description = "Run the JavaScript frontend tests with sb-cover instrumentation";
+      sbclPkgOverride = sbclWithJavascriptTests;
+      enableDispatchSemFix = true;
+      enablePbtSanitize = true;
+      enableFaslCacheCleaner = true;
+      forwardArgs = true;
+      forceReload = true;
+      extraTimeoutSeconds = 600;
+      loadProjectAsd = false;
+      lispPreLoadEvalForms = [
+        "(require :sb-cover)"
+        "(declaim (optimize sb-cover:store-coverage-data))"
+        "(require :asdf)"
+        "(asdf:initialize-source-registry `(:source-registry (:tree ,(uiop:getcwd)) :ignore-inherited-configuration))"
+        ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
+      ];
+      lispPostLoadEvalForms = [
+        ''(format t "# enabling coverage before reloading :cl-cc and :cl-cc-javascript-test~%")''
+        ''(handler-case
+              (asdf:load-system :cl-cc-type :force t)
+            (error (e)
+              (format *error-output* "~&FATAL: ~A~%" e)
+              (uiop:quit 1)))''
+        ''(handler-case
+              (load "packages/testing-framework/src/package.lisp")
+            (error (e)
+              (format *error-output* "~&FATAL: ~A~%" e)
+              (uiop:quit 1)))''
+        ''(proclaim '(optimize (sb-cover:store-coverage-data 3)))''
+        ''(handler-case
+              (asdf:load-system :cl-cc :force t)
+            (error (e)
+              (format *error-output* "~&FATAL: ~A~%" e)
+              (uiop:quit 1)))''
+        ''(handler-case
+              (asdf:load-system :cl-cc-javascript-test :force t)
+            (error (e)
+              (format *error-output* "~&FATAL: ~A~%" e)
+              (uiop:quit 1)))''
+        ''(format t "# starting coverage test plan (sb-cover + javascript)~%")''
+        ''(let* ((args (uiop:command-line-arguments))
+                 (filter (loop for rest on args
+                               when (and (string= (first rest) "--filter") (second rest))
+                                 collect (second rest))))
+            (handler-case
+                (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-javascript-suite)
+                                                    :parallel nil
+                                                    :random nil
+                                                    :coverage t
+                                                    :filter filter
+                                                    :quit-p nil)))
+                  (declaim (optimize (sb-cover:store-coverage-data 0)))
+                  (uiop:quit (if failed 1 0)))
+              (error (e)
+                (format t "~&not ok - coverage fatal error: ~A~%" e)
+                (format *error-output* "~&FATAL: ~A~%" e)
+                (uiop:quit 1))))''
       ];
     };
 

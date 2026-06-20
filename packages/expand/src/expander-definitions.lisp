@@ -41,8 +41,9 @@
          (setf (gethash accessor *setf-compound-place-handlers*)
                (let ((ll lambda-list) (sv store-var) (bd body))
                  (lambda (place value)
-                   (let* ((arg-bindings (generate-lambda-bindings ll place))
-                          (store-binding (list (list sv value))))
+                    (let* ((arg-bindings (%normalize-let-bindings
+                                          (generate-lambda-bindings ll place)))
+                           (store-binding (list (list sv value))))
                      (compiler-macroexpand-all
                       (cons 'let
                             (cons (append arg-bindings store-binding)

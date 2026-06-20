@@ -578,7 +578,7 @@ FACTS is an opt-devirt-facts struct bundling all per-register fact tables."
         (push inst result)))
   result)
 
-(defun opt-pass-devirtualize (instructions)
+(defun %opt-pass-devirtualize-local (instructions)
   "Insert direct function references before calls whose callee register is known.
 This implements a conservative called-value propagation slice: closure,
 function-reference, registered symbol, and move designators are tracked through a
@@ -622,5 +622,5 @@ uses the standard method combination, and has no EQL-specializer ambiguity."
                                  (opt-devirt-facts-reg-gf-literal facts))))
         (t
          (%opt-devirt-track-designator inst name-to-label reg-track)
-         (%opt-track-sealed-gf-facts inst class-sealed facts gf-infos)
-         (push inst result))))))
+          (%opt-track-sealed-gf-facts inst class-sealed facts gf-infos)
+          (push inst result))))))

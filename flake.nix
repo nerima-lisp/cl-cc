@@ -31,6 +31,7 @@
             productionAsdfSystems
             testAsdfSystems
             sbclWithCLCC
+            sbclWithJavascriptTests
             sbclWithTests
             ;
           binaryModule = import ./nix/binary.nix { inherit pkgs lib sbclWithCLCC; };
@@ -47,6 +48,7 @@
               pkgs
               lib
               sbclWithCLCC
+              sbclWithJavascriptTests
               sbclWithTests
               sbclBootstrap
               dispatchSemFix

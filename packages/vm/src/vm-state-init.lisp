@@ -64,8 +64,8 @@
 
 (defun %vm-profile-now-ns ()
   "Return current internal real time converted to nanoseconds."
-  (floor (* (get-internal-real-time) 1000000000)
-         internal-time-units-per-second))
+  (values (floor (* (get-internal-real-time) 1000000000)
+                 internal-time-units-per-second)))
 
 (defun vm-get-profile-samples (state)
   "Return the profile-samples hash table for STATE, handling both vm-state and vm2-state."
@@ -315,7 +315,7 @@ Valid indices are 0 through +VM-ARG-SLOT-COUNT+-1."
 (defun vm-generic-function-p (value)
   "Return T if VALUE is a generic function dispatch table (hash table with :__methods__)."
   (and (hash-table-p value)
-       (gethash :__methods__ value)
+       (nth-value 1 (gethash :__methods__ value))
        t))
 
 ;;; Host function bridge and CLOS slot-definition helpers live in vm-bridge.lisp

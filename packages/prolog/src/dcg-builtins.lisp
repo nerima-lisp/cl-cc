@@ -2,9 +2,6 @@
 
 (in-package :cl-cc/prolog)
 
-(defvar *dcg-sync-tokens* '(:T-RPAREN :T-SEMI :T-EOF)
-  "Token types used as synchronization points for error recovery.")
-
 (defun %dcg-alt (args env k)
   "Try each alternative rule; Args: (alt1 alt2 ... s-in s-out)."
   (let ((s-in (car (last args 2)))
@@ -13,12 +10,16 @@
     (dolist (alt alts)
       (solve-goal (list alt s-in s-out) env k))))
 
+(defun %dcg-continue-with-stream (s-out env k rest)
+  "Advance the output stream and resume K with the unified environment."
+  (when-unify-succeeds (new-env s-out rest env)
+    (funcall k new-env)))
+
 (defun %dcg-opt (args env k)
   "Optional match (0 or 1); Args: (rule s-in s-out)."
   (destructuring-bind (rule s-in s-out) args
     (solve-goal (list rule s-in s-out) env k)
-    (when-unify-succeeds (eps-env s-in s-out env)
-      (funcall k eps-env))))
+    (%dcg-continue-with-stream s-out env k s-in)))
 
 (defun %dcg-star-loop (rule s-out k current-in current-env)
   "Recursive helper for dcg-star: consume input with RULE until fixed point."
@@ -49,12 +50,10 @@
   "Recursive helper for dcg-error-recovery: skip until a sync token."
   (cond
     ((null remaining)
-     (when-unify-succeeds (new-env s-out nil env)
-       (funcall k new-env)))
+     (%dcg-continue-with-stream s-out env k nil))
     ((and (consp (car remaining))
           (member (caar remaining) *dcg-sync-tokens*))
-     (when-unify-succeeds (new-env s-out remaining env)
-       (funcall k new-env)))
+     (%dcg-continue-with-stream s-out env k remaining))
     (t (%dcg-skip-loop s-out env k (cdr remaining)))))
 
 (defun %dcg-error-recovery (args env k)
@@ -62,40 +61,30 @@
   (destructuring-bind (s-in s-out) args
     (%dcg-skip-loop s-out env k (logic-substitute s-in env))))
 
-(defmacro %dcg-with-matched-token ((token rest expected-type stream env) &body body)
-  "Bind TOKEN and REST when STREAM begins with EXPECTED-TYPE."
-  `(let ((input (logic-substitute ,stream ,env)))
-     (when (and (consp input)
-                (consp (car input))
-                (eq (caar input) ,expected-type))
-       (let ((,token (car input))
-             (,rest (cdr input)))
-         ,@body))))
+(defun %dcg-token-stream-match (expected-type env s-in)
+  "Return the matched token cell and the remaining stream when S-IN starts with EXPECTED-TYPE."
+  (let ((input (logic-substitute s-in env)))
+    (when (and (consp input)
+               (consp (car input))
+               (eq (caar input) expected-type))
+      (values (car input) (cdr input)))))
 
 (defun %dcg-token-match (args env k)
   "Match a token by type; Args: (expected-type s-in s-out)."
   (destructuring-bind (expected-type s-in s-out) args
-    (%dcg-with-matched-token (token rest expected-type s-in env)
-      (when-unify-succeeds (new-env s-out rest env)
-        (funcall k new-env)))))
+    (multiple-value-bind (_token rest)
+        (%dcg-token-stream-match expected-type env s-in)
+      (declare (ignore _token))
+      (%dcg-continue-with-stream s-out env k rest))))
 
 (defun %dcg-token-match-value (args env k)
   "Match a token by type and bind its value; Args: (expected-type value-var s-in s-out)."
   (destructuring-bind (expected-type value-var s-in s-out) args
-    (%dcg-with-matched-token (token rest expected-type s-in env)
-      (when-unify-succeeds (val-env value-var (cdr token) env)
-        (when-unify-succeeds (new-env s-out rest val-env)
-          (funcall k new-env))))))
-
-(defparameter *dcg-builtin-specs*
-  '((dcg-alt %dcg-alt)
-    (dcg-opt %dcg-opt)
-    (dcg-star %dcg-star)
-    (dcg-plus %dcg-plus)
-    (dcg-error-recovery %dcg-error-recovery)
-    (dcg-token-match %dcg-token-match)
-    (dcg-token-match-value %dcg-token-match-value))
-  "DCG builtin predicate registrations.")
+    (multiple-value-bind (token rest)
+        (%dcg-token-stream-match expected-type env s-in)
+      (when token
+        (when-unify-succeeds (val-env value-var (cdr token) env)
+          (%dcg-continue-with-stream s-out val-env k rest))))))
 
 (eval-when (:load-toplevel :execute)
-  (make-builtin-predicate-table *dcg-builtin-specs* *builtin-predicates*))
+  (register-builtin-specs *builtin-predicates* *dcg-builtin-specs*))

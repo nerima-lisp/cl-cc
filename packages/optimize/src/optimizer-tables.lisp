@@ -298,7 +298,7 @@ that returns the list of register keywords read by that instruction."
     (dolist (tp '(vm-set-global vm-register-function vm-ensure-values vm-spread-values))
       (setf (gethash tp ht) (lambda (inst) (list (vm-src inst)))))
     ;; Call-family: func/gf register + args
-    (dolist (tp '(vm-call vm-apply))
+    (dolist (tp '(vm-call vm-tail-call vm-trampoline vm-apply))
       (setf (gethash tp ht) (lambda (inst) (cons (vm-func-reg inst) (vm-args inst)))))
     (setf (gethash 'vm-generic-call ht)
           (lambda (inst) (cons (vm-gf-reg inst) (vm-args inst))))

@@ -801,6 +801,35 @@ After php-finish-let-bindings, $x let wraps $y let in its body."
     (assert-equal '("VENDOR\\EX" "OTHER\\ALT")
                   (mapcar #'symbol-name (cl-cc:ast-quote-value class-arg)))))
 
+(deftest php-parser-pipe-operator-lowers-to-helper-call
+  "PHP 8.5 pipe syntax lowers through the parser to the runtime pipe helper."
+  (let ((ast (%php-first "<?php \"  HI  \" |> trim(...);")))
+    (assert-true (cl-cc:ast-call-p ast))
+    (assert-eq 'cl-cc/php::%php-pipe
+               (cl-cc:ast-var-name (cl-cc:ast-call-func ast)))
+    (assert-= 2 (length (cl-cc:ast-call-args ast)))
+    (assert-true (cl-cc:ast-lambda-p (second (cl-cc:ast-call-args ast))))))
+
+(deftest php-parser-void-cast-lowers-to-progn
+  "PHP 8.5 (void) casts parse as a progn that discards the value and returns null."
+  (let ((value (%php-first-binding-value "<?php $x = (void) foo();")))
+    (assert-true (cl-cc:ast-progn-p value))
+    (assert-= 2 (length (cl-cc:ast-progn-forms value)))
+    (assert-true (cl-cc:ast-call-p (first (cl-cc:ast-progn-forms value))))
+    (assert-true (cl-cc:ast-quote-p (second (cl-cc:ast-progn-forms value))))
+    (assert-eq cl-cc/php:+php-null+
+               (cl-cc:ast-quote-value (second (cl-cc:ast-progn-forms value))))))
+
+(deftest php-parser-clone-with-lowers-to-helper-call
+  "PHP 8.5 clone-with syntax lowers through the parser to the clone-with helper."
+  (let* ((value (%php-first-binding-value "<?php $b = clone($a, ['x' => 9]);"))
+         (body (cl-cc:ast-let-body value))
+         (with-call (second body)))
+    (assert-true (cl-cc:ast-let-p value))
+    (assert-true (cl-cc:ast-call-p with-call))
+    (assert-eq 'cl-cc/php::%php-clone-with
+               (cl-cc:ast-var-name (cl-cc:ast-call-func with-call)))))
+
 (deftest php-parser-function-type-annotation-preservation
   "Characterization: function parameter and return type annotations should be preserved as declarations."
   (let ((ast (%php-first "<?php function add(int $a, ?string $b = null, int|string $c): bool { return true; }")))
@@ -1121,3 +1150,7 @@ parser error."
   (let ((ast (%php-first src)))
     (assert-true (cl-cc:ast-let-p ast))
     (assert-= expected-bindings (length (cl-cc:ast-let-bindings ast)))))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

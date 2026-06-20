@@ -149,7 +149,7 @@
 
 (defun generic-function-method-combination (gf)
   "Return GF's method-combination object, defaulting to STANDARD."
-  (if (and (hash-table-p gf) (gethash :__method-combination__ gf))
+  (if (and (hash-table-p gf) (nth-value 1 (gethash :__method-combination__ gf)))
       (gethash :__method-combination__ gf)
       'standard))
 

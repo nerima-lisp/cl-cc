@@ -44,10 +44,11 @@
 Returns (values attrs-alist rest) where ATTRS-ALIST is an association list
 of (string . string) pairs."
   ;; Consume 'with' — represented as a plain :T-IDENT with value \"with\"
-  ;; (the JS lexer emits contextual keywords as identifiers)
+  ;; or as :T-WITH, depending on the lexer path.
   (when (and stream
-             (eq (js-peek-type stream) :T-IDENT)
-             (equal "with" (js-peek-value stream)))
+             (or (eq (js-peek-type stream) :T-WITH)
+                 (and (eq (js-peek-type stream) :T-IDENT)
+                      (equal "with" (js-peek-value stream)))))
     (setf stream (cdr stream))  ; consume 'with'
     (multiple-value-bind (_ rest) (js-expect :T-LBRACE stream)
       (declare (ignore _))

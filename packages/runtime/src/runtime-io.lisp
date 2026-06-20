@@ -294,7 +294,10 @@ host package universe."
   (let* ((installer-sym (%rt-bootstrap-hook-symbol :installer))
          (vm-register (and installer-sym
                            (boundp installer-sym)
-                           (symbol-value installer-sym))))
+                           (symbol-value installer-sym)))
+         (php-package (find-package :cl-cc/php))
+         (php-current-closure (and php-package
+                                   (find-symbol "%PHP-CURRENT-CLOSURE" php-package))))
     (when vm-register
       (dolist (entry `(("RT-1+" . ,#'rt-1+)
                        ("RT-1-" . ,#'rt-1-)
@@ -309,6 +312,9 @@ host package universe."
                        ("RT-MAX" . ,#'rt-max)
                        ("RT-MIN" . ,#'rt-min)
                        ("RT-LENGTH" . ,#'rt-length)
+                       ,@(when (and php-current-closure
+                                    (fboundp php-current-closure))
+                           `(("PHP-CURRENT-CLOSURE" . ,(symbol-function php-current-closure))))
                        ("RT-CHAR-EQUAL" . ,#'rt-char-equal)
                        ("RT-CHAR=" . ,#'rt-char=)
                         ("RT-EQL" . ,#'rt-eql)

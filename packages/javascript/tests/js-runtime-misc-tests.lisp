@@ -10,7 +10,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Module exports ─────────────────────────────────────────────────────────
 
@@ -190,6 +190,73 @@
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
     (assert-equal '(3 2 1) acc)))
 
+(deftest js-rt-iterator-from-set
+  "%js-iterator-from-iterable normalizes Set values to an iterator object."
+  (let* ((set (cl-cc/javascript::%js-make-set))
+         (_   (cl-cc/javascript::%js-set-add set 3))
+         (_   (cl-cc/javascript::%js-set-add set 4))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable set))
+         (acc nil))
+    (declare (ignore _))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '(4 3) acc)))
+
+(deftest js-rt-iterator-from-map
+  "%js-iterator-from-iterable normalizes Map values to an entries iterator."
+  (let* ((map (cl-cc/javascript::%js-make-map))
+         (_1  (cl-cc/javascript::%js-map-set map "a" 1))
+         (_2  (cl-cc/javascript::%js-map-set map "b" 2))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable map))
+         (acc nil))
+    (declare (ignore _1 _2))
+    (cl-cc/javascript::%js-for-of iter
+                                  (lambda (entry)
+                                    (push (%jr-list entry) acc)))
+    (assert-equal '(("b" 2) ("a" 1)) acc)))
+
+(deftest js-rt-iterator-from-plain-next
+  "%js-iterator-from-iterable accepts plain iterator objects with next()."
+  (let* ((step 0)
+         (iterable
+           (cl-cc/javascript::%js-make-object
+            "next" (lambda ()
+                     (prog1
+                         (case step
+                           (0 (cl-cc/javascript::%js-make-object "value" "first" "done" nil))
+                           (1 (cl-cc/javascript::%js-make-object "value" "second" "done" nil))
+                           (t (cl-cc/javascript::%js-make-object "value" cl-cc/javascript::+js-undefined+ "done" t)))
+                       (incf step)))))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable iterable))
+         (acc nil))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '("second" "first") acc)))
+
+(deftest js-rt-iterator-from-@@iterator
+  "%js-iterator-from-iterable calls @@iterator when present on a plain object."
+  (let* ((iterable
+           (cl-cc/javascript::%js-make-object
+            "@@iterator" (lambda ()
+                           (cl-cc/javascript::%js-vec-to-iter (%jr-arr 8 9)))))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable iterable))
+         (acc nil))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '(9 8) acc)))
+
+(deftest js-rt-iterator-from-string
+  "%js-iterator-from-iterable wraps strings as iterators over one-char strings."
+  (let* ((iter (cl-cc/javascript::%js-iterator-from-iterable "ab"))
+         (acc nil))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '("b" "a") acc)))
+
+(deftest js-rt-iterator-from-non-iterable
+  "%js-iterator-from-iterable returns an already-done iterator for non-iterables."
+  (let ((iter (cl-cc/javascript::%js-iterator-from-iterable
+               (cl-cc/javascript::%js-make-object))))
+    (multiple-value-bind (value done) (cl-cc/javascript::%js-iter-next iter)
+      (assert-eq cl-cc/javascript::+js-undefined+ value)
+      (assert-true done))))
+
 ;;; ─── Map.groupBy ─────────────────────────────────────────────────────────────
 
 (deftest js-rt-map-group-by
@@ -255,6 +322,22 @@
     (assert-string= "x" deleted)
     (assert-false (nth-value 1 (gethash "x" target)))))
 
+(deftest js-rt-proxy-falls-back-without-traps
+  "Proxy operations fall back to the target when a trap is absent."
+  (let* ((target (cl-cc/javascript::%js-make-object "x" 1))
+         (proxy (cl-cc/javascript::%js-make-proxy-object
+                 target (cl-cc/javascript::%js-make-object))))
+    (multiple-value-bind (value trapped)
+        (cl-cc/javascript::%js-proxy-call-trap proxy "get" target "x" proxy)
+      (assert-eq cl-cc/javascript::+js-undefined+ value)
+      (assert-false trapped))
+    (assert-= 1 (cl-cc/javascript::%js-get-prop proxy "x"))
+    (assert-= 2 (cl-cc/javascript::%js-set-prop proxy "y" 2))
+    (assert-= 2 (gethash "y" target))
+    (assert-true (cl-cc/javascript::%js-in "x" proxy))
+    (assert-true (cl-cc/javascript::%js-delete proxy "x"))
+    (assert-false (nth-value 1 (gethash "x" target)))))
+
 (deftest js-rt-proxy-reflect-and-object-traps
   "Proxy traps route Reflect and Object descriptor/enumeration helpers."
   (let* ((target (cl-cc/javascript::%js-make-object "a" 1))
@@ -294,7 +377,9 @@
       (assert-string= "b" (aref keys 0))
       (assert-string= "c" (aref keys 1)))
     (let ((desc (cl-cc/javascript::%js-object-get-own-property-descriptor proxy "b")))
-      (assert-string= "b" (gethash "value" desc)))))
+      (assert-string= "b" (gethash "value" desc)))
+    (let ((desc (cl-cc/javascript::%js-object-get-own-property-descriptor proxy "c")))
+      (assert-string= "c" (gethash "value" desc)))))
 
 ;;; ─── Math.sumPrecise (ES2026) ────────────────────────────────────────────────
 
@@ -480,6 +565,18 @@
     (cl-cc/javascript::%js-object-define-properties obj descs)
     (assert-= 1 (gethash "a" obj))
     (assert-= 2 (gethash "b" obj))))
+
+(deftest js-rt-object-define-properties-ignores-non-objects
+  "%js-object-define-properties ignores non-object props and non-object descriptors."
+  (let* ((obj (cl-cc/javascript::%js-make-object "keep" 1))
+         (mixed (cl-cc/javascript::%js-make-object
+                 "ok" (cl-cc/javascript::%js-make-object "value" 2)
+                 "skip" 9)))
+    (cl-cc/javascript::%js-object-define-properties obj (%jr-arr "bad"))
+    (cl-cc/javascript::%js-object-define-properties obj mixed)
+    (assert-= 1 (gethash "keep" obj))
+    (assert-= 2 (gethash "ok" obj))
+    (assert-false (nth-value 1 (gethash "skip" obj)))))
 
 ;;; ─── Reflect.defineProperty / Object.defineProperty ─────────────────────────
 

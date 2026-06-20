@@ -195,13 +195,13 @@
      (%js-set-keys value))
     ((%js-ht-p value)
      (multiple-value-bind (next present-p) (gethash "next" value)
-       (cond
-         ((and present-p (functionp next))
-          value)
-         ((multiple-value-bind (iter-fn iter-present-p) (gethash "@@iterator" value)
-            (when (and iter-present-p (functionp iter-fn))
-              (%js-zip-normalize-iterable (%js-funcall iter-fn)))))
-         (t (%js-zip-type-error "Iterator.zip expects iterable objects")))))
+       (when (and present-p (functionp next))
+         (return-from %js-zip-normalize-iterable value)))
+     (multiple-value-bind (iter-fn iter-present-p) (gethash "@@iterator" value)
+       (when (and iter-present-p (functionp iter-fn))
+         (return-from %js-zip-normalize-iterable
+           (%js-zip-normalize-iterable (%js-funcall iter-fn)))))
+     (%js-zip-type-error "Iterator.zip expects iterable objects"))
     (t
      (%js-zip-type-error "Iterator.zip expects iterable objects"))))
 
@@ -212,9 +212,11 @@
 (defun %js-zip-collect-source-iterators (iterables)
   (let ((outer (%js-zip-normalize-iterable iterables))
         (sources nil))
-    (%js-doiter (value outer)
-      (push (%js-zip-normalize-iterable value) sources))
-    (nreverse sources)))
+    (loop
+      (multiple-value-bind (item done) (%js-iter-next outer)
+        (when done
+          (return (nreverse sources)))
+        (push (%js-zip-normalize-iterable item) sources)))))
 
 (defun %js-zip-collect-padding (padding-option iter-count)
   (cond
@@ -227,11 +229,14 @@
            (padding nil)
            (count 0))
        (block padding-limit
-         (%js-doiter (value padding-iter nil)
-           (push value padding)
-           (incf count)
-           (when (>= count iter-count)
-             (return-from padding-limit))))
+         (loop
+           (multiple-value-bind (item done) (%js-iter-next padding-iter)
+             (when done
+               (return-from padding-limit))
+             (push item padding)
+             (incf count)
+             (when (>= count iter-count)
+               (return-from padding-limit)))))
        (let ((result (nreverse padding)))
          (loop repeat (max 0 (- iter-count count))
                do (setf result (append result (list +js-undefined+))))
@@ -299,7 +304,7 @@
                         ((null iter)
                          (push pad results))
                         (t
-                         (multiple-value-bind (value exhausted-p) (%js-iter-next iter)
+                         (multiple-value-bind (next-value exhausted-p) (%js-iter-next iter)
                            (if exhausted-p
                              (progn
                                  (setf any-done-p t)
@@ -307,7 +312,7 @@
                                  (push pad results))
                                (progn
                                  (setf all-done-p nil)
-                                 (push value results)))))))
+                                 (push next-value results)))))))
              (when any-done-p
                (cond
                  ((and (string= mode "strict") (not all-done-p))
@@ -321,7 +326,7 @@
              (when all-done-p
                (setf done-p t)
                (return-from step :done))
-             (cons (%js-make-array (nreverse results)) nil))))))))
+             (cons (apply #'%js-make-array (nreverse results)) nil))))))))
 
 (defun %js-iterator-zip-keyed (iterables &optional options)
   "Iterator.zipKeyed(iterables[, options]) → iterator of null-prototype objects."
@@ -364,7 +369,7 @@
                         ((null iter)
                          (setf (gethash key results) pad))
                         (t
-                         (multiple-value-bind (value exhausted-p) (%js-iter-next iter)
+                         (multiple-value-bind (next-value exhausted-p) (%js-iter-next iter)
                            (if exhausted-p
                              (progn
                                  (setf any-done-p t)
@@ -372,7 +377,7 @@
                                  (setf (gethash key results) pad))
                                (progn
                                  (setf all-done-p nil)
-                                 (setf (gethash key results) value)))))))
+                                 (setf (gethash key results) next-value)))))))
              (when any-done-p
                (cond
                  ((and (string= mode "strict") (not all-done-p))

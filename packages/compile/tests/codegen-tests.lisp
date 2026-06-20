@@ -380,6 +380,19 @@ Note: identical non-string constants may coalesce to a single vm-const during co
          (result (cl-cc/compile::%let-noescape-closure 'f lam nil nil nil body)))
     (assert-eq lam result)))
 
+(deftest let-noescape-closure-the-wrapped-lambda-is-eligible
+  "%let-noescape-closure unwraps ast-the before checking the lambda shape."
+  (let* ((lam (make-ast-lambda :params '(x)
+                               :optional-params nil
+                               :rest-param nil
+                               :key-params nil
+                               :body (list (make-ast-var :name 'x))))
+         (wrapped (make-ast-the :type 'function :value lam))
+         (body (list (make-ast-call :func (make-ast-var :name 'f)
+                                    :args (list (make-ast-int :value 1)))))
+         (result (cl-cc/compile::%let-noescape-closure 'f wrapped nil nil nil body)))
+    (assert-eq lam result)))
+
 (deftest let-noescape-closure-mutated-binding-returns-nil
   "%let-noescape-closure returns NIL when the binding appears in the mutated set."
   (let* ((lam (make-ast-lambda :params '(x)

@@ -2,6 +2,20 @@
 
 (in-package :cl-cc/php)
 
+(defun %php-register-vm-runtime-callables ()
+  (let ((installer cl-cc/bootstrap:*vm-runtime-callable-installer*))
+    (when installer
+      (funcall installer "PHP-CURRENT-CLOSURE" #'%php-current-closure)))
+  (cl-cc/vm:vm-register-host-bridge
+   '%php-current-closure
+   (lambda (&rest args)
+     (apply (cl-cc/vm::%vm-runtime-callable "PHP-CURRENT-CLOSURE") args))))
+
+(defun %php-register-host-bridges ()
+  "Register PHP-specific host bridge aliases that bypass VM instruction names."
+  (cl-cc/vm:vm-register-host-bridge 'max #'%php-max)
+  (cl-cc/vm:vm-register-host-bridge 'min #'%php-min))
+
 (defparameter *php-builtin-registry* (make-hash-table :test #'equal)
   "Map lowercase PHP builtin names to Common Lisp helper functions.")
 
@@ -25,6 +39,9 @@
     (when symbol
       (setf (gethash key *php-builtin-symbol-registry*) symbol))
     fn))
+
+(eval-when (:load-toplevel :execute)
+  (%php-register-host-bridges))
 
 (defun %php-lookup-builtin (name)
   "Return the helper function registered for PHP builtin NAME, or NIL."
@@ -525,4 +542,7 @@
             %php-lookup-builtin-symbol
             %php-array-pairs)
           :cl-cc/php)
+  (setf cl-cc/bootstrap:*runtime-vm-callable-register-hook*
+        #'%php-register-vm-runtime-callables)
+  (%php-register-vm-runtime-callables)
   (%php-register-all-builtins))

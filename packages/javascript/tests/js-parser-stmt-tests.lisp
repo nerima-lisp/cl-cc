@@ -8,7 +8,7 @@
 ;;;; Depends on: js-parser-decl-tests.lisp (%js-parse, %js-first, %js-call-name).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── If / else ────────────────────────────────────────────────────────────────
 
@@ -137,6 +137,22 @@ list (a spread element makes the array literal an ast-apply, not a plain call)."
   (let ((asts (cl-cc/javascript:parse-js-module "import x from 'mod';")))
     (assert-true (>= (length asts) 0))))
 
+(deftest-each js-parser-import-forms
+  "Import syntax covers bare imports, attributes, namespace imports, default imports, and malformed forms."
+  :cases (("bare"              "import 'mod';"                                "%JS-IMPORT")
+          ("attributes"        "import 'mod' with { type: 'json' };"         "%JS-IMPORT")
+          ("named-string-spec" "import { 'default' as def, foo } from 'mod';" "%JS-IMPORT")
+          ("default"           "import foo from 'mod';"                      "%JS-IMPORT")
+          ("default-namespace" "import foo, * as ns from 'mod';"             "%JS-IMPORT")
+          ("default-named"     "import foo, { bar as baz } from 'mod';"      "%JS-IMPORT")
+          ("malformed"         "import { foo }"                               "error"))
+  (src expected)
+  (if (string= expected "error")
+      (assert-signals error (cl-cc/javascript:parse-js-module src))
+      (let ((ast (first (cl-cc/javascript:parse-js-module src))))
+        (assert-true (cl-cc:ast-call-p ast))
+        (assert-string= expected (%js-call-name ast)))))
+
 (deftest js-parser-export-const
   "export const val = 1; in module mode produces at least one AST node."
   (let ((asts (cl-cc/javascript:parse-js-module "export const val = 1;")))
@@ -197,6 +213,28 @@ list (a spread element makes the array literal an ast-apply, not a plain call)."
                        (eq :stub (cl-cc:ast-quote-value
                                   (first (cl-cc:ast-defun-body decl))))))))
 
+(deftest-each js-parser-export-forms
+  "Export syntax covers default expressions, default function/class forms, star exports, re-exports, declaration exports, and malformed forms."
+  :cases (("default-expr"      "export default 1 + 2;"                              "%JS-EXPORT")
+          ("default-function"  "export default function foo() {}"                  "%JS-EXPORT")
+          ("default-async-fn"  "export default async function foo() {}"           "%JS-EXPORT")
+          ("default-class"     "export default class Foo {}"                      "%JS-EXPORT")
+          ("star"              "export * from 'mod';"                              "%JS-EXPORT")
+          ("star-ns"           "export * as ns from 'mod';"                        "%JS-EXPORT")
+          ("named"             "export { foo, bar as baz };"                       "%JS-EXPORT")
+          ("re-export"         "export { foo as bar } from 'mod';"                 "%JS-EXPORT")
+          ("export-const"      "export const value = 1;"                            "%JS-EXPORT")
+          ("export-function"   "export function fn() {}"                           "%JS-EXPORT")
+          ("export-async-fn"   "export async function fn() {}"                     "%JS-EXPORT")
+          ("export-class"      "export class C {}"                                 "%JS-EXPORT")
+          ("malformed"         "export default"                                     "error"))
+  (src expected)
+  (if (string= expected "error")
+      (assert-signals error (cl-cc/javascript:parse-js-module src))
+      (let ((ast (first (cl-cc/javascript:parse-js-module src))))
+        (assert-true (cl-cc:ast-call-p ast))
+        (assert-string= expected (%js-call-name ast)))))
+
 (deftest js-parser-import-meta-expression
   "import.meta lowers to a runtime metadata object."
   (let* ((ast (first (cl-cc/javascript:parse-js-module "const meta = import.meta;")))
@@ -217,6 +255,187 @@ list (a spread element makes the array literal an ast-apply, not a plain call)."
   (let ((ast (%js-first "using x = getResource();")))
     (assert-true (cl-cc:ast-let-p ast))
     (assert-true (member :js-using (cl-cc:ast-let-declarations ast)))))
+
+;;; ─── Internal destructuring / default-expression coverage ────────────────────
+
+(defun %js-token-ast (src)
+  "Build the minimal AST returned by %js-toks-to-ast for the first token in SRC."
+  (cl-cc/javascript::%js-toks-to-ast
+   (list (first (cl-cc/javascript:tokenize-js-source src)))))
+
+(deftest-each js-parser-toks-to-ast-single-token
+  "Single-token defaults lower to the expected AST node kinds."
+  :cases (("number" "42" :int)
+          ("string" "'hello'" :quote)
+          ("true" "true" :quote)
+          ("false" "false" :quote)
+          ("null" "null" :quote)
+          ("undefined" "undefined" :quote)
+          ("ident" "name" :var)
+          ("fallback" "." :quote))
+  (src kind)
+  (let ((ast (%js-token-ast src)))
+    (case kind
+      (:int   (assert-true (cl-cc:ast-int-p ast)))
+      (:quote (assert-true (cl-cc:ast-quote-p ast)))
+      (:var   (assert-true (cl-cc:ast-var-p ast))))))
+
+(deftest js-parser-toks-to-ast-multi-token
+  "Multi-token defaults are wrapped in a %js-raw-default call."
+  (let ((ast (cl-cc/javascript::%js-toks-to-ast
+              (butlast (cl-cc/javascript:tokenize-js-source "(a + b)")))))
+    (assert-true (cl-cc:ast-call-p ast))
+    (assert-string= "%JS-RAW-DEFAULT" (%js-call-name ast))))
+
+(deftest-each js-parser-default-expr-delimiters
+  "Default-expression scanning stops on top-level delimiters and preserves nested ones."
+  :cases (("comma" ", tail" :quote)
+          ("close-bracket" "] tail" :quote)
+          ("nested" "(a, [b, c], {d: e}) , tail" :call))
+  (src kind)
+  (multiple-value-bind (ast rest)
+      (cl-cc/javascript::%js-parse-default-expr (cl-cc/javascript:tokenize-js-source src))
+    (case kind
+      (:quote
+       (assert-true (cl-cc:ast-quote-p ast))
+       (assert-equal nil (cl-cc:ast-quote-value ast)))
+      (:call
+       (assert-true (cl-cc:ast-call-p ast))
+       (assert-string= "%JS-RAW-DEFAULT" (%js-call-name ast))
+       (assert-eq :T-COMMA (getf (first rest) :type))))))
+
+(deftest js-parser-binding-pattern-array-branches
+  "[, a = 1, [b, ...r], ...rest] covers elisions, defaults, nested arrays, and rest."
+  (multiple-value-bind (pat rest)
+      (cl-cc/javascript::js-parse-binding-pattern
+       (cl-cc/javascript:tokenize-js-source "[, a = 1, [b, ...r], ...rest]"))
+    (assert-eq :T-EOF (getf (first rest) :type))
+    (assert-eq :array (cl-cc/javascript::js-binding-pattern-kind pat))
+    (let* ((elements (cl-cc/javascript::js-binding-pattern-elements pat))
+           (first-el (first elements))
+           (second-el (second elements))
+           (third-el  (third elements)))
+      (assert-= 3 (length elements))
+      (assert-true (null (first first-el)))
+      (assert-eq :ident (cl-cc/javascript::js-binding-pattern-kind
+                         (first second-el)))
+      (assert-true (cl-cc:ast-int-p (second second-el)))
+      (assert-eq :array (cl-cc/javascript::js-binding-pattern-kind
+                         (first third-el)))
+      (assert-true (cl-cc/javascript::js-binding-pattern-rest pat))
+      (assert-eq :ident (cl-cc/javascript::js-binding-pattern-kind
+                         (cl-cc/javascript::js-binding-pattern-rest pat))))))
+
+(deftest js-parser-binding-pattern-object-branches
+  "{x, \"s\": s, 1: n = 3, nested: [a, ...r], ...rest} covers key kinds, shorthand,
+rename/default, nested patterns, and rest."
+  (multiple-value-bind (pat rest)
+      (cl-cc/javascript::js-parse-binding-pattern
+       (cl-cc/javascript:tokenize-js-source
+        "{x, \"s\": s, 1: n = 3, nested: [a, ...r], ...rest}"))
+    (assert-eq :T-EOF (getf (first rest) :type))
+    (assert-eq :object (cl-cc/javascript::js-binding-pattern-kind pat))
+    (assert-= 4 (length (cl-cc/javascript::js-binding-pattern-properties pat)))
+    (let* ((props (cl-cc/javascript::js-binding-pattern-properties pat))
+           (p1 (first props))
+           (p2 (second props))
+           (p3 (third props))
+           (p4 (fourth props)))
+      (assert-equal "x" (first p1))
+      (assert-eq :ident (cl-cc/javascript::js-binding-pattern-kind (second p1)))
+      (assert-equal "s" (first p2))
+      (assert-eq :ident (cl-cc/javascript::js-binding-pattern-kind (second p2)))
+      (assert-equal "1" (first p3))
+      (assert-eq :ident (cl-cc/javascript::js-binding-pattern-kind (second p3)))
+      (assert-true (cl-cc:ast-int-p (third p3)))
+      (assert-equal "nested" (first p4))
+      (assert-eq :array (cl-cc/javascript::js-binding-pattern-kind (second p4)))
+      (assert-eq :ident (cl-cc/javascript::js-binding-pattern-kind
+                         (cl-cc/javascript::js-binding-pattern-rest pat))))))
+
+(deftest js-parser-binding-pattern-error
+  "An invalid leading token signals a parse error."
+  (assert-signals error
+    (cl-cc/javascript::js-parse-binding-pattern
+     (cl-cc/javascript:tokenize-js-source "."))))
+
+(deftest js-parser-build-pattern-let-array-rest
+  "Array rest bindings lower to %js-array-slice."
+  (let* ((pat (first (%js-parse "[a, ...rest]")))
+         (body (cl-cc/javascript::%js-build-pattern-let
+                (cl-cc/javascript::js-parse-binding-pattern
+                 (cl-cc/javascript:tokenize-js-source "[a, ...rest]"))
+                (make-ast-var :name 'src)
+                (list (make-ast-quote :value :done)))))
+    (declare (ignore pat))
+    (assert-true (cl-cc:ast-let-p (first body)))
+    (let* ((outer (first body))
+           (inner (first (cl-cc:ast-let-body outer)))
+           (rest-let (first (cl-cc:ast-let-body inner)))
+           (rest-binding (first (cl-cc:ast-let-bindings rest-let))))
+      (assert-true (cl-cc:ast-let-p outer))
+      (assert-true (cl-cc:ast-let-p inner))
+      (assert-true (cl-cc:ast-let-p rest-let))
+      (assert-string= "%JS-ARRAY-SLICE" (%js-call-name (cdr rest-binding))))))
+
+(deftest js-parser-build-pattern-let-object-rest
+  "Object rest bindings lower to %js-object-rest."
+  (let* ((body (cl-cc/javascript::%js-build-pattern-let
+                (cl-cc/javascript::js-parse-binding-pattern
+                 (cl-cc/javascript:tokenize-js-source "{a, ...rest}"))
+                (make-ast-var :name 'src)
+                (list (make-ast-quote :value :done))))
+         (outer (first body))
+         (inner (first (cl-cc:ast-let-body outer)))
+         (rest-let (first (cl-cc:ast-let-body inner)))
+         (rest-binding (first (cl-cc:ast-let-bindings rest-let))))
+    (assert-true (cl-cc:ast-let-p outer))
+    (assert-true (cl-cc:ast-let-p inner))
+    (assert-true (cl-cc:ast-let-p rest-let))
+    (assert-string= "%JS-OBJECT-REST" (%js-call-name (cdr rest-binding)))))
+
+(deftest js-parser-build-pattern-let-error
+  "Unknown pattern kinds signal an error in the lowerer."
+  (assert-signals error
+    (cl-cc/javascript::%js-build-pattern-let
+     (cl-cc/javascript::make-js-binding-pattern :kind :bogus)
+     (make-ast-var :name 'src)
+     (list (make-ast-quote :value :done)))))
+
+(deftest js-parser-lower-binding-pattern-ident
+  "Identifier patterns lower to a direct binding with no inner body."
+  (multiple-value-bind (bindings inner)
+      (cl-cc/javascript::js-lower-binding-pattern
+       (cl-cc/javascript::make-js-binding-pattern :kind :ident :name 'x)
+       (make-ast-var :name 'src))
+    (assert-= 1 (length bindings))
+    (assert-eq 'x (car (first bindings)))
+    (assert-true (cl-cc:ast-var-p (cdr (first bindings))))
+    (assert-equal nil inner)))
+
+(deftest-each js-parser-lower-binding-pattern-nested
+  "Nested array/object patterns produce an inner ast-let body."
+  :cases (("array" "[[a], ...rest]")
+          ("object" "{nested: [a], ...rest}"))
+  (src)
+  (multiple-value-bind (pat rest)
+      (cl-cc/javascript::js-parse-binding-pattern
+       (cl-cc/javascript:tokenize-js-source src))
+    (declare (ignore rest))
+    (multiple-value-bind (bindings inner)
+      (cl-cc/javascript::js-lower-binding-pattern
+       pat
+       (make-ast-var :name 'src))
+      (assert-= 1 (length bindings))
+      (assert-true (consp inner))
+      (assert-true (cl-cc:ast-let-p (first inner))))))
+
+(deftest js-parser-lower-binding-pattern-error
+  "Unknown pattern kinds also signal an error in js-lower-binding-pattern."
+  (assert-signals error
+    (cl-cc/javascript::js-lower-binding-pattern
+     (cl-cc/javascript::make-js-binding-pattern :kind :bogus)
+     (make-ast-var :name 'src))))
 
 ;;; ─── Throw statement ──────────────────────────────────────────────────────────
 

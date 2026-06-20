@@ -312,6 +312,9 @@
 (defparameter *wasm-wasi-p2-enabled* nil
   "FR-207: Full WASI Preview 2 capability-based interface.")
 
+(defparameter *wasm-wasi-preview1-compat-shim-enabled* nil
+  "FR-321: WASI Preview 1 compatibility shim for Preview 2 hosts.")
+
 (defparameter *wasm-wasi-p3-enabled* nil
   "FR-257: WASI 0.3 async-first I/O. Phase 2, experimental.")
 

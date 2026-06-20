@@ -6,15 +6,15 @@
   :version "0.1.0"
   :author "cl-cc team"
   :license "MIT"
-  :depends-on ("cl-cc-runtime" "cl-cc-vm" "cl-cc-codegen" "cl-cc-compile")
-  :pathname "src/jit/"
+  :depends-on ("sb-posix" "cl-cc-runtime" "cl-cc-vm" "cl-cc-codegen" "cl-cc-compile")
   :serial t
   :components
   ((:file "package")
+   (:file "config")
    (:file "stack-map")
    (:file "safepoints")
    (:file "write-barrier")
+   (:file "baseline")
    (:file "call-stubs")
    (:file "cache")
-   (:file "baseline")
    (:file "trace-jit")))

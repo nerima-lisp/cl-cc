@@ -21,7 +21,7 @@
        (equal "&" (php-peek-value stream))))
 
 (defun %php-helper-var (name)
-  (intern (string-upcase name) (find-package '#:cl-cc/php)))
+  (make-ast-var :name (intern (string-upcase name) (find-package '#:cl-cc/php))))
 
 (defun %php-unsupported (message)
   (error "Unsupported PHP parse form: ~A" message))
@@ -48,16 +48,25 @@
   (some #'%php-spread-call-p args))
 
 (defun %php-spread-arglist-expr (args)
-  (make-ast-call
-   :func (make-ast-var :name 'append)
-   :args (mapcar (lambda (a)
-                   (if (%php-spread-call-p a)
-                       (make-ast-call
-                        :func (make-ast-var :name 'cl-cc/php::%php-array-values-list)
-                        :args (list (first (ast-call-args a))))
-                       (make-ast-call :func (make-ast-var :name 'list)
-                                      :args (list a))))
-                 args)))
+  (labels ((%fragment (a)
+             (if (%php-spread-call-p a)
+                 (make-ast-call
+                  :func (make-ast-var :name 'cl-cc/php::%php-array-values-list)
+                  :args (list (first (ast-call-args a))))
+                 (make-ast-call :func (make-ast-var :name 'list)
+                                :args (list a)))))
+    (cond
+      ((null args)
+       (make-ast-call :func (make-ast-var :name 'list) :args nil))
+      ((null (cdr args))
+       (%fragment (first args)))
+      (t
+       (reduce (lambda (left right)
+                 (make-ast-call
+                  :func (make-ast-var :name 'append)
+                  :args (list left (%fragment right))))
+               (rest args)
+               :initial-value (%fragment (first args)))))))
 
 (defun %php-callable-by-ref-indices (node)
   (cond
@@ -139,7 +148,7 @@
                           (string-equal needle param-name))))))
 
 (defun %php-default-for-param (param defaults)
-  (cdr (assoc (%php-param-name param) defaults :test #'eq)))
+  (cdr (assoc param defaults :test #'eq)))
 
 (defun %php-array-constructor-call-p (node)
   (and (ast-call-p node)
@@ -163,6 +172,16 @@
         (values (length (ast-call-args expr)) t)
         (values nil nil))))
 
+(defun %php-spread-static-elements (arg)
+  "Return the element expressions inside a statically-known spread ARG."
+  (multiple-value-bind (width known-width-p) (%php-spread-static-width arg)
+    (unless known-width-p
+      (return-from %php-spread-static-elements (values nil nil)))
+    (values (loop for entry in (ast-call-args (first (ast-call-args arg)))
+                  repeat width
+                  collect (third (ast-list-elements entry)))
+            t)))
+
 (defun %php-runtime-call-arg-descriptor (arg)
   (cond
     ((%php-named-arg-call-p arg)
@@ -180,19 +199,21 @@
                 arg))))
 
 (defun %php-dynamic-named-spread-arglist-expr (fn-sym params defaults args)
-  (%php-call 'cl-cc/php::%php-call-args-with-named-spread
-             (make-ast-quote :value fn-sym)
-             (make-ast-quote :value (mapcar #'%php-param-string-name params))
-             (make-ast-quote :value (mapcar (lambda (param)
-                                              (not (null (%php-default-for-param
-                                                          param defaults))))
-                                            params))
-             (%php-call 'list
-                        (mapcar (lambda (param)
-                                  (or (%php-default-for-param param defaults)
-                                      (make-ast-quote :value nil)))
-                                params))
-             (mapcar #'%php-runtime-call-arg-descriptor args)))
+  (apply #'%php-call
+         'cl-cc/php::%php-call-args-with-named-spread
+         (append (list (make-ast-quote :value fn-sym)
+                       (make-ast-quote :value (mapcar #'%php-param-string-name params))
+                       (make-ast-quote :value (mapcar (lambda (param)
+                                                        (not (null (%php-default-for-param
+                                                                    param defaults))))
+                                                      params))
+                       (apply #'%php-call
+                              'list
+                              (mapcar (lambda (param)
+                                        (or (%php-default-for-param param defaults)
+                                            (make-ast-quote :value nil)))
+                                      params)))
+                 (mapcar #'%php-runtime-call-arg-descriptor args))))
 
 (defstruct (%php-named-call-state (:conc-name %php-named-call-state-))
   fn-sym params defaults slots filled positional-index last-index seen-named
@@ -241,40 +262,32 @@
   (when (%php-named-call-state-seen-named state)
     (error "PHP spread argument after named argument in call to ~A"
            (%php-named-call-state-fn-sym state)))
-  (multiple-value-bind (width known-width-p) (%php-spread-static-width arg)
+  (multiple-value-bind (elements known-width-p) (%php-spread-static-elements arg)
     (unless known-width-p
       (return-from %php-add-spread-call-arg
         (values nil (%php-named-call-state-dynamic-arglist-expr state args))))
-    (cond
-      ((zerop width) nil)
-      ((< (%php-named-call-state-positional-index state)
-          (length (%php-named-call-state-params state)))
-       (dotimes (offset width)
-         (let ((index (+ (%php-named-call-state-positional-index state) offset)))
-           (when (and (< index (length (%php-named-call-state-params state)))
-                      (aref (%php-named-call-state-filled state) index))
-             (error "Duplicate PHP argument for parameter ~A in call to ~A"
-                    (%php-param-string-name (nth index (%php-named-call-state-params state)))
-                    (%php-named-call-state-fn-sym state)))))
-       (setf (aref (%php-named-call-state-slots state)
-                   (%php-named-call-state-positional-index state))
-             arg
-             (aref (%php-named-call-state-filled state)
-                   (%php-named-call-state-positional-index state))
-             t
-             (%php-named-call-state-last-index state)
-             (max (%php-named-call-state-last-index state)
-                  (min (1- (length (%php-named-call-state-params state)))
-                       (+ (%php-named-call-state-positional-index state)
-                          width -1))))
-       (loop for index from (1+ (%php-named-call-state-positional-index state))
-             below (min (length (%php-named-call-state-params state))
-                        (+ (%php-named-call-state-positional-index state) width))
-             do (setf (aref (%php-named-call-state-filled state) index)
-                      :php-spread-covered))
-       (incf (%php-named-call-state-positional-index state) width))
-      (t
-       (push arg (%php-named-call-state-extra-args state)))))
+    (dolist (element elements)
+      (if (< (%php-named-call-state-positional-index state)
+             (length (%php-named-call-state-params state)))
+          (progn
+            (when (aref (%php-named-call-state-filled state)
+                        (%php-named-call-state-positional-index state))
+              (error "Duplicate PHP argument for parameter ~A in call to ~A"
+                     (%php-param-string-name
+                      (nth (%php-named-call-state-positional-index state)
+                           (%php-named-call-state-params state)))
+                     (%php-named-call-state-fn-sym state)))
+            (setf (aref (%php-named-call-state-slots state)
+                        (%php-named-call-state-positional-index state))
+                  element
+                  (aref (%php-named-call-state-filled state)
+                        (%php-named-call-state-positional-index state))
+                  t
+                  (%php-named-call-state-last-index state)
+                  (max (%php-named-call-state-last-index state)
+                       (%php-named-call-state-positional-index state)))
+            (incf (%php-named-call-state-positional-index state)))
+          (push element (%php-named-call-state-extra-args state)))))
   (values state nil))
 
 (defun %php-add-positional-call-arg (state arg)

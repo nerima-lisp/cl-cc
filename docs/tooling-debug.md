@@ -50,7 +50,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 
 - **対象**: `packages/vm/src/vm.lisp`
 - **現状**: VMクロージャ（`vm.lisp:19-31`、6スロット）・consセル・ヒープオブジェクトに人間可読インスペクションAPIなし。CLOSオブジェクトは`:__class__`付きハッシュテーブルだがプリンタなし
-- **内容**: `vm-inspect`：クロージャのentry-label/params/captured-values、ヒープオブジェクト、クラスインスタンス（スロット名+値）、ジェネリック関数ディスパッチテーブルを再帰的に表示
+- **内容**: `vm-inspect`：クロージャのentry-label/params/captured-regs/captured-vals、ヒープオブジェクト、クラスインスタンス（スロット名+値）、ジェネリック関数ディスパッチテーブルを再帰的に表示
 - **根拠**: SBCL `(inspect obj)` / SLIME Inspector。オブジェクト構造の理解に必須
 - **難易度**: Easy
 

@@ -183,7 +183,7 @@ console.log(new C(7).get());")))
 
 (deftest-js-run js-e2e-es2026-json-raw-json
   "ES2026 JSON.rawJSON / JSON.isRawJSON preserve raw JSON text through stringify."
-  ("true {\"x\":1}"
+  ("true {\"payload\":{\"x\":1}}"
    "const raw=JSON.rawJSON('{\"x\":1}'); console.log(JSON.isRawJSON(raw)+' '+JSON.stringify({payload:raw}));")
   ("false"
    "console.log(JSON.isRawJSON({payload:1})?'true':'false');"))

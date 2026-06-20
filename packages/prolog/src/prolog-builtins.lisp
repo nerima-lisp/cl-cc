@@ -5,37 +5,36 @@
 ;;; Each handler is (lambda (args env k)) — continuation-passing style:
 ;;; args = predicate arguments, env = current bindings, k = success continuation.
 
-(defvar *builtin-predicates*)
+(defvar *builtin-predicates* (make-hash-table :test 'eq))
 
 (declaim (ftype function subst-for-eval eval-lisp-condition
-                      solve-conjunction solve-goal our-eval))
+                      solve-conjunction solve-goal our-eval
+                      register-builtin-specs))
 
-(defmacro def-binary-prolog-handler (name (left right) &body body)
-  "Define a binary builtin handler with ARGS destructured once at the top."
-  `(defun ,name (args env k)
-     (destructuring-bind (,left ,right) args
-       ,@body)))
+(defun register-builtin-specs (table specs)
+  "Populate TABLE from SPECS entries of the form (NAME HANDLER)."
+  (dolist (spec specs)
+    (destructuring-bind (name handler) spec
+      (setf (gethash name table)
+            (symbol-function handler)))))
 
 (defun prolog-cut-handler (args env k)
   (declare (ignore args))
   (funcall k env)
   (signal 'prolog-cut))
 
-(defun prolog-and-handler (args env k)
-  (solve-conjunction args env k))
-
 (defun prolog-or-handler (args env k)
   (dolist (alt args)
     (solve-goal alt env k)))
 
-(def-binary-prolog-handler prolog-unify-handler (left right)
-  (when-unify-succeeds (new-env left right env)
-    (funcall k new-env)))
+(defun prolog-unify-handler (args env k)
+  (destructuring-bind (left right) args
+    (when-unify-succeeds (new-env left right env)
+      (funcall k new-env))))
 
-(def-binary-prolog-handler prolog-not-unify-handler (left right)
-  (let ((v1 (logic-substitute left env))
-        (v2 (logic-substitute right env)))
-    (when (not (equal v1 v2))
+(defun prolog-not-unify-handler (args env k)
+  (destructuring-bind (left right) args
+    (when (unify-failed-p (unify left right env))
       (funcall k env))))
 
 (defun prolog-when-handler (args env k)
@@ -68,14 +67,3 @@
           (cons (our-eval substituted))
           (t substituted)))
     (error () nil)))
-
-(defun %invoke-builtin-goal (predicate args env k)
-  "Invoke the built-in predicate handler for PREDICATE, if one exists."
-  (let ((builtin (gethash predicate *builtin-predicates*)))
-    (when builtin
-      (funcall builtin args env k)
-      t)))
-
-(eval-when (:load-toplevel :execute)
-  (setf *builtin-predicates*
-        (make-builtin-predicate-table *builtin-predicate-specs*)))

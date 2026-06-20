@@ -997,7 +997,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 - **対象**: `packages/vm/src/vm.lisp`
 - **現状**: `vm-closure-ref-idx`(`vm.lisp:688-693`)が`(nth idx values-list)`でO(n)アクセス
-- **内容**: captured-valuesをリストからベクタに変更。`svref`でO(1)アクセス
+- **内容**: captured-valsをリストからベクタに変更。`svref`でO(1)アクセス
 - **根拠**: クロージャ変数アクセス性能
 - **難易度**: Low
 

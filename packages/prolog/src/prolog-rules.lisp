@@ -1,6 +1,6 @@
 ;;; packages/prolog/src/prolog-rules.lisp
 ;;;
-;;; Goal and rule representation, database primitives, and cut support for
+;;; Goal and rule representation, rule store primitives, and cut support for
 ;;; CL-CC Prolog.
 
 (in-package :cl-cc/prolog)
@@ -29,29 +29,17 @@
                         :body (mapcar #'rename-term
                                       (rule-body rule))))))
 
-;;; Prolog database state
+;;; Prolog rule state
 
 (defvar *prolog-rules* (make-hash-table :test 'eq)
   "Hash table mapping predicate symbols to lists of rules.")
 
-(defun clear-prolog-database ()
-  "Clear all rules from the Prolog database."
-  (clrhash *prolog-rules*))
-
-(defun add-rule (predicate rule)
-  "Add RULE to the database under PREDICATE."
-  (setf (gethash predicate *prolog-rules*)
-        (cons rule (gethash predicate *prolog-rules*))))
-
 (defun register-prolog-rule (head &optional body)
   "Create a rule from HEAD and BODY, then register it under HEAD's predicate."
   (let ((rule (make-prolog-rule :head head :body body)))
-    (add-rule (car head) rule)
+    (setf (gethash (car head) *prolog-rules*)
+          (cons rule (gethash (car head) *prolog-rules*)))
     rule))
-
-(defmacro def-fact (head)
-  "Define a Prolog fact. Usage: (def-fact (parent tom mary))"
-  `(register-prolog-rule ',head))
 
 (defmacro def-rule (head &body body)
   "Define a Prolog rule. Usage: (def-rule (grandparent ?x ?z) (parent ?x ?y) (parent ?y ?z))"
@@ -62,19 +50,3 @@
 (define-condition prolog-cut (condition)
   ()
   (:documentation "Condition signaled when cut (!) is encountered."))
-
-;;; Declarative built-in predicates and type rules.
-;;; Register them directly so this file stays data-driven without one-off
-;;; expansion macros.
-
-(dolist (spec *prolog-declarative-rule-specs*)
-  (destructuring-bind (head &optional body) spec
-    (register-prolog-rule head body)))
-
-(dolist (spec *prolog-type-rule-specs*)
-  (destructuring-bind (result-type expr-kind operators) spec
-    (dolist (op operators)
-      (register-prolog-rule
-       `(type-of (,expr-kind ,op ?a ?b) ?env (,result-type))
-       '((type-of ?a ?env (integer-type))
-         (type-of ?b ?env (integer-type)))))))

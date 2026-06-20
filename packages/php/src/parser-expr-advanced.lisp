@@ -1475,11 +1475,13 @@ marker."
                      :func (make-ast-var :name 'cl-cc/php::%php-has-method)
                      :args (list (make-ast-var :name clone-sym)
                                  (make-ast-quote :value (php-ident-sym "__clone"))))
-              :then (make-ast-call
-                     :func (make-ast-slot-value
-                            :object (make-ast-var :name clone-sym)
-                            :slot (php-ident-sym "__clone"))
-                     :args (list (make-ast-var :name clone-sym)))
+              :then (%php-method-call-with-args
+                     (make-ast-slot-value
+                      :object (make-ast-var :name clone-sym)
+                      :slot (php-ident-sym "__clone"))
+                     (php-ident-sym "__clone")
+                     nil
+                     (make-ast-var :name clone-sym))
               :else (make-ast-quote :value nil)))
             (when overrides
               (list

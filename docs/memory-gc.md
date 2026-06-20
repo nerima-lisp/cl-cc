@@ -208,7 +208,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 #### FR-308: ⏸️: Data Structure Flattening (データ構造フラット化)
 
 - **対象**: `packages/vm/src/vm-clos.lisp`, `packages/vm/src/vm.lisp`
-- **現状**: CLOSインスタンスはハッシュテーブル→ハッシュテーブル（`vm-make-obj`、`vm-clos.lisp:165-183`）。VMレジスタもハッシュテーブル（`vm-state-registers`、`vm.lisp:343`）。スロット読み取りは2+回のハッシュテーブルルックアップ。クロージャの捕捉値はalist（`vm-closure-captured-values`、`vm.lisp:31`）
+- **現状**: CLOSインスタンスはハッシュテーブル→ハッシュテーブル（`vm-make-obj`、`vm-clos.lisp:165-183`）。VMレジスタもハッシュテーブル（`vm-state-registers`、`vm.lisp:343`）。スロット読み取りは2+回のハッシュテーブルルックアップ。クロージャの捕捉値は `captured-regs` / `captured-vals` の平坦ベクタ
 - **内容**: CLOSインスタンスを連続配列（struct-like inline slot storage）にフラット化。レジスタファイルを固定サイズベクタに置換。小クロージャの捕捉値をインライン化（alistチェイン廃止）。各ホップ=潜在的キャッシュミスの除去
 - **根拠**: V8 hidden class + inline slots / SpiderMonkey NativeObject。ポインタ追跡回避で10x高速化
 - **難易度**: Hard

@@ -113,12 +113,12 @@
   "The canonical runner keeps non-fast suites outside the default plan."
   (let ((captured nil))
     (with-restored-bindings (*suite-registry*)
-      (with-suite-registry-entry (cl-cc-e2e-suite
+      (with-suite-registry-entry ('cl-cc-e2e-suite
                                    :description "tmp"
                                    :parent 'cl-cc-suite
                                    :parallel nil)
         (with-replaced-function (run-suite
-                                 (lambda (suite-name &key parallel random warm-stdlib tags exclude-tags exclude-suites filter &allow-other-keys)
+                                 (lambda (suite-name &key parallel random warm-stdlib tags exclude-tags exclude-suites filter)
                                    (setf captured (list :suite-name suite-name
                                                         :parallel parallel
                                                         :random random
@@ -288,7 +288,7 @@
   "*suite-killer-exit-fn* is bound to a callable; rebinding to a recorder captures the exit code."
   (let ((captured nil))
     (let ((*suite-killer-exit-fn*
-            (lambda (&key code &allow-other-keys)
+            (lambda (&key code)
               (setf captured code))))
       (funcall *suite-killer-exit-fn* :code 124)
       (assert-eql 124 captured))))
@@ -399,7 +399,7 @@
                              *kill-grace-seconds*
                              *heartbeat-interval-seconds*
                              *watchdog-poll-seconds*)
-      (setf *watchdog-exit-fn* (lambda (&key code &allow-other-keys)
+      (setf *watchdog-exit-fn* (lambda (&key code)
                                  (setf captured code))
             *kill-grace-seconds* 0.01
             *heartbeat-interval-seconds* 0
@@ -424,7 +424,7 @@
                              *kill-grace-seconds*
                              *heartbeat-interval-seconds*
                              *watchdog-poll-seconds*)
-      (setf *watchdog-exit-fn* (lambda (&key code &allow-other-keys)
+      (setf *watchdog-exit-fn* (lambda (&key code)
                                  (setf captured code))
             *kill-grace-seconds* 0.01
             *heartbeat-interval-seconds* 0
