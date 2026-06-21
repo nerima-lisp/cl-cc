@@ -287,7 +287,8 @@ gensym-named class and makes an instance of it."
 (defun %php-predefined-class-constant-class-ast-p (obj)
   (and (ast-var-p obj)
        (member (string-upcase (symbol-name (ast-var-name obj)))
-               '("INTLLISTFORMATTER" "NUMBERFORMATTER" "PDO\\SQLITE")
+               '("INTLLISTFORMATTER" "NUMBERFORMATTER" "PDO\\SQLITE"
+                 "URI\\URICOMPARISONMODE")
                :test #'string=)))
 
 (defun %php-fiber-new-ast (args)

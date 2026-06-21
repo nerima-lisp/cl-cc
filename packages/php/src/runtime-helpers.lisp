@@ -306,7 +306,9 @@ else (values NIL NIL)."
                  ("Pdo\\Sqlite" "TRANSACTION_MODE_DEFERRED" 0)
                  ("Pdo\\Sqlite" "TRANSACTION_MODE_IMMEDIATE" 1)
                  ("Pdo\\Sqlite" "TRANSACTION_MODE_EXCLUSIVE" 2)
-                 ("Pdo\\Sqlite" "DETERMINISTIC" 2048)))
+                 ("Pdo\\Sqlite" "DETERMINISTIC" 2048)
+                 ("Uri\\UriComparisonMode" "ExcludeFragment" :exclude-fragment)
+                 ("Uri\\UriComparisonMode" "IncludeFragment" :include-fragment)))
   (destructuring-bind (class-name constant-name value) entry
     (%php-register-predefined-class-constant class-name constant-name value)))
 

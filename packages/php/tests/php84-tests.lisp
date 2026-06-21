@@ -539,6 +539,68 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
       (assert-string= "ada" (cl-cc/php::%php-uri-get-username copy))
       (assert-string= "user" (cl-cc/php::%php-uri-get-username uri)))))
 
+(%php85-register-test 'php85-uri-parse-invalid-inputs-return-null
+  "PHP 8.5 URI parse helpers return null instead of throwing on invalid input."
+  (lambda ()
+    (assert-true
+     (cl-cc/php::%php-null-p
+      (cl-cc/php::%php-uri-rfc3986-parse "https://example.com/%zz")))
+    (assert-true
+     (cl-cc/php::%php-null-p
+      (cl-cc/php::%php-uri-rfc3986-parse "http://example.com:99999/")))
+    (assert-true
+     (cl-cc/php::%php-null-p
+      (cl-cc/php::%php-uri-whatwg-parse "/relative-only")))
+    (let ((base (cl-cc/php::%php-uri-whatwg-new "https://example.com/root")))
+      (assert-string= "/child"
+                      (cl-cc/php::%php-uri-get-path
+                       (cl-cc/php::%php-uri-whatwg-parse "/child" base))))))
+
+(%php85-register-test 'php85-uri-constructors-signal-invalid-uri-exceptions
+  "PHP 8.5 URI constructors throw the documented URI exception classes on invalid input."
+  (lambda ()
+    (let ((condition (handler-case
+                         (progn
+                           (cl-cc/php::%php-uri-rfc3986-new "https://example.com/%zz")
+                           nil)
+                       (cl-cc/php:php-exception (e) e))))
+      (assert-true condition)
+      (assert-true
+       (cl-cc/php:%php-exception-matches-p
+        condition
+        (intern "URI\\INVALIDURIEXCEPTION" :cl-cc/php))))
+    (let ((condition (handler-case
+                         (progn
+                           (cl-cc/php::%php-uri-whatwg-new "/relative-only")
+                           nil)
+                       (cl-cc/php:php-exception (e) e))))
+      (assert-true condition)
+      (assert-true
+       (cl-cc/php:%php-exception-matches-p
+        condition
+        (intern "URI\\WHATWG\\INVALIDURLEXCEPTION" :cl-cc/php))))))
+
+(%php85-register-test 'php85-uri-equals-honors-fragment-comparison-mode
+  "PHP 8.5 URI equality excludes fragments by default and includes them with UriComparisonMode::IncludeFragment."
+  (lambda ()
+    (let ((a (cl-cc/php::%php-uri-rfc3986-new "https://example.com/a#one"))
+          (b (cl-cc/php::%php-uri-rfc3986-new "https://example.com/a#two")))
+      (assert-true (cl-cc/php::%php-uri-equals a b))
+      (assert-false
+       (cl-cc/php::%php-uri-equals
+        a
+        b
+        (cl-cc/php:%php-predefined-class-constant
+         "Uri\\UriComparisonMode"
+         "IncludeFragment"))))
+    (assert-string= "Y:N"
+                    (%php-run-capture
+                     "<?php
+$a = new Uri\\Rfc3986\\Uri('https://example.com/a#one');
+$b = new Uri\\Rfc3986\\Uri('https://example.com/a#two');
+echo ($a->equals($b) ? 'Y' : 'N') . ':' . ($a->equals($b, Uri\\UriComparisonMode::IncludeFragment) ? 'Y' : 'N');
+"))))
+
 (%php85-register-test 'php85-get-class-methods-accepts-runtime-object
   "PHP 8.5 method introspection accepts runtime objects."
   (lambda ()
