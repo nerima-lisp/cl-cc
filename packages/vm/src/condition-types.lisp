@@ -28,6 +28,15 @@
   (:documentation "Base class for VM errors. These are serious conditions that
 typically require intervention to continue execution."))
 
+(define-condition vm-fatal-error (vm-error)
+  ((message :initarg :message :reader vm-fatal-error-message)
+   (print-backtrace-p :initarg :print-backtrace-p
+                      :initform t
+                      :reader vm-fatal-error-print-backtrace-p))
+  (:report (lambda (condition stream)
+             (princ (vm-fatal-error-message condition) stream)))
+  (:documentation "VM error used for PHP fatal errors with optional backtraces."))
+
 (define-condition vm-warning (vm-condition warning)
   ()
   (:documentation "Base class for VM warnings. These indicate potential issues
@@ -385,11 +394,12 @@ this models dynamic propagation without a runtime handler stack."
                            (%vm-restore-frame-for-exception-propagation
                             state (vm-pop-call-frame state)))
                      (progn
-                       (when error-p
-                         (vm-print-backtrace state :labels labels)
-                         (if (typep condition 'condition)
-                             (error condition)
-                             (error "Unhandled error in VM: ~S" condition)))
+                      (when error-p
+                        (unless (typep condition 'vm-fatal-error)
+                          (vm-print-backtrace state :labels labels))
+                        (if (typep condition 'condition)
+                            (error condition)
+                            (error "Unhandled error in VM: ~S" condition)))
                        (return (values nil nil nil))))))
       (values nil nil nil)))
 
@@ -430,7 +440,8 @@ this models dynamic propagation without a runtime handler stack."
                                            saved-call-stack saved-regs saved-method-call-stack
                                            error-value)))
                 (progn
-                  (vm-print-backtrace state :labels labels)
+                  (unless (typep error-value 'vm-fatal-error)
+                    (vm-print-backtrace state :labels labels))
                   (if (typep error-value 'condition)
                       (error error-value)
                       (error "Unhandled error in VM: ~S" error-value)))))))))

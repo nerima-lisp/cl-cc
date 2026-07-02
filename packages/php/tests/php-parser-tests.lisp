@@ -835,9 +835,22 @@ After php-finish-let-bindings, $x let wraps $y let in its body."
     (assert-string= "%PHP-BOOLVAL" (cast-call-name "<?php $x = (bool) \"x\";"))))
 
 (deftest php-parser-cast-aliases-lower-to-canonical-runtime-helpers
-  "PHP cast aliases lower to the same canonical conversion helpers."
-  (flet ((cast-call-name (src)
-           (%php-call-name (%php-first-binding-value src))))
+  "PHP 8.5-deprecated cast aliases warn, then lower to canonical conversion helpers."
+  (labels ((cast-progn (src)
+             (let ((value (%php-first-binding-value src)))
+               (assert-true (cl-cc:ast-progn-p value))
+               (assert-= 2 (length (cl-cc:ast-progn-forms value)))
+               value))
+           (cast-call-name (src)
+             (let* ((forms (cl-cc:ast-progn-forms (cast-progn src)))
+                    (warn (first forms))
+                    (cast (second forms))
+                    (args (cl-cc:ast-call-args warn)))
+               (assert-string= "%PHP-TRIGGER-ERROR" (%php-call-name warn))
+               (assert-= 2 (length args))
+               (assert-true (cl-cc:ast-int-p (second args)))
+               (assert-= 8192 (cl-cc:ast-int-value (second args)))
+               (%php-call-name cast))))
     (assert-string= "%PHP-INTVAL" (cast-call-name "<?php $x = (integer) \"42\";"))
     (assert-string= "%PHP-BOOLVAL" (cast-call-name "<?php $x = (boolean) \"x\";"))
     (assert-string= "%PHP-FLOATVAL" (cast-call-name "<?php $x = (double) \"1.5\";"))

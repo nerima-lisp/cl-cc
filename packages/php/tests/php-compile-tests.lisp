@@ -1134,6 +1134,7 @@ consults *php-predefined-constants* and lowers a hit to its literal value."
   (assert-string= "3.14159" (%php-run-capture "<?php echo round(M_PI,5);"))
   (assert-string= "8.5.0"   (%php-run-capture "<?php echo PHP_VERSION;"))
   (assert-string= "8.5.0"   (%php-run-capture "<?php echo phpversion();"))
+  (assert-string= "1"       (%php-run-capture "<?php echo is_nan(NAN) ? '1' : '0';"))
   (assert-string= "2"       (%php-run-capture "<?php echo SORT_STRING;"))
   ;; PHP_EOL is a real newline
   (assert-string= "y" (%php-run-capture "<?php echo PHP_EOL===\"\\n\"?'y':'n';"))
@@ -1235,9 +1236,21 @@ through recursive symbol-registered helpers."
                   (%php-run-capture "<?php echo serialize([1,2,3]);"))
   (assert-string= "a:2:{s:1:\"a\";i:1;s:1:\"b\";i:2;}"
                   (%php-run-capture "<?php echo serialize(['a'=>1,'b'=>2]);"))
+  ;; objects — public properties only, with class metadata
+  (assert-string= "O:1:\"C\":1:{s:1:\"x\";i:7;}"
+                  (%php-run-capture "<?php class C { public $x = 7; } echo serialize(new C());"))
+  (assert-string= "O:1:\"C\":2:{s:1:\"y\";i:9;s:1:\"x\";i:7;}"
+                  (%php-run-capture "<?php class C { public $x = 7; public $y = 9; function __sleep(){ return ['y','x']; } } echo serialize(new C());"))
+  (assert-string= "15"
+                  (%php-run-capture "<?php class C { public $x = 7; public $y = 9; function __sleep(){ return ['y']; } function __wakeup(){ $this->x = 6; } } $u = unserialize(serialize(new C())); echo $u->x + $u->y;"))
+  (assert-string= "O:1:\"C\":2:{s:1:\"y\";i:9;s:1:\"x\";i:7;}"
+                  (%php-run-capture "<?php class C { public $x = 7; public $y = 9; function __serialize(){ return ['y'=>$this->y, 'x'=>$this->x]; } } echo serialize(new C());"))
+  (assert-string= "15"
+                  (%php-run-capture "<?php class C { public $x = 7; public $y = 9; function __serialize(){ return ['y'=>$this->y, 'x'=>$this->x]; } function __unserialize($data){ $this->y = $data['y']; $this->x = $data['x'] - 1; } } $u = unserialize(serialize(new C())); echo $u->x + $u->y;"))
   ;; round-trip: scalars and nested arrays
   (assert-string= "50" (%php-run-capture "<?php echo unserialize(serialize(42))+8;"))
   (assert-string= "v"  (%php-run-capture "<?php $x=unserialize(serialize([1,2,['k'=>'v']])); echo $x[2]['k'];"))
+  (assert-string= "7"  (%php-run-capture "<?php class C { public $x = 7; } $u = unserialize(serialize(new C())); echo $u->x;"))
   (assert-string= "T"  (%php-run-capture "<?php echo unserialize('b:1;')?'T':'F';"))
   ;; malformed input -> false
   (assert-string= "F"  (%php-run-capture "<?php echo unserialize('garbage')?'T':'F';")))

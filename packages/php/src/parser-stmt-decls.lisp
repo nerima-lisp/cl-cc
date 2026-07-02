@@ -482,8 +482,8 @@
     (let* ((break-tag (gensym "SWITCH-END-"))
            (*php-loop-break-target* break-tag)
            (*php-break-targets* (cons break-tag *php-break-targets*)))
-      (multiple-value-bind (cases default-body rest3 kv3) (%php-parse-switch-body rest2 kv2 break-tag)
-        (values (php-lower-switch switch-expr cases default-body break-tag) rest3 kv3)))))
+      (multiple-value-bind (cases default-body rest3 kv3 warnings) (%php-parse-switch-body rest2 kv2 break-tag)
+        (values (php-lower-switch switch-expr cases default-body break-tag warnings) rest3 kv3)))))
 
 (define-php-stmt-parser :try (rest known-vars)
   (multiple-value-bind (try-body rest2 kv2) (php-parse-block rest known-vars)

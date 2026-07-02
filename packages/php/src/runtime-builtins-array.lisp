@@ -113,7 +113,7 @@ spread as positional arguments."
 error (\"Cannot use [] for reading\"). Valid code consumes the marker at assignment
 time, so this only fires on misuse."
   (declare (ignore _))
-  (error "PHP fatal error: Cannot use [] for reading"))
+  (%php-fatal-error "PHP fatal error: Cannot use [] for reading"))
 
 (defun %php-array-pop (array)
   "Remove and return ARRAY's last value, or PHP null for an empty array."

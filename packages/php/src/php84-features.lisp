@@ -557,7 +557,7 @@ When no & follows, returns FIRST-TYPE and STREAM unchanged."
 
 (defun %php-match-error ()
   "Signal an UnhandledMatchError equivalent for a non-exhaustive PHP match."
-  (error "PHP UnhandledMatchError: Unhandled match case"))
+  (%php-fatal-error "PHP UnhandledMatchError: Unhandled match case"))
 
 ;;; ─── PHP 8.x Nullsafe Chaining — already in parser-expr.lisp ───────────────
 ;;; See php-parse-postfix: :T-NULLSAFE-ARROW case.

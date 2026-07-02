@@ -1300,6 +1300,11 @@ whole program."
   (make-ast-call :func (%php-helper-var 'cl-cc/php::%php-array-ref)
                  :args (list array key)))
 
+(defun %php-destructure-ref-call (array key)
+  "Lower destructuring ARRAY[KEY] to the PHP 8.5 warning-aware helper."
+  (make-ast-call :func (%php-helper-var 'cl-cc/php::%php-destructure-ref)
+                 :args (list array key)))
+
 (defun %php-array-ref-call-p (node)
   "Return true when NODE is a %php-array-ref helper call."
   (and (ast-call-p node)
@@ -1336,8 +1341,8 @@ later entries pushed on the front (caller nreverses)."
              (key (and elts (second elts)))
              (target (third elts))
              (access (if key-present
-                         (%php-array-ref-call val key)
-                         (%php-array-ref-call val (make-ast-int :value idx)))))
+                         (%php-destructure-ref-call val key)
+                         (%php-destructure-ref-call val (make-ast-int :value idx)))))
         (cond
           ((null target) nil)                     ; [ , $b] hole — skip
           ((ast-var-p target)

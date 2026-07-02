@@ -171,7 +171,8 @@ Used by both vm-signal-error and vm-throw."
                                    saved-call-stack saved-regs saved-method-call-stack
                                    error-value)))
         (progn
-          (vm-print-backtrace state :labels labels)
+          (unless (typep error-value 'vm-fatal-error)
+            (vm-print-backtrace state :labels labels))
           (if (typep error-value 'condition)
               (error error-value)
               (error "Unhandled error in VM: ~S" error-value))))))

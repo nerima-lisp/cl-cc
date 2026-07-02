@@ -28,7 +28,7 @@
   (eq x +php-null+))
 
 (defun %php-current-closure ()
-  "Return the currently executing PHP Closure, or PHP null outside a closure."
+  "Return the currently executing PHP Closure or signal PHP Error outside one."
   (let ((state cl-cc/vm:*vm-state*))
     (if state
         (let* ((depth (length (cl-cc/vm:vm-call-stack state)))
@@ -43,8 +43,19 @@
                               (cl-cc/vm::%vm-closure-object-p closure)
                               (not (and (consp tag) (eq (car tag) :known-function))))
                       return closure)
-              +php-null+))
-        +php-null+)))
+              (%php-throw 'error "Current function is not a closure.")))
+        (%php-throw 'error "Current function is not a closure."))))
+
+(defun %php-fatal-error (message)
+  "Emit a PHP fatal error message and optionally include a VM backtrace."
+  (format *error-output* "~&~A~%" message)
+  (let ((state cl-cc/vm:*vm-state*))
+    (when (and (%php-truthy (%php-ini-get "fatal_error_backtraces"))
+               state)
+      (cl-cc/vm:vm-print-backtrace state))
+    (error 'cl-cc/vm:vm-fatal-error
+           :message message
+           :print-backtrace-p nil)))
 
 ;;; ─── Predefined constants ──────────────────────────────────────────────────
 ;;; PHP magic/predefined constants (PHP_EOL, M_PI, STR_PAD_LEFT, SORT_*, ...)
@@ -133,7 +144,7 @@
       (c "M_LOG10E" (log (exp 1.0d0) 10.0d0))
       (c "M_EULER" 0.5772156649015329d0)
       (c "INF" most-positive-double-float)
-      (c "NAN" most-positive-double-float)
+      (c "NAN" #.(sb-kernel:make-double-float #x7FF80000 0))
       ;; error reporting
       (c "E_ALL" 32767) (c "E_ERROR" 1) (c "E_WARNING" 2) (c "E_NOTICE" 8)
       (c "E_STRICT" 2048) (c "E_DEPRECATED" 8192) (c "E_USER_ERROR" 256)
@@ -191,13 +202,95 @@
       (c "T_DOC_COMMENT" 392)
       (c "T_OPEN_TAG" 393)
       (c "T_OPEN_TAG_WITH_ECHO" 394)
+      (c "T_CLOSE_TAG" 395)
       (c "T_WHITESPACE" 396)
       (c "T_DOUBLE_COLON" 401)
       (c "T_VOID_CAST" 402)
       (c "T_PIPE" 403)
+      (c "T_INLINE_HTML" 404)
+      (c "T_ECHO" 405)
+      (c "T_CLASS" 406)
+      (c "T_CONST" 407)
+      (c "T_PUBLIC" 408)
+      (c "T_FUNCTION" 409)
+      (c "T_ABSTRACT" 410)
+      (c "T_ARRAY" 411)
+      (c "T_AS" 412)
+      (c "T_BREAK" 413)
+      (c "T_CALLABLE" 414)
+      (c "T_CASE" 415)
+      (c "T_CATCH" 416)
+      (c "T_CLONE" 417)
+      (c "T_CONTINUE" 418)
+      (c "T_DECLARE" 419)
+      (c "T_DEFAULT" 420)
+      (c "T_DO" 421)
+      (c "T_ELSE" 422)
+      (c "T_ELSEIF" 423)
+      (c "T_EMPTY" 424)
+      (c "T_ENDDECLARE" 425)
+      (c "T_ENDFOR" 426)
+      (c "T_ENDFOREACH" 427)
+      (c "T_ENDIF" 428)
+      (c "T_ENDSWITCH" 429)
+      (c "T_ENDWHILE" 430)
+      (c "T_ENUM" 431)
+      (c "T_EVAL" 432)
+      (c "T_EXIT" 433)
+      (c "T_EXTENDS" 434)
+      (c "T_FINAL" 435)
+      (c "T_FINALLY" 436)
+      (c "T_FN" 437)
+      (c "T_FOR" 438)
+      (c "T_FOREACH" 439)
+      (c "T_GLOBAL" 440)
+      (c "T_GOTO" 441)
+      (c "T_IF" 442)
+      (c "T_IMPLEMENTS" 443)
+      (c "T_INCLUDE" 444)
+      (c "T_INCLUDE_ONCE" 445)
+      (c "T_INSTANCEOF" 446)
+      (c "T_INSTEADOF" 447)
+      (c "T_INTERFACE" 448)
+      (c "T_ISSET" 449)
+      (c "T_LIST" 450)
+      (c "T_MATCH" 451)
+      (c "T_NAMESPACE" 452)
+      (c "T_NEW" 453)
+      (c "T_PRINT" 454)
+      (c "T_PRIVATE" 455)
+      (c "T_PROTECTED" 456)
+      (c "T_READONLY" 457)
+      (c "T_REQUIRE" 458)
+      (c "T_REQUIRE_ONCE" 459)
+      (c "T_RETURN" 460)
+      (c "T_STATIC" 461)
+      (c "T_SWITCH" 462)
+      (c "T_THROW" 463)
+      (c "T_TRAIT" 464)
+      (c "T_TRY" 465)
+      (c "T_UNSET" 466)
+      (c "T_USE" 467)
+      (c "T_VAR" 468)
+      (c "T_WHILE" 469)
+      (c "T_YIELD" 470)
+      (c "T_LOGICAL_AND" 471)
+      (c "T_LOGICAL_OR" 472)
+      (c "T_LOGICAL_XOR" 473)
+      (c "T_YIELD_FROM" 474)
+      (c "T_ATTRIBUTE" 475)
+      (c "T_NS_SEPARATOR" 476)
+      (c "T_NAME_FULLY_QUALIFIED" 477)
+      (c "T_NAME_QUALIFIED" 478)
+      (c "T_NAME_RELATIVE" 479)
+      (c "T_BAD_CHARACTER" 480)
       ;; standard
-      (c "IMAGETYPE_HEIF" 18)
-      (c "IMAGETYPE_SVG" 19)
+      (c "IMAGETYPE_UNKNOWN" 0)
+      (c "IMAGETYPE_WEBP" 18)
+      (c "IMAGETYPE_AVIF" 19)
+      (c "IMAGETYPE_HEIF" 20)
+      (c "IMAGETYPE_SVG" 21)
+      (c "IMAGETYPE_COUNT" 22)
       ;; str_pad
       (c "STR_PAD_RIGHT" 1) (c "STR_PAD_LEFT" 0) (c "STR_PAD_BOTH" 2)
       ;; htmlspecialchars
@@ -210,7 +303,7 @@
       ;; filesystem
       (c "FILE_APPEND" 8) (c "FILE_USE_INCLUDE_PATH" 1)
       (c "FILE_IGNORE_NEW_LINES" 2) (c "FILE_SKIP_EMPTY_LINES" 4)
-      (c "LOCK_SH" 1) (c "LOCK_EX" 2) (c "LOCK_UN" 3)
+      (c "LOCK_SH" 1) (c "LOCK_EX" 2) (c "LOCK_UN" 3) (c "LOCK_NB" 4)
       (c "SEEK_SET" 0) (c "SEEK_CUR" 1) (c "SEEK_END" 2)
       ;; preg
       (c "PREG_SPLIT_NO_EMPTY" 1) (c "PREG_SPLIT_DELIM_CAPTURE" 2)
@@ -643,6 +736,7 @@ lists get sequential integer keys 0,1,2,..."
         ((and (integerp value) (zerop value)) nil)
         ((and (floatp value) (zerop value)) nil)
         ((and (stringp value) (or (string= value "") (string= value "0"))) nil)
+        ((%php-object-table-p value) t)
         ((and (hash-table-p value) (%php-array-empty-p value)) nil)
         (t t)))
 
@@ -779,6 +873,12 @@ rational (10 / 4 -> 5/2, printed \"5/2\")."
       (when (> candidate next-index)
         (setf (gethash +php-array-next-index-key+ array) candidate)))))
 
+(defun %php-null-array-key-deprecation-warning ()
+  "Emit PHP 8.5's deprecation warning for null array keys."
+  (%php-trigger-error
+   "PHP 8.5 deprecates implicit conversion from null to array key"
+   8192))
+
 (defun %php-array-set (arr key value)
   "Set ARR[KEY] to VALUE, preserving PHP insertion order.
 
@@ -786,6 +886,8 @@ Duplicate keys overwrite their value without changing their original position.
 Integer keys greater than or equal to the current auto-index advance the next
 auto-increment index to one greater than the key."
   (check-type arr hash-table)
+  (when (or (null key) (%php-null-p key))
+    (%php-null-array-key-deprecation-warning))
   (unless (%php-array-key-present-p arr key)
     (%php-array-append-order-key arr key))
   (setf (gethash key arr) value)
@@ -795,12 +897,29 @@ auto-increment index to one greater than the key."
 (defun %php-array-ref (arr key)
   "Return ARR[KEY] for a PHP ordered array helper hash-table."
   (check-type arr hash-table)
+  (when (or (null key) (%php-null-p key))
+    (%php-null-array-key-deprecation-warning))
   (multiple-value-bind (value present-p) (gethash key arr)
     (if present-p value +php-null+)))
+
+(defun %php-destructure-ref (value key)
+  "Read VALUE[KEY] for list/array destructuring without leaking host type errors."
+  (cond
+    ((hash-table-p value)
+     (%php-array-ref value key))
+    ((%php-null-p value)
+     +php-null+)
+    (t
+     (%php-trigger-error
+      (format nil "Cannot destructure value of type ~A" (%php-value-type value))
+      2)
+     +php-null+)))
 
 (defun %php-array-unset (arr key)
   "Delete ARR[KEY] from a PHP ordered array and preserve insertion order."
   (check-type arr hash-table)
+  (when (or (null key) (%php-null-p key))
+    (%php-null-array-key-deprecation-warning))
   (remhash key arr)
   (setf (gethash +php-array-order-key+ arr)
         (remove key (gethash +php-array-order-key+ arr) :test #'equal))
@@ -931,7 +1050,16 @@ an integer (3.0 -> \"3\").  princ-to-string leaked the CL form: \"1.5d0\", \"5/2
 (defun %php-array-key-exists (arr key)
   "Return true when KEY exists in PHP ordered array ARR."
   (check-type arr hash-table)
-  (member key (gethash +php-array-order-key+ arr) :test #'equal))
+  (when (or (null key) (%php-null-p key))
+    (%php-null-array-key-deprecation-warning))
+  ;; PHP coerces a null array key to the empty string.
+  (let ((lookup-key (if (or (null key) (%php-null-p key)) "" key)))
+    (member lookup-key (gethash +php-array-order-key+ arr) :test #'equal)))
+
+(defun %php-builtin-array-key-exists (key arr)
+  "PHP array_key_exists(KEY, ARRAY): the key is the first argument and the array
+the second, the reverse of the internal %php-array-key-exists helper."
+  (%php-array-key-exists arr key))
 
 (defun %php-array-next-auto-index (array)
   "Return and reserve ARRAY's current PHP auto-increment index."

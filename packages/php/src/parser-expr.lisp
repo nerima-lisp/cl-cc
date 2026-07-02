@@ -108,9 +108,37 @@ T-TYPE.  Returns (values name-string rest)."
     (:array 'cl-cc/php::%php-settype-array-value)
     (:object 'cl-cc/php::%php-settype-object-value)))
 
-(defun %php-cast-ast (kind expr)
+(defun %php-deprecated-cast-name (tok)
+  "Return TOK's PHP 8.5-deprecated cast spelling, or NIL."
+  (let ((name (%php-cast-token-name tok)))
+    (when (member name '("integer" "boolean" "double" "binary") :test #'string=)
+      name)))
+
+(defun %php-deprecated-cast-replacement (name)
+  "Return the canonical PHP cast spelling replacing deprecated NAME."
+  (cond
+    ((string= name "integer") "int")
+    ((string= name "boolean") "bool")
+    ((string= name "double") "float")
+    ((string= name "binary") "string")))
+
+(defun %php-deprecated-cast-message (name)
+  "Return the PHP 8.5 deprecation message for non-canonical cast NAME."
+  (format nil "Non-canonical cast (~A) is deprecated, use the (~A) cast instead"
+          name
+          (%php-deprecated-cast-replacement name)))
+
+(defun %php-cast-ast (kind expr &optional deprecated-name)
   "Lower a PHP cast expression to the corresponding runtime conversion helper."
-  (%php-call (%php-cast-helper-symbol kind) expr))
+  (let ((cast-call (%php-call (%php-cast-helper-symbol kind) expr)))
+    (if deprecated-name
+        (make-ast-progn
+         :forms (list (%php-call 'cl-cc/php::%php-trigger-error
+                                  (make-ast-quote
+                                   :value (%php-deprecated-cast-message deprecated-name))
+                                  (make-ast-int :value 8192))
+                      cast-call))
+        cast-call)))
 
 ;;; ─── Expression Parser ──────────────────────────────────────────────────────
 
@@ -320,6 +348,44 @@ gensym-named class and makes an instance of it."
                                (:whatwg 'cl-cc/php::%php-uri-whatwg-parse)))
    :args args))
 
+(defun %php-reflection-object-class-kind (class-name)
+  (let ((name (string-upcase (symbol-name class-name))))
+    (cond
+      ((string= name "REFLECTIONCONSTANT") :constant)
+      ((string= name "REFLECTIONPROPERTY") :property))))
+
+(defun %php-reflection-new-ast (class-name args)
+  (make-ast-call
+   :func (make-ast-var :name (ecase (%php-reflection-object-class-kind class-name)
+                               (:constant 'cl-cc/php::%php-reflection-constant-new)
+                               (:property 'cl-cc/php::%php-reflection-property-new)))
+   :args args))
+
+(defun %php85-runtime-object-class-kind (class-name)
+  (let ((name (string-upcase (symbol-name class-name))))
+    (cond
+      ((string= name "DOM\\ELEMENT") :dom-element)
+      ((string= name "DOM\\HTMLDOCUMENT") :dom-html-document)
+      ((string= name "PDO\\SQLITE") :pdo-sqlite)
+      ((string= name "SOAPCLIENT") :soap-client)
+      ((string= name "SOAPFAULT") :soap-fault)
+      ((string= name "SOAPSERVER") :soap-server)
+      ((string= name "SQLITE3STMT") :sqlite3-stmt)
+      ((string= name "XSLTPROCESSOR") :xslt-processor))))
+
+(defun %php85-runtime-object-new-ast (class-name args)
+  (make-ast-call
+   :func (make-ast-var :name (ecase (%php85-runtime-object-class-kind class-name)
+                               (:dom-element 'cl-cc/php::%php-dom-element-new)
+                               (:dom-html-document 'cl-cc/php::%php-dom-html-document-new)
+                               (:pdo-sqlite 'cl-cc/php::%php-pdo-sqlite-new)
+                               (:soap-client 'cl-cc/php::%php-soap-client-new)
+                               (:soap-fault 'cl-cc/php::%php-soap-fault-new)
+                               (:soap-server 'cl-cc/php::%php-soap-server-new)
+                               (:sqlite3-stmt 'cl-cc/php::%php-sqlite3-stmt-new)
+                               (:xslt-processor 'cl-cc/php::%php-xslt-processor-new)))
+   :args args))
+
 (defun php-parse-new (stream known-vars)
   "Parse 'new ClassName(args)' or 'new class [(args)] [extends/implements] { ... }'."
   (multiple-value-bind (tok rest) (php-consume stream) ; consume 'new'
@@ -330,7 +396,11 @@ gensym-named class and makes an instance of it."
         (%php-parse-anonymous-class (cdr rest) known-vars)))
     (multiple-value-bind (qualified-name rest2) (php-parse-qualified-name rest)
       (let ((class-name (php-ident-sym (php-resolve-qualified-name qualified-name :class))))
-        (multiple-value-bind (args rest3 kv3) (php-parse-arglist rest2 known-vars)
+        ;; `new C` without parentheses is legal PHP, equivalent to `new C()`.
+        (multiple-value-bind (args rest3 kv3)
+            (if (eq (php-peek-type rest2) :T-LPAREN)
+                (php-parse-arglist rest2 known-vars)
+                (values nil rest2 known-vars))
           (when (%php-spl-builtin-class-p class-name)
             (return-from php-parse-new
               (values (%php-spl-new-ast class-name args) rest3 kv3)))
@@ -340,6 +410,12 @@ gensym-named class and makes an instance of it."
           (when (%php-uri-class-kind class-name)
             (return-from php-parse-new
               (values (%php-uri-new-ast class-name args) rest3 kv3)))
+          (when (%php-reflection-object-class-kind class-name)
+            (return-from php-parse-new
+              (values (%php-reflection-new-ast class-name args) rest3 kv3)))
+          (when (%php85-runtime-object-class-kind class-name)
+            (return-from php-parse-new
+              (values (%php85-runtime-object-new-ast class-name args) rest3 kv3)))
           ;; new C(args): allocate the instance (properties default-init from their
           ;; initforms), then run __construct($this, args) via %php-construct, and
           ;; yield the instance. (Previously the args were passed as :ARGn CLOS
@@ -736,9 +812,11 @@ to simple variables and avoids reading an unbound variable on first use."
   "Parse unary expressions: casts, prefix ++/--, !, -, +, ~."
   (cond
     ((%php-cast-start-p stream)
-     (let ((kind (%php-cast-token-kind (second stream))))
+     (let* ((cast-token (second stream))
+            (kind (%php-cast-token-kind cast-token))
+            (deprecated-name (%php-deprecated-cast-name cast-token)))
        (multiple-value-bind (expr rest2 kv2) (php-parse-unary (cdddr stream) known-vars)
-         (values (%php-cast-ast kind expr) rest2 kv2))))
+         (values (%php-cast-ast kind expr deprecated-name) rest2 kv2))))
     ((%php-reference-token-p stream)
       ;; PHP reference operator (&expr): keep an internal marker so assignment
       ;; lowering can model $b = &$a with the same ref-box machinery used by

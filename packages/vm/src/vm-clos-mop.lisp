@@ -323,6 +323,19 @@ with no argument returns T if any GF has been satiated in the current session."
     (when documentation (setf (gethash :__documentation__ gf) documentation))
     gf))
 
+(defun %vm-hashlike-slot-key (object slot-name)
+  "Return the most specific hash-table key for SLOT-NAME in OBJECT."
+  (when (hash-table-p object)
+    (multiple-value-bind (_ found-p) (gethash slot-name object)
+      (declare (ignore _))
+      (cond
+        (found-p slot-name)
+        (t
+         (let ((string-key (string-downcase (symbol-name slot-name))))
+           (multiple-value-bind (_ string-found-p) (gethash string-key object)
+             (declare (ignore _))
+             (and string-found-p string-key))))))))
+
 (defun slot-value-using-class (class object slot-name)
   "Read SLOT-NAME from OBJECT using CLASS metadata."
   (let ((class-slots (and (hash-table-p class) (gethash :__class-slots__ class))))
@@ -332,8 +345,10 @@ with no argument returns T if any GF has been satiated in the current session."
            (let ((index (class-slot-vector-index class slot-name)))
              (if index (aref object index) (error "Missing slot ~S" slot-name))))
           ((hash-table-p object)
-           (multiple-value-bind (value found-p) (gethash slot-name object)
-             (if found-p value (error "Unbound slot ~S" slot-name))))
+           (let ((key (%vm-hashlike-slot-key object slot-name)))
+             (if key
+                 (gethash key object)
+                 (error "Unbound slot ~S" slot-name))))
           (t (error "slot-value-using-class: unsupported object ~S" object)))))
 
 (defun (setf slot-value-using-class) (new-value class object slot-name)
@@ -345,7 +360,12 @@ with no argument returns T if any GF has been satiated in the current session."
            (let ((index (class-slot-vector-index class slot-name)))
              (unless index (error "Missing slot ~S" slot-name))
              (setf (aref object index) new-value)))
-          ((hash-table-p object) (setf (gethash slot-name object) new-value))
+          ((hash-table-p object)
+           (let ((key (%vm-hashlike-slot-key object slot-name)))
+             (if key
+                 (setf (gethash key object) new-value)
+                 (setf (gethash (string-downcase (symbol-name slot-name)) object)
+                       new-value))))
           (t (error "(setf slot-value-using-class): unsupported object ~S" object)))))
 
 (defun slot-bound-using-class-p (class object slot-name)
@@ -356,7 +376,9 @@ with no argument returns T if any GF has been satiated in the current session."
           ((and (vectorp object) (plusp (length object)) (hash-table-p class))
            (let ((index (class-slot-vector-index class slot-name)))
              (and index (not (eq (aref object index) *unbound-slot-marker*)))))
-          ((hash-table-p object) (nth-value 1 (gethash slot-name object)))
+          ((hash-table-p object)
+           (let ((key (%vm-hashlike-slot-key object slot-name)))
+             (and key (nth-value 1 (gethash key object)))))
           (t nil))))
 
 (defun slot-makunbound-using-class (class object slot-name)
@@ -368,7 +390,11 @@ with no argument returns T if any GF has been satiated in the current session."
            (let ((index (class-slot-vector-index class slot-name)))
              (unless index (error "Missing slot ~S" slot-name))
              (setf (aref object index) *unbound-slot-marker*)))
-          ((hash-table-p object) (remhash slot-name object))
+          ((hash-table-p object)
+           (let ((key (%vm-hashlike-slot-key object slot-name)))
+             (if key
+                 (remhash key object)
+                 (remhash (string-downcase (symbol-name slot-name)) object))))
           (t (error "slot-makunbound-using-class: unsupported object ~S" object))))
   object)
 

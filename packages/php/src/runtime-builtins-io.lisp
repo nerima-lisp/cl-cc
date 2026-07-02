@@ -2,12 +2,343 @@
 
 (in-package :cl-cc/php)
 
-;;; ─── File I/O ────────────────────────────────────────────────────────────────
+;;; ─── Shared Utilities ────────────────────────────────────────────────────────
 
 (defun %php-path-string (value)
   (if (pathnamep value)
       (namestring value)
       (%php-stringify value)))
+
+;;; ─── Image Metadata ─────────────────────────────────────────────────────────
+
+(defun %php-image-type-info (image-type)
+  "Return extension and MIME type for a PHP IMAGETYPE_* integer."
+  (case (%php-to-integer image-type)
+    (1 (values "gif" "image/gif"))
+    (2 (values "jpeg" "image/jpeg"))
+    (3 (values "png" "image/png"))
+    (4 (values "swf" "application/x-shockwave-flash"))
+    (5 (values "psd" "image/vnd.adobe.photoshop"))
+    (6 (values "bmp" "image/bmp"))
+    (7 (values "tiff" "image/tiff"))
+    (8 (values "tiff" "image/tiff"))
+    (9 (values "jpc" "application/octet-stream"))
+    (10 (values "jp2" "image/jp2"))
+    (11 (values "jpx" "application/octet-stream"))
+    (12 (values "jb2" "application/octet-stream"))
+    (13 (values "swc" "application/x-shockwave-flash"))
+    (14 (values "iff" "image/iff"))
+    (15 (values "wbmp" "image/vnd.wap.wbmp"))
+    (16 (values "xbm" "image/xbm"))
+    (17 (values "ico" "image/vnd.microsoft.icon"))
+    (18 (values "webp" "image/webp"))
+    (19 (values "avif" "image/avif"))
+    (20 (values "heif" "image/heif"))
+    (21 (values "svg" "image/svg+xml"))
+    (otherwise (values nil nil))))
+
+(defun %php-image-type-to-extension (image-type &optional (include-dot t))
+  "PHP image_type_to_extension: map IMAGETYPE_* to an extension."
+  (multiple-value-bind (extension mime)
+      (%php-image-type-info image-type)
+    (declare (ignore mime))
+    (when extension
+      (if (%php-truthy include-dot)
+          (concatenate 'string "." extension)
+          extension))))
+
+(defun %php-image-type-to-mime-type (image-type)
+  "PHP image_type_to_mime_type: map IMAGETYPE_* to a MIME type."
+  (multiple-value-bind (extension mime)
+      (%php-image-type-info image-type)
+    (declare (ignore extension))
+    mime))
+
+(defun %php-read-file-bytes (filename &optional limit)
+  (handler-case
+      (with-open-file (stream (%php-path-string filename)
+                              :direction :input
+                              :element-type '(unsigned-byte 8))
+        (let* ((size (file-length stream))
+               (count (if limit (min size limit) size))
+               (data (make-array count :element-type '(unsigned-byte 8))))
+          (read-sequence data stream)
+          data))
+    (error () nil)))
+
+(defun %php-read-file-text-prefix (filename &optional (limit 65536))
+  (handler-case
+      (with-open-file (stream (%php-path-string filename)
+                              :direction :input
+                              :external-format :utf-8)
+        (let* ((size (file-length stream))
+               (count (min size limit))
+               (data (make-string count)))
+          (read-sequence data stream)
+          data))
+    (error () nil)))
+
+(defun %php-bytes-prefix-p (bytes values &optional (start 0))
+  (and bytes
+       (<= (+ start (length values)) (length bytes))
+       (loop for value in values
+             for index from start
+             always (= (aref bytes index) value))))
+
+(defun %php-bytes-match-string-p (bytes start string)
+  (and bytes
+       (<= (+ start (length string)) (length bytes))
+       (loop for index below (length string)
+             always (= (aref bytes (+ start index))
+                       (char-code (char string index))))))
+
+(defun %php-bytes-ascii-string (bytes start end)
+  (coerce (loop for index from start below (min end (length bytes))
+                collect (code-char (aref bytes index)))
+          'string))
+
+(defun %php-u16-be (bytes start)
+  (+ (ash (aref bytes start) 8)
+     (aref bytes (1+ start))))
+
+(defun %php-u16-le (bytes start)
+  (+ (aref bytes start)
+     (ash (aref bytes (1+ start)) 8)))
+
+(defun %php-u32-be (bytes start)
+  (+ (ash (aref bytes start) 24)
+     (ash (aref bytes (+ start 1)) 16)
+     (ash (aref bytes (+ start 2)) 8)
+     (aref bytes (+ start 3))))
+
+(defun %php-webp-bytes-p (bytes)
+  (and bytes
+       (<= 12 (length bytes))
+       (%php-bytes-match-string-p bytes 0 "RIFF")
+       (%php-bytes-match-string-p bytes 8 "WEBP")))
+
+(defun %php-iso-bmff-brands (bytes)
+  (when (and bytes
+             (<= 12 (length bytes))
+             (%php-bytes-match-string-p bytes 4 "ftyp"))
+    (string-downcase
+     (%php-bytes-ascii-string bytes 8 (min 128 (length bytes))))))
+
+(defun %php-iso-bmff-brand-p (bytes brands)
+  (let ((detected-brands (%php-iso-bmff-brands bytes)))
+    (and detected-brands
+         (some (lambda (brand)
+                 (search brand detected-brands :test #'char=))
+               brands))))
+
+(defun %php-avif-bytes-p (bytes)
+  (%php-iso-bmff-brand-p bytes '("avif" "avis")))
+
+(defun %php-heif-bytes-p (bytes)
+  (%php-iso-bmff-brand-p bytes '("heic" "heix" "hevc" "hevx" "heim" "heis")))
+
+(defun %php-image-type-from-bytes (bytes)
+  (cond
+    ((or (%php-bytes-match-string-p bytes 0 "GIF87a")
+         (%php-bytes-match-string-p bytes 0 "GIF89a"))
+     1)
+    ((%php-bytes-prefix-p bytes '(#xff #xd8 #xff)) 2)
+    ((%php-bytes-prefix-p bytes '(#x89 #x50 #x4e #x47 #x0d #x0a #x1a #x0a)) 3)
+    ((%php-webp-bytes-p bytes) 18)
+    ((%php-avif-bytes-p bytes) 19)
+    ((%php-heif-bytes-p bytes) 20)
+    (t nil)))
+
+(defun %php-svg-text-p (text)
+  (and text (search "<svg" text :test #'char-equal)))
+
+(defun %php-detect-image-type (filename)
+  (let* ((bytes (%php-read-file-bytes filename 65536))
+         (image-type (%php-image-type-from-bytes bytes)))
+    (if image-type
+        (values image-type bytes nil)
+        (let ((text (%php-read-file-text-prefix filename)))
+          (when (%php-svg-text-p text)
+            (values 21 bytes text))))))
+
+(defun %php-png-dimensions (bytes)
+  (when (and bytes (<= 24 (length bytes)))
+    (values (%php-u32-be bytes 16)
+            (%php-u32-be bytes 20))))
+
+(defun %php-gif-dimensions (bytes)
+  (when (and bytes (<= 10 (length bytes)))
+    (values (%php-u16-le bytes 6)
+            (%php-u16-le bytes 8))))
+
+(defun %php-jpeg-sof-marker-p (marker)
+  (member marker '(#xc0 #xc1 #xc2 #xc3 #xc5 #xc6 #xc7 #xc9 #xca #xcb #xcd #xce #xcf)))
+
+(defun %php-jpeg-dimensions (bytes)
+  (when (and bytes (%php-bytes-prefix-p bytes '(#xff #xd8)))
+    (let ((position 2)
+          (size (length bytes)))
+      (loop while (< (+ position 3) size)
+            do (progn
+                 (loop while (and (< position size)
+                                  (/= (aref bytes position) #xff))
+                       do (incf position))
+                 (loop while (and (< position size)
+                                  (= (aref bytes position) #xff))
+                       do (incf position))
+                 (when (>= position size)
+                   (return-from %php-jpeg-dimensions nil))
+                 (let ((marker (aref bytes position)))
+                   (incf position)
+                   (when (= marker #xd9)
+                     (return-from %php-jpeg-dimensions nil))
+                   (unless (member marker '(#xd8 #x01))
+                     (when (>= (+ position 2) size)
+                       (return-from %php-jpeg-dimensions nil))
+                     (let ((segment-size (%php-u16-be bytes position)))
+                       (when (< segment-size 2)
+                         (return-from %php-jpeg-dimensions nil))
+                       (when (and (%php-jpeg-sof-marker-p marker)
+                                  (<= (+ position 7) size))
+                         (return-from %php-jpeg-dimensions
+                           (values (%php-u16-be bytes (+ position 5))
+                                   (%php-u16-be bytes (+ position 3)))))
+                       (when (= marker #xda)
+                         (return-from %php-jpeg-dimensions nil))
+                       (incf position segment-size)))))))))
+
+(defun %php-svg-start-tag (text)
+  (let ((start (and text (search "<svg" text :test #'char-equal))))
+    (when start
+      (let ((end (position #\> text :start start)))
+        (subseq text start (or end (length text)))))))
+
+(defun %php-svg-name-char-p (char)
+  (or (alphanumericp char)
+      (member char '(#\_ #\- #\:))))
+
+(defun %php-xml-space-p (char)
+  (member char '(#\Space #\Tab #\Newline #\Return #\Page)))
+
+(defun %php-skip-xml-space (string position)
+  (loop while (and (< position (length string))
+                   (%php-xml-space-p (char string position)))
+        do (incf position))
+  position)
+
+(defun %php-svg-attribute-value (tag name)
+  (let ((position 0)
+        (name-length (length name)))
+    (loop
+      (let ((found (search name tag :start2 position :test #'char-equal)))
+        (unless found
+          (return nil))
+        (let* ((after-name (+ found name-length))
+               (before-ok (or (= found 0)
+                              (not (%php-svg-name-char-p (char tag (1- found))))))
+               (after-ok (or (>= after-name (length tag))
+                             (not (%php-svg-name-char-p (char tag after-name))))))
+          (setf position after-name)
+          (when (and before-ok after-ok)
+            (let ((cursor (%php-skip-xml-space tag after-name)))
+              (when (and (< cursor (length tag))
+                         (char= (char tag cursor) #\=))
+                (incf cursor)
+                (setf cursor (%php-skip-xml-space tag cursor))
+                (when (< cursor (length tag))
+                  (let ((quote (char tag cursor)))
+                    (if (member quote '(#\" #\'))
+                        (let ((end (position quote tag :start (1+ cursor))))
+                          (when end
+                            (return (subseq tag (1+ cursor) end))))
+                        (let ((end (or (position-if
+                                        (lambda (char)
+                                          (or (%php-xml-space-p char)
+                                              (char= char #\>)
+                                              (char= char #\/)))
+                                        tag
+                                        :start cursor)
+                                       (length tag))))
+                          (return (subseq tag cursor end))))))))))))))
+
+(defun %php-svg-number-value (number-string)
+  (handler-case
+      (if (find #\. number-string)
+          (let ((value (read-from-string number-string nil 0)))
+            (if (and (numberp value)
+                     (zerop (- value (round value))))
+                (round value)
+                value))
+          (parse-integer number-string))
+    (error () 0)))
+
+(defun %php-svg-dimension (value)
+  (let* ((trimmed (if value
+                      (string-trim '(#\Space #\Tab #\Newline #\Return #\Page) value)
+                      ""))
+         (position 0)
+         (seen-dot nil))
+    (when (and (< position (length trimmed))
+               (member (char trimmed position) '(#\+ #\-)))
+      (incf position))
+    (loop while (and (< position (length trimmed))
+                     (or (digit-char-p (char trimmed position))
+                         (and (char= (char trimmed position) #\.)
+                              (not seen-dot))))
+          do (when (char= (char trimmed position) #\.)
+               (setf seen-dot t))
+             (incf position))
+    (let* ((number-string (subseq trimmed 0 position))
+           (unit (string-trim '(#\Space #\Tab #\Newline #\Return #\Page)
+                              (subseq trimmed position))))
+      (values (if (plusp (length number-string))
+                  (%php-svg-number-value number-string)
+                  0)
+              (if (plusp (length unit)) unit "px")))))
+
+(defun %php-svg-dimensions (text)
+  (let* ((tag (%php-svg-start-tag text))
+         (width-value (and tag (%php-svg-attribute-value tag "width")))
+         (height-value (and tag (%php-svg-attribute-value tag "height"))))
+    (multiple-value-bind (width width-unit) (%php-svg-dimension width-value)
+      (multiple-value-bind (height height-unit) (%php-svg-dimension height-value)
+        (values width height width-unit height-unit)))))
+
+(defun %php-image-dimensions-and-units (image-type bytes text)
+  (multiple-value-bind (width height)
+      (case image-type
+        (1 (%php-gif-dimensions bytes))
+        (2 (%php-jpeg-dimensions bytes))
+        (3 (%php-png-dimensions bytes))
+        (21 (return-from %php-image-dimensions-and-units
+              (%php-svg-dimensions text)))
+        (otherwise (values 0 0)))
+    (values (or width 0) (or height 0) "px" "px")))
+
+(defun %php-getimagesize (filename &optional image-info)
+  (declare (ignore image-info))
+  (multiple-value-bind (image-type bytes text) (%php-detect-image-type filename)
+    (when image-type
+      (multiple-value-bind (width height width-unit height-unit)
+          (%php-image-dimensions-and-units image-type bytes text)
+        (multiple-value-bind (extension mime) (%php-image-type-info image-type)
+          (declare (ignore extension))
+          (let ((result (%php-make-array)))
+            (%php-array-set result 0 width)
+            (%php-array-set result 1 height)
+            (%php-array-set result 2 image-type)
+            (%php-array-set result 3 (format nil "width=\"~A\" height=\"~A\"" width height))
+            (%php-array-set result "mime" mime)
+            (%php-array-set result "width_unit" width-unit)
+            (%php-array-set result "height_unit" height-unit)
+            result))))))
+
+(defun %php-exif-imagetype (filename)
+  (multiple-value-bind (image-type bytes text) (%php-detect-image-type filename)
+    (declare (ignore bytes text))
+    image-type))
+
+;;; ─── File I/O ────────────────────────────────────────────────────────────────
 
 (defun %php-file-get-contents (filename &optional use-include-path context offset length)
   "PHP file_get_contents: read file into string."
@@ -288,6 +619,72 @@
     (%php-array-set handle "__eof__" nil)
     handle))
 
+(defvar *php-file-locks* (make-hash-table :test #'equal)
+  "Per-path flock state for the CLI compatibility model.")
+
+(defun %php-file-lock-state (path)
+  (or (gethash path *php-file-locks*)
+      (setf (gethash path *php-file-locks*)
+            (list :exclusive nil
+                  :shared (make-hash-table :test #'eq)))))
+
+(defun %php-file-lock-release-handle (handle)
+  (let ((paths-to-remove '()))
+    (maphash (lambda (path state)
+               (let ((exclusive (getf state :exclusive))
+                     (shared (getf state :shared)))
+                 (when (eq exclusive handle)
+                   (setf (getf state :exclusive) nil))
+                 (when (hash-table-p shared)
+                   (remhash handle shared))
+                 (when (and (null (getf state :exclusive))
+                            (hash-table-p shared)
+                            (zerop (hash-table-count shared)))
+                   (push path paths-to-remove))))
+             *php-file-locks*)
+    (dolist (path paths-to-remove)
+      (remhash path *php-file-locks*))))
+
+(defun %php-file-lock-compatible-p (state handle mode)
+  (let ((exclusive (getf state :exclusive))
+        (shared (getf state :shared)))
+    (cond
+      ((= mode 1)
+       (or (null exclusive)
+           (eq exclusive handle)))
+      ((= mode 2)
+       (and (or (null exclusive)
+                (eq exclusive handle))
+            (or (not (hash-table-p shared))
+                (zerop (hash-table-count shared))
+                (and (= (hash-table-count shared) 1)
+                     (gethash handle shared)))))
+      (t nil))))
+
+(defun %php-file-lock-acquire (handle mode)
+  (let* ((path (%php-array-ref handle "__path__"))
+         (state (%php-file-lock-state path))
+         (shared (getf state :shared)))
+    (cond
+      ((= mode 3)
+       (%php-file-lock-release-handle handle)
+       (%php-array-set handle "__lock__" nil)
+       t)
+      ((%php-file-lock-compatible-p state handle mode)
+       (cond
+         ((= mode 1)
+          (setf (getf state :exclusive) nil)
+          (setf (gethash handle shared) t)
+          (%php-array-set handle "__lock__" mode)
+          t)
+         ((= mode 2)
+          (when (hash-table-p shared)
+            (remhash handle shared))
+          (setf (getf state :exclusive) handle)
+          (%php-array-set handle "__lock__" mode)
+          t)))
+      (t nil))))
+
 (defun %php-stdin ()
   "PHP STDIN stream resource."
   (%php-standard-stream-handle *standard-input* "php://stdin" "r"))
@@ -333,7 +730,20 @@
         (when (and stream (streamp stream))
           (unless (%php-array-ref handle "__standard__")
             (close stream)))
+        (%php-file-lock-release-handle handle)
         t)
+    (error () nil)))
+
+(defun %php-flock (handle operation)
+  "PHP flock: maintain a minimal in-memory lock model for file handles."
+  (handler-case
+      (let* ((stream (%php-array-ref handle "__stream__"))
+             (path (%php-array-ref handle "__path__"))
+             (mode (%php-to-integer operation))
+             (lock-mode (logand mode 3)))
+        (if (and stream path)
+            (%php-file-lock-acquire handle lock-mode)
+            nil))
     (error () nil)))
 
 (defun %php-fread (handle length)
@@ -512,11 +922,66 @@
     ("log_errors" . "0")
     ("max_execution_time" . "0")
     ("memory_limit" . "-1")
+    ("max_memory_limit" . "-1")
+    ("fatal_error_backtraces" . "0")
     ("default_charset" . "UTF-8")
     ("date.timezone" . "UTC")
     ("precision" . "14")
     ("serialize_precision" . "-1"))
   "Default INI values modelled by the PHP runtime.")
+
+(defun %php-memory-limit-unit-multiplier (unit)
+  "Return the multiplier for a PHP memory_limit suffix."
+  (case (char-upcase unit)
+    (#\K 1024)
+    (#\M (expt 1024 2))
+    (#\G (expt 1024 3))
+    (#\T (expt 1024 4))
+    (#\P (expt 1024 5))
+    (#\E (expt 1024 6))
+    (#\Z (expt 1024 7))
+    (#\Y (expt 1024 8))
+    (t 1)))
+
+(defun %php-parse-memory-limit (value)
+  "Parse a PHP memory_limit-style value into bytes or :unlimited."
+  (let* ((text (string-trim '(#\Space #\Tab #\Newline #\Return)
+                            (%php-stringify value))))
+    (cond
+      ((string= text "-1")
+       (values nil t))
+      ((zerop (length text))
+       (values nil nil))
+      (t
+       (let* ((len (length text))
+              (unit (and (> len 0)
+                         (find (char-upcase (char text (1- len)))
+                               "KMGTPEZY"
+                               :test #'char=)))
+              (number-text (if unit (subseq text 0 (1- len)) text)))
+         (handler-case
+             (let ((number (parse-integer (string-trim '(#\Space #\Tab #\Newline #\Return)
+                                                       number-text)
+                                          :junk-allowed nil)))
+               (values (if unit
+                           (* number (%php-memory-limit-unit-multiplier
+                                      (char text (1- len))))
+                           number)
+                       nil))
+           (error ()
+             (values nil nil))))))))
+
+(defun %php-memory-limit-exceeds-p (value max-value)
+  "Return true when VALUE is larger than MAX-VALUE."
+  (multiple-value-bind (value-bytes value-unlimited-p)
+      (%php-parse-memory-limit value)
+    (multiple-value-bind (max-bytes max-unlimited-p)
+        (%php-parse-memory-limit max-value)
+      (cond
+        (max-unlimited-p nil)
+        (value-unlimited-p t)
+        ((or (null value-bytes) (null max-bytes)) nil)
+        (t (> value-bytes max-bytes))))))
 
 (defvar *php-ini-settings* nil
   "Mutable PHP INI settings for the current Lisp image.")
@@ -587,9 +1052,22 @@
          (table (%php-ensure-ini-settings))
          (old (%php-ini-get key)))
     (cond
+      ((string= key "max_memory_limit")
+       nil)
       ((string= key "date.timezone")
        (when (%php-date-default-timezone-set newvalue)
          (setf (gethash key table) (%php-date-default-timezone-get))
+         old))
+      ((string= key "memory_limit")
+       (let ((max-memory-limit (%php-ini-get "max_memory_limit")))
+         (when (and max-memory-limit
+                    (%php-memory-limit-exceeds-p newvalue max-memory-limit))
+           (format *error-output*
+                   "memory_limit exceeds max_memory_limit (~A); clamping to ~A~%"
+                   max-memory-limit
+                   max-memory-limit)
+           (setf newvalue max-memory-limit))
+         (setf (gethash key table) (%php-stringify newvalue))
          old))
       (t
        (setf (gethash key table) (%php-stringify newvalue))
@@ -652,7 +1130,13 @@
                 (%php-truthy
                  (funcall fn errno (%php-stringify message) nil nil))))))
     (unless (or handled-p (not reportable-p))
-      (format t "~A~%" (%php-stringify message))))
+      ;; User-triggered errors (E_USER_*) report to stdout so trigger_error() is
+      ;; observable in program output; engine-generated diagnostics (E_DEPRECATED,
+      ;; E_WARNING, …) go to stderr as PHP's CLI SAPI does, keeping them out of
+      ;; captured program output (e.g. serialize() using __sleep()).
+      (if (logtest errno (logior 256 512 1024 16384)) ; E_USER_ERROR/WARNING/NOTICE/DEPRECATED
+          (format t "~A~%" (%php-stringify message))
+          (format *error-output* "~A~%" (%php-stringify message)))))
   t)
 
 (defun %php-exit (&optional (status 0))
@@ -870,6 +1354,479 @@
   (declare (ignore file line))
   *php-output-started-p*)
 
+(defun %php-mail
+    (to subject message &optional additional-headers additional-params)
+  "PHP mail: accept a mail request in the CLI compatibility model."
+  (declare (ignore to subject message additional-headers additional-params))
+  t)
+
+;;; --- Cookie / session response model ---------------------------------------
+
+(defvar *php-session-name* "PHPSESSID"
+  "Current PHP session cookie name for the CLI response model.")
+
+(defvar *php-session-id* ""
+  "Current PHP session identifier for the CLI response model.")
+
+(defvar *php-session-active-p* nil
+  "Whether session_start() has activated the modeled session.")
+
+(defvar *php-session-cookie-params* nil
+  "Modeled session cookie params as a PHP ordered array.")
+
+(defun %php-cookie-option (options key default)
+  "Read KEY from PHP option array OPTIONS, preserving false as a value."
+  (if (hash-table-p options)
+      (let ((result default))
+        (dolist (present-key (%php-array-ordered-keys options))
+          (when (and (stringp present-key)
+                     (string-equal present-key key))
+            (let ((value (gethash present-key options)))
+              (setf result (if (%php-null-p value) default value)))))
+        result)
+      default))
+
+(defparameter +php-cookie-option-keys+
+  '("expires" "path" "domain" "secure" "httponly" "samesite" "partitioned"))
+
+(defparameter +php-session-cookie-option-keys+
+  '("lifetime" "path" "domain" "secure" "partitioned" "httponly" "samesite"))
+
+(defun %php-cookie-option-key-name (key)
+  (if (stringp key)
+      key
+      (%php-stringify key)))
+
+(defun %php-cookie-valid-option-key-p (key allowed-keys)
+  (and (stringp key)
+       (member key allowed-keys :test #'string-equal)))
+
+(defun %php-cookie-valid-option-count (options allowed-keys)
+  (let ((count 0))
+    (when (hash-table-p options)
+      (dolist (key (%php-array-ordered-keys options))
+        (when (%php-cookie-valid-option-key-p key allowed-keys)
+          (incf count))))
+    count))
+
+(defun %php-cookie-validate-option-keys
+    (function-name options allowed-keys &key warn)
+  "Validate cookie option array keys like PHP's cookie APIs."
+  (when (hash-table-p options)
+    (dolist (key (%php-array-ordered-keys options))
+      (unless (%php-cookie-valid-option-key-p key allowed-keys)
+        (if warn
+            (%php-trigger-error
+             (if (stringp key)
+                 (format nil "~A(): Argument #1 ($lifetime_or_options) contains an unrecognized key \"~A\""
+                         function-name
+                         key)
+                 (format nil "~A(): Argument #1 ($lifetime_or_options) cannot contain numeric keys"
+                         function-name))
+             2)
+            (%php-throw 'value-error
+                        (if (stringp key)
+                            (format nil "~A(): option \"~A\" is invalid"
+                                    function-name
+                                    (%php-cookie-option-key-name key))
+                            (format nil "~A(): option array cannot have numeric keys"
+                                    function-name))))))))
+
+(defun %php-cookie-string (value &optional (default ""))
+  "Coerce cookie option VALUE to a string, using DEFAULT for null/omitted."
+  (if (or (null value) (%php-null-p value))
+      default
+      (%php-stringify value)))
+
+(defun %php-cookie-integer (value &optional (default 0))
+  "Coerce cookie option VALUE to an integer, using DEFAULT for null/omitted."
+  (if (or (null value) (%php-null-p value))
+      default
+      (%php-to-integer value)))
+
+(defun %php-cookie-bool (value)
+  "Coerce cookie option VALUE to a PHP boolean."
+  (and (not (%php-null-p value))
+       (%php-truthy value)))
+
+(defun %php-cookie-samesite (function-name value &optional (default ""))
+  "Normalize and validate SameSite cookie option values."
+  (let ((samesite (%php-cookie-string value default)))
+    (when (and (plusp (length samesite))
+               (not (member samesite '("None" "Lax" "Strict")
+                            :test #'string-equal)))
+      (%php-throw 'value-error
+                  (format nil "~A(): \"samesite\" option must be \"Strict\", \"Lax\", \"None\", or \"\""
+                          function-name)))
+    samesite))
+
+(defun %php-cookie-params (&key (expires 0) (path "") (domain "")
+                                secure httponly (samesite "") partitioned)
+  "Return normalized cookie params as a plist."
+  (list :expires expires
+        :path path
+        :domain domain
+        :secure secure
+        :httponly httponly
+        :samesite samesite
+        :partitioned partitioned))
+
+(defun %php-cookie-validate-partitioned (function-name params)
+  "PHP 8.5 CHIPS requires Partitioned cookies to also be Secure."
+  (when (and (getf params :partitioned)
+             (not (getf params :secure)))
+    (%php-throw 'value-error
+                (format nil "~A(): \"partitioned\" option cannot be used without \"secure\" option"
+                        function-name)))
+  params)
+
+(defun %php-cookie-params-from-call
+    (function-name expires-or-options path domain secure httponly)
+  "Normalize setcookie()/setrawcookie() positional or options-array params."
+  (when (hash-table-p expires-or-options)
+    (%php-cookie-validate-option-keys
+     function-name
+     expires-or-options
+     +php-cookie-option-keys+))
+  (%php-cookie-validate-partitioned
+   function-name
+   (if (hash-table-p expires-or-options)
+       (%php-cookie-params
+        :expires (%php-cookie-integer
+                  (%php-cookie-option expires-or-options "expires" 0))
+        :path (%php-cookie-string
+               (%php-cookie-option expires-or-options "path" ""))
+        :domain (%php-cookie-string
+                 (%php-cookie-option expires-or-options "domain" ""))
+        :secure (%php-cookie-bool
+                 (%php-cookie-option expires-or-options "secure" nil))
+        :httponly (%php-cookie-bool
+                   (%php-cookie-option expires-or-options "httponly" nil))
+        :samesite (%php-cookie-samesite
+                   function-name
+                   (%php-cookie-option expires-or-options "samesite" ""))
+        :partitioned (%php-cookie-bool
+                      (%php-cookie-option expires-or-options "partitioned" nil)))
+       (%php-cookie-params
+        :expires (%php-cookie-integer expires-or-options)
+        :path (%php-cookie-string path)
+        :domain (%php-cookie-string domain)
+        :secure (%php-cookie-bool secure)
+        :httponly (%php-cookie-bool httponly)))))
+
+(defun %php-cookie-weekday-name (index)
+  (nth index '("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")))
+
+(defun %php-cookie-month-name (index)
+  (nth (1- index)
+       '("Jan" "Feb" "Mar" "Apr" "May" "Jun"
+         "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")))
+
+(defun %php-cookie-expires-gmt (unix-seconds)
+  "Format a Unix timestamp as an HTTP-date for cookie Expires."
+  (multiple-value-bind (second minute hour date month year day)
+      (decode-universal-time (+ (%php-to-integer unix-seconds) 2208988800) 0)
+    (format nil "~A, ~2,'0D ~A ~4,'0D ~2,'0D:~2,'0D:~2,'0D GMT"
+            (%php-cookie-weekday-name day)
+            date
+            (%php-cookie-month-name month)
+            year
+            hour
+            minute
+            second)))
+
+(defun %php-cookie-header (name value params &key raw-value)
+  "Build a Set-Cookie header from normalized PARAMS."
+  (let ((path (getf params :path))
+        (domain (getf params :domain))
+        (samesite (getf params :samesite))
+        (expires (getf params :expires)))
+    (with-output-to-string (out)
+      (format out "Set-Cookie: ~A=~A"
+              (%php-stringify name)
+              (if raw-value
+                  (%php-stringify value)
+                  (%php-urlencode (%php-stringify value))))
+      (when (> (%php-to-integer expires) 0)
+        (format out "; expires=~A" (%php-cookie-expires-gmt expires)))
+      (when (plusp (length path))
+        (format out "; path=~A" path))
+      (when (plusp (length domain))
+        (format out "; domain=~A" domain))
+      (when (getf params :secure)
+        (write-string "; secure" out))
+      (when (getf params :httponly)
+        (write-string "; HttpOnly" out))
+      (when (plusp (length samesite))
+        (format out "; SameSite=~A" samesite))
+      (when (getf params :partitioned)
+        (write-string "; Partitioned" out)))))
+
+(defun %php-queue-cookie-header (header)
+  "Queue HEADER unless response headers have already been sent."
+  (if *php-output-started-p*
+      nil
+      (progn
+        (%php-header header nil)
+        t)))
+
+(defun %php-setcookie
+    (name &optional value expires-or-options path domain secure httponly)
+  "PHP setcookie: queue a URL-encoded Set-Cookie header."
+  (let ((params (%php-cookie-params-from-call
+                 "setcookie" expires-or-options path domain secure httponly)))
+    (%php-queue-cookie-header (%php-cookie-header name value params))))
+
+(defun %php-setrawcookie
+    (name &optional value expires-or-options path domain secure httponly)
+  "PHP setrawcookie: queue an unencoded Set-Cookie header."
+  (let ((params (%php-cookie-params-from-call
+                 "setrawcookie" expires-or-options path domain secure httponly)))
+    (%php-queue-cookie-header
+     (%php-cookie-header name value params :raw-value t))))
+
+(defun %php-default-session-cookie-params ()
+  "Return default modeled session cookie params."
+  (let ((params (%php-make-array)))
+    (%php-array-set params "lifetime" 0)
+    (%php-array-set params "path" "/")
+    (%php-array-set params "domain" "")
+    (%php-array-set params "secure" nil)
+    (%php-array-set params "partitioned" nil)
+    (%php-array-set params "httponly" nil)
+    (%php-array-set params "samesite" "")
+    params))
+
+(defun %php-copy-array (array)
+  "Return a shallow copy of a PHP ordered array."
+  (let ((copy (%php-make-array)))
+    (when (hash-table-p array)
+      (dolist (key (%php-array-ordered-keys array))
+        (%php-array-set copy key (gethash key array))))
+    copy))
+
+(defun %php-ensure-session-cookie-params ()
+  "Ensure the session cookie param array exists."
+  (unless (hash-table-p *php-session-cookie-params*)
+    (setf *php-session-cookie-params* (%php-default-session-cookie-params)))
+  *php-session-cookie-params*)
+
+(defun %php-session-cookie-params-plist (params)
+  "Convert session cookie param array PARAMS to normalized cookie plist."
+  (%php-cookie-params
+   :expires 0
+   :path (%php-cookie-string (%php-cookie-option params "path" "/") "/")
+   :domain (%php-cookie-string (%php-cookie-option params "domain" ""))
+   :secure (%php-cookie-bool (%php-cookie-option params "secure" nil))
+   :httponly (%php-cookie-bool (%php-cookie-option params "httponly" nil))
+   :samesite (%php-cookie-samesite
+              "session_start"
+              (%php-cookie-option params "samesite" ""))
+   :partitioned (%php-cookie-bool
+                 (%php-cookie-option params "partitioned" nil))))
+
+(defun %php-session-partitioned-without-secure-p (params)
+  "Return true when modeled session params violate CHIPS Secure requirements."
+  (let ((cookie-params (%php-session-cookie-params-plist params)))
+    (and (getf cookie-params :partitioned)
+         (not (getf cookie-params :secure)))))
+
+(defun %php-session-warn-partitioned-without-secure ()
+  (%php-trigger-error
+   "session_start(): Partitioned session cookie cannot be used without also configuring it as secure"
+   2))
+
+(defun %php-session-name (&optional name)
+  "PHP session_name: get or set the modeled session cookie name."
+  (if (or (null name) (%php-null-p name))
+      *php-session-name*
+      (let ((old *php-session-name*))
+        (setf *php-session-name* (%php-stringify name))
+        old)))
+
+(defun %php-session-id (&optional id)
+  "PHP session_id: get or set the modeled session id."
+  (if (or (null id) (%php-null-p id))
+      *php-session-id*
+      (let ((old *php-session-id*))
+        (setf *php-session-id* (%php-stringify id))
+        old)))
+
+(defun %php-session-get-cookie-params ()
+  "PHP session_get_cookie_params: return current session cookie params."
+  (%php-copy-array (%php-ensure-session-cookie-params)))
+
+(defun %php-session-set-cookie-params
+    (lifetime-or-options &optional path domain secure httponly)
+  "PHP session_set_cookie_params with PHP 8.5 partitioned support."
+  (let ((params (%php-copy-array (%php-ensure-session-cookie-params))))
+    (if (hash-table-p lifetime-or-options)
+        (progn
+          (%php-cookie-validate-option-keys
+           "session_set_cookie_params"
+           lifetime-or-options
+           +php-session-cookie-option-keys+
+           :warn t)
+          (when (zerop (%php-cookie-valid-option-count
+                        lifetime-or-options
+                        +php-session-cookie-option-keys+))
+            (%php-throw
+             'value-error
+             "session_set_cookie_params(): Argument #1 ($lifetime_or_options) must contain at least 1 valid key"))
+          (%php-array-set params "lifetime"
+                          (%php-cookie-integer
+                           (%php-cookie-option lifetime-or-options
+                                               "lifetime"
+                                               (%php-cookie-option params
+                                                                   "lifetime"
+                                                                   0))))
+          (%php-array-set params "path"
+                          (%php-cookie-string
+                           (%php-cookie-option lifetime-or-options
+                                               "path"
+                                               (%php-cookie-option params
+                                                                   "path"
+                                                                   "/"))))
+          (%php-array-set params "domain"
+                          (%php-cookie-string
+                           (%php-cookie-option lifetime-or-options
+                                               "domain"
+                                               (%php-cookie-option params
+                                                                   "domain"
+                                                                   ""))))
+          (%php-array-set params "secure"
+                          (%php-cookie-bool
+                           (%php-cookie-option lifetime-or-options
+                                               "secure"
+                                               (%php-cookie-option params
+                                                                   "secure"
+                                                                   nil))))
+          (%php-array-set params "httponly"
+                          (%php-cookie-bool
+                           (%php-cookie-option lifetime-or-options
+                                               "httponly"
+                                               (%php-cookie-option params
+                                                                   "httponly"
+                                                                   nil))))
+          (%php-array-set params "samesite"
+                          (%php-cookie-samesite
+                           "session_set_cookie_params"
+                           (%php-cookie-option lifetime-or-options
+                                               "samesite"
+                                               (%php-cookie-option params
+                                                                   "samesite"
+                                                                   ""))))
+          (%php-array-set params "partitioned"
+                          (%php-cookie-bool
+                           (%php-cookie-option lifetime-or-options
+                                               "partitioned"
+                                               (%php-cookie-option params
+                                                                   "partitioned"
+                                                                   nil)))))
+        (progn
+          (%php-array-set params "lifetime"
+                          (%php-cookie-integer lifetime-or-options))
+          (%php-array-set params "path"
+                          (%php-cookie-string path
+                                              (%php-cookie-option params
+                                                                  "path"
+                                                                  "/")))
+          (%php-array-set params "domain"
+                          (%php-cookie-string domain
+                                              (%php-cookie-option params
+                                                                  "domain"
+                                                                  "")))
+          (%php-array-set params "secure" (%php-cookie-bool secure))
+          (%php-array-set params "httponly" (%php-cookie-bool httponly))))
+    (setf *php-session-cookie-params* params)
+    t))
+
+(defun %php-session-apply-start-options (options)
+  "Apply session_start() options, including PHP 8.5 cookie_partitioned."
+  (when (hash-table-p options)
+    (let ((params (%php-copy-array (%php-ensure-session-cookie-params))))
+      (multiple-value-bind (name present-p) (gethash "name" options)
+        (when (and present-p (not (%php-null-p name)))
+          (setf *php-session-name* (%php-stringify name))))
+      (%php-array-set params "lifetime"
+                      (%php-cookie-integer
+                       (%php-cookie-option options
+                                           "cookie_lifetime"
+                                           (%php-cookie-option params
+                                                               "lifetime"
+                                                               0))))
+      (%php-array-set params "path"
+                      (%php-cookie-string
+                       (%php-cookie-option options
+                                           "cookie_path"
+                                           (%php-cookie-option params
+                                                               "path"
+                                                               "/"))))
+      (%php-array-set params "domain"
+                      (%php-cookie-string
+                       (%php-cookie-option options
+                                           "cookie_domain"
+                                           (%php-cookie-option params
+                                                               "domain"
+                                                               ""))))
+      (%php-array-set params "secure"
+                      (%php-cookie-bool
+                       (%php-cookie-option options
+                                           "cookie_secure"
+                                           (%php-cookie-option params
+                                                               "secure"
+                                                               nil))))
+      (%php-array-set params "httponly"
+                      (%php-cookie-bool
+                       (%php-cookie-option options
+                                           "cookie_httponly"
+                                           (%php-cookie-option params
+                                                               "httponly"
+                                                               nil))))
+      (%php-array-set params "samesite"
+                      (%php-cookie-samesite
+                       "session_start"
+                       (%php-cookie-option options
+                                           "cookie_samesite"
+                                           (%php-cookie-option params
+                                                               "samesite"
+                                                               ""))))
+      (%php-array-set params "partitioned"
+                      (%php-cookie-bool
+                       (%php-cookie-option options
+                                           "cookie_partitioned"
+                                           (%php-cookie-option params
+                                                               "partitioned"
+                                                               nil))))
+      (setf *php-session-cookie-params* params))))
+
+(defun %php-session-effective-id ()
+  "Return the current session id, creating a deterministic one when absent."
+  (when (or (null *php-session-id*)
+            (string= *php-session-id* ""))
+    (setf *php-session-id* "clccsession"))
+  *php-session-id*)
+
+(defun %php-session-start (&optional options)
+  "PHP session_start: mark a session active and queue the modeled cookie."
+  (%php-session-apply-start-options options)
+  (cond
+    (*php-output-started-p* nil)
+    ((%php-session-partitioned-without-secure-p
+      (%php-ensure-session-cookie-params))
+     (%php-session-warn-partitioned-without-secure)
+     nil)
+    (t
+     (let* ((params (%php-ensure-session-cookie-params))
+            (cookie-params (%php-session-cookie-params-plist params))
+            (header (%php-cookie-header *php-session-name*
+                                        (%php-session-effective-id)
+                                        cookie-params
+                                        :raw-value t)))
+       (%php-queue-cookie-header header)
+       (setf *php-session-active-p* t)
+       t))))
+
 ;;; ─── String misc ─────────────────────────────────────────────────────────────
 
 (defun %php-parse-str (str &optional result)
@@ -904,13 +1861,29 @@
 (defparameter *php-runtime-class-tags* (make-hash-table :test #'equal))
 (defparameter *php-runtime-interface-tags* (make-hash-table :test #'equal))
 (defparameter *php-runtime-class-methods* (make-hash-table :test #'equal))
+(defparameter *php-runtime-class-aliases* (make-hash-table :test #'equal))
 
 (defun %php-runtime-type-key (type-name)
   (string-upcase (%php-stringify type-name)))
 
+(defun %php-runtime-class-canonical-key (class-name)
+  (let ((current (%php-runtime-type-key class-name))
+        (seen (make-hash-table :test #'equal)))
+    (loop
+      (let ((next (gethash current *php-runtime-class-aliases*)))
+        (when (or (null next) (gethash current seen))
+          (return current))
+        (setf (gethash current seen) t
+              current next)))))
+
 (defun %php-defined-class-symbol-p (class-name)
   (let ((sym (find-symbol (%php-runtime-type-key class-name) :cl-cc/php)))
     (and sym (fboundp sym))))
+
+(defun %php-runtime-class-alias-name-forbidden-p (alias)
+  (let ((key (%php-runtime-type-key alias)))
+    (or (string= key "ARRAY")
+        (string= key "CALLABLE"))))
 
 (defun %php-register-runtime-class-tag (class-name)
   (setf (gethash (%php-runtime-type-key class-name) *php-runtime-class-tags*) t))
@@ -923,13 +1896,13 @@
         (mapcar #'%php-stringify methods)))
 
 (defun %php-runtime-class-tag-exists-p (class-name)
-  (gethash (%php-runtime-type-key class-name) *php-runtime-class-tags*))
+  (gethash (%php-runtime-class-canonical-key class-name) *php-runtime-class-tags*))
 
 (defun %php-runtime-interface-tag-exists-p (interface-name)
   (gethash (%php-runtime-type-key interface-name) *php-runtime-interface-tags*))
 
 (defun %php-runtime-class-methods (class-name)
-  (gethash (%php-runtime-type-key class-name) *php-runtime-class-methods*))
+  (gethash (%php-runtime-class-canonical-key class-name) *php-runtime-class-methods*))
 
 (defun %php-runtime-class-method-exists-p (class-name method)
   (not (null (find (%php-stringify method)
@@ -942,12 +1915,17 @@
                         "Closure"
                         "CurlSharePersistentHandle"
                         "Dom\\Element"
+                        "Dom\\HTMLCollection"
+                        "Dom\\HTMLDocument"
                         "Filter\\FilterException"
                         "Filter\\FilterFailedException"
                         "IntlListFormatter"
                         "Locale"
                         "NumberFormatter"
                         "Pdo\\Sqlite"
+                        "SoapClient"
+                        "SoapFault"
+                        "SoapServer"
                         "ReflectionConstant"
                         "ReflectionProperty"
                         "SQLite3Stmt"
@@ -959,11 +1937,16 @@
                         "Uri\\WhatWg\\InvalidUrlException"
                         "Uri\\WhatWg\\UrlValidationErrorType"
                         "Uri\\WhatWg\\UrlValidationError"
-                        "Uri\\WhatWg\\Url"))
+                        "Uri\\WhatWg\\Url"
+                        "XSLTProcessor"))
     (%php-register-runtime-class-tag class-name))
+  (%php-register-runtime-interface-tag "Dom\\ParentNode")
   (%php-register-runtime-class-methods
    "Dom\\Element"
    '("getElementsByClassName" "insertAdjacentHTML"))
+  (%php-register-runtime-class-methods
+   "Dom\\HTMLDocument"
+   '("getElementsByName"))
   (%php-register-runtime-class-methods
    "Closure"
    '("getCurrent"))
@@ -974,11 +1957,24 @@
    "Pdo\\Sqlite"
    '("setAuthorizer"))
   (%php-register-runtime-class-methods
+   "SoapClient"
+   '("__construct" "__getTypes"))
+  (%php-register-runtime-class-methods
+   "SoapFault"
+   '("__construct"))
+  (%php-register-runtime-class-methods
+   "SoapServer"
+   '("__construct" "fault"))
+  (%php-register-runtime-class-methods
+   "XSLTProcessor"
+   '("__construct" "getParameter" "setParameter" "removeParameter"))
+  (%php-register-runtime-class-methods
    "SQLite3Stmt"
    '("busy"))
   (%php-register-runtime-class-methods
    "ReflectionConstant"
-   '("getFileName" "getExtension" "getExtensionName" "getAttributes"))
+   '("getFileName" "getExtension" "getExtensionName" "getAttributes"
+     "isDeprecated"))
   (%php-register-runtime-class-methods
    "ReflectionProperty"
    '("getMangledName"))
@@ -1008,8 +2004,33 @@
 (defun %php-class-exists (class-name &optional autoload)
   "PHP class_exists: check if class is defined."
   (declare (ignore autoload))
-  (or (%php-defined-class-symbol-p class-name)
-      (%php-runtime-class-tag-exists-p class-name)))
+  (let ((canonical-key (%php-runtime-class-canonical-key class-name)))
+    (or (%php-defined-class-symbol-p class-name)
+        (%php-defined-class-symbol-p canonical-key)
+        (gethash canonical-key *php-runtime-class-tags*))))
+
+(defun %php-class-alias (class-name alias &optional autoload)
+  "PHP class_alias: create a runtime-visible class alias."
+  (declare (ignore autoload))
+  (let* ((alias-string (%php-stringify alias))
+         (alias-key (%php-runtime-type-key alias-string))
+         (class-key (%php-runtime-class-canonical-key class-name)))
+    (when (%php-runtime-class-alias-name-forbidden-p alias-string)
+      (%php-throw 'value-error
+                  (format nil "class_alias(): Argument #2 ($alias) must not be ~S" alias-string)))
+    (cond
+      ((not (or (%php-defined-class-symbol-p class-name)
+                (%php-defined-class-symbol-p class-key)
+                (gethash class-key *php-runtime-class-tags*)))
+       nil)
+      ((or (%php-defined-class-symbol-p alias-string)
+           (gethash alias-key *php-runtime-class-tags*)
+           (gethash alias-key *php-runtime-interface-tags*)
+           (gethash alias-key *php-runtime-class-aliases*))
+       nil)
+      (t
+       (setf (gethash alias-key *php-runtime-class-aliases*) class-key)
+       t))))
 
 (defun %php-interface-exists (interface-name &optional autoload)
   "PHP interface_exists: check if interface is defined."
@@ -1024,39 +2045,73 @@
 (defun %php-method-exists (object method)
   "PHP method_exists: check if method exists on object or runtime class name."
   (cond
-    ((hash-table-p object)
-     (let ((methods (%php-array-ref object "__methods__"))
-           (class-name (%php-array-ref object "__class__")))
-       (or (and (hash-table-p methods)
-                (not (%php-null-p (%php-array-ref methods (%php-stringify method)))))
-           (and (not (%php-null-p class-name))
-                (%php-runtime-class-method-exists-p class-name method)))))
+    ((or (hash-table-p object)
+         (typep object 'cl-cc/vm::vm-hash-table-object)
+         (and (vectorp object)
+              (plusp (length object))
+              (hash-table-p (aref object 0))))
+     (not (null (%php-object-method object method))))
     ((or (stringp object) (symbolp object))
      (%php-runtime-class-method-exists-p object method))))
 
 (defun %php-property-exists (object property)
   "PHP property_exists: check if property exists."
-  (when (hash-table-p object)
-    (not (%php-null-p (%php-array-ref object (%php-stringify property))))))
+  (let ((property-name (%php-stringify property)))
+    (cond
+      ((or (hash-table-p object)
+           (typep object 'cl-cc/vm::vm-hash-table-object)
+           (and (vectorp object)
+                (plusp (length object))
+                (hash-table-p (aref object 0))))
+       (some (lambda (pair)
+               (string= (%php-stringify (car pair)) property-name))
+             (%php-object-visible-pairs object)))
+      ((or (stringp object) (symbolp object))
+       (let ((descriptor (%php-reflection-class-descriptor object)))
+         (when descriptor
+           (some (lambda (slot)
+                   (string= (%php-stringify (cl-cc/vm::slot-definition-name slot))
+                            property-name))
+                 (cl-cc/vm::class-slots descriptor)))))
+       (t nil))))
 
 (defun %php-get-class (object)
   "PHP get_class: return class name of object."
-  (when (hash-table-p object)
-    (let ((cls (%php-array-ref object "__class__")))
-      (if (%php-null-p cls) nil (%php-stringify cls)))))
+  (%php-object-class-name object))
 
 (defun %php-get-parent-class (object)
   "PHP get_parent_class: return parent class name."
-  (when (hash-table-p object)
-    (let ((parent (%php-array-ref object "__parent__")))
-      (if (%php-null-p parent) nil (%php-stringify parent)))))
+  (let ((storage (%php-object-hashlike-storage object)))
+    (cond
+      (storage
+       (let ((parent (or (gethash "__parent__" storage)
+                         (gethash :__parent__ storage))))
+         (unless (%php-null-p parent)
+           (%php-stringify parent))))
+      ((or (stringp object) (symbolp object))
+       (let ((descriptor (%php-reflection-class-descriptor object)))
+         (when descriptor
+           (let ((parent (or (gethash :__parent__ descriptor)
+                             (gethash "__parent__" descriptor))))
+             (unless (%php-null-p parent)
+               (%php-stringify parent))))))
+      (t nil))))
 
 (defun %php-is-a (object class-name &optional allow-string)
   "PHP is_a: check if object is an instance of class."
   (declare (ignore allow-string))
-  (when (hash-table-p object)
-    (let ((cls (%php-array-ref object "__class__")))
-      (string= (%php-stringify cls) (%php-stringify class-name)))))
+  (let ((storage (%php-object-hashlike-storage object)))
+    (cond
+      (storage
+       (let ((cls (or (gethash "__class__" storage)
+                      (gethash :__class__ storage))))
+         (and (not (%php-null-p cls))
+              (string= (%php-runtime-class-canonical-key cls)
+                       (%php-runtime-class-canonical-key class-name)))))
+      ((or (stringp object) (symbolp object))
+       (string= (%php-runtime-class-canonical-key object)
+                (%php-runtime-class-canonical-key class-name)))
+      (t nil))))
 
 (defun %php-instanceof (object class-name)
   "PHP instanceof: check if object is an instance of class."
@@ -1064,13 +2119,10 @@
 
 (defun %php-get-object-vars (object)
   "PHP get_object_vars: get properties of object as array."
-  (when (hash-table-p object)
+  (when (%php-object-class-name object)
     (let ((result (%php-make-array)))
-      (dolist (pair (%php-array-pairs object))
-        (unless (and (stringp (car pair))
-                     (> (length (car pair)) 2)
-                     (string= (car pair) "__" :end1 2))
-          (%php-array-set result (car pair) (cdr pair))))
+      (dolist (pair (%php-object-visible-pairs object))
+        (%php-array-set result (car pair) (cdr pair)))
       result)))
 
 (defun %php-method-table-methods (methods)
@@ -1086,11 +2138,12 @@
   "PHP get_class_methods: get class method names."
   (let ((object-methods nil)
         (class-name class-or-object))
-    (when (hash-table-p class-or-object)
-      (setf object-methods
-            (%php-method-table-methods (%php-array-ref class-or-object "__methods__")))
-      (let ((cls (%php-array-ref class-or-object "__class__")))
-        (setf class-name (unless (%php-null-p cls) cls))))
+    (let ((storage (%php-object-hashlike-storage class-or-object)))
+      (when storage
+        (setf object-methods
+              (%php-method-table-methods (gethash "__methods__" storage)))
+        (let ((cls (gethash "__class__" storage)))
+          (setf class-name (unless (%php-null-p cls) cls)))))
     (let ((result (%php-make-array))
           (seen (make-hash-table :test #'equal)))
       (dolist (method (append object-methods
@@ -1269,6 +2322,307 @@
   (let ((obj (make-hash-table :test #'equal)))
     (setf (gethash "__class__" obj) class-name)
     (setf (gethash "__methods__" obj) methods)
+    obj))
+
+(defun %php-spl-set-property (object name value)
+  "Set a PHP-visible property on an SPL-style runtime object."
+  (setf (gethash name object) value)
+  (let ((fallback-name (string-downcase name)))
+    (unless (string= fallback-name name)
+      (setf (gethash fallback-name object) value)))
+  value)
+
+;;; ─── Reflection runtime objects ─────────────────────────────────────────────
+
+(defun %php-reflection-class-name-value (class)
+  (if (hash-table-p class)
+      (or (gethash "__class__" class) "")
+      (%php-stringify class)))
+
+(defun %php-reflection-constant-get-file-name (self)
+  (declare (ignore self))
+  +php-null+)
+
+(defun %php-reflection-constant-get-extension (self)
+  (declare (ignore self))
+  +php-null+)
+
+(defun %php-reflection-constant-get-extension-name (self)
+  (declare (ignore self))
+  +php-null+)
+
+(defun %php-reflection-constant-get-attributes (self &optional name flags)
+  (declare (ignore name flags))
+  (or (gethash "__attributes__" self) (%php-array)))
+
+(defun %php-reflection-constant-is-deprecated (self)
+  (and (gethash "__deprecated__" self) t))
+
+(defun %php-reflection-constant-new (name)
+  (let* ((constant-name (%php-stringify name))
+         (obj (%php-spl-object
+               "ReflectionConstant"
+               (%php-spl-make-methods "getFileName" "getExtension"
+                                      "getExtensionName" "getAttributes"
+                                      "isDeprecated"))))
+    (multiple-value-bind (value foundp) (%php-lookup-constant constant-name)
+      (unless foundp
+        (error "Undefined PHP constant ~A" constant-name))
+      (setf (gethash "__name__" obj) constant-name
+            (gethash "__value__" obj) value
+            (gethash "__attributes__" obj) (%php-array)
+            (gethash "__deprecated__" obj) nil)
+      (%php-spl-install-methods
+       obj
+       '(("getFileName" %php-reflection-constant-get-file-name)
+         ("getExtension" %php-reflection-constant-get-extension)
+         ("getExtensionName" %php-reflection-constant-get-extension-name)
+         ("getAttributes" %php-reflection-constant-get-attributes)
+         ("isDeprecated" %php-reflection-constant-is-deprecated)))
+      obj)))
+
+(defun %php-reflection-property-get-mangled-name (self)
+  (let ((name (gethash "__property__" self))
+        (class-name (gethash "__class_name__" self))
+        (visibility (gethash "__visibility__" self)))
+    (case visibility
+      (:private (format nil "~C~A~C~A" #\Null class-name #\Null name))
+      (:protected (format nil "~C*~C~A" #\Null #\Null name))
+      (t name))))
+
+(defun %php-reflection-property-new (class property)
+  (let* ((class-name (%php-reflection-class-name-value class))
+         (property-name (%php-stringify property))
+         (obj (%php-spl-object
+               "ReflectionProperty"
+               (%php-spl-make-methods "getMangledName"))))
+    (setf (gethash "__class_name__" obj) class-name
+          (gethash "__property__" obj) property-name
+          (gethash "__visibility__" obj) :public)
+    (%php-spl-install-methods
+     obj
+     '(("getMangledName" %php-reflection-property-get-mangled-name)))
+    obj))
+
+;;; ─── PHP 8.5 runtime compatibility objects ────────────────────────────────
+
+(defun %php-dom-html-collection-new (&optional (items '()))
+  (let ((obj (%php-spl-object "Dom\\HTMLCollection" (%php-spl-make-methods))))
+    (setf (gethash "__items__" obj) items)
+    obj))
+
+(defun %php-dom-parent-node-children (owner)
+  (let ((collection (%php-dom-html-collection-new)))
+    (setf (gethash "__owner__" collection) owner
+          (gethash "__property__" collection) "children")
+    collection))
+
+(defun %php-dom-element-outer-html (tag-name)
+  (if (string= tag-name "")
+      ""
+      (format nil "<~A></~A>" tag-name tag-name)))
+
+(defun %php-dom-element-get-elements-by-class-name (self class-names)
+  (let ((collection (%php-dom-html-collection-new)))
+    (setf (gethash "__owner__" collection) self
+          (gethash "__class_names__" collection) (%php-stringify class-names))
+    collection))
+
+(defun %php-dom-html-document-get-elements-by-name (self element-name)
+  (let ((collection (%php-dom-html-collection-new)))
+    (setf (gethash "__owner__" collection) self
+          (gethash "__name__" collection) (%php-stringify element-name))
+    collection))
+
+(defun %php-dom-element-insert-adjacent-html (self where html)
+  (let ((entries (or (gethash "__adjacent_html__" self) '())))
+    (setf (gethash "__adjacent_html__" self)
+          (append entries
+                  (list (list :where (%php-stringify where)
+                              :html (%php-stringify html))))))
+  +php-null+)
+
+(defun %php-dom-element-new (&optional tag-name)
+  (let* ((tag-text (if tag-name (%php-stringify tag-name) ""))
+         (obj (%php-spl-object
+               "Dom\\Element"
+               (%php-spl-make-methods "getElementsByClassName"
+                                      "insertAdjacentHTML"))))
+    (setf (gethash "__tag_name__" obj) tag-text
+          (gethash "__adjacent_html__" obj) '())
+    (%php-spl-set-property obj "outerHTML" (%php-dom-element-outer-html tag-text))
+    (%php-spl-set-property obj "children" (%php-dom-parent-node-children obj))
+    (%php-spl-install-methods
+     obj
+     '(("getElementsByClassName" %php-dom-element-get-elements-by-class-name)
+       ("insertAdjacentHTML" %php-dom-element-insert-adjacent-html)))
+    obj))
+
+(defun %php-dom-html-document-new (&optional html)
+  (let ((obj (%php-spl-object
+              "Dom\\HTMLDocument"
+              (%php-spl-make-methods "getElementsByName"))))
+    (setf (gethash "__html__" obj)
+          (if (and html (not (%php-null-p html)))
+              (%php-stringify html)
+              ""))
+    (%php-spl-set-property obj "children" (%php-dom-parent-node-children obj))
+    (%php-spl-install-methods
+     obj
+     '(("getElementsByName" %php-dom-html-document-get-elements-by-name)))
+    obj))
+
+(defun %php-soap-client-get-types (self)
+  (or (gethash "__types__" self) (%php-array)))
+
+(defun %php-soap-client-new (&rest args)
+  (let ((obj (%php-spl-object
+              "SoapClient"
+              (%php-spl-make-methods "__construct" "__getTypes"))))
+    (setf (gethash "__constructor_args__" obj) args
+          (gethash "__types__" obj) (%php-array))
+    (%php-spl-install-methods
+     obj
+     '(("__construct" %php-soap-client-construct)
+       ("__getTypes" %php-soap-client-get-types)))
+    obj))
+
+(defun %php-soap-client-construct (self &rest args)
+  (setf (gethash "__constructor_args__" self) args)
+  +php-null+)
+
+(defun %php-soap-fault-new (&rest args)
+  (let ((obj (%php-spl-object
+              "SoapFault"
+              (%php-spl-make-methods "__construct"))))
+    (setf (gethash "__constructor_args__" obj) args)
+    (%php-spl-install-methods
+     obj
+     '(("__construct" %php-soap-fault-construct)))
+    (apply #'%php-soap-fault-construct obj args)
+    obj))
+
+(defun %php-soap-fault-construct (self &rest args)
+  (setf (gethash "__constructor_args__" self) args)
+  (when args
+    (setf (gethash "faultcode" self) (first args))
+    (when (second args) (setf (gethash "faultstring" self) (second args)))
+    (when (third args) (setf (gethash "faultactor" self) (third args)))
+    (when (fourth args) (setf (gethash "detail" self) (fourth args)))
+    (when (fifth args) (setf (gethash "_name" self) (fifth args)))
+    (when (sixth args) (setf (gethash "headerfault" self) (sixth args)))
+    (when (seventh args) (setf (gethash "lang" self) (seventh args))))
+  +php-null+)
+
+(defun %php-soap-server-fault (self &rest args)
+  (setf (gethash "__last_fault__" self) args)
+  +php-null+)
+
+(defun %php-soap-server-new (&rest args)
+  (let ((obj (%php-spl-object
+              "SoapServer"
+              (%php-spl-make-methods "__construct" "fault"))))
+    (setf (gethash "__constructor_args__" obj) args)
+    (%php-spl-install-methods
+     obj
+     '(("__construct" %php-soap-server-construct)
+       ("fault" %php-soap-server-fault)))
+    obj))
+
+(defun %php-soap-server-construct (self &rest args)
+  (setf (gethash "__constructor_args__" self) args)
+  +php-null+)
+
+(defun %php-xslt-processor-construct (self &rest args)
+  (setf (gethash "__constructor_args__" self) args)
+  +php-null+)
+
+(defun %php-xslt-processor-namespace-table (self namespace &optional createp)
+  (let* ((ns (if (or (null namespace) (%php-null-p namespace))
+                 ""
+                 (%php-stringify namespace)))
+         (tables (or (gethash "__parameters__" self)
+                     (when createp
+                       (setf (gethash "__parameters__" self) (make-hash-table :test #'equal)))))
+         (table (and tables (gethash ns tables))))
+    (when (and createp (null table))
+      (setf table (make-hash-table :test #'equal)
+            (gethash ns tables) table))
+    table))
+
+(defun %php-xslt-processor-get-parameter (self namespace name)
+  (let* ((table (%php-xslt-processor-namespace-table self namespace))
+         (key (if (or (null name) (%php-null-p name)) "" (%php-stringify name))))
+    (if table
+        (gethash key table)
+        nil)))
+
+(defun %php-xslt-processor-set-parameter (self namespace name-or-options &optional value)
+  (if (and (hash-table-p name-or-options)
+           (null value))
+      (dolist (pair (%php-array-pairs name-or-options) t)
+        (%php-xslt-processor-set-parameter self namespace (car pair) (cdr pair)))
+      (let* ((table (%php-xslt-processor-namespace-table self namespace t))
+             (key (if (or (null name-or-options) (%php-null-p name-or-options))
+                      ""
+                      (%php-stringify name-or-options))))
+        (setf (gethash key table)
+              (if (or (null value) (%php-null-p value))
+                  +php-null+
+                  (%php-stringify value)))
+        t)))
+
+(defun %php-xslt-processor-remove-parameter (self namespace name)
+  (let* ((table (%php-xslt-processor-namespace-table self namespace))
+         (key (if (or (null name) (%php-null-p name)) "" (%php-stringify name))))
+    (when table
+      (multiple-value-bind (value present-p) (gethash key table)
+        (declare (ignore value))
+        (when present-p
+          (remhash key table)
+          t)))))
+
+(defun %php-xslt-processor-new (&rest args)
+  (let ((obj (%php-spl-object
+              "XSLTProcessor"
+              (%php-spl-make-methods "__construct" "getParameter"
+                                     "setParameter" "removeParameter"))))
+    (setf (gethash "__constructor_args__" obj) args
+          (gethash "__parameters__" obj) (make-hash-table :test #'equal))
+    (%php-spl-install-methods
+     obj
+     '(("__construct" %php-xslt-processor-construct)
+       ("getParameter" %php-xslt-processor-get-parameter)
+       ("setParameter" %php-xslt-processor-set-parameter)
+       ("removeParameter" %php-xslt-processor-remove-parameter)))
+    obj))
+
+(defun %php-pdo-sqlite-set-authorizer (self callback)
+  (setf (gethash "__authorizer__" self) callback)
+  +php-null+)
+
+(defun %php-pdo-sqlite-new (&rest args)
+  (let ((obj (%php-spl-object
+              "Pdo\\Sqlite"
+              (%php-spl-make-methods "setAuthorizer"))))
+    (setf (gethash "__constructor_args__" obj) args)
+    (%php-spl-install-methods
+     obj
+     '(("setAuthorizer" %php-pdo-sqlite-set-authorizer)))
+    obj))
+
+(defun %php-sqlite3-stmt-busy (self)
+  (not (null (gethash "__busy__" self))))
+
+(defun %php-sqlite3-stmt-new (&rest args)
+  (declare (ignore args))
+  (let ((obj (%php-spl-object
+              "SQLite3Stmt"
+              (%php-spl-make-methods "busy"))))
+    (setf (gethash "__busy__" obj) nil)
+    (%php-spl-install-methods
+     obj
+     '(("busy" %php-sqlite3-stmt-busy)))
     obj))
 
 (defun %php-spl-items (object)
@@ -1998,10 +3352,88 @@
     "T_DOC_COMMENT"
     "T_OPEN_TAG"
     "T_OPEN_TAG_WITH_ECHO"
+    "T_CLOSE_TAG"
     "T_WHITESPACE"
     "T_DOUBLE_COLON"
     "T_VOID_CAST"
-    "T_PIPE"))
+    "T_PIPE"
+    "T_INLINE_HTML"
+    "T_ECHO"
+    "T_CLASS"
+    "T_CONST"
+    "T_PUBLIC"
+    "T_FUNCTION"
+    "T_ABSTRACT"
+    "T_ARRAY"
+    "T_AS"
+    "T_BREAK"
+    "T_CALLABLE"
+    "T_CASE"
+    "T_CATCH"
+    "T_CLONE"
+    "T_CONTINUE"
+    "T_DECLARE"
+    "T_DEFAULT"
+    "T_DO"
+    "T_ELSE"
+    "T_ELSEIF"
+    "T_EMPTY"
+    "T_ENDDECLARE"
+    "T_ENDFOR"
+    "T_ENDFOREACH"
+    "T_ENDIF"
+    "T_ENDSWITCH"
+    "T_ENDWHILE"
+    "T_ENUM"
+    "T_EVAL"
+    "T_EXIT"
+    "T_EXTENDS"
+    "T_FINAL"
+    "T_FINALLY"
+    "T_FN"
+    "T_FOR"
+    "T_FOREACH"
+    "T_GLOBAL"
+    "T_GOTO"
+    "T_IF"
+    "T_IMPLEMENTS"
+    "T_INCLUDE"
+    "T_INCLUDE_ONCE"
+    "T_INSTANCEOF"
+    "T_INSTEADOF"
+    "T_INTERFACE"
+    "T_ISSET"
+    "T_LIST"
+    "T_MATCH"
+    "T_NAMESPACE"
+    "T_NEW"
+    "T_PRINT"
+    "T_PRIVATE"
+    "T_PROTECTED"
+    "T_READONLY"
+    "T_REQUIRE"
+    "T_REQUIRE_ONCE"
+    "T_RETURN"
+    "T_STATIC"
+    "T_SWITCH"
+    "T_THROW"
+    "T_TRAIT"
+    "T_TRY"
+    "T_UNSET"
+    "T_USE"
+    "T_VAR"
+    "T_WHILE"
+    "T_YIELD"
+    "T_YIELD_FROM"
+    "T_ATTRIBUTE"
+    "T_NS_SEPARATOR"
+    "T_NAME_FULLY_QUALIFIED"
+    "T_NAME_QUALIFIED"
+    "T_NAME_RELATIVE"
+    "T_BAD_CHARACTER"
+    "T_LOGICAL_AND"
+    "T_LOGICAL_OR"
+    "T_LOGICAL_XOR"))
 
 (defun %php-token-id (name)
   (%php-lookup-constant name))
@@ -2026,12 +3458,14 @@
         "UNKNOWN")))
 
 (defun %php-token-get-all (source &optional flags)
-  (declare (ignore flags))
   (let* ((code (%php-stringify source))
          (len (length code))
          (tokens (%php-make-array))
          (i 0)
-         (line 1))
+         (line 1)
+         (in-php nil)
+         (token-parse-p (not (zerop (logand (%php-to-integer flags) 1))))
+         (last-significant-token nil))
     (labels ((push-value (value)
                (%php-array-set tokens (%php-array-next-auto-index tokens) value))
              (newline-count (text)
@@ -2039,24 +3473,67 @@
                      count (char= ch #\Newline)))
              (advance-line (text)
                (incf line (newline-count text)))
+             (significant-token-p (name)
+               (not (member name '("T_WHITESPACE" "T_COMMENT" "T_DOC_COMMENT"
+                                   "T_OPEN_TAG" "T_OPEN_TAG_WITH_ECHO"
+                                   "T_CLOSE_TAG" "T_INLINE_HTML")
+                            :test #'string=)))
+             (record-significant-token (name)
+               (when (significant-token-p name)
+                 (setf last-significant-token name)))
              (emit-token (name text token-line)
                (push-value (%php-token-entry name text token-line))
+               (record-significant-token name)
                (advance-line text))
              (emit-string (text)
                (push-value text)
+               (setf last-significant-token text)
                (advance-line text))
-             (starts-with-p (needle &key ignore-case)
-               (let ((end-pos (+ i (length needle))))
+             (starts-with-at-p (needle pos &key ignore-case)
+               (let ((end-pos (+ pos (length needle))))
                  (and (<= end-pos len)
                       (if ignore-case
-                          (string-equal needle code :start2 i :end2 end-pos)
-                          (string= needle code :start2 i :end2 end-pos)))))
+                          (string-equal needle code :start2 pos :end2 end-pos)
+                          (string= needle code :start2 pos :end2 end-pos)))))
+             (starts-with-p (needle &key ignore-case)
+               (starts-with-at-p needle i :ignore-case ignore-case))
+             (php-open-tag-p (pos)
+               (or (starts-with-at-p "<?=" pos)
+                   (starts-with-at-p "<?php" pos :ignore-case t)
+                   (starts-with-at-p "<?" pos)))
+             (scan-inline-html-end ()
+               (let ((pos i))
+                 (loop while (and (< pos len)
+                                  (not (php-open-tag-p pos)))
+                       do (incf pos))
+                 pos))
              (identifier-start-p (ch)
                (or (alpha-char-p ch) (char= ch #\_)))
              (identifier-part-p (ch)
                (or (identifier-start-p ch) (digit-char-p ch)))
+             (qualified-name-tail-end-position (pos)
+               (let ((cursor pos)
+                     (saw-tail nil))
+                 (loop while (and (< cursor len)
+                                  (char= (char code cursor) #\\)
+                                  (< (1+ cursor) len)
+                                  (identifier-start-p (char code (1+ cursor))))
+                       do (setf saw-tail t)
+                          (incf cursor 2)
+                          (loop while (and (< cursor len)
+                                           (identifier-part-p (char code cursor)))
+                                do (incf cursor)))
+                 (and saw-tail cursor)))
              (whitespace-p (ch)
-               (member ch '(#\Space #\Tab #\Newline #\Return #\Page) :test #'char=))
+               (member ch '(#\Space #\Tab #\Newline #\Return) :test #'char=))
+             (scan-open-tag-text (base-length)
+               (let ((start i)
+                     (end (+ i base-length)))
+                 (loop while (and (< end len)
+                                  (whitespace-p (char code end)))
+                       do (incf end))
+                 (setf i end)
+                 (subseq code start end)))
              (scan-while (predicate)
                (loop while (and (< i len)
                                 (funcall predicate (char code i)))
@@ -2087,80 +3564,231 @@
                              (return))
                             (t
                              (incf i))))
-                 (subseq code start i))))
+                 (subseq code start i)))
+             (close-tag-text ()
+               (let ((end (+ i 2)))
+                  (when (< end len)
+                   (let ((next (char code end)))
+                     (cond
+                       ((and (char= next #\Return)
+                             (< (1+ end) len)
+                             (char= (char code (1+ end)) #\Newline))
+                        (incf end 2))
+                       ((or (char= next #\Return)
+                            (char= next #\Newline))
+                        (incf end)))))
+                  (subseq code i end)))
+             (yield-from-end-position (yield-end)
+               (let ((pos yield-end))
+                 (loop while (and (< pos len)
+                                  (whitespace-p (char code pos)))
+                       do (incf pos))
+                 (let ((from-end (+ pos 4)))
+                   (when (and (< yield-end pos)
+                              (<= from-end len)
+                              (string-equal "from" code :start2 pos :end2 from-end)
+                              (or (= from-end len)
+                                  (not (identifier-part-p (char code from-end)))))
+                     from-end))))
+             (keyword-token-name (text)
+               (cdr (assoc (string-downcase text)
+                           '(("echo" . "T_ECHO")
+                             ("abstract" . "T_ABSTRACT")
+                             ("array" . "T_ARRAY")
+                             ("as" . "T_AS")
+                             ("break" . "T_BREAK")
+                             ("callable" . "T_CALLABLE")
+                             ("case" . "T_CASE")
+                             ("catch" . "T_CATCH")
+                             ("class" . "T_CLASS")
+                             ("const" . "T_CONST")
+                             ("clone" . "T_CLONE")
+                             ("continue" . "T_CONTINUE")
+                             ("declare" . "T_DECLARE")
+                             ("default" . "T_DEFAULT")
+                             ("die" . "T_EXIT")
+                             ("do" . "T_DO")
+                             ("else" . "T_ELSE")
+                             ("elseif" . "T_ELSEIF")
+                             ("empty" . "T_EMPTY")
+                             ("enddeclare" . "T_ENDDECLARE")
+                             ("endfor" . "T_ENDFOR")
+                             ("endforeach" . "T_ENDFOREACH")
+                             ("endif" . "T_ENDIF")
+                             ("endswitch" . "T_ENDSWITCH")
+                             ("endwhile" . "T_ENDWHILE")
+                             ("enum" . "T_ENUM")
+                             ("eval" . "T_EVAL")
+                             ("exit" . "T_EXIT")
+                             ("extends" . "T_EXTENDS")
+                             ("final" . "T_FINAL")
+                             ("finally" . "T_FINALLY")
+                             ("fn" . "T_FN")
+                             ("for" . "T_FOR")
+                             ("foreach" . "T_FOREACH")
+                             ("public" . "T_PUBLIC")
+                             ("function" . "T_FUNCTION")
+                             ("global" . "T_GLOBAL")
+                             ("goto" . "T_GOTO")
+                             ("if" . "T_IF")
+                             ("implements" . "T_IMPLEMENTS")
+                             ("include" . "T_INCLUDE")
+                             ("include_once" . "T_INCLUDE_ONCE")
+                             ("instanceof" . "T_INSTANCEOF")
+                             ("insteadof" . "T_INSTEADOF")
+                             ("interface" . "T_INTERFACE")
+                             ("isset" . "T_ISSET")
+                             ("list" . "T_LIST")
+                             ("match" . "T_MATCH")
+                             ("namespace" . "T_NAMESPACE")
+                             ("new" . "T_NEW")
+                             ("print" . "T_PRINT")
+                             ("private" . "T_PRIVATE")
+                             ("protected" . "T_PROTECTED")
+                             ("readonly" . "T_READONLY")
+                             ("require" . "T_REQUIRE")
+                             ("require_once" . "T_REQUIRE_ONCE")
+                             ("return" . "T_RETURN")
+                             ("static" . "T_STATIC")
+                             ("switch" . "T_SWITCH")
+                             ("throw" . "T_THROW")
+                             ("trait" . "T_TRAIT")
+                             ("try" . "T_TRY")
+                             ("unset" . "T_UNSET")
+                             ("use" . "T_USE")
+                             ("var" . "T_VAR")
+                             ("while" . "T_WHILE")
+                             ("yield" . "T_YIELD")
+                             ("and" . "T_LOGICAL_AND")
+                             ("or" . "T_LOGICAL_OR")
+                             ("xor" . "T_LOGICAL_XOR"))
+                           :test #'string=)))
+             (identifier-token-name (text)
+               (if (and token-parse-p
+                        (string= last-significant-token "T_CONST"))
+                   "T_STRING"
+                   (or (keyword-token-name text) "T_STRING"))))
       (loop while (< i len)
             do (let ((token-line line)
                      (ch (char code i)))
-                 (cond
-                   ((starts-with-p "<?=")
-                    (emit-token "T_OPEN_TAG_WITH_ECHO" "<?=" token-line)
-                    (incf i 3))
-                   ((starts-with-p "<?php" :ignore-case t)
-                    (emit-token "T_OPEN_TAG" "<?php" token-line)
-                    (incf i 5))
-                   ((starts-with-p "<?")
-                    (emit-token "T_OPEN_TAG" "<?" token-line)
-                    (incf i 2))
-                   ((whitespace-p ch)
-                    (let ((start i))
-                      (scan-while #'whitespace-p)
-                      (emit-token "T_WHITESPACE" (subseq code start i) token-line)))
-                   ((or (starts-with-p "//") (char= ch #\#))
-                    (let ((start i))
-                      (incf i (if (char= ch #\#) 1 2))
-                      (loop while (and (< i len)
-                                       (not (char= (char code i) #\Newline)))
-                            do (incf i))
-                      (emit-token "T_COMMENT" (subseq code start i) token-line)))
-                   ((starts-with-p "/*")
-                    (emit-token (if (starts-with-p "/**") "T_DOC_COMMENT" "T_COMMENT")
-                                (scan-block-comment)
-                                token-line))
-                   ((and (char= ch #\$)
-                         (< (1+ i) len)
-                         (identifier-start-p (char code (1+ i))))
-                    (let ((start i))
-                      (incf i)
-                      (scan-while #'identifier-part-p)
-                      (emit-token "T_VARIABLE" (subseq code start i) token-line)))
-                   ((starts-with-p "(void)" :ignore-case t)
-                    (emit-token "T_VOID_CAST" "(void)" token-line)
-                    (incf i 6))
-                   ((starts-with-p "|>")
-                    (emit-token "T_PIPE" "|>" token-line)
-                    (incf i 2))
-                   ((starts-with-p "->")
-                    (emit-token "T_OBJECT_OPERATOR" "->" token-line)
-                    (incf i 2))
-                   ((starts-with-p "::")
-                    (emit-token "T_DOUBLE_COLON" "::" token-line)
-                    (incf i 2))
-                   ((starts-with-p "=>")
-                    (emit-token "T_DOUBLE_ARROW" "=>" token-line)
-                    (incf i 2))
-                   ((identifier-start-p ch)
-                    (let ((start i))
-                      (scan-while #'identifier-part-p)
-                      (emit-token "T_STRING" (subseq code start i) token-line)))
-                   ((digit-char-p ch)
-                    (let ((start i)
-                          (has-dot nil))
-                      (scan-while #'digit-char-p)
-                      (when (and (< i len)
-                                 (char= (char code i) #\.)
-                                 (< (1+ i) len)
-                                 (digit-char-p (char code (1+ i))))
-                        (setf has-dot t)
-                        (incf i)
-                        (scan-while #'digit-char-p))
-                      (emit-token (if has-dot "T_DNUMBER" "T_LNUMBER")
-                                  (subseq code start i)
-                                  token-line)))
-                   ((or (char= ch #\') (char= ch #\"))
-                    (emit-token "T_CONSTANT_ENCAPSED_STRING" (scan-quoted-string) token-line))
-                   (t
-                    (emit-string (string ch))
-                    (incf i))))))
+                 (if (not in-php)
+                     (cond
+                       ((starts-with-p "<?=")
+                        (emit-token "T_OPEN_TAG_WITH_ECHO" "<?=" token-line)
+                        (incf i 3)
+                        (setf in-php t))
+                       ((starts-with-p "<?php" :ignore-case t)
+                        (emit-token "T_OPEN_TAG" (scan-open-tag-text 5) token-line)
+                        (setf in-php t))
+                       ((starts-with-p "<?")
+                        (emit-token "T_OPEN_TAG" (scan-open-tag-text 2) token-line)
+                        (setf in-php t))
+                       (t
+                        (let ((end (scan-inline-html-end)))
+                          (emit-token "T_INLINE_HTML" (subseq code i end) token-line)
+                          (setf i end))))
+                     (cond
+                       ((starts-with-p "?>")
+                        (let ((text (close-tag-text)))
+                          (emit-token "T_CLOSE_TAG" text token-line)
+                          (incf i (length text))
+                          (setf in-php nil)))
+                       ((whitespace-p ch)
+                        (let ((start i))
+                          (scan-while #'whitespace-p)
+                          (emit-token "T_WHITESPACE" (subseq code start i) token-line)))
+                       ((starts-with-p "#[")
+                        (emit-token "T_ATTRIBUTE" "#[" token-line)
+                        (incf i 2))
+                       ((or (starts-with-p "//") (char= ch #\#))
+                        (let ((start i))
+                          (incf i (if (char= ch #\#) 1 2))
+                          (loop while (and (< i len)
+                                           (not (char= (char code i) #\Newline)))
+                                do (incf i))
+                          (emit-token "T_COMMENT" (subseq code start i) token-line)))
+                       ((starts-with-p "/*")
+                        (emit-token (if (starts-with-p "/**") "T_DOC_COMMENT" "T_COMMENT")
+                                    (scan-block-comment)
+                                    token-line))
+                       ((and (char= ch #\$)
+                             (< (1+ i) len)
+                             (identifier-start-p (char code (1+ i))))
+                        (let ((start i))
+                          (incf i)
+                          (scan-while #'identifier-part-p)
+                          (emit-token "T_VARIABLE" (subseq code start i) token-line)))
+                       ((char= ch #\\)
+                        (let ((start i))
+                          (incf i)
+                          (if (and (< i len) (identifier-start-p (char code i)))
+                              (progn
+                                (scan-while #'identifier-part-p)
+                                (let ((qualified-end (qualified-name-tail-end-position i)))
+                                  (when qualified-end
+                                    (setf i qualified-end)))
+                                (emit-token "T_NAME_FULLY_QUALIFIED" (subseq code start i) token-line))
+                              (emit-token "T_NS_SEPARATOR" "\\" token-line))))
+                       ((starts-with-p "(void)" :ignore-case t)
+                        (let ((text (subseq code i (+ i 6))))
+                          (emit-token "T_VOID_CAST" text token-line)
+                          (incf i 6)))
+                       ((starts-with-p "|>")
+                        (emit-token "T_PIPE" "|>" token-line)
+                        (incf i 2))
+                       ((starts-with-p "->")
+                        (emit-token "T_OBJECT_OPERATOR" "->" token-line)
+                        (incf i 2))
+                       ((starts-with-p "::")
+                        (emit-token "T_DOUBLE_COLON" "::" token-line)
+                        (incf i 2))
+                       ((starts-with-p "=>")
+                        (emit-token "T_DOUBLE_ARROW" "=>" token-line)
+                        (incf i 2))
+                       ((identifier-start-p ch)
+                        (let ((start i))
+                          (scan-while #'identifier-part-p)
+                          (let* ((text (subseq code start i))
+                                 (qualified-end (qualified-name-tail-end-position i))
+                                 (yield-from-end (and (string-equal text "yield")
+                                                      (yield-from-end-position i))))
+                            (cond
+                              ((and (string-equal text "namespace") qualified-end)
+                               (setf i qualified-end)
+                               (emit-token "T_NAME_RELATIVE" (subseq code start i) token-line))
+                              (qualified-end
+                               (setf i qualified-end)
+                               (emit-token "T_NAME_QUALIFIED" (subseq code start i) token-line))
+                              (yield-from-end
+                               (let ((combined (subseq code start yield-from-end)))
+                                 (setf i yield-from-end)
+                                 (emit-token "T_YIELD_FROM" combined token-line)))
+                              (t
+                               (let ((token-name (identifier-token-name text)))
+                                 (emit-token token-name text token-line)))))))
+                       ((digit-char-p ch)
+                        (let ((start i)
+                              (has-dot nil))
+                          (scan-while #'digit-char-p)
+                          (when (and (< i len)
+                                     (char= (char code i) #\.)
+                                     (< (1+ i) len)
+                                     (digit-char-p (char code (1+ i))))
+                            (setf has-dot t)
+                            (incf i)
+                            (scan-while #'digit-char-p))
+                          (emit-token (if has-dot "T_DNUMBER" "T_LNUMBER")
+                                      (subseq code start i)
+                                      token-line)))
+                       ((or (char= ch #\') (char= ch #\"))
+                        (emit-token "T_CONSTANT_ENCAPSED_STRING" (scan-quoted-string) token-line))
+                       ((and (< (char-code ch) 32)
+                             (not (member ch '(#\Tab #\Newline #\Return) :test #'char=)))
+                        (emit-token "T_BAD_CHARACTER" (string ch) token-line)
+                        (incf i))
+                       (t
+                        (emit-string (string ch))
+                        (incf i)))))))
     tokens))
 
 (defun %php-list-assign (&rest values)
