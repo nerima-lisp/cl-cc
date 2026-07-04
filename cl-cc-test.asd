@@ -142,7 +142,13 @@
       (:file "php-grammar-stmt-tests")
       (:file "php-traits-tests")
       (:file "php-interfaces-tests")
-      (:file "php84-tests")))
+      (:file "php84-tests")
+      (:file "php84-tests-language")
+      (:file "php85-tests-language")
+      (:file "php85-tests-runtime-objects")
+      (:file "php85-tests-runtime-tokenizer")
+      (:file "php85-tests-runtime-behavior")
+      (:file "php85-tests-registration")))
    (:module "javascript-tests"
     :pathname "packages/javascript/tests"
     :serial t
