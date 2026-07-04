@@ -16,4 +16,7 @@
   ((:file "package")
    (:file "regalloc")
    (:file "regalloc-defs-uses")
+   (:file "regalloc-policy")
+   (:file "regalloc-color")
+   (:file "regalloc-spill")
    (:file "regalloc-allocate")))

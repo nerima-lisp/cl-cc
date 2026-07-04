@@ -1,24 +1,13 @@
 (in-package :cl-cc/regalloc)
-;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-;;; Regalloc — Spill Code Insertion and Live-Range Splitting
+;;; ------------------------------------------------------------------------
+;;; Regalloc - Spill Code Insertion and Live-Range Splitting
 ;;;
-;;; Contains: vm-spill-store/vm-spill-load instruction structs,
-;;; %regalloc-map-tree, %regalloc-rewrite-inst,
-;;; %regalloc-rewrite-inst-dst, %regalloc-rematerialize-inst,
-;;; %regalloc-reserved-scratch-regs, %regalloc-scratch-candidates,
-;;; %split-vreg-at-position, %copy-float-vreg-map-with-splits,
-;;; %split-live-range-rewrite-map, %rewrite-inst-for-split-position,
-;;; %collect-live-range-splits, %assign-live-range-split-slots,
-;;; %boundaries-by-position, split-live-ranges,
-;;; %finalize-split-spill-registers, insert-spill-code.
-;;;
-;;; Depends on: regalloc-allocate.lisp (linear-scan-allocate,
-;;;   %regalloc-scratch-candidates, regalloc-target-fp-registers).
-;;;
-;;; Load order: after regalloc-allocate.lisp, before regalloc-color.lisp.
-;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+;;; Owns spill VM instructions, split live-range rewriting, rematerialization,
+;;; and final spill insertion. Scratch register policy lives in
+;;; regalloc-policy.lisp; public entry points live in regalloc-allocate.lisp.
+;;; ------------------------------------------------------------------------
 
-;;; Spill Instructions
+;;; Spill Code Insertion
 
 (define-vm-instruction vm-spill-store (vm-instruction)
   "Store register to spill slot [RBP - slot*8]."
@@ -38,85 +27,6 @@
 
 (defmethod instruction-defs ((inst vm-spill-load))
   (list (vm-spill-dst inst)))
-
-;;; Register Rewriting
-
-(defun %regalloc-map-tree (fn tree)
-  "Recursively map FN over all leaves of TREE."
-  (if (consp tree)
-      (cons (%regalloc-map-tree fn (car tree))
-            (%regalloc-map-tree fn (cdr tree)))
-      (funcall fn tree)))
-
-(defun %regalloc-rewrite-inst (inst reg-map)
-  "Return INST with register keywords substituted per REG-MAP."
-  (flet ((rewrite-reg (reg)
-           (if (and (keywordp reg) (gethash reg reg-map))
-               (gethash reg reg-map)
-               reg)))
-    (cond
-      ((typep inst 'vm-spill-store)
-       (make-vm-spill-store :src-reg (rewrite-reg (vm-spill-src inst))
-                            :slot (vm-spill-slot inst)))
-      ((typep inst 'vm-spill-load)
-       (make-vm-spill-load :dst-reg (rewrite-reg (vm-spill-dst inst))
-                           :slot (vm-spill-slot inst)))
-      (t
-       (handler-case
-           (sexp->instruction
-            (%regalloc-map-tree #'rewrite-reg (instruction->sexp inst)))
-         (error () inst))))))
-
-(defun %regalloc-rewrite-inst-dst (inst dst)
-  "Return INST cloned with its single destination rewritten to DST."
-  (let ((old-dst (opt-inst-dst inst))
-        (reg-map (make-hash-table :test #'eq)))
-    (when old-dst
-      (setf (gethash old-dst reg-map) dst))
-    (%regalloc-rewrite-inst inst reg-map)))
-
-(defun %regalloc-rematerialize-inst (remat scratch)
-  "Return instruction(s) that rematerialize REMAT into SCRATCH."
-  (cond
-    ((and (consp remat) (eq (car remat) :const))
-     (list (make-vm-const :dst scratch :value (cadr remat))))
-    ((and (consp remat) (eq (car remat) :inst))
-     (list (%regalloc-rewrite-inst-dst (cadr remat) scratch)))
-    ((or (integerp remat) (symbolp remat) (characterp remat) (stringp remat))
-     (list (make-vm-const :dst scratch :value remat)))
-    (t nil)))
-
-;;; Scratch Register Selection
-
-(defun %regalloc-reserved-scratch-regs (inst cc)
-  "Return scratch registers reserved internally by INST on CC, if any."
-  (when (and (eq (target-name cc) :x86-64)
-             (or (typep inst 'vm-integer-mul-high-u)
-                 (typep inst 'vm-integer-mul-high-s)
-                 (typep inst 'vm-truncate)
-                 (typep inst 'vm-rem)
-                 (typep inst 'vm-div)
-                 (typep inst 'vm-mod)))
-    (list (first (target-scratch-regs cc)))))
-
-(defun %regalloc-scratch-candidates (cc used-phys &optional inst fp-p)
-  "Return allocatable scratch registers excluding USED-PHYS and reserved registers."
-  (let ((reserved (remove nil (%regalloc-reserved-scratch-regs inst cc))))
-    (remove-if
-     (lambda (reg)
-       (or (null reg)
-           (member reg used-phys :test #'eq)
-           (member reg reserved :test #'eq)))
-     (if fp-p
-         (regalloc-target-fp-registers cc)
-         (remove-duplicates
-          (append (list (first (target-scratch-regs cc))
-                        (target-ret-reg cc))
-                  (target-caller-saved cc)
-                  (target-allocatable-regs cc))
-          :test #'eq)))))
-
-;;; Live Range Splitting
 
 (defun %split-vreg-at-position (children position)
   "Return the child vreg live at POSITION, or NIL."
@@ -212,24 +122,76 @@ float-vreg map updated with split children."
                       split-slot-count
                       split-float-vregs)))))))
 
-(defun %finalize-split-spill-registers (instructions assignment)
-  "Rewrite split spill helper instructions from allocated vregs to physical regs."
-  (mapcar (lambda (inst)
-            (cond
-              ((typep inst 'vm-spill-store)
-               (let ((phys (gethash (vm-spill-src inst) assignment)))
-                 (if phys
-                     (make-vm-spill-store :src-reg phys :slot (vm-spill-slot inst))
-                     inst)))
-              ((typep inst 'vm-spill-load)
-               (let ((phys (gethash (vm-spill-dst inst) assignment)))
-                 (if phys
-                     (make-vm-spill-load :dst-reg phys :slot (vm-spill-slot inst))
-                     inst)))
-              (t inst)))
-          instructions))
+(defun %regalloc-map-tree (fn tree)
+  (if (consp tree)
+      (cons (%regalloc-map-tree fn (car tree))
+            (%regalloc-map-tree fn (cdr tree)))
+      (funcall fn tree)))
 
-;;; Spill Code Insertion
+(defun %regalloc-rewrite-inst (inst reg-map)
+  "Return INST with register keywords substituted per REG-MAP."
+  (flet ((rewrite-reg (reg)
+           (if (and (keywordp reg) (gethash reg reg-map))
+               (gethash reg reg-map)
+               reg)))
+    (cond
+      ((typep inst 'vm-spill-store)
+       (make-vm-spill-store :src-reg (rewrite-reg (vm-spill-src inst))
+                            :slot (vm-spill-slot inst)))
+      ((typep inst 'vm-spill-load)
+       (make-vm-spill-load :dst-reg (rewrite-reg (vm-spill-dst inst))
+                           :slot (vm-spill-slot inst)))
+      (t
+       (handler-case
+           (sexp->instruction
+            (%regalloc-map-tree #'rewrite-reg (instruction->sexp inst)))
+         (error () inst))))))
+
+(defun %regalloc-rewrite-inst-dst (inst dst)
+  "Return INST cloned with its single destination rewritten to DST."
+  (let ((old-dst (opt-inst-dst inst))
+        (reg-map (make-hash-table :test #'eq)))
+    (when old-dst
+      (setf (gethash old-dst reg-map) dst))
+    (%regalloc-rewrite-inst inst reg-map)))
+
+(defun %regalloc-rematerialize-inst (remat scratch)
+  "Return instruction(s) that rematerialize REMAT into SCRATCH."
+  (cond
+    ((and (consp remat) (eq (car remat) :const))
+     (list (make-vm-const :dst scratch :value (cadr remat))))
+    ((and (consp remat) (eq (car remat) :inst))
+     (list (%regalloc-rewrite-inst-dst (cadr remat) scratch)))
+    ((or (integerp remat) (symbolp remat) (characterp remat) (stringp remat))
+     (list (make-vm-const :dst scratch :value remat)))
+    (t nil)))
+
+(defun %regalloc-reserved-scratch-regs (inst cc)
+  "Return scratch registers reserved internally by INST on CC, if any."
+  (when (and (eq (target-name cc) :x86-64)
+             (or (typep inst 'vm-integer-mul-high-u)
+                 (typep inst 'vm-integer-mul-high-s)
+                 (typep inst 'vm-truncate)
+                 (typep inst 'vm-rem)
+                 (typep inst 'vm-div)
+                 (typep inst 'vm-mod)))
+    (list (first (target-scratch-regs cc)))))
+
+(defun %regalloc-scratch-candidates (cc used-phys &optional inst fp-p)
+  (let ((reserved (remove nil (%regalloc-reserved-scratch-regs inst cc))))
+    (remove-if
+     (lambda (reg)
+       (or (null reg)
+           (member reg used-phys :test #'eq)
+           (member reg reserved :test #'eq)))
+     (if fp-p
+         (regalloc-target-fp-registers cc)
+         (remove-duplicates
+          (append (list (first (target-scratch-regs cc))
+                        (target-ret-reg cc))
+                  (target-caller-saved cc)
+                  (target-allocatable-regs cc))
+          :test #'eq)))))
 
 (defun insert-spill-code (instructions assignment spill-map cc &optional remat-map float-vregs)
   "Insert spill loads/stores around instructions that use spilled registers.
@@ -292,3 +254,20 @@ float-vreg map updated with split children."
                                           :slot (gethash vreg spill-map))
                     result)))))))
     (nreverse result)))
+
+(defun %finalize-split-spill-registers (instructions assignment)
+  "Rewrite split spill helper instructions from allocated vregs to physical regs."
+  (mapcar (lambda (inst)
+            (cond
+              ((typep inst 'vm-spill-store)
+               (let ((phys (gethash (vm-spill-src inst) assignment)))
+                 (if phys
+                     (make-vm-spill-store :src-reg phys :slot (vm-spill-slot inst))
+                     inst)))
+              ((typep inst 'vm-spill-load)
+               (let ((phys (gethash (vm-spill-dst inst) assignment)))
+                 (if phys
+                     (make-vm-spill-load :dst-reg phys :slot (vm-spill-slot inst))
+                     inst)))
+              (t inst)))
+          instructions))
