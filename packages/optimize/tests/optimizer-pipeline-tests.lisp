@@ -165,44 +165,71 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 ;;; ─── *opt-convergence-passes* / *opt-pass-registry* data coverage ────────
 
+(defparameter *opt-pass-registry-presence-keys*
+  '(:prolog-rewrite
+    :egraph
+    :fold
+    :cons-slot-forward
+    :pure-call-optimization
+    :dce
+    :cse))
+
+(defparameter *opt-pass-registry-function-bindings*
+  `((:if-conversion . ,#'cl-cc/optimize::opt-pass-if-conversion)
+    (:fma-recognition . ,#'cl-cc/optimize::opt-pass-fma-recognition)))
+
+(defparameter *opt-default-convergence-prefix*
+  '(:prolog-rewrite
+    :call-site-splitting
+    :devirtualize
+    :if-conversion
+    :closure-capture-dedup
+    :closure-thunk-sharing))
+
+(defparameter *opt-default-convergence-positional-keys*
+  '((7 . :inline)
+    (8 . :overflow-check-elim)
+    (9 . :sccp)
+    (10 . :cons-slot-forward)))
+
+(defparameter *opt-default-convergence-ordering-edges*
+  '((:devirtualize :if-conversion)
+    (:if-conversion :inline)
+    (:fma-recognition :schedule-local)
+    (:copy-prop :pure-call-optimization)
+    (:pure-call-optimization :gvn)
+    (:pure-call-optimization :cse)
+    (:pure-call-optimization :dce)))
+
+(defun %opt-default-convergence-key-position (key)
+  (or (position key cl-cc/optimize::*opt-default-convergence-pass-keys*)
+      (error "Missing optimizer convergence key: ~S" key)))
+
+(defun %assert-opt-default-convergence-edge (before after)
+  (assert-true (< (%opt-default-convergence-key-position before)
+                  (%opt-default-convergence-key-position after))))
+
 (deftest opt-pass-registry-key-presence
   "*opt-pass-registry* includes all expected pass keywords."
-  (assert-true (gethash :prolog-rewrite cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :egraph cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :fold cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :cons-slot-forward cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :pure-call-optimization cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :dce  cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :cse  cl-cc/optimize::*opt-pass-registry*))
-  (assert-eq #'cl-cc/optimize::opt-pass-if-conversion
-             (gethash :if-conversion cl-cc/optimize::*opt-pass-registry*))
-  (assert-eq #'cl-cc/optimize::opt-pass-fma-recognition
-             (gethash :fma-recognition cl-cc/optimize::*opt-pass-registry*)))
+  (dolist (key *opt-pass-registry-presence-keys*)
+    (assert-true (gethash key cl-cc/optimize::*opt-pass-registry*)))
+  (dolist (binding *opt-pass-registry-function-bindings*)
+    (assert-eq (cdr binding)
+               (gethash (car binding) cl-cc/optimize::*opt-pass-registry*))))
 
 (deftest opt-default-convergence-pass-keys-ordering
   "*opt-default-convergence-pass-keys* has the expected prefix order and positional invariants."
-  (assert-equal '(:prolog-rewrite :call-site-splitting :devirtualize :if-conversion
-                  :closure-capture-dedup :closure-thunk-sharing)
+  (assert-equal *opt-default-convergence-prefix*
                 (subseq cl-cc/optimize::*opt-default-convergence-pass-keys* 0 6))
-  (assert-eq :inline (seventh cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-eq :overflow-check-elim (eighth cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-eq :sccp (ninth cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-eq :cons-slot-forward (tenth cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-true (< (position :devirtualize cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :if-conversion cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :inline cl-cc/optimize::*opt-default-convergence-pass-keys*)))
+  (dolist (case *opt-default-convergence-positional-keys*)
+    (destructuring-bind (position . expected-key) case
+      (assert-eq expected-key
+                 (nth (1- position) cl-cc/optimize::*opt-default-convergence-pass-keys*))))
   (assert-true (member :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*))
   (assert-true (member :fma-recognition cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-true (< (position :fma-recognition cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :schedule-local cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :copy-prop cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :gvn cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :cse cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :dce cl-cc/optimize::*opt-default-convergence-pass-keys*))))
+  (dolist (edge *opt-default-convergence-ordering-edges*)
+    (destructuring-bind (before after) edge
+      (%assert-opt-default-convergence-edge before after))))
 
 (deftest opt-convergence-passes-type-invariants
   "*opt-convergence-passes* is a non-empty function list with expected first element and exclusions."
