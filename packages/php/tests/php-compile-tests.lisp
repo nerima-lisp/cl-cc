@@ -1,22 +1,6 @@
 (in-package :cl-cc/test)
 
-(defsuite cl-cc-php-e2e-suite
-  :description "PHP end-to-end VM execution tests"
-  :parent cl-cc-e2e-suite
-  :parallel nil)
-
 (in-suite cl-cc-php-e2e-suite)
-
-(defun %php-run-capture (source)
-  "Compile PHP SOURCE to VM and run it, returning everything it echoed as a
-string. compile-string with :language :php registers the PHP host bridges, so a
-fresh VM state runs the program end-to-end."
-  (let* ((result  (cl-cc:compile-string source :target :vm :language :php))
-         (program (cl-cc/compile:compilation-result-program result))
-         (out     (make-string-output-stream)))
-    (cl-cc/vm:run-compiled program :output-stream out)
-    ;; Trim a trailing newline the VM appends when flushing program output.
-    (string-right-trim '(#\Newline) (get-output-stream-string out))))
 
 (deftest php-e2e-postfix-incdec-on-places
   "Postfix ++/-- mutate an object property and an array element (regression: only a

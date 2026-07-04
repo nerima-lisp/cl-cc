@@ -14,8 +14,12 @@
   :serial t
   :components
   ((:file "package")
+   (:file "prolog-builtin-data")
+   (:file "prolog-rule-specs")
+   (:file "peephole-data")
    (:file "prolog-unification")
    (:file "prolog-rules")
+   (:file "prolog-rule-bootstrap")
    (:file "prolog-builtins")
    (:file "prolog-solver")
    (:file "dcg-rules")

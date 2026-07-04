@@ -14,6 +14,21 @@
   "Assert that unifying LEFT and RIGHT fails."
   `(assert-prolog-unify-result= :unify-fail ,left ,right ,initial-env))
 
+(defun collect-prolog-unify-handler-results (args &optional initial-env)
+  "Collect environments emitted by the CPS prolog-unify-handler."
+  (let ((results nil))
+    (funcall #'cl-cc/prolog::prolog-unify-handler
+             args
+             initial-env
+             (lambda (env)
+               (push env results)))
+    (nreverse results)))
+
+(defmacro assert-prolog-unify-handler-results= (expected args &optional initial-env)
+  "Assert that prolog-unify-handler emits EXPECTED environments."
+  `(assert-equal ,expected
+                 (collect-prolog-unify-handler-results ,args ,initial-env)))
+
 (defmacro assert-prolog-logic-substitute= (var expected env)
   "Assert that VAR resolves to EXPECTED in ENV."
   `(assert-= ,expected (cl-cc:logic-substitute ,var ,env)))

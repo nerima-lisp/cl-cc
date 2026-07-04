@@ -134,12 +134,14 @@
     :serial t
     :components
      ((:file "php-tests")
+      (:file "php-parser-test-support")
       (:file "php-parser-tests")
+      (:file "php-e2e-test-support")
       (:file "php-compile-tests")
       (:file "php-grammar-tests")
       (:file "php-grammar-stmt-tests")
-     (:file "php-traits-tests")
-     (:file "php-interfaces-tests")
+      (:file "php-traits-tests")
+      (:file "php-interfaces-tests")
       (:file "php84-tests")))
    (:module "javascript-tests"
     :pathname "packages/javascript/tests"

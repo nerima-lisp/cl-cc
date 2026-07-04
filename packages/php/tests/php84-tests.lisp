@@ -4,51 +4,6 @@
 
 (defvar *php85-self-load-guard* nil)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %php-run-capture (source)
-    "Compile PHP SOURCE to VM and run it, returning everything it echoed as a
-string. compile-string with :language :php registers the PHP host bridges, so a
-fresh VM state runs the program end-to-end."
-    (let* ((result  (cl-cc:compile-string source :target :vm :language :php))
-           (program (cl-cc/compile:compilation-result-program result))
-           (out     (make-string-output-stream)))
-      (cl-cc/vm:run-compiled program :output-stream out)
-      ;; Trim a trailing newline the VM appends when flushing program output.
-      (string-right-trim '(#\Newline) (get-output-stream-string out)))))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %php-run-capture-io (source &key ini-settings)
-    "Compile PHP SOURCE and capture both stdout and error output."
-    (let ((cl-cc/php::*php-ini-settings* ini-settings)
-          (cl-cc/php::*php-error-reporting-level* 32767))
-      (let* ((result  (cl-cc:compile-string source :target :vm :language :php))
-             (program (cl-cc/compile:compilation-result-program result))
-             (out     (make-string-output-stream))
-             (err     (make-string-output-stream)))
-        (handler-case
-            (let ((*error-output* err))
-              (cl-cc/vm:run-compiled program :output-stream out))
-          (error (c)
-            (declare (ignore c))))
-        (values (string-right-trim '(#\Newline)
-                                   (get-output-stream-string out))
-                  (string-right-trim '(#\Newline)
-                                     (get-output-stream-string err)))))))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %php-make-ini-settings (&rest pairs)
-    "Create a fresh INI settings table for tests."
-    (let ((table (make-hash-table :test 'equal)))
-      (dolist (entry cl-cc/php::*php-ini-defaults* table)
-        (setf (gethash (car entry) table) (cdr entry)))
-      (loop for (key value) on pairs by #'cddr
-            do (setf (gethash key table) value))
-      table)))
-
-(defun %php84-first (src)
-  "Parse SRC and return the first top-level AST node."
-  (first (cl-cc/php:parse-php-source src)))
-
 (defun %php85-register-test (name docstring thunk &key timeout depends-on tags)
   "Register a php85 coverage test body under NAME."
   (setf *test-registry*
@@ -111,7 +66,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php84-named-args-parse-produces-positional-call
   "createUser(name: \"Alice\", age: 25) lowers to an ast-call with 2 positional args."
   (lambda ()
-(let* ((ast (%php84-first "<?php createUser(\"Alice\", 25);")))
+(let* ((ast (%php-first "<?php createUser(\"Alice\", 25);")))
     ;; Without named-arg integration in php-parse-arglist the call uses
     ;; positional lowering: two arguments are preserved in order.
     (assert-true (cl-cc:ast-call-p ast))
@@ -120,7 +75,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php84-named-args-mixed-with-positional
   "Positional args before named args both survive into the call AST."
   (lambda ()
-(let* ((ast (%php84-first "<?php htmlspecialchars(\"<b>hi</b>\", 11);")))
+(let* ((ast (%php-first "<?php htmlspecialchars(\"<b>hi</b>\", 11);")))
     (assert-true (cl-cc:ast-call-p ast))
     (assert-true (plusp (length (cl-cc:ast-call-args ast)))))))
 
@@ -224,7 +179,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-pipe-operator-lowers-to-helper-call
   "The PHP 8.5 pipe operator lowers to the runtime pipe helper."
   (lambda ()
-(let ((ast (%php84-first "<?php \"  HI  \" |> trim(...);")))
+(let ((ast (%php-first "<?php \"  HI  \" |> trim(...);")))
     (assert-true (cl-cc:ast-call-p ast))
     (assert-eq 'cl-cc/php::%php-pipe
                (cl-cc:ast-var-name (cl-cc:ast-call-func ast)))
@@ -327,7 +282,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-no-discard-attribute-preserved-on-function
   "PHP 8.5 #[\\NoDiscard] is preserved as function attribute metadata."
   (lambda ()
-(let* ((ast (%php84-first "<?php #[\\NoDiscard] function important(): int { return 1; }"))
+(let* ((ast (%php-first "<?php #[\\NoDiscard] function important(): int { return 1; }"))
          (attr (first (getf (cl-cc:ast-imports ast) :php-attributes))))
     (assert-true (cl-cc:ast-defun-p ast))
     (assert-string= "NoDiscard" (cl-cc/php:php-attribute-name attr))
@@ -336,7 +291,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-no-discard-attribute-preserves-message
   "PHP 8.5 #[NoDiscard('message')] preserves the optional attribute message."
   (lambda ()
-(let* ((ast (%php84-first "<?php #[NoDiscard('use the return value')] function important() { return 1; }"))
+(let* ((ast (%php-first "<?php #[NoDiscard('use the return value')] function important() { return 1; }"))
          (attr (first (getf (cl-cc:ast-imports ast) :php-attributes)))
          (arg (first (cl-cc/php:php-attribute-args attr))))
     (assert-string= "NoDiscard" (cl-cc/php:php-attribute-name attr))
@@ -401,7 +356,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-attribute-preserved-on-top-level-constant
   "PHP 8.5 attributes on top-level constants survive as constant metadata."
   (lambda ()
-(let* ((ast (%php84-first "<?php #[Deprecated('use NEW')] const OLD = 1;"))
+(let* ((ast (%php-first "<?php #[Deprecated('use NEW')] const OLD = 1;"))
          (attr (first (getf (cl-cc:ast-imports ast) :php-attributes)))
          (arg (first (cl-cc/php:php-attribute-args attr))))
     (assert-true (cl-cc:ast-defvar-p ast))
@@ -423,7 +378,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
     (dolist (source (list
                      "<?php enum Mode { #[NoDiscard] public function label(): string { return 'x'; } case A; } class AfterEnum {}"
                      "<?php class Box { #[NoDiscard] public function label(): string { return 'x'; } }"))
-      (let* ((form (%php84-first source))
+      (let* ((form (%php-first source))
              (ast (if (cl-cc:ast-progn-p form) (first (cl-cc:ast-progn-forms form)) form))
              (method-slot (find-if (lambda (slot)
                                      (and (cl-cc:ast-slot-def-p slot)
@@ -443,7 +398,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
   (lambda ()
     (assert-true
      (cl-cc:ast-defclass-p
-      (%php84-first
+      (%php-first
        "<?php class Base { public function label(): string { return 'x'; } } class Child extends Base { #[Override] public function label(): string { return 'y'; } }")))))
 
 (%php85-register-test 'php85-override-property-is-validated-against-parent
@@ -451,7 +406,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
   (lambda ()
     (assert-true
      (cl-cc:ast-defclass-p
-      (%php84-first
+      (%php-first
        "<?php class Base { public string $name; } class Child extends Base { #[Override] public string $name; }")))))
 
 (%php85-register-test 'php85-override-private-parent-property-signals-error
@@ -464,7 +419,7 @@ EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
 (%php85-register-test 'php85-void-cast-lowers-to-discarding-progn
   "The PHP 8.5 (void) statement evaluates its operand and returns PHP null."
   (lambda ()
-(let* ((value (%php84-first "<?php (void) 123;"))
+(let* ((value (%php-first "<?php (void) 123;"))
          (forms (cl-cc:ast-progn-forms value)))
     (assert-true (cl-cc:ast-progn-p value))
     (assert-= 2 (length forms))
@@ -2188,7 +2143,7 @@ echo ($first ? 'Y' : 'N') . ':' .
 (%php85-register-test 'php84-class-property-hooks-lower-to-accessor-slots
   "Class property hooks parse through the class parser and add accessor slots."
   (lambda ()
-(let* ((ast (%php84-first
+(let* ((ast (%php-first
                "<?php class User { public string $name { get => $this->name; set($value) => $value; } }"))
          (slots (cl-cc:ast-defclass-slots ast))
          (slot-names (mapcar (lambda (slot)
@@ -2228,7 +2183,7 @@ echo ($first ? 'Y' : 'N') . ':' .
 (%php85-register-test 'php84-class-asymmetric-visibility-metadata
   "Class properties preserve PHP 8.4 asymmetric set visibility metadata."
   (lambda ()
-(let* ((ast (%php84-first
+(let* ((ast (%php-first
                "<?php class User { public private(set) string $id; }"))
          (slot (first (cl-cc:ast-defclass-slots ast)))
          (imports (cl-cc:ast-imports slot)))
@@ -2242,7 +2197,7 @@ echo ($first ? 'Y' : 'N') . ':' .
                      :private)
                     ("<?php class Config { final public static protected(set) string $name; }"
                      :protected)))
-      (let* ((ast (%php84-first (first case)))
+      (let* ((ast (%php-first (first case)))
              (slot (first (cl-cc:ast-defclass-slots ast)))
              (imports (cl-cc:ast-imports slot))
              (modifiers (getf imports :php-modifiers)))
@@ -2255,7 +2210,7 @@ echo ($first ? 'Y' : 'N') . ':' .
 (%php85-register-test 'php85-final-promoted-property-preserves-final-modifier
   "PHP 8.5 constructor promotion preserves final property metadata."
   (lambda ()
-(let* ((ast (%php84-first
+(let* ((ast (%php-first
                "<?php class Token { public function __construct(final string $id) {} }"))
          (slots (cl-cc:ast-defclass-slots ast))
          (slot (find-if (lambda (candidate)
@@ -2270,7 +2225,7 @@ echo ($first ? 'Y' : 'N') . ':' .
 (%php85-register-test 'php84-function-intersection-type-annotation-preserved
   "Intersection type A&B in a function declaration is preserved as a type annotation string."
   (lambda ()
-(let* ((ast (%php84-first
+(let* ((ast (%php-first
                "<?php function process(Iterator $it): void { return; }"))
          (decls (cl-cc:ast-defun-declarations ast)))
     (assert-true (cl-cc:ast-defun-p ast))
@@ -2295,7 +2250,7 @@ echo ($first ? 'Y' : 'N') . ':' .
 (%php85-register-test 'php84-never-return-type-preserved-in-declarations
   "function fail(): never preserves 'never' as the return type in declarations."
   (lambda ()
-(let* ((ast (%php84-first "<?php function fail(): never { throw new Ex(); }"))
+(let* ((ast (%php-first "<?php function fail(): never { throw new Ex(); }"))
          (decls (cl-cc:ast-defun-declarations ast)))
     (assert-true (cl-cc:ast-defun-p ast))
     (assert-equal "never" (getf decls :php-return-type)))))
@@ -2309,7 +2264,7 @@ echo ($first ? 'Y' : 'N') . ':' .
                    (list "<?php class User { public string $name; }"
                          :class "NAME")))
       (destructuring-bind (source expected-kind expected-slot-name) spec
-        (let* ((form  (%php84-first source))
+        (let* ((form  (%php-first source))
                ;; An enum now lowers to (progn defclass (link-cases)); unwrap the defclass when present.
                (ast   (if (cl-cc:ast-progn-p form) (first (cl-cc:ast-progn-forms form)) form))
                (slots (cl-cc:ast-defclass-slots ast))
@@ -2323,7 +2278,7 @@ echo ($first ? 'Y' : 'N') . ':' .
 ;; PHP 8.1 allows `new ClassName()` as a default parameter value.
   ;; `new` lowers to a let that allocates the instance, conditionally runs
   ;; __construct, and returns the instance.
-  (let* ((ast (%php84-first
+  (let* ((ast (%php-first
                "<?php function process(Logger $logger = new FileLogger()) { return $logger; }"))
          (optionals (cl-cc:ast-defun-optional-params ast))
          (default-ast (second (first optionals)))

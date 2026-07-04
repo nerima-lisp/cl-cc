@@ -70,20 +70,8 @@
 
 (deftest prolog-unify-handler-behavior
   "prolog-unify-handler succeeds only when terms can be unified."
-  (let ((results nil))
-    (funcall #'cl-cc/prolog::prolog-unify-handler
-             '(?x 1)
-             nil
-             (lambda (env)
-               (push env results)))
-    (assert-equal '(((?x . 1))) results))
-  (let ((results nil))
-    (funcall #'cl-cc/prolog::prolog-unify-handler
-             '(?x (?x))
-             nil
-             (lambda (env)
-               (push env results)))
-    (assert-null results)))
+  (assert-prolog-unify-handler-results= '(((?x . 1))) '(?x 1))
+  (assert-prolog-unify-handler-results= nil '(?x (?x))))
 
 (deftest prolog-when-unify-succeeds-gates-body-on-success
   "when-unify-succeeds only runs its body when unification succeeds."
