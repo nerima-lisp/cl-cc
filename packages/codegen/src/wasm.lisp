@@ -84,4 +84,7 @@
 ;;; (Structural sections — type section, globals, tags, table, elem — are in wasm-sections.lisp)
 ;;; (Function locals, full function emission, BigInt wrappers — are in wasm-functions.lisp)
 ;;; (AOT mode tracking, import filtering, emit-wat-imports — are in wasm-imports.lisp)
-;;; (emit-wasm-module, binary backend, debug/DevTools, profiles — are in wasm-output.lisp)
+;;; (emit-wasm-module — is in wasm-output.lisp)
+;;; (Binary backend — is in wasm-binary.lisp)
+;;; (Debug/DevTools and profiles — are in wasm-binary-debug.lisp)
+;;; (AOT helpers — are in wasm-aot.lisp)

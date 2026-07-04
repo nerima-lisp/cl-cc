@@ -3,8 +3,8 @@
 ;;; Binary encoding: LEB128, section buffers, type/function/export sections,
 ;;; module serialization, and compile-to-wasm-binary entry point.
 ;;;
-;;; Load order: after wasm.lisp (WAT text backend).
-;;; AOT helpers are loaded from wasm-output.lisp.
+;;; Load order: after wasm-feature-params.lisp and before wasm-output.lisp.
+;;; AOT helpers live in wasm-aot.lisp.
 ;;; Debug/devtools custom sections live in wasm-binary-debug.lisp.
 
 (in-package :cl-cc/codegen)
@@ -225,6 +225,6 @@
     (emit-wasm-binary-module module)))
 
 ;;; AOT helpers (wasm-aot-result struct, tool integration, hashing, base64,
-;;; compile-to-aot-wasm) live in wasm-output.lisp.
+;;; compile-to-aot-wasm) live in wasm-aot.lisp.
 ;;; Debug/devtools custom sections (DWARF, name section, branch hints, devtools JS)
 ;;; live in wasm-binary-debug.lisp.
