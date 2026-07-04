@@ -21,6 +21,8 @@
     (:file "runtime-builtins-array")
     (:file "runtime-builtins-string-data")
     (:file "runtime-builtins-string")
+    (:file "runtime-builtins-string-serialization")
+    (:file "runtime-builtins-string-json")
     (:file "runtime-builtins-string-digest")
      (:file "runtime-builtins-regex")
      (:file "runtime-builtins-math")
