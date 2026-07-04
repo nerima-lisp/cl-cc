@@ -563,17 +563,21 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
       (assert-true found)
       (assert-= 2 child))))
 
+(defparameter *opt-ic-patch-plan-cases*
+  '((:site1 :uninitialized :monomorphic :t1 :install-monomorphic)
+    (:site2 :monomorphic :polymorphic :t2 :promote-polymorphic)
+    (:site3 :polymorphic :megamorphic :t3 :promote-megamorphic)))
+
+(defun %assert-opt-ic-patch-plan-case (site current-state next-state target expected-kind)
+  (assert-eq expected-kind
+             (cl-cc/optimize::opt-ic-patch-patch-kind
+              (cl-cc/optimize::opt-ic-make-patch-plan
+               site current-state next-state target))))
+
 (deftest optimize-ic-make-patch-plan-classifies-state-transitions
   "opt-ic-make-patch-plan assigns expected patch kinds for IC promotions."
-  (assert-eq :install-monomorphic
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan :site1 :uninitialized :monomorphic :t1)))
-  (assert-eq :promote-polymorphic
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan :site2 :monomorphic :polymorphic :t2)))
-  (assert-eq :promote-megamorphic
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan :site3 :polymorphic :megamorphic :t3))))
+  (dolist (case *opt-ic-patch-plan-cases*)
+    (apply #'%assert-opt-ic-patch-plan-case case)))
 
 (deftest optimize-build-inline-polymorphic-dispatch-builds-guard-chain
   "opt-build-inline-polymorphic-dispatch returns one guard record per observed shape."
@@ -704,20 +708,23 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
     (assert-eq :fs (cl-cc/optimize::opt-tls-plan-base-register x86))
     (assert-eq :tpidr_el0 (cl-cc/optimize::opt-tls-plan-base-register arm))))
 
+(defparameter *opt-atomic-opcode-cases*
+  '((:x86-64 :incf :acq-rel :lock-xadd)
+    (:x86-64 :cas :seq-cst :lock-cmpxchg)
+    (:aarch64 :incf :acq-rel :ldadd)
+    (:aarch64 :cas :seq-cst :ldxr-stxr)))
+
+(defun %assert-opt-atomic-opcode-case (target operation memory-order expected-opcode)
+  (assert-eq expected-opcode
+             (cl-cc/optimize::opt-select-atomic-opcode
+              :target target
+              :operation operation
+              :memory-order memory-order)))
+
 (deftest optimize-select-atomic-opcode-reflects-target-and-operation
   "Atomic helper picks target-specific representative opcodes for incf/cas."
-  (assert-eq :lock-xadd
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :x86-64 :operation :incf :memory-order :acq-rel))
-  (assert-eq :lock-cmpxchg
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :x86-64 :operation :cas :memory-order :seq-cst))
-  (assert-eq :ldadd
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :aarch64 :operation :incf :memory-order :acq-rel))
-  (assert-eq :ldxr-stxr
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :aarch64 :operation :cas :memory-order :seq-cst)))
+  (dolist (case *opt-atomic-opcode-cases*)
+    (apply #'%assert-opt-atomic-opcode-case case)))
 
 (deftest optimize-build-htm-plan-enables-lock-elision-only-when-supported-and-low-contention
   "HTM helper enables lock elision only under support + low-contention preconditions."
