@@ -27,6 +27,7 @@
      (:file "runtime-builtins-types")
      (:file "runtime-builtins-io-data")
      (:file "runtime-builtins-io")
+     (:file "runtime-builtins-io-cookie-session")
      (:file "runtime-builtins-io-tokenizer")
      (:file "runtime-builtins-io-uri")
      (:file "runtime-builtins-register")
