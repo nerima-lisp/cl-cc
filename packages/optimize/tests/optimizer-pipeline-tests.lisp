@@ -938,6 +938,49 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                 (make-vm-jump :label :l0)
                 (make-vm-label :name :l1))))
 
+(defun %opt-instruction-sexps (instructions)
+  (mapcar #'instruction->sexp instructions))
+
+(defun %opt-assert-program-changed (optimized program)
+  (assert-false (equal (%opt-instruction-sexps optimized)
+                       (%opt-instruction-sexps program))))
+
+(defun %opt-assert-program-unchanged (optimized program)
+  (assert-equal (%opt-instruction-sexps optimized)
+                (%opt-instruction-sexps program)))
+
+(defun %opt-sortable-loop-body ()
+  (list (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
+        (make-vm-move :dst :r8 :src :r5)))
+
+(defun %opt-loop-label-count (label instructions)
+  (count-if (lambda (inst)
+              (and (typep inst 'vm-label)
+                   (eq (cl-cc/vm::vm-name inst) label)))
+            instructions))
+
+(defun %opt-adjacent-loop-program (&key (first-init 0)
+                                        (second-init 0)
+                                        (second-condition :rc))
+  (list (make-vm-const :dst :ri :value first-init)
+        (make-vm-const :dst :rj :value second-init)
+        (make-vm-const :dst :rlim :value 4)
+        (make-vm-const :dst :rstep :value 1)
+        (make-vm-label :name :la)
+        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
+        (make-vm-jump-zero :reg :rc :label :lax)
+        (make-vm-move :dst :r10 :src :r11)
+        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
+        (make-vm-jump :label :la)
+        (make-vm-label :name :lax)
+        (make-vm-label :name :lb)
+        (make-vm-lt :dst second-condition :lhs :rj :rhs :rlim)
+        (make-vm-jump-zero :reg second-condition :label :lbx)
+        (make-vm-move :dst :r12 :src :r13)
+        (make-vm-add :dst :rj :lhs :rj :rhs :rstep)
+        (make-vm-jump :label :lb)
+        (make-vm-label :name :lbx)))
+
 (deftest optimize-affine-loop-summary-builds-descriptor
   "FR-523: affine-loop analysis helper returns structured summary metadata."
   (let ((summary (cl-cc/optimize::opt-build-affine-loop-summary
@@ -961,12 +1004,9 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-pass-loop-interchange-handles-nested-canonical-loop
   "FR-524: safe canonical-loop core ops are interchanged (independent swap)."
-  (let* ((program (%opt-canonical-loop-program
-                   (list (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
-                         (make-vm-move :dst :r8 :src :r5))))
+  (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
          (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
+    (%opt-assert-program-changed optimized program)
     (assert-true (typep (nth 6 optimized) 'vm-move))
     (assert-true (typep (nth 7 optimized) 'vm-mul))))
 
@@ -975,8 +1015,7 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
   (let* ((program (%opt-canonical-loop-program
                    (list (make-vm-set-global :src :r2 :name 'g))))
          (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (assert-equal (mapcar #'instruction->sexp optimized)
-                  (mapcar #'instruction->sexp program))))
+    (%opt-assert-program-unchanged optimized program)))
 
 (deftest optimize-polyhedral-schedule-plan-preserves-objective
   "FR-525: polyhedral schedule helper keeps statement/constraint/objective payloads."
@@ -1042,91 +1081,34 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-pass-polyhedral-schedule-reorders-loop-body
   "FR-525: schedule pass reorders sortable body ops inside canonical loop."
-  (let* ((program (%opt-canonical-loop-program
-                   (list (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
-                         (make-vm-move :dst :r8 :src :r5))))
+  (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
          (optimized (cl-cc/optimize::opt-pass-polyhedral-schedule program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
+    (%opt-assert-program-changed optimized program)
     (assert-true (typep (nth 6 optimized) 'vm-move))
     (assert-true (typep (nth 7 optimized) 'vm-mul))))
 
 (deftest optimize-pass-loop-fusion-fission-fuses-adjacent-loops
   "FR-526: adjacent compatible pure loops are fused into one canonical loop."
-  (let* ((program
-           (list (make-vm-const :dst :ri :value 0)
-                 (make-vm-const :dst :rj :value 0)
-                 (make-vm-const :dst :rlim :value 4)
-                 (make-vm-const :dst :rstep :value 1)
-                  ;; loop A
-                  (make-vm-label :name :la)
-                  (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                  (make-vm-jump-zero :reg :rc :label :lax)
-                  (make-vm-move :dst :r10 :src :r11)
-                  (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                  (make-vm-jump :label :la)
-                  (make-vm-label :name :lax)
-                  ;; loop B
-                  (make-vm-label :name :lb)
-                  (make-vm-lt :dst :rc :lhs :rj :rhs :rlim)
-                  (make-vm-jump-zero :reg :rc :label :lbx)
-                  (make-vm-move :dst :r12 :src :r13)
-                  (make-vm-add :dst :rj :lhs :rj :rhs :rstep)
-                  (make-vm-jump :label :lb)
-                  (make-vm-label :name :lbx)))
+  (let* ((program (%opt-adjacent-loop-program))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-= 1 (count-if (lambda (inst)
-                            (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :la)))
-                          optimized))
-    (assert-= 0 (count-if (lambda (inst)
-                            (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :lb)))
-                          optimized))))
+    (%opt-assert-program-changed optimized program)
+    (assert-= 1 (%opt-loop-label-count :la optimized))
+    (assert-= 0 (%opt-loop-label-count :lb optimized))))
 
 (deftest optimize-pass-loop-fusion-fission-skips-unsafe-fusion
   "FR-526 safety: fusion is skipped when iteration spaces are not equivalent."
-  (let* ((program (list (make-vm-const :dst :ri :value 0)
-                        (make-vm-const :dst :rj :value 1) ;; different init
-                        (make-vm-const :dst :rlim :value 4)
-                        (make-vm-const :dst :rstep :value 1)
-                        (make-vm-label :name :la)
-                        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc :label :lax)
-                        (make-vm-move :dst :r10 :src :r11)
-                        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                        (make-vm-jump :label :la)
-                        (make-vm-label :name :lax)
-                        (make-vm-label :name :lb)
-                        (make-vm-lt :dst :rc2 :lhs :rj :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc2 :label :lbx)
-                        (make-vm-move :dst :r12 :src :r13)
-                        (make-vm-add :dst :rj :lhs :rj :rhs :rstep)
-                        (make-vm-jump :label :lb)
-                        (make-vm-label :name :lbx)))
+  (let* ((program (%opt-adjacent-loop-program :second-init 1
+                                              :second-condition :rc2))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-equal (mapcar #'instruction->sexp optimized)
-                  (mapcar #'instruction->sexp program))))
+    (%opt-assert-program-unchanged optimized program)))
 
 (deftest optimize-pass-loop-fusion-fission-splits-oversized-loop
   "FR-526: oversized pure loops are split into two core regions with a split marker." 
   (let* ((core (loop for idx from 0 below 36
                      collect (make-vm-move :dst :r8 :src :r5)))
-         (program (append (list (make-vm-const :dst :ri :value 0)
-                                (make-vm-const :dst :rlim :value 8)
-                                (make-vm-const :dst :rstep :value 1)
-                                (make-vm-label :name :l0)
-                                (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                                (make-vm-jump-zero :reg :rc :label :l1))
-                          core
-                          (list (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                                (make-vm-jump :label :l0)
-                                (make-vm-label :name :l1))))
+         (program (%opt-canonical-loop-program core))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
+    (%opt-assert-program-changed optimized program)
     (assert-true (some (lambda (inst)
                          (and (typep inst 'vm-label)
                               (search "__SPLIT" (string (cl-cc/vm::vm-name inst)))))
