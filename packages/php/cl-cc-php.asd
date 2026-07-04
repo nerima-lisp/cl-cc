@@ -44,6 +44,7 @@
      (:file "runtime-builtins-types")
      (:file "runtime-builtins-io-data")
      (:file "runtime-builtins-io")
+     (:file "runtime-builtins-io-scan")
      (:file "runtime-builtins-io-files")
      (:file "runtime-builtins-io-objects")
      (:file "runtime-builtins-io-spl")
