@@ -65,10 +65,6 @@ FR-216. Override: CLCC_WASM_BRANCH_HINTS=1|0")
   "Feature gate for Wasm JS Promise Integration.
 FR-217. Override: CLCC_WASM_JS_PROMISE=1|0")
 
-(defparameter *wasm-string-builtins-enabled* nil
-  "Feature gate for Wasm String Builtins proposal.
-FR-218, FR-295. Override: CLCC_WASM_STRING_BUILTINS=1|0")
-
 (defparameter *wasm-dwarf-enabled* nil
   "Feature gate for DWARF debug info emission.
 FR-222. Override: CLCC_WASM_DWARF=1|0")

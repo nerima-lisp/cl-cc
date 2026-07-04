@@ -190,9 +190,6 @@
 (defparameter *wasm-js-promise-integration-enabled* t
   "FR-217: Use WebAssembly.suspending/promising for async JS calls.")
 
-(defparameter *wasm-string-builtins-enabled* t
-  "FR-218: Use Wasm String Builtins for efficient string operations.")
-
 (defparameter *wasm-esm-integration-enabled* t
   "FR-230: Generate ESM-compatible .wasm exports.")
 

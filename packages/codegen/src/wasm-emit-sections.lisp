@@ -133,8 +133,8 @@ Default is NIL to preserve existing standalone modules."
   (wasm-feature-enabled-p "CLCC_WASM_JS_PROMISE" *wasm-js-promise-enabled*))
 
 (defun wasm-string-builtins-feature-enabled-p ()
-  "FR-218: Return T when String Builtins is enabled."
-  (wasm-feature-enabled-p "CLCC_WASM_STRING_BUILTINS" *wasm-string-builtins-enabled*))
+  "FR-218: String Builtins are required by the Wasm backend."
+  t)
 
 (defun wasm-dwarf-feature-enabled-p ()
   "FR-222: Return T when DWARF debug info is enabled."

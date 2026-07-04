@@ -1,7 +1,7 @@
 ;;;; packages/codegen/src/wasm-string-builtins.lisp — Wasm String/JS FFI helpers
 ;;;;
-;;;; Feature-gated WAT helpers for the Wasm String Builtins proposal and the
-;;;; JavaScript integration features that need small, reusable text forms.
+;;;; WAT helpers for the Wasm String Builtins proposal and the JavaScript
+;;;; integration features that need small, reusable text forms.
 
 (in-package :cl-cc/codegen)
 
@@ -24,28 +24,23 @@
 (defun wasm-stringref-from-eqref-wat (value-wat)
   "Return WAT that treats VALUE-WAT as the backend's string value.
 
-When String Builtins are enabled, string literals and string-producing builtins
-store native stringref values directly in eqref VM locals.  For legacy staged
-$string_t values, callers should keep using the fallback helpers that operate on
-the $chars byte array."
+String literals and string-producing builtins store native stringref values
+directly in eqref VM locals."
   value-wat)
 
 (defun wasm-string-literal-wat (str)
   "Return WAT for string literal STR.
 
-With FR-218 enabled this emits a native string.new_utf8_array instead of a
-linear-memory/string-struct byte representation.  The byte array is still a GC
-array immediate, not a linear-memory byte buffer."
+FR-218 emits a native string.new_utf8_array.  The byte array is still a GC array
+immediate, not a linear-memory byte buffer."
   (let* ((bytes (map 'list #'char-code str))
          (byte-elems (format nil "~{~A~^ ~}"
                              (mapcar (lambda (b) (format nil "(i32.const ~D)" b)) bytes)))
          (array-wat (format nil "(array.new_fixed $bytes_array_t ~D~@[ ~A~])"
                             (length bytes)
                             (and bytes byte-elems))))
-    (if (wasm-string-builtins-feature-enabled-p)
-        (emit-wasm-string-new-wat :utf8 array-wat "(i32.const 0)"
-                                  (format nil "(i32.const ~D)" (length bytes)))
-        (format nil "(struct.new $string_t ~A)" array-wat))))
+    (emit-wasm-string-new-wat :utf8 array-wat "(i32.const 0)"
+                              (format nil "(i32.const ~D)" (length bytes)))))
 
 (defun emit-wasm-string-new-wat (encoding source-wat start-wat end-wat
                                   &key array-p)
@@ -160,22 +155,18 @@ for call-site clarity; current builtins use the *_array spelling for GC arrays."
 
 (defun emit-wat-string-builtin-helpers (stream)
   "Emit reusable FR-218 string builtin helpers."
-  (when (wasm-string-builtins-feature-enabled-p)
-    (format stream "~%  ;; FR-218: UTF-8 array roundtrip helper for staged string transforms")
-    (format stream "~%  (func $clcc_string_roundtrip_utf8 (param $s stringref) (result stringref)")
-    (format stream "~%    (local $buf (ref $bytes_array_t))")
-    (format stream "~%    (local.set $buf (array.new_default $bytes_array_t (string.measure_utf8 (local.get $s))))")
-    (format stream "~%    (drop (string.encode_utf8_array (local.get $s) (local.get $buf) (i32.const 0)))")
-    (format stream "~%    (string.new_utf8_array (local.get $buf) (i32.const 0) (array.len (local.get $buf))))" )
-    (format stream "~%  )")))
+  (format stream "~%  ;; FR-218: UTF-8 array roundtrip helper for string transforms")
+  (format stream "~%  (func $clcc_string_roundtrip_utf8 (param $s stringref) (result stringref)")
+  (format stream "~%    (local $buf (ref $bytes_array_t))")
+  (format stream "~%    (local.set $buf (array.new_default $bytes_array_t (string.measure_utf8 (local.get $s))))")
+  (format stream "~%    (drop (string.encode_utf8_array (local.get $s) (local.get $buf) (i32.const 0)))")
+  (format stream "~%    (string.new_utf8_array (local.get $buf) (i32.const 0) (array.len (local.get $buf))))" )
+  (format stream "~%  )"))
 
 (defun maybe-emit-wasm-string-instruction (inst reg-map stream &key (indent 6))
-  "Emit a VM string instruction through Wasm String Builtins when enabled.
+  "Emit a VM string instruction through Wasm String Builtins.
 
-Returns T when INST was handled, NIL otherwise.  The fallback path is left to the
-caller so existing non-string lowering remains unchanged."
-  (unless (wasm-string-builtins-feature-enabled-p)
-    (return-from maybe-emit-wasm-string-instruction nil))
+Returns T when INST was handled, NIL otherwise."
   (let ((pad (make-string indent :initial-element #\Space)))
     (labels ((line (fmt &rest args)
                (apply #'format stream (concatenate 'string "~%" pad fmt) args))
