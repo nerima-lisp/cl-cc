@@ -257,6 +257,41 @@
        (string= (symbol-name expected)
                 (symbol-name actual))))
 
+(defun %optimize-backend-assert-member (expected values test)
+  "Assert that EXPECTED is present in VALUES according to TEST."
+  (assert-true (member expected values :test test)))
+
+(defun %optimize-backend-assert-evidence-contains
+    (evidence modules api-symbols test-anchors)
+  "Assert that EVIDENCE contains the supplied module, API, and test anchors."
+  (dolist (module modules)
+    (%optimize-backend-assert-member
+     module
+     (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
+     #'string=))
+  (dolist (api-symbol api-symbols)
+    (%optimize-backend-assert-member
+     api-symbol
+     (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
+     #'equal))
+  (dolist (test-anchor test-anchors)
+    (%optimize-backend-assert-member
+     test-anchor
+     (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
+     #'%optimize-backend-test-anchor-name=)))
+
+(defun %optimize-backend-assert-evidence-case
+    (feature-id status modules api-symbols test-anchors)
+  "Assert the roadmap evidence contract for FEATURE-ID."
+  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
+    (assert-true evidence)
+    (assert-eq status (cl-cc/optimize::opt-roadmap-evidence-status evidence))
+    (%optimize-backend-assert-evidence-contains
+     evidence
+     modules
+     api-symbols
+     test-anchors)))
+
 (deftest optimize-backend-roadmap-completed-headings-avoid-incomplete-language
   "FRs marked ✅ in optimize-backend.md must not explicitly say they are unimplemented."
   (assert-null (%optimize-backend-doc-completed-heading-contradictions)))
@@ -382,21 +417,12 @@
                    cl-cc/optimize::ssa-sequentialize-copies
                    cl-cc/optimize::ssa-seq-copies-behavior)))
     (destructuring-bind (feature-id status module api-symbol test-anchor) case
-      (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-        (assert-true evidence)
-        (assert-eq status (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-        (assert-true
-         (member module
-                 (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                 :test #'string=))
-        (assert-true
-         (member api-symbol
-                 (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                 :test #'equal))
-        (assert-true
-         (member test-anchor
-                    (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                    :test #'equal))))))
+      (%optimize-backend-assert-evidence-case
+       feature-id
+       status
+       (list module)
+       (list api-symbol)
+       (list test-anchor)))))
 
 (deftest optimize-backend-roadmap-phase40-frs-have-specific-evidence
   "Phase 40 partial-eval/specialization FRs expose concrete optimization anchors."
@@ -413,277 +439,183 @@
                    cl-cc/optimize::opt-build-specialization-plan
                    optimize-build-specialization-plan-reuses-cache-for-constant-signature)))
     (destructuring-bind (feature-id status module api-symbol test-anchor) case
-      (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-        (assert-true evidence)
-        (assert-eq status (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-        (assert-true
-         (member module
-                 (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                 :test #'string=))
-        (assert-true
-         (member api-symbol
-                 (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                 :test #'equal))
-        (assert-true
-         (member test-anchor
-                 (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                 :test #'%optimize-backend-test-anchor-name=))))))
+      (%optimize-backend-assert-evidence-case
+       feature-id
+       status
+       (list module)
+       (list api-symbol)
+       (list test-anchor)))))
 
 (deftest optimize-backend-roadmap-fr-217-has-specific-evidence
   "FR-217 memory-SSA implementation is backed by concrete helpers and tests."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-217")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/optimize/src/optimizer-memory-alias.lisp"
-                      "packages/optimize/tests/optimizer-memory-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(cl-cc/optimize::opt-compute-memory-ssa-snapshot
-                          cl-cc/optimize::opt-memory-ssa-version-at))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(memory-ssa-snapshot-assigns-monotonic-versions-for-def-use-chain
-                           memory-ssa-snapshot-slot-location-uses-alias-root))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-217"
+   :implemented
+   '("packages/optimize/src/optimizer-memory-alias.lisp"
+     "packages/optimize/tests/optimizer-memory-tests.lisp")
+   '(cl-cc/optimize::opt-compute-memory-ssa-snapshot
+     cl-cc/optimize::opt-memory-ssa-version-at)
+   '(memory-ssa-snapshot-assigns-monotonic-versions-for-def-use-chain
+     memory-ssa-snapshot-slot-location-uses-alias-root)))
 
 (deftest optimize-backend-roadmap-fr-251-has-specific-evidence
   "FR-251 abstract-interpretation framework is backed by generic domain helpers and tests."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-251")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/optimize/src/optimizer-dataflow.lisp"
-                      "packages/optimize/tests/optimizer-dataflow-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(cl-cc/optimize::make-opt-abstract-domain
-                          cl-cc/optimize::opt-run-abstract-interpretation))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(abstract-domain-struct-retains-operators
-                           abstract-interpretation-runs-over-cfg-and-produces-result))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-251"
+   :implemented
+   '("packages/optimize/src/optimizer-dataflow.lisp"
+     "packages/optimize/tests/optimizer-dataflow-tests.lisp")
+   '(cl-cc/optimize::make-opt-abstract-domain
+     cl-cc/optimize::opt-run-abstract-interpretation)
+   '(abstract-domain-struct-retains-operators
+     abstract-interpretation-runs-over-cfg-and-produces-result)))
 
 (deftest optimize-backend-roadmap-fr-252-has-specific-evidence
   "FR-252 interprocedural regalloc is backed by policy derivation and allocator integration tests."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-252")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/regalloc/src/regalloc.lisp"
-                      "packages/regalloc/src/regalloc-allocate.lisp"
-                      "packages/emit/tests/regalloc-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(("CL-CC/REGALLOC" . "REGALLOC-BUILD-DIRECT-CALL-GRAPH")
-                          ("CL-CC/REGALLOC" . "REGALLOC-COMPUTE-INTERPROCEDURAL-HINTS")
-                          ("CL-CC/REGALLOC" . "REGALLOC-BUILD-ALLOCATION-POLICY-FROM-HINTS")
-                          ("CL-CC/REGALLOC" . "ALLOCATE-REGISTERS")))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(regalloc-interprocedural-hints-detect-leaf-and-leaf-callee-chain
-                           regalloc-interprocedural-policy-hook-derives-preferences
-                           regalloc-interprocedural-policy-caller-saved-respects-call-crossing-safety
-                           regalloc-interprocedural-policy-end-to-end-keeps-call-crossing-safe
-                           regalloc-interprocedural-policy-prefers-callee-saved-on-call-crossing))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-252"
+   :implemented
+   '("packages/regalloc/src/regalloc.lisp"
+     "packages/regalloc/src/regalloc-allocate.lisp"
+     "packages/emit/tests/regalloc-tests.lisp")
+   '(("CL-CC/REGALLOC" . "REGALLOC-BUILD-DIRECT-CALL-GRAPH")
+     ("CL-CC/REGALLOC" . "REGALLOC-COMPUTE-INTERPROCEDURAL-HINTS")
+     ("CL-CC/REGALLOC" . "REGALLOC-BUILD-ALLOCATION-POLICY-FROM-HINTS")
+     ("CL-CC/REGALLOC" . "ALLOCATE-REGISTERS"))
+   '(regalloc-interprocedural-hints-detect-leaf-and-leaf-callee-chain
+     regalloc-interprocedural-policy-hook-derives-preferences
+     regalloc-interprocedural-policy-caller-saved-respects-call-crossing-safety
+     regalloc-interprocedural-policy-end-to-end-keeps-call-crossing-safe
+     regalloc-interprocedural-policy-prefers-callee-saved-on-call-crossing)))
 
 (deftest optimize-backend-roadmap-fr-253-has-specific-evidence
   "FR-253 COW helper layer is backed by concrete copy/write APIs and tests."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-253")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/optimize/src/optimizer-speculative-peval.lisp"
-                      "packages/optimize/tests/optimizer-pipeline-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(cl-cc/optimize::make-opt-cow-object
-                          cl-cc/optimize::opt-cow-copy
-                          cl-cc/optimize::opt-cow-write))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(optimize-cow-copy-is-constant-time-share
-                           optimize-cow-write-detaches-when-shared))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-253"
+   :implemented
+   '("packages/optimize/src/optimizer-speculative-peval.lisp"
+     "packages/optimize/tests/optimizer-pipeline-tests.lisp")
+   '(cl-cc/optimize::make-opt-cow-object
+     cl-cc/optimize::opt-cow-copy
+     cl-cc/optimize::opt-cow-write)
+   '(optimize-cow-copy-is-constant-time-share
+     optimize-cow-write-detaches-when-shared)))
 
 (deftest optimize-backend-roadmap-fr-254-has-specific-evidence
   "FR-254 region helper layer is backed by bump/slab APIs and tests."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-254")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/optimize/src/optimizer-speculative-peval.lisp"
-                      "packages/optimize/tests/optimizer-pipeline-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(cl-cc/optimize::make-opt-bump-region
-                          cl-cc/optimize::opt-bump-allocate
-                          cl-cc/optimize::opt-bump-mark
-                          cl-cc/optimize::opt-bump-reset
-                          cl-cc/optimize::make-opt-slab-pool
-                          cl-cc/optimize::opt-slab-allocate
-                          cl-cc/optimize::opt-slab-free))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(optimize-bump-region-mark-reset-restores-cursor
-                           optimize-slab-pool-reuses-freed-object))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-254"
+   :implemented
+   '("packages/optimize/src/optimizer-speculative-peval.lisp"
+     "packages/optimize/tests/optimizer-pipeline-tests.lisp")
+   '(cl-cc/optimize::make-opt-bump-region
+     cl-cc/optimize::opt-bump-allocate
+     cl-cc/optimize::opt-bump-mark
+     cl-cc/optimize::opt-bump-reset
+     cl-cc/optimize::make-opt-slab-pool
+     cl-cc/optimize::opt-slab-allocate
+     cl-cc/optimize::opt-slab-free)
+   '(optimize-bump-region-mark-reset-restores-cursor
+     optimize-slab-pool-reuses-freed-object)))
 
 (deftest optimize-backend-roadmap-fr-008-has-specific-evidence
   "FR-008 float lane has concrete allocator/emitter evidence."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-008")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/regalloc/src/regalloc.lisp"
-                      "packages/emit/tests/regalloc-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (assert-true (member 'regalloc-float-vregs-allocated-to-distinct-xmm-registers
-                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                         :test #'%optimize-backend-test-anchor-name=))))
+  (%optimize-backend-assert-evidence-case
+   "FR-008"
+   :implemented
+   '("packages/regalloc/src/regalloc.lisp"
+     "packages/emit/tests/regalloc-tests.lisp")
+   nil
+   '(regalloc-float-vregs-allocated-to-distinct-xmm-registers)))
 
 (deftest optimize-backend-roadmap-fr-283-has-specific-evidence
   "FR-283 multiply-high support is backed by concrete VM semantics, native encoder, and roadmap audit anchors."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-283")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/vm/src/vm-bitwise.lisp"
-                      "packages/codegen/src/x86-64-sequences.lisp"
-                      "packages/codegen/src/aarch64-codegen.lisp"
-                      "packages/emit/tests/x86-64-encoding-tests.lisp"
-                      "packages/emit/tests/aarch64-codegen-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(("CL-CC" . "MAKE-VM-INTEGER-MUL-HIGH-U")
-                          ("CL-CC" . "MAKE-VM-INTEGER-MUL-HIGH-S")
-                          ("CL-CC/VM" . "%VM-INTEGER-MUL-HIGH-U")
-                          ("CL-CC/VM" . "%VM-INTEGER-MUL-HIGH-S")
-                          ("CL-CC/CODEGEN" . "EMIT-MUL-HIGH-SEQUENCE")
-                          ("CL-CC/CODEGEN" . "ENCODE-UMULH")
-                          ("CL-CC/CODEGEN" . "ENCODE-SMULH")))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(vm-mul-high-64-semantics
-                           x86-mul-rm64-high-encodings
-                           x86-seq-mul-high-sequence-encodings
-                           x86-mul-high-size-and-dispatch-registered
-                           a64-mul-high-encoders
-                           aarch64-mul-high-emitter-encodings
-                           aarch64-mul-high-size-and-dispatch-registered))
-      (assert-true (member test-anchor
-                            (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                            :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-283"
+   :implemented
+   '("packages/vm/src/vm-bitwise.lisp"
+     "packages/codegen/src/x86-64-sequences.lisp"
+     "packages/codegen/src/aarch64-codegen.lisp"
+     "packages/emit/tests/x86-64-encoding-tests.lisp"
+     "packages/emit/tests/aarch64-codegen-tests.lisp")
+   '(("CL-CC" . "MAKE-VM-INTEGER-MUL-HIGH-U")
+     ("CL-CC" . "MAKE-VM-INTEGER-MUL-HIGH-S")
+     ("CL-CC/VM" . "%VM-INTEGER-MUL-HIGH-U")
+     ("CL-CC/VM" . "%VM-INTEGER-MUL-HIGH-S")
+     ("CL-CC/CODEGEN" . "EMIT-MUL-HIGH-SEQUENCE")
+     ("CL-CC/CODEGEN" . "ENCODE-UMULH")
+     ("CL-CC/CODEGEN" . "ENCODE-SMULH"))
+   '(vm-mul-high-64-semantics
+     x86-mul-rm64-high-encodings
+     x86-seq-mul-high-sequence-encodings
+     x86-mul-high-size-and-dispatch-registered
+     a64-mul-high-encoders
+     aarch64-mul-high-emitter-encodings
+     aarch64-mul-high-size-and-dispatch-registered)))
 
 (deftest optimize-backend-roadmap-fr-303-has-specific-evidence
   "FR-303 overflow detection is backed by checked VM instructions and native trap emitters."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-303")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/vm/src/vm-instructions.lisp"
-                      "packages/codegen/src/x86-64-emit-ops.lisp"
-                      "packages/codegen/src/aarch64-emitters.lisp"
-                      "packages/emit/tests/x86-64-emit-ops-tests.lisp"
-                      "packages/emit/tests/aarch64-emit-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(("CL-CC" . "MAKE-VM-ADD-CHECKED")
-                          ("CL-CC" . "MAKE-VM-SUB-CHECKED")
-                          ("CL-CC" . "MAKE-VM-MUL-CHECKED")
-                          ("CL-CC/CODEGEN" . "EMIT-VM-ADD-CHECKED")
-                          ("CL-CC/CODEGEN" . "EMIT-A64-VM-ADD-CHECKED")))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(x86-emit-add-checked-emits-14-bytes
-                           x86-emit-sub-checked-emits-14-bytes
-                           x86-emit-mul-checked-emits-15-bytes
-                           aarch64-emit-add-checked-emits-12-bytes
-                           aarch64-emit-sub-checked-emits-12-bytes
-                           aarch64-emit-mul-checked-emits-24-bytes))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-303"
+   :implemented
+   '("packages/vm/src/vm-instructions.lisp"
+     "packages/codegen/src/x86-64-emit-ops.lisp"
+     "packages/codegen/src/aarch64-emitters.lisp"
+     "packages/emit/tests/x86-64-emit-ops-tests.lisp"
+     "packages/emit/tests/aarch64-emit-tests.lisp")
+   '(("CL-CC" . "MAKE-VM-ADD-CHECKED")
+     ("CL-CC" . "MAKE-VM-SUB-CHECKED")
+     ("CL-CC" . "MAKE-VM-MUL-CHECKED")
+     ("CL-CC/CODEGEN" . "EMIT-VM-ADD-CHECKED")
+     ("CL-CC/CODEGEN" . "EMIT-A64-VM-ADD-CHECKED"))
+   '(x86-emit-add-checked-emits-14-bytes
+     x86-emit-sub-checked-emits-14-bytes
+     x86-emit-mul-checked-emits-15-bytes
+     aarch64-emit-add-checked-emits-12-bytes
+     aarch64-emit-sub-checked-emits-12-bytes
+     aarch64-emit-mul-checked-emits-24-bytes)))
 
 (deftest optimize-backend-roadmap-fr-295-has-specific-evidence
   "FR-295 PGO instrumentation has concrete counter-plan, pipeline, and CLI tests."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-295")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/optimize/src/optimizer-speculative-peval.lisp"
-                      "packages/pipeline/src/pipeline.lisp"
-                      "packages/compile/src/codegen.lisp"
-                      "packages/cli/src/main-utils.lisp"
-                      "packages/cli/src/handlers.lisp"
-                      "packages/optimize/tests/optimizer-pipeline-tests.lisp"
-                      "packages/compile/tests/pipeline-tests.lisp"
-                      "packages/cli/tests/cli-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(cl-cc/optimize::opt-pgo-build-counter-plan
-                          cl-cc/optimize::opt-pgo-make-profile-template
-                          ("CL-CC/COMPILE" . "COMPILATION-RESULT-PGO-COUNTER-PLAN")))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(optimize-pgo-build-counter-plan-emits-deterministic-bb-and-edge-ids
-                           optimize-pgo-make-profile-template-zero-initializes-counts
-                           pipeline-compile-string-emits-pgo-counter-plan
-                           cli-maybe-make-profiled-vm-state-enabled-for-pgo-generate
-                           cli-write-pgo-profile-emits-file))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-295"
+   :implemented
+   '("packages/optimize/src/optimizer-speculative-peval.lisp"
+     "packages/pipeline/src/pipeline.lisp"
+     "packages/compile/src/codegen.lisp"
+     "packages/cli/src/main-utils.lisp"
+     "packages/cli/src/handlers.lisp"
+     "packages/optimize/tests/optimizer-pipeline-tests.lisp"
+     "packages/compile/tests/pipeline-tests.lisp"
+     "packages/cli/tests/cli-tests.lisp")
+   '(cl-cc/optimize::opt-pgo-build-counter-plan
+     cl-cc/optimize::opt-pgo-make-profile-template
+     ("CL-CC/COMPILE" . "COMPILATION-RESULT-PGO-COUNTER-PLAN"))
+   '(optimize-pgo-build-counter-plan-emits-deterministic-bb-and-edge-ids
+     optimize-pgo-make-profile-template-zero-initializes-counts
+     pipeline-compile-string-emits-pgo-counter-plan
+     cli-maybe-make-profiled-vm-state-enabled-for-pgo-generate
+     cli-write-pgo-profile-emits-file)))
 
 (deftest optimize-backend-roadmap-fr-352-has-specific-evidence
   "FR-352 bit-width analysis is backed by interval helpers, range propagation, and low-bit rewrites."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-352")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/optimize/src/optimizer-memory-alias.lisp"
-                      "packages/optimize/src/optimizer-memory-ranges.lisp"
-                      "packages/optimize/src/optimizer.lisp"
-                      "packages/optimize/tests/optimizer-memory-tests.lisp"
-                      "packages/optimize/tests/optimizer-memory-pass-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(cl-cc/optimize::opt-interval-logand
-                          cl-cc/optimize::opt-interval-bit-width
-                          cl-cc/optimize::opt-pass-elide-proven-overflow-checks
-                          cl-cc/optimize::%opt-rewrite-logand-low-bit-test
-                          cl-cc/optimize::opt-pass-fold))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(value-ranges-logand-mask-with-unknown-input-narrows-to-8-bit
-                           value-ranges-add-of-masked-8-bit-values-is-9-bit-wide
-                           overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add
-                           optimize-instructions-rewrites-logand-one-eq-zero-to-evenp))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                            :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-352"
+   :implemented
+   '("packages/optimize/src/optimizer-memory-alias.lisp"
+     "packages/optimize/src/optimizer-memory-ranges.lisp"
+     "packages/optimize/src/optimizer.lisp"
+     "packages/optimize/tests/optimizer-memory-tests.lisp"
+     "packages/optimize/tests/optimizer-memory-pass-tests.lisp")
+   '(cl-cc/optimize::opt-interval-logand
+     cl-cc/optimize::opt-interval-bit-width
+     cl-cc/optimize::opt-pass-elide-proven-overflow-checks
+     cl-cc/optimize::%opt-rewrite-logand-low-bit-test
+     cl-cc/optimize::opt-pass-fold)
+   '(value-ranges-logand-mask-with-unknown-input-narrows-to-8-bit
+     value-ranges-add-of-masked-8-bit-values-is-9-bit-wide
+     overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add
+     optimize-instructions-rewrites-logand-one-eq-zero-to-evenp)))
 
 (deftest optimize-backend-roadmap-fr-523-to-fr-528-have-fr-specific-evidence
   "FR-523..FR-528 keep per-FR module/API/test anchors instead of a shared generic bucket."
@@ -700,21 +632,13 @@
                   ("FR-528" cl-cc/optimize::opt-learned-codegen-cost-plan
                    optimize-learned-codegen-cost-plan-is-target-aware)))
     (destructuring-bind (feature-id api-symbol test-anchor) case
-      (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-        (assert-true evidence)
-        (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-        (assert-true (member "packages/optimize/src/optimizer-speculative-peval.lisp"
-                             (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                             :test #'string=))
-        (assert-true (member "packages/optimize/tests/optimizer-pipeline-tests.lisp"
-                             (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                             :test #'string=))
-        (assert-true (member api-symbol
-                             (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                             :test #'equal))
-        (assert-true (member test-anchor
-                             (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                             :test #'%optimize-backend-test-anchor-name=))))))
+      (%optimize-backend-assert-evidence-case
+       feature-id
+       :implemented
+       '("packages/optimize/src/optimizer-speculative-peval.lisp"
+         "packages/optimize/tests/optimizer-pipeline-tests.lisp")
+       (list api-symbol)
+       (list test-anchor)))))
 
 (deftest optimize-backend-roadmap-audited-fr-statuses-match-doc
   "The audited optimize-backend FRs keep their intended doc statuses after roadmap updates."
@@ -807,21 +731,12 @@
                     ("CL-CC/CLI" . "%DUMP-IR-PHASE")
                     cli-dump-ir-phase-dispatches-all-phases)))
     (destructuring-bind (feature-id status module api-symbol test-anchor) case
-      (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-        (assert-true evidence)
-        (assert-eq status (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-        (assert-true
-         (member module
-                 (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                 :test #'string=))
-        (assert-true
-         (member api-symbol
-                 (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                 :test #'equal))
-        (assert-true
-         (member test-anchor
-                  (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                  :test #'%optimize-backend-test-anchor-name=))))))
+      (%optimize-backend-assert-evidence-case
+       feature-id
+       status
+       (list module)
+       (list api-symbol)
+       (list test-anchor)))))
 
 (deftest optimize-backend-roadmap-support-evidence-has-behavior
   "Backend support evidence exercises analysis, profile, allocation, guard, and layout helpers."
@@ -849,41 +764,32 @@
 
 (deftest optimize-backend-roadmap-fr-463-has-specific-evidence
   "FR-463 Compiler Explorer compatible output is backed by CLI dump functions, phase table, and annotate-source support."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence "FR-463")))
-    (assert-true evidence)
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (dolist (module '("packages/cli/src/main-dump.lisp"
-                      "packages/cli/src/main-utils.lisp"
-                      "packages/cli/src/args.lisp"
-                      "packages/cli/src/handlers.lisp"
-                      "packages/pipeline/src/pipeline.lisp"
-                      "packages/cli/tests/main-dump-tests.lisp"
-                      "packages/cli/tests/cli-tests.lisp"))
-      (assert-true (member module
-                           (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=)))
-    (dolist (api-symbol '(("CL-CC/CLI" . "%DUMP-IR-PHASE")
-                          ("CL-CC/CLI" . "%DUMP-AST-PHASE")
-                          ("CL-CC/CLI" . "%DUMP-CPS-PHASE")
-                          ("CL-CC/CLI" . "%DUMP-SSA-PHASE")
-                          ("CL-CC/CLI" . "%DUMP-VM-PHASE")
-                          ("CL-CC/CLI" . "%DUMP-OPT-PHASE")
-                          ("CL-CC/CLI" . "%DUMP-ASM-PHASE")
-                          ("CL-CC/CLI" . "*IR-PHASE-DUMP-FNS*")
-                          ("CL-CC/CLI" . "*IR-PHASES*")))
-      (assert-true (member api-symbol
-                           (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal)))
-    (dolist (test-anchor '(cli-dump-ir-phase-dispatches-all-phases
-                           cli-dump-ir-phase-annotate-source-writes-comment-for-ast
-                           cli-dump-ir-phase-annotate-source-writes-comment-for-vm-and-opt
-                           cli-dump-ir-phase-asm-output-is-ansi-colored
-                           cli-dump-ir-phase-annotate-source-omits-comment-on-missing-location
-                           cli-real-file-dump-ir-annotation-preserves-source-location
-                            cli-do-compile-dump-ir-annotate-source-preserves-real-file-location
-                            cli-do-compile-dump-ir-annotate-source-macro-forms-preserve-real-file-location
-                            cli-dump-ir-phase-phase-table-covers-all-recognized-phases
-                           cli-dump-ir-phase-invalid-signals-error))
-      (assert-true (member test-anchor
-                           (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)
-                           :test #'%optimize-backend-test-anchor-name=)))))
+  (%optimize-backend-assert-evidence-case
+   "FR-463"
+   :implemented
+   '("packages/cli/src/main-dump.lisp"
+     "packages/cli/src/main-utils.lisp"
+     "packages/cli/src/args.lisp"
+     "packages/cli/src/handlers.lisp"
+     "packages/pipeline/src/pipeline.lisp"
+     "packages/cli/tests/main-dump-tests.lisp"
+     "packages/cli/tests/cli-tests.lisp")
+   '(("CL-CC/CLI" . "%DUMP-IR-PHASE")
+     ("CL-CC/CLI" . "%DUMP-AST-PHASE")
+     ("CL-CC/CLI" . "%DUMP-CPS-PHASE")
+     ("CL-CC/CLI" . "%DUMP-SSA-PHASE")
+     ("CL-CC/CLI" . "%DUMP-VM-PHASE")
+     ("CL-CC/CLI" . "%DUMP-OPT-PHASE")
+     ("CL-CC/CLI" . "%DUMP-ASM-PHASE")
+     ("CL-CC/CLI" . "*IR-PHASE-DUMP-FNS*")
+     ("CL-CC/CLI" . "*IR-PHASES*"))
+   '(cli-dump-ir-phase-dispatches-all-phases
+     cli-dump-ir-phase-annotate-source-writes-comment-for-ast
+     cli-dump-ir-phase-annotate-source-writes-comment-for-vm-and-opt
+     cli-dump-ir-phase-asm-output-is-ansi-colored
+     cli-dump-ir-phase-annotate-source-omits-comment-on-missing-location
+     cli-real-file-dump-ir-annotation-preserves-source-location
+     cli-do-compile-dump-ir-annotate-source-preserves-real-file-location
+     cli-do-compile-dump-ir-annotate-source-macro-forms-preserve-real-file-location
+     cli-dump-ir-phase-phase-table-covers-all-recognized-phases
+     cli-dump-ir-phase-invalid-signals-error)))
