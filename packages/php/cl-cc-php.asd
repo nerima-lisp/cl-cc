@@ -77,6 +77,7 @@
      (:file "parser-expr-advanced-dispatch")
    (:file "parser-stmt-lowering")
    (:file "parser-stmt-decls")
+    (:file "parser-attribute-passes")
     (:file "parser-class")
     (:file "parser-trait")
     (:file "parser-interface")
