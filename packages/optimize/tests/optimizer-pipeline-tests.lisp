@@ -604,12 +604,27 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
      :indirect-p nil
      :enabled-p nil)))
 
+(defun %opt-wasm-gc-struct-layout (&key (fields '((slot-a . i32)))
+                                        (nullable-p t))
+  (cl-cc/optimize:opt-build-wasm-gc-layout
+   :kind :struct
+   :fields fields
+   :nullable-p nullable-p))
+
+(defun %opt-wasm-gc-array-layout (&key (fields '(eqref))
+                                       (nullable-p nil))
+  (cl-cc/optimize:opt-build-wasm-gc-layout
+   :kind :array
+   :fields fields
+   :nullable-p nullable-p))
+
+(defun %opt-wasm-gc-bad-array-layout ()
+  (%opt-wasm-gc-array-layout :fields '(eqref i32)))
+
 (deftest optimize-build-wasm-gc-layout-preserves-kind-and-fields
   "Wasm GC helper stores layout kind/fields/nullability deterministically."
-  (let ((layout (cl-cc/optimize::opt-build-wasm-gc-layout
-                 :kind :struct
-                 :fields '((slot-a . i32) (slot-b . externref))
-                 :nullable-p t)))
+  (let ((layout (%opt-wasm-gc-struct-layout
+                 :fields '((slot-a . i32) (slot-b . externref)))))
     (assert-eq :struct (cl-cc/optimize::opt-wasm-gc-kind layout))
     (assert-equal '((slot-a . i32) (slot-b . externref))
                   (cl-cc/optimize::opt-wasm-gc-fields layout))
@@ -617,32 +632,18 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-wasm-gc-layout-validates-struct-and-array-shapes
   "Wasm GC validation helper accepts legal struct/array layouts only."
-  (let ((struct-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                        :kind :struct
-                        :fields '((slot-a . i32) (slot-b . eqref))
-                        :nullable-p t))
-        (array-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                       :kind :array
-                       :fields '(eqref)
-                       :nullable-p nil))
-        (bad-array-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                           :kind :array
-                           :fields '(eqref i32)
-                           :nullable-p nil)))
+  (let ((struct-layout (%opt-wasm-gc-struct-layout
+                        :fields '((slot-a . i32) (slot-b . eqref))))
+        (array-layout (%opt-wasm-gc-array-layout))
+        (bad-array-layout (%opt-wasm-gc-bad-array-layout)))
     (assert-true (cl-cc/optimize:opt-wasm-gc-layout-valid-p struct-layout))
     (assert-true (cl-cc/optimize:opt-wasm-gc-layout-valid-p array-layout))
     (assert-false (cl-cc/optimize:opt-wasm-gc-layout-valid-p bad-array-layout))))
 
 (deftest optimize-wasm-gc-runtime-host-compatibility-requires-feature-and-valid-layout
   "Host-compatibility helper gates lowering on wasm-gc support and layout validity."
-  (let ((layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                 :kind :struct
-                 :fields '((slot-a . i32))
-                 :nullable-p t))
-        (bad-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                     :kind :array
-                     :fields '(eqref i32)
-                     :nullable-p nil)))
+  (let ((layout (%opt-wasm-gc-struct-layout))
+        (bad-layout (%opt-wasm-gc-bad-array-layout)))
     (assert-true
      (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
       layout
@@ -658,14 +659,8 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-wasm-gc-optimization-plan-reflects-layout-kind
   "Optimization-plan helper enables struct vs array specific lowering hints."
-  (let* ((struct-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                         :kind :struct
-                         :fields '((slot-a . i32))
-                         :nullable-p t))
-         (array-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                        :kind :array
-                        :fields '(eqref)
-                        :nullable-p nil))
+  (let* ((struct-layout (%opt-wasm-gc-struct-layout))
+         (array-layout (%opt-wasm-gc-array-layout))
          (struct-plan (cl-cc/optimize:opt-build-wasm-gc-optimization-plan struct-layout))
          (array-plan (cl-cc/optimize:opt-build-wasm-gc-optimization-plan array-layout)))
     (assert-true (getf struct-plan :layout-valid-p))
@@ -986,6 +981,17 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                    (eq (cl-cc/vm::vm-name inst) label)))
             instructions))
 
+(defun %opt-assert-sortable-loop-pass-reorders (pass)
+  (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
+         (optimized (funcall pass program)))
+    (%opt-assert-program-changed optimized program)
+    (assert-true (typep (nth 6 optimized) 'vm-move))
+    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+
+(defun %opt-loop-split-marker-p (instruction)
+  (and (typep instruction 'vm-label)
+       (search "__SPLIT" (string (cl-cc/vm::vm-name instruction)))))
+
 (defun %opt-adjacent-loop-program (&key (first-init 0)
                                         (second-init 0)
                                         (second-condition :rc))
@@ -1031,11 +1037,8 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-pass-loop-interchange-handles-nested-canonical-loop
   "FR-524: safe canonical-loop core ops are interchanged (independent swap)."
-  (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
-         (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (%opt-assert-program-changed optimized program)
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+  (%opt-assert-sortable-loop-pass-reorders
+   #'cl-cc/optimize::opt-pass-loop-interchange))
 
 (deftest optimize-pass-loop-interchange-skips-side-effecting-loop
   "FR-524 safety: side-effecting loop bodies are not interchanged."
@@ -1108,11 +1111,8 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-pass-polyhedral-schedule-reorders-loop-body
   "FR-525: schedule pass reorders sortable body ops inside canonical loop."
-  (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
-         (optimized (cl-cc/optimize::opt-pass-polyhedral-schedule program)))
-    (%opt-assert-program-changed optimized program)
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+  (%opt-assert-sortable-loop-pass-reorders
+   #'cl-cc/optimize::opt-pass-polyhedral-schedule))
 
 (deftest optimize-pass-loop-fusion-fission-fuses-adjacent-loops
   "FR-526: adjacent compatible pure loops are fused into one canonical loop."
@@ -1136,7 +1136,4 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
          (program (%opt-canonical-loop-program core))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
     (%opt-assert-program-changed optimized program)
-    (assert-true (some (lambda (inst)
-                         (and (typep inst 'vm-label)
-                              (search "__SPLIT" (string (cl-cc/vm::vm-name inst)))))
-                       optimized))))
+    (assert-true (some #'%opt-loop-split-marker-p optimized))))
