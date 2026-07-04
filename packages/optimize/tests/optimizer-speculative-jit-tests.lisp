@@ -322,13 +322,21 @@
   "Wasm tail-call helper selects the right opcode from (tail × indirect × enabled)."
   :cases (("tail-direct-enabled"   t nil t   :return-call)
           ("tail-indirect-enabled" t t   t   :return-call-indirect)
-          ("tail-disabled"         t nil nil :call))
+          ("non-tail-disabled"     nil nil nil :call))
   (tail-position-p indirect-p enabled-p expected)
   (assert-eq expected
              (cl-cc/optimize::opt-wasm-select-tailcall-opcode
               :tail-position-p tail-position-p
               :indirect-p      indirect-p
               :enabled-p       enabled-p)))
+
+(deftest optimize-wasm-tailcall-disabled-tail-signals
+  "Wasm tail-call selection signals when tail lowering is requested but disabled."
+  (assert-signals error
+    (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+     :tail-position-p t
+     :indirect-p nil
+     :enabled-p nil)))
 
 (deftest optimize-build-wasm-gc-layout-preserves-kind-and-fields
   "Wasm GC helper stores layout kind/fields/nullability deterministically."

@@ -10,7 +10,12 @@
 (defun opt-wasm-select-tailcall-opcode (&key tail-position-p indirect-p enabled-p)
   "Select wasm call opcode with tail-call proposal support.
 
+Tail-position calls require ENABLED-P; the backend does not silently lower them
+to non-tail calls.
+
 Returns one of :call, :call-indirect, :return-call, :return-call-indirect."
+  (when (and tail-position-p (not enabled-p))
+    (error "Wasm tail-call lowering requires the tail-call feature."))
   (if (and enabled-p tail-position-p)
       (if indirect-p :return-call-indirect :return-call)
       (if indirect-p :call-indirect :call)))
@@ -18,7 +23,7 @@ Returns one of :call, :call-indirect, :return-call, :return-call-indirect."
 (defun opt-wasm-select-direct-tailcall-opcode (&key tail-position-p enabled-p)
   "Select opcode for direct wasm calls.
 
-Returns :return-call in tail position when enabled, otherwise :call."
+Tail-position calls require ENABLED-P."
   (opt-wasm-select-tailcall-opcode
    :tail-position-p tail-position-p
    :indirect-p nil
@@ -84,4 +89,3 @@ Returns plist:
     (list :layout-valid-p valid-p
           :inline-field-access-p (and valid-p (eq kind :struct))
           :bounds-check-elision-p (and valid-p (eq kind :array)))))
-

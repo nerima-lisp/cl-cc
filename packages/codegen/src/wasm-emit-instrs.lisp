@@ -197,57 +197,40 @@ The host import $host_print_val takes a single eqref parameter."
     (emit-wasm-closure-allocation reg-map dst idx nil stream 4)))
 
 (defmethod emit-instruction ((target wasm-target) (inst vm-tail-call) stream)
-  "Emit wasm tail-call instruction form when available.
+  "Emit wasm tail-call instruction form.
 
-Uses optimize helper to select opcode; defaults to return_call_indirect for
-tail-position indirect call sites."
-  (let ((reg-map (wasm-target-reg-map target)))
-    (let* ((func-reg (vm-func-reg inst))
+The wasm tail-call feature must be enabled; disabled feature gates signal
+instead of lowering tail calls to ordinary calls."
+  (flet ((opcode-wat-name (opcode)
+           (substitute #\_ #\- (string-downcase (symbol-name opcode)))))
+    (let* ((reg-map (wasm-target-reg-map target))
+           (func-reg (vm-func-reg inst))
            (func-ref (reg-local-ref reg-map func-reg))
            (known-label (gethash func-reg (wasm-target-known-func-labels target)))
-           (tailcall-enabled-p (wasm-tail-call-feature-enabled-p))
-            (opcode (cl-cc/optimize:opt-wasm-select-tailcall-opcode
-                     :tail-position-p t
-                     :indirect-p t
-                     :enabled-p tailcall-enabled-p))
-            (opcode-str (if (eq opcode :return-call-indirect)
-                            "return_call_indirect"
-                            "call_indirect")))
+           (tailcall-enabled-p (wasm-tail-call-feature-enabled-p)))
+      (unless tailcall-enabled-p
+        (error "Wasm vm-tail-call emission requires the tail-call feature."))
       (loop for arg in (vm-args inst) for i from 0 do
         (format stream "~%    (global.set $cl_arg~D ~A)" i (reg-local-ref reg-map arg)))
-      (cond
-        ;; Direct tail-call path (FR-320 follow-up): if the callee register is
-        ;; known to come from vm-func-ref and tail-call feature is enabled,
-        ;; emit return_call with symbolic function name.
-        ((and tailcall-enabled-p known-label)
-         (let* ((direct-opcode (cl-cc/optimize:opt-wasm-select-direct-tailcall-opcode
-                                :tail-position-p t
-                                :enabled-p tailcall-enabled-p))
-                (direct-opcode-str (if (eq direct-opcode :return-call)
-                                       "return_call"
-                                       "call")))
+      (if known-label
+          (let ((opcode (cl-cc/optimize:opt-wasm-select-direct-tailcall-opcode
+                         :tail-position-p t
+                         :enabled-p tailcall-enabled-p)))
             (format stream "~%    ~A"
                     (reg-local-set reg-map (vm-dst inst)
-                                   (format nil "(~A $~A)" direct-opcode-str known-label)))))
-        ;; Direct non-tail fallback when feature disabled.
-        (known-label
-         (let* ((direct-opcode (cl-cc/optimize:opt-wasm-select-direct-tailcall-opcode
-                                :tail-position-p nil
-                                :enabled-p tailcall-enabled-p))
-                (direct-opcode-str (if (eq direct-opcode :return-call)
-                                       "return_call"
-                                       "call")))
+                                   (format nil "(~A $~A)"
+                                           (opcode-wat-name opcode)
+                                           known-label))))
+          (let ((opcode (cl-cc/optimize:opt-wasm-select-tailcall-opcode
+                         :tail-position-p t
+                         :indirect-p t
+                         :enabled-p tailcall-enabled-p)))
             (format stream "~%    ~A"
                     (reg-local-set reg-map (vm-dst inst)
-                                   (format nil "(~A $~A)" direct-opcode-str known-label)))))
-        ;; Indirect fallback.
-        (t
-         (format stream "~%    ~A"
-                 (reg-local-set reg-map (vm-dst inst)
-                                 (format nil "(~A (type $main_func_t) (table $funcref_table~@[ i64~]) ~A)"
-                                         opcode-str
-                                         (wasm-table64-feature-enabled-p)
-                                         (wasm-table-index-from-eqref-wat func-ref)))))))))
+                                   (format nil "(~A (type $main_func_t) (table $funcref_table~@[ i64~]) ~A)"
+                                           (opcode-wat-name opcode)
+                                           (wasm-table64-feature-enabled-p)
+                                           (wasm-table-index-from-eqref-wat func-ref)))))))))
 
 (defmethod emit-instruction ((target wasm-target) (inst vm-closure) stream)
   (let ((reg-map (wasm-target-reg-map target)))

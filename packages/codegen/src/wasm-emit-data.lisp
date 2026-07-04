@@ -13,7 +13,8 @@
 (defparameter *wasm-tail-call-enabled* t
   "Feature gate for wasm tail-call opcodes.
 
-When NIL, wasm tail-call lowering falls back to call_indirect.")
+When NIL, vm-tail-call emission signals instead of lowering tail calls to
+ordinary calls.")
 
 (defparameter *wasm-eh-enabled* t
   "Feature gate for Wasm Exception Handling proposal (try/catch/throw).

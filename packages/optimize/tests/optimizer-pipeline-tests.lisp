@@ -561,13 +561,21 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
   "Wasm tail-call helper selects return-call opcodes when enabled at tail position."
   :cases (("direct-enabled"   t nil t :return-call)
           ("indirect-enabled" t t   t :return-call-indirect)
-          ("disabled"         t nil nil :call))
+          ("non-tail-disabled" nil nil nil :call))
   (tail-p indirect-p enabled-p expected)
   (assert-eq expected
              (cl-cc/optimize::opt-wasm-select-tailcall-opcode
               :tail-position-p tail-p
               :indirect-p indirect-p
               :enabled-p enabled-p)))
+
+(deftest wasm-tailcall-opcode-disabled-tail-signals
+  "Tail-call opcode selection fails fast when tail calls are requested but disabled."
+  (assert-signals error
+    (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+     :tail-position-p t
+     :indirect-p nil
+     :enabled-p nil)))
 
 (deftest optimize-build-wasm-gc-layout-preserves-kind-and-fields
   "Wasm GC helper stores layout kind/fields/nullability deterministically."
