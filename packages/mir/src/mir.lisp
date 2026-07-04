@@ -168,6 +168,32 @@
 ;;;; MIR Effect Classification and Type Propagation
 ;;;; ────────────────────────────────────────────────────────────────────────
 
+(defparameter *mir-numeric-result-ops*
+  '(:add :sub :mul :div :mod :neg :band :bor :bxor :bnot :shl :shr :ushr)
+  "MIR operations whose result type follows numeric operand widening.")
+
+(defparameter *mir-pure-numeric-result-ops*
+  (remove-if (lambda (op) (member op '(:div :mod) :test #'eq))
+             *mir-numeric-result-ops*)
+  "Numeric MIR operations classified as pure by the effect lattice.")
+
+(defparameter *mir-comparison-result-ops*
+  '(:lt :le :gt :ge :eq :ne)
+  "MIR operations that always produce a boolean result.")
+
+(defparameter *mir-void-result-ops*
+  '(:store :ret :jump :branch :tail-call :safepoint :nop)
+  "MIR operations that do not produce a value result.")
+
+(defparameter *mir-control-void-result-ops*
+  (remove-if (lambda (op) (member op '(:store :nop) :test #'eq))
+             *mir-void-result-ops*)
+  "Void-result MIR operations classified as control effects.")
+
+(defun %mir-op-member-p (op ops)
+  "Return T when OP is in OPS using keyword identity."
+  (not (null (member op ops :test #'eq))))
+
 (defun %mir-effect-table (&rest groups)
   "Build an OP → effect-kind hash table from GROUPS.
 Each group is `(effect-kind op...)'.  Effect-kind names mirror the optimizer
@@ -181,13 +207,14 @@ depending on the optimizer system."
 
 (defparameter *mir-effect-kind-table*
   (%mir-effect-table
-   '(:pure :const :move :add :sub :mul :neg
-     :band :bor :bxor :bnot :shl :shr :ushr
-     :lt :le :gt :ge :eq :ne :phi :values :mv-bind :nop)
+   (append '(:pure :const :move :phi :values :mv-bind :nop)
+           *mir-pure-numeric-result-ops*
+           *mir-comparison-result-ops*)
    '(:read-only :load)
    '(:alloc :alloca)
    '(:write-global :store)
-   '(:control :div :mod :ret :jump :branch :tail-call :safepoint)
+   (append '(:control :div :mod)
+           *mir-control-void-result-ops*)
    '(:unknown :call))
   "Maps MIR op keywords to target-neutral effect-kind keywords.")
 
@@ -269,33 +296,33 @@ types join to :ANY instead of inventing a union representation."
 
 (defun mir-infer-inst-type (inst)
   "Infer a conservative result type for MIR instruction INST."
-  (let ((srcs (miri-srcs inst)))
-    (case (miri-op inst)
-      (:const
+  (let ((op (miri-op inst))
+        (srcs (miri-srcs inst)))
+    (cond
+      ((eq op :const)
        (if srcs (mir-operand-type (first srcs)) (miri-type inst)))
-      (:move
+      ((eq op :move)
        (if srcs (mir-operand-type (first srcs)) (miri-type inst)))
-      ((:add :sub :mul :div :mod :neg
-        :band :bor :bxor :bnot :shl :shr :ushr)
+      ((%mir-op-member-p op *mir-numeric-result-ops*)
        (cond
          ((%mir-operands-any-type-p srcs :bignum) :bignum)
          ((%mir-operands-all-type-p srcs :integer) :integer)
          (t (miri-type inst))))
-      ((:lt :le :gt :ge :eq :ne)
+      ((%mir-op-member-p op *mir-comparison-result-ops*)
        :boolean)
-      (:load
+      ((eq op :load)
        (miri-type inst))
-      (:alloca
+      ((eq op :alloca)
        :pointer)
-      (:phi
+      ((eq op :phi)
        (%mir-join-type-list (mapcar #'mir-operand-type srcs)))
-      (:values
+      ((eq op :values)
        :values)
-      (:mv-bind
+      ((eq op :mv-bind)
        (miri-type inst))
-      ((:store :ret :jump :branch :tail-call :safepoint :nop)
+      ((%mir-op-member-p op *mir-void-result-ops*)
        :void)
-      (otherwise
+      (t
        (miri-type inst)))))
 
 (defun mir-propagate-inst-type (inst)
