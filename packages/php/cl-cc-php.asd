@@ -19,6 +19,7 @@
     ;; hit undefined functions. register loads last (it references the others).
     (:file "runtime-builtins-core")
     (:file "runtime-builtins-array")
+    (:file "runtime-builtins-string-data")
     (:file "runtime-builtins-string")
     (:file "runtime-builtins-regex")
     (:file "runtime-builtins-math")
