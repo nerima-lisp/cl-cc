@@ -9,7 +9,7 @@
                      (wasm-fixnum-box (format nil "(i64.const ~D)" val)))
                     (null "(ref.null eq)")
                     ((eql t) "(ref.i31 (i32.const 1))")
-                     ;; FR-297: String literals — emit as staged string objects
+                     ;; FR-297: String literals emit native stringref values.
                      (string
                       (wasm-string-literal-wat val))
                     ;; FR-297: Symbol literals — emit staged symbol objects
@@ -570,7 +570,7 @@ Uses $eqref_array_t as the canonical mutable eqref array representation."
   `(defmethod emit-instruction ((target wasm-target) (inst ,class) stream)
      (let ((reg-map (wasm-target-reg-map target)))
        (unless (maybe-emit-wasm-string-instruction inst reg-map stream :indent 4)
-         (format stream "~%    ;; UNSUPPORTED without Wasm String Builtins: ~A" (type-of inst))))))
+         (format stream "~%    ;; UNSUPPORTED Wasm string instruction: ~A" (type-of inst))))))
 
 (define-wasm-string-emit-method vm-concatenate)
 (define-wasm-string-emit-method vm-string=)
@@ -581,9 +581,8 @@ Uses $eqref_array_t as the canonical mutable eqref array representation."
 (define-wasm-string-emit-method vm-string-not-equal)
 (define-wasm-string-emit-method vm-code-char)
 
-(defun %wasm-string-literal-eqref (str)
-  "Return wasm-gc eqref construction for a string literal STR.
-Builds a $string_t struct with a $bytes_array_t containing the UTF-8 bytes."
+(defun %wasm-symbol-name-string-t-eqref (str)
+  "Return the staged $string_t payload used inside symbol literals."
   (let* ((bytes (map 'list #'char-code str))
          (byte-elems (format nil "~{~A~^ ~}" 
                               (mapcar (lambda (b) (format nil "(i32.const ~D)" b)) bytes))))
@@ -615,9 +614,9 @@ Builds a staged symbol object: $symbol_t with the symbol's name string
 and null value cell."
   (let ((name-str (string sym)))
     (if *wasm-gc-frozen-values-enabled*
-        (wasm-struct-new-immutable-wat "$symbol_t" (%wasm-string-literal-eqref name-str) "(ref.null eq)")
+        (wasm-struct-new-immutable-wat "$symbol_t" (%wasm-symbol-name-string-t-eqref name-str) "(ref.null eq)")
         (format nil "(struct.new $symbol_t ~A (ref.null eq))"
-                (%wasm-string-literal-eqref name-str)))))
+                (%wasm-symbol-name-string-t-eqref name-str)))))
 
 (defun %wasm-float-literal-eqref (val)
   "Return wasm-gc eqref for a float literal VAL.
