@@ -61,6 +61,7 @@
    (:file "runtime-temporal-global")
    (:file "runtime-builtins")
    (:file "runtime-builtins-globals")
+   (:file "runtime-builtins-intl")
    (:file "runtime-builtins-table")
    (:file "runtime-builtins-prelude")
    (:file "runtime-method-resolver")))
