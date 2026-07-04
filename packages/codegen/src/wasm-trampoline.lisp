@@ -62,6 +62,28 @@
    so that emit-trampoline-instruction can emit real table indices for vm-closure.")
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Wasm atomic lowering policy
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defun wasm-require-threads-for-atomic (inst)
+  "Signal unless INST can be emitted as a true Wasm atomic operation."
+  (unless (wasm-threads-feature-enabled-p)
+    (error "Wasm atomic instruction ~A requires Wasm threads."
+           (type-of inst)))
+  t)
+
+(defun wasm-unsupported-atomic-swap (inst)
+  "Signal the lack of a correct Wasm atomic swap lowering for INST."
+  (error "Wasm atomic swap ~A requires atomic.rmw.xchg lowering."
+         (type-of inst)))
+
+(defmacro with-wasm-atomic-threads ((inst) &body body)
+  "Run BODY only when Wasm threads are enabled for atomic lowering."
+  `(progn
+     (wasm-require-threads-for-atomic ,inst)
+     ,@body))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Step 3: Emit WAT for a single instruction
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Returns T if instruction was handled, NIL if not supported (emits comment).
