@@ -71,6 +71,7 @@
        (:file "stream")
                                (:file "string-builder")
        (:file "ryu")
+       (:file "format-render")
        (:file "format")
      (:file "pprint")
       (:file "condition-types")
