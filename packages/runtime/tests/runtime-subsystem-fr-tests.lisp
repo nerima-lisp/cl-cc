@@ -702,58 +702,38 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
 ;;; FR Coverage Verification
 ;;; =================================================================
 
+(defun %fr-ids (start end)
+  "Return inclusive FR keyword IDs from START to END."
+  (loop for id from start to end
+        collect (intern (format nil "FR-~D" id) :keyword)))
+
+(defun %fr-id-set (&rest clauses)
+  "Expand coverage clauses into a flat FR keyword list.
+Each clause is either a single numeric FR ID or an inclusive (START END) range."
+  (loop for clause in clauses
+        append (etypecase clause
+                 (integer (%fr-ids clause clause))
+                 (cons (%fr-ids (first clause) (second clause))))))
+
+(defparameter *runtime-subsystem-fr-coverage-sentinels*
+  '(:fr-500 :fr-654 :fr-190 :fr-492))
+
+(defconstant +runtime-subsystem-fr-coverage-count+ 170)
+
 (defparameter *runtime-subsystem-fr-coverage*
-  '(:fr-190 :fr-191 :fr-192 :fr-193
-    :fr-257 :fr-258 :fr-259 :fr-260
-    :fr-280 :fr-281 :fr-282 :fr-283
-    :fr-290 :fr-291
-    :fr-300 :fr-301
-    :fr-310 :fr-311 :fr-312
-    :fr-320 :fr-321 :fr-322
-    :fr-330 :fr-331 :fr-332
-    :fr-340 :fr-341
-    :fr-345 :fr-346 :fr-347 :fr-348 :fr-349 :fr-350 :fr-351 :fr-352 :fr-353
-    :fr-355 :fr-356
-    :fr-360 :fr-361 :fr-362 :fr-363
-    :fr-370 :fr-371 :fr-372 :fr-373
-    :fr-380 :fr-381 :fr-382 :fr-383
-    :fr-390 :fr-391 :fr-392
-    :fr-400 :fr-401
-    :fr-410 :fr-411 :fr-412
-    :fr-420 :fr-421 :fr-422
-    :fr-430 :fr-431 :fr-432
-    :fr-440 :fr-441 :fr-442
-    :fr-450 :fr-451 :fr-452
-    :fr-460 :fr-461 :fr-462
-    :fr-470 :fr-471 :fr-472
-    :fr-480 :fr-481
-    :fr-490 :fr-491 :fr-492
-    :fr-500 :fr-501 :fr-502 :fr-503 :fr-504
-    :fr-510 :fr-511 :fr-512 :fr-513
-    :fr-520 :fr-521 :fr-522 :fr-523 :fr-524 :fr-525
-    :fr-530 :fr-531 :fr-532 :fr-533
-    :fr-540 :fr-541 :fr-542 :fr-543 :fr-544
-    :fr-550 :fr-551 :fr-552 :fr-553 :fr-554
-    :fr-560 :fr-561 :fr-562 :fr-563 :fr-564
-    :fr-570 :fr-571 :fr-572 :fr-573 :fr-574
-    :fr-580 :fr-581 :fr-582 :fr-583 :fr-584 :fr-585 :fr-586 :fr-587
-    :fr-590 :fr-591 :fr-592 :fr-593
-    :fr-595 :fr-596 :fr-597
-    :fr-600 :fr-601 :fr-602
-    :fr-605 :fr-606 :fr-607
-    :fr-610 :fr-611 :fr-612
-    :fr-615 :fr-616 :fr-617
-    :fr-620 :fr-621 :fr-622
-    :fr-625 :fr-626 :fr-627
-    :fr-630 :fr-631 :fr-632 :fr-633 :fr-634
-    :fr-638 :fr-639 :fr-640
-    :fr-643 :fr-644 :fr-645 :fr-646
-    :fr-650 :fr-651 :fr-652 :fr-653 :fr-654))
+  (%fr-id-set
+   '(190 193) '(257 260) '(280 283) '(290 291) '(300 301) '(310 312)
+   '(320 322) '(330 332) '(340 341) '(345 353) '(355 356) '(360 363)
+   '(370 373) '(380 383) '(390 392) '(400 401) '(410 412) '(420 422)
+   '(430 432) '(440 442) '(450 452) '(460 462) '(470 472) '(480 481)
+   '(490 492) '(500 504) '(510 513) '(520 525) '(530 533) '(540 544)
+   '(550 554) '(560 564) '(570 574) '(580 587) '(590 593) '(595 597)
+   '(600 602) '(605 607) '(610 612) '(615 617) '(620 622) '(625 627)
+   '(630 634) '(638 640) '(643 646) '(650 654)))
 
 (deftest runtime-subsystem-fr-coverage-complete
   "Verify all runtime subsystem FR IDs are tracked."
-  (assert-= 170 (length *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-500 *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-654 *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-190 *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-492 *runtime-subsystem-fr-coverage*)))
+  (assert-= +runtime-subsystem-fr-coverage-count+
+            (length *runtime-subsystem-fr-coverage*))
+  (dolist (fr-id *runtime-subsystem-fr-coverage-sentinels*)
+    (assert-true (member fr-id *runtime-subsystem-fr-coverage*))))
