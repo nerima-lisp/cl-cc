@@ -169,28 +169,18 @@ Returns the byte vector, or NIL on error."
   (let ((bytes (%a64-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-a64-vm-bswap (cl-cc:make-vm-bswap :dst :R0 :src :R1) s)))))
-    (assert-= 4 (length bytes))
-    (assert-= #x20 (nth 0 bytes))
-    (assert-= #x08 (nth 1 bytes))
-    (assert-= #xC0 (nth 2 bytes))
-    (assert-= #x5A (nth 3 bytes))))
+    (%a64-assert-emitted-bytes '(#x20 #x08 #xC0 #x5A) bytes)))
 
 (deftest aarch64-rotate-emitter-encoding
   "emit-a64-vm-rotate emits MOV Rd, Rn followed by RORV Rd, Rd, Rm (8 bytes total)."
   (let ((bytes (%a64-collect-bytes
                 (lambda (s)
-                  (cl-cc/codegen::emit-a64-vm-rotate (cl-cc:make-vm-rotate :dst :R0 :lhs :R1 :rhs :R2) s)))))
-    (assert-= 8 (length bytes))
-    ;; First instruction: MOV X0, X1 (encode-mov-rr 0 1) = #xAA0103E0
-    (assert-= #xE0 (nth 0 bytes))
-    (assert-= #x03 (nth 1 bytes))
-    (assert-= #x01 (nth 2 bytes))
-    (assert-= #xAA (nth 3 bytes))
-    ;; Second instruction: RORV X0, X0, X2 (encode-rorv 0 0 2) = #x9AC22C00
-    (assert-= #x00 (nth 4 bytes))
-    (assert-= #x2C (nth 5 bytes))
-     (assert-= #xC2 (nth 6 bytes))
-     (assert-= #x9A (nth 7 bytes))))
+                  (cl-cc/codegen::emit-a64-vm-rotate
+                   (cl-cc:make-vm-rotate :dst :R0 :lhs :R1 :rhs :R2) s)))))
+    (%a64-assert-emitted-bytes
+     '(#xE0 #x03 #x01 #xAA
+       #x00 #x2C #xC2 #x9A)
+     bytes)))
 
 (deftest aarch64-mul-high-emitter-encodings
   "emit-a64-vm-integer-mul-high-{u,s} emit single UMULH/SMULH instructions with stable encodings."
@@ -330,11 +320,7 @@ Returns the byte vector, or NIL on error."
                   (cl-cc/codegen::emit-a64-instruction
                    (cl-cc:make-vm-tail-call :dst :R0 :func :R1 :args nil)
                    s 0 (make-hash-table :test #'eq))))))
-    (assert-= 4 (length bytes))
-    (assert-= #x20 (nth 0 bytes))
-    (assert-= #x00 (nth 1 bytes))
-    (assert-= #x1F (nth 2 bytes))
-    (assert-= #xD6 (nth 3 bytes))))
+    (%a64-assert-emitted-bytes '(#x20 #x00 #x1F #xD6) bytes)))
 
 (deftest aarch64-build-label-offsets-account-for-elided-self-move
   "build-a64-label-offsets does not advance offsets for self-moves elided at emit time."
@@ -354,26 +340,14 @@ Returns the byte vector, or NIL on error."
                     (lambda (s)
                       (cl-cc/codegen::emit-a64-vm-max
                        (cl-cc:make-vm-max :dst :R0 :lhs :R1 :rhs :R2) s)))))
-    (assert-= 8 (length min-bytes))
-    (assert-= 8 (length max-bytes))
-    ;; CMP X1, X2 => 3F 00 02 EB; CSEL X0, X1, X2, LT => 20 B0 82 9A
-    (assert-= #x3F (nth 0 min-bytes))
-    (assert-= #x00 (nth 1 min-bytes))
-    (assert-= #x02 (nth 2 min-bytes))
-    (assert-= #xEB (nth 3 min-bytes))
-    (assert-= #x20 (nth 4 min-bytes))
-    (assert-= #xB0 (nth 5 min-bytes))
-    (assert-= #x82 (nth 6 min-bytes))
-    (assert-= #x9A (nth 7 min-bytes))
-    ;; CMP X1, X2 => 3F 00 02 EB; CSEL X0, X1, X2, GT => 20 C0 82 9A
-    (assert-= #x3F (nth 0 max-bytes))
-    (assert-= #x00 (nth 1 max-bytes))
-    (assert-= #x02 (nth 2 max-bytes))
-    (assert-= #xEB (nth 3 max-bytes))
-    (assert-= #x20 (nth 4 max-bytes))
-    (assert-= #xC0 (nth 5 max-bytes))
-    (assert-= #x82 (nth 6 max-bytes))
-    (assert-= #x9A (nth 7 max-bytes))))
+    (%a64-assert-emitted-bytes
+     '(#x3F #x00 #x02 #xEB
+       #x20 #xB0 #x82 #x9A)
+     min-bytes)
+    (%a64-assert-emitted-bytes
+     '(#x3F #x00 #x02 #xEB
+       #x20 #xC0 #x82 #x9A)
+     max-bytes)))
 
 (deftest aarch64-null-p-emitter-byte-patterns
   "emit-a64-vm-null-p emits CMP + MOVZ + MOVZ + CSEL with EQ condition."
