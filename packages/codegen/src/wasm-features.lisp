@@ -27,11 +27,6 @@
 (defparameter *wasm-bulk-table-enabled* t
   "FR-237: Use table.init/table.copy/table.fill/elem.drop.") ;; MVP v1.1
 
-;;; ABI-sensitive proposal defaults remain NIL until all call boundaries agree.
-
-(defparameter *wasm-multi-value-enabled* nil
-  "FR-235: Use wasm multi-value returns for CL values. WARNING: changes ABI.") ;; MVP v1.1
-
 (defparameter *wasm-js-bigint-i64-enabled* nil
   "FR-236: Enable JS BigInt <-> i64 conversion at boundary. Default off for compat.")
 

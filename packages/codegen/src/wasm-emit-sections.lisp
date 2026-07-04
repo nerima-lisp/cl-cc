@@ -161,10 +161,6 @@ Default is NIL to preserve existing standalone modules."
   "FR-270: Return T when GC null safety instructions are enabled."
   (wasm-feature-enabled-p "CLCC_WASM_GC_NULL_SAFETY" *wasm-gc-null-safety-enabled*))
 
-(defun wasm-multi-value-feature-enabled-p ()
-  "FR-235: Return T when Multi-value returns are enabled."
-  (wasm-feature-enabled-p "CLCC_WASM_MULTI_VALUE" *wasm-multi-value-enabled*))
-
 (defun wasm-bigint-feature-enabled-p ()
   "FR-236: Return T when JS BigInt integration is enabled."
   (wasm-feature-enabled-p "CLCC_WASM_BIGINT"

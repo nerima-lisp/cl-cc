@@ -552,8 +552,7 @@ Uses $eqref_array_t as the canonical mutable eqref array representation."
     (wasm-array-reg-record-kind reg-map (vm-dst inst) :eqref)))
 
 (defmethod emit-instruction ((target wasm-target) (inst vm-values) stream)
-  "Emit CL multiple values.  FR-235 uses the legacy heap-vector path unless the
-multi-value feature gate is explicitly enabled."
+  "Emit CL multiple values through the FR-235 multi-value block representation."
   (let ((reg-map (wasm-target-reg-map target)))
     (format stream "~%    ~A"
             (wasm-values-wat reg-map (vm-dst inst) (vm-src-regs inst) :indent 4))))

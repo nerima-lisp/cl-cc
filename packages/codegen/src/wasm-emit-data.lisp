@@ -93,10 +93,6 @@ FR-284, FR-281, FR-249.")
   "Feature gate for Wasm GC null safety (br_on_null/ref.as_non_null).
 FR-270.")
 
-(defparameter *wasm-multi-value-enabled* nil
-  "Feature gate for Wasm Multi-value returns.
-  FR-235. Default NIL because this changes the public Wasm ABI.")
-
 (defparameter *wasm-bulk-table-enabled* t
   "Feature gate for Wasm Bulk Table Operations (table.init/copy/fill).
 FR-237, FR-294.")
