@@ -30,6 +30,25 @@
    (cl-cc/runtime:make-rt-header size tag :gc-bits age))
   addr)
 
+(defun %fr-assert-free-list-blocks (heap expected-blocks)
+  (let ((blocks (cl-cc/runtime::rt-heap-free-list-blocks heap)))
+    (assert-true (listp blocks))
+    (dolist (block expected-blocks)
+      (assert-true (member block blocks :test #'equal)))))
+
+(defun %fr-assert-pointer-tags (expected-tags)
+  (dolist (case expected-tags)
+    (destructuring-bind (addr tag) case
+      (assert-= tag
+                (cl-cc/runtime:pointer-tag
+                 (cl-cc/runtime:encode-pointer addr tag))))))
+
+(defun %fr-assert-header-fields (header expected-size expected-tag expected-age)
+  (assert-true (typep header '(unsigned-byte 64)))
+  (assert-= expected-size (cl-cc/runtime:rt-header-size header))
+  (assert-= expected-tag (cl-cc/runtime:rt-header-type-tag header))
+  (assert-= expected-age (cl-cc/runtime:rt-header-age header)))
+
 ;;; ------------------------------------------------------------
 ;;; FR-331: Old-Space Free-List Allocation Reuse
 ;;; ------------------------------------------------------------
@@ -49,18 +68,15 @@
       (multiple-value-bind (bin addr) (cl-cc/runtime::rt-free-list-find heap 4)
         (assert-= insert-bin bin)
         (assert-= 1000 addr)
-        (let ((blocks (cl-cc/runtime::rt-heap-free-list-blocks heap)))
-          (assert-true (member (cons 4 1004) blocks :test #'equal)))))))
+        (%fr-assert-free-list-blocks heap (list (cons 4 1004)))))))
 
 (deftest fr-331-free-list-blocks-enumeration
   "FR-331: Free-list blocks can be enumerated across segregated bins."
   (let ((heap (%make-small-heap-fr)))
     (cl-cc/runtime::rt-free-list-insert heap 8 1000)
     (cl-cc/runtime::rt-free-list-insert heap 16 2000)
-    (let ((blocks (cl-cc/runtime::rt-heap-free-list-blocks heap)))
-      (assert-true (listp blocks))
-      (assert-true (member (cons 8 1000) blocks :test #'equal))
-      (assert-true (member (cons 16 2000) blocks :test #'equal)))))
+    (%fr-assert-free-list-blocks heap (list (cons 8 1000)
+                                            (cons 16 2000)))))
 
 (deftest fr-331-free-list-bin-index
   "FR-331: Size classes map to monotonic power-of-2 bucket indices."
@@ -81,9 +97,7 @@
     (multiple-value-bind (bin addr) (cl-cc/runtime::rt-free-list-find heap 12)
       (assert-= (cl-cc/runtime::rt-free-list-bin-index 16) bin)
       (assert-= 100 addr)
-      (assert-true (member (cons 4 112)
-                           (cl-cc/runtime::rt-heap-free-list-blocks heap)
-                           :test #'equal)))))
+      (%fr-assert-free-list-blocks heap (list (cons 4 112))))))
 
 ;;; ------------------------------------------------------------
 ;;; FR-333: Nursery Sizing Heuristics
@@ -157,12 +171,10 @@
 
 (deftest fr-336-pointer-tag-extraction
   "FR-336: Pointer sub-tags are correctly extracted from NaN-boxed values."
-  (let ((obj-ptr (cl-cc/runtime:encode-pointer #x100 cl-cc/runtime:+tag-object+))
-        (cons-ptr (cl-cc/runtime:encode-pointer #x200 cl-cc/runtime:+tag-cons+))
-        (sym-ptr (cl-cc/runtime:encode-pointer #x300 cl-cc/runtime:+tag-symbol+)))
-    (assert-= cl-cc/runtime:+tag-object+ (cl-cc/runtime:pointer-tag obj-ptr))
-    (assert-= cl-cc/runtime:+tag-cons+ (cl-cc/runtime:pointer-tag cons-ptr))
-    (assert-= cl-cc/runtime:+tag-symbol+ (cl-cc/runtime:pointer-tag sym-ptr))))
+  (%fr-assert-pointer-tags
+   `((#x100 ,cl-cc/runtime:+tag-object+)
+     (#x200 ,cl-cc/runtime:+tag-cons+)
+     (#x300 ,cl-cc/runtime:+tag-symbol+))))
 
 (deftest fr-336-val-cons-p-detection
   "FR-336: NaN-boxing cons predicate detects cons-tagged pointers only."
@@ -197,10 +209,7 @@
 (deftest fr-266-compressed-object-header-is-one-word
   "FR-266: Object headers pack size/tag/age metadata into one unsigned 64-bit word."
   (let ((header (cl-cc/runtime:make-rt-header 42 cl-cc/runtime:+rt-tag-cons+ :gc-bits 2)))
-    (assert-true (typep header '(unsigned-byte 64)))
-    (assert-= 42 (cl-cc/runtime:rt-header-size header))
-    (assert-= cl-cc/runtime:+rt-tag-cons+ (cl-cc/runtime:rt-header-type-tag header))
-    (assert-= 2 (cl-cc/runtime:rt-header-age header))))
+    (%fr-assert-header-fields header 42 cl-cc/runtime:+rt-tag-cons+ 2)))
 
 (deftest fr-184-weak-reference-and-finalizer-evidence
   "FR-184: Weak references clear unreachable referents and finalizers run for unmarked objects."
