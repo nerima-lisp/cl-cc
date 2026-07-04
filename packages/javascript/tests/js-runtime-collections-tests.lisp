@@ -26,6 +26,16 @@
               (declare (ignore _))
               entries))))
 
+(defun %jr-assert-set-has-all (set expected-values)
+  (assert-= (length expected-values)
+            (cl-cc/javascript::%js-set-size set))
+  (dolist (value expected-values)
+    (assert-true (cl-cc/javascript::%js-set-has set value))))
+
+(defun %jr-assert-set-keys (expected-values set)
+  (assert-equal expected-values
+                (%jr-list (cl-cc/javascript::%js-set-keys set))))
+
 (deftest js-rt-set-basic
   "add/has/delete/size/clear on a set."
   (let ((s (%jr-set 1 2 3)))
@@ -63,25 +73,21 @@
   (let* ((a (%jr-set 1 2))
          (b (%jr-set 2 3))
          (u (cl-cc/javascript::%js-set-union a b)))
-    (assert-= 3 (cl-cc/javascript::%js-set-size u))
-    (assert-true (cl-cc/javascript::%js-set-has u 1))
-    (assert-true (cl-cc/javascript::%js-set-has u 3))))
+    (%jr-assert-set-has-all u '(1 2 3))))
 
 (deftest js-rt-set-union-set-like
   "union accepts a set-like object with size/has/keys."
   (let* ((a (%jr-set 1 2))
          (b (%jr-set-like 2 3))
          (u (cl-cc/javascript::%js-set-union a b)))
-    (assert-equal '(1 2 3)
-                  (%jr-list (cl-cc/javascript::%js-set-keys u)))))
+    (%jr-assert-set-keys '(1 2 3) u)))
 
 (deftest js-rt-set-intersection
   "intersection contains only elements in both."
   (let* ((a (%jr-set 1 2 3))
          (b (%jr-set 2 3 4))
          (i (cl-cc/javascript::%js-set-intersection a b)))
-    (assert-= 2 (cl-cc/javascript::%js-set-size i))
-    (assert-true  (cl-cc/javascript::%js-set-has i 2))
+    (%jr-assert-set-has-all i '(2 3))
     (assert-false (cl-cc/javascript::%js-set-has i 1))))
 
 (deftest js-rt-set-difference
@@ -89,7 +95,7 @@
   (let* ((a (%jr-set 1 2 3))
          (b (%jr-set 2))
          (d (cl-cc/javascript::%js-set-difference a b)))
-    (assert-= 2 (cl-cc/javascript::%js-set-size d))
+    (%jr-assert-set-has-all d '(1 3))
     (assert-false (cl-cc/javascript::%js-set-has d 2))))
 
 (deftest js-rt-set-filter-ops-set-like
@@ -99,12 +105,9 @@
          (intersection (cl-cc/javascript::%js-set-intersection a b))
          (difference (cl-cc/javascript::%js-set-difference a b))
          (symmetric (cl-cc/javascript::%js-set-symmetric-difference a b)))
-    (assert-equal '(2)
-                  (%jr-list (cl-cc/javascript::%js-set-keys intersection)))
-    (assert-equal '(1 3)
-                  (%jr-list (cl-cc/javascript::%js-set-keys difference)))
-    (assert-equal '(1 3 4)
-                  (%jr-list (cl-cc/javascript::%js-set-keys symmetric)))))
+    (%jr-assert-set-keys '(2) intersection)
+    (%jr-assert-set-keys '(1 3) difference)
+    (%jr-assert-set-keys '(1 3 4) symmetric)))
 
 (deftest js-rt-set-subset-disjoint
   "is-subset-of and is-disjoint-from."
