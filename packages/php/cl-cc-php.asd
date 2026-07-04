@@ -27,6 +27,7 @@
      (:file "runtime-builtins-types")
      (:file "runtime-builtins-io-data")
      (:file "runtime-builtins-io")
+     (:file "runtime-builtins-io-files")
      (:file "runtime-builtins-io-image")
      (:file "runtime-builtins-io-output")
      (:file "runtime-builtins-io-cookie-session")
