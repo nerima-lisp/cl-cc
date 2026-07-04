@@ -12,6 +12,13 @@
 (in-package :cl-cc/test)
 (in-suite cl-cc-javascript-suite)
 
+;;; ─── Local test helpers ──────────────────────────────────────────────────────
+
+(defun %jr-assert-string-props (object expected-props)
+  (dolist (prop expected-props)
+    (destructuring-bind (key expected) prop
+      (assert-string= expected (gethash key object)))))
+
 ;;; ─── Module exports ─────────────────────────────────────────────────────────
 
 (deftest js-rt-export-default-registers-module-value
@@ -499,15 +506,17 @@
   "%js-make-url parses common absolute URL components."
   (let ((url (cl-cc/javascript::%js-make-url
               "https://example.com:8443/path/to?q=1#frag")))
-    (assert-string= "https://example.com:8443/path/to?q=1#frag" (gethash "href" url))
-    (assert-string= "https:" (gethash "protocol" url))
-    (assert-string= "example.com:8443" (gethash "host" url))
-    (assert-string= "example.com" (gethash "hostname" url))
-    (assert-string= "8443" (gethash "port" url))
-    (assert-string= "https://example.com:8443" (gethash "origin" url))
-    (assert-string= "/path/to" (gethash "pathname" url))
-    (assert-string= "?q=1" (gethash "search" url))
-    (assert-string= "#frag" (gethash "hash" url))
+    (%jr-assert-string-props
+     url
+     '(("href" "https://example.com:8443/path/to?q=1#frag")
+       ("protocol" "https:")
+       ("host" "example.com:8443")
+       ("hostname" "example.com")
+       ("port" "8443")
+       ("origin" "https://example.com:8443")
+       ("pathname" "/path/to")
+       ("search" "?q=1")
+       ("hash" "#frag")))
     (assert-string= "https://example.com:8443/path/to?q=1#frag"
                     (funcall (gethash "toString" url)))))
 
@@ -516,18 +525,22 @@
   (let ((url (cl-cc/javascript::%js-make-url
               "child?x=1"
               "https://example.com/a/b/index.html")))
-    (assert-string= "https://example.com/a/b/child?x=1" (gethash "href" url))
-    (assert-string= "/a/b/child" (gethash "pathname" url))
-    (assert-string= "?x=1" (gethash "search" url))))
+    (%jr-assert-string-props
+     url
+     '(("href" "https://example.com/a/b/child?x=1")
+       ("pathname" "/a/b/child")
+       ("search" "?x=1")))))
 
 (deftest js-rt-make-url-normalizes-relative-dot-segments
   "%js-make-url normalizes dot segments when resolving against a base URL."
   (let ((url (cl-cc/javascript::%js-make-url
               "../c/./d/?x=1"
               "https://example.com/a/b/index.html")))
-    (assert-string= "https://example.com/a/c/d/?x=1" (gethash "href" url))
-    (assert-string= "/a/c/d/" (gethash "pathname" url))
-    (assert-string= "?x=1" (gethash "search" url))))
+    (%jr-assert-string-props
+     url
+     '(("href" "https://example.com/a/c/d/?x=1")
+       ("pathname" "/a/c/d/")
+       ("search" "?x=1")))))
 
 (deftest js-rt-make-url-resolves-query-and-hash-only-relative
   "%js-make-url keeps the base path for query-only and hash-only relative URLs."
@@ -537,13 +550,17 @@
         (hash-url (cl-cc/javascript::%js-make-url
                    "#next"
                    "https://example.com/a/b/index.html?old=1#frag")))
-    (assert-string= "https://example.com/a/b/index.html?q=2" (gethash "href" query-url))
-    (assert-string= "/a/b/index.html" (gethash "pathname" query-url))
-    (assert-string= "?q=2" (gethash "search" query-url))
-    (assert-string= "https://example.com/a/b/index.html?old=1#next" (gethash "href" hash-url))
-    (assert-string= "/a/b/index.html" (gethash "pathname" hash-url))
-    (assert-string= "?old=1" (gethash "search" hash-url))
-    (assert-string= "#next" (gethash "hash" hash-url))))
+    (%jr-assert-string-props
+     query-url
+     '(("href" "https://example.com/a/b/index.html?q=2")
+       ("pathname" "/a/b/index.html")
+       ("search" "?q=2")))
+    (%jr-assert-string-props
+     hash-url
+     '(("href" "https://example.com/a/b/index.html?old=1#next")
+       ("pathname" "/a/b/index.html")
+       ("search" "?old=1")
+       ("hash" "#next")))))
 
 ;;; ─── TypedArray constructor factory ─────────────────────────────────────────
 
