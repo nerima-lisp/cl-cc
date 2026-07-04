@@ -13,6 +13,7 @@
    (:file "lexer")
    (:file "lexer-ops")
     (:file "runtime-helpers")
+    (:file "runtime-helpers-array")
     (:file "runtime-constants")
     ;; PHP runtime builtins (count, array_*, str*, math, type predicates, and the
     ;; dispatch registry). Previously omitted, so their bodies were never compiled
