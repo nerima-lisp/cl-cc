@@ -1,4 +1,4 @@
-;;;; wasm-binary-tests.lisp — Tests for wasm-binary, wasm-binary-aot, wasm-binary-debug
+;;;; wasm-binary-tests.lisp — Tests for wasm-binary, wasm-output, wasm-binary-debug
 ;;;
 ;;; Covers: LEB128 encoding, value-type table, name writing, export name handling,
 ;;; local decls, function body bytes, base64 encoding, hex-to-bytes round-trip,
@@ -8,7 +8,7 @@
 (in-package :cl-cc/test)
 
 (defsuite wasm-binary-suite
-  :description "Unit tests for wasm-binary, wasm-binary-aot, wasm-binary-debug"
+  :description "Unit tests for wasm-binary, wasm-output, wasm-binary-debug"
   :parent cl-cc-unit-suite)
 
 (in-suite wasm-binary-suite)

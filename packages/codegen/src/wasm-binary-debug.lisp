@@ -5,7 +5,7 @@
 ;;; name section (FR-242), type reflection / devtools JS (FR-263/269/288/317/318),
 ;;; profiles section (FR-258).
 ;;;
-;;; Load order: after wasm-binary-aot.lisp.
+;;; Load order: after wasm-output.lisp.
 
 (in-package :cl-cc/codegen)
 
