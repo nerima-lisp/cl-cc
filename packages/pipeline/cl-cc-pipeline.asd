@@ -24,6 +24,7 @@
    (:file "pipeline-data")
     (:file "arena")
     (:file "pipeline-incremental")
+   (:file "pipeline-runtime-bridges")
    (:file "pipeline")
    (:file "pipeline-runtime")
    (:file "pipeline-native")
