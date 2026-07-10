@@ -8,7 +8,9 @@
 
 (deftest runtime-stdlib-2-expand-system-loads
   "The expand system remains loadable with runtime-stdlib-2 scaffolding."
-  :timeout 5
+  ;; asdf:find-system re-scans .asd files; disk I/O under parallel CI
+  ;; load regularly exceeds 5s, so give it a generous margin.
+  :timeout 30
   (assert-true (asdf:find-system :cl-cc-expand nil)))
 
 (deftest runtime-stdlib-2-delay-force-caches-nil
