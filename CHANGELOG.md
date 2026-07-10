@@ -2,19 +2,13 @@
 
 All notable changes to cl-cc will be documented in this file.
 
-## [Unreleased]
+## [0.1.0] — 2026-07-11 — Initial Release
 
-### Fixed
+### Infrastructure
 
-- Linux build: removed bogus `(require :sb-alien)` (SB-ALIEN is SBCL core, not a contrib); this had broken `cl-cc-runtime` and every dependent system in the Nix sandbox on Linux
-- Benchmark CI: `nix run .#benchmarks` no longer forces recompilation into the read-only Nix store
-- Tracked 46 refactor-split source files that were missing from the Nix build
-
-### Added
-
-- OSS governance: LICENSE (MIT), SECURITY.md, CODE_OF_CONDUCT.md, GitHub issue/PR templates, README badges
-
-## [0.1.0] — Initial Release
+- Green CI on ubuntu-24.04 and macos-15 (10,000-test fast plan, 0 failures)
+- Benchmark workflow with regression detection
+- OSS governance: LICENSE (MIT), SECURITY.md, CODE_OF_CONDUCT.md, GitHub issue/PR templates
 
 ### Compiler Core
 
