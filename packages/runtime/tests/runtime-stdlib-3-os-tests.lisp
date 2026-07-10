@@ -2,11 +2,15 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
+;; rt-shell forks; forking while parallel test workers hold heap/malloc
+;; locks deadlocks the child before exec on macOS. Run it serially.
+(in-suite cl-cc-serial-suite)
 
 (deftest rt-process-management-shell-output
   "FR-1007: rt-shell returns captured stdout."
   (assert-equal "hello" (cl-cc/runtime:rt-shell "printf hello")))
+
+(in-suite cl-cc-unit-suite)
 
 (deftest rt-stackmap-compression-roundtrip
   "FR-1115: stack map delta compression round-trips and safepoint API registers maps."
