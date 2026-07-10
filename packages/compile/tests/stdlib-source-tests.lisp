@@ -48,3 +48,7 @@
 (deftest stdlib-source-has-many-defun-forms
   "The source string still contains the bulk of the stdlib as defun forms."
   (assert-true (> (%count-substring "(defun " cl-cc::*standard-library-source*) 20)))
+
+(deftest stdlib-source-omits-sbcl-compatibility-stubs
+  "The stdlib source keeps implementation-specific compatibility outside the core image."
+  (assert-false (search "without-package-locks" cl-cc::*standard-library-source*)))

@@ -32,6 +32,11 @@
   (let ((expanded (our-macroexpand-1 '(remove-duplicates xs :from-end t))))
     (assert-eq 'let (car expanded))))
 
+(deftest sequence-remove-duplicates-vector-expands-to-coerce
+  "REMOVE-DUPLICATES preserves vector result coercion."
+  (let ((expanded (our-macroexpand-1 '(remove-duplicates #(1 2 1)))))
+    (assert-true (%tree-contains-head-p 'coerce expanded))))
+
 (deftest sequence-concatenate-coerces-inputs-for-list-vector
   "CONCATENATE normalizes non-list inputs before APPEND for list/vector results."
   (let ((list-exp (our-macroexpand-1 '(concatenate 'list #(1 2) '(3))))

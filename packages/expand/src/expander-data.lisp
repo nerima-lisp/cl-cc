@@ -93,7 +93,7 @@ These recurse into subforms but their head is not macro-expanded.")
     bswap
     expt scale-float gcd lcm complex
     array-dimension row-major-aref svref vector-push
-    bit sbit bit-and bit-or bit-xor adjust-array nreconc)
+    bit sbit bit-and bit-ior bit-xor adjust-array nreconc)
   "Builtins that take exactly 2 arguments.")
 
 (defparameter *unary-builtins*

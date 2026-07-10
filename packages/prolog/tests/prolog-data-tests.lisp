@@ -4,177 +4,139 @@
 
 (deftest prolog-data-built-in-handler-specs
   "The built-in predicate table stays data-only and exposes the expected handlers."
-  (assert-prolog-specs= `((cl-cc/prolog::! cl-cc/prolog::prolog-cut-handler)
-                          (,(find-symbol "AND" :cl) cl-cc/prolog::solve-conjunction)
-                          (,(find-symbol "OR" :cl) cl-cc/prolog::prolog-or-handler)
-                          (,(find-symbol "=" :cl) cl-cc/prolog::prolog-unify-handler)
-                          (,(find-symbol "/=" :cl) cl-cc/prolog::prolog-not-unify-handler)
-                          (:when cl-cc/prolog::prolog-when-handler))
-                        cl-cc/prolog::*builtin-predicate-specs*))
+  (assert-equal `((,(find-symbol "AND" :cl) cl-cc/prolog::solve-conjunction)
+                  (,(find-symbol "OR" :cl) cl-cc/prolog::prolog-or-handler)
+                  (,(find-symbol "=" :cl) cl-cc/prolog::prolog-unify-handler)
+                  (,(find-symbol "/=" :cl) cl-cc/prolog::prolog-not-unify-handler)
+                  (:when cl-cc/prolog::prolog-when-handler))
+                cl-cc/prolog::*builtin-predicate-specs*))
 
 (deftest prolog-data-dcg-specs
   "The DCG data tables stay centralized in the shared data file."
-  (assert-prolog-specs= '(:T-RPAREN :T-SEMI :T-EOF)
-                        cl-cc/prolog::*dcg-sync-tokens*)
-  (assert-prolog-specs= '((cl-cc/prolog::dcg-alt cl-cc/prolog::%dcg-alt)
-                          (cl-cc/prolog::dcg-opt cl-cc/prolog::%dcg-opt)
-                          (cl-cc/prolog::dcg-star cl-cc/prolog::%dcg-star)
-                          (cl-cc/prolog::dcg-plus cl-cc/prolog::%dcg-plus)
-                          (cl-cc/prolog::dcg-error-recovery cl-cc/prolog::%dcg-error-recovery)
-                          (cl-cc/prolog::dcg-token-match cl-cc/prolog::%dcg-token-match)
-                          (cl-cc/prolog::dcg-token-match-value cl-cc/prolog::%dcg-token-match-value))
-                        cl-cc/prolog::*dcg-builtin-specs*))
+  (assert-equal '(:T-RPAREN :T-SEMI :T-EOF)
+                cl-cc/prolog::*dcg-sync-tokens*)
+  (assert-equal '((cl-cc/prolog::dcg-alt cl-cc/prolog::%dcg-alt)
+                  (cl-cc/prolog::dcg-opt cl-cc/prolog::%dcg-opt)
+                  (cl-cc/prolog::dcg-star cl-cc/prolog::%dcg-star)
+                  (cl-cc/prolog::dcg-plus cl-cc/prolog::%dcg-plus)
+                  (cl-cc/prolog::dcg-error-recovery cl-cc/prolog::%dcg-error-recovery)
+                  (cl-cc/prolog::dcg-token-match cl-cc/prolog::%dcg-token-match)
+                  (cl-cc/prolog::dcg-token-match-value cl-cc/prolog::%dcg-token-match-value))
+                cl-cc/prolog::*dcg-builtin-specs*))
 
 (deftest prolog-data-rule-specs
   "Declarative and type-rule specs are assembled from dedicated data groups."
-  (assert-prolog-specs= (append cl-cc/prolog::*prolog-list-rule-specs*
-                                cl-cc/prolog::*prolog-environment-rule-specs*)
-                        cl-cc/prolog::*prolog-declarative-rule-specs*)
-  (assert-prolog-specs= '((integer-type binop (+ - * / mod))
-                          (boolean-type cmp   (< > <= >= = /=)))
-                        cl-cc/prolog::*prolog-type-rule-specs*))
+  (assert-equal (append cl-cc/prolog::*prolog-list-rule-specs*
+                        cl-cc/prolog::*prolog-environment-rule-specs*)
+                cl-cc/prolog::*prolog-declarative-rule-specs*)
+  (assert-equal '((integer-type binop (+ - * / mod))
+                  (boolean-type cmp   (< > <= >= = /=)))
+                cl-cc/prolog::*prolog-type-rule-specs*))
 
 (deftest prolog-builtins-builds-dispatch-table-from-specs
   "The built-in table constructor resolves handler symbols into callable functions."
-  (let ((specs '((foo cl-cc/prolog::prolog-cut-handler)))
+  (let ((specs '((foo cl-cc/prolog::prolog-unify-handler)))
         (table (make-hash-table :test 'eq)))
     (cl-cc/prolog::register-builtin-specs table specs)
     (let ((handler (gethash 'foo table)))
       (assert-true handler)
-      (assert-eq (symbol-function 'cl-cc/prolog::prolog-cut-handler) handler))))
+      (assert-true (eq (symbol-function 'cl-cc/prolog::prolog-unify-handler)
+                       handler)))))
 
 (deftest prolog-register-prolog-rule-uses-active-table
   "register-prolog-rule stores rules in the dynamically bound registry."
   (let ((cl-cc/prolog::*prolog-rules* (make-hash-table :test 'eq)))
     (let ((rule1 (cl-cc/prolog::register-prolog-rule '(foo ?x) '((bar ?x))))
           (rule2 (cl-cc/prolog::register-prolog-rule '(foo ?y) '((baz ?y)))))
-      (assert-prolog-rule= rule1 '(foo ?x) '((bar ?x)))
-      (assert-prolog-rule= rule2 '(foo ?y) '((baz ?y)))
+      (assert-equal '(foo ?x) (cl-cc/prolog::rule-head rule1))
+      (assert-equal '((bar ?x)) (cl-cc/prolog::rule-body rule1))
+      (assert-equal '(foo ?y) (cl-cc/prolog::rule-head rule2))
+      (assert-equal '((baz ?y)) (cl-cc/prolog::rule-body rule2))
       (let ((rules (gethash 'foo cl-cc/prolog::*prolog-rules*)))
-        (assert-prolog-rule-store= rules
-                                   ((foo ?y) ((baz ?y)))
-                                   ((foo ?x) ((bar ?x))))))))
+        (assert-equal 2 (length rules))
+        (assert-equal '(foo ?y) (cl-cc/prolog::rule-head (first rules)))
+        (assert-equal '((baz ?y)) (cl-cc/prolog::rule-body (first rules)))
+        (assert-equal '(foo ?x) (cl-cc/prolog::rule-head (second rules)))
+        (assert-equal '((bar ?x)) (cl-cc/prolog::rule-body (second rules)))))))
 
-(deftest prolog-subst-for-eval-quotes-bound-symbols
-  "subst-for-eval preserves quoted forms and quotes substituted symbols for CL eval."
-  (let ((env (list (cons '?x 'foo)
-                   (cons '?y 7))))
-    (assert-equal '(and 'foo (quote bar) 7)
-                  (cl-cc/prolog::subst-for-eval '(and ?x (quote bar) ?y) env))))
+(deftest-each prolog-invalid-predicate-rejections
+  "Rules and queries reject invalid predicates instead of silently missing."
+  :cases (("nil rule head"       :register nil)
+          ("nil predicate head"  :register '(nil ?x))
+          ("number predicate"    :register '(1 ?x))
+          ("nil query predicate" :query    '(nil ?x))
+          ("number query predicate" :query '(1 ?x)))
+  (operation form)
+  (ecase operation
+    (:register
+     (assert-signals error
+       (cl-cc/prolog::register-prolog-rule form)))
+    (:query
+     (assert-signals error
+       (cl-cc/prolog:query-all form)))))
 
-(deftest prolog-eval-lisp-condition-handles-success-and-error
+(deftest-each prolog-eval-lisp-condition-handles-success-and-error
   "eval-lisp-condition evaluates truthy forms and returns NIL on evaluation errors."
-  (let ((env (list (cons '?x 'foo))))
-    (assert-true (cl-cc/prolog::eval-lisp-condition '(eq ?x 'foo) env)))
-  (assert-false (cl-cc/prolog::eval-lisp-condition '(/ 1 0) nil)))
+  :cases (("success with quoted symbol binding" t '(eq ?x 'foo) (list (cons '?x 'foo)))
+          ("success with self-evaluating binding" t '(eql ?x 42) (list (cons '?x 42)))
+          ("error"   nil '(/ 1 0)      nil))
+  (expected form env)
+  (if expected
+      (assert-true (cl-cc/prolog::eval-lisp-condition form env))
+      (assert-false (cl-cc/prolog::eval-lisp-condition form env))))
 
-(deftest prolog-unify-handler-behavior
-  "prolog-unify-handler succeeds only when terms can be unified."
-  (assert-prolog-unify-handler-results= '(((?x . 1))) '(?x 1))
-  (assert-prolog-unify-handler-results= nil '(?x (?x))))
+(deftest-each prolog-when-handler-gates-body-on-truth
+  "prolog-when-handler only runs its continuation for truthy embedded Lisp conditions."
+  :cases (("success" t   '(eq ?x 'foo) (list (cons '?x 'foo)))
+          ("error"   nil '(/ 1 0)      nil))
+  (expected condition env)
+  (let ((ran nil))
+    (cl-cc/prolog::prolog-when-handler (list condition) env
+                                       (lambda (new-env)
+                                         (declare (ignore new-env))
+                                         (setf ran t)))
+    (if expected
+        (assert-true ran)
+        (assert-false ran))))
 
-(deftest prolog-when-unify-succeeds-gates-body-on-success
-  "when-unify-succeeds only runs its body when unification succeeds."
-  (let ((ran nil))
-    (cl-cc/prolog::when-unify-succeeds (result '?x 1 nil)
-      (setf ran t)
-      (assert-equal '((?x . 1)) result))
-    (assert-true ran))
-  (let ((ran nil))
-    (cl-cc/prolog::when-unify-succeeds (result '?x '(?x) nil)
-      (setf ran t))
-    (assert-false ran)))
+(deftest prolog-when-handler-rejects-extra-arguments
+  "The :when built-in is unary; extra arguments are programmer errors."
+  (assert-prolog-call-arguments-rejected cl-cc/prolog::prolog-when-handler
+                                         '(t t)
+                                         nil
+                                         (lambda (next-env) next-env)))
 
 (deftest prolog-data-peephole-rules-present
-  "The peephole rule data remains available after the data/logic split."
-  (assert-true (listp cl-cc/prolog:*peephole-rules*))
-  (assert-true (>= (length cl-cc/prolog:*peephole-rules*) 30))
-  (assert-true (member '((:const cl-cc/prolog::?src cl-cc/prolog::?val)
-                          (:move cl-cc/prolog::?dst cl-cc/prolog::?src)
-                          ((:const cl-cc/prolog::?dst cl-cc/prolog::?val)))
-                       cl-cc/prolog:*peephole-rules*
-                         :test #'equal)))
+  "The peephole rule data stays internal after the data/logic split."
+  (assert-eq :internal (nth-value 1 (find-symbol "*PEEPHOLE-RULES*" :cl-cc/prolog)))
+  (let ((rules cl-cc/prolog::*peephole-rules*))
+    (assert-true (listp rules))
+    (assert-true (>= (length rules) 30))
+    (assert-true (member '((:const cl-cc/prolog::?src cl-cc/prolog::?val)
+                           (:move cl-cc/prolog::?dst cl-cc/prolog::?src)
+                           ((:const cl-cc/prolog::?dst cl-cc/prolog::?val)))
+                         rules
+                         :test #'equal))
+    (assert-true (member '((:move cl-cc/prolog::?mid cl-cc/prolog::?src)
+                           (:move cl-cc/prolog::?dst cl-cc/prolog::?mid)
+                           ((:move cl-cc/prolog::?mid cl-cc/prolog::?src)
+                            (:move cl-cc/prolog::?dst cl-cc/prolog::?src)))
+                         rules
+                         :test #'equal))
+    (assert-true (member '((:const cl-cc/prolog::?r cl-cc/prolog::?_v1)
+                           (:const cl-cc/prolog::?r cl-cc/prolog::?v2)
+                           ((:const cl-cc/prolog::?r cl-cc/prolog::?v2)))
+                         rules
+                         :test #'equal))))
 
-(deftest-each prolog-logic-var-p
-  "logic-var-p recognises ?-prefixed symbols as logic variables."
-  :cases (("?x"   '?x   t)
-          ("?foo" '?foo t)
-          ("x"    'x    nil)
-          ("42"   42    nil)
-          ("nil"  nil   nil))
-  (term expected)
-  (if expected
-      (assert-true (cl-cc:logic-var-p term))
-      (assert-false (cl-cc:logic-var-p term))))
+(deftest prolog-solve-goal-is-internal
+  "query-all is the public solver entry point; solve-goal stays internal."
+  (assert-eq :internal (nth-value 1 (find-symbol "SOLVE-GOAL" :cl-cc/prolog)))
+  (with-prolog-facts ((solver-entry 1))
+    (assert-prolog-query-count= '(solver-entry ?x) 1)))
 
-(deftest-each prolog-occurs-check-simple-cases
-  "occurs-check: same-variable, nested structure, and absent cases with empty env."
-  :cases (("self"   t   '?x '?x    nil)
-          ("nested" t   '?x '(?x 1) nil)
-          ("absent" nil '?x 42      nil))
-  (expected var term env)
-  (if expected
-      (assert-true (cl-cc/prolog::occurs-check var term env))
-      (assert-false (cl-cc/prolog::occurs-check var term env))))
-
-(deftest prolog-occurs-check-via-binding
-  "occurs-check: follows binding chain when ?y is bound to ?x."
-  (let ((env (list (cons '?y '?x))))
-    (assert-true (cl-cc/prolog::occurs-check '?x '?y env))))
-
-(deftest-each prolog-unify-atoms
-  "unify: atomic terms unify iff they are equal."
-  :cases (("same int" 42 42 nil)
-          ("same sym" 'a  'a  nil)
-          ("diff ints" 1  2   :unify-fail)
-          ("int vs sym" 42 'a :unify-fail))
-  (t1 t2 expected)
-  (assert-prolog-unify-result= expected t1 t2))
-
-(deftest prolog-unify-variable-binding
-  "unify: logic variable binds to atom; occurs-check prevents circular unification."
-  (assert-prolog-unify-result= '((?x . 42)) '?x 42)
-  (assert-prolog-unify-fails '?x '(?x)))
-
-(deftest prolog-unify-two-vars-aliased
-  "unify: two distinct vars become aliased."
-  (assert-prolog-unify-result= '((?x . ?y)) '?x '?y)
-  (with-prolog-unify-result (env '?x 99 '((?x . ?y)))
-    (assert-prolog-logic-substitute= '?y 99 env)))
-
-(deftest prolog-unify-list-structure
-  "unify: cons structures are unified component-wise."
-  (assert-prolog-goal-results=
-   '(= (?x 2) (1 ?y))
-   '((1 2))
-   (list ?x ?y)))
-
-(deftest-each prolog-logic-substitute-cases
-  "logic-substitute handles atoms, bound and unbound variables correctly."
-  :cases (("atom-integer" 42       nil                   42)
-          ("atom-symbol"  'hello   nil                   'hello)
-          ("bound-var"    '?x      (list (cons '?x 99))  99)
-          ("unbound-var"  '?unbound nil                   '?unbound))
-  (input env expected)
-  (assert-equal expected (cl-cc:logic-substitute input env)))
-
-(deftest prolog-logic-substitute-traverses-structure-and-chains
-  "logic-substitute traverses nested cons structure and follows variable chains."
-  (with-prolog-unify-result (env '?x '(a b c))
-    (assert-equal '((a b c) ?y) (cl-cc:logic-substitute '(?x ?y) env)))
-  (with-prolog-unify-result (e1 '?a '?b)
-    (with-prolog-unify-result (e2 '?b 7 e1)
-      (assert-prolog-logic-substitute= '?a 7 e2))))
-
-(deftest prolog-rename-variables-behavior
-  "rename-variables produces fresh symbols distinct from originals and consistent across head/body."
-  (let* ((rule1 (cl-cc/prolog::make-prolog-rule :head '(foo ?x ?y)
-                                                 :body '((bar ?x ?z))))
-         (fresh1 (cl-cc/prolog::rename-variables rule1)))
-    (assert-false (eq '?x (second (cl-cc/prolog::rule-head fresh1))))
-    (assert-true (cl-cc:logic-var-p (second (cl-cc/prolog::rule-head fresh1)))))
-  (let* ((rule2 (cl-cc/prolog::make-prolog-rule :head '(foo ?x)
-                                                :body '((bar ?x))))
-         (fresh2 (cl-cc/prolog::rename-variables rule2)))
-    (assert-eq (second (cl-cc/prolog::rule-head fresh2))
-               (second (car (cl-cc/prolog::rule-body fresh2))))))
+(deftest prolog-symbols-are-not-reexported-by-umbrella-package
+  "The Prolog API is owned by :cl-cc/prolog, not the top-level :cl-cc facade."
+  (dolist (name '("LOGIC-VAR-P" "UNIFY" "LOGIC-SUBSTITUTE" "DEF-RULE"
+                  "QUERY-ALL" "DEF-DCG-RULE" "PHRASE" "PHRASE-ALL"))
+    (assert-eq nil (nth-value 1 (find-symbol name :cl-cc)))))

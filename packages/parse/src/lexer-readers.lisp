@@ -109,16 +109,23 @@
 
 (defun %lex-find-package (name)
   "Resolve package NAME through the runtime package layer when available.
-Returns NIL when the runtime package layer is unavailable."
-  (when cl-cc/bootstrap:*runtime-find-package-fn*
-    (funcall cl-cc/bootstrap:*runtime-find-package-fn* name)))
+Falls back to the host FIND-PACKAGE so package-qualified references resolve to
+the same package (and therefore the same interned symbol) that an unqualified
+definition read while *PACKAGE* was bound to that package produced."
+  (or (when cl-cc/bootstrap:*runtime-find-package-fn*
+        (funcall cl-cc/bootstrap:*runtime-find-package-fn* name))
+      (find-package name)))
 
 (defun %lex-runtime-intern (name package)
   "Intern NAME through the runtime package layer when available.
-Falls back to MAKE-SYMBOL semantics when runtime intern is unavailable." 
+Falls back to host INTERN into PACKAGE so a package-qualified reference (p1:f)
+resolves to the identical symbol the unqualified definition interned, rather
+than a fresh uninterned symbol."
   (if cl-cc/bootstrap:*runtime-intern-fn*
       (funcall cl-cc/bootstrap:*runtime-intern-fn* name package)
-      (make-symbol (string name))))
+      (if (packagep package)
+          (intern (string name) package)
+          (make-symbol (string name)))))
 
 (defun lex-read-symbol-or-number (state)
   "Read a symbol, keyword, or number from the current position."
@@ -151,7 +158,11 @@ Falls back to MAKE-SYMBOL semantics when runtime intern is unavailable."
                             (let ((pkg (%lex-find-package (string-upcase pkg-name))))
                               (if pkg
                                   (%lex-runtime-intern sym-name pkg)
-                                  (intern (format nil "~A::~A" pkg-name sym-name))))
+                                  ;; Package genuinely unknown: intern the bare
+                                  ;; symbol name in the current package so the
+                                  ;; reference still matches an unqualified use,
+                                  ;; instead of fabricating a "P1::F" literal.
+                                  (intern sym-name)))
                              (intern sym-name))))
             (lex-make-token state :T-IDENT symbol start)))))))
 

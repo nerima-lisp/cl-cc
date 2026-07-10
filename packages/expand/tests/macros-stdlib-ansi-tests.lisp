@@ -144,26 +144,29 @@
            (user (cl-cc/runtime:rt-make-package "WPI-USER"))
            (internal-sym (cl-cc/runtime:rt-intern "INTERNAL" user))
            (external-sym (cl-cc/runtime:rt-intern "EXTERNAL" user))
-           (inherited-sym (cl-cc/runtime:rt-intern "IMPORTED" lib))
-           (results nil))
+           (inherited-sym (cl-cc/runtime:rt-intern "IMPORTED" lib)))
       (cl-cc/runtime:rt-export external-sym user)
       (cl-cc/runtime:rt-export inherited-sym lib)
       (cl-cc/runtime:rt-use-package lib user)
       (assert-eq internal-sym (cl-cc/runtime:rt-intern "INTERNAL" user))
-      (with-package-iterator (next (list user) :internal :external :inherited)
-        (loop
-          (multiple-value-bind (more sym type pkg) (next)
-            (unless more
-              (return))
-            (push (list (cl-cc/runtime:rt-symbol-name sym)
-                        type
-                        (cl-cc/runtime:rt-package-name pkg))
-                  results))))
-      (assert-equal
-       '(("INTERNAL" :internal "WPI-USER")
-         ("EXTERNAL" :external "WPI-USER")
-         ("IMPORTED" :inherited "WPI-USER"))
-       (nreverse results)))))
+      (let ((expected '(("INTERNAL" :internal "WPI-USER")
+                        ("EXTERNAL" :external "WPI-USER")
+                        ("IMPORTED" :inherited "WPI-USER")))
+            (expanded (our-macroexpand-1
+                       '(with-package-iterator (next (list user) :internal :external :inherited)
+                          (next)))))
+        (assert-true
+         (%tree-contains-head-p 'cl-cc/expand::%package-iterator-entries expanded))
+        (assert-equal
+         expected
+         (mapcar (lambda (entry)
+                   (destructuring-bind (sym type pkg) entry
+                     (list (cl-cc/runtime:rt-symbol-name sym)
+                           type
+                           (cl-cc/runtime:rt-package-name pkg))))
+                 (cl-cc/expand::%package-iterator-entries
+                  (list user)
+                  '(:internal :external :inherited))))))))
 
 ;;; ─── define-compiler-macro ────────────────────────────────────────────────
 

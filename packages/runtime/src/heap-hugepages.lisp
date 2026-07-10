@@ -6,16 +6,13 @@
   "Huge page size used by cl-cc runtime huge-page probes (2MiB).")
 
 (defconstant +rt-map-hugetlb+ #x40000
-  "Linux MAP_HUGETLB flag value used on best-effort huge-page mmap attempts.")
+  "Linux MAP_HUGETLB flag value used when requesting huge-page mappings.")
 
 (defconstant +rt-vm-flags-superpage-size-2mb+ #x200000
   "Darwin VM_FLAGS_SUPERPAGE_SIZE_2MB marker used as metadata in the portable backend.")
 
 (defparameter *use-huge-pages* t
-  "When true, runtime code/heap mmap helpers try huge pages before falling back.
-
-Huge pages are opt-in and best-effort: allocation must keep working when the
-host does not support MAP_HUGETLB, Darwin superpages, or any native equivalent.")
+  "When true, runtime code/heap mmap helpers may request native huge pages.")
 
 (defvar *rt-huge-pages-active-p* nil
   "True after a huge-page probe/allocation succeeds in this runtime instance.")
@@ -35,32 +32,23 @@ host does not support MAP_HUGETLB, Darwin superpages, or any native equivalent."
       (t flags))))
 
 (defun rt-huge-page-mmap (addr length prot flags fd offset)
-  "Best-effort huge-page mmap wrapper with graceful fallback to regular pages.
+  "Allocate a huge-page-backed mmap region.
 
-The portable Common Lisp backend records mmap regions as descriptors.  Native
-backends can map this function to real mmap/VM_FLAGS_SUPERPAGE_SIZE_2MB calls;
-here we align length and logical addresses to 2MiB, try platform flags, and fall
-back to RT-MMAP if anything fails."
+The Pure CL runtime has no native MAP_HUGETLB or Darwin superpage backend, so
+this function fails explicitly."
+  (declare (ignore addr prot fd offset))
   (let* ((aligned-length (rt-huge-page-align length))
          (huge-flags (%rt-platform-huge-page-flags flags)))
     (when (and (boundp '*rt-mmap-next-address*)
                (integerp *rt-mmap-next-address*))
       (setf *rt-mmap-next-address*
             (rt-huge-page-align *rt-mmap-next-address*)))
-    (handler-case
-        (let ((region (rt-mmap addr aligned-length prot huge-flags fd offset)))
-          (setf *rt-huge-pages-active-p* t)
-          region)
-      (error ()
-        (setf *rt-huge-pages-active-p* nil)
-        (rt-mmap addr (rt-page-align length) prot flags fd offset)))))
+    (setf *rt-huge-pages-active-p* nil)
+    (error "RT-HUGE-PAGE-MMAP requires a native huge-page backend (length=~D flags=~D)."
+           aligned-length huge-flags)))
 
 (defun try-enable-huge-pages (&key (probe-size +rt-huge-page-size+))
-  "Enable best-effort huge pages and return true when a probe allocation works.
-
-Failure is non-fatal: *USE-HUGE-PAGES* remains true so later native backends may
-try again, while HUGE-PAGES-ENABLED-P reports whether the current probe/allocation
-actually succeeded."
+  "Enable huge pages and return true only when a native probe allocation works."
   (setf *use-huge-pages* t)
   (handler-case
       (let ((probe (rt-huge-page-mmap nil probe-size

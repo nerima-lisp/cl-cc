@@ -49,7 +49,7 @@
   "Element-wise OR of two bit arrays."
   (dst nil :reader vm-dst) (lhs nil :reader vm-lhs) (rhs nil :reader vm-rhs)
   (:sexp-tag :bit-or) (:sexp-slots dst lhs rhs))
-;; ANSI CL uses bit-ior (not bit-or); cl-cc exposes it as bit-or for symmetry
+;; The VM instruction name stays short; source-level builtin lookup uses ANSI bit-ior.
 (define-simple-instruction vm-bit-or :binary bit-ior)
 
 (define-vm-instruction vm-bit-xor (vm-instruction)

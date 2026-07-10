@@ -422,11 +422,40 @@
 ;;; FR-376: Guard Pages for Stack Overflow (⚠️ Pure CL interface)
 ;;; ------------------------------------------------------------
 
-(deftest fr-376-stack-guard-returns-plist
-  "FR-376: rt-install-stack-guard returns a property list describing the guard region."
-  (let ((result (cl-cc/runtime:rt-install-stack-guard 0 4096)))
-    (assert-true (listp result))
-    (assert-true (getf result :portable-fallback))))
+(deftest fr-376-stack-guard-requires-native-backend
+  "FR-376: rt-install-stack-guard fails until native guard pages are wired."
+  (assert-signals error
+    (cl-cc/runtime:rt-install-stack-guard 0 4096)))
+
+(deftest fr-376-madvise-requires-native-backend
+  "Heap and mmap advice fail explicitly until native madvise support exists."
+  (let ((heap (cl-cc/runtime:make-rt-heap :young-size 64 :old-size 64)))
+    (assert-signals error
+      (cl-cc/runtime::rt-heap-madvise-sequential heap 0 8))
+    (assert-signals error
+      (cl-cc/runtime::rt-heap-madvise-willneed heap 0 8))
+    (assert-signals error
+      (cl-cc/runtime::rt-heap-madvise-hugepage heap)))
+  (assert-signals error
+    (cl-cc/runtime:mmap-advice nil :sequential)))
+
+(deftest fr-623-huge-pages-require-native-backend
+  "FR-623: huge-page mmap requires a native backend."
+  (assert-signals error
+    (cl-cc/runtime:rt-huge-page-mmap nil 4096
+                                     (logior cl-cc/runtime::+rt-prot-read+
+                                             cl-cc/runtime::+rt-prot-write+)
+                                     cl-cc/runtime::+rt-map-anonymous+
+                                     nil 0))
+  (assert-false (cl-cc/runtime:try-enable-huge-pages))
+  (assert-false (cl-cc/runtime:huge-pages-enabled-p)))
+
+(deftest fr-772-xom-requires-native-support
+  "FR-772: requested execute-only memory fails without native support."
+  (let ((cl-cc/runtime:*xom-enabled* t))
+    (flet ((cl-cc/runtime::rt-xom-supported-p () nil))
+      (assert-signals error
+        (cl-cc/runtime::rt-xom-effective-prot)))))
 
 ;;; ------------------------------------------------------------
 ;;; FR-377: Immortal / Permanent Objects (⚠️ Pure CL interface)

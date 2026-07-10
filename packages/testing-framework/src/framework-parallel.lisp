@@ -31,16 +31,6 @@ to sb-ext:exit. Workers that don't respond within this window are considered hun
 Tests may rebind this to a smaller positive real to keep timeout regression
 coverage fast without changing the production polling cadence.")
 
-(defparameter *watchdog-exit-fn*
-  (lambda (&key code)
-    (sb-ext:exit :code code :abort t))
-  "Indirection for the hard-kill action so tests can rebind to a recorder.
-Default uses sb-ext:exit with :abort t for IMMEDIATE process termination
-without unwinding stuck worker threads. The :abort flag is critical: a
-plain (sb-ext:exit :code N) does an orderly shutdown that joins all threads,
-which would block forever on the very threads the watchdog is trying to
-kill. Tests rebind to a lambda that records the code without killing.")
-
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Watchdog state structs
 ;;; ─────────────────────────────────────────────────────────────────────────
@@ -51,7 +41,7 @@ kill. Tests rebind to a lambda that records the code without killing.")
 
 (defstruct escalation
   "Pending hard-kill record: epoch was captured when the interrupt fired."
-  worker-idx epoch deadline)
+  worker-idx epoch deadline thread)
 
 (defun %deadline-expired-p (deadline)
   "Return true when absolute internal-time DEADLINE has passed."
@@ -100,11 +90,16 @@ sleep is GC-interruptible so the main thread can reach its safepoint normally."
   (dolist (thread threads)
     (%terminate-thread-safely thread)))
 
-(defun %join-worker-threads-until-deadline (threads deadline)
+(defun %join-worker-threads-until-deadline (threads deadline &optional hung-thread-p)
   "Join worker THREADS with bounded waits.
-Return :SUITE-TIMEOUT when DEADLINE passes before all workers finish."
+HUNG-THREAD-P (when supplied) is a predicate: threads it accepts have been
+written off by the watchdog (stuck in an uninterruptible trap) and are
+skipped instead of awaited.
+Return :SUITE-TIMEOUT when DEADLINE passes before all live workers finish."
   (dolist (thread threads nil)
     (loop
+      (when (and hung-thread-p (funcall hung-thread-p thread))
+        (return))
       (when (%thread-joined-p thread (%join-poll-seconds deadline))
         (return))
       (when (%deadline-expired-p deadline)
@@ -151,11 +146,17 @@ Clears the slot in place. Returns a list of (thread epoch worker-idx) triples."
               (make-escalation
                :worker-idx worker-idx
                :epoch      epoch
-               :deadline   (+ now (* kill-grace internal-time-units-per-second)))))
+               :deadline   (+ now (* kill-grace internal-time-units-per-second))
+               :thread     thread)))
           timed-out))
 
-(defun %check-escalations (escalations worker-epochs current-tests watchdog-lock now)
-  "Trigger hard-kill only when a worker still has an in-flight test after the grace period.
+(defun %check-escalations (escalations worker-epochs current-tests watchdog-lock now
+                           record-hang-fn)
+  "Handle workers whose in-flight test is still running after the grace period.
+RECORD-HANG-FN is called with (worker-idx test-plist thread): the hung test is
+recorded as a failure and its worker abandoned, letting the rest of the suite
+finish (a thread stuck in a hardware trap — e.g. the macOS 26.5 trap-delivery
+hang — cannot be interrupted or terminated, only written off).
 Returns the pruned escalation list (resolved entries removed)."
   (dolist (esc escalations)
     (let* ((worker-idx (escalation-worker-idx esc))
@@ -167,10 +168,11 @@ Returns the pruned escalation list (resolved entries removed)."
                  (= (aref worker-epochs worker-idx)
                     (escalation-epoch esc)))
         (format *error-output*
-                "# FATAL: worker ~A hung past timeout+~As; exiting 124~%"
-                worker-idx *kill-grace-seconds*)
+                "# WARNING: worker ~A hung on ~A past timeout+~As; abandoning worker~%"
+                worker-idx (getf still-running :name) *kill-grace-seconds*)
         (finish-output *error-output*)
-        (funcall *watchdog-exit-fn* :code 124))))
+        (funcall record-hang-fn worker-idx still-running
+                 (escalation-thread esc)))))
   (remove-if (lambda (esc)
                (let* ((worker-idx (escalation-worker-idx esc))
                       (still-running
@@ -262,9 +264,42 @@ Correctness invariants:
          (watchdog-lock   (sb-thread:make-mutex :name "watchdog-lock"))
          (watchdog-stop   nil)
          (suite-deadline  *parallel-suite-deadline*)
-         (threads         '()))
+         (threads         '())
+         ;; Threads written off by the watchdog (stuck in an uninterruptible
+         ;; trap — e.g. the macOS 26.5 hardware-trap delivery hang) and their
+         ;; replacements. Guarded by hung-lock.
+         (hung-threads    '())
+         (respawned       '())
+         (hung-lock       (sb-thread:make-mutex :name "hung-lock")))
     (labels
-        ((watchdog ()
+        ((hung-thread-p (thread)
+           (sb-thread:with-mutex (hung-lock)
+             (and (member thread hung-threads) t)))
+
+         (record-hang (worker-idx test-plist thread)
+           ;; The stuck thread can never publish a result or pick up more
+           ;; work: record the test as a failure, write the worker off, and
+           ;; respawn a replacement so pool throughput is preserved.
+           (let* ((idx (position test-plist work-queue :test #'eq))
+                  (result (append (%make-parallel-failure-result
+                                   test-plist (get-internal-real-time)
+                                   (format nil "  ---~%  message: \"test hung; worker abandoned by watchdog\"~%  ..."))
+                                  (list :batch-id idx))))
+             (when idx
+               (sb-thread:with-mutex (results-lock)
+                 (setf (aref results idx) result))
+               (%tap-print-result result))
+             (sb-thread:with-mutex (watchdog-lock)
+               (setf (aref current-tests worker-idx) nil))
+             (let ((replacement
+                     (sb-thread:make-thread
+                      (make-worker worker-idx)
+                      :name (format nil "test-worker-~A-respawn" worker-idx))))
+               (sb-thread:with-mutex (hung-lock)
+                 (push thread hung-threads)
+                 (push replacement respawned)))))
+
+         (watchdog ()
            (let ((escalations '()))
              (loop
                (when (sb-thread:with-mutex (watchdog-lock) watchdog-stop) (return))
@@ -279,7 +314,8 @@ Correctness invariants:
                         (append new-escs
                                 (%check-escalations escalations worker-epochs
                                                     current-tests watchdog-lock
-                                                    (get-internal-real-time))))))))
+                                                    (get-internal-real-time)
+                                                    #'record-hang)))))))
 
          (heartbeat ()
            (let ((start    (get-internal-real-time))
@@ -340,8 +376,23 @@ Correctness invariants:
                        threads))
                (setf threads (nreverse threads))
                (setf suite-timed-out-p
-                     (eq (%join-worker-threads-until-deadline threads suite-deadline)
+                     (eq (%join-worker-threads-until-deadline
+                          threads suite-deadline #'hung-thread-p)
                          :suite-timeout))
+               ;; Join respawned replacement workers too; a replacement can
+               ;; itself hang and be replaced, so loop until the set is stable.
+               (unless suite-timed-out-p
+                 (let ((joined '()))
+                   (loop
+                     (let ((pending (sb-thread:with-mutex (hung-lock)
+                                      (set-difference respawned joined))))
+                       (when (null pending) (return))
+                       (when (eq (%join-worker-threads-until-deadline
+                                  pending suite-deadline #'hung-thread-p)
+                                 :suite-timeout)
+                         (setf suite-timed-out-p t)
+                         (return))
+                       (setf joined (append pending joined))))))
                (when suite-timed-out-p
                  (format *error-output*
                          "# ERROR: parallel suite deadline reached; terminating workers~%")
@@ -349,9 +400,13 @@ Correctness invariants:
                  (%terminate-live-threads threads)
                  (error 'sb-ext:timeout)))
           (when (or suite-timed-out-p (%deadline-expired-p suite-deadline))
-            (%terminate-live-threads threads))
+            (%terminate-live-threads threads)
+            (%terminate-live-threads
+             (sb-thread:with-mutex (hung-lock) (copy-list respawned))))
           (sb-thread:with-mutex (watchdog-lock)
             (setf watchdog-stop t))
           (%join-support-thread watchdog-thread)
           (%join-support-thread heartbeat-thread))))
-    (coerce results 'list)))
+    ;; A hang can leave unclaimed queue slots (all workers stuck at once);
+    ;; drop the nil placeholders so reporting sees only real result plists.
+    (remove nil (coerce results 'list))))

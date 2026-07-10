@@ -19,6 +19,20 @@
      (prolog-cut ()
        :cut)))
 
+(defmacro with-prolog-solution-collection ((emit results &key limit) &body body)
+  "Collect values emitted by EMIT into RESULTS, preserving Prolog cut semantics."
+  (let ((count (gensym "COUNT-")))
+    `(let ((,results nil)
+           (,count 0))
+       (flet ((,emit (value)
+                (when (or (null ,limit) (< ,count ,limit))
+                  (push value ,results)
+                  (incf ,count)
+                  (when (and ,limit (>= ,count ,limit))
+                    (signal 'prolog-cut)))))
+         ,@body
+         (nreverse ,results)))))
+
 (defun solve-goal (goal env k)
   "Solve GOAL in environment ENV, call continuation K with each solution.
    GOAL should be a list (predicate arg1 arg2 ...) or a bare atom like ! (cut).
@@ -26,7 +40,7 @@
   (cond
     ((null goal)
      (funcall k env))
-    ((eq goal '!)
+    ((prolog-cut-goal-p goal)
      (funcall k env)
      (signal 'prolog-cut))
     (t
@@ -34,26 +48,28 @@
 
 (defun solve-atomic-goal (goal env k)
   "Dispatch an atomic GOAL to a built-in predicate or a registered rule."
-  (let ((predicate (car goal))
-        (args (cdr goal)))
-    (or (let ((builtin (gethash predicate *builtin-predicates*)))
-          (when builtin
+  (multiple-value-bind (predicate args) (prolog-compound-form-parts goal)
+    (let ((builtin (gethash predicate *builtin-predicates*)))
+      (if builtin
+          (progn
             (funcall builtin args env k)
-            t))
-        (solve-prolog-rules predicate args env k))))
+            t)
+          (solve-prolog-rules predicate args env k)))))
 
 (defun solve-prolog-rule (rule args env k)
   "Try RULE against ARGS, returning :CUT when the rule body cuts."
   (let* ((fresh-rule (rename-variables rule))
          (head (rule-head fresh-rule))
          (body (rule-body fresh-rule)))
-    (when-unify-succeeds (new-env args (cdr head) env)
-      (when (eq (with-prolog-cut-handling
-                  (if body
-                      (solve-conjunction body new-env k)
-                      (funcall k new-env)))
-                :cut)
-        :cut))))
+    (multiple-value-bind (_predicate head-args) (prolog-compound-form-parts head)
+      (declare (ignore _predicate))
+      (when-unify-succeeds (new-env args head-args env)
+        (when (eq (with-prolog-cut-handling
+                    (if body
+                        (solve-conjunction body new-env k)
+                        (funcall k new-env)))
+                  :cut)
+          :cut)))))
 
 (defun solve-prolog-rules (predicate args env k)
   "Try every rule registered under PREDICATE and stop early on cut."
@@ -65,28 +81,22 @@
   "Solve a conjunction of goals (AND). Call K when all goals succeed."
   (if (null goals)
       (funcall k env)
-      (with-prolog-cut-handling
-        (solve-goal (car goals) env
-                    (lambda (new-env)
-                      (solve-conjunction (cdr goals) new-env k))))))
+      (destructuring-bind (goal . rest-goals) goals
+        (with-prolog-cut-handling
+          (solve-goal goal env
+                      (lambda (new-env)
+                        (solve-conjunction rest-goals new-env k)))))))
 
 (defun %collect-projected-solutions (goal &optional projector limit)
   "Collect solutions for GOAL, optionally projecting each environment and
    stopping after LIMIT."
-  (let ((solutions nil)
-        (count 0))
-    (labels ((emit-solution (env)
-               (when (or (null limit) (< count limit))
-                 (push (if projector
-                           (funcall projector env)
-                           (logic-substitute goal env))
-                       solutions)
-                 (incf count)
-                 (when (and limit (>= count limit))
-                   (signal 'prolog-cut)))))
-      (with-prolog-cut-handling
-        (solve-goal goal nil #'emit-solution)))
-    (nreverse solutions)))
+  (with-prolog-solution-collection (emit results :limit limit)
+    (with-prolog-cut-handling
+      (solve-goal goal nil
+                  (lambda (env)
+                    (emit (if projector
+                              (funcall projector env)
+                              (logic-substitute goal env))))))))
 
 (defun query-all (goal)
   "Return all solutions for GOAL as a list of substituted goals.

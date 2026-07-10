@@ -3,8 +3,7 @@
 ;;; Prolog built-in and DCG dispatch data
 
 (defparameter *builtin-predicate-specs*
-  '((! prolog-cut-handler)
-    (and solve-conjunction)
+  '((and solve-conjunction)
     (or prolog-or-handler)
     (= prolog-unify-handler)
     (/= prolog-not-unify-handler)

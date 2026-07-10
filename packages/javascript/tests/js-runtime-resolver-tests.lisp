@@ -71,13 +71,13 @@
     (assert-eq cl-cc/javascript::+js-null+ m)))
 
 (deftest js-rt-regex-string-match-global
-  "String.prototype.match() with /g returns all matched substrings."
+  "String.prototype.match() with /g returns each match once, advancing past
+the match end ('hello'.match(/l/g) is ['l','l'] in JS, not three)."
   (let ((result (cl-cc/javascript::%js-string-match-regex
                  "hello" (cl-cc/javascript::%js-make-regex "l" "g"))))
-    (assert-= 3 (length result))
+    (assert-= 2 (length result))
     (assert-string= "l" (aref result 0))
-    (assert-string= "l" (aref result 1))
-    (assert-string= "l" (aref result 2))))
+    (assert-string= "l" (aref result 1))))
 
 (deftest js-rt-regex-string-match-global-empty
   "Global empty matches advance by one code unit to avoid infinite loops."
@@ -157,23 +157,27 @@
                    "hello" (cl-cc/javascript::%js-make-regex "l" "g") "-")))
 
 (deftest js-rt-regex-string-split
-  "String.prototype.split(regexp) returns pieces around the separator."
+  "String.prototype.split(regexp) returns the fields between separator matches."
   (let ((parts (cl-cc/javascript::%js-string-split-regex
                 "a,b,c" (cl-cc/javascript::%js-make-regex ","))))
-    (assert-= 1 (length parts))
-    (assert-string= "a,b,c" (aref parts 0))))
+    (assert-= 3 (length parts))
+    (assert-string= "a" (aref parts 0))
+    (assert-string= "b" (aref parts 1))
+    (assert-string= "c" (aref parts 2))))
 
 (deftest js-rt-regex-string-split-limit-and-empty
-  "Split respects an explicit limit and advances on empty matches."
+  "Split respects an explicit limit; an empty pattern splits between characters."
+  ;; 'ab'.split(/a/, 1) => [''] — the field BEFORE the separator is empty.
   (let ((parts (cl-cc/javascript::%js-string-split-regex
                 "ab" (cl-cc/javascript::%js-make-regex "a") 1)))
     (assert-= 1 (length parts))
-    (assert-string= "a" (aref parts 0)))
+    (assert-string= "" (aref parts 0)))
+  ;; 'ab'.split(//) => ['a','b'] — zero-width matches split between characters.
   (let ((parts (cl-cc/javascript::%js-string-split-regex
                 "ab" (cl-cc/javascript::%js-make-regex ""))))
     (assert-= 2 (length parts))
-    (assert-string= "" (aref parts 0))
-    (assert-string= "" (aref parts 1))))
+    (assert-string= "a" (aref parts 0))
+    (assert-string= "b" (aref parts 1))))
 
 (deftest js-rt-regex-string-split-fallback
   "String.prototype.split(regexp) falls back to string split when regex compile fails."
@@ -376,8 +380,11 @@
           ("toString" "toString" "function() { [native code] }"))
   (key expected)
   (let* ((fn  (lambda (&rest args) args))
-         (val (cl-cc/javascript::%js-resolve-function-method fn key)))
-    (assert-equal expected val)))
+         (val (cl-cc/javascript::%js-resolve-function-method fn key))
+         ;; toString resolves to a callable method (f.toString() in JS);
+         ;; name resolves directly to its value.
+         (result (if (functionp val) (funcall val) val)))
+    (assert-equal expected result)))
 
 (deftest js-rt-resolve-function-length
   "Function resolver returns 0 for the synthetic length property."

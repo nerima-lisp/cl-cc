@@ -286,7 +286,7 @@ Supports :start, :end, and :index keyword arguments."
            (syms-var (gensym "SYMS"))
            (idx-var (gensym "IDX"))
            (len-var (gensym "LEN")))
-      `(let* ((,syms-var (%package-iterator-entries ,packages ,symbol-types))
+      `(let* ((,syms-var (%package-iterator-entries ,packages ',symbol-types))
               (,idx-var 0)
               (,len-var (length ,syms-var)))
          (let ((,name (lambda ()

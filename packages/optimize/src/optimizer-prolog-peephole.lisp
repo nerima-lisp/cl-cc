@@ -19,16 +19,16 @@
   "Return replacement instructions when RULE matches CURRENT and NEXT."
   (destructuring-bind (cur-pat next-pat result-list) rule
     (let ((env (unify cur-pat current nil)))
-      (unless (unify-failed-p env)
+      (unless (eq env :unify-fail)
         (let ((env2 (unify next-pat next env)))
-          (unless (unify-failed-p env2)
+          (unless (eq env2 :unify-fail)
             (mapcar (lambda (template)
                       (logic-substitute template env2))
                     result-list)))))))
 
 (defun %maybe-peephole-rewrite (current next)
   "Try all peephole rules for CURRENT/NEXT and return replacements if one matches."
-  (dolist (rule *peephole-rules*)
+  (dolist (rule cl-cc/prolog::*peephole-rules*)
     (let ((replacements (%match-peephole-rule rule current next)))
       (when replacements
         (return replacements)))))
@@ -47,7 +47,7 @@
 (defun apply-prolog-peephole (instructions)
   "Apply Prolog-unification peephole rules over two-instruction windows.
 
-   Rule format: each rule in *peephole-rules* is a three-element list
+   Rule format: each rule in cl-cc/prolog::*peephole-rules* is a three-element list
      (CURRENT-PATTERN NEXT-PATTERN REPLACEMENT-LIST)
    On a match, both instructions are consumed and REPLACEMENT-LIST sexps emitted.
    Self-moves (:move :Rx :Rx) are removed in a pre-pass."

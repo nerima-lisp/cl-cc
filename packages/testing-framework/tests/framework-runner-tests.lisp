@@ -422,3 +422,224 @@
                                    (declare (ignore args))
                                    (error "cpu-count failed"))))
     (assert-null (%parse-command-cpu-count '("fake-cpu-count")))))
+
+;;; ── Runner policy / filtering / flaky detection ────────────────────────
+
+(deftest mixed-runner-keeps-serial-suites-out-of-parallel-pool
+  "Serial suites and dependent tests are excluded from the parallel worker batch."
+  (let ((serial-suite (gensym "ULW-SERIAL-SUITE-"))
+        (parallel-suite (gensym "ULW-PARALLEL-SUITE-")))
+    (with-restored-binding (*suite-registry*)
+      (with-suite-registry-entry (serial-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel nil)
+        (with-suite-registry-entry (parallel-suite
+                                     :description "tmp"
+                                     :parent nil
+                                     :parallel t)
+          (assert-false (%test-parallel-safe-p
+                         (list :name 'serial-test :suite serial-suite :depends-on nil)))
+          (assert-false (%test-parallel-safe-p
+                         (list :name 'dependent-test :suite parallel-suite
+                               :depends-on 'other-test)))
+          (assert-true (%test-parallel-safe-p
+                        (list :name 'parallel-test :suite parallel-suite :depends-on nil))))))))
+
+(deftest effective-worker-count-falls-back-to-one-for-serial-batches
+  "Worker reporting collapses to 1 when no test in the batch may run in parallel."
+  (let ((serial-suite (gensym "ULW-SERIAL-SUITE-")))
+    (with-restored-binding (*suite-registry*)
+      (with-suite-registry-entry (serial-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel nil)
+        (assert-= 1
+                  (%effective-worker-count
+                   (list (list :name 'serial-test :suite serial-suite :depends-on nil))
+                   t
+                   4))
+        (assert-= 1
+                  (%effective-worker-count
+                   (list (list :name 'serial-test :suite serial-suite :depends-on nil))
+                   nil
+                   4))))))
+
+(deftest effective-worker-count-keeps-requested-workers-for-parallel-safe-batches
+  "Worker reporting preserves the requested worker count when at least one test can run in parallel."
+  (let ((parallel-suite (gensym "ULW-PARALLEL-SUITE-")))
+    (with-restored-binding (*suite-registry*)
+      (with-suite-registry-entry (parallel-suite
+                                   :description "tmp"
+                                   :parent nil
+                                   :parallel t)
+        (assert-= 4
+                  (%effective-worker-count
+                   (list (list :name 'parallel-test :suite parallel-suite :depends-on nil))
+                   t
+                   4))
+        (assert-= 2
+                  (%effective-worker-count
+                   (list (list :name 'parallel-test :suite parallel-suite :depends-on nil))
+                   t
+                   2))))))
+
+(deftest run-suite-reports-one-worker-for-serial-only-batch
+  "run-suite reports one worker when the selected batch has no parallel-safe tests."
+  (let ((root (gensym "ULW-ROOT-"))
+        (serial-suite (gensym "ULW-SERIAL-"))
+        (test-name (gensym "ULW-TEST-")))
+    (with-restored-bindings (*suite-registry*
+                             *test-registry*
+                             ((symbol-function 'cl-cc::warm-stdlib-cache)))
+      (with-fresh-registry-state
+        (with-suite-registry-entry (root
+                                     :description "tmp"
+                                     :parent nil
+                                     :parallel t)
+          (with-suite-registry-entry (serial-suite
+                                       :description "tmp"
+                                       :parent root
+                                       :parallel nil)
+            (with-test-registry-entry (test-name
+                                        :suite serial-suite
+                                        :fn (lambda () t)
+                                        :depends-on nil
+                                        :timeout nil
+                                        :tags nil)
+              (setf (symbol-function 'cl-cc::warm-stdlib-cache) (lambda () nil))
+              ;; Use quit-p nil so run-suite returns any-fail directly without calling
+              ;; uiop:quit — avoids the need to mock uiop:quit and is immune to the
+              ;; mocked-quit-returns-NIL ambiguity when the killer thread is active.
+              (let ((output (with-output-to-string (s)
+                              (let ((*standard-output* s))
+                                (assert-false
+                                 (run-suite root :parallel t :random nil :workers 4 :quit-p nil))))))
+                (assert-string-contains-all output '("Workers: 1"))))))))))
+
+(deftest-each canonical-suite-taxonomy-matches-runner-contract
+  "The canonical runner exposes its top-level test classes under the root taxonomy."
+  :cases (("unit"        'cl-cc-unit-suite)
+          ("integration" 'cl-cc-integration-suite)
+          ("e2e"         'cl-cc-e2e-suite)
+          ("conformance" 'cl-cc-conformance-suite)
+          ("docs"        'cl-cc-documentation-suite))
+  (suite-name)
+  (assert-eq 'cl-cc-suite
+             (getf (persist-lookup *suite-registry* suite-name) :parent)))
+
+(deftest run-tests-excludes-non-unit-suites-by-default
+  "The canonical runner keeps non-fast suites outside the default plan."
+  (let ((captured nil))
+    (with-restored-bindings (*suite-registry*)
+      (with-suite-registry-entry ('cl-cc-e2e-suite
+                                   :description "tmp"
+                                   :parent 'cl-cc-suite
+                                   :parallel nil)
+        (with-replaced-function (run-suite
+                                 (lambda (suite-name &key parallel random warm-stdlib tags exclude-tags exclude-suites filter coverage &allow-other-keys)
+                                   (setf captured (list :suite-name suite-name
+                                                        :parallel parallel
+                                                        :random random
+                                                        :warm-stdlib warm-stdlib
+                                                        :tags tags
+                                                        :exclude-tags exclude-tags
+                                                        :exclude-suites exclude-suites
+                                                        :filter filter
+                                                        :coverage coverage))
+                                   0))
+          (assert-equal 0 (run-tests :parallel nil :random nil :filter "static"))
+          (assert-eq 'cl-cc-suite (getf captured :suite-name))
+          (assert-string= "static" (getf captured :filter))
+          (assert-true (getf captured :warm-stdlib))
+          (assert-true (member 'cl-cc-integration-suite (getf captured :exclude-suites)))
+          (assert-true (member 'cl-cc-e2e-suite (getf captured :exclude-suites)))
+          (assert-true (member 'cl-cc-conformance-suite (getf captured :exclude-suites)))
+          (assert-true (member 'cl-cc-documentation-suite (getf captured :exclude-suites))))))))
+
+(deftest run-tests-forwards-warm-stdlib-option
+  "run-tests lets the Nix app skip pre-warming for focused non-stdlib runs."
+  (let ((captured nil))
+    (with-replaced-function (run-suite
+                             (lambda (suite-name &key warm-stdlib &allow-other-keys)
+                               (setf captured (list :suite-name suite-name
+                                                    :warm-stdlib warm-stdlib))
+                               0))
+      (assert-equal 0 (run-tests :parallel nil :random nil :warm-stdlib nil))
+      (assert-eq 'cl-cc-suite (getf captured :suite-name))
+      (assert-false (getf captured :warm-stdlib)))))
+
+(deftest test-name-filter-matches-substrings-case-insensitively
+  "The fast-runner filter matches test names by case-insensitive substring."
+  (let ((tests (list (list :name 'php-e2e-static-members)
+                     (list :name 'js-rt-array))))
+    (assert-equal '(php-e2e-static-members)
+                  (mapcar (lambda (test) (getf test :name))
+                          (%filter-tests-by-name tests "STATIC")))))
+
+(deftest test-name-filter-supports-comma-and-repeated-filters
+  "Comma-separated and repeated filters narrow names with AND semantics."
+  (let ((tests (list (list :name 'php-e2e-array-pad-key-policy)
+                     (list :name 'php-e2e-array-column-index-key)
+                     (list :name 'js-rt-array-to-spliced))))
+    (assert-equal '(php-e2e-array-pad-key-policy)
+                  (mapcar (lambda (test) (getf test :name))
+                          (%filter-tests-by-name tests "php,array-pad")))
+    (assert-equal '(js-rt-array-to-spliced)
+                  (mapcar (lambda (test) (getf test :name))
+                          (%filter-tests-by-name tests '("js" "spliced"))))))
+
+(deftest run-tests-does-not-load-e2e-system-implicitly
+  "run-tests only dispatches the already-loaded fast suite taxonomy."
+  (let ((loaded nil)
+        (run-called nil))
+    (with-restored-bindings (*suite-registry*)
+      (setf *suite-registry* (persist-remove *suite-registry* 'cl-cc-e2e-suite))
+      (with-replaced-function (asdf:load-system
+                               (lambda (system &key &allow-other-keys)
+                                 (setf loaded system)
+                                 0))
+        (with-replaced-function (run-suite
+                                 (lambda (&rest args)
+                                   (declare (ignore args))
+                                   (setf run-called t)
+                                   0))
+          (assert-equal 0 (run-tests :parallel nil :random nil))
+          (assert-null loaded)
+          (assert-true run-called))))))
+
+(deftest fast-plan-filter-is-name-independent
+  "Fast-plan selection is based on suite taxonomy, not a slow-name convention."
+  (let ((captured nil))
+    (with-replaced-function (run-suite
+                             (lambda (suite-name &key exclude-suites &allow-other-keys)
+                               (setf captured (list suite-name exclude-suites))
+                               0))
+      (assert-equal 0 (run-tests :parallel nil :random nil))
+      (assert-eq 'cl-cc-suite (first captured))
+      (assert-true (member 'cl-cc-integration-suite (second captured)))
+      (assert-true (member 'cl-cc-e2e-suite (second captured)))
+      (assert-true (member 'cl-cc-conformance-suite (second captured)))
+      (assert-true (member 'cl-cc-documentation-suite (second captured))))))
+
+(deftest detect-flaky-reports-inconsistent-statuses
+  "%detect-flaky prints a summary when a test passes in only some repeated runs."
+  (let ((*standard-output* (make-string-output-stream)))
+    (%detect-flaky (list (list (list :name 'sometimes :status :pass)
+                               (list :name 'always :status :pass))
+                         (list (list :name 'sometimes :status :fail)
+                               (list :name 'always :status :pass)))
+                   2)
+    (let ((output (get-output-stream-string *standard-output*)))
+      (assert-string-contains-all output '("Flaky tests detected"))
+      (assert-string-contains-all (string-upcase output) '("SOMETIMES")))))
+
+(deftest detect-flaky-is-silent-for-consistent-results
+  "%detect-flaky emits nothing when every test is consistently pass or fail."
+  (let ((*standard-output* (make-string-output-stream)))
+    (%detect-flaky (list (list (list :name 'always-pass :status :pass)
+                               (list :name 'always-fail :status :fail))
+                         (list (list :name 'always-pass :status :pass)
+                               (list :name 'always-fail :status :fail)))
+                   2)
+    (assert-string= "" (get-output-stream-string *standard-output*))))

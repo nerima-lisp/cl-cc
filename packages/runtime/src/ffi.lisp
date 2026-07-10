@@ -68,16 +68,15 @@
 (defvar *rt-ffi-next-callback-id* 0)
 
 (defun rt-make-callback (fn arg-types return-type)
-  "Create a C-callable function pointer from a Lisp function. When this SBCL build
-lacks alien-callback support, return a non-nil stub token instead of erroring —
-the cl-cc-side callback registry (register/lookup/cleanup) still works; only the
-native C function pointer is unavailable."
-  (declare (ignore arg-types return-type))
-  (let ((id (incf *rt-ffi-next-callback-id*)))
-    #+(and sbcl sb-alien-callback)
-    (progn id (sb-alien:alien-callback (function sb-alien:void) fn))
-    #-(and sbcl sb-alien-callback)
-    (list :rt-callback-stub id fn)))
+  "Create a C-callable function pointer from a Lisp function."
+  (declare (ignore arg-types return-type)
+           #-(and sbcl sb-alien-callback) (ignore fn))
+  #+(and sbcl sb-alien-callback)
+  (progn
+    (incf *rt-ffi-next-callback-id*)
+    (sb-alien:alien-callback (function sb-alien:void) fn))
+  #-(and sbcl sb-alien-callback)
+  (error "C callback trampolines require SB-ALIEN-CALLBACK support."))
 
 (defun rt-ffi-callback-invoke (cb-id &rest args)
   "Invoke a registered callback. Called from native code."
@@ -130,12 +129,6 @@ native C function pointer is unavailable."
       (dolist (f (rt-ffi-struct-type-fields st))
         (when (eq (first f) field-name)
           (return (third f)))))))
-
-;; ── Inline assembly stubs ──
-(defmacro rt-asm ((&rest instrs))
-  "Inline assembly placeholder. On native backend, emits actual instructions."
-  (declare (ignore instrs))
-  '(error "Inline assembly not available on host CL"))
 
 ;; ── Initialization ──
 (defun rt-ffi-init ()
@@ -305,15 +298,6 @@ native C function pointer is unavailable."
   (check-type state cl-cc-state)
   (cl-cc-state-last-error state))
 
-;;; C ABI spelling aliases for generated/exported shared-library entry points.
-(setf (symbol-function '|cl_cc_init|) #'cl-cc-init)
-(setf (symbol-function '|cl_cc_eval|) #'cl-cc-eval)
-(setf (symbol-function '|cl_cc_call|) #'cl-cc-call)
-(setf (symbol-function '|cl_cc_cleanup|) #'cl-cc-cleanup)
-(setf (symbol-function '|cl_cc_last_error|) #'cl-cc-last-error)
-(setf (symbol-function '|cl_cc_register_callback|) #'cl-cc-register-callback)
-(setf (symbol-function '|cl_cc_get_callback|) #'cl-cc-callback)
-
 ;;; ──── FR-522: Deoptimization Trampoline ────
 ;;; Called by native codegen when a deoptimization checkpoint is hit.
 ;;; The trampoline saves register state, reconstructs the interpreter
@@ -331,17 +315,11 @@ When NIL, deopt checkpoints are treated as fatal errors.")
 DEOPT-ID is the checkpoint identifier. SAVED-REGS is a plist of
 (register-name . value) pairs captured by the codegen prologue.
 Reconstructs interpreter state and transfers control."
-  (declare (ignore deopt-id saved-regs))
   (incf *rt-deopt-frame-count*)
-  ;; On host SBCL, signal a continuable error for development.
-  (restart-case
-      (error "Deoptimization trampoline invoked (id=~D, frame=~D). ~
-              Full interpreter state reconstruction not yet implemented. ~
-              Use CONTINUE to return to the deopt point."
-             deopt-id *rt-deopt-frame-count*)
-    (continue ()
-      :report "Return from deoptimization (no-op)"
-      nil)))
+  (error "Deoptimization trampoline invoked (id=~D, frame=~D). ~
+          Full interpreter state reconstruction is not implemented. ~
+          Saved registers: ~S"
+         deopt-id *rt-deopt-frame-count* saved-regs))
 
 ;; C ABI entry point for the deopt trampoline
 (setf (symbol-function '|_cl_cc_deopt_trampoline|)

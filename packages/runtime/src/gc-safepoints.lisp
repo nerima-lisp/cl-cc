@@ -214,44 +214,27 @@ stop-the-world work."
          (rt-gc-signal-handler-leave ,h ,old)))))
 
 (defun rt-heap-madvise-sequential (heap start end)
-  "Portable MADV_SEQUENTIAL heap hint.
-
-On Linux/native targets this interface would call madvise(2) with
-MADV_SEQUENTIAL for heap pages in [START, END), telling the kernel that the
-collector expects sequential access.  The Pure CL runtime cannot alter host VM
-policy, so it validates the range and returns descriptive no-op metadata."
+  "Request MADV_SEQUENTIAL for heap pages in [START, END)."
   (check-type heap rt-heap)
   (check-type start integer)
   (check-type end integer)
   (unless (<= 0 start end (length (rt-heap-words heap)))
     (error "Invalid heap madvise range [~D, ~D)" start end))
-  (list :status :noop :hint :madv-sequential :start start :end end :portable t))
+  (error "RT-HEAP-MADVISE-SEQUENTIAL requires a native madvise backend."))
 
 (defun rt-heap-madvise-willneed (heap start end)
-  "Portable MADV_WILLNEED heap hint.
-
-On Linux/native targets this interface would call madvise(2) with
-MADV_WILLNEED to prefetch heap pages before GC scans them.  Pure CL returns a
-documented no-op result while keeping the call site portable."
+  "Request MADV_WILLNEED for heap pages in [START, END)."
   (check-type heap rt-heap)
   (check-type start integer)
   (check-type end integer)
   (unless (<= 0 start end (length (rt-heap-words heap)))
     (error "Invalid heap madvise range [~D, ~D)" start end))
-  (list :status :noop :hint :madv-willneed :start start :end end :portable t))
+  (error "RT-HEAP-MADVISE-WILLNEED requires a native madvise backend."))
 
 (defun rt-heap-madvise-hugepage (heap)
-  "Portable Transparent Huge Page promotion hint for HEAP.
-
-Native Linux runtimes may request MADV_HUGEPAGE for large old/large-object
-spaces when *RT-HEAP-HUGEPAGE-ENABLED* is true.  The Pure CL heap is a vector,
-so this records the intended policy without changing OS memory mappings."
+  "Request transparent huge-page promotion for HEAP."
   (check-type heap rt-heap)
-  (list :status :noop
-        :hint :transparent-huge-pages
-        :enabled *rt-heap-hugepage-enabled*
-        :portable t
-        :heap-words (length (rt-heap-words heap))))
+  (error "RT-HEAP-MADVISE-HUGEPAGE requires a native madvise backend."))
 
 (defvar *rt-adjustable-array-storage-registry* (make-hash-table :test #'eq)
   "Heap -> records of adjustable-array backing storage superseded by resize.")

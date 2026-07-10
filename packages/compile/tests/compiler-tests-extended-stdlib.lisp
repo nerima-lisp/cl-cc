@@ -245,7 +245,7 @@
   (assert-= 42 (run-string "(inspect 42)")))
 
 (deftest compile-foreign-funcall-strlen
-  "foreign-funcall provides a minimal CFFI-compatible host-backed FFI path."
+  "foreign-funcall provides a minimal host-backed FFI path."
   (assert-= 4 (run-string "(foreign-funcall \"strlen\" :string \"abcd\" :int)" :stdlib t))
   (assert-= 5 (run-string "(cffi:foreign-funcall \"strlen\" :string \"abcde\" :int)" :stdlib t)))
 

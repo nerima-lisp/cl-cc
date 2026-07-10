@@ -10,8 +10,7 @@
   "Indirection for the suite-deadline-killer exit action so tests can rebind to a recorder.
 Default uses sb-ext:exit :code code :abort t.  The :abort t flag calls _exit(2) directly,
 bypassing the SBCL thread join that plain (sb-ext:exit) would perform; without :abort t a
-GC-safepoint-blocked main thread cannot be terminated by the killer.
-Mirrors *watchdog-exit-fn* in framework-parallel.lisp.")
+GC-safepoint-blocked main thread cannot be terminated by the killer.")
 
 ;;; ------------------------------------------------------------
 ;;; Parallel Worker Pool
@@ -58,6 +57,9 @@ sequentially in dependency-safe input order."
         (parallel-batch '()))
     (flet ((flush-parallel-batch ()
              (when parallel-batch
+               (format *error-output* "# batch: ~D parallel tests~%"
+                       (length parallel-batch))
+               (finish-output *error-output*)
                (setf results
                      (append results
                              (%run-tests-parallel (nreverse parallel-batch)
@@ -68,6 +70,12 @@ sequentially in dependency-safe input order."
             (push test parallel-batch)
             (progn
               (flush-parallel-batch)
+              ;; Serial tests run on THIS thread: a hang here is unrecoverable
+              ;; (the macOS 26.5 trap-delivery hang blocks interrupts), so
+              ;; always announce the test first — the last announced name in
+              ;; the log identifies the hung test after a deadline kill.
+              (format *error-output* "# serial: ~A~%" (getf test :name))
+              (finish-output *error-output*)
               (let ((*test-runner-mode* :parallel))
                 (setf results
                       (append results
@@ -150,6 +158,7 @@ FASLs); warm-cache runs complete in well under a minute."
                   (sb-thread:make-semaphore :name "suite-killer-sem" :count 0)))))
     (when suite-deadline
       (let ((err *error-output*)
+            (exit-fn *suite-killer-exit-fn*)
             (remaining (max 1.0 (/ (- suite-deadline (get-internal-real-time))
                                    (float internal-time-units-per-second)))))
         (sb-thread:make-thread
@@ -168,7 +177,7 @@ FASLs); warm-cache runs complete in well under a minute."
                          (%suite-deadline-killer-state-live state))
                    (format err "# FATAL: suite deadline killer triggered; aborting~%")
                    (finish-output err)
-                   (funcall *suite-killer-exit-fn* :code 124))))
+                   (funcall exit-fn :code 124))))
          :name "suite-deadline-killer")))
     state))
 
@@ -308,16 +317,23 @@ When QUIT-P is true, exits via uiop:quit; otherwise returns whether any test fai
                                     filter))
                   (n               (length tests-plists))
                   (test-vec        (coerce (%number-tests tests-plists) 'vector)))
+             (format *error-output* "# stage: collected ~D tests~%" n)
+             (finish-output *error-output*)
              (when filter
                (format t "# Filtering tests by name: ~A (~D selected)~%" filter n))
              (when random (%fisher-yates-shuffle test-vec))
              (let* ((ordered-tests     (%order-tests-for-dependencies (coerce test-vec 'list)))
                     (effective-workers (%effective-worker-count ordered-tests parallel workers)))
+               (format *error-output* "# stage: ordered; workers=~D~%" effective-workers)
+               (finish-output *error-output*)
                (%print-tap-header n repeat actual-seed effective-workers)
+               (finish-output)
                ;; Second warm call: should be a no-op cache hit if apps.nix pre-warmed.
                ;; No inner sb-ext:with-timeout — see note above about SIGALRM delivery.
                (when warm-stdlib
                  (ignore-errors (cl-cc:warm-stdlib-cache)))
+               (format *error-output* "# stage: warm2 done~%")
+               (finish-output *error-output*)
                (when coverage (format t "# Coverage report enabled~%"))
                (let* ((prior-timings   (%load-prior-timings))
                       (all-run-results

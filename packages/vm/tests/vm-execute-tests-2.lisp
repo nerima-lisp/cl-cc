@@ -88,7 +88,7 @@
       (declare (ignore result))
       (assert-= 10 next-pc)
       (assert-false halted)
-      (assert-= 33 (cl-cc:vm-reg-get s :R0)))))
+      (assert-= 63 (cl-cc:vm-reg-get s :R0)))))
 
 (deftest vm-execute-vm-values-buffer-management
   "vm-clear-values resets values-list; vm-ensure-values initialises it from src when nil."

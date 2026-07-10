@@ -136,8 +136,6 @@
       #:cl-cc-error-code #:cl-cc-error-message
       #:cl-cc-init #:cl-cc-eval #:cl-cc-call #:cl-cc-cleanup
       #:cl-cc-last-error #:cl-cc-register-callback #:cl-cc-callback
-      #:|cl_cc_init| #:|cl_cc_eval| #:|cl_cc_call| #:|cl_cc_cleanup|
-      #:|cl_cc_last_error| #:|cl_cc_register_callback| #:|cl_cc_get_callback|
     #:rt-random #:rt-make-random-state
    #:rt-get-universal-time #:rt-get-internal-real-time #:rt-get-internal-run-time
     #:rt-read-from-string #:rt-read-sexp
@@ -432,7 +430,7 @@
    #:rt-make-actor #:rt-actor-send #:rt-actor-receive
    ;; ── STM (stm.lisp) ───────────────────────────────────────────────
     #:rt-tvar #:rt-tvar-p #:rt-make-tvar #:rt-read-tvar #:rt-write-tvar
-    #:rt-atomically #:atomic #:rt-retry #:rt-tvar-value-unsafe #:rt-tvar-version-unsafe
+    #:rt-atomically #:rt-retry #:rt-tvar-value-unsafe #:rt-tvar-version-unsafe
     #:rt-stm-transaction #:rt-stm-conflict #:rt-stm-retry #:opt-pass-stm
     ;; ── Fibers / green threads (fiber.lisp) ───────────────────────────
     #:rt-fiber #:rt-fiber-p #:rt-make-fiber #:rt-fiber-spawn #:rt-fiber-schedule
@@ -584,7 +582,6 @@
     #:rt-pinned-unboxed-array-buffer-released-p
     ;; ── Self-host portability facades (portable.lisp) ──
     #:rt-make-lock #:rt-with-lock #:rt-lock #:rt-unlock #:rt-try-lock
-    #:rt-thread-yield
     #:rt-getenv))
 
 (in-package :cl-cc/runtime)

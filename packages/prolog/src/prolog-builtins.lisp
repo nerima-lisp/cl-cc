@@ -7,9 +7,16 @@
 
 (defvar *builtin-predicates* (make-hash-table :test 'eq))
 
-(declaim (ftype function subst-for-eval eval-lisp-condition
-                      solve-conjunction solve-goal our-eval
-                      register-builtin-specs))
+(defmacro define-prolog-builtin (name lambda-list &body body)
+  "Define a CPS Prolog builtin handler with a destructured ARGS list."
+  (let ((docstring (when (stringp (first body))
+                     (pop body))))
+    `(defun ,name (args env k)
+       ,@(when docstring (list docstring))
+       (destructuring-bind ,lambda-list args
+         ,@body))))
+
+(declaim (ftype function solve-conjunction solve-goal register-builtin-specs))
 
 (defun register-builtin-specs (table specs)
   "Populate TABLE from SPECS entries of the form (NAME HANDLER)."
@@ -18,52 +25,22 @@
       (setf (gethash name table)
             (symbol-function handler)))))
 
-(defun prolog-cut-handler (args env k)
-  (declare (ignore args))
-  (funcall k env)
-  (signal 'prolog-cut))
-
-(defun prolog-or-handler (args env k)
-  (dolist (alt args)
+(define-prolog-builtin prolog-or-handler (alt1 &rest alts)
+  "Try each alternative goal in sequence."
+  (dolist (alt (cons alt1 alts))
     (solve-goal alt env k)))
 
-(defun prolog-unify-handler (args env k)
-  (destructuring-bind (left right) args
-    (when-unify-succeeds (new-env left right env)
-      (funcall k new-env))))
+(define-prolog-builtin prolog-unify-handler (left right)
+  "Unify LEFT and RIGHT, then continue with the resulting environment."
+  (when-unify-succeeds (new-env left right env)
+    (funcall k new-env)))
 
-(defun prolog-not-unify-handler (args env k)
-  (destructuring-bind (left right) args
-    (when (unify-failed-p (unify left right env))
-      (funcall k env))))
-
-(defun prolog-when-handler (args env k)
-  (when (eval-lisp-condition (first args) env)
+(define-prolog-builtin prolog-not-unify-handler (left right)
+  "Succeed only when LEFT and RIGHT do not unify."
+  (when-unify-fails (left right env)
     (funcall k env)))
 
-(defun subst-for-eval (form env)
-  "Like logic-substitute, but wraps substituted non-self-evaluating symbols in
-   (quote ...) so they survive CL eval, and skips (quote ...) forms."
-  (cond
-    ((logic-var-p form)
-      (let ((val (logic-substitute form env)))
-        (if (logic-var-p val)
-            val
-            (if (and (symbolp val) val (not (keywordp val)))
-                `(quote ,val)
-                val))))
-    ((and (consp form) (eq (car form) 'quote))
-     form)
-    ((consp form)
-     (cons (subst-for-eval (car form) env)
-           (subst-for-eval (cdr form) env)))
-    (t form)))
-
-(defun eval-lisp-condition (condition env)
-  "Evaluate a Lisp condition embedded in Prolog rules."
-  (handler-case
-      (let ((substituted (subst-for-eval condition env)))
-        (typecase substituted
-          (cons (our-eval substituted))
-          (t substituted)))
-    (error () nil)))
+(define-prolog-builtin prolog-when-handler (condition)
+  "Evaluate CONDITION as Lisp and continue only on truthy results."
+  (when (eval-lisp-condition condition env)
+    (funcall k env)))

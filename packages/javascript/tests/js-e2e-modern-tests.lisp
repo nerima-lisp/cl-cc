@@ -253,3 +253,41 @@ console.log(new C(7).get());")))
   "Atomics.pause is callable and returns undefined."
   ("true"
    "console.log(Atomics.pause()===undefined);"))
+
+(deftest-js-run js-e2e-regex-literals
+  "Regex literals construct a working RegExp (regression: the parser passed the
+whole (:regex pat flags) token value as %js-make-regex's first argument, and
+string-method dispatch routed match/search/replace/split to the string-only
+helpers, which spun forever on a js-regexp struct)."
+  ("true"    "console.log(/\\d+/.test('x42'));")
+  ("n"       "console.log(/z/.test('abc')?'y':'n');")
+  ("ab gi"   "const r=/ab/gi; console.log(r.source+' '+r.flags);")
+  ("true"    "console.log(/ab/g.global);"))
+
+(deftest-js-run js-e2e-regex-string-methods
+  "String.prototype.replace/match/search/split accept RegExp arguments."
+  ("bbb"     "console.log('aaa'.replace(/a/g,'b'));")
+  ("baa"     "console.log('aaa'.replace(/a/,'b'));")
+  ("1 ll"    "const m='hello'.match(/l+/g); console.log(m.length+' '+m[0]);")
+  ("42 1"    "const m='x42y'.match(/\\d+/); console.log(m[0]+' '+m.index);")
+  ("3"       "console.log('abcdef'.search(/de/));")
+  ("-1"      "console.log('abcdef'.search(/zz/));")
+  ("a-b-c"   "console.log('a1b22c'.split(/\\d+/).join('-'));")
+  ("2"       "console.log('a1b2'.matchAll(/\\d/g).length);"))
+
+(deftest-js-run js-e2e-regex-constructor
+  "new RegExp(pattern, flags) matches like a literal."
+  ("true"    "console.log(new RegExp('l+','g').test('hello'));")
+  ("X-X"     "const re=new RegExp('[0-9]','g'); console.log('1-2'.replace(re,'X'));"))
+
+(deftest-js-run js-e2e-date-constructor-and-methods
+  "Date is a constructor object (regression: a bare :function prelude binding
+made %js-new fall through to the empty-object branch, so every Date instance
+was a plain {} whose methods resolved to undefined; Date.now/parse/UTC statics
+were likewise unreachable through the function-method resolver)."
+  ("1970 0"  "const d=new Date(0); console.log(d.getUTCFullYear()+' '+d.getTime());")
+  ("2020 0 15" "const d=new Date(2020,0,15); console.log(d.getUTCFullYear()+' '+d.getUTCMonth()+' '+d.getUTCDate());")
+  ("0"       "console.log(Date.UTC(1970,0,1));")
+  ("true"    "console.log(Date.now()>0);")
+  ("1970-01-02T00:00:00.000Z" "console.log(new Date(86400000).toISOString());")
+  ("true"    "console.log(Date.parse('1970-01-02')===86400000);"))

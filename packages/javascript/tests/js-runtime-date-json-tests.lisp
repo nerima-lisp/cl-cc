@@ -173,27 +173,39 @@
     (assert-string= "P-1Y-2M-3W-4DT-5H-6M-7S" (funcall (gethash "toString" negated)))
     (assert-= 38995567.0d0 (funcall (gethash "total" duration)))))
 
-(deftest js-rt-temporal-normalization-and-fallbacks
-  "Temporal normalization and parse fallback branches cover non-number inputs and invalid ISO strings."
-  (let* ((duration (cl-cc/javascript::%js-temporal-duration :hours -2.7 :minutes nil))
-         (instant (cl-cc/javascript::%js-temporal-parse-instant "("))
-         (plain-date (cl-cc/javascript::%js-temporal-parse-plain-date "(")))
-    (assert-= 3 (cl-cc/javascript::%temporal-normalize-number 3.9))
-    (assert-= 7 (cl-cc/javascript::%temporal-normalize-number nil 7))
-    (multiple-value-bind (s mn h d m y dow)
-        (cl-cc/javascript::%temporal-decode
-         (cl-cc/javascript::%temporal-encode 2025 6 18 12 34 56))
-      (assert-= 56 s)
-      (assert-= 34 mn)
-      (assert-= 12 h)
-      (assert-= 18 d)
-      (assert-= 6 m)
-      (assert-= 2025 y)
-      (assert-true (numberp dow)))
+(deftest js-rt-temporal-normalization-numbers
+  "Temporal number normalization truncates and falls back to the default."
+  (assert-= 3 (cl-cc/javascript::%temporal-normalize-number 3.9))
+  (assert-= 7 (cl-cc/javascript::%temporal-normalize-number nil 7)))
+
+(deftest js-rt-temporal-normalization-encode-decode
+  "Temporal encode/decode round-trips date-time fields."
+  (multiple-value-bind (s mn h d m y dow)
+      (cl-cc/javascript::%temporal-decode
+       (cl-cc/javascript::%temporal-encode 2025 6 18 12 34 56))
+    (assert-= 56 s)
+    (assert-= 34 mn)
+    (assert-= 12 h)
+    (assert-= 18 d)
+    (assert-= 6 m)
+    (assert-= 2025 y)
+    (assert-true (numberp dow))))
+
+(deftest js-rt-temporal-normalization-duration
+  "Temporal.Duration normalizes non-number fields (nil minutes, float hours)."
+  (let ((duration (cl-cc/javascript::%js-temporal-duration :hours -2.7 :minutes nil)))
     (assert-string= "P0Y0M0W0DT-2H0M0S" (funcall (gethash "toString" duration)))
     (assert-= -1.0d0 (gethash "sign" duration))
-    (assert-= -7200.0d0 (funcall (gethash "total" duration)))
-    (assert-string= "Temporal.Instant" (gethash "__type__" instant))
+    (assert-= -7200.0d0 (funcall (gethash "total" duration)))))
+
+(deftest js-rt-temporal-normalization-parse-instant-fallback
+  "Temporal instant parsing falls back to now for invalid ISO strings."
+  (let ((instant (cl-cc/javascript::%js-temporal-parse-instant "(")))
+    (assert-string= "Temporal.Instant" (gethash "__type__" instant))))
+
+(deftest js-rt-temporal-normalization-parse-plain-date-fallback
+  "Temporal plain-date parsing falls back to today for invalid ISO strings."
+  (let ((plain-date (cl-cc/javascript::%js-temporal-parse-plain-date "(")))
     (assert-string= "Temporal.PlainDate" (gethash "__type__" plain-date))))
 
 (deftest js-rt-temporal-year-month-and-month-day

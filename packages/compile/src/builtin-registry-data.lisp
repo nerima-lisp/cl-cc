@@ -241,7 +241,6 @@
     ;; Bit array
     (bit-and          . make-vm-bit-and)
     (bit-ior          . make-vm-bit-or)  ; ANSI CL name (inclusive or)
-    (bit-or           . make-vm-bit-or)  ; cl-cc alias
     (bit-xor          . make-vm-bit-xor)
     ;; List
     (equal            . make-vm-equal)

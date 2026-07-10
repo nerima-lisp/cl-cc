@@ -131,8 +131,8 @@
     (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
     (assert-true (keywordp reg))))
 
-(deftest codegen-not-the-wrapped-predicate-keeps-vm-not
-  "not keeps the vm-not fast path when the predicate call is ast-the-wrapped."
+(deftest codegen-not-the-wrapped-predicate-tests-nil-only
+  "not tests exactly for NIL even when the predicate call is ast-the-wrapped."
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-call
                              :func 'not
@@ -142,8 +142,8 @@
                                                   :func (make-ast-var :name 'numberp)
                                                   :args (list (make-ast-quote :value 42))))))
                            ctx)))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-not))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-null-p))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-not))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-null-p))
     (assert-true (keywordp reg))))
 
 (deftest codegen-apply-the-wrapped-literal-spread-keeps-direct-call

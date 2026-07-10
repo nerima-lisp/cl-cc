@@ -81,14 +81,41 @@ first-class function values here."
         do (setf node (ast-the-value node))
         finally (return node)))
 
+(defun %ast-assigns-var-p (node name)
+  "True when NODE contains an assignment (setq/incf lowering) to variable NAME."
+  (labels ((setq-target (n)
+             (let ((v (ast-setq-var n)))
+               (if (typep v 'ast-var) (ast-var-name v) v)))
+           (walk (n)
+             (and n
+                  (or (and (typep n 'ast-setq)
+                           (eq (setq-target n) name))
+                      (some #'walk (ast-children n))))))
+    (walk node)))
+
 (defun %compile-call-arg-registers (args ctx)
   "Compile ARGS left-to-right and return their result registers.
 Each already-computed argument register is protected (via *pending-call-arg-regs*)
 while the remaining arguments compile, so a nested call in a later argument
-saves/restores it instead of clobbering it."
+saves/restores it instead of clobbering it.
+
+A bare-variable argument compiles to the variable's own binding register; when
+a LATER argument assigns that variable (e.g. (list i (incf i) i)), the shared
+register would retroactively change the earlier argument's value. Copy such an
+argument into a fresh register before compiling the mutating sibling."
   (let ((regs nil))
-    (dolist (arg args (nreverse regs))
-      (push (%compile-operand-protecting arg ctx regs) regs))))
+    (loop for (arg . later) on args
+          do (let ((reg (%compile-operand-protecting arg ctx regs)))
+               (when (and later
+                          (typep arg 'ast-var)
+                          (some (lambda (l)
+                                  (%ast-assigns-var-p l (ast-var-name arg)))
+                                later))
+                 (let ((fresh (make-register ctx)))
+                   (emit ctx (make-vm-move :dst fresh :src reg))
+                   (setf reg fresh)))
+               (push reg regs)))
+    (nreverse regs)))
 
 (defun %maybe-unbox-labels-boxed-function (name raw-func-reg ctx)
   "Return RAW-FUNC-REG or its boxed closure payload for NAME."
@@ -355,52 +382,27 @@ saves/restores it instead of clobbering it."
     (let ((ctor (%equality-predicate-constructor func-sym (first args) (second args) ctx)))
       (when ctor
         (let ((lhs-reg (compile-ast (first args) ctx))
-              (rhs-reg (compile-ast (second args) ctx)))
-          (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg))
-          result-reg)))))
-
-(defparameter *vm-falsey-predicate-call-names*
-  '("EQ" "EQL" "EQUAL" "EQUALP" "=" "/=" "<" "<=" ">" ">="
-    "NULL" "TYPEP" "NUMBERP" "STRINGP" "SYMBOLP" "CONSP" "ATOM"
-    "LISTP" "VECTORP" "ARRAYP" "HASH-TABLE-P" "FUNCTIONP"
-    "CHARACTERP" "INTEGERP" "FLOATP" "BOUNDP" "FBOUNDP"
-    "SLOT-BOUNDP" "SLOT-EXISTS-P" "STRING=" "STRING/=" "STRING<"
-    "STRING>" "STRING<=" "STRING>=" "CHAR=" "CHAR/=" "CHAR<"
-    "CHAR>" "CHAR<=" "CHAR>=")
-  "Predicate calls whose compiled VM result follows the VM 0/NIL falsey convention.")
-
-(defun %vm-falsey-predicate-call-p (node)
-  "Return T when NODE is a predicate call lowered to a VM falsey result."
-  (setf node (%callable-designator-node node))
-  (and (typep node 'ast-call)
-       (let ((func (%callable-designator-node (ast-call-func node))))
-         (and (typep func 'ast-var)
-              (member (symbol-name (ast-var-name func))
-                      *vm-falsey-predicate-call-names*
-                      :test #'string=)))))
+              (rhs-reg (compile-ast (second args) ctx))
+              (predicate-reg (make-register ctx)))
+          (emit ctx (funcall ctor :dst predicate-reg :lhs lhs-reg :rhs rhs-reg))
+          (%emit-vm-branch-boolean-as-cl-boolean ctx predicate-reg result-reg "equality_bool"))))))
 
 (defun %try-compile-common-lisp-not (func-sym args result-reg ctx)
   "Lower Common Lisp NOT with generalized boolean semantics.
-VM boolean primitives keep numeric-zero falsey behavior for legacy predicate
-interoperability.  Plain values therefore test exactly for NIL, while known
-VM-style predicate calls use VM-NOT to invert their 0/NIL falsey result."
+NOT tests exactly for NIL; numeric zero is truthy under Common Lisp semantics."
   (when (and (eq func-sym 'not) (= (length args) 1))
     (let ((arg-reg (compile-ast (first args) ctx)))
-      (if (%vm-falsey-predicate-call-p (first args))
-          (progn
-            (emit ctx (make-vm-not :dst result-reg :src arg-reg))
-            result-reg)
-          (let ((nil-p-reg (make-register ctx))
-                (false-label (make-label ctx "not_false"))
-                (end-label (make-label ctx "not_end")))
-            (emit ctx (make-vm-null-p :dst nil-p-reg :src arg-reg))
-            (emit ctx (make-vm-jump-zero :reg nil-p-reg :label false-label))
-            (%emit-constant ctx t :dst result-reg)
-            (emit ctx (make-vm-jump :label end-label))
-            (emit ctx (make-vm-label :name false-label))
-            (%emit-constant ctx nil :dst result-reg)
-            (emit ctx (make-vm-label :name end-label))
-            result-reg)))))
+      (let ((nil-p-reg (make-register ctx))
+            (false-label (make-label ctx "not_false"))
+            (end-label (make-label ctx "not_end")))
+        (emit ctx (make-vm-null-p :dst nil-p-reg :src arg-reg))
+        (emit ctx (make-vm-jump-zero :reg nil-p-reg :label false-label))
+        (%emit-constant ctx t :dst result-reg)
+        (emit ctx (make-vm-jump :label end-label))
+        (emit ctx (make-vm-label :name false-label))
+        (%emit-constant ctx nil :dst result-reg)
+        (emit ctx (make-vm-label :name end-label))
+        result-reg))))
 
 (defun %try-compile-builtin (func-sym args result-reg ctx)
   "Phase-1 (table-driven) + Phase-2 (Prolog-style) builtin dispatch."

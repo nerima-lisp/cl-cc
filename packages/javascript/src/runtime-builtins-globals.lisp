@@ -130,7 +130,7 @@
      ((typep iterable 'js-map)
       (%js-map-entries iterable))
      ((typep iterable 'js-set)
-      (%js-vec-to-iter (%js-set-keys iterable)))
+      (%js-vec-to-iter (coerce (%js-set-keys iterable) 'vector)))
      ((and (%js-ht-p iterable) (gethash "next" iterable))
       iterable)
      ((and (%js-ht-p iterable) (gethash "@@iterator" iterable))

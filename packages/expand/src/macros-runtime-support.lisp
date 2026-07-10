@@ -209,7 +209,7 @@ Unknown or malformed optimize specs are ignored conservatively."
     (intern "%FOREIGN-FUNCALL" package)))
 
 (defun %expand-foreign-funcall (form)
-  "Expand CFFI-compatible FOREIGN-FUNCALL to the VM host bridge."
+  "Expand FOREIGN-FUNCALL to the VM host bridge."
   (cons (%foreign-funcall-bridge-symbol) (cdr form)))
 
 (register-macro 'foreign-funcall
@@ -221,12 +221,6 @@ Unknown or malformed optimize specs are ignored conservatively."
   (lambda (form env)
     (declare (ignore env))
     (%expand-foreign-funcall form)))
-
-(dolist (name '("CFFI:FOREIGN-FUNCALL" "CFFI::FOREIGN-FUNCALL"))
-  (register-macro (intern name :cl-cc/expand)
-    (lambda (form env)
-      (declare (ignore env))
-      (%expand-foreign-funcall form))))
 
 (defun %coerce-runtime-symbol-for-form (value type-form)
   "Return the runtime helper symbol in the caller's package when possible."

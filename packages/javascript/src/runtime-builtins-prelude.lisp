@@ -29,7 +29,7 @@
     (:quote      "undefined"           :js-undefined)
     (:var        "Infinity"            *js-inf-float*)
     (:var        "NaN"                 *js-nan-float*)
-    (:function   "Date"                %js-make-date)
+    (:var        "Date"                *js-date-global*)
     ;; Namespace objects — built from *js-builtin-specs* entries whose key is PREFIX.PROP
     (:namespace  "JSON"                "JSON")
     (:namespace  "Math"                "Math")

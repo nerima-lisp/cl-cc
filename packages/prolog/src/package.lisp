@@ -3,8 +3,8 @@
 ;;;; packages/prolog/src/package.lisp - CL-CC Prolog Package
 ;;;;
 ;;;; This package owns the Prolog engine, DCG transformer, and peephole rule
-;;;; tables. The facade :cl-cc package uses :cl-cc/prolog for the public
-;;;; Prolog API.
+;;;; tables. Public Prolog API consumers should import from :cl-cc/prolog
+;;;; directly.
 ;;;;
 ;;;; Bootstrap symbols (binop, const, var, cmp, integer-type, boolean-type,
 ;;;; env-lookup, make-cst-token, lexer-token-p/type/value, our-eval) are
@@ -15,12 +15,11 @@
   (:use :cl :cl-cc/bootstrap)
   (:export
    ;; Logic variables & unification
-   #:logic-var-p #:unify #:unify-failed-p
+   #:logic-var-p
+   #:unify
    #:logic-substitute
    ;; Fact/rule macro
    #:def-rule
-   ;; Data tables & builtins
-   #:*peephole-rules*
    ;; Solver
    #:query-all
    ;; DCG

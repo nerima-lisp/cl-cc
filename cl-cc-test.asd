@@ -206,17 +206,21 @@
       :pathname "packages/prolog/tests"
       :serial t
       :components
-      ((:file "test-support")
-       (:file "prolog-test-support-core")
+      ((:file "prolog-test-support-core")
        (:file "prolog-test-support-fixtures")
        (:file "prolog-test-support-projections")
-       (:file "prolog-test-support-dcg")
        (:file "prolog-test-support-unify")
        (:file "prolog-test-support-peephole")
+       (:file "prolog-tests")
+       (:file "prolog-tests-builtins")
+       (:file "prolog-tests-builtins-internal")
+       (:file "prolog-tests-solver")
+       (:file "prolog-tests-rules")
        (:file "prolog-data-tests")
+       (:file "prolog-peephole-tests-internal")
        (:file "prolog-peephole-tests")
-       (:file "dcg-tests")
-       (:file "prolog-tests")))
+       (:file "dcg-tests-core")
+       (:file "dcg-tests-builtins")))
    (:module "expand-tests"
     :pathname "packages/expand/tests"
     :serial t

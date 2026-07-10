@@ -184,9 +184,9 @@
        (mmap-close ,var))))
 
 (defun mmap-advice (region advice &key start end)
-  "Portable madvise hook. Native backends may use REGION, ADVICE, START, END."
+  "Signal that mmap advice requires a native madvise backend."
   (declare (ignore region advice start end))
-  t)
+  (error "MMAP-ADVICE requires a native madvise backend."))
 
 (defun rt-allocate-code-memory (size)
   (rt-mmap nil size (logior +rt-prot-read+ +rt-prot-write+ +rt-prot-exec+)

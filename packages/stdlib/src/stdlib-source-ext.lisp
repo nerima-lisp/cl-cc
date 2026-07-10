@@ -413,10 +413,4 @@
     "(defun translate-pathname (source from-wildcard to-wildcard)
        (cl:translate-pathname source from-wildcard to-wildcard))"
 
-    ;; without-package-locks stub
-    "(defmacro without-package-locks (&body body) `(progn ,@body))"
-    "(defmacro with-package-iterator ((name package-list-form &rest symbol-types) &body body)
-       (declare (ignore name package-list-form symbol-types))
-       `(progn ,@body))"
-
        ))

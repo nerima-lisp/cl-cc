@@ -2,7 +2,7 @@
 ;;;;
 ;;;; Extracted from parser-expr.lisp.  These three parsers form a cohesive
 ;;;; "literal expression" layer that builds compound primary expressions.
-;;;; Load order: after parser-expr.lisp (needs js-parse-params, %js-call),
+;;;; Load order: after parser-expr-args.lisp (needs js-parse-params, %js-call),
 ;;;;             before parser-expr-primary.lisp (calls these parsers).
 
 (in-package :cl-cc/javascript)
@@ -149,11 +149,14 @@ Returns (values key-expr value-expr method-p computed-p rest)."
                            nil nil rest)))))))))
       ;; get/set accessor: get name() { } / set name(x) { }
       ((and (or (eq type :T-GET) (eq type :T-SET))
-            ;; Distinguish from shorthand {get} or {get, ...}
+            ;; Distinguish from shorthand {get} or {get, ...}, and from a
+            ;; method named get/set: `{ get() {} }` — when `(` follows, `get`
+            ;; is the METHOD NAME, so fall through to the method-shorthand arm.
             (let ((next (js-peek-type (cdr stream))))
               (and (not (eq next :T-COMMA))
                    (not (eq next :T-RBRACE))
                    (not (eq next :T-COLON))
+                   (not (eq next :T-LPAREN))
                    (not (eq next :T-EOF)))))
        (let ((accessor-kind (js-tok-value (car stream))))
          (multiple-value-bind (tok rest) (js-consume stream)

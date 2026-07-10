@@ -38,10 +38,7 @@
   (assert-true (fboundp 'cl-cc/runtime:cl-cc-call))
   (assert-true (fboundp 'cl-cc/runtime:cl-cc-cleanup))
   (assert-true (fboundp 'cl-cc/runtime:cl-cc-last-error))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-register-callback))
-  (assert-true (fboundp 'cl-cc/runtime:|cl_cc_init|))
-  (assert-true (fboundp 'cl-cc/runtime:|cl_cc_eval|))
-  (assert-true (fboundp 'cl-cc/runtime:|cl_cc_call|)))
+  (assert-true (fboundp 'cl-cc/runtime:cl-cc-register-callback)))
 
 (deftest runtime-subsystem-c-embedding-api-eval-call-cleanup
   "FR-812: embedding states evaluate strings, call functions, track errors, and clean up."
@@ -55,16 +52,28 @@
            (let ((value (cl-cc/runtime:cl-cc-call state "embedded-add" 7 8)))
              (assert-eq :integer (cl-cc/runtime:cl-cc-value-kind value))
              (assert-= 15 (cl-cc/runtime:cl-cc-value-payload value)))
+           #+(and sbcl sb-alien-callback)
            (let ((callback (cl-cc/runtime:cl-cc-register-callback
                             state "identity" #'identity :arg-types '(:pointer) :return-type :pointer)))
              (assert-true callback)
              (assert-eq callback (cl-cc/runtime:cl-cc-callback state "identity")))
+           #-(and sbcl sb-alien-callback)
+           (assert-signals error
+             (cl-cc/runtime:cl-cc-register-callback
+              state "identity" #'identity :arg-types '(:pointer) :return-type :pointer))
            (let ((value (cl-cc/runtime:cl-cc-eval state "(/ 1 0)")))
              (assert-eq :error (cl-cc/runtime:cl-cc-value-kind value))
              (assert-= 1 (cl-cc/runtime:cl-cc-error-code
                           (cl-cc/runtime:cl-cc-last-error state)))))
       (cl-cc/runtime:cl-cc-cleanup state))
     (assert-true (cl-cc/runtime:cl-cc-state-closed-p state))))
+
+(deftest runtime-subsystem-deopt-trampoline-signals-fatal-error
+  "FR-522: deopt trampoline fails explicitly until interpreter reconstruction exists."
+  (let ((frame-count cl-cc/runtime::*rt-deopt-frame-count*))
+    (assert-signals error
+      (cl-cc/runtime::rt-deopt-trampoline 7 '((:r0 . 42))))
+    (assert-= (1+ frame-count) cl-cc/runtime::*rt-deopt-frame-count*)))
 
 (deftest runtime-subsystem-multiple-vm-instances-isolated
   "FR-813: VM instances have independent stores and can share read-only parent environments."

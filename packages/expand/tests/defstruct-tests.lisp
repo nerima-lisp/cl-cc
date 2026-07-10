@@ -305,7 +305,7 @@
       (assert-equal '(function print-point) (second body))
       (assert-equal 4 (length body)))))
 
-(deftest ds-print-function-generates-legacy-print-object-method
+(deftest ds-print-function-generates-print-object-method
   "(:print-function fn) emits a PRINT-OBJECT bridge calling FN with object, stream, depth."
   (cl-cc/expand:with-fresh-defstruct-registries
     (let* ((exp   (ds-expand '(defstruct (point (:print-function print-point)) x y)))

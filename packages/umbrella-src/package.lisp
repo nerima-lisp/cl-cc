@@ -1,5 +1,5 @@
 (defpackage :cl-cc
-  (:use :cl :cl-cc/bootstrap :cl-cc/ast :cl-cc/prolog :cl-cc/parse :cl-cc/optimize :cl-cc/emit :cl-cc/expand :cl-cc/compile :cl-cc/vm :cl-cc/stdlib :cl-cc/pipeline :cl-cc/selfhost :cl-cc/repl)
+  (:use :cl :cl-cc/bootstrap :cl-cc/ast :cl-cc/parse :cl-cc/optimize :cl-cc/emit :cl-cc/expand :cl-cc/compile :cl-cc/vm :cl-cc/stdlib :cl-cc/pipeline :cl-cc/selfhost :cl-cc/repl)
   (:shadowing-import-from :cl-cc/expand
     #:define-syntax
 )
@@ -68,9 +68,6 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
   ;; Re-export AST symbols from :cl-cc so cl-cc:SYMBOL syntax works
   ;; in downstream packages (e.g. :cl-cc/cli, tests, compile/).
   (do-external-symbols (s :cl-cc/ast)
-    (export s :cl-cc))
-  ;; Re-export prolog symbols from :cl-cc so cl-cc:SYMBOL syntax works.
-  (do-external-symbols (s :cl-cc/prolog)
     (export s :cl-cc))
   ;; Re-export optimize symbols BEFORE use-package bridges, so child
   ;; packages can see optimize exports through the umbrella bridge.

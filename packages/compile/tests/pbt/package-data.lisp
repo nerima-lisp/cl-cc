@@ -56,8 +56,10 @@
           :vm-reg-get :vm-reg-set :vm-heap-get :execute-instruction
           :instruction->sexp :sexp->instruction :vm-dst :vm-src :vm-lhs :vm-rhs
           :vm-value :vm-car-reg :vm-cdr-reg :vm-cons-reg :vm-val-reg
-          :vm-closure-reg :vm-closure-index :unify :unify-failed-p
-          :logic-substitute :logic-var-p))
+          :vm-closure-reg :vm-closure-index))
+
+(setf cl-user::*cl-cc-pbt-prolog-imports*
+      '(:unify :logic-substitute :logic-var-p))
 
   (setf cl-user::*cl-cc-pbt-exports*
         '(#:defproperty #:defgenerator #:for-all #:check
