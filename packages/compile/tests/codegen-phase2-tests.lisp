@@ -203,7 +203,7 @@
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write)))
       (assert-true inst)
-      (assert-eq 'slot-name (cl-cc::vm-slot-write-slot-name inst)))))
+      (assert-eq 'slot-name (cl-cc::vm-slot-name-sym inst)))))
 
 (deftest codegen-phase2-make-string-the-wrapped-initial-element-lowers
   "Compiling (make-string n :initial-element (the character #\\x)) still emits vm-make-string with a char slot."
@@ -230,7 +230,7 @@
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-register-function)))
       (assert-true inst)
-      (assert-eq 'helper (cl-cc::vm-register-function-name inst)))))
+      (assert-eq 'helper (cl-cc::vm-func-name inst)))))
 
 ;;; ─── Section 6: FORMAT ──────────────────────────────────────────────────────
 

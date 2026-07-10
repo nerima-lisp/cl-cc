@@ -228,6 +228,19 @@ When EMIT-FAILURE-P is NIL, keep the lightweight type check but omit failure han
                    :format-arguments (list *compiling-typed-fn*
                                            (type-error-message-from-mismatch e))))
           (type-inference-error () nil))))
-    (unless proven-type-matches-p
-      (%emit-the-runtime-assertion ctx reg declared))
+    (cond
+      ;; Statically proven (e.g. nested `the`, or a type-env fact): the
+      ;; assertion is fully redundant, so emit nothing.
+      ((and proven-type-matches-p
+            (not (and (typep transparent-value 'ast-var)
+                      (member (ast-var-name transparent-value)
+                              (ctx-guard-narrowed-vars ctx)
+                              :test #'eq))))
+       nil)
+      ;; Proven only by a runtime flow guard: keep the lightweight type check
+      ;; but omit the failure path, since the guard already established the type.
+      (proven-type-matches-p
+       (%emit-the-runtime-assertion ctx reg declared :emit-failure-p nil))
+      (t
+       (%emit-the-runtime-assertion ctx reg declared)))
     reg))

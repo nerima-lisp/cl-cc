@@ -396,16 +396,24 @@ Only removes the inner test when the condition matches exactly."
   "Compile one branch of an IF into CTX with type-env narrowing.
 Emits a move from the branch result into DST; optionally emits a jump to JUMP-LABEL."
   (setf (ctx-tail-position ctx) tail)
-  (let ((saved-type-env (ctx-type-env ctx)))
+  (let ((saved-type-env (ctx-type-env ctx))
+        (saved-guard-vars (ctx-guard-narrowed-vars ctx)))
     (unwind-protect
          (let ((*string-literal-pool* (%copy-string-literal-pool *string-literal-pool*)))
            (setf (ctx-type-env ctx) (%branch-type-env ctx guard-var guard-type branch))
+           ;; The :then branch proves GUARD-VAR at runtime via the guard test;
+           ;; record it so redundant `the` assertions keep a lightweight check
+           ;; but drop the failure path.
+           (when (and guard-var (eq branch :then))
+             (setf (ctx-guard-narrowed-vars ctx)
+                   (cons guard-var (ctx-guard-narrowed-vars ctx))))
            (let ((result-reg (compile-ast ast ctx)))
              (%with-no-tail-position ctx
                (emit ctx (make-vm-move :dst dst :src result-reg))
                (when jump-label
                  (emit ctx (make-vm-jump :label jump-label))))))
-      (setf (ctx-type-env ctx) saved-type-env))))
+      (setf (ctx-type-env ctx) saved-type-env)
+      (setf (ctx-guard-narrowed-vars ctx) saved-guard-vars))))
 
 (defmethod compile-ast ((node ast-if) ctx)
   (let* ((tail       (ctx-tail-position ctx))

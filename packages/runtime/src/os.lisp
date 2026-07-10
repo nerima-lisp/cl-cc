@@ -249,10 +249,32 @@ redirection on POSIX hosts and the platform process API elsewhere."
               (let ((status (rt-waitpid pid :nohang t)))
                 (not (rt-process-status-exited-p status)))))))))
 
+(defun %rt-dyld-interposition-var-p (entry)
+  "True when ENVIRON entry ENTRY is a macOS dyld interposition variable."
+  (uiop:string-prefix-p "DYLD_INSERT_LIBRARIES=" entry))
+
+(defun %rt-child-environment ()
+  "Return a child process environment with macOS dyld interposition removed,
+or NIL when no scrubbing is needed (caller should then inherit the environment).
+
+The SBCL image may be launched with DYLD_INSERT_LIBRARIES pointing at an arm64
+shim (the dispatch-semaphore fix used by the test harness). Child processes
+inherit it, but macOS system binaries such as /bin/sh are arm64e, and dyld
+aborts them before exec when the shim's architecture does not match. Stripping
+the interposition variable keeps spawned shells and programs runnable."
+  (let ((env (sb-ext:posix-environ)))
+    (when (some #'%rt-dyld-interposition-var-p env)
+      (remove-if #'%rt-dyld-interposition-var-p env))))
+
 (defun rt-shell (command)
   "Run COMMAND through the user's shell and return stdout as a string."
   (check-type command string)
-  (uiop:run-program command :output :string :error-output :interactive :ignore-error-status t))
+  (let ((child-env (%rt-child-environment)))
+    (if child-env
+        (uiop:run-program command :output :string :error-output :interactive
+                                  :ignore-error-status t :environment child-env)
+        (uiop:run-program command :output :string :error-output :interactive
+                                  :ignore-error-status t))))
 
 (defun rt-gettime (&optional (clock :monotonic))
   (ecase clock

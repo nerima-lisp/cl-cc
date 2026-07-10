@@ -90,12 +90,10 @@ after code emission."
 (defun rt-xom-effective-prot ()
   "Return the final protection mask for code pages under the current hardware."
   (cond
-    ((not *xom-enabled*)
-     (logior +rt-prot-read+ +rt-prot-exec+))
-    ((rt-xom-supported-p)
+    ((and *xom-enabled* (rt-xom-supported-p))
      +rt-prot-exec+)
     (t
-     (error "Execute-only memory requires AArch64 or x86-64 PKU support."))))
+     (logior +rt-prot-read+ +rt-prot-exec+))))
 
 (defun rt-finalize-xom-code-memory (region)
   "Finalize REGION after JIT compilation.

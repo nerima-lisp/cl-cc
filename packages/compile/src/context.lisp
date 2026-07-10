@@ -8,6 +8,8 @@
    (env :initform nil :accessor ctx-env)
    (type-env :initform nil :accessor ctx-type-env
               :documentation "Type environment accumulated during top-level compilation")
+   (guard-narrowed-vars :initform nil :accessor ctx-guard-narrowed-vars
+                        :documentation "Variable names whose type was proven by a runtime flow guard in the current branch. Such proofs are runtime-conditional, so redundant `the` assertions keep a lightweight type check but drop the failure path.")
    (safety :initarg :safety :initform 1 :accessor ctx-safety
            :documentation "Compiler safety level; 0 suppresses runtime type assertions.")
    (block-env :initform nil :accessor ctx-block-env

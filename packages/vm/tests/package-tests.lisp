@@ -14,7 +14,7 @@
 
 (deftest cl-cc-package-exports-representatives
   "Representative exports stay external in the package surface."
-  (dolist (name '("CST-NODE" "RUN-STRING" "QUERY-ONE" "OUR-MACROEXPAND-ALL" "AST-INT"))
+  (dolist (name '("CST-NODE" "RUN-STRING" "QUERY-GRAMMAR" "OUR-MACROEXPAND-ALL" "AST-INT"))
     (multiple-value-bind (sym status)
         (find-symbol name :cl-cc)
       (assert-true sym)

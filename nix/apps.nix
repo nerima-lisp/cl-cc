@@ -347,7 +347,9 @@ let
         "(setf *default-pathname-defaults* (uiop:getcwd))"
         "(setf uiop:*temporary-directory* (uiop:temporary-directory))"
         ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
-        "(asdf:load-system :cl-cc-test :force t)"
+        # No :force — the FASLs ship pre-compiled in sbclWithTests; forcing a
+        # recompile writes into the read-only Nix store and fails on CI.
+        "(asdf:load-system :cl-cc-test)"
         ''(format t "# running all benchmarks~%")''
         ''
           (handler-case

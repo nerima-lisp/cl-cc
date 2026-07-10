@@ -185,15 +185,13 @@
 
 ;; UNION: all elements present in either list, no duplicates (with optional :test/:key)
 (our-defmacro union (list1 list2 &key test key test-not)
-  (let ((l1 (gensym "L1")) (l2 (gensym "L2")) (x (gensym "X"))
-        (acc (gensym "ACC")) (seen (gensym "SEEN")) (kx (gensym "KEYED-X"))
-        (kfn-var (gensym "KEY")))
+  (let ((x (gensym "X")) (acc (gensym "ACC")))
     (let ((slow-form
             `(let ((,acc nil))
-               (dolist (,x ,l2)
+               (dolist (,x ,list2)
                  (unless (member ,x ,acc ,@(%keyword-test-key-args test test-not key))
                    (setq ,acc (cons ,x ,acc))))
-               (dolist (,x ,l1 (nreverse ,acc))
+               (dolist (,x ,list1 (nreverse ,acc))
                  (unless (member ,x ,acc ,@(%keyword-test-key-args test test-not key))
                    (setq ,acc (cons ,x ,acc)))))))
       (%set-hash-fast-path-expand
