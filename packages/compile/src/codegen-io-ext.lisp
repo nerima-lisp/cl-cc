@@ -37,6 +37,7 @@
 
 (defun %write-to-string-arg-keyword (ast)
   "Extract a literal keyword from an arg AST node (ast-var or ast-quote), or NIL."
+  (setf ast (%phase2-transparent-node ast))
   (cond ((and (typep ast 'ast-var)   (keywordp (ast-var-name ast)))   (ast-var-name ast))
         ((and (typep ast 'ast-quote) (keywordp (ast-quote-value ast))) (ast-quote-value ast))
         (t nil)))
@@ -200,6 +201,8 @@ Returns RESULT-REG on success, or NIL when ARG-REGS cannot satisfy PIECES."
            (format-arg-regs nil)
            (dest-sym        :stream)
            (stream-reg      nil))
+      (setf dest-arg (%phase2-transparent-node dest-arg))
+      (setf fmt-arg (%phase2-transparent-node fmt-arg))
       (if (typep dest-arg 'ast-var)
           (let ((name (ast-var-name dest-arg)))
             (when (or (null name) (eq name t))
@@ -248,6 +251,7 @@ Returns RESULT-REG on success, or NIL when ARG-REGS cannot satisfy PIECES."
   ;; Parse :direction, :if-exists, :if-does-not-exist, :external-format,
   ;; and :element-type for the VM-backed stream runtime.
   (flet ((keyword-ast-value (ast)
+           (setf ast (%phase2-transparent-node ast))
            (if (and (typep ast 'ast-var) (keywordp (ast-var-name ast)))
                (ast-var-name ast)
                (if (and (typep ast 'ast-quote) (keywordp (ast-quote-value ast)))
@@ -296,9 +300,10 @@ Returns RESULT-REG on success, or NIL when ARG-REGS cannot satisfy PIECES."
     (let ((handle-reg (compile-ast (first args) ctx)))
       ;; Compile and discard :abort keyword arg value
       (loop for kv on (cdr args) by #'cddr
+            for key = (%phase2-transparent-node (car kv))
             when (and (cdr kv)
-                      (typep (car kv) 'ast-var)
-                      (keywordp (ast-var-name (car kv))))
+                      (typep key 'ast-var)
+                      (keywordp (ast-var-name key)))
               do (compile-ast (cadr kv) ctx))
       (emit ctx (make-vm-close-file :handle handle-reg))
       ;; close returns t per ANSI CL
@@ -310,6 +315,7 @@ Returns RESULT-REG on success, or NIL when ARG-REGS cannot satisfy PIECES."
 ;; the VM executor does not pass those arguments to CL:MAKE-PATHNAME.
 (defun %keyword-ast-value (ast)
   "Return keyword represented by AST, or NIL when AST is not a literal keyword."
+  (setf ast (%phase2-transparent-node ast))
   (cond
     ((and (typep ast 'ast-var) (keywordp (ast-var-name ast)))
      (ast-var-name ast))
@@ -354,6 +360,7 @@ Returns RESULT-REG on success, or NIL when ARG-REGS cannot satisfy PIECES."
 (defun %quoted-string-ast-list-p (args)
   (if (consp args)
       (let ((arg (car args)))
+        (setf arg (%phase2-transparent-node arg))
         (if (typep arg 'ast-quote)
             (if (stringp (ast-quote-value arg))
                 (%quoted-string-ast-list-p (cdr args))
@@ -363,16 +370,18 @@ Returns RESULT-REG on success, or NIL when ARG-REGS cannot satisfy PIECES."
 
 (defun %concatenate-quoted-string-asts (args acc)
   (if (consp args)
-      (%concatenate-quoted-string-asts
-       (cdr args)
-       (concatenate 'string acc (ast-quote-value (car args))))
+      (let ((arg (%phase2-transparent-node (car args))))
+        (%concatenate-quoted-string-asts
+         (cdr args)
+         (concatenate 'string acc (ast-quote-value arg))))
       acc))
 
 ;; concatenate: fold literal string chains; otherwise lower to vm-concatenate
 (define-phase2-handler "CONCATENATE" (args result-reg ctx)
   (if (and (>= (length args) 3)
-           (typep (first args) 'ast-quote)
-           (equal (symbol-name (ast-quote-value (first args))) "STRING"))
+           (let ((first-arg (%phase2-transparent-node (first args))))
+             (and (typep first-arg 'ast-quote)
+                  (equal (symbol-name (ast-quote-value first-arg)) "STRING"))))
       (let ((string-args (cdr args)))
         (if (%quoted-string-ast-list-p string-args)
             (progn

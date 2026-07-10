@@ -4,6 +4,8 @@
 (defpackage :cl-cc/jit
   (:use :cl :cl-cc/bootstrap)
   (:export
+   ;; config
+   #:*jit-enabled* #:*jit-native-code-enabled* #:*jit-cache-enabled*
    ;; stack-map (FR-550)
    #:*stack-map-table* #:emit-stack-map #:lookup-stack-map
    #:walk-stack-frame #:register-live-set
@@ -22,7 +24,11 @@
    #:jit-cache-deserialize #:*jit-cache-dir*
    ;; baseline JIT (FR-559)
    #:jit-baseline-compile #:jit-tier-compile #:*jit-threshold*
-   #:*type-feedback-table* #:record-type-feedback
+   #:*type-feedback-table* #:record-type-feedback #:dominant-type
+   #:jit-compiled-code #:make-jit-compiled-code #:jit-compiled-code-p
+   #:jcc-func-name #:jcc-bytecode #:jcc-tier #:jcc-type-feedback
+   #:jcc-entry-address #:jcc-native-code #:jcc-guards #:jcc-compiled-at
+   #:jit-compiled-code-entry-address
    ;; speculative inlining (FR-560)
    #:speculative-inline-candidate-p #:emit-guarded-inline
    ;; megamorphic (FR-561)

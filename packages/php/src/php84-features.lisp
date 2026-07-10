@@ -1,4 +1,4 @@
-;;;; php84-features.lisp — PHP 8.0-8.4 feature implementations
+;;;; php84-features.lisp — PHP 8.0-8.5 feature implementations
 ;;;;
 ;;;; Covers:
 ;;;;   - PHP 8.4 Property Hooks (get/set, short and long forms)
@@ -557,7 +557,7 @@ When no & follows, returns FIRST-TYPE and STREAM unchanged."
 
 (defun %php-match-error ()
   "Signal an UnhandledMatchError equivalent for a non-exhaustive PHP match."
-  (error "PHP UnhandledMatchError: Unhandled match case"))
+  (%php-fatal-error "PHP UnhandledMatchError: Unhandled match case"))
 
 ;;; ─── PHP 8.x Nullsafe Chaining — already in parser-expr.lisp ───────────────
 ;;; See php-parse-postfix: :T-NULLSAFE-ARROW case.

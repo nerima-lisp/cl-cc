@@ -140,6 +140,57 @@
       (assert-true (search "closure parameter local 1" result))
       (assert-true (search "$pc at index 2" result)))))
 
+;;; ─── FR-228 bulk-memory helpers ─────────────────────────────────────────
+
+(deftest wasm-tb-array-fill-emits-specialized-array-fill
+  "wasm-array-fill-wat emits the specialized array.fill form for typed GC arrays."
+  (let ((cl-cc/codegen::*wasm-gc-array-types-enabled* t))
+    (let* ((reg-map (make-test-wasm-reg-map))
+           (array-reg :R0)
+           (value-reg :R1)
+           (array-local (cl-cc/codegen::wasm-reg-to-local reg-map array-reg))
+           (value-local (cl-cc/codegen::wasm-reg-to-local reg-map value-reg))
+           (_ (cl-cc/codegen::wasm-array-reg-record-kind reg-map array-reg :fixnum))
+           (result (cl-cc/codegen::wasm-array-fill-wat
+                    reg-map array-reg value-reg "(i32.const 3)" "(i32.const 5)")))
+      (assert-true (search "(array.fill $fixnum_array_t" result))
+      (assert-true (search "(ref.cast (ref $fixnum_array_t)" result))
+      (assert-true (search (format nil "(local.get ~D)" array-local) result))
+      (assert-true (search (format nil "(i64.extend_i32_s (i31.get_s (local.get ~D)))" value-local)
+                           result)))))
+
+(deftest wasm-tb-array-copy-emits-specialized-array-copy
+  "wasm-array-copy-wat emits the specialized array.copy form with source and destination types."
+  (let ((cl-cc/codegen::*wasm-gc-array-types-enabled* t))
+    (let* ((reg-map (make-test-wasm-reg-map))
+           (dst-reg :R0)
+           (src-reg :R1)
+           (len-reg :R2)
+           (dst-local (cl-cc/codegen::wasm-reg-to-local reg-map dst-reg))
+           (src-local (cl-cc/codegen::wasm-reg-to-local reg-map src-reg))
+           (len-local (cl-cc/codegen::wasm-reg-to-local reg-map len-reg))
+           (_dst (cl-cc/codegen::wasm-array-reg-record-kind reg-map dst-reg :char))
+           (_src (cl-cc/codegen::wasm-array-reg-record-kind reg-map src-reg :fixnum))
+           (result (cl-cc/codegen::wasm-array-copy-wat reg-map dst-reg src-reg len-reg)))
+      (assert-true (search "(array.copy $char_array_t $fixnum_array_t" result))
+      (assert-true (search "(ref.cast (ref $char_array_t)" result))
+      (assert-true (search "(ref.cast (ref $fixnum_array_t)" result))
+      (assert-true (search (format nil "(local.get ~D)" dst-local) result))
+      (assert-true (search (format nil "(local.get ~D)" src-local) result))
+      (assert-true (search (format nil "(i31.get_s (local.get ~D))" len-local)
+                           result)))))
+
+(deftest wasm-tb-memory-copy-honors-multi-memory-gating
+  "wasm-memory-copy-wat* switches between plain and explicit-memory forms based on the multi-memory gate."
+  (let ((plain (let ((cl-cc/codegen::*wasm-multiple-memories-enabled* nil))
+                 (cl-cc/codegen::wasm-memory-copy-wat* "(i32.const 4)" "(i32.const 8)" "(i32.const 16)"
+                                                      :dst-memory 0 :src-memory 1)))
+        (multi (let ((cl-cc/codegen::*wasm-multiple-memories-enabled* t))
+                 (cl-cc/codegen::wasm-memory-copy-wat* "(i32.const 4)" "(i32.const 8)" "(i32.const 16)"
+                                                      :dst-memory 0 :src-memory 1))))
+    (assert-true (search "(memory.copy (i32.const 4) (i32.const 8) (i32.const 16))" plain))
+    (assert-true (search "(memory.copy (memory 0) (i32.const 4) (memory 1) (i32.const 8) (i32.const 16))" multi))))
+
 ;;; ─── build-all-wasm-functions (module table setup) ───────────────────────
 
 (deftest wasm-tb-build-all-returns-module

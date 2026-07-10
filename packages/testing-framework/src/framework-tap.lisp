@@ -55,10 +55,8 @@ The operation is idempotent and uses SBCL's sb-cover as the low-level engine."
   "Return T when sb-cover produced an empty HTML index for DIRECTORY."
   (let ((index (coverage-report-index-path directory)))
     (and (probe-file index)
-         (with-open-file (stream index :direction :input)
-           (let ((contents (make-string (file-length stream))))
-             (read-sequence contents stream)
-             (not (null (search "No code coverage data found" contents))))))))
+         (not (null (search "No code coverage data found"
+                            (%read-file-contents index)))))))
 
 (defun coverage-report-empty-p (&optional (directory (%coverage-report-directory)))
   "Return true when DIRECTORY contains an empty/no-data coverage report."
@@ -289,6 +287,28 @@ stable CL-CC report artifact generation around the covered body."
       (substitute-if #\Space (lambda (c) (find c '(#\Tab #\Newline #\Return))) s)
       ""))
 
+(defun %tsv-fields (line)
+  "Split LINE into TSV fields."
+  (uiop:split-string line :separator (list #\Tab)))
+
+(defun %timings-result->tsv-line (r)
+  "Render one timing result plist as a frozen 5-column TSV row."
+  (let* ((suite      (getf r :suite))
+         (name       (getf r :name))
+         (duration   (or (getf r :duration-ns) 0))
+         (status     (getf r :status))
+         (batch-id   (getf r :batch-id))
+         (suite-str  (%tsv-sanitize (if suite (symbol-name suite) "")))
+         (name-str   (%tsv-sanitize (if name (symbol-name name) "")))
+         (status-str (%status-keyword-to-string status))
+         (batch-str  (if batch-id (format nil "~D" batch-id) "-")))
+    (format nil "~A~C~A~C~D~C~A~C~A"
+            suite-str #\Tab
+            name-str #\Tab
+            duration #\Tab
+            status-str #\Tab
+            batch-str)))
+
 (defun %write-timings-tsv (results path)
   "Write RESULTS (a flat list of test result plists) to PATH as TSV."
   (with-open-file (stream path
@@ -296,21 +316,21 @@ stable CL-CC report artifact generation around the covered body."
                           :if-exists :supersede
                           :if-does-not-exist :create)
     (dolist (r results)
-      (let* ((suite      (getf r :suite))
-             (name       (getf r :name))
-             (duration   (or (getf r :duration-ns) 0))
-             (status     (getf r :status))
-             (batch-id   (getf r :batch-id))
-             (suite-str  (%tsv-sanitize (if suite (symbol-name suite) "")))
-             (name-str   (%tsv-sanitize (if name (symbol-name name) "")))
-             (status-str (%status-keyword-to-string status))
-             (batch-str  (if batch-id (format nil "~D" batch-id) "-")))
-        (format stream "~A~C~A~C~D~C~A~C~A~%"
-                suite-str #\Tab
-                name-str #\Tab
-                duration #\Tab
-                status-str #\Tab
-                batch-str)))))
+      (write-line (%timings-result->tsv-line r) stream))))
+
+(defun %parse-prior-timing-row (fields)
+  "Return timing name and duration when FIELDS encode a valid prior TSV row."
+  (when (>= (length fields) 3)
+    (let ((name-str (second fields))
+          (dur (ignore-errors (parse-integer (third fields)))))
+      (when (and (plusp (length name-str)) dur (plusp dur))
+        (values name-str dur)))))
+
+(defun %record-prior-timing! (table name-str duration)
+  "Keep the maximum prior DURATION for NAME-STR in TABLE."
+  (let ((existing (gethash name-str table 0)))
+    (when (> duration existing)
+      (setf (gethash name-str table) duration))))
 
 (defun %emit-slowest-summary (results &optional (n 20))
   "Print the top N slowest tests by :duration-ns (descending)."
@@ -333,24 +353,12 @@ stable CL-CC report artifact generation around the covered body."
   (when (probe-file path)
     (handler-case
         (let ((ht (make-hash-table :test #'equal :size 8192)))
-          (with-open-file (s path :direction :input)
-            (loop for line = (read-line s nil nil)
-                  while line
-                  unless (zerop (length line))
-                    do (let ((fields '())
-                             (start 0))
-                         (loop for pos = (position #\Tab line :start start)
-                               do (push (subseq line start (or pos (length line))) fields)
-                               while pos
-                               do (setf start (1+ pos)))
-                         (setf fields (nreverse fields))
-                         (when (>= (length fields) 3)
-                           (let ((name-str (second fields))
-                                 (dur (ignore-errors (parse-integer (third fields)))))
-                             (when (and (plusp (length name-str)) dur (plusp dur))
-                               (let ((existing (gethash name-str ht 0)))
-                                 (when (> dur existing)
-                                   (setf (gethash name-str ht) dur)))))))))
+          (dolist (line (%read-file-lines path))
+            (unless (zerop (length line))
+              (multiple-value-bind (name-str dur)
+                  (%parse-prior-timing-row (%tsv-fields line))
+                (when name-str
+                  (%record-prior-timing! ht name-str dur)))))
           ht)
       (error (e)
         (format *error-output* "# WARN: could not load prior timings from ~A: ~A~%" path e)

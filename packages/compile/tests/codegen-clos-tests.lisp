@@ -104,7 +104,11 @@
   "Static make-instance emits vm-get-global to load the class descriptor."
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc/ast:make-ast-make-instance
-                  :class (cl-cc/ast:make-ast-quote :value 'my-cat)
+                  :class (cl-cc/ast:make-ast-the
+                          :type 'symbol
+                          :value (cl-cc/ast:make-ast-quote :value 'my-cat))
                   :initargs nil)
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-get-global))))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-get-global)))
+      (assert-true inst)
+      (assert-eq 'my-cat (cl-cc/vm:vm-global-name inst)))))

@@ -29,3 +29,7 @@
   "Token-stream end detection treats nil and EOF as finished."
   (assert-true (cl-cc/php::php-ts-at-end-p (%php-ts nil)))
   (assert-true (cl-cc/php::php-ts-at-end-p (%php-ts (list (list :type :T-EOF :value nil))))))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

@@ -5,12 +5,20 @@
 ;;;; global isNaN/isFinite, structuredClone, queueMicrotask,
 ;;;; Iterator.from, Map.groupBy, Set-from-iterable, Proxy,
 ;;;; Math.sumPrecise, Error.isError, AggregateError, AbortController,
-;;;; URL, TypedArray constructor factory, Object.defineProperties.
+;;;; URL, TypedArray constructor factory, Object.defineProperties,
+;;;; Reflect.defineProperty / Object.defineProperty.
 ;;;;
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
+
+;;; ─── Local test helpers ──────────────────────────────────────────────────────
+
+(defun %jr-assert-string-props (object expected-props)
+  (dolist (prop expected-props)
+    (destructuring-bind (key expected) prop
+      (assert-string= expected (gethash key object)))))
 
 ;;; ─── Module exports ─────────────────────────────────────────────────────────
 
@@ -190,6 +198,73 @@
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
     (assert-equal '(3 2 1) acc)))
 
+(deftest js-rt-iterator-from-set
+  "%js-iterator-from-iterable normalizes Set values to an iterator object."
+  (let* ((set (cl-cc/javascript::%js-make-set))
+         (_   (cl-cc/javascript::%js-set-add set 3))
+         (_   (cl-cc/javascript::%js-set-add set 4))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable set))
+         (acc nil))
+    (declare (ignore _))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '(4 3) acc)))
+
+(deftest js-rt-iterator-from-map
+  "%js-iterator-from-iterable normalizes Map values to an entries iterator."
+  (let* ((map (cl-cc/javascript::%js-make-map))
+         (_1  (cl-cc/javascript::%js-map-set map "a" 1))
+         (_2  (cl-cc/javascript::%js-map-set map "b" 2))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable map))
+         (acc nil))
+    (declare (ignore _1 _2))
+    (cl-cc/javascript::%js-for-of iter
+                                  (lambda (entry)
+                                    (push (%jr-list entry) acc)))
+    (assert-equal '(("b" 2) ("a" 1)) acc)))
+
+(deftest js-rt-iterator-from-plain-next
+  "%js-iterator-from-iterable accepts plain iterator objects with next()."
+  (let* ((step 0)
+         (iterable
+           (cl-cc/javascript::%js-make-object
+            "next" (lambda ()
+                     (prog1
+                         (case step
+                           (0 (cl-cc/javascript::%js-make-object "value" "first" "done" nil))
+                           (1 (cl-cc/javascript::%js-make-object "value" "second" "done" nil))
+                           (t (cl-cc/javascript::%js-make-object "value" cl-cc/javascript::+js-undefined+ "done" t)))
+                       (incf step)))))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable iterable))
+         (acc nil))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '("second" "first") acc)))
+
+(deftest js-rt-iterator-from-@@iterator
+  "%js-iterator-from-iterable calls @@iterator when present on a plain object."
+  (let* ((iterable
+           (cl-cc/javascript::%js-make-object
+            "@@iterator" (lambda ()
+                           (cl-cc/javascript::%js-vec-to-iter (%jr-arr 8 9)))))
+         (iter (cl-cc/javascript::%js-iterator-from-iterable iterable))
+         (acc nil))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '(9 8) acc)))
+
+(deftest js-rt-iterator-from-string
+  "%js-iterator-from-iterable wraps strings as iterators over one-char strings."
+  (let* ((iter (cl-cc/javascript::%js-iterator-from-iterable "ab"))
+         (acc nil))
+    (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
+    (assert-equal '("b" "a") acc)))
+
+(deftest js-rt-iterator-from-non-iterable
+  "%js-iterator-from-iterable returns an already-done iterator for non-iterables."
+  (let ((iter (cl-cc/javascript::%js-iterator-from-iterable
+               (cl-cc/javascript::%js-make-object))))
+    (multiple-value-bind (value done) (cl-cc/javascript::%js-iter-next iter)
+      (assert-eq cl-cc/javascript::+js-undefined+ value)
+      (assert-true done))))
+
 ;;; ─── Map.groupBy ─────────────────────────────────────────────────────────────
 
 (deftest js-rt-map-group-by
@@ -255,6 +330,22 @@
     (assert-string= "x" deleted)
     (assert-false (nth-value 1 (gethash "x" target)))))
 
+(deftest js-rt-proxy-falls-back-without-traps
+  "Proxy operations fall back to the target when a trap is absent."
+  (let* ((target (cl-cc/javascript::%js-make-object "x" 1))
+         (proxy (cl-cc/javascript::%js-make-proxy-object
+                 target (cl-cc/javascript::%js-make-object))))
+    (multiple-value-bind (value trapped)
+        (cl-cc/javascript::%js-proxy-call-trap proxy "get" target "x" proxy)
+      (assert-eq cl-cc/javascript::+js-undefined+ value)
+      (assert-false trapped))
+    (assert-= 1 (cl-cc/javascript::%js-get-prop proxy "x"))
+    (assert-= 2 (cl-cc/javascript::%js-set-prop proxy "y" 2))
+    (assert-= 2 (gethash "y" target))
+    (assert-true (cl-cc/javascript::%js-in "x" proxy))
+    (assert-true (cl-cc/javascript::%js-delete proxy "x"))
+    (assert-false (nth-value 1 (gethash "x" target)))))
+
 (deftest js-rt-proxy-reflect-and-object-traps
   "Proxy traps route Reflect and Object descriptor/enumeration helpers."
   (let* ((target (cl-cc/javascript::%js-make-object "a" 1))
@@ -294,7 +385,9 @@
       (assert-string= "b" (aref keys 0))
       (assert-string= "c" (aref keys 1)))
     (let ((desc (cl-cc/javascript::%js-object-get-own-property-descriptor proxy "b")))
-      (assert-string= "b" (gethash "value" desc)))))
+      (assert-string= "b" (gethash "value" desc)))
+    (let ((desc (cl-cc/javascript::%js-object-get-own-property-descriptor proxy "c")))
+      (assert-string= "c" (gethash "value" desc)))))
 
 ;;; ─── Math.sumPrecise (ES2026) ────────────────────────────────────────────────
 
@@ -307,7 +400,8 @@
 
 (deftest js-rt-error-is-error
   "%js-error-is-error returns truthy for Error-like objects, nil for non-errors."
-  (let ((with-message (cl-cc/javascript::%js-make-object "message" "oops"))
+  (let ((with-message (cl-cc/javascript::%js-make-error-instance
+                       cl-cc/javascript::*js-error-class* "oops"))
         (plain-obj    (cl-cc/javascript::%js-make-object "x" 1)))
     (assert-true  (cl-cc/javascript::%js-error-is-error with-message))
     (assert-false (cl-cc/javascript::%js-error-is-error plain-obj))
@@ -413,15 +507,17 @@
   "%js-make-url parses common absolute URL components."
   (let ((url (cl-cc/javascript::%js-make-url
               "https://example.com:8443/path/to?q=1#frag")))
-    (assert-string= "https://example.com:8443/path/to?q=1#frag" (gethash "href" url))
-    (assert-string= "https:" (gethash "protocol" url))
-    (assert-string= "example.com:8443" (gethash "host" url))
-    (assert-string= "example.com" (gethash "hostname" url))
-    (assert-string= "8443" (gethash "port" url))
-    (assert-string= "https://example.com:8443" (gethash "origin" url))
-    (assert-string= "/path/to" (gethash "pathname" url))
-    (assert-string= "?q=1" (gethash "search" url))
-    (assert-string= "#frag" (gethash "hash" url))
+    (%jr-assert-string-props
+     url
+     '(("href" "https://example.com:8443/path/to?q=1#frag")
+       ("protocol" "https:")
+       ("host" "example.com:8443")
+       ("hostname" "example.com")
+       ("port" "8443")
+       ("origin" "https://example.com:8443")
+       ("pathname" "/path/to")
+       ("search" "?q=1")
+       ("hash" "#frag")))
     (assert-string= "https://example.com:8443/path/to?q=1#frag"
                     (funcall (gethash "toString" url)))))
 
@@ -430,18 +526,22 @@
   (let ((url (cl-cc/javascript::%js-make-url
               "child?x=1"
               "https://example.com/a/b/index.html")))
-    (assert-string= "https://example.com/a/b/child?x=1" (gethash "href" url))
-    (assert-string= "/a/b/child" (gethash "pathname" url))
-    (assert-string= "?x=1" (gethash "search" url))))
+    (%jr-assert-string-props
+     url
+     '(("href" "https://example.com/a/b/child?x=1")
+       ("pathname" "/a/b/child")
+       ("search" "?x=1")))))
 
 (deftest js-rt-make-url-normalizes-relative-dot-segments
   "%js-make-url normalizes dot segments when resolving against a base URL."
   (let ((url (cl-cc/javascript::%js-make-url
               "../c/./d/?x=1"
               "https://example.com/a/b/index.html")))
-    (assert-string= "https://example.com/a/c/d/?x=1" (gethash "href" url))
-    (assert-string= "/a/c/d/" (gethash "pathname" url))
-    (assert-string= "?x=1" (gethash "search" url))))
+    (%jr-assert-string-props
+     url
+     '(("href" "https://example.com/a/c/d/?x=1")
+       ("pathname" "/a/c/d/")
+       ("search" "?x=1")))))
 
 (deftest js-rt-make-url-resolves-query-and-hash-only-relative
   "%js-make-url keeps the base path for query-only and hash-only relative URLs."
@@ -451,13 +551,17 @@
         (hash-url (cl-cc/javascript::%js-make-url
                    "#next"
                    "https://example.com/a/b/index.html?old=1#frag")))
-    (assert-string= "https://example.com/a/b/index.html?q=2" (gethash "href" query-url))
-    (assert-string= "/a/b/index.html" (gethash "pathname" query-url))
-    (assert-string= "?q=2" (gethash "search" query-url))
-    (assert-string= "https://example.com/a/b/index.html?old=1#next" (gethash "href" hash-url))
-    (assert-string= "/a/b/index.html" (gethash "pathname" hash-url))
-    (assert-string= "?old=1" (gethash "search" hash-url))
-    (assert-string= "#next" (gethash "hash" hash-url))))
+    (%jr-assert-string-props
+     query-url
+     '(("href" "https://example.com/a/b/index.html?q=2")
+       ("pathname" "/a/b/index.html")
+       ("search" "?q=2")))
+    (%jr-assert-string-props
+     hash-url
+     '(("href" "https://example.com/a/b/index.html?old=1#next")
+       ("pathname" "/a/b/index.html")
+       ("search" "?old=1")
+       ("hash" "#next")))))
 
 ;;; ─── TypedArray constructor factory ─────────────────────────────────────────
 
@@ -479,6 +583,18 @@
     (cl-cc/javascript::%js-object-define-properties obj descs)
     (assert-= 1 (gethash "a" obj))
     (assert-= 2 (gethash "b" obj))))
+
+(deftest js-rt-object-define-properties-ignores-non-objects
+  "%js-object-define-properties ignores non-object props and non-object descriptors."
+  (let* ((obj (cl-cc/javascript::%js-make-object "keep" 1))
+         (mixed (cl-cc/javascript::%js-make-object
+                 "ok" (cl-cc/javascript::%js-make-object "value" 2)
+                 "skip" 9)))
+    (cl-cc/javascript::%js-object-define-properties obj (%jr-arr "bad"))
+    (cl-cc/javascript::%js-object-define-properties obj mixed)
+    (assert-= 1 (gethash "keep" obj))
+    (assert-= 2 (gethash "ok" obj))
+    (assert-false (nth-value 1 (gethash "skip" obj)))))
 
 ;;; ─── Reflect.defineProperty / Object.defineProperty ─────────────────────────
 
@@ -577,348 +693,3 @@
     (assert-signals error
       (cl-cc/javascript::%js-object-define-property obj "locked" desc))
     (assert-= 1 (gethash "locked" obj))))
-
-;;; ─── URLSearchParams ─────────────────────────────────────────────────────────
-
-(deftest js-rt-url-search-params-basic-operations
-  "%js-make-url-search-params supports ordered query param operations."
-  (let* ((params (cl-cc/javascript::%js-make-url-search-params "?a=1&b=two&a=3"))
-         (get-fn (gethash "get" params))
-         (get-all-fn (gethash "getAll" params))
-         (has-fn (gethash "has" params))
-         (set-fn (gethash "set" params))
-         (append-fn (gethash "append" params))
-         (to-string-fn (gethash "toString" params)))
-    (assert-string= "1" (funcall get-fn "a"))
-    (assert-true (funcall has-fn "b"))
-    (let ((all-a (funcall get-all-fn "a")))
-      (assert-= 2 (length all-a))
-      (assert-string= "1" (aref all-a 0))
-      (assert-string= "3" (aref all-a 1)))
-    (funcall set-fn "a" "9")
-    (assert-string= "a=9&b=two" (funcall to-string-fn))
-    (funcall append-fn "space" "a b")
-    (assert-string= "a=9&b=two&space=a+b" (funcall to-string-fn))))
-
-(deftest js-rt-url-search-params-updates-url-search-and-href
-  "URL.searchParams mutators update the owning URL search and href fields."
-  (let* ((url (cl-cc/javascript::%js-make-url "https://example.com/path?a=1"))
-         (params (gethash "searchParams" url))
-         (set-fn (gethash "set" params))
-         (delete-fn (gethash "delete" params)))
-    (funcall set-fn "a" "2")
-    (assert-string= "?a=2" (gethash "search" url))
-    (assert-string= "https://example.com/path?a=2" (gethash "href" url))
-    (funcall delete-fn "a")
-    (assert-string= "" (gethash "search" url))
-    (assert-string= "https://example.com/path" (gethash "href" url))))
-
-(deftest js-rt-url-search-params-sort-is-stable-and-updates-url
-  "URLSearchParams.sort orders by key, preserves duplicate order, and updates URL."
-  (let* ((url (cl-cc/javascript::%js-make-url "https://example.com/path?b=2&a=1&a=0&c=3"))
-         (params (gethash "searchParams" url))
-         (sort-fn (gethash "sort" params))
-         (to-string-fn (gethash "toString" params))
-         (get-all-fn (gethash "getAll" params)))
-    (assert-eq cl-cc/javascript::+js-undefined+ (funcall sort-fn))
-    (assert-string= "a=1&a=0&b=2&c=3" (funcall to-string-fn))
-    (assert-string= "?a=1&a=0&b=2&c=3" (gethash "search" url))
-    (assert-string= "https://example.com/path?a=1&a=0&b=2&c=3"
-                    (gethash "href" url))
-    (let ((all-a (funcall get-all-fn "a")))
-      (assert-= 2 (length all-a))
-      (assert-string= "1" (aref all-a 0))
-      (assert-string= "0" (aref all-a 1)))))
-
-;;; ─── TextEncoder / TextDecoder ──────────────────────────────────────────────
-
-(deftest js-rt-text-encoder-encode-utf8
-  "TextEncoder.encode returns UTF-8 bytes in a Uint8Array."
-  (let* ((encoder (cl-cc/javascript::%js-make-text-encoder))
-         (text (format nil "A~C~C" (code-char #x00E9) (code-char #x20AC)))
-         (encoded (funcall (gethash "encode" encoder) text)))
-    (assert-true (cl-cc/javascript::js-typed-array-p encoded))
-    (assert-string= "Uint8Array" (cl-cc/javascript::js-ta-type-name encoded))
-    (assert-= 6 (cl-cc/javascript::js-ta-length encoded))
-    (assert-equal '(65 195 169 226 130 172)
-                  (loop for i below (cl-cc/javascript::js-ta-length encoded)
-                        collect (cl-cc/javascript::%js-ta-get encoded i)))))
-
-(deftest js-rt-text-decoder-decode-utf8
-  "TextDecoder.decode reads UTF-8 bytes from a typed array."
-  (let* ((decoder (cl-cc/javascript::%js-make-text-decoder "utf8"))
-         (bytes (cl-cc/javascript::%js-make-typed-array "Uint8Array" 6))
-         (expected (format nil "A~C~C" (code-char #x00E9) (code-char #x20AC))))
-    (loop for b in '(65 195 169 226 130 172)
-          for i from 0
-          do (cl-cc/javascript::%js-ta-set bytes i b))
-    (assert-string= "utf-8" (gethash "encoding" decoder))
-    (assert-string= expected (funcall (gethash "decode" decoder) bytes))
-    (assert-string= "" (funcall (gethash "decode" decoder)))))
-
-(deftest js-rt-text-decoder-decode-subarray
-  "TextDecoder.decode reads bytes through the TypedArray accessor path."
-  (let* ((decoder (cl-cc/javascript::%js-make-text-decoder))
-         (bytes (cl-cc/javascript::%js-make-typed-array "Uint8Array" 6))
-         (expected (format nil "~C~C" (code-char #x00E9) (code-char #x20AC))))
-    (loop for b in '(88 195 169 226 130 0)
-          for i from 0
-          do (cl-cc/javascript::%js-ta-set bytes i b))
-    (let ((view (cl-cc/javascript::%js-ta-subarray bytes 1)))
-      (cl-cc/javascript::%js-ta-set view 4 172)
-      (assert-string= expected (funcall (gethash "decode" decoder) view)))))
-
-(deftest js-rt-text-encoder-encode-into
-  "TextEncoder.encodeInto writes complete UTF-8 characters into destination."
-  (let* ((encoder (cl-cc/javascript::%js-make-text-encoder))
-         (dest (cl-cc/javascript::%js-make-typed-array "Uint8Array" 4))
-         (text (format nil "A~C~C" (code-char #x00E9) (code-char #x20AC)))
-         (result (funcall (gethash "encodeInto" encoder) text dest)))
-    (assert-= 2 (gethash "read" result))
-    (assert-= 3 (gethash "written" result))
-    (assert-equal '(65 195 169 0)
-                  (loop for i below (cl-cc/javascript::js-ta-length dest)
-                        collect (cl-cc/javascript::%js-ta-get dest i)))))
-
-;;; ─── Intl.NumberFormat ──────────────────────────────────────────────────────
-
-(deftest js-rt-intl-number-format-fraction-options
-  "Intl.NumberFormat honors basic minimum/maximum fraction digit options."
-  (let* ((formatter (cl-cc/javascript::%js-make-intl-number-format
-                     "en-US" (cl-cc/javascript::%js-make-object
-                              "minimumFractionDigits" 1
-                              "maximumFractionDigits" 2)))
-         (format-fn (gethash "format" formatter)))
-    (assert-string= "12.35" (funcall format-fn 12.345d0))
-    (assert-string= "12.0" (funcall format-fn 12))))
-
-(deftest js-rt-intl-number-format-grouping-option
-  "Intl.NumberFormat applies grouping by default and allows disabling it."
-  (let* ((grouped (cl-cc/javascript::%js-make-intl-number-format "en-US"))
-         (plain (cl-cc/javascript::%js-make-intl-number-format
-                 "en-US" (cl-cc/javascript::%js-make-object
-                          "useGrouping" nil))))
-    (assert-string= "12,345" (funcall (gethash "format" grouped) 12345))
-    (assert-string= "12345" (funcall (gethash "format" plain) 12345))))
-
-(deftest js-rt-intl-number-format-percent-and-parts
-  "Intl.NumberFormat supports a basic percent style and exposes simple parts."
-  (let* ((formatter (cl-cc/javascript::%js-make-intl-number-format
-                     "en-US" (cl-cc/javascript::%js-make-object
-                              "style" "percent"
-                              "minimumFractionDigits" 1
-                              "maximumFractionDigits" 1)))
-         (format-fn (gethash "format" formatter))
-         (parts-fn (gethash "formatToParts" formatter))
-         (parts (funcall parts-fn 0.1234d0)))
-    (assert-string= "12.3%" (funcall format-fn 0.1234d0))
-    (assert-string= "integer" (gethash "type" (aref parts 0)))
-    (assert-string= "12" (gethash "value" (aref parts 0)))
-    (assert-string= "decimal" (gethash "type" (aref parts 1)))
-    (assert-string= "." (gethash "value" (aref parts 1)))
-    (assert-string= "fraction" (gethash "type" (aref parts 2)))
-    (assert-string= "3" (gethash "value" (aref parts 2)))
-    (assert-string= "percentSign" (gethash "type" (aref parts 3)))
-    (assert-string= "%" (gethash "value" (aref parts 3)))))
-
-;;; ─── Intl.Collator ──────────────────────────────────────────────────────────
-
-(deftest js-rt-intl-collator-numeric-option
-  "Intl.Collator({ numeric: true }) compares digit runs numerically."
-  (let* ((collator (cl-cc/javascript::%js-make-intl-collator
-                    "en-US" (cl-cc/javascript::%js-make-object "numeric" t)))
-         (compare (gethash "compare" collator)))
-    (assert-true (< (funcall compare "item2" "item10") 0))
-    (assert-true (> (funcall compare "item11" "item2") 0))))
-
-(deftest js-rt-intl-collator-sensitivity-base
-  "Intl.Collator({ sensitivity: 'base' }) ignores case and basic accents."
-  (let* ((collator (cl-cc/javascript::%js-make-intl-collator
-                    "en-US" (cl-cc/javascript::%js-make-object
-                             "sensitivity" "base")))
-         (compare (gethash "compare" collator)))
-    (assert-= 0 (funcall compare "Résumé" "resume"))
-    (assert-= 0 (funcall compare "Alpha" "alpha"))))
-
-(deftest js-rt-intl-collator-resolved-options
-  "Intl.Collator.resolvedOptions exposes the lightweight option state."
-  (let* ((collator (cl-cc/javascript::%js-make-intl-collator
-                    "en-US" (cl-cc/javascript::%js-make-object
-                             "numeric" t
-                             "sensitivity" "accent")))
-         (resolved (funcall (gethash "resolvedOptions" collator))))
-    (assert-string= "en-US" (gethash "locale" resolved))
-    (assert-string= "sort" (gethash "usage" resolved))
-    (assert-string= "accent" (gethash "sensitivity" resolved))
-    (assert-true (gethash "numeric" resolved))))
-
-;;; ─── Intl.DateTimeFormat ───────────────────────────────────────────────────
-
-(deftest js-rt-intl-date-time-format-default-and-parts
-  "Intl.DateTimeFormat defaults to deterministic UTC month/day/year output."
-  (let* ((formatter (cl-cc/javascript::%js-make-intl-date-time-format "en-US"))
-         (date (cl-cc/javascript::%js-make-date 97445000))
-         (format-fn (gethash "format" formatter))
-         (parts (funcall (gethash "formatToParts" formatter) date)))
-    (assert-string= "1/2/1970" (funcall format-fn date))
-    (assert-= 5 (length parts))
-    (assert-string= "month" (gethash "type" (aref parts 0)))
-    (assert-string= "1" (gethash "value" (aref parts 0)))
-    (assert-string= "literal" (gethash "type" (aref parts 1)))
-    (assert-string= "/" (gethash "value" (aref parts 1)))
-    (assert-string= "day" (gethash "type" (aref parts 2)))
-    (assert-string= "2" (gethash "value" (aref parts 2)))
-    (assert-string= "year" (gethash "type" (aref parts 4)))
-    (assert-string= "1970" (gethash "value" (aref parts 4)))))
-
-(deftest js-rt-intl-date-time-format-options-and-resolved
-  "Intl.DateTimeFormat honors basic component options and resolvedOptions."
-  (let* ((formatter (cl-cc/javascript::%js-make-intl-date-time-format
-                     "en-US" (cl-cc/javascript::%js-make-object
-                              "year" "2-digit"
-                              "month" "short"
-                              "day" "2-digit"
-                              "hour" "2-digit"
-                              "minute" "2-digit"
-                              "second" "2-digit"
-                              "hour12" t)))
-         (date (cl-cc/javascript::%js-make-date 97445000))
-         (resolved (funcall (gethash "resolvedOptions" formatter))))
-    (assert-string= "Jan/02/70, 03:04:05 AM"
-                    (funcall (gethash "format" formatter) date))
-    (assert-string= "en-US" (gethash "locale" resolved))
-    (assert-string= "UTC" (gethash "timeZone" resolved))
-    (assert-string= "short" (gethash "month" resolved))
-    (assert-string= "2-digit" (gethash "day" resolved))
-    (assert-string= "2-digit" (gethash "hour" resolved))
-    (assert-true (gethash "hour12" resolved))))
-
-(deftest js-rt-intl-date-time-format-style-options
-  "Intl.DateTimeFormat maps dateStyle/timeStyle to stable English UTC output."
-  (let* ((formatter (cl-cc/javascript::%js-make-intl-date-time-format
-                     "en-US" (cl-cc/javascript::%js-make-object
-                              "dateStyle" "medium"
-                              "timeStyle" "short")))
-         (date (cl-cc/javascript::%js-make-date 97445000))
-         (resolved (funcall (gethash "resolvedOptions" formatter))))
-    (assert-string= "Jan/2/1970, 3:04"
-                    (funcall (gethash "format" formatter) date))
-    (assert-string= "medium" (gethash "dateStyle" resolved))
-    (assert-string= "short" (gethash "timeStyle" resolved))
-    (assert-string= "short" (gethash "month" resolved))
-    (assert-string= "2-digit" (gethash "minute" resolved))))
-
-;;; ─── Intl.ListFormat ────────────────────────────────────────────────────────
-
-(deftest js-rt-intl-list-format-conjunction-and-disjunction
-  "Intl.ListFormat formats conjunction and disjunction lists."
-  (let* ((conjunction (cl-cc/javascript::%js-make-intl-list-format "en-US"))
-         (disjunction (cl-cc/javascript::%js-make-intl-list-format
-                       "en-US" (cl-cc/javascript::%js-make-object
-                                "type" "disjunction")))
-         (items (%jr-arr "red" "green" "blue")))
-    (assert-string= "red, green, and blue"
-                    (funcall (gethash "format" conjunction) items))
-    (assert-string= "red, green, or blue"
-                    (funcall (gethash "format" disjunction) items))))
-
-(deftest js-rt-intl-list-format-to-parts-and-resolved-options
-  "Intl.ListFormat exposes parts and resolved option state."
-  (let* ((formatter (cl-cc/javascript::%js-make-intl-list-format
-                     "en-US" (cl-cc/javascript::%js-make-object
-                              "type" "unit"
-                              "style" "short")))
-         (parts (funcall (gethash "formatToParts" formatter)
-                         (%jr-arr "1 km" "2 min")))
-         (resolved (funcall (gethash "resolvedOptions" formatter))))
-    (assert-= 3 (length parts))
-    (assert-string= "element" (gethash "type" (aref parts 0)))
-    (assert-string= "1 km" (gethash "value" (aref parts 0)))
-    (assert-string= "literal" (gethash "type" (aref parts 1)))
-    (assert-string= ", " (gethash "value" (aref parts 1)))
-    (assert-string= "element" (gethash "type" (aref parts 2)))
-    (assert-string= "2 min" (gethash "value" (aref parts 2)))
-    (assert-string= "en-US" (gethash "locale" resolved))
-    (assert-string= "unit" (gethash "type" resolved))
-    (assert-string= "short" (gethash "style" resolved))))
-
-;;; ─── Intl.PluralRules ───────────────────────────────────────────────────────
-
-(deftest js-rt-intl-plural-rules-cardinal-and-ordinal
-  "Intl.PluralRules selects basic English cardinal and ordinal categories."
-  (let* ((cardinal (cl-cc/javascript::%js-make-intl-plural-rules "en-US"))
-         (ordinal (cl-cc/javascript::%js-make-intl-plural-rules
-                   "en-US" (cl-cc/javascript::%js-make-object
-                            "type" "ordinal"))))
-    (assert-string= "one" (funcall (gethash "select" cardinal) 1))
-    (assert-string= "other" (funcall (gethash "select" cardinal) 2))
-    (assert-string= "one" (funcall (gethash "select" ordinal) 21))
-    (assert-string= "two" (funcall (gethash "select" ordinal) 22))
-    (assert-string= "few" (funcall (gethash "select" ordinal) 23))
-    (assert-string= "other" (funcall (gethash "select" ordinal) 11))))
-
-(deftest js-rt-intl-plural-rules-select-range-and-resolved-options
-  "Intl.PluralRules exposes selectRange and resolved option categories."
-  (let* ((rules (cl-cc/javascript::%js-make-intl-plural-rules
-                 "en-US" (cl-cc/javascript::%js-make-object
-                          "type" "ordinal")))
-         (resolved (funcall (gethash "resolvedOptions" rules)))
-         (categories (gethash "pluralCategories" resolved)))
-    (assert-string= "few" (funcall (gethash "selectRange" rules) 1 3))
-    (assert-string= "en-US" (gethash "locale" resolved))
-    (assert-string= "ordinal" (gethash "type" resolved))
-    (assert-equal '("one" "two" "few" "other") (%jr-list categories))))
-
-;;; ─── crypto ──────────────────────────────────────────────────────────────────
-
-(deftest js-rt-crypto-random-uuid
-  "%js-make-crypto randomUUID returns a string matching UUID format."
-  (let* ((crypto (cl-cc/javascript::%js-make-crypto))
-         (uuid   (funcall (gethash "randomUUID" crypto))))
-    (assert-true (stringp uuid))
-    (assert-= 36 (length uuid))
-    (assert-string= uuid (string-downcase uuid))
-    (assert-equal #\- (char uuid 8))
-    (assert-equal #\- (char uuid 13))
-    (assert-equal #\- (char uuid 18))
-    (assert-equal #\- (char uuid 23))
-    (assert-equal #\4 (char uuid 14))
-    (assert-true (member (char uuid 19) '(#\8 #\9 #\a #\b) :test #'char=))))
-
-(deftest js-rt-crypto-get-random-values
-  "%js-make-crypto getRandomValues fills and returns the same integer TypedArray."
-  (let* ((crypto (cl-cc/javascript::%js-make-crypto))
-         (ta     (cl-cc/javascript::%js-make-typed-array "Uint8Array" 4))
-         (ret    (funcall (gethash "getRandomValues" crypto) ta))
-         (buffer (cl-cc/javascript::js-ta-buffer ta)))
-    (assert-eq ta ret)
-    (assert-= 4 (cl-cc/javascript::js-ta-length ret))
-    (loop for i below (cl-cc/javascript::js-ta-length ret)
-          do (progn
-               (assert-true (integerp (aref buffer i)))
-               (assert-true (<= 0 (aref buffer i) 255))))))
-
-(deftest js-rt-crypto-get-random-values-typed-array
-  "%js-make-crypto getRandomValues fills integer TypedArrays."
-  (let* ((crypto (cl-cc/javascript::%js-make-crypto))
-         (ta     (cl-cc/javascript::%js-make-typed-array "Uint8Array" 8))
-         (ret    (funcall (gethash "getRandomValues" crypto) ta))
-         (buffer (cl-cc/javascript::js-ta-buffer ta)))
-    (assert-eq ta ret)
-    (assert-= 8 (cl-cc/javascript::js-ta-length ta))
-    (loop for i below (cl-cc/javascript::js-ta-length ta)
-          do (progn
-               (assert-true (integerp (aref buffer i)))
-               (assert-true (<= 0 (aref buffer i) 255))))))
-
-(deftest js-rt-crypto-get-random-values-rejects-invalid-inputs
-  "%js-make-crypto getRandomValues rejects non-integer views and oversized arrays."
-  (let ((crypto (cl-cc/javascript::%js-make-crypto)))
-    (assert-signals error
-      (funcall (gethash "getRandomValues" crypto) (make-array 4 :initial-element 0)))
-    (assert-signals error
-      (funcall (gethash "getRandomValues" crypto)
-               (cl-cc/javascript::%js-make-typed-array "Float32Array" 4)))
-    (assert-signals error
-      (funcall (gethash "getRandomValues" crypto)
-               (cl-cc/javascript::%js-make-typed-array "Uint8Array" 65537)))))

@@ -1,6 +1,6 @@
 (asdf:defsystem :cl-cc-codegen
   :description "Per-target code generation: x86-64, AArch64, WASM backends"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-vm :cl-cc-mir :cl-cc-target
@@ -57,13 +57,17 @@
    (:file "wasm-trampoline-emit")
    (:file "wasm-trampoline-build")
       (:file "wasm")
-      (:file "wasm-sections")
-      (:file "wasm-functions")
-      (:file "wasm-imports")
-      (:file "wasm-output")
-      (:file "wasm-feature-params")
-      (:file "wasm-simd")
+                 (:file "wasm-sections")
+                 (:file "wasm-functions")
+                 (:file "wasm-imports")
+                 (:file "wasm-feature-params")
+                 (:file "wasm-binary")
+                 (:file "wasm-binary-debug")
+                 (:file "wasm-output")
+                 (:file "wasm-aot")
+                 (:file "wasm-simd")
       (:file "wasm-emit-data")
-     (:file "wasm-emit-sections")
-     (:file "wasm-threads-integration")
-     (:file "wasm-emit-instrs")))
+      (:file "wasm-emit-sections")
+      (:file "wasm-threads-integration")
+      (:file "wasm-emit-instrs-atomic")
+      (:file "wasm-emit-instrs")))

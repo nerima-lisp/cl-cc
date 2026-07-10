@@ -7,7 +7,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defparameter *lambda-list-keyword-transitions*
-  '((&optional . :optional)
+  '((&whole . :whole)
+    (&optional . :optional)
     (&rest . :rest)
     (&body . :body)
     (&key . :key)
@@ -17,6 +18,7 @@
 
 (defstruct lambda-list-info
   "Information about a parsed lambda list."
+  whole
   required
   optional
   rest
@@ -28,8 +30,9 @@
 
 (defun parse-lambda-list (lambda-list)
   "Parse LAMBDA-LIST into a lambda-list-info structure.
-   Supports: required, &optional, &rest, &body, &key, &allow-other-keys, &aux."
+   Supports: &whole, required, &optional, &rest, &body, &key, &allow-other-keys, &aux."
   (let ((state :required)
+        (whole nil)
         (required nil)
         (optional nil)
         (rest nil)
@@ -52,6 +55,11 @@
              (setf allow-other-keys t)))
           (t
            (case state
+             (:whole
+              (unless (symbolp item)
+                (error "Invalid &whole parameter: ~S" item))
+              (setf whole item
+                    state :required))
              (:required
               (push item required))
              (:optional
@@ -98,6 +106,7 @@
               (error "Unexpected parameter after ~A: ~S"
                      (if (eq state :after-rest) "&rest" "&body") item)))))))
     (make-lambda-list-info
+     :whole whole
      :required (nreverse required)
      :optional (nreverse optional)
      :rest rest
@@ -162,6 +171,38 @@ Returns the updated CURRENT-ARG cursor and BINDINGS list."
       (push (list aux-name init) bindings)))
   bindings)
 
+(defun %proper-list-p (object)
+  "Return true when OBJECT is a proper list."
+  (loop for tail = object then (cdr tail)
+        when (null tail) return t
+        unless (consp tail) return nil))
+
+(defun %let-binding-form (binding)
+  "Normalize public lambda-list binding pairs for LET/LET*."
+  (if (and (consp binding)
+           (symbolp (car binding))
+           (not (and (%proper-list-p binding)
+                     (<= (length binding) 2))))
+      (list (car binding) (cdr binding))
+      binding))
+
+(defun %normalize-let-bindings (bindings)
+  "Return BINDINGS in LET/LET* binding syntax."
+  (mapcar #'%let-binding-form bindings))
+
+(defun %strip-lambda-list-keywords (lambda-list keywords)
+  "Return LAMBDA-LIST without KEYWORDS and their following binding names."
+  (let ((result nil)
+        (skip-next nil))
+    (dolist (item lambda-list (nreverse result))
+      (cond
+        (skip-next
+         (setf skip-next nil))
+        ((member item keywords :test #'eq)
+         (setf skip-next t))
+        (t
+         (push item result))))))
+
 (defun %push-destructured-required-bindings (required current-arg bindings gensym-local)
   "Accumulate binding forms for REQUIRED destructuring parameters."
   (dolist (req required)
@@ -210,48 +251,66 @@ Returns the updated CURRENT-ARG cursor and BINDINGS list."
   "Generate LET* bindings from LAMBDA-LIST for the macro form in FORM-VAR.
 Uses the full destructuring path so macro lambda lists like
   (name (parent) &body body)
-work in host-registered expanders as well as simpler flat lambda lists."
-  (destructure-lambda-list lambda-list `(cdr ,form-var)))
+work in host-registered expanders as well as simpler flat lambda lists.
+Strips &whole and &environment before destructuring because those symbols
+are bound explicitly by the expander runtime."
+  (let* ((info (parse-lambda-list lambda-list))
+         (whole (lambda-list-info-whole info))
+         (lambda-list-without-locals
+           (if (or whole (lambda-list-info-environment info))
+               (%strip-lambda-list-keywords
+                lambda-list
+                (remove nil
+                        (list (and whole '&whole)
+                              (and (lambda-list-info-environment info)
+                                   '&environment))))
+               lambda-list))
+         (bindings (destructure-lambda-list lambda-list-without-locals `(cdr ,form-var))))
+    (if whole
+        (cons (list whole form-var) bindings)
+        bindings)))
 
 (defun destructure-lambda-list (pattern arg)
   "Destructure ARG according to PATTERN lambda list.
    Returns an alist of (symbol . binding-form) pairs.
-   Supports: required, &optional, &rest, &body, &key, &aux"
+   Supports: &whole, required, &optional, &rest, &body, &key, &aux"
   (let ((info (parse-lambda-list pattern))
         (bindings nil)
         (arg-var (gensym "ARG"))
         (remaining-var (gensym "REMAINING"))
         (gensym-local (%make-gensym-local)))
     (push (list arg-var arg) bindings)
+    (when (lambda-list-info-whole info)
+      (push (cons (lambda-list-info-whole info) arg) bindings))
 
-      (let ((current-arg arg-var))
-        (setf bindings (%push-destructured-required-bindings
-                        (lambda-list-info-required info)
-                        current-arg bindings gensym-local))
+    (let ((current-arg arg-var))
+      (setf bindings (%push-destructured-required-bindings
+                      (lambda-list-info-required info)
+                      current-arg bindings gensym-local))
 
-        (push (list remaining-var current-arg) bindings))
+      (push (list remaining-var current-arg) bindings))
 
-      (let ((opt-remaining remaining-var))
-        (setf bindings (%push-destructured-optional-bindings
-                        (lambda-list-info-optional info)
-                        opt-remaining bindings gensym-local))
+    (let ((opt-remaining remaining-var))
+      (setf bindings (%push-destructured-optional-bindings
+                      (lambda-list-info-optional info)
+                      opt-remaining bindings gensym-local))
 
-        (setf remaining-var opt-remaining))
+      (setf remaining-var opt-remaining))
 
-      (when (or (lambda-list-info-rest info)
-                (lambda-list-info-body info))
-        (let ((rest-sym (or (lambda-list-info-rest info)
-                             (lambda-list-info-body info))))
-          (push (list rest-sym remaining-var) bindings)))
+    (when (or (lambda-list-info-rest info)
+              (lambda-list-info-body info))
+      (let ((rest-sym (or (lambda-list-info-rest info)
+                          (lambda-list-info-body info))))
+        (push (list rest-sym remaining-var) bindings)))
 
-      (when (lambda-list-info-key-params info)
-        (let ((key-remaining remaining-var))
-          (setf bindings (%push-destructured-key-bindings
-                          (lambda-list-info-key-params info)
-                          key-remaining bindings gensym-local))))
+    (when (lambda-list-info-key-params info)
+      (let ((key-remaining remaining-var))
+        (setf bindings (%push-destructured-key-bindings
+                        (lambda-list-info-key-params info)
+                        key-remaining bindings gensym-local))))
 
-      (setf bindings (%push-aux-bindings (lambda-list-info-aux info) bindings))
+    (setf bindings (%push-aux-bindings (lambda-list-info-aux info) bindings))
 
-      (nreverse bindings)))
+    (nreverse bindings)))
 
 ) ; end eval-when

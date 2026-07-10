@@ -11,10 +11,6 @@
 ;; VM format directive at end-of-string has parser bug (FR-965)
 ;; ~D/~P/~W at EOL all fail with "Unterminated FORMAT directive"
 ;; Skipped until VM format parser is fixed
-#+nil (deftest runtime-stdlib-3-format-p-and-w
-  "FR-965: native FORMAT supports basic directives."
-  (assert-equal "1" (cl-cc/vm::%vm-format-native "~D" '(1))))
-
 (deftest runtime-stdlib-3-external-format-roundtrip
   "FR-959: external-format helpers expose UTF-8 encode/decode round trips."
   (let* ((text "hello")
@@ -34,6 +30,8 @@
   "FR-1006/1054/1066/1082: exported state variables and env helpers exist."
   (assert-true (find :cl-cc cl-cc/vm:*features*))
   (assert-equal "cl-cc" (cl-cc/vm:lisp-implementation-type))
+  (assert-true (stringp (cl-cc/vm::short-site-name)))
+  (assert-true (stringp (cl-cc/vm::long-site-name)))
   (assert-= 10 cl-cc/vm:*read-base*)
   (assert-true (cl-cc/vm:source-location-p
                 (cl-cc/vm:make-source-location :pathname #P"x.lisp" :line 1 :column 0)))

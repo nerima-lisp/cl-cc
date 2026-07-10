@@ -1,6 +1,6 @@
 (asdf:defsystem :cl-cc-emit
   :description "Emit backend subsystem: regalloc, codegen"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-ast :cl-cc-mir :cl-cc-optimize :cl-cc-codegen)

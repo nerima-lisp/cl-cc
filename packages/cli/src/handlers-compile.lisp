@@ -20,74 +20,68 @@ For files: compiles a single source file to native binary or IR dump."
          (verbose (flag parsed "--verbose"))
          (compress (and (flag parsed "--compress")
                         (not (flag parsed "--no-compress"))))
-         (timeout (%get-timeout parsed))
          (opts (%parse-compile-opts parsed)))
-    (when verbose
-      (format *error-output* "; cl-cc compile: ~A  arch=~A  output=~A~%"
-              (or system-name "file") arch-str (or output "(auto)")))
-    ;; ── System compilation path ──
-    (when system-name
-      (%with-cli-error-handler
-        (%call-with-cli-timeout timeout
-          (lambda ()
-            (let ((result (%compile-system-to-native system-name output arch compress
-                                                     (list :bolt-profile (flag parsed "--bolt-profile"))
-                                                     :bolt (flag parsed "--bolt")
-                                                     :bolt-profile (flag parsed "--bolt-profile"))))
-              (format t "~A~%" result)
-              (uiop:quit 0))))
-        "system-compile"))
-      (return-from %do-compile))
-    ;; ── File compilation path ──
-    (let* ((file (%required-file-arg parsed "compile"))
-           (lang-flag (or (flag parsed "--lang") ""))
-           (language (let ((l (%detect-language file lang-flag)))
-                        (if (string= lang-flag "") nil l))))
-    (when verbose
-      (format *error-output* "; cl-cc compile: ~A  arch=~A  output=~A~%"
-              file arch-str (or output "(auto)")))
-     (%with-cli-error-handler
-       (%call-with-cli-timeout timeout
-        (lambda ()
-           (flet ((compile-source (source &rest kwargs)
-                    (if (member (or language :lisp) '(:lisp :elisp))
-                        (apply #'compile-string source
-                               :source-file (if (compile-opts-deterministic opts)
-                                                (normalize-build-path file)
-                                                file)
-                               :language :lisp kwargs)
-                        (apply #'compile-string source :language (or language :lisp) kwargs))))
-             (let ((cl-cc/codegen::*x86-64-omit-frame-pointer*
-                     (if (or debug (compile-opts-stack-protector opts))
-                         nil
-                         cl-cc/codegen::*x86-64-omit-frame-pointer*))
-                   (cl-cc/codegen::*wasm-memory64-enabled*
-                    (if (flag parsed "--memory64")
-                        t
-                        cl-cc/codegen::*wasm-memory64-enabled*))
-                   (cl-cc/codegen::*wasm-table64-enabled*
-                    (if (flag parsed "--memory64")
-                        t
-                        cl-cc/codegen::*wasm-table64-enabled*))
-                    (cl-cc/codegen::*x86-64-use-retpoline*
-                     (if (or (compile-opts-retpoline opts)
-                             (compile-opts-spectre-mitigations opts))
-                        t
-                        cl-cc/codegen::*x86-64-use-retpoline*))
-                   (cl-cc/codegen::*x86-64-spectre-mitigations-enabled*
-                    (if (compile-opts-spectre-mitigations opts)
-                        t
-                        cl-cc/codegen::*x86-64-spectre-mitigations-enabled*))
+    (%with-cli-timeout (parsed "compile")
+      (when verbose
+        (format *error-output* "; cl-cc compile: ~A  arch=~A  output=~A~%"
+                (or system-name "file") arch-str (or output "(auto)")))
+      ;; ── System compilation path ──
+      (when system-name
+        (%with-cli-error-handler
+          (let ((result (%compile-system-to-native system-name output arch compress
+                                                   (list :bolt-profile (flag parsed "--bolt-profile"))
+                                                   :bolt (flag parsed "--bolt")
+                                                   :bolt-profile (flag parsed "--bolt-profile"))))
+            (format t "~A~%" result)
+            (uiop:quit 0))
+          "system-compile")
+        (return-from %do-compile))
+      ;; ── File compilation path ──
+      (let* ((file (%required-file-arg parsed "compile"))
+             (lang-flag (or (flag parsed "--lang") ""))
+             (language (let ((l (%detect-language file lang-flag)))
+                         (if (string= lang-flag "") nil l))))
+        (when verbose
+          (format *error-output* "; cl-cc compile: ~A  arch=~A  output=~A~%"
+                  file arch-str (or output "(auto)")))
+        (%with-cli-error-handler
+          (flet ((compile-source (source &rest kwargs)
+                   (if (member (or language :lisp) '(:lisp :elisp))
+                     (apply #'compile-string source
+                              :source-file (if (compile-opts-deterministic opts)
+                                               (cl-cc/vm::normalize-build-path file)
+                                               file)
+                              :language (or language :lisp) kwargs)
+                       (apply #'compile-string source :language (or language :lisp) kwargs))))
+            (let ((cl-cc/codegen::*x86-64-omit-frame-pointer*
+                    (if (or debug (compile-opts-stack-protector opts))
+                        nil
+                        cl-cc/codegen::*x86-64-omit-frame-pointer*))
+                  (cl-cc/codegen::*wasm-memory64-enabled*
+                   (if (flag parsed "--memory64")
+                       t
+                       cl-cc/codegen::*wasm-memory64-enabled*))
+                  (cl-cc/codegen::*wasm-table64-enabled*
+                   (if (flag parsed "--memory64")
+                       t
+                       cl-cc/codegen::*wasm-table64-enabled*))
+                  (cl-cc/codegen::*x86-64-use-retpoline*
+                   (if (or (compile-opts-retpoline opts)
+                           (compile-opts-spectre-mitigations opts))
+                       t
+                       cl-cc/codegen::*x86-64-use-retpoline*))
+                  (cl-cc/codegen::*x86-64-spectre-mitigations-enabled*
+                   (if (compile-opts-spectre-mitigations opts)
+                       t
+                       cl-cc/codegen::*x86-64-spectre-mitigations-enabled*))
                   (cl-cc/codegen::*x86-64-stack-protector-enabled*
-                    (if (compile-opts-stack-protector opts) t cl-cc/codegen::*x86-64-stack-protector-enabled*))
+                   (if (compile-opts-stack-protector opts) t cl-cc/codegen::*x86-64-stack-protector-enabled*))
                   (cl-cc/codegen::*x86-64-shadow-stack-enabled*
-                    (if (compile-opts-shadow-stack opts) t cl-cc/codegen::*x86-64-shadow-stack-enabled*))
-                  (cl-cc/codegen::*wasm-bigint-enabled*
-                    (if (flag parsed "--bigint") t cl-cc/codegen::*wasm-bigint-enabled*))
+                   (if (compile-opts-shadow-stack opts) t cl-cc/codegen::*x86-64-shadow-stack-enabled*))
                   (cl-cc/codegen::*wasm-js-bigint-i64-enabled*
-                    (if (flag parsed "--bigint") t cl-cc/codegen::*wasm-js-bigint-i64-enabled*))
+                   (if (flag parsed "--bigint") t cl-cc/codegen::*wasm-js-bigint-i64-enabled*))
                   (cl-cc/codegen::*a64-omit-frame-pointer*
-                    (if debug nil cl-cc/codegen::*a64-omit-frame-pointer*)))
+                   (if debug nil cl-cc/codegen::*a64-omit-frame-pointer*)))
               (if dump-ir
                   (let ((phase (%parse-ir-phase dump-ir)))
                     (unless phase
@@ -102,25 +96,25 @@ For files: compiles a single source file to native binary or IR dump."
                   (%call-with-optional-output-file
                    (compile-opts-trace-json-path opts)
                    (lambda (stream)
-                      (let* ((source (%read-command-source file))
-                             (kwargs (%compile-opts-kwargs opts stream))
-                             (trace-result (when (and (compile-opts-trace-emit opts)
+                     (let* ((source (%read-command-source file))
+                            (kwargs (%compile-opts-kwargs opts stream))
+                            (trace-result (when (and (compile-opts-trace-emit opts)
                                                      (not (%wasm-target-requested-p arch-str parsed)))
-                                             (apply #'compile-source source
-                                                    :target (%compile-target-keyword arch-str)
-                                                    kwargs)))
-                             (result (if (%wasm-target-requested-p arch-str parsed)
-                                         (%compile-to-wasm-output file output language opts parsed kwargs)
-                                         (apply #'compile-file-to-native file
-                                              :arch arch
-                                              :output-file output
-                                              :language language
-                                              :compress compress
-                                              (append (if (compile-opts-bolt opts)
-                                                          (list :bolt t
-                                                                :bolt-profile (compile-opts-pgo-use-path opts))
-                                                          nil)
-                                                      kwargs)))))
+                                            (apply #'compile-source source
+                                                   :target (%compile-target-keyword arch-str)
+                                                   kwargs)))
+                            (result (if (%wasm-target-requested-p arch-str parsed)
+                                        (%compile-to-wasm-output file output language opts parsed kwargs)
+                                        (apply #'compile-file-to-native file
+                                               :arch arch
+                                               :output-file output
+                                               :language language
+                                               :compress compress
+                                               (append (if (compile-opts-bolt opts)
+                                                           (list :bolt t
+                                                                 :bolt-profile (compile-opts-pgo-use-path opts))
+                                                           nil)
+                                                       kwargs)))))
                        (when (and (compile-opts-pgo-generate-path opts)
                                   (null trace-result))
                          (setf trace-result
@@ -129,11 +123,10 @@ For files: compiles a single source file to native binary or IR dump."
                                       kwargs)))
                        (when trace-result
                          (%maybe-write-pgo-profile opts trace-result))
-                        (when trace-result
-                          (%trace-emit-stages trace-result *standard-output* :annotate-source annotate))
-                        (when (or (compile-opts-deterministic opts)
-                                  (compile-opts-build-id opts))
-                          (%apply-reproducible-build-options result parsed))
-                        (format t "~A~%" result)
-                        (uiop:quit 0))))))))
-        "compile"))))
+                       (when trace-result
+                         (%trace-emit-stages trace-result *standard-output* :annotate-source annotate))
+                       (when (or (compile-opts-deterministic opts)
+                                 (compile-opts-build-id opts))
+                         (%apply-reproducible-build-options result parsed))
+                       (format t "~A~%" result)
+                       (uiop:quit 0))))))))))))

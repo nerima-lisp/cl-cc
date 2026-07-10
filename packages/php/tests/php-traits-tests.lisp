@@ -226,8 +226,12 @@
                  "<?php trait Simple { public function act() { return 1; } }
                   class Worker { use Simple; }"))
          (class (second asts))
-         (use-slot (find-if (lambda (s) (getf (cl-cc:ast-imports s) :php-trait-use))
+        (use-slot (find-if (lambda (s) (getf (cl-cc:ast-imports s) :php-trait-use))
                             (cl-cc:ast-defclass-slots class)))
-         (insteadof-list (getf (cl-cc:ast-imports use-slot) :php-insteadof)))
+        (insteadof-list (getf (cl-cc:ast-imports use-slot) :php-insteadof)))
     (assert-true use-slot)
     (assert-null insteadof-list)))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

@@ -165,44 +165,71 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 ;;; ─── *opt-convergence-passes* / *opt-pass-registry* data coverage ────────
 
+(defparameter *opt-pass-registry-presence-keys*
+  '(:prolog-rewrite
+    :egraph
+    :fold
+    :cons-slot-forward
+    :pure-call-optimization
+    :dce
+    :cse))
+
+(defparameter *opt-pass-registry-function-bindings*
+  `((:if-conversion . ,#'cl-cc/optimize::opt-pass-if-conversion)
+    (:fma-recognition . ,#'cl-cc/optimize::opt-pass-fma-recognition)))
+
+(defparameter *opt-default-convergence-prefix*
+  '(:prolog-rewrite
+    :call-site-splitting
+    :devirtualize
+    :if-conversion
+    :closure-capture-dedup
+    :closure-thunk-sharing))
+
+(defparameter *opt-default-convergence-positional-keys*
+  '((7 . :inline)
+    (8 . :overflow-check-elim)
+    (9 . :sccp)
+    (10 . :cons-slot-forward)))
+
+(defparameter *opt-default-convergence-ordering-edges*
+  '((:devirtualize :if-conversion)
+    (:if-conversion :inline)
+    (:fma-recognition :schedule-local)
+    (:copy-prop :pure-call-optimization)
+    (:pure-call-optimization :gvn)
+    (:pure-call-optimization :cse)
+    (:pure-call-optimization :dce)))
+
+(defun %opt-default-convergence-key-position (key)
+  (or (position key cl-cc/optimize::*opt-default-convergence-pass-keys*)
+      (error "Missing optimizer convergence key: ~S" key)))
+
+(defun %assert-opt-default-convergence-edge (before after)
+  (assert-true (< (%opt-default-convergence-key-position before)
+                  (%opt-default-convergence-key-position after))))
+
 (deftest opt-pass-registry-key-presence
   "*opt-pass-registry* includes all expected pass keywords."
-  (assert-true (gethash :prolog-rewrite cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :egraph cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :fold cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :cons-slot-forward cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :pure-call-optimization cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :dce  cl-cc/optimize::*opt-pass-registry*))
-  (assert-true (gethash :cse  cl-cc/optimize::*opt-pass-registry*))
-  (assert-eq #'cl-cc/optimize::opt-pass-if-conversion
-             (gethash :if-conversion cl-cc/optimize::*opt-pass-registry*))
-  (assert-eq #'cl-cc/optimize::opt-pass-fma-recognition
-             (gethash :fma-recognition cl-cc/optimize::*opt-pass-registry*)))
+  (dolist (key *opt-pass-registry-presence-keys*)
+    (assert-true (gethash key cl-cc/optimize::*opt-pass-registry*)))
+  (dolist (binding *opt-pass-registry-function-bindings*)
+    (assert-eq (cdr binding)
+               (gethash (car binding) cl-cc/optimize::*opt-pass-registry*))))
 
 (deftest opt-default-convergence-pass-keys-ordering
   "*opt-default-convergence-pass-keys* has the expected prefix order and positional invariants."
-  (assert-equal '(:prolog-rewrite :call-site-splitting :devirtualize :if-conversion
-                  :closure-capture-dedup :closure-thunk-sharing)
+  (assert-equal *opt-default-convergence-prefix*
                 (subseq cl-cc/optimize::*opt-default-convergence-pass-keys* 0 6))
-  (assert-eq :inline (seventh cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-eq :overflow-check-elim (eighth cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-eq :sccp (ninth cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-eq :cons-slot-forward (tenth cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-true (< (position :devirtualize cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :if-conversion cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :inline cl-cc/optimize::*opt-default-convergence-pass-keys*)))
+  (dolist (case *opt-default-convergence-positional-keys*)
+    (destructuring-bind (position . expected-key) case
+      (assert-eq expected-key
+                 (nth (1- position) cl-cc/optimize::*opt-default-convergence-pass-keys*))))
   (assert-true (member :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*))
   (assert-true (member :fma-recognition cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-true (< (position :fma-recognition cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :schedule-local cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :copy-prop cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :gvn cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :cse cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-  (assert-true (< (position :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*)
-                  (position :dce cl-cc/optimize::*opt-default-convergence-pass-keys*))))
+  (dolist (edge *opt-default-convergence-ordering-edges*)
+    (destructuring-bind (before after) edge
+      (%assert-opt-default-convergence-edge before after))))
 
 (deftest opt-convergence-passes-type-invariants
   "*opt-convergence-passes* is a non-empty function list with expected first element and exclusions."
@@ -536,17 +563,21 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
       (assert-true found)
       (assert-= 2 child))))
 
+(defparameter *opt-ic-patch-plan-cases*
+  '((:site1 :uninitialized :monomorphic :t1 :install-monomorphic)
+    (:site2 :monomorphic :polymorphic :t2 :promote-polymorphic)
+    (:site3 :polymorphic :megamorphic :t3 :promote-megamorphic)))
+
+(defun %assert-opt-ic-patch-plan-case (site current-state next-state target expected-kind)
+  (assert-eq expected-kind
+             (cl-cc/optimize::opt-ic-patch-patch-kind
+              (cl-cc/optimize::opt-ic-make-patch-plan
+               site current-state next-state target))))
+
 (deftest optimize-ic-make-patch-plan-classifies-state-transitions
   "opt-ic-make-patch-plan assigns expected patch kinds for IC promotions."
-  (assert-eq :install-monomorphic
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan :site1 :uninitialized :monomorphic :t1)))
-  (assert-eq :promote-polymorphic
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan :site2 :monomorphic :polymorphic :t2)))
-  (assert-eq :promote-megamorphic
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan :site3 :polymorphic :megamorphic :t3))))
+  (dolist (case *opt-ic-patch-plan-cases*)
+    (apply #'%assert-opt-ic-patch-plan-case case)))
 
 (deftest optimize-build-inline-polymorphic-dispatch-builds-guard-chain
   "opt-build-inline-polymorphic-dispatch returns one guard record per observed shape."
@@ -561,7 +592,7 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
   "Wasm tail-call helper selects return-call opcodes when enabled at tail position."
   :cases (("direct-enabled"   t nil t :return-call)
           ("indirect-enabled" t t   t :return-call-indirect)
-          ("disabled"         t nil nil :call))
+          ("non-tail-disabled" nil nil nil :call))
   (tail-p indirect-p enabled-p expected)
   (assert-eq expected
              (cl-cc/optimize::opt-wasm-select-tailcall-opcode
@@ -569,12 +600,35 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
               :indirect-p indirect-p
               :enabled-p enabled-p)))
 
+(deftest wasm-tailcall-opcode-disabled-tail-signals
+  "Tail-call opcode selection fails fast when tail calls are requested but disabled."
+  (assert-signals error
+    (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+     :tail-position-p t
+     :indirect-p nil
+     :enabled-p nil)))
+
+(defun %opt-wasm-gc-struct-layout (&key (fields '((slot-a . i32)))
+                                        (nullable-p t))
+  (cl-cc/optimize:opt-build-wasm-gc-layout
+   :kind :struct
+   :fields fields
+   :nullable-p nullable-p))
+
+(defun %opt-wasm-gc-array-layout (&key (fields '(eqref))
+                                       (nullable-p nil))
+  (cl-cc/optimize:opt-build-wasm-gc-layout
+   :kind :array
+   :fields fields
+   :nullable-p nullable-p))
+
+(defun %opt-wasm-gc-bad-array-layout ()
+  (%opt-wasm-gc-array-layout :fields '(eqref i32)))
+
 (deftest optimize-build-wasm-gc-layout-preserves-kind-and-fields
   "Wasm GC helper stores layout kind/fields/nullability deterministically."
-  (let ((layout (cl-cc/optimize::opt-build-wasm-gc-layout
-                 :kind :struct
-                 :fields '((slot-a . i32) (slot-b . externref))
-                 :nullable-p t)))
+  (let ((layout (%opt-wasm-gc-struct-layout
+                 :fields '((slot-a . i32) (slot-b . externref)))))
     (assert-eq :struct (cl-cc/optimize::opt-wasm-gc-kind layout))
     (assert-equal '((slot-a . i32) (slot-b . externref))
                   (cl-cc/optimize::opt-wasm-gc-fields layout))
@@ -582,32 +636,18 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-wasm-gc-layout-validates-struct-and-array-shapes
   "Wasm GC validation helper accepts legal struct/array layouts only."
-  (let ((struct-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                        :kind :struct
-                        :fields '((slot-a . i32) (slot-b . eqref))
-                        :nullable-p t))
-        (array-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                       :kind :array
-                       :fields '(eqref)
-                       :nullable-p nil))
-        (bad-array-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                           :kind :array
-                           :fields '(eqref i32)
-                           :nullable-p nil)))
+  (let ((struct-layout (%opt-wasm-gc-struct-layout
+                        :fields '((slot-a . i32) (slot-b . eqref))))
+        (array-layout (%opt-wasm-gc-array-layout))
+        (bad-array-layout (%opt-wasm-gc-bad-array-layout)))
     (assert-true (cl-cc/optimize:opt-wasm-gc-layout-valid-p struct-layout))
     (assert-true (cl-cc/optimize:opt-wasm-gc-layout-valid-p array-layout))
     (assert-false (cl-cc/optimize:opt-wasm-gc-layout-valid-p bad-array-layout))))
 
 (deftest optimize-wasm-gc-runtime-host-compatibility-requires-feature-and-valid-layout
   "Host-compatibility helper gates lowering on wasm-gc support and layout validity."
-  (let ((layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                 :kind :struct
-                 :fields '((slot-a . i32))
-                 :nullable-p t))
-        (bad-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                     :kind :array
-                     :fields '(eqref i32)
-                     :nullable-p nil)))
+  (let ((layout (%opt-wasm-gc-struct-layout))
+        (bad-layout (%opt-wasm-gc-bad-array-layout)))
     (assert-true
      (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
       layout
@@ -623,14 +663,8 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-wasm-gc-optimization-plan-reflects-layout-kind
   "Optimization-plan helper enables struct vs array specific lowering hints."
-  (let* ((struct-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                         :kind :struct
-                         :fields '((slot-a . i32))
-                         :nullable-p t))
-         (array-layout (cl-cc/optimize:opt-build-wasm-gc-layout
-                        :kind :array
-                        :fields '(eqref)
-                        :nullable-p nil))
+  (let* ((struct-layout (%opt-wasm-gc-struct-layout))
+         (array-layout (%opt-wasm-gc-array-layout))
          (struct-plan (cl-cc/optimize:opt-build-wasm-gc-optimization-plan struct-layout))
          (array-plan (cl-cc/optimize:opt-build-wasm-gc-optimization-plan array-layout)))
     (assert-true (getf struct-plan :layout-valid-p))
@@ -674,20 +708,23 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
     (assert-eq :fs (cl-cc/optimize::opt-tls-plan-base-register x86))
     (assert-eq :tpidr_el0 (cl-cc/optimize::opt-tls-plan-base-register arm))))
 
+(defparameter *opt-atomic-opcode-cases*
+  '((:x86-64 :incf :acq-rel :lock-xadd)
+    (:x86-64 :cas :seq-cst :lock-cmpxchg)
+    (:aarch64 :incf :acq-rel :ldadd)
+    (:aarch64 :cas :seq-cst :ldxr-stxr)))
+
+(defun %assert-opt-atomic-opcode-case (target operation memory-order expected-opcode)
+  (assert-eq expected-opcode
+             (cl-cc/optimize::opt-select-atomic-opcode
+              :target target
+              :operation operation
+              :memory-order memory-order)))
+
 (deftest optimize-select-atomic-opcode-reflects-target-and-operation
   "Atomic helper picks target-specific representative opcodes for incf/cas."
-  (assert-eq :lock-xadd
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :x86-64 :operation :incf :memory-order :acq-rel))
-  (assert-eq :lock-cmpxchg
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :x86-64 :operation :cas :memory-order :seq-cst))
-  (assert-eq :ldadd
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :aarch64 :operation :incf :memory-order :acq-rel))
-  (assert-eq :ldxr-stxr
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target :aarch64 :operation :cas :memory-order :seq-cst)))
+  (dolist (case *opt-atomic-opcode-cases*)
+    (apply #'%assert-opt-atomic-opcode-case case)))
 
 (deftest optimize-build-htm-plan-enables-lock-elision-only-when-supported-and-low-contention
   "HTM helper enables lock elision only under support + low-contention preconditions."
@@ -918,6 +955,72 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
     (assert-true has-specialized-label)
     (assert-true rewritten-call)))
 
+(defun %opt-canonical-loop-program (body-instructions)
+  (append (list (make-vm-const :dst :ri :value 0)
+                (make-vm-const :dst :rlim :value 8)
+                (make-vm-const :dst :rstep :value 1)
+                (make-vm-label :name :l0)
+                (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
+                (make-vm-jump-zero :reg :rc :label :l1))
+          body-instructions
+          (list (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
+                (make-vm-jump :label :l0)
+                (make-vm-label :name :l1))))
+
+(defun %opt-instruction-sexps (instructions)
+  (mapcar #'instruction->sexp instructions))
+
+(defun %opt-assert-program-changed (optimized program)
+  (assert-false (equal (%opt-instruction-sexps optimized)
+                       (%opt-instruction-sexps program))))
+
+(defun %opt-assert-program-unchanged (optimized program)
+  (assert-equal (%opt-instruction-sexps optimized)
+                (%opt-instruction-sexps program)))
+
+(defun %opt-sortable-loop-body ()
+  (list (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
+        (make-vm-move :dst :r8 :src :r5)))
+
+(defun %opt-loop-label-count (label instructions)
+  (count-if (lambda (inst)
+              (and (typep inst 'vm-label)
+                   (eq (cl-cc/vm::vm-name inst) label)))
+            instructions))
+
+(defun %opt-assert-sortable-loop-pass-reorders (pass)
+  (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
+         (optimized (funcall pass program)))
+    (%opt-assert-program-changed optimized program)
+    (assert-true (typep (nth 6 optimized) 'vm-move))
+    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+
+(defun %opt-loop-split-marker-p (instruction)
+  (and (typep instruction 'vm-label)
+       (search "__SPLIT" (string (cl-cc/vm::vm-name instruction)))))
+
+(defun %opt-adjacent-loop-program (&key (first-init 0)
+                                        (second-init 0)
+                                        (second-condition :rc))
+  (list (make-vm-const :dst :ri :value first-init)
+        (make-vm-const :dst :rj :value second-init)
+        (make-vm-const :dst :rlim :value 4)
+        (make-vm-const :dst :rstep :value 1)
+        (make-vm-label :name :la)
+        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
+        (make-vm-jump-zero :reg :rc :label :lax)
+        (make-vm-move :dst :r10 :src :r11)
+        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
+        (make-vm-jump :label :la)
+        (make-vm-label :name :lax)
+        (make-vm-label :name :lb)
+        (make-vm-lt :dst second-condition :lhs :rj :rhs :rlim)
+        (make-vm-jump-zero :reg second-condition :label :lbx)
+        (make-vm-move :dst :r12 :src :r13)
+        (make-vm-add :dst :rj :lhs :rj :rhs :rstep)
+        (make-vm-jump :label :lb)
+        (make-vm-label :name :lbx)))
+
 (deftest optimize-affine-loop-summary-builds-descriptor
   "FR-523: affine-loop analysis helper returns structured summary metadata."
   (let ((summary (cl-cc/optimize::opt-build-affine-loop-summary
@@ -928,53 +1031,28 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
     (assert-equal '(:i) (getf summary :induction-vars))
     (assert-equal '((:i 0 100)) (getf summary :bounds))))
 
-(deftest optimize-loop-interchange-plan-requires-safety
+(deftest-each optimize-loop-interchange-plan-requires-safety
   "FR-524: loop interchange plan only applies when dependence-safe and beneficial."
-  (let ((applied (cl-cc/optimize::opt-loop-interchange-plan
-                  :loops '(:i :j)
-                  :cache-locality-score 3
-                  :dependence-safe-p t))
-        (blocked (cl-cc/optimize::opt-loop-interchange-plan
-                  :loops '(:i :j)
-                  :cache-locality-score 3
-                  :dependence-safe-p nil)))
-    (assert-true (getf applied :applied-p))
-    (assert-false (getf blocked :applied-p))))
+  :cases (("safe"   t   t)
+          ("unsafe" nil nil))
+  (dependence-safe-p expected-applied-p)
+  (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
+               :loops '(:i :j)
+               :cache-locality-score 3
+               :dependence-safe-p dependence-safe-p)))
+    (assert-equal expected-applied-p (not (null (getf plan :applied-p))))))
 
 (deftest optimize-pass-loop-interchange-handles-nested-canonical-loop
   "FR-524: safe canonical-loop core ops are interchanged (independent swap)."
-  (let* ((program (list (make-vm-const :dst :ri :value 0)
-                        (make-vm-const :dst :rlim :value 8)
-                        (make-vm-const :dst :rstep :value 1)
-                        (make-vm-label :name :l0)
-                        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc :label :l1)
-                        (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
-                        (make-vm-move :dst :r8 :src :r5)
-                        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                        (make-vm-jump :label :l0)
-                        (make-vm-label :name :l1)))
-         (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+  (%opt-assert-sortable-loop-pass-reorders
+   #'cl-cc/optimize::opt-pass-loop-interchange))
 
 (deftest optimize-pass-loop-interchange-skips-side-effecting-loop
   "FR-524 safety: side-effecting loop bodies are not interchanged."
-  (let* ((program (list (make-vm-const :dst :ri :value 0)
-                        (make-vm-const :dst :rlim :value 8)
-                        (make-vm-const :dst :rstep :value 1)
-                        (make-vm-label :name :l0)
-                        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc :label :l1)
-                        (make-vm-set-global :src :r2 :name 'g)
-                        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                        (make-vm-jump :label :l0)
-                        (make-vm-label :name :l1)))
+  (let* ((program (%opt-canonical-loop-program
+                   (list (make-vm-set-global :src :r2 :name 'g))))
          (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (assert-equal (mapcar #'instruction->sexp optimized)
-                  (mapcar #'instruction->sexp program))))
+    (%opt-assert-program-unchanged optimized program)))
 
 (deftest optimize-polyhedral-schedule-plan-preserves-objective
   "FR-525: polyhedral schedule helper keeps statement/constraint/objective payloads."
@@ -986,18 +1064,16 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
     (assert-eq :throughput-max (getf plan :objective))
     (assert-equal '(:s0 :s1) (getf plan :statements))))
 
-(deftest optimize-loop-fusion-fission-plan-selects-strategy
+(deftest-each optimize-loop-fusion-fission-plan-selects-strategy
   "FR-526: fusion/fission helper picks strategy from pressure and budget."
-  (let ((fusion (cl-cc/optimize::opt-loop-fusion-fission-plan
-                 :loops '(:l0 :l1)
-                 :register-pressure 16
-                 :instruction-budget 20))
-        (fission (cl-cc/optimize::opt-loop-fusion-fission-plan
-                  :loops '(:l0 :l1)
-                  :register-pressure 64
-                  :instruction-budget 20)))
-    (assert-eq :fusion (getf fusion :strategy))
-    (assert-eq :fission (getf fission :strategy))))
+  :cases (("fusion"  16 :fusion)
+          ("fission" 64 :fission))
+  (register-pressure expected-strategy)
+  (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
+               :loops '(:l0 :l1)
+               :register-pressure register-pressure
+               :instruction-budget 20)))
+    (assert-eq expected-strategy (getf plan :strategy))))
 
 (deftest optimize-ml-inline-score-plan-is-deterministic
   "FR-527: MLGO-style scoring helper is deterministic for identical features."
@@ -1027,16 +1103,8 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-pass-affine-loop-analysis-captures-real-loop-summary
   "FR-523: affine analysis pass extracts summaries from canonical loop instructions."
-  (let* ((program (list (make-vm-const :dst :ri :value 0)
-                        (make-vm-const :dst :rlim :value 8)
-                        (make-vm-const :dst :rstep :value 1)
-                        (make-vm-label :name :l0)
-                        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc :label :l1)
-                        (make-vm-get-global :dst :r2 :name 'g)
-                        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                        (make-vm-jump :label :l0)
-                        (make-vm-label :name :l1)))
+  (let* ((program (%opt-canonical-loop-program
+                   (list (make-vm-get-global :dst :r2 :name 'g))))
          (_ (cl-cc/optimize::opt-pass-affine-loop-analysis program))
          (summaries cl-cc/optimize::*opt-last-affine-loop-summaries*)
          (summary (first summaries)))
@@ -1050,100 +1118,29 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 
 (deftest optimize-pass-polyhedral-schedule-reorders-loop-body
   "FR-525: schedule pass reorders sortable body ops inside canonical loop."
-  (let* ((program (list (make-vm-const :dst :ri :value 0)
-                        (make-vm-const :dst :rlim :value 8)
-                        (make-vm-const :dst :rstep :value 1)
-                        (make-vm-label :name :l0)
-                        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc :label :l1)
-                        (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
-                        (make-vm-move :dst :r8 :src :r5)
-                        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                        (make-vm-jump :label :l0)
-                        (make-vm-label :name :l1)))
-         (optimized (cl-cc/optimize::opt-pass-polyhedral-schedule program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+  (%opt-assert-sortable-loop-pass-reorders
+   #'cl-cc/optimize::opt-pass-polyhedral-schedule))
 
 (deftest optimize-pass-loop-fusion-fission-fuses-adjacent-loops
   "FR-526: adjacent compatible pure loops are fused into one canonical loop."
-  (let* ((program
-           (list (make-vm-const :dst :ri :value 0)
-                 (make-vm-const :dst :rj :value 0)
-                 (make-vm-const :dst :rlim :value 4)
-                 (make-vm-const :dst :rstep :value 1)
-                  ;; loop A
-                  (make-vm-label :name :la)
-                  (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                  (make-vm-jump-zero :reg :rc :label :lax)
-                  (make-vm-move :dst :r10 :src :r11)
-                  (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                  (make-vm-jump :label :la)
-                  (make-vm-label :name :lax)
-                  ;; loop B
-                  (make-vm-label :name :lb)
-                  (make-vm-lt :dst :rc :lhs :rj :rhs :rlim)
-                  (make-vm-jump-zero :reg :rc :label :lbx)
-                  (make-vm-move :dst :r12 :src :r13)
-                  (make-vm-add :dst :rj :lhs :rj :rhs :rstep)
-                  (make-vm-jump :label :lb)
-                  (make-vm-label :name :lbx)))
+  (let* ((program (%opt-adjacent-loop-program))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-= 1 (count-if (lambda (inst)
-                            (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :la)))
-                          optimized))
-    (assert-= 0 (count-if (lambda (inst)
-                            (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :lb)))
-                          optimized))))
+    (%opt-assert-program-changed optimized program)
+    (assert-= 1 (%opt-loop-label-count :la optimized))
+    (assert-= 0 (%opt-loop-label-count :lb optimized))))
 
 (deftest optimize-pass-loop-fusion-fission-skips-unsafe-fusion
   "FR-526 safety: fusion is skipped when iteration spaces are not equivalent."
-  (let* ((program (list (make-vm-const :dst :ri :value 0)
-                        (make-vm-const :dst :rj :value 1) ;; different init
-                        (make-vm-const :dst :rlim :value 4)
-                        (make-vm-const :dst :rstep :value 1)
-                        (make-vm-label :name :la)
-                        (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc :label :lax)
-                        (make-vm-move :dst :r10 :src :r11)
-                        (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                        (make-vm-jump :label :la)
-                        (make-vm-label :name :lax)
-                        (make-vm-label :name :lb)
-                        (make-vm-lt :dst :rc2 :lhs :rj :rhs :rlim)
-                        (make-vm-jump-zero :reg :rc2 :label :lbx)
-                        (make-vm-move :dst :r12 :src :r13)
-                        (make-vm-add :dst :rj :lhs :rj :rhs :rstep)
-                        (make-vm-jump :label :lb)
-                        (make-vm-label :name :lbx)))
+  (let* ((program (%opt-adjacent-loop-program :second-init 1
+                                              :second-condition :rc2))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-equal (mapcar #'instruction->sexp optimized)
-                  (mapcar #'instruction->sexp program))))
+    (%opt-assert-program-unchanged optimized program)))
 
 (deftest optimize-pass-loop-fusion-fission-splits-oversized-loop
   "FR-526: oversized pure loops are split into two core regions with a split marker." 
   (let* ((core (loop for idx from 0 below 36
                      collect (make-vm-move :dst :r8 :src :r5)))
-         (program (append (list (make-vm-const :dst :ri :value 0)
-                                (make-vm-const :dst :rlim :value 8)
-                                (make-vm-const :dst :rstep :value 1)
-                                (make-vm-label :name :l0)
-                                (make-vm-lt :dst :rc :lhs :ri :rhs :rlim)
-                                (make-vm-jump-zero :reg :rc :label :l1))
-                          core
-                          (list (make-vm-add :dst :ri :lhs :ri :rhs :rstep)
-                                (make-vm-jump :label :l0)
-                                (make-vm-label :name :l1))))
+         (program (%opt-canonical-loop-program core))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-true (some (lambda (inst)
-                         (and (typep inst 'vm-label)
-                              (search "__SPLIT" (string (cl-cc/vm::vm-name inst)))))
-                       optimized))))
+    (%opt-assert-program-changed optimized program)
+    (assert-true (some #'%opt-loop-split-marker-p optimized))))

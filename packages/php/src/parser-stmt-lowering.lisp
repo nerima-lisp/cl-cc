@@ -33,8 +33,12 @@
 
 (defun %php-parse-expr-stmt (stream known-vars)
   "Parse an expression statement."
-  (multiple-value-bind (expr rest kv) (php-parse-expr stream known-vars)
-    (values expr (php-skip-semis rest) kv)))
+  (if (%php-void-cast-start-p stream)
+      (let ((rest (cdddr stream)))
+        (multiple-value-bind (expr rest2 kv2) (php-parse-expr rest known-vars)
+          (values (%php-void-cast-ast expr) (php-skip-semis rest2) kv2)))
+      (multiple-value-bind (expr rest kv) (php-parse-expr stream known-vars)
+        (values expr (php-skip-semis rest) kv))))
 
 (defvar *php-loop-continue-target* nil
   "Dynamically bound innermost loop continue target.")
@@ -429,6 +433,7 @@ with no explicit default defaults to PHP null."
   (let ((current (%php-consume-expected :T-LBRACE stream))
         (cases nil)
         (default-body nil)
+        (warnings nil)
         (kv known-vars))
     (loop
       (setf current (php-skip-semis current))
@@ -437,7 +442,14 @@ with no explicit default defaults to PHP null."
       (cond
         ((%php-keyword-p current :case)
          (multiple-value-bind (case-expr rest kv2) (php-parse-expr (cdr current) kv)
-           (setf current (if (eq (php-peek-type rest) :T-COLON) (cdr rest) (php-skip-semis rest))
+           (setf current (cond
+                           ((eq (php-peek-type rest) :T-COLON) (cdr rest))
+                           ((eq (php-peek-type rest) :T-SEMI)
+                            (push (%php-switch-deprecation-warning-ast
+                                   "PHP 8.5 deprecates semicolons after switch case labels; use a colon instead")
+                                  warnings)
+                            (cdr rest))
+                           (t (php-skip-semis rest)))
                  kv kv2)
            (let ((body nil))
              (loop
@@ -452,7 +464,14 @@ with no explicit default defaults to PHP null."
              (push (cons case-expr (nreverse body)) cases))))
         ((%php-keyword-p current :default)
          (setf current (cdr current))
-         (when (eq (php-peek-type current) :T-COLON) (setf current (cdr current)))
+         (cond
+           ((eq (php-peek-type current) :T-COLON)
+            (setf current (cdr current)))
+           ((eq (php-peek-type current) :T-SEMI)
+            (push (%php-switch-deprecation-warning-ast
+                   "PHP 8.5 deprecates semicolons after switch default labels; use a colon instead")
+                  warnings)
+            (setf current (cdr current))))
          (let ((body nil))
            (loop
              (setf current (php-skip-semis current))
@@ -465,7 +484,15 @@ with no explicit default defaults to PHP null."
                  (setf current rest2 kv kv2))))
            (setf default-body (nreverse body))))
         (t (setf current (%php-skip-to-stmt-end current)))))
-    (values (nreverse cases) default-body (%php-consume-expected :T-RBRACE current) kv)))
+    (values (nreverse cases) default-body (%php-consume-expected :T-RBRACE current)
+            kv (nreverse warnings))))
+
+(defun %php-switch-deprecation-warning-ast (message)
+  "Emit E_DEPRECATED for a PHP 8.5 switch-label deprecation."
+  (make-ast-progn
+   :forms (list (%php-call 'cl-cc/php::%php-trigger-error
+                           (make-ast-quote :value message)
+                           (make-ast-int :value 8192)))))
 
 (defun %php-lower-while-with-label (cond-expr body-stmts loop-tag)
   "Lower a PHP while loop using LOOP-TAG as the continue target."
@@ -525,7 +552,7 @@ make `continue' skip the increment and loop forever."
                     (when *php-loop-break-target*
                       (list *php-loop-break-target*)))))))
 
-(defun php-lower-switch (switch-expr cases default-body break-tag)
+(defun php-lower-switch (switch-expr cases default-body break-tag &optional warning-forms)
   "Lower a PHP switch/case/default to a let/tagbody dispatch form."
   (let ((value-sym (gensym "SWITCH-VAL-"))
         (default-tag (when default-body (gensym "SWITCH-DEFAULT-"))))
@@ -549,14 +576,18 @@ make `continue' skip the increment and loop forever."
             (default-forms
              (when default-body
                (list* default-tag default-body))))
-      (make-ast-let
-       :bindings (list (cons value-sym switch-expr))
-       :body (list (make-ast-block :name nil
-                      :body (list (%php-make-tagbody
-                                   (append dispatch-forms
-                                           case-forms
-                                           default-forms
-                                           (list break-tag))))))))))
+      (let ((switch-form
+              (make-ast-let
+               :bindings (list (cons value-sym switch-expr))
+               :body (list (make-ast-block :name nil
+                              :body (list (%php-make-tagbody
+                                           (append dispatch-forms
+                                                   case-forms
+                                                   default-forms
+                                                   (list break-tag)))))))))
+        (if warning-forms
+            (make-ast-progn :forms (append warning-forms (list switch-form)))
+            switch-form)))))
 
 (defun %php-make-list-advance (list-sym)
   "Build an AST setq that advances LIST-SYM to (cdr LIST-SYM)."

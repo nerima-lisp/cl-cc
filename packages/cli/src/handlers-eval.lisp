@@ -3,14 +3,15 @@
 
 (in-package :cl-cc/cli)
 
-(defun %compile-and-run-eval-form (expr stdlib no-stdlib kwargs vm-state opts)
+(defun %compile-and-run-eval-form (expr stdlib no-stdlib language kwargs vm-state opts)
   "Compile and run EXPR for the eval command.
 STDLIB selects whether the stdlib-aware compiler may be used. KWARGS are
-forwarded to the compiler, VM-STATE is passed to RUN-COMPILED, and OPTS supply
-runtime sanitizer flags. Returns two values: the evaluated result and the
-compilation-result object used to produce it."
+forwarded to the compiler, LANGUAGE selects the parser/compiler language,
+VM-STATE is passed to RUN-COMPILED, and OPTS supply runtime sanitizer flags.
+Returns two values: the evaluated result and the compilation-result object
+used to produce it."
   (labels ((compile-and-run (compile-fn)
-             (let* ((compiled (apply compile-fn expr :target :vm kwargs))
+             (let* ((compiled (apply compile-fn expr :target :vm :language language kwargs))
                     (result (%call-with-runtime-sanitizer-flags
                              opts
                              (lambda ()
@@ -45,39 +46,38 @@ status 0 on success or 2 when the expression is missing."
       (format *error-output* "Error: 'eval' requires an expression argument.~%")
       (%print-help "eval")
       (uiop:quit 2))
-    (let* ((stdlib (flag parsed "--stdlib"))
-            (verbose (flag parsed "--verbose"))
-            (no-stdlib (flag parsed "--no-stdlib"))
-           (timeout (%get-timeout parsed))
-           (opts (%parse-compile-opts parsed)))
-      (when verbose
-        (format *error-output* "; cl-cc eval: ~S~%" expr))
-      (%with-cli-error-handler
-        (%call-with-cli-timeout
-         timeout
-         (lambda ()
-           (%call-with-optional-output-file
-            (compile-opts-trace-json-path opts)
-            (lambda (stream)
-              (let* ((vm-state (or (%maybe-make-profiled-vm-state opts)
-                                   (cl-cc/vm:make-vm-state :output-stream *standard-output*)))
+    (%with-cli-timeout (parsed "eval")
+      (let* ((stdlib (flag parsed "--stdlib"))
+             (lang-flag (or (flag parsed "--lang") ""))
+             (language (%detect-language nil lang-flag))
+             (verbose (flag parsed "--verbose"))
+             (no-stdlib (flag parsed "--no-stdlib"))
+             (opts (%parse-compile-opts parsed)))
+        (when verbose
+          (format *error-output* "; cl-cc eval: ~S~%" expr))
+        (%with-cli-error-handler
+          (progn
+            (%call-with-optional-output-file
+             (compile-opts-trace-json-path opts)
+             (lambda (stream)
+               (let* ((vm-state (or (%maybe-make-profiled-vm-state opts)
+                                    (cl-cc/vm:make-vm-state :output-stream *standard-output*)))
                       (kwargs (%compile-opts-kwargs opts stream))
                       (result nil)
                       (compiled nil))
-                (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
-                (multiple-value-setq (result compiled)
-                   (%compile-and-run-eval-form expr stdlib no-stdlib kwargs vm-state opts))
-                (%maybe-write-pgo-profile opts compiled vm-state)
-                (when (compile-opts-profile opts)
-                  (print-profile vm-state))
-                (%maybe-print-jit-cache-stats opts)
-                (when (compile-opts-trace-emit opts)
-                  (%trace-emit-stages compiled *standard-output*))
-                (when (compile-opts-flamegraph-path opts)
-                  (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
-                    (if (plusp (hash-table-count samples))
-                        (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
-                        (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))
-                (format t "~S~%" result)
-                (uiop:quit 0)))))
-          "eval")))))
+                 (%bind-command-line-arguments (%script-argv-from-parsed parsed) vm-state)
+                 (multiple-value-setq (result compiled)
+                   (%compile-and-run-eval-form expr stdlib no-stdlib language kwargs vm-state opts))
+                 (%maybe-write-pgo-profile opts compiled vm-state)
+                 (when (compile-opts-profile opts)
+                   (print-profile vm-state))
+                 (%maybe-print-jit-cache-stats opts)
+                 (when (compile-opts-trace-emit opts)
+                   (%trace-emit-stages compiled *standard-output*))
+                 (when (compile-opts-flamegraph-path opts)
+                   (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
+                     (if (plusp (hash-table-count samples))
+                         (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
+                         (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))
+                 (format t "~S~%" result))))
+            (uiop:quit 0)))))))

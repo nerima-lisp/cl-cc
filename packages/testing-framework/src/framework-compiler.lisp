@@ -79,9 +79,8 @@ iterations. When OUTPUT-STREAM is non-NIL, a JSON representation is written to
 that stream before the result plist is returned."
   (check-type warmup (integer 0 *))
   (check-type iterations (integer 1 *))
-  (dotimes (_ warmup)
-    (declare (ignore _))
-    (funcall thunk))
+  (loop repeat warmup
+        do (funcall thunk))
   (let* ((durations (loop repeat iterations collect (%benchmark-duration-ns thunk)))
          (stats (benchmark-statistics durations :warmup-count warmup))
          (result (list* :name name stats)))

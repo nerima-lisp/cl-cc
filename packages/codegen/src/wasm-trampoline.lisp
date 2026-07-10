@@ -62,6 +62,28 @@
    so that emit-trampoline-instruction can emit real table indices for vm-closure.")
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Wasm atomic lowering policy
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defun wasm-require-threads-for-atomic (inst)
+  "Signal unless INST can be emitted as a true Wasm atomic operation."
+  (unless (wasm-threads-feature-enabled-p)
+    (error "Wasm atomic instruction ~A requires Wasm threads."
+           (type-of inst)))
+  t)
+
+(defun wasm-unsupported-atomic-swap (inst)
+  "Signal the lack of a correct Wasm atomic swap lowering for INST."
+  (error "Wasm atomic swap ~A requires atomic.rmw.xchg lowering."
+         (type-of inst)))
+
+(defmacro with-wasm-atomic-threads ((inst) &body body)
+  "Run BODY only when Wasm threads are enabled for atomic lowering."
+  `(progn
+     (wasm-require-threads-for-atomic ,inst)
+     ,@body))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Step 3: Emit WAT for a single instruction
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Returns T if instruction was handled, NIL if not supported (emits comment).
@@ -539,27 +561,8 @@ FR-145: Checks *wasm-fixnum-unboxed-regs* table for the register."
       (format nil "(result~{ ~A~})" types)
       ""))
 
-(defun wasm-values-heap-vector-wat (reg-map dst src-regs &key (indent 0))
-  "Return fallback WAT for vm-values using the existing heap-vector representation."
-  (let ((prefix (make-string indent :initial-element #\Space))
-        (values (or src-regs nil))
-        (tmp (wasm-reg-map-tmp-index reg-map)))
-    (with-output-to-string (s)
-      (format s "~A;; FR-235 legacy multiple-values heap-vector path" prefix)
-      (format s "~%~A(local.set ~D (array.new_fixed $eqref_array_t ~D~@[ ~A~]))"
-              prefix tmp (length values)
-              (and values
-                   (format nil "~{~A~^ ~}"
-                           (mapcar (lambda (reg) (reg-local-ref reg-map reg)) values))))
-      (format s "~%~A~A"
-              prefix
-              (reg-local-set reg-map dst
-                             (if values
-                                 (reg-local-ref reg-map (first values))
-                                 "(ref.null eq)"))))))
-
 (defun wasm-values-multi-value-block-wat (reg-map dst src-regs &key (indent 0))
-  "Return guarded FR-235 WAT that materializes values through a multi-value block."
+  "Return FR-235 WAT that materializes values through a multi-value block."
   (let ((prefix (make-string indent :initial-element #\Space))
         (values (or src-regs nil)))
     (if (null values)
@@ -577,10 +580,8 @@ FR-145: Checks *wasm-fixnum-unboxed-regs* table for the register."
           (format s "~%~A(local.set ~D)" prefix (wasm-reg-to-local reg-map dst))))))
 
 (defun wasm-values-wat (reg-map dst src-regs &key (indent 0))
-  "Return WAT for vm-values, selecting FR-235 multi-value or legacy fallback."
-  (if (wasm-multi-value-feature-enabled-p)
-      (wasm-values-multi-value-block-wat reg-map dst src-regs :indent indent)
-      (wasm-values-heap-vector-wat reg-map dst src-regs :indent indent)))
+  "Return WAT for vm-values using the FR-235 multi-value block representation."
+  (wasm-values-multi-value-block-wat reg-map dst src-regs :indent indent))
 
 (defun %wasm-captured-value-reg (capture)
   "Return the VM register carrying CAPTURE's value."

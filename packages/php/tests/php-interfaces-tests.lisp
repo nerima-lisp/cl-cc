@@ -191,3 +191,7 @@
     (assert-true (member "BASE"       supers :test #'string=))
     (assert-true (member "STORABLE"   supers :test #'string=))
     (assert-true (member "COUNTABLE"  supers :test #'string=))))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

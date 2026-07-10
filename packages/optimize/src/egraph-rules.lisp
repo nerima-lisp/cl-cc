@@ -4,7 +4,7 @@
 ;;;
 ;;; Defines the rewrite rule macro `defrule` and all built-in rules.
 ;;; Rules are compiled to:
-;;;   1. A Prolog fact (`def-fact`) for pattern-matching via the Prolog engine
+;;;   1. A Prolog rule (`def-rule`) for pattern-matching via the Prolog engine
 ;;;   2. A guard-table entry keyed by rule name for host-side `:when` predicates
 ;;;
 ;;; The use of the existing Prolog unification engine for pattern matching
@@ -21,11 +21,11 @@
 ;;; ─── Rule Registry ───────────────────────────────────────────────────────
 
 (defparameter *egraph-rule-guards* (make-hash-table :test #'eq)
-  "Rule-name → guard function mapping used when reconstructing rules from Prolog facts.")
+  "Rule-name → guard function mapping used when reconstructing rules from Prolog rule entries.")
 
 (defun egraph-rule-register (name lhs rhs when-fn)
   "Register the guard function for NAME.
-Rule structure itself is sourced from the Prolog fact database emitted by `defrule`."
+Rule structure itself is sourced from the Prolog rule database emitted by `defrule`."
   (declare (ignore lhs rhs))
   (setf (gethash name *egraph-rule-guards*) when-fn)
   name)
@@ -45,20 +45,16 @@ Rule structure itself is sourced from the Prolog fact database emitted by `defru
 ;;;            :when (lambda (b _) (numberp (egraph-binding-value b '?a))))
 
 (defmacro defrule (name pattern replacement &key when)
-  "Define an e-graph rewrite rule guard and emit a matching Prolog fact." 
-  (list 'progn
-        (list 'egraph-rule-register
-              (list 'quote name)
-              (list 'quote pattern)
-              (list 'quote replacement)
-              (if when
-                  (list 'lambda '(bindings eg)
-                        '(declare (ignorable bindings eg))
-                        when)
-                  nil))
-        (list 'def-fact (list 'egraph-rule (list 'quote name)
-                              (list 'quote pattern) (list 'quote replacement)))
-        (list 'quote name)))
+  "Define an e-graph rewrite rule guard and emit a matching Prolog rule."
+  `(progn
+     (egraph-rule-register ',name ',pattern ',replacement
+                           ,(if when
+                                `(lambda (bindings eg)
+                                   (declare (ignorable bindings eg))
+                                   ,when)
+                                nil))
+     (cl-cc/prolog:def-rule (egraph-rule ,name ,pattern ,replacement))
+     ',name))
 
 ;;; ─── Binding Helpers ─────────────────────────────────────────────────────
 

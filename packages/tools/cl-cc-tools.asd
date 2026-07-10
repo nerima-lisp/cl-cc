@@ -36,7 +36,7 @@
 
 (asdf:defsystem :cl-cc-tools
   :description "CL-CC protocol tools (LSP and DAP)"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc)
@@ -48,7 +48,7 @@
 
 (asdf:defsystem :cl-cc-tools/tests
   :description "Tests for CL-CC protocol tools"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-tools :cl-cc-testing-framework)

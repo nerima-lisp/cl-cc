@@ -1,23 +1,13 @@
 (in-package :cl-cc/regalloc)
-;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-;;; Regalloc — Graph Coloring Allocation (FR-061) + Spill Slot Sharing (FR-199)
+;;; ------------------------------------------------------------------------
+;;; Regalloc - Graph Coloring Allocation and Spill Slot Sharing
 ;;;
-;;; Contains: %intervals-overlap-p, %vreg<, %build-interference-graph-body,
-;;; %color-build-interference-graph,
-;;; %copy-interference-graph, %graph-nodes, %graph-degree, %graph-remove-node,
-;;; %color-spill-priority, %color-spill-candidate, %color-simplify,
-;;; %color-ordered-registers-for-interval, %color-select-register,
-;;; %color-assign-spill-slots, %interval-map, color-allocate,
-;;; %copy-hash-into, color-allocate-for-target,
-;;; %spill-weight,
-;;; %build-spill-interference-matrix, color-spill-slots,
-;;; regalloc-color-spill-slots, %maybe-color-spill-slots.
-;;;
-;;; Depends on: regalloc-allocate.lisp (linear-scan-allocate,
-;;;   %preferred-register-for-interval, regalloc-target-fp-registers).
-;;;
-;;; Load order: after regalloc-allocate.lisp.
-;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+;;; Owns the Chaitin-Briggs graph-coloring allocator and stack spill-slot
+;;; coloring. Allocation strategy and register preference helpers live in
+;;; regalloc-policy.lisp; spill insertion and live-range splitting live in
+;;; regalloc-spill.lisp; the public allocation driver lives in
+;;; regalloc-allocate.lisp.
+;;; ------------------------------------------------------------------------
 
 ;;; FR-061: Graph Coloring Allocation (Chaitin-Briggs)
 ;;;
@@ -36,10 +26,8 @@
   "Deterministic ordering predicate for virtual-register symbols."
   (string< (symbol-name a) (symbol-name b)))
 
-(defun %build-interference-graph-body (intervals overlap-predicate)
-  "Build a vreg -> neighbor-vregs hash-table for INTERVALS.
-Two intervals become neighbors when OVERLAP-PREDICATE returns true for them.
-Intervals without a vreg are silently skipped."
+(defun %color-build-interference-graph (intervals)
+  "Build a vreg -> neighbor-vregs interference graph for INTERVALS."
   (let ((graph (make-hash-table :test #'eq)))
     (dolist (interval intervals)
       (when (interval-vreg interval)
@@ -49,14 +37,10 @@ Intervals without a vreg are silently skipped."
           do (dolist (b (cdr rest))
                (when (and (interval-vreg a)
                           (interval-vreg b)
-                          (funcall overlap-predicate a b))
+                          (%intervals-overlap-p a b))
                  (pushnew (interval-vreg b) (gethash (interval-vreg a) graph) :test #'eq)
                  (pushnew (interval-vreg a) (gethash (interval-vreg b) graph) :test #'eq))))
     graph))
-
-(defun %color-build-interference-graph (intervals)
-  "Build a vreg -> neighbor-vregs interference graph for INTERVALS."
-  (%build-interference-graph-body intervals #'%intervals-overlap-p))
 
 (defun %copy-interference-graph (graph)
   "Return a shallow mutable copy of GRAPH with copied neighbor lists."
@@ -226,9 +210,11 @@ assignment hash-table, spill-map hash-table, and the maximum spill slot."
 ;;; the same stack slot via greedy interval-graph coloring.  This reduces O(N)
 ;;; stack slots to O(χ(G)), where χ(G) is the chromatic number of the interference
 ;;; graph of spilled intervals.
-;;;
-;;; Note: %intervals-overlap-p (defined above) is reused here; the former
-;;; %spill-intervals-overlap-p duplicate has been removed.
+
+(defun %spill-intervals-overlap-p (a b)
+  "Return T when live intervals A and B interfere for stack-slot sharing."
+  (and (<= (interval-start a) (interval-end b))
+       (<= (interval-start b) (interval-end a))))
 
 (defun %spill-weight (interval)
   "Return a deterministic greedy-coloring priority for spilled INTERVAL."
@@ -238,7 +224,16 @@ assignment hash-table, spill-map hash-table, and the maximum spill slot."
 
 (defun %build-spill-interference-matrix (spilled)
   "Build vreg → neighbor-vregs matrix for spilled live intervals."
-  (%build-interference-graph-body spilled #'%intervals-overlap-p))
+  (let ((matrix (make-hash-table :test #'eq)))
+    (dolist (interval spilled)
+      (setf (gethash (interval-vreg interval) matrix) nil))
+    (loop for rest on spilled
+          for a = (car rest)
+          do (dolist (b (cdr rest))
+               (when (%spill-intervals-overlap-p a b)
+                 (pushnew (interval-vreg b) (gethash (interval-vreg a) matrix) :test #'eq)
+                 (pushnew (interval-vreg a) (gethash (interval-vreg b) matrix) :test #'eq))))
+    matrix))
 
 (defun color-spill-slots (spilled &optional (spill-slot-offset 0))
   "Color SPILLED live intervals and return a vreg → shared slot hash-table.
@@ -282,9 +277,8 @@ the existing [RBP - slot*8] spill/restore instruction format unchanged."
         spill-map)))
 
 (defun %maybe-color-spill-slots (intervals spill-map &optional (spill-slot-offset 0))
-  "Optionally apply spill slot coloring when both INTERVALS and SPILL-MAP are non-nil."
+  "Wrapper that optionally applies spill slot coloring.  Controlled by a special
+   variable for safety during testing."
   (if (and spill-map intervals)
       (regalloc-color-spill-slots intervals spill-map spill-slot-offset)
       spill-map))
-
-

@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-binary
   :description "cl-cc binary-format emitters — Mach-O, ELF, WebAssembly module bytes"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

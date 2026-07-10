@@ -38,10 +38,7 @@
   (assert-true (fboundp 'cl-cc/runtime:cl-cc-call))
   (assert-true (fboundp 'cl-cc/runtime:cl-cc-cleanup))
   (assert-true (fboundp 'cl-cc/runtime:cl-cc-last-error))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-register-callback))
-  (assert-true (fboundp 'cl-cc/runtime:|cl_cc_init|))
-  (assert-true (fboundp 'cl-cc/runtime:|cl_cc_eval|))
-  (assert-true (fboundp 'cl-cc/runtime:|cl_cc_call|)))
+  (assert-true (fboundp 'cl-cc/runtime:cl-cc-register-callback)))
 
 (deftest runtime-subsystem-c-embedding-api-eval-call-cleanup
   "FR-812: embedding states evaluate strings, call functions, track errors, and clean up."
@@ -55,16 +52,28 @@
            (let ((value (cl-cc/runtime:cl-cc-call state "embedded-add" 7 8)))
              (assert-eq :integer (cl-cc/runtime:cl-cc-value-kind value))
              (assert-= 15 (cl-cc/runtime:cl-cc-value-payload value)))
+           #+(and sbcl sb-alien-callback)
            (let ((callback (cl-cc/runtime:cl-cc-register-callback
                             state "identity" #'identity :arg-types '(:pointer) :return-type :pointer)))
              (assert-true callback)
              (assert-eq callback (cl-cc/runtime:cl-cc-callback state "identity")))
+           #-(and sbcl sb-alien-callback)
+           (assert-signals error
+             (cl-cc/runtime:cl-cc-register-callback
+              state "identity" #'identity :arg-types '(:pointer) :return-type :pointer))
            (let ((value (cl-cc/runtime:cl-cc-eval state "(/ 1 0)")))
              (assert-eq :error (cl-cc/runtime:cl-cc-value-kind value))
              (assert-= 1 (cl-cc/runtime:cl-cc-error-code
                           (cl-cc/runtime:cl-cc-last-error state)))))
       (cl-cc/runtime:cl-cc-cleanup state))
     (assert-true (cl-cc/runtime:cl-cc-state-closed-p state))))
+
+(deftest runtime-subsystem-deopt-trampoline-signals-fatal-error
+  "FR-522: deopt trampoline fails explicitly until interpreter reconstruction exists."
+  (let ((frame-count cl-cc/runtime::*rt-deopt-frame-count*))
+    (assert-signals error
+      (cl-cc/runtime::rt-deopt-trampoline 7 '((:r0 . 42))))
+    (assert-= (1+ frame-count) cl-cc/runtime::*rt-deopt-frame-count*)))
 
 (deftest runtime-subsystem-multiple-vm-instances-isolated
   "FR-813: VM instances have independent stores and can share read-only parent environments."
@@ -298,7 +307,9 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
 (define-fr-existence-test runtime-subsystem-environment-loaded
   "FR-612: Environment introspection is loaded in VM."
   (:f cl-cc/vm:lisp-implementation-type)
-  (:f cl-cc/vm:lisp-implementation-version))
+  (:f cl-cc/vm:lisp-implementation-version)
+  (:f cl-cc/vm::short-site-name)
+  (:f cl-cc/vm::long-site-name))
 
 (define-fr-existence-test runtime-subsystem-conditions-loaded
   "FR-643-646: Condition system is loaded in VM."
@@ -363,20 +374,20 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
       (cl-cc/runtime:rt-scheduler-run)
       (assert-equal '(:low :normal :high) events))))
 
-(deftest runtime-subsystem-scheduler-sleep-task-delays-execution
+(deftest runtime-subsystem-scheduler-sleep-task-records-wake-time
   "FR-257: Sleep-task records a future wake time for the current task."
   (let ((cl-cc/runtime::*rt-global-scheduler* (cl-cc/runtime:rt-make-scheduler)))
-    (let ((scheduled-in-future-p nil))
-      (cl-cc/runtime:rt-spawn
-       (lambda ()
-         (let ((before (get-internal-real-time)))
-           (cl-cc/runtime::rt-sleep-task 0.01)
-           (setf scheduled-in-future-p
-                 (> (cl-cc/runtime::rt-green-thread-wake-time
-                     cl-cc/runtime::*rt-current-green-thread*)
-                    before)))))
-      (cl-cc/runtime:rt-scheduler-run :once t)
-      (assert-true scheduled-in-future-p))))
+    (sb-ext:without-package-locks
+      (with-replaced-function (get-internal-real-time (lambda () 1000))
+        (let ((observed-wake-time nil))
+          (cl-cc/runtime:rt-spawn
+           (lambda ()
+             (cl-cc/runtime::rt-sleep-task 1)
+             (setf observed-wake-time
+                   (cl-cc/runtime::rt-green-thread-wake-time
+                    cl-cc/runtime::*rt-current-green-thread*))))
+          (cl-cc/runtime:rt-scheduler-run :once t)
+          (assert-= (+ 1000 internal-time-units-per-second) observed-wake-time))))))
 
 (deftest runtime-subsystem-channel-buffered-preserves-order
   "FR-282: Buffered channels receive values in send order."
@@ -695,70 +706,43 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
   (let ((c (cl-cc/runtime:rt-make-raft-cluster '("n1" "n2" "n3"))))
     (assert-true (gethash "n1" (cl-cc/runtime:rt-raft-cluster-nodes c)))))
 
-#+nil (deftest runtime-subsystem-image-roundtrip
-  "FR-350: Basic image save/load round-trip."
-  (let ((path "/tmp/cl-cc-test-image.bin"))
-    (cl-cc/runtime:rt-save-image path)
-    (assert-true (probe-file path))
-    (assert-true (cl-cc/runtime:rt-load-image path))
-    (delete-file path)))
 
 ;;; =================================================================
 ;;; FR Coverage Verification
 ;;; =================================================================
 
+(defun %fr-ids (start end)
+  "Return inclusive FR keyword IDs from START to END."
+  (loop for id from start to end
+        collect (intern (format nil "FR-~D" id) :keyword)))
+
+(defun %fr-id-set (&rest clauses)
+  "Expand coverage clauses into a flat FR keyword list.
+Each clause is either a single numeric FR ID or an inclusive (START END) range."
+  (loop for clause in clauses
+        append (etypecase clause
+                 (integer (%fr-ids clause clause))
+                 (cons (%fr-ids (first clause) (second clause))))))
+
+(defparameter *runtime-subsystem-fr-coverage-sentinels*
+  '(:fr-500 :fr-654 :fr-190 :fr-492))
+
+(defconstant +runtime-subsystem-fr-coverage-count+ 170)
+
 (defparameter *runtime-subsystem-fr-coverage*
-  '(:fr-190 :fr-191 :fr-192 :fr-193
-    :fr-257 :fr-258 :fr-259 :fr-260
-    :fr-280 :fr-281 :fr-282 :fr-283
-    :fr-290 :fr-291
-    :fr-300 :fr-301
-    :fr-310 :fr-311 :fr-312
-    :fr-320 :fr-321 :fr-322
-    :fr-330 :fr-331 :fr-332
-    :fr-340 :fr-341
-    :fr-345 :fr-346 :fr-347 :fr-348 :fr-349 :fr-350 :fr-351 :fr-352 :fr-353
-    :fr-355 :fr-356
-    :fr-360 :fr-361 :fr-362 :fr-363
-    :fr-370 :fr-371 :fr-372 :fr-373
-    :fr-380 :fr-381 :fr-382 :fr-383
-    :fr-390 :fr-391 :fr-392
-    :fr-400 :fr-401
-    :fr-410 :fr-411 :fr-412
-    :fr-420 :fr-421 :fr-422
-    :fr-430 :fr-431 :fr-432
-    :fr-440 :fr-441 :fr-442
-    :fr-450 :fr-451 :fr-452
-    :fr-460 :fr-461 :fr-462
-    :fr-470 :fr-471 :fr-472
-    :fr-480 :fr-481
-    :fr-490 :fr-491 :fr-492
-    :fr-500 :fr-501 :fr-502 :fr-503 :fr-504
-    :fr-510 :fr-511 :fr-512 :fr-513
-    :fr-520 :fr-521 :fr-522 :fr-523 :fr-524 :fr-525
-    :fr-530 :fr-531 :fr-532 :fr-533
-    :fr-540 :fr-541 :fr-542 :fr-543 :fr-544
-    :fr-550 :fr-551 :fr-552 :fr-553 :fr-554
-    :fr-560 :fr-561 :fr-562 :fr-563 :fr-564
-    :fr-570 :fr-571 :fr-572 :fr-573 :fr-574
-    :fr-580 :fr-581 :fr-582 :fr-583 :fr-584 :fr-585 :fr-586 :fr-587
-    :fr-590 :fr-591 :fr-592 :fr-593
-    :fr-595 :fr-596 :fr-597
-    :fr-600 :fr-601 :fr-602
-    :fr-605 :fr-606 :fr-607
-    :fr-610 :fr-611 :fr-612
-    :fr-615 :fr-616 :fr-617
-    :fr-620 :fr-621 :fr-622
-    :fr-625 :fr-626 :fr-627
-    :fr-630 :fr-631 :fr-632 :fr-633 :fr-634
-    :fr-638 :fr-639 :fr-640
-    :fr-643 :fr-644 :fr-645 :fr-646
-    :fr-650 :fr-651 :fr-652 :fr-653 :fr-654))
+  (%fr-id-set
+   '(190 193) '(257 260) '(280 283) '(290 291) '(300 301) '(310 312)
+   '(320 322) '(330 332) '(340 341) '(345 353) '(355 356) '(360 363)
+   '(370 373) '(380 383) '(390 392) '(400 401) '(410 412) '(420 422)
+   '(430 432) '(440 442) '(450 452) '(460 462) '(470 472) '(480 481)
+   '(490 492) '(500 504) '(510 513) '(520 525) '(530 533) '(540 544)
+   '(550 554) '(560 564) '(570 574) '(580 587) '(590 593) '(595 597)
+   '(600 602) '(605 607) '(610 612) '(615 617) '(620 622) '(625 627)
+   '(630 634) '(638 640) '(643 646) '(650 654)))
 
 (deftest runtime-subsystem-fr-coverage-complete
   "Verify all runtime subsystem FR IDs are tracked."
-  (assert-= 170 (length *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-500 *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-654 *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-190 *runtime-subsystem-fr-coverage*))
-  (assert-true (member :fr-492 *runtime-subsystem-fr-coverage*)))
+  (assert-= +runtime-subsystem-fr-coverage-count+
+            (length *runtime-subsystem-fr-coverage*))
+  (dolist (fr-id *runtime-subsystem-fr-coverage-sentinels*)
+    (assert-true (member fr-id *runtime-subsystem-fr-coverage*))))

@@ -52,7 +52,7 @@
                 :ast-call-args :ast-quote-value :ast-the-type :ast-the-value
                 :cps-transform
                 :vm-state :vm-io-state :vm-heap-counter :vm-cons-cell :vm-closure-object
-                :vm-closure-entry-label :vm-closure-params :vm-closure-captured-values
+                :vm-closure-entry-label :vm-closure-params :vm-closure-captured-regs :vm-closure-captured-vals
                 :vm-const :vm-move :vm-add :vm-sub :vm-mul :vm-cons :vm-car :vm-cdr
                 :vm-rplaca :vm-rplacd :vm-make-closure :vm-closure-ref-idx
                 :make-vm-add :make-vm-car :make-vm-cdr :make-vm-closure-ref-idx
@@ -61,8 +61,10 @@
                 :vm-reg-get :vm-reg-set :vm-heap-get :execute-instruction
                 :instruction->sexp :sexp->instruction :vm-dst :vm-src :vm-lhs :vm-rhs
                 :vm-value :vm-car-reg :vm-cdr-reg :vm-cons-reg :vm-val-reg
-          :vm-closure-reg :vm-closure-index :unify :unify-failed-p
-          :logic-substitute :logic-var-p)
+                :vm-closure-reg :vm-closure-index)
+(:import-from :cl-cc/prolog
+              :unify
+              :logic-substitute :logic-var-p)
   (:export
    #:defproperty #:defgenerator #:for-all #:check
    #:*test-count* #:*max-list-length* #:*max-string-length* #:*max-type-depth* #:*size* #:*pbt-rng-override*

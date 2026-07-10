@@ -77,7 +77,9 @@ host Common Lisp restarts are appended for interoperability."
 
 (defun vm-invoke-debugger (condition &optional vm-state labels)
   "Print a VM backtrace when available, then enter the host debugger."
-  (when vm-state
+  (when (and vm-state
+             (or (not (typep condition 'vm-fatal-error))
+                 (vm-fatal-error-print-backtrace-p condition)))
     (vm-print-backtrace vm-state :labels labels))
   (invoke-debugger condition))
 

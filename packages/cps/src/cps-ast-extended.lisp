@@ -49,6 +49,60 @@ KEY slots may include a fourth explicit keyword-name element."
           (when key-params
             (cons '&key (mapcar #'%cps-lower-lambda-param key-params)))))
 
+(defun %cps-return-quoted-name (k name)
+  (%cps-funcall k (list 'quote name)))
+
+(defun %cps-evaluate-host-definition (form k name)
+  (%cps-progn form (%cps-return-quoted-name k name)))
+
+(defun %cps-defmethod-param (name spec)
+  (cond
+    ((null spec) name)
+    ((consp spec) (list name (cdr spec)))
+    (t (list name spec))))
+
+(defun %cps-defclass-form (node)
+  (let ((form (list 'defclass (ast-defclass-name node)
+                    (ast-defclass-superclasses node)
+                    (mapcar #'slot-def-to-sexp (ast-defclass-slots node)))))
+    (setf form
+          (append form
+                  (when (ast-defclass-default-initargs node)
+                    (list (cons :default-initargs
+                                (loop for (key . value) in (ast-defclass-default-initargs node)
+                                      append (list key (ast-to-sexp value))))))
+                  (when (ast-defclass-metaclass node)
+                    (list (list :metaclass
+                                (if (ast-quote-p (ast-defclass-metaclass node))
+                                    (ast-quote-value (ast-defclass-metaclass node))
+                                    (ast-to-sexp (ast-defclass-metaclass node))))))))
+    form))
+
+(defun %cps-defgeneric-form (node)
+  (let ((base-form (list 'defgeneric
+                         (ast-defgeneric-name node)
+                         (ast-defgeneric-params node)))
+        (combination (ast-defgeneric-combination node)))
+    (if combination
+        (append base-form (list (list :method-combination combination)))
+        base-form)))
+
+(defun %cps-defmethod-form (node)
+  (let ((params (loop for name in (ast-defmethod-params node)
+                      for spec in (ast-defmethod-specializers node)
+                      collect (%cps-defmethod-param name spec)))
+        (qualifier (ast-defmethod-qualifier node)))
+    (if qualifier
+        (list* 'defmethod
+               (ast-defmethod-name node)
+               qualifier
+               params
+               (ast-defmethod-body node))
+        (list* 'defmethod
+               (ast-defmethod-name node)
+               params
+               (ast-defmethod-body node)))))
+
 (defmethod cps-transform-ast ((node ast-setq) k)
   "Transform setq assignment."
   (let* ((var (ast-setq-var node))
@@ -71,14 +125,14 @@ KEY slots may include a fourth explicit keyword-name element."
                            (%cps-lambda (list v)
                                         (%cps-progn
                                           (list kind name v)
-                                          (%cps-funcall k (list 'quote name)))))
+                                          (%cps-return-quoted-name k name))))
         (%cps-progn
          (list kind name)
-         (%cps-funcall k (list 'quote name))))))
+         (%cps-return-quoted-name k name)))))
 
 (defmethod cps-transform-ast ((node ast-defun) k)
   "Transform defun conservatively through host DEFUN."
-  (%cps-progn
+  (%cps-evaluate-host-definition
    (trmc-transform-defun-form
     (append (list 'defun
                   (ast-defun-name node)
@@ -88,16 +142,18 @@ KEY slots may include a fourth explicit keyword-name element."
                                              (ast-defun-key-params node)))
             (ast-defun-declarations node)
             (mapcar #'ast-to-sexp (ast-defun-body node))))
-   (%cps-funcall k (list 'quote (ast-defun-name node)))))
+   k
+   (ast-defun-name node)))
 
 (defmethod cps-transform-ast ((node ast-defmacro) k)
   "Transform defmacro conservatively through host DEFMACRO."
-  (%cps-progn
+  (%cps-evaluate-host-definition
    (append (list 'defmacro
                  (ast-defmacro-name node)
                  (ast-defmacro-lambda-list node))
            (ast-defmacro-body node))
-   (%cps-funcall k (list 'quote (ast-defmacro-name node)))))
+   k
+   (ast-defmacro-name node)))
 
 (defmethod cps-transform-ast ((node ast-handler-case) k)
   "Transform handler-case conservatively through host handler-case."
@@ -174,57 +230,24 @@ When done, constructs the (make-instance class-form ...) call and delivers it to
 
 (defmethod cps-transform-ast ((node ast-defclass) k)
   "Transform defclass conservatively through host DEFCLASS."
-  (let ((form (list 'defclass (ast-defclass-name node)
-                    (ast-defclass-superclasses node)
-                    (mapcar #'slot-def-to-sexp (ast-defclass-slots node)))))
-    (setf form
-          (append form
-                  (when (ast-defclass-default-initargs node)
-                    (list (cons :default-initargs
-                                (loop for (key . value) in (ast-defclass-default-initargs node)
-                                      append (list key (ast-to-sexp value))))))
-                  (when (ast-defclass-metaclass node)
-                    (list (list :metaclass
-                                (if (ast-quote-p (ast-defclass-metaclass node))
-                                    (ast-quote-value (ast-defclass-metaclass node))
-                                    (ast-to-sexp (ast-defclass-metaclass node))))))))
-    (%cps-progn
-     form
-     (%cps-funcall k (list 'quote (ast-defclass-name node))))))
+  (%cps-evaluate-host-definition
+   (%cps-defclass-form node)
+   k
+   (ast-defclass-name node)))
 
 (defmethod cps-transform-ast ((node ast-defgeneric) k)
   "Transform defgeneric conservatively through host DEFGENERIC."
-  (let ((base-form (list 'defgeneric
-                         (ast-defgeneric-name node)
-                         (ast-defgeneric-params node)))
-        (combination (ast-defgeneric-combination node)))
-    (%cps-progn
-     (if combination
-         (append base-form (list (list :method-combination combination)))
-         base-form)
-     (%cps-funcall k (list 'quote (ast-defgeneric-name node))))))
+  (%cps-evaluate-host-definition
+   (%cps-defgeneric-form node)
+   k
+   (ast-defgeneric-name node)))
 
 (defmethod cps-transform-ast ((node ast-defmethod) k)
   "Transform defmethod conservatively through host DEFMETHOD."
-  (let ((params (loop for name in (ast-defmethod-params node)
-                      for spec in (ast-defmethod-specializers node)
-                      collect (cond
-                                ((null spec) name)
-                                ((consp spec) (list name (cdr spec)))
-                                (t (list name spec)))))
-        (qualifier (ast-defmethod-qualifier node)))
-    (%cps-progn
-     (if qualifier
-         (list* 'defmethod
-                (ast-defmethod-name node)
-                qualifier
-                params
-                (ast-defmethod-body node))
-         (list* 'defmethod
-                (ast-defmethod-name node)
-                params
-                (ast-defmethod-body node)))
-     (%cps-funcall k (list 'quote (ast-defmethod-name node))))))
+  (%cps-evaluate-host-definition
+   (%cps-defmethod-form node)
+   k
+   (ast-defmethod-name node)))
 
 (defmethod cps-transform-ast ((node ast-set-gethash) k)
   "Transform setf/gethash conservatively through host GETHASH setf."

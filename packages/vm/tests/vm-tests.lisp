@@ -9,23 +9,6 @@
 (in-suite vm-suite)
 
 ;; SKIP (Nix sandbox): *features* initialization differs in sandbox
-#+nil (deftest vm-state-initial-globals
-  "vm-state seeds representative standard globals at initialization time."
-  (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
-    (assert-true (hash-table-p (cl-cc/vm::vm-global-vars state)))
-    (multiple-value-bind (features found-p)
-        (gethash 'cl-cc::*features* (cl-cc/vm::vm-global-vars state))
-      (assert-true found-p)
-      (assert-equal '(:common-lisp :cl-cc) features))
-    (multiple-value-bind (package found-p)
-        (gethash 'cl-cc::*package* (cl-cc/vm::vm-global-vars state))
-      (assert-true found-p)
-      (assert-eq (find-package :cl-user) package))
-    (multiple-value-bind (docs found-p)
-        (gethash 'cl-cc/expand::*documentation-table* (cl-cc/vm::vm-global-vars state))
-      (assert-true found-p)
-      (assert-null docs))))
-
 (deftest vm-heap-address-normalization
   "vm-heap-address normalizes integers, wrapped addresses, and nil."
   (let ((wrapped (cl-cc/vm::make-vm-heap-address :value 7)))
@@ -58,11 +41,12 @@
 
 (deftest vm-bind-closure-args-populates-arg-slots
   "vm-bind-closure-args also mirrors call arguments into reserved ARG slots."
-  (let ((state (make-instance 'cl-cc/vm::vm-io-state))
+    (let ((state (make-instance 'cl-cc/vm::vm-io-state))
         (closure (make-instance 'cl-cc/vm::vm-closure-object
                                 :entry-label "f"
                                 :params '(:R10 :R11)
-                                :captured-values #())))
+                                :captured-regs #()
+                                :captured-vals #())))
     (cl-cc/vm::vm-bind-closure-args closure state '(1 2 3))
     (assert-= 1 (cl-cc:vm-reg-get state :ARG0))
     (assert-= 2 (cl-cc:vm-reg-get state :ARG1))
@@ -83,25 +67,32 @@
 ;;; ─── vm runtime objects and heap helpers ────────────────────────────────────
 
 (deftest vm-closure-object
-  "vm-closure-object: entry-label/params/captured-values stored; typep passes."
+  "vm-closure-object: entry-label/params/captured-regs/vals stored; typep passes."
   ;; basic slots
   (let ((c (make-instance 'cl-cc/vm::vm-closure-object
                            :entry-label "my-fn"
                            :params (list :r1 :r2)
-                           :captured-values #())))
+                           :captured-regs #()
+                           :captured-vals #())))
     (assert-string= "my-fn" (cl-cc/vm::vm-closure-entry-label c))
     (assert-equal (list :r1 :r2) (cl-cc/vm::vm-closure-params c))
-    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-values c)))
-    (assert-= 0 (length (cl-cc/vm::vm-closure-captured-values c)))
+    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-regs c)))
+    (assert-= 0 (length (cl-cc/vm::vm-closure-captured-regs c)))
+    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-vals c)))
+    (assert-= 0 (length (cl-cc/vm::vm-closure-captured-vals c)))
     (assert-true (typep c 'cl-cc/vm::vm-closure-object)))
   ;; captured variables
   (let ((c (make-instance 'cl-cc/vm::vm-closure-object
                            :entry-label "adder"
                            :params (list :r1)
-                           :captured-values (vector (cons :r0 10)))))
-    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-values c)))
-    (assert-= 1 (length (cl-cc/vm::vm-closure-captured-values c)))
-    (assert-equal (cons :r0 10) (aref (cl-cc/vm::vm-closure-captured-values c) 0))))
+                           :captured-regs (vector :r0)
+                           :captured-vals (vector 10))))
+    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-regs c)))
+    (assert-= 1 (length (cl-cc/vm::vm-closure-captured-regs c)))
+    (assert-equal :r0 (aref (cl-cc/vm::vm-closure-captured-regs c) 0))
+    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-vals c)))
+    (assert-= 1 (length (cl-cc/vm::vm-closure-captured-vals c)))
+    (assert-equal 10 (aref (cl-cc/vm::vm-closure-captured-vals c) 0))))
 
 (deftest vm-cons-cell
   "vm-cons-cell: stores car/cdr, car is setf-able, subtype of vm-heap-object."

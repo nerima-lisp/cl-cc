@@ -56,7 +56,9 @@ Handles standard method combination: :around → :before → primary → :after.
 Custom method combination: calls all qualified methods and folds with operator.
 Returns (values next-pc halt-p result) like execute-instruction."
   ;; Check for custom method combination
-  (let ((combination (gethash :__method-combination__ gf-ht)))
+  (let ((combination (when (and (hash-table-p gf-ht)
+                                (nth-value 1 (gethash :__method-combination__ gf-ht)))
+                       (gethash :__method-combination__ gf-ht))))
     (when (and combination (not (eq combination 'standard)))
       (return-from vm-dispatch-generic-call
         (%vm-dispatch-custom-combination gf-ht state pc arg-regs dst-reg labels combination))))

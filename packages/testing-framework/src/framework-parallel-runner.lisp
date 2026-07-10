@@ -5,26 +5,22 @@
   "Timeout in seconds for external CPU-count detection commands.")
 
 (defparameter *suite-killer-exit-fn*
-  (lambda (&rest args &key code &allow-other-keys)
-    (declare (ignore args))
+  (lambda (&key code)
     (sb-ext:exit :code code :abort t))
   "Indirection for the suite-deadline-killer exit action so tests can rebind to a recorder.
 Default uses sb-ext:exit :code code :abort t.  The :abort t flag calls _exit(2) directly,
 bypassing the SBCL thread join that plain (sb-ext:exit) would perform; without :abort t a
-GC-safepoint-blocked main thread cannot be terminated by the killer.
-&allow-other-keys lets callers pass forward-compatible keyword arguments without error (the
-same reason *watchdog-exit-fn* in framework-parallel.lisp uses it).
-Mirrors *watchdog-exit-fn* in framework-parallel.lisp.")
+GC-safepoint-blocked main thread cannot be terminated by the killer.")
 
 ;;; ------------------------------------------------------------
 ;;; Parallel Worker Pool
 ;;; ------------------------------------------------------------
 
 (defun %copy-prolog-rules (src)
-  "Return a shallow copy of the Prolog fact DB SRC (hash-table).
-Per-thread rebinding of `cl-cc/prolog:*prolog-rules*` needs a fresh
-table per worker so concurrent add-rule / clear-prolog-database calls
-do not race through the global binding."
+  "Return a shallow copy of the Prolog rule DB SRC (hash-table).
+Per-thread rebinding of `cl-cc/prolog::*prolog-rules*` needs a fresh
+table per worker so concurrent test-side rebindings do not race through
+the global binding."
   (let ((dst (make-hash-table :test 'eq)))
     (when src
       (maphash (lambda (k v) (setf (gethash k dst) v)) src))
@@ -61,6 +57,9 @@ sequentially in dependency-safe input order."
         (parallel-batch '()))
     (flet ((flush-parallel-batch ()
              (when parallel-batch
+               (format *error-output* "# batch: ~D parallel tests~%"
+                       (length parallel-batch))
+               (finish-output *error-output*)
                (setf results
                      (append results
                              (%run-tests-parallel (nreverse parallel-batch)
@@ -71,6 +70,12 @@ sequentially in dependency-safe input order."
             (push test parallel-batch)
             (progn
               (flush-parallel-batch)
+              ;; Serial tests run on THIS thread: a hang here is unrecoverable
+              ;; (the macOS 26.5 trap-delivery hang blocks interrupts), so
+              ;; always announce the test first — the last announced name in
+              ;; the log identifies the hung test after a deadline kill.
+              (format *error-output* "# serial: ~A~%" (getf test :name))
+              (finish-output *error-output*)
               (let ((*test-runner-mode* :parallel))
                 (setf results
                       (append results
@@ -131,6 +136,57 @@ FASLs); warm-cache runs complete in well under a minute."
                (let ((parsed (parse-integer raw)))
                  (and (plusp parsed) parsed))))
         600)))
+
+(defun %suite-timeout-deadline (suite-timeout)
+  "Convert SUITE-TIMEOUT seconds into an absolute internal-time deadline."
+  (and suite-timeout
+       (+ (get-internal-real-time)
+          (round (* suite-timeout
+                    internal-time-units-per-second)))))
+
+(defstruct (%suite-deadline-killer-state
+            (:constructor %make-suite-deadline-killer-state (lock sem)))
+  (live t :type boolean)
+  lock
+  sem)
+
+(defun %start-suite-deadline-killer (suite-deadline)
+  "Start the deadline-killer thread for SUITE-DEADLINE and return its state."
+  (let ((state (%make-suite-deadline-killer-state
+                (sb-thread:make-mutex :name "suite-killer-lock")
+                (when suite-deadline
+                  (sb-thread:make-semaphore :name "suite-killer-sem" :count 0)))))
+    (when suite-deadline
+      (let ((err *error-output*)
+            (exit-fn *suite-killer-exit-fn*)
+            (remaining (max 1.0 (/ (- suite-deadline (get-internal-real-time))
+                                   (float internal-time-units-per-second)))))
+        (sb-thread:make-thread
+         (lambda ()
+           ;; Poll every 0.1s: sleep marks a GC safepoint before blocking.
+           ;; try-semaphore is a non-blocking probe — returns t if signalled
+           ;; (suite finished normally, do nothing), nil otherwise.
+           (loop with check-interval = 0.1d0
+                 for elapsed = 0.0d0 then (+ elapsed check-interval)
+                 while (< elapsed remaining)
+                 do (sleep check-interval)
+                    (when (sb-thread:try-semaphore (%suite-deadline-killer-state-sem state))
+                      (return))
+                 finally
+                 (when (sb-thread:with-mutex ((%suite-deadline-killer-state-lock state))
+                         (%suite-deadline-killer-state-live state))
+                   (format err "# FATAL: suite deadline killer triggered; aborting~%")
+                   (finish-output err)
+                   (funcall exit-fn :code 124))))
+         :name "suite-deadline-killer")))
+    state))
+
+(defun %stop-suite-deadline-killer (state)
+  "Mark STATE inactive and wake the killer thread if it is waiting."
+  (sb-thread:with-mutex ((%suite-deadline-killer-state-lock state))
+    (setf (%suite-deadline-killer-state-live state) nil))
+  (when (%suite-deadline-killer-state-sem state)
+    (sb-thread:signal-semaphore (%suite-deadline-killer-state-sem state))))
 
 (defun %suite-timeout-result (suite-name timeout quit-p)
   "Handle a whole-suite timeout consistently for CLI and programmatic callers."
@@ -228,21 +284,8 @@ When QUIT-P is true, exits via uiop:quit; otherwise returns whether any test fai
     (format t "# Snapshot update mode enabled~%"))
 
   (let* ((suite-timeout (%default-suite-timeout))
-         (suite-deadline (and suite-timeout
-                              (+ (get-internal-real-time)
-                                 (round (* suite-timeout
-                                           internal-time-units-per-second)))))
-         (killer-live    t)
-         (killer-lock    (sb-thread:make-mutex :name "suite-killer-lock"))
-         ;; Semaphore used to cancel the deadline-killer thread early (when
-         ;; tests finish normally).  We signal it in the unwind-protect cleanup;
-         ;; the killer polls try-semaphore so it exits on the next 0.1s tick.
-         ;; Note: sb-thread:make-thread in SBCL 2.6.1 accepts only &key name
-         ;; arguments — :daemon is NOT a valid keyword and causes a hang on
-         ;; macOS 26 ARM64.  The semaphore-based cancellation removes the need
-         ;; for a daemon/ephemeral thread entirely.
-         (killer-sem     (when suite-deadline
-                           (sb-thread:make-semaphore :name "suite-killer-sem" :count 0))))
+         (suite-deadline (%suite-timeout-deadline suite-timeout))
+         (killer-state (%start-suite-deadline-killer suite-deadline)))
     ;; Deadline killer: fires (sb-ext:exit :abort t) from a side thread so that
     ;; a GC-safepoint-blocked main thread cannot outlive the suite deadline.
     ;; sb-ext:with-timeout alone is unreliable when the main thread is stuck in GC.
@@ -250,27 +293,6 @@ When QUIT-P is true, exits via uiop:quit; otherwise returns whether any test fai
     ;; wait-on-semaphore :timeout, which uses __ulock_wait2 (NOT a GC safepoint on
     ;; macOS 26 ARM64).  Without this, GC blocks waiting for the killer thread to
     ;; reach a safepoint, while the main thread is already suspended by GC — deadlock.
-    (when suite-deadline
-      (let ((err *error-output*)
-            (remaining (max 1.0 (/ (- suite-deadline (get-internal-real-time))
-                                   (float internal-time-units-per-second)))))
-        (sb-thread:make-thread
-          (lambda ()
-            ;; Poll every 0.1s: sleep marks a GC safepoint before blocking.
-            ;; try-semaphore is a non-blocking probe — returns t if signalled
-            ;; (suite finished normally, do nothing), nil otherwise.
-            (loop with check-interval = 0.1d0
-                  for elapsed = 0.0d0 then (+ elapsed check-interval)
-                  while (< elapsed remaining)
-                  do (sleep check-interval)
-                     (when (sb-thread:try-semaphore killer-sem)
-                       (return))
-                  finally
-                  (when (sb-thread:with-mutex (killer-lock) killer-live)
-                    (format err "# FATAL: suite deadline killer triggered; aborting~%")
-                    (finish-output err)
-                    (funcall *suite-killer-exit-fn* :code 124))))
-          :name "suite-deadline-killer")))
     ;; Do NOT use sb-ext:with-timeout here — on macOS ARM64 SIGALRM is
     ;; delivered to an arbitrary thread and will kill the watchdog thread
     ;; rather than the main thread, disabling per-test timeout enforcement.
@@ -295,16 +317,23 @@ When QUIT-P is true, exits via uiop:quit; otherwise returns whether any test fai
                                     filter))
                   (n               (length tests-plists))
                   (test-vec        (coerce (%number-tests tests-plists) 'vector)))
+             (format *error-output* "# stage: collected ~D tests~%" n)
+             (finish-output *error-output*)
              (when filter
                (format t "# Filtering tests by name: ~A (~D selected)~%" filter n))
              (when random (%fisher-yates-shuffle test-vec))
              (let* ((ordered-tests     (%order-tests-for-dependencies (coerce test-vec 'list)))
                     (effective-workers (%effective-worker-count ordered-tests parallel workers)))
+               (format *error-output* "# stage: ordered; workers=~D~%" effective-workers)
+               (finish-output *error-output*)
                (%print-tap-header n repeat actual-seed effective-workers)
+               (finish-output)
                ;; Second warm call: should be a no-op cache hit if apps.nix pre-warmed.
                ;; No inner sb-ext:with-timeout — see note above about SIGALRM delivery.
                (when warm-stdlib
                  (ignore-errors (cl-cc:warm-stdlib-cache)))
+               (format *error-output* "# stage: warm2 done~%")
+               (finish-output *error-output*)
                (when coverage (format t "# Coverage report enabled~%"))
                (let* ((prior-timings   (%load-prior-timings))
                       (all-run-results
@@ -319,14 +348,13 @@ When QUIT-P is true, exits via uiop:quit; otherwise returns whether any test fai
                         (any-fail     (%print-result-summary flat-results)))
                    (when coverage (%print-coverage-report flat-results))
                    (%emit-postrun-artifacts flat-results)
-                   (if quit-p
-                       (uiop:quit (if any-fail 1 0))
-                       any-fail)))))
+                       (if quit-p
+                           (uiop:quit (if any-fail 1 0))
+                           any-fail)))))
       ;; Cleanup: cancel the deadline-killer thread before calling uiop:quit,
       ;; so it exits promptly rather than blocking on the remaining sleep time.
       (when coverage (disable-coverage))
-      (sb-thread:with-mutex (killer-lock) (setf killer-live nil))
-      (when killer-sem (sb-thread:signal-semaphore killer-sem))))))
+      (%stop-suite-deadline-killer killer-state)))))
 
 (defun run-tests (&key
                        (tags nil)
@@ -356,14 +384,17 @@ report is written to *coverage-report-directory* (default: ./coverage/)."
                   :coverage coverage
                   :exclude-suites (remove-duplicates
                                    (append exclude-suites
-                                           '(cl-cc-integration-suite
-                                             cl-cc-e2e-suite
-                                             cl-cc-conformance-suite
-                                             cl-cc-documentation-suite))
+                                           (%default-fast-plan-exclude-suites))
                                    :test #'eq))
     (when coverage
       (disable-coverage)
       (format t "~&Coverage report written to ~A~%" (or *coverage-report-directory* "./coverage/")))))
+
+(defun %default-fast-plan-exclude-suites ()
+  '(cl-cc-integration-suite
+    cl-cc-e2e-suite
+    cl-cc-conformance-suite
+    cl-cc-documentation-suite))
 
 (defun %resolve-suite (package-name symbol-name)
   (let* ((pkg (find-package package-name))

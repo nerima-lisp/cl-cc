@@ -3,6 +3,13 @@
 (defparameter *x86-64-host-probe-timeout-seconds* 2
   "Timeout in seconds for external host feature probe commands.")
 
+(defmacro x86-64-with-host-probe-timeout (&body body)
+  `(handler-case
+       (sb-ext:with-timeout *x86-64-host-probe-timeout-seconds*
+         ,@body)
+     (sb-ext:timeout ()
+       nil)))
+
 (defun x86-64-unlikely-branch-prefix-p (inst)
   "Return T when INST should carry the legacy x86 unlikely-branch hint prefix."
   (and (typep inst 'vm-jump-zero)
@@ -390,11 +397,11 @@ formats such as:\n
     (or (ignore-errors
           (when (and (find-package :uiop)
                      (fboundp 'uiop:run-program))
-             (cl-cc/runtime:rt-with-timeout (*x86-64-host-probe-timeout-seconds*)
-               (uiop:run-program
-                '("sysctl" "-a")
-                :output :string
-                :ignore-error-status t))))
+            (x86-64-with-host-probe-timeout
+              (uiop:run-program
+               '("sysctl" "-a")
+               :output :string
+               :ignore-error-status t))))
         (ignore-errors
           (with-open-file (in "/proc/cpuinfo" :direction :input)
             (let ((buf (make-string-output-stream)))
@@ -440,8 +447,8 @@ Environment variables remain the primary override path."
      (ignore-errors
       (when (and (find-package :uiop)
                  (fboundp 'uiop:run-program))
-        (let ((out (cl-cc/runtime:rt-with-timeout (*x86-64-host-probe-timeout-seconds*)
-                      (uiop:run-program
+        (let ((out (x86-64-with-host-probe-timeout
+                     (uiop:run-program
                       '("sysctl" "-a")
                       :output :string
                       :ignore-error-status t))))

@@ -1,9 +1,10 @@
-;;;; packages/javascript/tests/js-e2e-modern-tests.lisp — ES2022+ execution tests
+;;;; packages/javascript/tests/js-e2e-modern-tests.lisp — ES2022-ES2026 execution tests
 ;;;;
 ;;;; Private class fields, Promise chaining, WeakMap/WeakSet, Object static
 ;;;; methods, ES2021 strings, ES2023 arrays, ES2025 Set/Iterator, ES2025/2026
-;;;; static built-ins (Math.sumPrecise, Error.isError, RegExp.escape, Map.groupBy),
-;;;; AbortController/AbortSignal, crypto.
+;;;; static built-ins (Math.sumPrecise, Error.isError, RegExp.escape, Map.groupBy,
+;;;; Iterator.concat),
+;;;; AbortController/AbortSignal, Atomics.pause, crypto.
 ;;;;
 ;;;; Depends on: js-e2e-core-tests.lisp (%js-run-capture, deftest-js-run).
 
@@ -148,7 +149,25 @@ console.log(new C(7).get());")))
   ("true false" "function* vals(){yield 1;yield 3;yield 5;} const g=vals(); function* vals2(){yield 1;yield 3;yield 5;} const g2=vals2(); console.log(g.some(x=>x>2)+' '+g2.every(x=>x%2===0));")
   ("4,6"      "function* nums(){for(let i=1;i<=6;i++)yield i;} console.log(nums().drop(2).filter(x=>x%2===0).toArray().join(','));"))
 
+;;; ─── ES2026 Iterator.zip helpers ────────────────────────────────────────────
+
+(deftest-js-run-isolated-batch js-e2e-es2026-iterator-zip
+  "ES2026 Iterator.zip and Iterator.zipKeyed combine iterables in shortest and longest modes."
+  ("1,10|2,20"
+   "console.log(Iterator.from(Iterator.zip([[1,2,3],[10,20]])).toArray().map(row=>row.join(',')).join('|'));")
+  ("1,10|2,20|3,9"
+   "console.log(Iterator.from(Iterator.zip([[1,2,3],[10,20]], {mode:'longest', padding:[0,9]})).toArray().map(row=>row.join(',')).join('|'));")
+  ("1,10|2,9"
+   "console.log(Iterator.from(Iterator.zipKeyed({left:[1,2], right:[10]}, {mode:'longest', padding:{left:0, right:9}})).toArray().map(row=>row.left+','+row.right).join('|'));"))
+
 ;;; ─── ES2025/2026 static built-ins ────────────────────────────────────────────
+
+(deftest-js-run js-e2e-es2026-iterator-concat
+  "ES2026 Iterator.concat lazily chains multiple iterables."
+  ("1,2,3,4,5"
+   "const it=Iterator.concat([1,2], new Set([3,4]), '5'); console.log(Iterator.from(it).toArray().join(','));")
+  ("a,b,c"
+   "function* g(){ yield 'b'; yield 'c'; } const it=Iterator.concat(['a'], g()); console.log(Iterator.from(it).toArray().join(','));"))
 
 (deftest-js-run js-e2e-es2026-math-sum-precise
   "ES2026 Math.sumPrecise: precise summation over an iterable."
@@ -162,6 +181,13 @@ console.log(new C(7).get());")))
   ("no"  "console.log(Error.isError(42)?'yes':'no');")
   ("no"  "console.log(Error.isError(null)?'yes':'no');"))
 
+(deftest-js-run js-e2e-es2026-json-raw-json
+  "ES2026 JSON.rawJSON / JSON.isRawJSON preserve raw JSON text through stringify."
+  ("true {\"payload\":{\"x\":1}}"
+   "const raw=JSON.rawJSON('{\"x\":1}'); console.log(JSON.isRawJSON(raw)+' '+JSON.stringify({payload:raw}));")
+  ("false"
+   "console.log(JSON.isRawJSON({payload:1})?'true':'false');"))
+
 (deftest-js-run js-e2e-es2024-regexp-escape
   "ES2025 RegExp.escape: escapes strings for literal use in RegExp patterns."
   ("\\x48ello\\.World" "console.log(RegExp.escape('Hello.World'));")
@@ -174,6 +200,26 @@ console.log(new C(7).get());")))
   ("2,4,6" "const g=Map.groupBy([1,2,3,4,5,6],x=>x%2===0?'even':'odd'); console.log(g.get('even').join(','));")
   ("1,3,5" "const g=Map.groupBy([1,2,3,4,5,6],x=>x%2===0?'even':'odd'); console.log(g.get('odd').join(','));")
   ("none"  "const g=Map.groupBy([1,3,5],x=>'odd'); const v=g.get('even'); console.log(v===undefined?'none':v.join(','));"))
+
+(deftest-js-run js-e2e-es2026-map-get-or-insert
+  "ES2026 Map.getOrInsert / Map.getOrInsertComputed install defaults once."
+  ("1"
+   "const m=new Map([['a',1]]); console.log(m.getOrInsert('a',99));")
+  ("7"
+   "const m=new Map(); console.log(m.getOrInsert('b',7));")
+  ("1"
+   "const m=new Map([['c',1]]); console.log(m.getOrInsertComputed('c',()=>{ throw new Error('no'); }));")
+  ("3"
+   "const m=new Map(); console.log(m.getOrInsertComputed('d', k => k.length + 2));"))
+
+(deftest-js-run js-e2e-es2026-weak-map-get-or-insert
+  "ES2026 WeakMap.getOrInsert / WeakMap.getOrInsertComputed work on object keys."
+  ("12"
+   "const wm=new WeakMap(); const key={x:1}; wm.set(key,12); console.log(wm.getOrInsert(key,99));")
+  ("5"
+   "const wm=new WeakMap(); const key={x:1}; console.log(wm.getOrInsertComputed(key,()=>5));")
+  ("3"
+   "const wm=new WeakMap(); const key={x:1}; wm.set(key,3); console.log(wm.getOrInsertComputed(key,()=>{ throw new Error('no'); }));"))
 
 (deftest-js-run js-e2e-es2024-object-group-by
   "ES2024 Object.groupBy: groups iterable elements into object properties."
@@ -202,3 +248,46 @@ console.log(new C(7).get());")))
    "const bytes=new Uint8Array(8); const ret=crypto.getRandomValues(bytes); console.log((ret===bytes)+' '+bytes.length);")
   ("true"
    "const u=crypto.randomUUID(); const ok=u.length===36&&u===u.toLowerCase()&&u[8]==='-'&&u[13]==='-'&&u[18]==='-'&&u[23]==='-'&&u[14]==='4'&&'89ab'.indexOf(u[19])>=0; console.log(ok);"))
+
+(deftest-js-run js-e2e-atomics-pause
+  "Atomics.pause is callable and returns undefined."
+  ("true"
+   "console.log(Atomics.pause()===undefined);"))
+
+(deftest-js-run js-e2e-regex-literals
+  "Regex literals construct a working RegExp (regression: the parser passed the
+whole (:regex pat flags) token value as %js-make-regex's first argument, and
+string-method dispatch routed match/search/replace/split to the string-only
+helpers, which spun forever on a js-regexp struct)."
+  ("true"    "console.log(/\\d+/.test('x42'));")
+  ("n"       "console.log(/z/.test('abc')?'y':'n');")
+  ("ab gi"   "const r=/ab/gi; console.log(r.source+' '+r.flags);")
+  ("true"    "console.log(/ab/g.global);"))
+
+(deftest-js-run js-e2e-regex-string-methods
+  "String.prototype.replace/match/search/split accept RegExp arguments."
+  ("bbb"     "console.log('aaa'.replace(/a/g,'b'));")
+  ("baa"     "console.log('aaa'.replace(/a/,'b'));")
+  ("1 ll"    "const m='hello'.match(/l+/g); console.log(m.length+' '+m[0]);")
+  ("42 1"    "const m='x42y'.match(/\\d+/); console.log(m[0]+' '+m.index);")
+  ("3"       "console.log('abcdef'.search(/de/));")
+  ("-1"      "console.log('abcdef'.search(/zz/));")
+  ("a-b-c"   "console.log('a1b22c'.split(/\\d+/).join('-'));")
+  ("2"       "console.log('a1b2'.matchAll(/\\d/g).length);"))
+
+(deftest-js-run js-e2e-regex-constructor
+  "new RegExp(pattern, flags) matches like a literal."
+  ("true"    "console.log(new RegExp('l+','g').test('hello'));")
+  ("X-X"     "const re=new RegExp('[0-9]','g'); console.log('1-2'.replace(re,'X'));"))
+
+(deftest-js-run js-e2e-date-constructor-and-methods
+  "Date is a constructor object (regression: a bare :function prelude binding
+made %js-new fall through to the empty-object branch, so every Date instance
+was a plain {} whose methods resolved to undefined; Date.now/parse/UTC statics
+were likewise unreachable through the function-method resolver)."
+  ("1970 0"  "const d=new Date(0); console.log(d.getUTCFullYear()+' '+d.getTime());")
+  ("2020 0 15" "const d=new Date(2020,0,15); console.log(d.getUTCFullYear()+' '+d.getUTCMonth()+' '+d.getUTCDate());")
+  ("0"       "console.log(Date.UTC(1970,0,1));")
+  ("true"    "console.log(Date.now()>0);")
+  ("1970-01-02T00:00:00.000Z" "console.log(new Date(86400000).toISOString());")
+  ("true"    "console.log(Date.parse('1970-01-02')===86400000);"))

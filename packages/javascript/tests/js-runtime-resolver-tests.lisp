@@ -7,7 +7,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── RegExp public API ───────────────────────────────────────────────────────
 
@@ -30,6 +30,193 @@
   (let* ((re (cl-cc/javascript::%js-make-regex "xyz"))
          (m  (cl-cc/javascript::%js-regex-exec re "hello" 0)))
     (assert-eq cl-cc/javascript::+js-null+ m)))
+
+(deftest js-rt-regex-flags-and-last-index
+  "Regexp flag accessors and lastIndex updates/reset correctly."
+  (let ((re (cl-cc/javascript::%js-make-regex "l" "gimy")))
+    (assert-true  (cl-cc/javascript::js-regexp-ignore-case-p re))
+    (assert-true  (cl-cc/javascript::js-regexp-multiline-p re))
+    (assert-true  (cl-cc/javascript::js-regexp-global-p re))
+    (assert-true  (cl-cc/javascript::js-regexp-sticky-p re))
+    (let* ((exec-re (cl-cc/javascript::make-js-regexp
+                     :source "l"
+                     :flags "g"
+                     :compiled (lambda (str i groups)
+                                 (declare (ignore str groups))
+                                 (when (and (string= str "hello") (= i 2)) 3))
+                     :global-p t
+                     :ignore-case-p nil
+                     :multiline-p nil
+                     :sticky-p nil
+                     :last-index 0))
+           (m1 (cl-cc/javascript::%js-regex-exec exec-re "hello" 0)))
+      (assert-false (eq m1 cl-cc/javascript::+js-null+))
+      (assert-= 3 (cl-cc/javascript::js-regexp-last-index exec-re))
+      (let ((m2 (cl-cc/javascript::%js-regex-exec exec-re "zzzz" 0)))
+        (assert-eq cl-cc/javascript::+js-null+ m2))
+      (assert-= 0 (cl-cc/javascript::js-regexp-last-index exec-re)))))
+
+(deftest js-rt-regex-exec-uncompiled-pattern
+  "regex-exec returns null when pattern compilation fails."
+  (let* ((re (cl-cc/javascript::make-js-regexp
+              :source "("
+              :flags ""
+              :compiled nil
+              :global-p nil
+              :ignore-case-p nil
+              :multiline-p nil
+              :sticky-p nil
+              :last-index 0))
+         (m  (cl-cc/javascript::%js-regex-exec re "hello" 0)))
+    (assert-eq cl-cc/javascript::+js-null+ m)))
+
+(deftest js-rt-regex-string-match-global
+  "String.prototype.match() with /g returns each match once, advancing past
+the match end ('hello'.match(/l/g) is ['l','l'] in JS, not three)."
+  (let ((result (cl-cc/javascript::%js-string-match-regex
+                 "hello" (cl-cc/javascript::%js-make-regex "l" "g"))))
+    (assert-= 2 (length result))
+    (assert-string= "l" (aref result 0))
+    (assert-string= "l" (aref result 1))))
+
+(deftest js-rt-regex-string-match-global-empty
+  "Global empty matches advance by one code unit to avoid infinite loops."
+  (let ((result (cl-cc/javascript::%js-string-match-regex
+                 "abc" (cl-cc/javascript::%js-make-regex "" "g"))))
+    (assert-= 4 (length result))
+    (dotimes (i (length result))
+      (assert-string= "" (aref result i)))))
+
+(deftest js-rt-regex-string-pattern-branches
+  "String pattern inputs exercise the non-RegExp branches for match/search/replace/split."
+  (let ((replaced (cl-cc/javascript::%js-string-replace-regex "hello" "l" "-")))
+    (assert-string= "he-lo" replaced))
+  (assert-= 3 (cl-cc/javascript::%js-string-search-regex "hello" "lo"))
+  (let ((matched (cl-cc/javascript::%js-string-match-regex "hello" "lo")))
+    (assert-= 1 (length matched))
+    (assert-string= "lo" (aref matched 0)))
+  (let ((replaced-all (cl-cc/javascript::%js-string-replace-all-regex "hello" "l" "-")))
+    (assert-string= "he--o" replaced-all))
+  (let ((parts (cl-cc/javascript::%js-string-split-regex "hello" "l")))
+    (assert-equal '("he" "" "o") (%jr-list parts))))
+
+(deftest js-rt-regex-string-search
+  "String.prototype.search(regexp) returns the first match index."
+  (assert-= 3 (cl-cc/javascript::%js-string-search-regex
+               "hello" (cl-cc/javascript::%js-make-regex "lo"))))
+
+(deftest js-rt-regex-string-replace
+  "String.prototype.replace(regexp, replacement) substitutes the first match."
+  (assert-string= "he-lo"
+                  (cl-cc/javascript::%js-string-replace-regex
+                   "hello" (cl-cc/javascript::%js-make-regex "l") "-")))
+
+(deftest js-rt-regex-string-replace-placeholders
+  "Replacement templates expand $& to the matched substring."
+  (assert-string= "hel-lo"
+                  (cl-cc/javascript::%js-string-replace-regex
+                   "hello" (cl-cc/javascript::%js-make-regex "l") "$&-")))
+
+(deftest js-rt-regex-string-replace-fn-and-fallback
+  "String.prototype.replace(regexp, fn) uses callback replacement and falls back on uncompiled regex."
+  (let ((re (cl-cc/javascript::make-js-regexp
+             :source "he"
+             :flags ""
+             :compiled (lambda (str i groups)
+                         (declare (ignore str groups))
+                         (when (= i 0) 2))
+             :global-p nil
+             :ignore-case-p nil
+             :multiline-p nil
+             :sticky-p nil
+             :last-index 0)))
+    (assert-string= "Xllo"
+                    (cl-cc/javascript::%js-string-replace-regex
+                     "hello"
+                     re
+                     (lambda (match-str match-start source)
+                       (declare (ignore match-str match-start source))
+                       "X"))))
+  (let ((re (cl-cc/javascript::make-js-regexp
+             :source "l"
+             :flags ""
+             :compiled nil
+             :global-p nil
+             :ignore-case-p nil
+             :multiline-p nil
+             :sticky-p nil
+             :last-index 0)))
+    (assert-string= "he-lo"
+                    (cl-cc/javascript::%js-string-replace-regex
+                     "hello" re "-"))))
+
+(deftest js-rt-regex-string-replace-all
+  "String.prototype.replaceAll(regexp, replacement) substitutes every match."
+  (assert-string= "he--o"
+                  (cl-cc/javascript::%js-string-replace-all-regex
+                   "hello" (cl-cc/javascript::%js-make-regex "l" "g") "-")))
+
+(deftest js-rt-regex-string-split
+  "String.prototype.split(regexp) returns the fields between separator matches."
+  (let ((parts (cl-cc/javascript::%js-string-split-regex
+                "a,b,c" (cl-cc/javascript::%js-make-regex ","))))
+    (assert-= 3 (length parts))
+    (assert-string= "a" (aref parts 0))
+    (assert-string= "b" (aref parts 1))
+    (assert-string= "c" (aref parts 2))))
+
+(deftest js-rt-regex-string-split-limit-and-empty
+  "Split respects an explicit limit; an empty pattern splits between characters."
+  ;; 'ab'.split(/a/, 1) => [''] — the field BEFORE the separator is empty.
+  (let ((parts (cl-cc/javascript::%js-string-split-regex
+                "ab" (cl-cc/javascript::%js-make-regex "a") 1)))
+    (assert-= 1 (length parts))
+    (assert-string= "" (aref parts 0)))
+  ;; 'ab'.split(//) => ['a','b'] — zero-width matches split between characters.
+  (let ((parts (cl-cc/javascript::%js-string-split-regex
+                "ab" (cl-cc/javascript::%js-make-regex ""))))
+    (assert-= 2 (length parts))
+    (assert-string= "a" (aref parts 0))
+    (assert-string= "b" (aref parts 1))))
+
+(deftest js-rt-regex-string-split-fallback
+  "String.prototype.split(regexp) falls back to string split when regex compile fails."
+  (let ((parts (cl-cc/javascript::%js-string-split-regex
+                "a(b)c"
+                (cl-cc/javascript::make-js-regexp
+                 :source "b"
+                 :flags ""
+                 :compiled nil
+                 :global-p nil
+                 :ignore-case-p nil
+                 :multiline-p nil
+                 :sticky-p nil
+                 :last-index 0))))
+    (assert-equal '("a(" ")c") (%jr-list parts))))
+
+(deftest js-rt-regex-pattern-branches
+  "Regex compilation exercises classes, anchors, alternation, escapes, and lazy quantifiers."
+  (let ((range-re (cl-cc/javascript::%js-make-regex "^[a-cx]+$")))
+    (assert-true (cl-cc/javascript::%js-regex-test range-re "abcx"))
+    (assert-false (cl-cc/javascript::%js-regex-test range-re "abdz")))
+  (let ((complement-re (cl-cc/javascript::%js-make-regex "[^a-c]+")))
+    (assert-true (cl-cc/javascript::%js-regex-test complement-re "z"))
+    (assert-false (cl-cc/javascript::%js-regex-test complement-re "b")))
+  (let ((class-escape-re (cl-cc/javascript::%js-make-regex "[\\d\\w\\s]+")))
+    (assert-true (cl-cc/javascript::%js-regex-test class-escape-re "a_9 "))
+    (assert-false (cl-cc/javascript::%js-regex-test class-escape-re "!")))
+  (let ((group-re (cl-cc/javascript::%js-make-regex "^(?:cat|dog)?$")))
+    (assert-true (cl-cc/javascript::%js-regex-test group-re "cat"))
+    (assert-true (cl-cc/javascript::%js-regex-test group-re "")))
+  (let ((literal-escape-re (cl-cc/javascript::%js-make-regex "a\\+b")))
+    (assert-true (cl-cc/javascript::%js-regex-test literal-escape-re "a+b"))
+    (assert-false (cl-cc/javascript::%js-regex-test literal-escape-re "ab")))
+  (let ((dot-re (cl-cc/javascript::%js-make-regex "a.b" "m")))
+    (assert-true (cl-cc/javascript::%js-regex-test dot-re "acb"))
+    (assert-false (cl-cc/javascript::%js-regex-test dot-re (format nil "a~%b"))))
+  (let ((lazy-star-re (cl-cc/javascript::%js-make-regex "a*?")))
+    (assert-true (cl-cc/javascript::%js-regex-test lazy-star-re "aaa"))
+    (assert-string= "" (gethash "0" (cl-cc/javascript::%js-regex-exec lazy-star-re "aaa" 0)))))
 
 ;;; ─── Reflect helpers ─────────────────────────────────────────────────────────
 
@@ -130,6 +317,109 @@
          (fn (cl-cc/javascript::%js-resolve-regexp-method re "test")))
     (assert-true  (funcall fn "say hi there"))
     (assert-false (funcall fn "goodbye"))))
+
+(deftest-each js-rt-resolve-regexp-bool-props
+  "Regexp resolver exposes the ignoreCase and multiline flags."
+  :cases (("ignoreCase" "ignoreCase" t)
+          ("multiline"  "multiline"  t))
+  (key expected)
+  (let* ((re (cl-cc/javascript::%js-make-regex "hello" "im"))
+         (val (cl-cc/javascript::%js-resolve-regexp-method re key)))
+    (assert-equal expected val)))
+
+(deftest js-rt-resolve-regexp-last-index
+  "Regexp resolver returns the current lastIndex as a number."
+  (let ((re (cl-cc/javascript::%js-make-regex "hello" "im")))
+    (setf (cl-cc/javascript::js-regexp-last-index re) 3)
+    (let ((val (cl-cc/javascript::%js-resolve-regexp-method re "lastIndex")))
+      (assert-= 3 val))))
+
+(deftest js-rt-resolve-regexp-exec-method
+  "Regexp exec resolves to a closure that returns match objects."
+  (let* ((re (cl-cc/javascript::%js-make-regex "hello" ""))
+         (fn (cl-cc/javascript::%js-resolve-regexp-method re "exec"))
+         (m  (funcall fn "say hello world")))
+    (assert-string= "hello" (gethash "0" m))
+    (assert-= 4 (truncate (gethash "index" m)))))
+
+(deftest js-rt-resolve-promise-methods
+  "Promise resolver returns closures for then/catch/finally."
+  (let* ((fulfilled (cl-cc/javascript::%js-promise-resolve 5))
+         (rejected   (cl-cc/javascript::%js-promise-reject "boom"))
+         (then       (cl-cc/javascript::%js-resolve-promise-method fulfilled "then"))
+         (catch      (cl-cc/javascript::%js-resolve-promise-method rejected "catch"))
+         (finally    (cl-cc/javascript::%js-resolve-promise-method fulfilled "finally"))
+         (called     0)
+         (then-value (cl-cc/javascript::%js-await
+                      (funcall then (lambda (v) (+ v 1)))))
+         (catch-value (cl-cc/javascript::%js-await
+                       (funcall catch (lambda (reason)
+                                        (if (string= reason "boom") 99 0)))))
+         (finally-value (cl-cc/javascript::%js-await
+                         (funcall finally (lambda ()
+                                           (incf called))))))
+    (assert-= 6 then-value)
+    (assert-= 99 catch-value)
+    (assert-= 1 called)
+    (assert-= 5 finally-value)))
+
+(deftest js-rt-resolve-promise-finally-rejects-through
+  "Promise.finally still rejects when the original promise rejects."
+  (let* ((called 0)
+         (rejected (cl-cc/javascript::%js-promise-reject "boom"))
+         (finally (cl-cc/javascript::%js-resolve-promise-method rejected "finally"))
+         (result (funcall finally (lambda ()
+                                    (incf called)))))
+    (assert-signals cl-cc/javascript:js-exception
+      (cl-cc/javascript::%js-await result))
+    (assert-= 1 called)))
+
+(deftest-each js-rt-resolve-function-methods
+  "Function resolver exposes native metadata and call helpers."
+  :cases (("name"     "name"     "")
+          ("toString" "toString" "function() { [native code] }"))
+  (key expected)
+  (let* ((fn  (lambda (&rest args) args))
+         (val (cl-cc/javascript::%js-resolve-function-method fn key))
+         ;; toString resolves to a callable method (f.toString() in JS);
+         ;; name resolves directly to its value.
+         (result (if (functionp val) (funcall val) val)))
+    (assert-equal expected result)))
+
+(deftest js-rt-resolve-function-length
+  "Function resolver returns 0 for the synthetic length property."
+  (let* ((fn  (lambda (&rest args) args))
+         (val (cl-cc/javascript::%js-resolve-function-method fn "length")))
+    (assert-= 0 val)))
+
+(deftest js-rt-resolve-function-call-apply-bind
+  "Function resolver returns working call/apply/bind closures."
+  (let* ((seen nil)
+         (fn   (lambda (&rest args)
+                 (setf seen args)
+                 args))
+         (call (cl-cc/javascript::%js-resolve-function-method fn "call"))
+         (apply (cl-cc/javascript::%js-resolve-function-method fn "apply"))
+         (bind  (cl-cc/javascript::%js-resolve-function-method fn "bind"))
+         (bound (funcall bind "self" 1 2))
+         (call-result (funcall call "self" 3 4))
+         (apply-result (funcall apply "self" (%jr-arr 5 6)))
+         (bind-result (funcall bound 7 8)))
+    (assert-equal '("self" 3 4) call-result)
+    (assert-equal '("self" 5 6) apply-result)
+    (assert-equal '("self" 1 2 7 8) bind-result)
+    (assert-equal '("self" 1 2 7 8) seen)))
+
+(deftest js-rt-resolve-symbol-description
+  "Symbol resolver exposes the description property."
+  (let* ((sym (cl-cc/javascript::%js-make-symbol "label"))
+         (val (cl-cc/javascript::%js-resolve-symbol-method sym "description")))
+    (assert-string= "label" val)))
+
+(deftest js-rt-resolve-method-dispatch-fallback
+  "Method dispatcher returns +js-undefined+ for unsupported values."
+  (assert-eq cl-cc/javascript::+js-undefined+
+             (cl-cc/javascript::%js-resolve-method (list 1 2) "anything")))
 
 (deftest-each js-rt-resolve-typed-array-props
   "TypedArray resolver returns numeric properties from struct slots."

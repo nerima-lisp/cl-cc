@@ -39,12 +39,15 @@ yield, await, import()."
       ((eq type :T-STRING)
        (multiple-value-bind (tok rest) (js-consume stream)
          (values (make-ast-quote :value (js-tok-value tok)) rest)))
-      ;; Regex literal
+      ;; Regex literal — token value is (:regex pattern-string flags-string);
+      ;; %js-make-regex takes (pattern &optional flags) as separate strings.
       ((eq type :T-REGEX)
        (multiple-value-bind (tok rest) (js-consume stream)
-         (values (%js-call '%js-make-regex
-                           (make-ast-quote :value (js-tok-value tok)))
-                 rest)))
+         (let ((v (js-tok-value tok)))
+           (values (%js-call '%js-make-regex
+                             (make-ast-quote :value (second v))
+                             (make-ast-quote :value (third v)))
+                   rest))))
       ;; Template literal
       ((or (eq type :T-TEMPLATE-START)
            (eq type :T-TEMPLATE-PARTS))

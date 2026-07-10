@@ -26,19 +26,43 @@
                (member name (cdr decl) :test #'eq)))
         declarations))
 
+(defun %ast-transparent-designator-node (node)
+  "Return NODE with transparent ast-the wrappers removed."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node)))
+  node)
+
+(defun %ast-call-designator-name-p (func fn-name)
+  "True when FUNC names FN-NAME, ignoring ast-the wrappers."
+  (setf func (%ast-transparent-designator-node func))
+  (or (and (symbolp func)        (string= (symbol-name func) fn-name))
+      (and (typep func 'ast-var) (string= (symbol-name (ast-var-name func)) fn-name))
+      (and (typep func 'ast-function)
+           (string= (symbol-name (ast-function-name func)) fn-name))))
+
+(defun %ast-callable-binding-name-p (func binding-name)
+  "True when FUNC names BINDING-NAME, ignoring ast-the wrappers."
+  (setf func (%ast-transparent-designator-node func))
+  (or (and (symbolp func)        (eq func binding-name))
+      (and (typep func 'ast-var) (eq (ast-var-name func) binding-name))
+      (and (typep func 'ast-function)
+           (eq (ast-function-name func) binding-name))))
+
 (defun %ast-call-named-p (node fn-name nargs)
   "True if NODE is an ast-call to a function named FN-NAME with exactly NARGS arguments.
-FN-NAME is compared case-insensitively via SYMBOL-NAME so both symbol and ast-var funcs match."
+FN-NAME is compared case-insensitively via SYMBOL-NAME so symbol, ast-var, and ast-function funcs match."
   (and (typep node 'ast-call)
        (= (length (ast-call-args node)) nargs)
-       (let ((func (ast-call-func node)))
-         (or (and (symbolp func)        (string= (symbol-name func) fn-name))
-             (and (typep func 'ast-var) (string= (symbol-name (ast-var-name func)) fn-name))))))
+       (%ast-call-designator-name-p (ast-call-func node) fn-name)))
 
 (defun %ast-cons-call-p (node)
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node)))
   (%ast-call-named-p node "CONS" 2))
 
 (defun %ast-make-array-call-p (node)
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node)))
   (%ast-call-named-p node "MAKE-ARRAY" 1))
 
 (defun %ast-make-array-int-call-p (node)
@@ -51,22 +75,24 @@ Currently accepts either:
 - (make-array <int>)
 - (make-array <int> :element-type '<symbol>)
 and rejects other keyword shapes conservatively."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node)))
   (and (typep node 'ast-call)
        (let ((func (ast-call-func node))
              (args (ast-call-args node)))
-         (and (or (and (symbolp func) (string= (symbol-name func) "MAKE-ARRAY"))
-                  (and (typep func 'ast-var)
-                       (string= (symbol-name (ast-var-name func)) "MAKE-ARRAY")))
+         (and (%ast-call-designator-name-p func "MAKE-ARRAY")
               (consp args)
               (typep (first args) 'ast-int)
               (let ((tail (rest args)))
                 (or (null tail)
                     (and (= (length tail) 2)
-                         (typep (first tail) 'ast-var)
-                         (eq (ast-var-name (first tail)) :element-type)
-                         (or (typep (second tail) 'ast-quote)
-                             (and (typep (second tail) 'ast-var)
-                                  (keywordp (ast-var-name (second tail))))))))))))
+                         (let ((keyword-node (%ast-transparent-designator-node (first tail)))
+                               (value-node (%ast-transparent-designator-node (second tail))))
+                           (and (typep keyword-node 'ast-var)
+                                (eq (ast-var-name keyword-node) :element-type)
+                                (or (typep value-node 'ast-quote)
+                                    (and (typep value-node 'ast-var)
+                                         (keywordp (ast-var-name value-node)))))))))))))
 
 (defun %binding-mentioned-in-body-p (body-forms binding-name)
   (and (listp body-forms)
@@ -136,6 +162,7 @@ and rejects other keyword shapes conservatively."
        (%array-binding-static-access-p (%sink-if-branch-body if-node branch) name nil)))
 
 (defun %sink-if-instance-candidate-p (expr if-node branch name then-uses else-uses)
+  (setf expr (%ast-transparent-designator-node expr))
   (and (typep expr 'ast-make-instance)
        (%sink-if-branch-uses-p then-uses else-uses branch)
        (%instance-binding-static-slot-only-p (%sink-if-branch-body if-node branch)

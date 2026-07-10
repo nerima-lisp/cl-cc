@@ -90,17 +90,26 @@ Saves and restores call stack around the sub-invocation."
         (when (funcall (symbol-function (car entry)) value)
           (return (funcall (symbol-function (cdr entry)) value))))))
 
+(defun %vm-callable-registry-entry-p (entry)
+  "Return T when ENTRY is a registry value that can be invoked directly."
+  (or (vm-forward-reference-cell-p entry)
+      (%vm-closure-object-p entry)
+      (vm-generic-function-p entry)
+      (vm-continuation-p entry)
+      (functionp entry)))
+
 (defun %resolve-symbol-function-designator (state value)
-  "Resolve symbol VALUE through the VM function registry or host bridge." 
+  "Resolve symbol VALUE through the host bridge or VM function registry."
   (let* ((registry (ignore-errors (vm-function-registry state)))
          (entry (and registry (gethash value registry))))
     (cond
+      ((vm-bridge-callable value)
+       (vm-bridge-callable value))
       ((vm-forward-reference-cell-p entry)
        (or (vm-forward-reference-cell-ref entry)
            (error "Unresolved forward reference: ~S" value)))
-      (entry entry)
-      ((vm-bridge-callable value)
-       (vm-bridge-callable value))
+      ((%vm-callable-registry-entry-p entry)
+       entry)
       (t (error "Undefined function: ~S" value)))))
 
 (defun vm-resolve-function (state value)
@@ -288,6 +297,27 @@ Restores captured environment, then handles required, &optional, &rest, and &key
     (when (plusp (length captured-vals))
       (setf (vm-closure-env state) closure)))))
 
+(defun %vm-php-array-values-list (array)
+  "Return PHP ARRAY values in insertion order when the PHP runtime is loaded."
+  (let ((package (find-package :cl-cc/php)))
+    (when package
+      (multiple-value-bind (values-symbol status)
+          (find-symbol "%PHP-ARRAY-VALUES-LIST" package)
+        (declare (ignore status))
+        (when (and values-symbol (fboundp values-symbol))
+          (return-from %vm-php-array-values-list
+            (funcall (symbol-function values-symbol) array)))
+        (multiple-value-bind (order-symbol order-status)
+            (find-symbol "+PHP-ARRAY-ORDER-KEY+" package)
+          (declare (ignore order-status))
+          (when order-symbol
+            (let ((order-key (symbol-value order-symbol)))
+              (let ((order (gethash order-key array)))
+                (when order
+                  (return-from %vm-php-array-values-list
+                    (loop for key in order
+                          collect (gethash key array))))))))))))
+
 (defun vm-list-to-lisp-list (state value)
   "Convert a VM list (possibly using vm-cons-cell heap objects) to a Lisp list."
   (typecase value
@@ -296,15 +326,21 @@ Restores captured environment, then handles required, &optional, &rest, and &key
     (vm-cons-cell
      (cons (vm-cons-cell-car value)
            (vm-list-to-lisp-list state (vm-cons-cell-cdr value))))
-    (integer
-     ;; Could be a heap address or managed cons pointer (NaN-boxed)
-     (let ((obj (vm-heap-get state value)))
-       (if (typep obj 'vm-cons-cell)
-           (cons (vm-cons-cell-car obj)
-                 (vm-list-to-lisp-list state (vm-cons-cell-cdr obj)))
-           ;; Check for managed cons pointer (loaded after this file)
-           (if (and (fboundp 'cl-cc/vm::%vm-managed-cons-pointer-p)
-                    (cl-cc/vm::%vm-managed-cons-pointer-p value))
-               (cl-cc/vm::%vm-managed-tree-materialize state value)
-               (list value)))))
-    (t (list value))))
+    (hash-table
+     (let ((values (%vm-php-array-values-list value)))
+       (cond
+         (values values)
+         ((zerop (hash-table-count value)) nil)
+         (t (list value)))))
+    (t
+     (let ((atom (%vm-list-structure-materialize state value)))
+       (cond
+         ((listp atom) atom)
+         ((hash-table-p atom)
+          (let ((values (%vm-php-array-values-list atom)))
+            (cond
+              (values values)
+              ((zerop (hash-table-count atom)) nil)
+              (t (list atom)))))
+         (t
+          (list atom)))))))

@@ -79,7 +79,6 @@
           cl-cc:vm-closure-object
           cl-cc:vm-closure-entry-label
           cl-cc:vm-closure-params
-          cl-cc:vm-closure-captured-values
           ;; VM Instruction classes
           cl-cc:vm-instruction
           cl-cc:vm-const
@@ -188,9 +187,9 @@
           cl-cc:instruction->sexp
           cl-cc:sexp->instruction
           ;; Prolog
-          cl-cc:unify
-          cl-cc:logic-substitute
-          cl-cc:logic-var-p
+          cl-cc/prolog:unify
+          cl-cc/prolog:logic-substitute
+          cl-cc/prolog:logic-var-p
           ;; CLOS AST
           cl-cc:ast-defclass
           cl-cc:ast-defclass-name

@@ -2,6 +2,18 @@
 
 All notable changes to cl-cc will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Linux build: removed bogus `(require :sb-alien)` (SB-ALIEN is SBCL core, not a contrib); this had broken `cl-cc-runtime` and every dependent system in the Nix sandbox on Linux
+- Benchmark CI: `nix run .#benchmarks` no longer forces recompilation into the read-only Nix store
+- Tracked 46 refactor-split source files that were missing from the Nix build
+
+### Added
+
+- OSS governance: LICENSE (MIT), SECURITY.md, CODE_OF_CONDUCT.md, GitHub issue/PR templates, README badges
+
 ## [0.1.0] — Initial Release
 
 ### Compiler Core

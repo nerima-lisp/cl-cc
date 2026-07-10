@@ -47,7 +47,8 @@
                      (mapcar (lambda (phi)
                                (make-ssa-phi :dst (phi-dst phi)
                                              :args (%ssa-rewrite-phi-args phi replacements)
-                                             :reg (phi-reg phi)))
+                                             :reg (phi-reg phi)
+                                             :kind (phi-kind phi)))
                              phis)))
              phi-map)
     new-map))
@@ -112,7 +113,8 @@ located in predecessor block P, replace B with that phi's argument for P."
                          (phi-args phi))))
                   (make-ssa-phi :dst (phi-dst phi)
                                 :args new-args
-                                :reg (phi-reg phi))))
+                                :reg (phi-reg phi)
+                                :kind (phi-kind phi))))
               phis)))
      phi-map)
     (values new-map changed)))
@@ -142,6 +144,7 @@ located in predecessor block P, replace B with that phi's argument for P."
                                 (first (car resolved-args)))
                            (when (and first
                                       (every (lambda (arg) (eq arg first)) (cdr resolved-args))
+                                      (not (eq (phi-kind phi) :lcssa))
                                       (not (eq (phi-dst phi) first)))
                              (unless (eq (gethash (phi-dst phi) replacements) first)
                                (setf (gethash (phi-dst phi) replacements) first

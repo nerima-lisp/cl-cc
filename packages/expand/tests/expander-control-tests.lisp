@@ -29,6 +29,14 @@
          (str (format nil "~S" result)))
     (assert-true (search "1" str))))
 
+(deftest expand-macrolet-form-binds-environment
+  "expand-macrolet-form binds &environment for local macros."
+  (let* ((result (cl-cc/expand::expand-macrolet-form
+                  '((probe (&environment env) (if env :has-env :no-env)))
+                  '((probe))))
+         (str (format nil "~S" result)))
+    (assert-true (search ":HAS-ENV" str))))
+
 (deftest expand-macrolet-form-body-is-progn
   "expand-macrolet-form with multiple body forms wraps in progn."
   (let ((result (cl-cc/expand::expand-macrolet-form

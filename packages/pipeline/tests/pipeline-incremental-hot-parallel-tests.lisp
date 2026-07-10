@@ -72,21 +72,29 @@
 
 (deftest pipeline-hot-reload-entry-swaps-after-quiescence
   "FR-641 swaps hot-reload entries only after active executions drain."
-  (let* ((entry (cl-cc/pipeline:make-hot-reload-entry 'f (lambda () :old)))
+  (let* ((entered (sb-thread:make-semaphore :count 0))
+         (release (sb-thread:make-semaphore :count 0))
+         (entry (cl-cc/pipeline:make-hot-reload-entry
+                 'f
+                 (lambda ()
+                   (sb-thread:signal-semaphore entered)
+                   (sb-thread:wait-on-semaphore release)
+                   :old)))
          (done nil))
-    (sb-thread:with-mutex ((cl-cc/pipeline::hot-reload-entry-lock entry))
-      (setf (cl-cc/pipeline::hot-reload-entry-active-count entry) 1))
-    (let ((thread (sb-thread:make-thread
+    (let ((caller (sb-thread:make-thread
                    (lambda ()
-                     (cl-cc/pipeline:hot-reload-swap entry (lambda () :new))
-                     (setf done t)))))
-      (cl:sleep 0.02)
-      (assert-false done)
-      (sb-thread:with-mutex ((cl-cc/pipeline::hot-reload-entry-lock entry))
-        (setf (cl-cc/pipeline::hot-reload-entry-active-count entry) 0))
-      (sb-thread:join-thread thread)
-      (assert-true done)
-      (assert-eq :new (cl-cc/pipeline:hot-reload-call entry)))))
+                     (assert-eq :old (cl-cc/pipeline:hot-reload-call entry))))))
+      (sb-thread:wait-on-semaphore entered)
+      (let ((swapper (sb-thread:make-thread
+                      (lambda ()
+                        (cl-cc/pipeline:hot-reload-swap entry (lambda () :new))
+                        (setf done t)))))
+        (assert-false done)
+        (sb-thread:signal-semaphore release)
+        (sb-thread:join-thread caller)
+        (sb-thread:join-thread swapper)
+        (assert-true done)
+        (assert-eq :new (cl-cc/pipeline:hot-reload-call entry))))))
 
 (deftest pipeline-parallel-respects-dependency-waves
   "FR-632 compiles dependency-free files in worker waves before dependents."

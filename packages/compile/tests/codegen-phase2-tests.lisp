@@ -115,6 +115,19 @@
     (compile-ast (make-ast-call :func 'make-array :args args) ctx)
     (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))))
 
+(deftest codegen-phase2-make-array-the-wrapped-initial-contents-lowers
+  "MAKE-ARRAY lowers ast-the-wrapped initial-contents and emits vm-aset for each element."
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'make-array
+                                :args (list (make-ast-int :value 3)
+                                            (make-ast-var :name :initial-contents)
+                                            (make-ast-the
+                                             :type 'list
+                                             :value (make-ast-quote :value '(1 2 3)))))
+                 ctx)
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
+    (assert-= 3 (codegen-count-inst ctx 'cl-cc/vm::vm-aset))))
+
 ;;; ─── Section 4: MAKE-ADJUSTABLE-VECTOR ─────────────────────────────────────
 
 (deftest codegen-phase2-make-adjustable-vector-compilation
@@ -153,6 +166,19 @@
       (assert-true inst)
       (assert-eq type-sym (cl-cc::vm-typep-type-name inst)))))
 
+(deftest codegen-phase2-typep-the-wrapped-quoted-type-emits-vm-typep
+  "Compiling (typep x (the type-specifier 'TYPE)) still emits vm-typep."
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'typep
+                                :args (list (make-ast-int :value 42)
+                                            (make-ast-the
+                                             :type 'type-specifier
+                                             :value (make-ast-quote :value 'string))))
+                 ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))
+      (assert-true inst)
+      (assert-eq 'string (cl-cc::vm-typep-type-name inst)))))
+
 (deftest codegen-phase2-typep-unquoted-falls-through
   "Compiling (typep x integer) with unquoted type does not emit vm-typep."
   (let ((ctx (make-codegen-ctx)))
@@ -162,6 +188,49 @@
                                             (make-ast-var :name 'integer)))
                  ctx)
     (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))))
+
+;;; ─── Section 6: RT-SLOT-SET / MAKE-STRING / SET-FDEFINITION ───────────────
+
+(deftest codegen-phase2-rt-slot-set-the-wrapped-slot-name-lowers
+  "RT-SLOT-SET lowers ast-the-wrapped quoted slot names to vm-slot-write."
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'rt-slot-set
+                                :args (list (make-ast-int :value 0)
+                                            (make-ast-the
+                                             :type 'symbol
+                                             :value (make-ast-quote :value 'slot-name))
+                                            (make-ast-int :value 99)))
+                 ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write)))
+      (assert-true inst)
+      (assert-eq 'slot-name (cl-cc::vm-slot-name-sym inst)))))
+
+(deftest codegen-phase2-make-string-the-wrapped-initial-element-lowers
+  "Compiling (make-string n :initial-element (the character #\\x)) still emits vm-make-string with a char slot."
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'make-string
+                                :args (list (make-ast-int :value 5)
+                                            (make-ast-var :name :initial-element)
+                                            (make-ast-the
+                                             :type 'character
+                                             :value (make-ast-quote :value #\x))))
+                 ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-string)))
+      (assert-true inst)
+      (assert-true (cl-cc::vm-make-string-char inst)))))
+
+(deftest codegen-phase2-set-fdefinition-the-wrapped-symbol-registers-function
+  "SET-FDEFINITION treats ast-the-wrapped quoted symbols as static function names."
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'set-fdefinition
+                                :args (list (make-ast-function :name 'helper)
+                                            (make-ast-the
+                                             :type 'symbol
+                                             :value (make-ast-quote :value 'helper))))
+                 ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-register-function)))
+      (assert-true inst)
+      (assert-eq 'helper (cl-cc::vm-func-name inst)))))
 
 ;;; ─── Section 6: FORMAT ──────────────────────────────────────────────────────
 

@@ -112,6 +112,20 @@
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
     (assert-true (keywordp reg))))
 
+(deftest codegen-mv-call-the-wrapped-function-keeps-direct-call
+  "multiple-value-call treats ast-the-wrapped function designators transparently."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-call
+                             :func (make-ast-the
+                                    :type 'function
+                                    :value (make-ast-function :name 'list))
+                             :args nil)
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list))
+    (assert-true (keywordp reg))))
+
 (deftest codegen-mv-call-run-cases
   "multiple-value-call spreads values to lambda; spreads to cons producing dotted pair."
   (assert-run= 3

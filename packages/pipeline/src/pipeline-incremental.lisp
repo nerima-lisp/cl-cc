@@ -162,21 +162,25 @@ successful compilation. Writes the hash and dependency sidecar files."
   "FR-641: Lock-protected hot-reloadable function entry.
 NAME is a debug identifier; FN is the current function implementation.
 The LOCK protects SWAP operations; ACTIVE-COUNT tracks concurrent callers
-to prevent swapping during execution."
+to prevent swapping during execution. WAITQUEUE lets swap wait for an exact
+notification when active callers drain."
   (name        nil :type symbol :read-only t)
   (fn          nil :type function)
   (lock        (sb-thread:make-mutex :name (format nil "hot-reload ~A" name))
                :type sb-thread:mutex :read-only t)
+  (waitqueue   (sb-thread:make-waitqueue) :read-only t)
   (active-count 0 :type fixnum))
 
 (defun hot-reload-swap (entry new-fn)
   "FR-641: Atomically swap the function in ENTRY to NEW-FN.
 Blocks until no active callers are using the entry (active-count = 0).
 Returns the old function."
-  ;; Poll with yield until all active callers drain
-  (loop while (plusp (hot-reload-entry-active-count entry))
-        do (sleep 0.001))
   (sb-thread:with-mutex ((hot-reload-entry-lock entry))
+    ;; Wait on a condition variable instead of polling so callers wake up
+    ;; immediately when the active count drains to zero.
+    (loop while (plusp (hot-reload-entry-active-count entry))
+          do (sb-thread:condition-wait (hot-reload-entry-waitqueue entry)
+                                       (hot-reload-entry-lock entry)))
     (let ((old (hot-reload-entry-fn entry)))
       (setf (hot-reload-entry-fn entry) new-fn)
       old)))
@@ -190,4 +194,6 @@ Returns whatever the function returns."
   (unwind-protect
        (funcall (hot-reload-entry-fn entry))
     (sb-thread:with-mutex ((hot-reload-entry-lock entry))
-      (decf (hot-reload-entry-active-count entry)))))
+      (decf (hot-reload-entry-active-count entry))
+      (when (zerop (hot-reload-entry-active-count entry))
+        (sb-thread:condition-broadcast (hot-reload-entry-waitqueue entry))))))

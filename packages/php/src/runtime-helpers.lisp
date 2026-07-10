@@ -28,7 +28,7 @@
   (eq x +php-null+))
 
 (defun %php-current-closure ()
-  "Return the currently executing PHP Closure, or PHP null outside a closure."
+  "Return the currently executing PHP Closure or signal PHP Error outside one."
   (let ((state cl-cc/vm:*vm-state*))
     (if state
         (let* ((depth (length (cl-cc/vm:vm-call-stack state)))
@@ -43,165 +43,19 @@
                               (cl-cc/vm::%vm-closure-object-p closure)
                               (not (and (consp tag) (eq (car tag) :known-function))))
                       return closure)
-              +php-null+))
-        +php-null+)))
+              (%php-throw 'error "Current function is not a closure.")))
+        (%php-throw 'error "Current function is not a closure."))))
 
-;;; ─── Predefined constants ──────────────────────────────────────────────────
-;;; PHP magic/predefined constants (PHP_EOL, M_PI, STR_PAD_LEFT, SORT_*, ...)
-;;; are referenced bare, e.g. `echo PHP_EOL;` or
-;;; `str_pad($s, 3, "0", STR_PAD_LEFT)`. The parser (php-parse-primary)
-;;; consults this table and lowers a hit to a literal; a miss stays an ast-var
-;;; so user define()/const values still resolve at runtime.
-(defparameter +php-nl-langinfo-items+
-  '(("CODESET" 1 "UTF-8")
-    ("ABDAY_1" 2 "Sun") ("ABDAY_2" 3 "Mon") ("ABDAY_3" 4 "Tue")
-    ("ABDAY_4" 5 "Wed") ("ABDAY_5" 6 "Thu") ("ABDAY_6" 7 "Fri")
-    ("ABDAY_7" 8 "Sat")
-    ("DAY_1" 9 "Sunday") ("DAY_2" 10 "Monday") ("DAY_3" 11 "Tuesday")
-    ("DAY_4" 12 "Wednesday") ("DAY_5" 13 "Thursday")
-    ("DAY_6" 14 "Friday") ("DAY_7" 15 "Saturday")
-    ("ABMON_1" 16 "Jan") ("ABMON_2" 17 "Feb") ("ABMON_3" 18 "Mar")
-    ("ABMON_4" 19 "Apr") ("ABMON_5" 20 "May") ("ABMON_6" 21 "Jun")
-    ("ABMON_7" 22 "Jul") ("ABMON_8" 23 "Aug") ("ABMON_9" 24 "Sep")
-    ("ABMON_10" 25 "Oct") ("ABMON_11" 26 "Nov") ("ABMON_12" 27 "Dec")
-    ("MON_1" 28 "January") ("MON_2" 29 "February") ("MON_3" 30 "March")
-    ("MON_4" 31 "April") ("MON_5" 32 "May") ("MON_6" 33 "June")
-    ("MON_7" 34 "July") ("MON_8" 35 "August") ("MON_9" 36 "September")
-    ("MON_10" 37 "October") ("MON_11" 38 "November") ("MON_12" 39 "December")
-    ("AM_STR" 40 "AM") ("PM_STR" 41 "PM")
-    ("D_T_FMT" 42 "%a %b %e %H:%M:%S %Y")
-    ("D_FMT" 43 "%m/%d/%y")
-    ("T_FMT" 44 "%H:%M:%S")
-    ("T_FMT_AMPM" 45 "%I:%M:%S %p")
-    ("ERA" 46 "") ("ERA_D_T_FMT" 47 "") ("ERA_D_FMT" 48 "")
-    ("ERA_T_FMT" 49 "") ("ALT_DIGITS" 50 "")
-    ("YESEXPR" 51 "^[yY]") ("NOEXPR" 52 "^[nN]")
-    ("YESSTR" 53 "") ("NOSTR" 54 "")
-    ("CRNCYSTR" 55 "") ("RADIXCHAR" 56 ".") ("THOUSEP" 57 ","))
-  "Deterministic nl_langinfo item table used by PHP constants and runtime.")
-
-(defparameter *php-predefined-constants*
-  (let ((h (make-hash-table :test #'equal)))
-    (flet ((c (name value) (setf (gethash name h) value)))
-      ;; core
-      (c "PHP_EOL" (string #\Newline))
-      (c "PHP_INT_MAX" 9223372036854775807)
-      (c "PHP_INT_MIN" -9223372036854775808)
-      (c "PHP_INT_SIZE" 8)
-      (c "PHP_FLOAT_MAX" most-positive-double-float)
-      (c "PHP_FLOAT_MIN" least-positive-normalized-double-float)
-      (c "PHP_FLOAT_EPSILON" 2.220446049250313d-16)
-      (c "PHP_FLOAT_DIG" 15)
-      (c "PHP_VERSION" "8.5.0")
-      (c "PHP_VERSION_ID" 80500)
-      (c "PHP_MAJOR_VERSION" 8)
-      (c "PHP_MINOR_VERSION" 5)
-      (c "PHP_RELEASE_VERSION" 0)
-      (c "PHP_BUILD_DATE" "1970-01-01T00:00:00+00:00")
-      (c "PHP_BUILD_PROVIDER" "cl-cc")
-      (c "PHP_OS" "Linux")
-      (c "PHP_OS_FAMILY" "Linux")
-      (c "PHP_MAXPATHLEN" 4096)
-      (c "PHP_SAPI" "cli")
-      (c "DIRECTORY_SEPARATOR" "/")
-      (c "PATH_SEPARATOR" ":")
-      ;; math
-      (c "M_PI" pi)
-      (c "M_E" (exp 1.0d0))
-      (c "M_SQRT2" (sqrt 2.0d0))
-      (c "M_SQRT3" (sqrt 3.0d0))
-      (c "M_SQRT1_2" (/ 1.0d0 (sqrt 2.0d0)))
-      (c "M_2_SQRTPI" (/ 2.0d0 (sqrt pi)))
-      (c "M_1_PI" (/ 1.0d0 pi))
-      (c "M_2_PI" (/ 2.0d0 pi))
-      (c "M_PI_2" (/ pi 2))
-      (c "M_PI_4" (/ pi 4))
-      (c "M_LN2" (log 2.0d0))
-      (c "M_LN10" (log 10.0d0))
-      (c "M_LOG2E" (log (exp 1.0d0) 2.0d0))
-      (c "M_LOG10E" (log (exp 1.0d0) 10.0d0))
-      (c "M_EULER" 0.5772156649015329d0)
-      (c "INF" most-positive-double-float)
-      (c "NAN" most-positive-double-float)
-      ;; error reporting
-      (c "E_ALL" 32767) (c "E_ERROR" 1) (c "E_WARNING" 2) (c "E_NOTICE" 8)
-      (c "E_STRICT" 2048) (c "E_DEPRECATED" 8192) (c "E_USER_ERROR" 256)
-      (c "E_USER_WARNING" 512) (c "E_USER_NOTICE" 1024)
-      ;; sort
-      (c "SORT_REGULAR" 0) (c "SORT_NUMERIC" 1) (c "SORT_STRING" 2)
-      (c "SORT_DESC" 3) (c "SORT_ASC" 4) (c "SORT_NATURAL" 6) (c "SORT_FLAG_CASE" 8)
-      ;; count / array_filter
-      (c "COUNT_NORMAL" 0) (c "COUNT_RECURSIVE" 1)
-      (c "ARRAY_FILTER_USE_BOTH" 1) (c "ARRAY_FILTER_USE_KEY" 2)
-      ;; filter
-      (c "FILTER_DEFAULT" 516) (c "FILTER_UNSAFE_RAW" 516)
-      (c "FILTER_VALIDATE_INT" 257) (c "FILTER_VALIDATE_BOOLEAN" 258)
-      (c "FILTER_VALIDATE_FLOAT" 259)
-      (c "FILTER_VALIDATE_URL" 273) (c "FILTER_VALIDATE_EMAIL" 274)
-      (c "FILTER_NULL_ON_FAILURE" 134217728)
-      (c "FILTER_THROW_ON_FAILURE" 268435456)
-      ;; str_pad
-      (c "STR_PAD_RIGHT" 1) (c "STR_PAD_LEFT" 0) (c "STR_PAD_BOTH" 2)
-      ;; htmlspecialchars
-      (c "ENT_HTML401" 0) (c "ENT_QUOTES" 3) (c "ENT_COMPAT" 2)
-      (c "ENT_NOQUOTES" 0) (c "ENT_HTML5" 48)
-      ;; json
-      (c "JSON_PRETTY_PRINT" 128) (c "JSON_UNESCAPED_UNICODE" 256)
-      (c "JSON_UNESCAPED_SLASHES" 64) (c "JSON_THROW_ON_ERROR" 4194304)
-      (c "JSON_ERROR_NONE" 0) (c "JSON_HEX_TAG" 1)
-      ;; filesystem
-      (c "FILE_APPEND" 8) (c "FILE_USE_INCLUDE_PATH" 1)
-      (c "FILE_IGNORE_NEW_LINES" 2) (c "FILE_SKIP_EMPTY_LINES" 4)
-      (c "LOCK_SH" 1) (c "LOCK_EX" 2) (c "LOCK_UN" 3)
-      (c "SEEK_SET" 0) (c "SEEK_CUR" 1) (c "SEEK_END" 2)
-      ;; preg
-      (c "PREG_SPLIT_NO_EMPTY" 1) (c "PREG_SPLIT_DELIM_CAPTURE" 2)
-      (c "PREG_PATTERN_ORDER" 1) (c "PREG_SET_ORDER" 2) (c "PREG_OFFSET_CAPTURE" 256)
-      ;; round modes
-      (c "PHP_ROUND_HALF_UP" 1) (c "PHP_ROUND_HALF_DOWN" 2)
-      (c "PHP_ROUND_HALF_EVEN" 3) (c "PHP_ROUND_HALF_ODD" 4)
-      ;; locale / nl_langinfo
-      (dolist (item +php-nl-langinfo-items+)
-        (c (first item) (second item))))
-    h)
-  "Name (case-sensitive string) → value for PHP predefined constants.")
-
-(defparameter *php-dynamic-predefined-constants*
-  (let ((h (make-hash-table :test #'equal)))
-    (flet ((c (name helper) (setf (gethash name h) helper)))
-      (c "STDIN" '%php-stdin)
-      (c "STDOUT" '%php-stdout)
-      (c "STDERR" '%php-stderr))
-    h)
-  "Name (case-sensitive string) → zero-arg runtime helper symbol for dynamic PHP predefined constants.")
-
-(defun %php-lookup-dynamic-constant (name)
-  "Return (values HELPER T) when NAME is a dynamic predefined PHP constant,
-else (values NIL NIL)."
-  (multiple-value-bind (helper found) (gethash name *php-dynamic-predefined-constants*)
-    (if found
-        (values helper t)
-        (let ((sep (position (code-char 92) name :from-end t)))
-          (if sep
-              (gethash (subseq name (1+ sep)) *php-dynamic-predefined-constants*)
-              (values nil nil))))))
-
-(defun %php-lookup-constant (name)
-  "Return (values VALUE T) when NAME is a predefined PHP constant, else
-(values NIL NIL).  Tries NAME, then its unqualified tail (after the last \\) so
-\\PHP_EOL and NS\\PHP_EOL resolve to the global constant."
-  (multiple-value-bind (value found) (gethash name *php-predefined-constants*)
-    (if found
-        (values value t)
-        (let ((sep (position (code-char 92) name :from-end t)))
-          (if sep
-              (gethash (subseq name (1+ sep)) *php-predefined-constants*)
-              (values nil nil))))))
-
-(defun %php-array-empty-p (ht)
-  "Return true when PHP ordered array HT contains no user entries."
-  (check-type ht hash-table)
-  (null (gethash +php-array-order-key+ ht)))
+(defun %php-fatal-error (message)
+  "Emit a PHP fatal error message and optionally include a VM backtrace."
+  (format *error-output* "~&~A~%" message)
+  (let ((state cl-cc/vm:*vm-state*))
+    (when (and (%php-truthy (%php-ini-get "fatal_error_backtraces"))
+               state)
+      (cl-cc/vm:vm-print-backtrace state))
+    (error 'cl-cc/vm:vm-fatal-error
+           :message message
+           :print-backtrace-p nil)))
 
 (defun %php-object-table-p (x)
   "Return true when X is a PHP object represented as a property table."
@@ -529,6 +383,7 @@ lists get sequential integer keys 0,1,2,..."
         ((and (integerp value) (zerop value)) nil)
         ((and (floatp value) (zerop value)) nil)
         ((and (stringp value) (or (string= value "") (string= value "0"))) nil)
+        ((%php-object-table-p value) t)
         ((and (hash-table-p value) (%php-array-empty-p value)) nil)
         (t t)))
 
@@ -640,62 +495,6 @@ rational (10 / 4 -> 5/2, printed \"5/2\")."
 (defun %php-neq-strict (a b)
   "PHP !== : the negation of strict equality."
   (not (%php-eq-strict a b)))
-
-(defun %php-make-array ()
-  "Create an empty PHP ordered array."
-  (let ((ht (make-hash-table :test #'equal)))
-    (setf (gethash +php-array-order-key+ ht) nil
-          (gethash +php-array-next-index-key+ ht) 0)
-    ht))
-
-(defun %php-array-key-present-p (array key)
-  "Return true when ARRAY already contains PHP array KEY."
-  (nth-value 1 (gethash key array)))
-
-(defun %php-array-append-order-key (array key)
-  "Record KEY at the end of ARRAY's insertion-order list."
-  (let ((order (gethash +php-array-order-key+ array)))
-    (setf (gethash +php-array-order-key+ array) (append order (list key)))))
-
-(defun %php-array-advance-next-index (array key)
-  "Advance ARRAY's next auto index if KEY is a non-negative integer."
-  (when (and (integerp key) (>= key 0))
-    (let ((candidate (1+ key))
-          (next-index (gethash +php-array-next-index-key+ array)))
-      (when (> candidate next-index)
-        (setf (gethash +php-array-next-index-key+ array) candidate)))))
-
-(defun %php-array-set (arr key value)
-  "Set ARR[KEY] to VALUE, preserving PHP insertion order.
-
-Duplicate keys overwrite their value without changing their original position.
-Integer keys greater than or equal to the current auto-index advance the next
-auto-increment index to one greater than the key."
-  (check-type arr hash-table)
-  (unless (%php-array-key-present-p arr key)
-    (%php-array-append-order-key arr key))
-  (setf (gethash key arr) value)
-  (%php-array-advance-next-index arr key)
-  value)
-
-(defun %php-array-ref (arr key)
-  "Return ARR[KEY] for a PHP ordered array helper hash-table."
-  (check-type arr hash-table)
-  (multiple-value-bind (value present-p) (gethash key arr)
-    (if present-p value +php-null+)))
-
-(defun %php-array-unset (arr key)
-  "Delete ARR[KEY] from a PHP ordered array and preserve insertion order."
-  (check-type arr hash-table)
-  (remhash key arr)
-  (setf (gethash +php-array-order-key+ arr)
-        (remove key (gethash +php-array-order-key+ arr) :test #'equal))
-  +php-null+)
-
-(defun %php-count (arr)
-  "Return the number of entries in PHP ordered array ARR."
-  (check-type arr hash-table)
-  (length (gethash +php-array-order-key+ arr)))
 
 (defun %php-strlen (s)
   "Return the length of string S."
@@ -813,55 +612,6 @@ an integer (3.0 -> \"3\").  princ-to-string leaked the CL form: \"1.5d0\", \"5/2
   "Return true when symbol VAR is bound."
   (check-type var symbol)
   (boundp var))
-
-(defun %php-array-key-exists (arr key)
-  "Return true when KEY exists in PHP ordered array ARR."
-  (check-type arr hash-table)
-  (member key (gethash +php-array-order-key+ arr) :test #'equal))
-
-(defun %php-array-next-auto-index (array)
-  "Return and reserve ARRAY's current PHP auto-increment index."
-  (let ((index (gethash +php-array-next-index-key+ array)))
-    (setf (gethash +php-array-next-index-key+ array) (1+ index))
-    index))
-
-(defun %php-spread (array)
-  "Wrap ARRAY in a spread marker for %php-array to splice in.  Lowered from
-[...$a] inside an array literal.  (In a CALL, ...$a is rewritten before runtime,
-so this is only reached for array-literal spreads.)"
-  (cons :__php-spread__ array))
-
-(defun %php-spread-marker-p (x)
-  "True when X is a %php-spread marker."
-  (and (consp x) (eq (car x) :__php-spread__)))
-
-(defun %php-array (&rest entries)
-  "Construct a PHP ordered array from flat entry descriptors.
-
-Each entry descriptor is a list of the form (KEY-PRESENT-P KEY VALUE). When
-KEY-PRESENT-P is false, KEY is ignored and VALUE is inserted at the current
-auto-increment integer index. Explicit integer keys update the next auto-index
-to max(existing-next-index, key + 1), matching PHP array literal semantics.
-A VALUE that is a %php-spread marker ([...$a]) splices the wrapped array's
-elements in — integer keys re-indexed, string keys preserved (PHP 8.1)."
-  (let ((array (make-hash-table :test #'equal)))
-    (setf (gethash +php-array-order-key+ array) nil
-          (gethash +php-array-next-index-key+ array) 0)
-    (dolist (entry entries array)
-      (destructuring-bind (key-present-p key value) entry
-        (cond
-          ((%php-spread-marker-p value)
-           (let ((src (cdr value)))
-             (when (hash-table-p src)
-               (dolist (k (gethash +php-array-order-key+ src))
-                 (let ((v (gethash k src)))
-                   (if (integerp k)
-                       (%php-array-set array (%php-array-next-auto-index array) v)
-                       (%php-array-set array k v)))))))
-          (t
-           (%php-array-set array
-                           (if key-present-p key (%php-array-next-auto-index array))
-                           value)))))))
 
 (defun %php-enum-make-case (enum-name case-name value)
   "Create a PHP enum case singleton payload.  `name' and `value' are stored under

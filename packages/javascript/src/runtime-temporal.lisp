@@ -15,15 +15,35 @@
 (defun %temporal-now-unix-seconds ()
   (- (get-universal-time) (%temporal-epoch-offset)))
 
+(defun %temporal-normalize-number (n &optional (default 0))
+  "Normalize Temporal numeric fields before passing them to CL time primitives."
+  (if (numberp n)
+      (truncate n)
+      default))
+
 (defun %temporal-decode (unix-seconds)
   "Decode Unix seconds to (values sec min hour day month year dow)."
-  (let ((ut (+ unix-seconds (%temporal-epoch-offset))))
+  (let ((ut (+ (%temporal-normalize-number unix-seconds) (%temporal-epoch-offset))))
     (multiple-value-bind (s mn h d m y dow) (decode-universal-time ut 0)
       (values s mn h d m y dow))))
 
 (defun %temporal-encode (year month day &optional (hour 0) (min 0) (sec 0))
-  (- (encode-universal-time sec min hour day month year 0)
-     (%temporal-epoch-offset)))
+  (let ((y (%temporal-normalize-number year))
+        (mo (%temporal-normalize-number month))
+        (d (%temporal-normalize-number day))
+        (h (%temporal-normalize-number hour))
+        (mi (%temporal-normalize-number min))
+        (s (%temporal-normalize-number sec)))
+    ;; encode-universal-time raises out-of-range field errors via a hardware
+    ;; trap; on macOS 26.5 ARM64 trap delivery hangs the thread (SBCL
+    ;; runtime/OS regression), so reject invalid fields with a normal error
+    ;; that the parse-fallback handler-cases can catch.
+    (unless (and (<= 1900 y) (<= 1 mo 12) (<= 1 d 31)
+                 (<= 0 h 23) (<= 0 mi 59) (<= 0 s 59))
+      (error "invalid date-time fields: ~4,'0D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D"
+             y mo d h mi s))
+    (- (encode-universal-time s mi h d mo y 0)
+       (%temporal-epoch-offset))))
 
 (defun %temporal-pad (n width)
   (format nil "~v,'0D" width n))
@@ -104,7 +124,7 @@
      "month"      (coerce m 'double-float)
      "day"        (coerce d 'double-float)
      "calendarId" "iso8601"
-     "dayOfWeek"  (coerce (nth-value 6 (%temporal-decode (%temporal-encode y m d))) 'double-float)
+     "dayOfWeek"  (coerce (1+ (nth-value 6 (%temporal-decode (%temporal-encode y m d)))) 'double-float)
      "toString"   (lambda () (format nil "~A-~A-~A"
                                      (%temporal-pad y 4) (%temporal-pad m 2) (%temporal-pad d 2)))
      "toPlainDateTime" (lambda (&optional plain-time)
@@ -224,58 +244,9 @@
      "toPlainTime"  (lambda () (%js-temporal-plain-time h mn s))
      "toPlainDateTime" (lambda () (%js-temporal-plain-datetime y m d h mn s))
      "toInstant"    (lambda () (%js-temporal-instant (%temporal-encode y m d h mn s))))))
-
-;;; -----------------------------------------------------------------------
-;;;  Temporal.Duration
-;;; -----------------------------------------------------------------------
-
-;;; Seconds-per-unit table for %temporal-duration-to-seconds.
-(defparameter *%temporal-unit-seconds*
-  '(("years" . 31557600) ("months" . 2629800) ("weeks" . 604800)
-    ("days"  . 86400)    ("hours"  . 3600)    ("minutes" . 60) ("seconds" . 1))
-  "Alist mapping Temporal duration field names to their second equivalents.")
-
-(defun %temporal-duration-to-seconds (duration)
-  "Convert a Temporal.Duration to total seconds."
-  (if (%js-ht-p duration)
-      (loop for (key . scale) in *%temporal-unit-seconds*
-            sum (* (or (gethash key duration) 0) scale))
-      0))
-
-(defun %js-temporal-duration (&key (years 0) (months 0) (weeks 0) (days 0)
-                                    (hours 0) (minutes 0) (seconds 0)
-                                    (milliseconds 0) (microseconds 0) (nanoseconds 0))
-  (let ((y years) (mo months) (w weeks) (d days) (h hours) (mn minutes) (s seconds))
-    (declare (ignore milliseconds microseconds nanoseconds))
-    (%js-make-object
-     "__type__"   "Temporal.Duration"
-     "years"      (coerce y 'double-float)
-     "months"     (coerce mo 'double-float)
-     "weeks"      (coerce w 'double-float)
-     "days"       (coerce d 'double-float)
-     "hours"      (coerce h 'double-float)
-     "minutes"    (coerce mn 'double-float)
-     "seconds"    (coerce s 'double-float)
-     "milliseconds" 0.0d0
-     "microseconds" 0.0d0
-     "nanoseconds"  0.0d0
-     "sign"       (if (or (plusp y) (plusp mo) (plusp w) (plusp d) (plusp h) (plusp mn) (plusp s)) 1.0d0 -1.0d0)
-     "toString"   (lambda ()
-                    (format nil "P~AY~AM~AW~ADT~AH~AM~AS"
-                            y mo w d h mn s))
-     "abs"        (lambda () (%js-temporal-duration :years (abs y) :months (abs mo) :weeks (abs w)
-                                                    :days (abs d) :hours (abs h) :minutes (abs mn) :seconds (abs s)))
-     "negated"    (lambda () (%js-temporal-duration :years (- y) :months (- mo) :weeks (- w)
-                                                    :days (- d) :hours (- h) :minutes (- mn) :seconds (- s)))
-     "total"      (lambda (&optional opts)
-                    (declare (ignore opts))
-                    (coerce (%temporal-duration-to-seconds (%js-make-object
-                                                            "years" y "months" mo "weeks" w "days" d
-                                                            "hours" h "minutes" mn "seconds" s)) 'double-float)))))
-
-;;; -----------------------------------------------------------------------
-;;;  Temporal.PlainYearMonth / Temporal.PlainMonthDay
-;;; -----------------------------------------------------------------------
+;;; Temporal.Duration, Temporal.PlainYearMonth / Temporal.PlainMonthDay, and
+;;; parse helpers live in runtime-temporal-duration.lisp and
+;;; runtime-temporal-parse.lisp.
 
 (defun %js-temporal-plain-year-month (year month)
   (%js-make-object
@@ -291,31 +262,4 @@
    "day"      (coerce day 'double-float)
    "toString" (lambda () (format nil "--~A-~A" (%temporal-pad month 2) (%temporal-pad day 2)))))
 
-;;; -----------------------------------------------------------------------
-;;;  Parse helpers
-;;; -----------------------------------------------------------------------
-
-(defun %temporal-parse-iso-fields (s)
-  "Parse an ISO-8601 string S into (values year month day hour minute second).
-Fields beyond what S contains default to 0."
-  (flet ((field (start end) (if (>= (length s) end) (parse-integer s :start start :end end) 0)))
-    (values (field 0 4) (field 5 7) (field 8 10) (field 11 13) (field 14 16) (field 17 19))))
-
-(defun %js-temporal-parse-instant (str)
-  (handler-case
-      (multiple-value-bind (y mo d h mi s) (%temporal-parse-iso-fields (%js-to-string str))
-        (%js-temporal-instant (%temporal-encode y mo d h mi s)))
-    (error () (%js-temporal-instant (%temporal-now-unix-seconds)))))
-
-(defun %js-temporal-parse-plain-date (str)
-  (handler-case
-      (multiple-value-bind (y mo d) (%temporal-parse-iso-fields (%js-to-string str))
-        (%js-temporal-plain-date y mo d))
-    (error ()
-      (multiple-value-bind (s mn h d m y) (%temporal-decode (%temporal-now-unix-seconds))
-        (declare (ignore s mn h))
-        (%js-temporal-plain-date y m d)))))
-
-;;; -----------------------------------------------------------------------
-;;;  The Temporal global object
-;;; -----------------------------------------------------------------------
+;;; The Temporal global object lives in runtime-temporal-global.lisp.

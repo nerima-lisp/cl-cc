@@ -38,11 +38,35 @@
   "Return T when COUNT is eligible for FR-073 register multiple values."
   (and (integerp count) (<= 2 count 3)))
 
+(defun %transparent-apply-spread-arg (spread-arg)
+  "Return SPREAD-ARG with transparent AST-THE wrappers stripped."
+  (loop while (typep spread-arg 'ast-the)
+        do (setf spread-arg (ast-the-value spread-arg))
+        finally (return spread-arg)))
+
+(defun %transparent-callable-designator (node)
+  "Return NODE with transparent AST-THE wrappers stripped."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node))
+        finally (return node)))
+
+(defun %callable-designator-function-name (node)
+  "Return NODE's global function name when NODE names a static callable."
+  (let ((node (%transparent-callable-designator node)))
+    (cond
+      ((symbolp node) node)
+      ((typep node 'ast-function)
+       (let ((name (ast-function-name node)))
+         (and (symbolp name) name)))
+      ((typep node 'ast-quote)
+       (let ((value (ast-quote-value node)))
+         (and (symbolp value) value)))
+      (t nil))))
+
 (defun %call-function-symbol (call-node ctx)
   "Return the statically named function of CALL-NODE, or NIL for dynamic calls."
   (declare (ignore ctx))
-  (let ((func (ast-call-func call-node)))
-    (and (symbolp func) func)))
+  (%callable-designator-function-name (ast-call-func call-node)))
 
 (defun %static-small-values-arity (values-form ctx)
   "Return a known 2-3 value arity for VALUES-FORM, or NIL when unknown."
@@ -73,19 +97,6 @@
           (emit ctx (make-vm-mv-bind :dst-regs var-regs))
           var-regs))))
 
-(defun %resolve-apply-function-register (func-node ctx)
-  "Compile or resolve the function designator used by APPLY."
-  (cond
-    ((typep func-node 'ast-function)
-     (compile-ast func-node ctx))
-    ((and (typep func-node 'ast-quote)
-          (symbolp (ast-quote-value func-node)))
-     (%resolve-func-sym-reg (ast-quote-value func-node) ctx))
-    ((symbolp func-node)
-     (%resolve-func-sym-reg func-node ctx))
-    (t
-     (compile-ast func-node ctx))))
-
 (defun %apply-argument-plan (args)
   "Return a data plist describing APPLY's leading args and final spread arg."
   (labels ((walk (tail leading)
@@ -114,20 +125,20 @@ Reject dotted and circular lists so APPLY literal lowering stays conservative."
 
 (defun %literal-apply-spread-values (spread-arg)
   "Return (values T VALUES) when SPREAD-ARG is a quoted finite proper list."
-  (if (and spread-arg
+  (let ((spread-arg (%transparent-apply-spread-arg spread-arg)))
+    (if (and spread-arg
              (typep spread-arg 'ast-quote)
              (%proper-list-p (ast-quote-value spread-arg)))
-       (values t (ast-quote-value spread-arg))
-       (values nil nil)))
+        (values t (ast-quote-value spread-arg))
+        (values nil nil))))
 
 (defun %list-call-spread-function-name (spread-arg)
   "Return SPREAD-ARG's function name for a direct call node, or NIL."
-  (when (typep spread-arg 'ast-call)
-    (let ((func (ast-call-func spread-arg)))
-      (cond
-        ((symbolp func) func)
-        ((typep func 'ast-var) (ast-var-name func))
-        (t nil)))))
+  (let ((spread-arg (%transparent-apply-spread-arg spread-arg)))
+    (when (typep spread-arg 'ast-call)
+      (let ((func (%transparent-callable-designator (ast-call-func spread-arg))))
+        (or (%callable-designator-function-name func)
+            (and (typep func 'ast-var) (ast-var-name func)))))))
 
 (defun %list-call-apply-spread-forms (spread-arg ctx)
   "Return (values T FORMS) when SPREAD-ARG is a direct (LIST ...) call.
@@ -137,12 +148,12 @@ known element count, so callers may compile its element forms directly as flat
 call arguments and skip constructing then spreading a runtime list.  The
 optimization is valid only for the global CL:LIST meaning; local function
 bindings named LIST must continue through the dynamic apply path."
-  (if (and spread-arg
-            (typep spread-arg 'ast-call)
-            (eq (%list-call-spread-function-name spread-arg) 'list)
+  (let ((spread-arg (%transparent-apply-spread-arg spread-arg)))
+    (if (and spread-arg
+             (eq (%list-call-spread-function-name spread-arg) 'list)
             (not (%codegen-call-assoc 'list (ctx-env ctx))))
       (values t (ast-call-args spread-arg))
-      (values nil nil)))
+      (values nil nil))))
 
 (defun %apply-spread-plan (args ctx)
   "Return a plist describing APPLY's leading args and final spread arg.

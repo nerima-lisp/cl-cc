@@ -18,12 +18,66 @@
              (setf (symbol-function ',name) ,old)
              (fmakunbound ',name))))))
 
-(defun %copy-hash-table-shallow (table)
-  "Return a shallow copy of TABLE preserving its test function."
-  (let ((copy (make-hash-table :test (hash-table-test table)
-                               :size (hash-table-count table))))
-    (maphash (lambda (k v) (setf (gethash k copy) v)) table)
-    copy))
+(defmacro with-restored-binding ((place) &body body)
+  "Run BODY and restore PLACE to its original value afterward."
+  (let ((saved (gensym "SAVED")))
+    `(let ((,saved ,place))
+       (unwind-protect
+            (progn ,@body)
+         (setf ,place ,saved)))))
+
+(defmacro with-restored-bindings (bindings &body body)
+  "Run BODY while restoring each binding in BINDINGS afterward."
+  (labels ((normalize-binding (binding)
+             (if (consp binding)
+                 binding
+                 (list binding))))
+    (if bindings
+        `(with-restored-binding ,(normalize-binding (first bindings))
+           (with-restored-bindings ,(rest bindings)
+             ,@body))
+        `(progn ,@body))))
+
+(defmacro %with-preserved-env-var ((name) &body body)
+  "Run BODY while restoring environment variable NAME afterward."
+  (let ((saved (gensym "SAVED-ENV")))
+    `(let ((,saved (uiop:getenv ,name)))
+       (unwind-protect
+            (progn ,@body)
+         (if ,saved
+             (sb-posix:setenv ,name ,saved 1)
+             (sb-posix:unsetenv ,name))))))
+
+(defun %read-file-contents (path)
+  "Return PATH as a string."
+  (with-open-file (stream path :direction :input)
+    (let ((contents (make-string (file-length stream))))
+      (read-sequence contents stream)
+      contents)))
+
+(defun %read-file-lines (path)
+  "Return PATH as a list of lines."
+  (with-open-file (stream path :direction :input)
+    (loop for line = (read-line stream nil nil)
+          while line
+          collect line)))
+
+(defun %write-file-contents (path contents)
+  "Write CONTENTS to PATH."
+  (with-open-file (stream path
+                          :direction :output
+                          :if-exists :supersede
+                          :if-does-not-exist :create)
+    (write-string contents stream)))
+
+(defun %write-file-lines (path lines)
+  "Write LINES to PATH, one line per item."
+  (with-open-file (stream path
+                          :direction :output
+                          :if-exists :supersede
+                          :if-does-not-exist :create)
+    (dolist (line lines)
+      (write-line line stream))))
 
 (defun %copy-macro-environment ()
   "Return a fresh macro-env instance populated from the current global macro table."
@@ -33,7 +87,7 @@
     (maphash (lambda (k v) (setf (gethash k dst) v)) src)
     copy))
 
-(defun %snapshot-hash-table (table &key (copy-value #'identity))
+(defun %snapshot-hash-table (table &key (copy-value 'identity))
   "Return a fresh snapshot of TABLE, applying COPY-VALUE to every value."
   (let ((snapshot (make-hash-table :test (hash-table-test table)
                                    :size (hash-table-count table))))
@@ -42,31 +96,46 @@
              table)
     snapshot))
 
-(defun %restore-hash-table (target snapshot &key (copy-value #'identity))
+(defun %restore-hash-table (target snapshot &key (copy-value 'identity))
   "Replace TARGET contents with SNAPSHOT, applying COPY-VALUE during restore."
   (clrhash target)
   (maphash (lambda (k v)
              (setf (gethash k target) (funcall copy-value v)))
-            snapshot)
+           snapshot)
   target)
 
-(defmacro with-restored-hash-table ((place &key (copy-value #'identity)) &body body)
+(defun %copy-hash-table-shallow (table)
+  "Return a shallow copy of TABLE."
+  (%snapshot-hash-table table :copy-value #'identity))
+
+(defmacro with-restored-hash-table ((place &key (copy-value 'identity)) &body body)
   "Run BODY while restoring PLACE to its original contents afterward."
   (let ((table (gensym "TABLE"))
         (saved (gensym "SAVED")))
-    `(let* ((,table ,place)
-            (,saved (%snapshot-hash-table ,table :copy-value ,copy-value)))
-       (unwind-protect
-            (progn ,@body)
-         (%restore-hash-table ,table ,saved :copy-value ,copy-value)))))
+    (if (eq copy-value 'identity)
+        `(let* ((,table ,place)
+                (,saved (%snapshot-hash-table ,table :copy-value #'identity)))
+           (unwind-protect
+                (progn ,@body)
+             (%restore-hash-table ,table ,saved :copy-value #'identity)))
+        `(let* ((,table ,place)
+                (,saved (%snapshot-hash-table ,table :copy-value ,copy-value)))
+           (unwind-protect
+                (progn ,@body)
+             (%restore-hash-table ,table ,saved :copy-value ,copy-value))))))
 
-(defmacro with-cleared-hash-table ((place &key (copy-value #'identity)) &body body)
+(defmacro with-cleared-hash-table ((place &key (copy-value 'identity)) &body body)
   "Run BODY with PLACE cleared, restoring its prior contents afterward."
   (let ((table (gensym "TABLE")))
-    `(let ((,table ,place))
-       (with-restored-hash-table (,table :copy-value ,copy-value)
-         (clrhash ,table)
-         ,@body))))
+    (if (eq copy-value 'identity)
+        `(let ((,table ,place))
+           (with-restored-hash-table (,table :copy-value #'identity)
+             (clrhash ,table)
+             ,@body))
+        `(let ((,table ,place))
+           (with-restored-hash-table (,table :copy-value ,copy-value)
+             (clrhash ,table)
+             ,@body)))))
 
 ;;; ------------------------------------------------------------
 ;;; Global cache isolation fixtures
@@ -104,7 +173,7 @@ surface."
 
 (defmacro with-fresh-prolog (&body body)
   "Run BODY with an empty Prolog rule database and restore the prior state."
-  `(with-cleared-hash-table (cl-cc/prolog:*prolog-rules*)
+  `(with-cleared-hash-table (cl-cc/prolog::*prolog-rules*)
      ,@body))
 
 (defun make-test-vm ()

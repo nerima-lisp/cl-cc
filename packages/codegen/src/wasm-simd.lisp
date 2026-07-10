@@ -9,13 +9,8 @@
 (defvar *wasm-relaxed-simd-nan-warning-issued* nil)
 
 (defun wasm-simd128-emission-enabled-p ()
-  "Return true when SIMD128 emission is enabled.
-
-Both historical feature variables are honored: wasm-features.lisp exposes
-*WASM-SIMD128-ENABLED*, while wasm-emit-data.lisp and feature predicates use
-*WASM-SIMD-ENABLED*.  Treat either variable being NIL as disabling emission."
-  (and (if (boundp '*wasm-simd128-enabled*) *wasm-simd128-enabled* t)
-       (if (boundp '*wasm-simd-enabled*) *wasm-simd-enabled* t)))
+  "Return true when SIMD128 emission is enabled."
+  *wasm-simd128-enabled*)
 
 (defun wasm-relaxed-simd-emission-enabled-p ()
   "Return true when relaxed SIMD emission is enabled and strict NaN is off."

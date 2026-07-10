@@ -3,7 +3,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (shadow '(lisp-implementation-type lisp-implementation-version
             machine-type machine-version machine-instance
-            software-type software-version room apropos apropos-list)))
+            software-type software-version short-site-name long-site-name
+            room apropos apropos-list)))
 
 ;;; VM Heap Object Base Class
 
@@ -179,10 +180,8 @@ lazy byte retrieval."
                         :documentation "T when the &rest list may be stack-allocated")
     (captured-regs :initarg :captured-regs :initform #() :accessor vm-closure-captured-regs
                    :documentation "Captured lexical environment register names as a flat vector.")
-    (captured-vals :initarg :captured-vals :initform #() :accessor vm-closure-captured-vals
+   (captured-vals :initarg :captured-vals :initform #() :accessor vm-closure-captured-vals
                    :documentation "Captured lexical environment values as a flat vector parallel to CAPTURED-REGS.")
-    (captured-values :initarg :captured-values :initform nil :accessor %vm-closure-legacy-captured-values
-                      :documentation "Legacy serialized captured environment payload, normalized after initialization.")
     (deopt-info :initarg :deopt-info :initform nil :accessor vm-closure-deopt-info
                 :documentation "PC -> deoptimization reconstruction metadata for optimized closures.")
     (osr-entry-points :initarg :osr-entry-points :initform nil :accessor vm-closure-osr-entry-points
@@ -198,35 +197,6 @@ lazy byte retrieval."
    (label-table :initarg :label-table :initform nil :accessor vm-closure-label-table
                 :documentation "Optional label table paired with PROGRAM-FLAT for cross-program calls."))
   (:documentation "Represents a closure with code and captured environment."))
-
-(defun %vm-normalize-captured-values (captured-values)
-  "Return two vectors, captured registers and captured values, from legacy CAPTURED-VALUES.
-Legacy bytecode used either a vector/list of (register . value) pairs for normal
-closures or a vector/list of raw values for indexed heap closures."
-  (let ((payload (cond
-                   ((null captured-values) nil)
-                   ((vectorp captured-values) (coerce captured-values 'list))
-                   ((listp captured-values) captured-values)
-                   (t (list captured-values)))))
-    (if (and payload (every #'consp payload))
-        (values (coerce (mapcar #'car payload) 'vector)
-                (coerce (mapcar #'cdr payload) 'vector))
-        (values #() (coerce (or payload nil) 'vector)))))
-
-(defmethod initialize-instance :after ((closure vm-closure-object) &key captured-values captured-regs captured-vals)
-  "Normalize legacy closure captures into flat parallel vectors."
-  (declare (ignore captured-regs captured-vals))
-  (when captured-values
-    (multiple-value-bind (regs vals) (%vm-normalize-captured-values captured-values)
-      (setf (vm-closure-captured-regs closure) regs
-            (vm-closure-captured-vals closure) vals))))
-
-(defun vm-closure-captured-values (closure)
-  "Return CLOSURE's legacy captured payload when present, otherwise values.
-Runtime restore uses VM-CLOSURE-CAPTURED-REGS/VALS; this reader remains for
-serialized bytecode/tests that constructed closures with :CAPTURED-VALUES."
-  (or (%vm-closure-legacy-captured-values closure)
-      (vm-closure-captured-vals closure)))
 
 (defparameter *tier-upgrade-threshold* 50
   "Number of calls after which a Tier-0 closure is upgraded to Tier-1.")
@@ -625,6 +595,8 @@ Tests should dynamically bind this to T for OSR coverage.")
 (defun machine-instance () (cl:machine-instance))
 (defun software-type () (cl:software-type))
 (defun software-version () (cl:software-version))
+(defun short-site-name () (or (cl:short-site-name) "unknown"))
+(defun long-site-name () (or (cl:long-site-name) "unknown"))
 
 (defun room (&optional (stream cl:*standard-output*))
   (cl:format stream "; CL-CC ~A ~A on ~A ~A~%"

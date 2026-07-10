@@ -4,7 +4,7 @@
 
 (asdf:defsystem :cl-cc-testing-framework
   :description "CL-CC testing framework — deftest, deftest-each, assert-*, fuzz, runner"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-php)

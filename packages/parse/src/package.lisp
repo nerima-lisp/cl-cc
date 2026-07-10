@@ -11,8 +11,8 @@
 ;;;; remain exported from :cl-cc via package-exports-1.lisp.
 ;;;;
 ;;;; DCG public symbols (def-dcg-rule, phrase, phrase-all) come from
-;;;; :cl-cc/prolog. The internal DCG helpers (dcg-fresh-var, dcg-reset-counter)
-;;;; remain unexported on purpose and are not re-exported here.
+;;;; :cl-cc/prolog. Internal DCG helpers remain unexported on purpose and are
+;;;; not re-exported here.
 
 (defpackage :cl-cc/parse
   (:use :cl :cl-cc/ast :cl-cc/bootstrap)

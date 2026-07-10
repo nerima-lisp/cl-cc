@@ -35,7 +35,9 @@ so method ordering and combination semantics are preserved."
   (let ((has-qualified (or (gethash :__BEFORE__ gf-ht)
                            (gethash :__AFTER__ gf-ht)
                            (gethash :__AROUND__ gf-ht)))
-        (combination (gethash :__method-combination__ gf-ht)))
+        (combination (when (and (hash-table-p gf-ht)
+                                (nth-value 1 (gethash :__method-combination__ gf-ht)))
+                       (gethash :__method-combination__ gf-ht))))
     (and (not has-qualified)
          (or (null combination) (eq combination 'standard)))))
 

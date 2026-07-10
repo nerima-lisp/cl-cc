@@ -1,5 +1,9 @@
 # cl-cc
 
+[![CI](https://github.com/takeokunn/cl-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/takeokunn/cl-cc/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Built with Nix](https://img.shields.io/badge/Built_with-Nix-5277C3.svg?logo=nixos)](https://nixos.org)
+
 A self-hosting Common Lisp compiler and runtime implemented in pure Common Lisp — no project C source; the VM interpreter includes a minimal SBCL host-backed CFFI-compatible FFI shim.
 
 cl-cc compiles ANSI Common Lisp to a register-based bytecode VM, and from there to native x86-64, AArch64, and WebAssembly. The compiler is itself written in Common Lisp, and its core design — CLOS dispatch, Prolog-based optimization, CPS transformation, Hindley–Milner type inference — is implemented using the same language features it compiles.
@@ -437,7 +441,7 @@ cl-cc check file.php --strict
 **Expressions**
 
 | PHP                                         | Lowering                                                     |
-| ------------------------------------------- | ------------------------------------------------------------ |
+| ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
 | `[1, 2, 3]` / `array(1, 2, 3)`              | `%php-array` call                                            |
 | `["a" => 1, "b" => 2]`                      | `%php-array` with key/value pairs                            |
 | `$a[0]`                                     | `%php-array-ref`                                             |
@@ -450,9 +454,9 @@ cl-cc check file.php --strict
 | `$a <=> $b`                                 | `%php-spaceship`                                             |
 | `$a >> $n`                                  | `%php-shift-right`                                           |
 | `$a instanceof C`                           | `%php-instanceof`                                            |
-| `$value |> f(...)`                          | PHP 8.5 pipe helper with first-class callable lowering        |
-| `(void) $expr`                              | side-effect evaluation followed by PHP null                   |
-| `clone($obj, ["prop" => $value])`           | PHP 8.5 clone-with helper after `__clone` dispatch            |
+| `$value                                     | > f(...)`                                                    | PHP 8.5 pipe helper with first-class callable lowering |
+| `(void) $expr`                              | side-effect evaluation followed by PHP null                  |
+| `clone($obj, ["prop" => $value])`           | PHP 8.5 clone-with helper after `__clone` dispatch           |
 | `Closure::getCurrent()`                     | currently executing Closure or PHP null                      |
 
 **Type annotations** — parameter and return type annotations (`int`, `?string`, `int\|string`, `void`, `never`, `mixed`, `static`, nullable/union/intersection types) are preserved as `:php-param-types` / `:php-return-type` in the `ast-defun` declarations. Class properties and constants preserve their declared PHP types on `ast-slot-def` nodes.
@@ -499,7 +503,8 @@ PHP 8.5 predefined constants include `PHP_VERSION` / `PHP_VERSION_ID`,
 cl-cc includes a JavaScript frontend that lowers JavaScript source through the
 same CL AST and backend pipeline used by the other frontends. `.js` and `.mjs`
 files are auto-detected; `--lang js` and `--lang javascript` select it
-explicitly for any command.
+explicitly for any command. The JavaScript frontend tracks ECMAScript 2026 as
+the latest supported target.
 
 ```bash
 cl-cc run file.js
@@ -583,3 +588,15 @@ cl-cc selfhost [file]     Run the self-hosting workload
   --timeout <seconds>     Maximum execution time (default: 30)
   --no-timeout            Disable CLI timeout for debugging
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development environment setup and
+the pull-request workflow, and [ARCHITECTURE.md](ARCHITECTURE.md) for a
+subsystem-level tour of the compiler. Security issues should be reported
+privately per [SECURITY.md](SECURITY.md). This project follows the
+[Contributor Covenant](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE)

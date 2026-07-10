@@ -420,92 +420,58 @@ tree emission on NIL."
                                   (vm-len-reg inst)))
       t)
     (cl-cc/vm::vm-atomic-cas
-     (let ((width (wasm-atomic-width-for-inst inst 64)))
-       (if (wasm-threads-feature-enabled-p)
-           (progn
-             (format stream "~%      ;; FR-203/FR-327 atomic CAS width=~D" width)
-             (format stream "~%      ~A"
-                     (reg-local-set reg-map (vm-dst inst)
-                                    (wasm-atomic-result-box-wat
-                                     (wasm-atomic-rmw-cmpxchg-wat
-                                       reg-map (cl-cc/vm::vm-acas-addr inst)
-                                       (cl-cc/vm::vm-acas-expected inst)
-                                       (cl-cc/vm::vm-acas-newval inst)
-                                      :width width)
-                                     :width width))))
-           (progn
-             (format stream "~%      ;; Wasm threads disabled; non-atomic fallback for vm-atomic-cas")
-             (format stream "~%      ~A"
-                     (reg-local-set reg-map (vm-dst inst)
-                                      (reg-local-ref reg-map (cl-cc/vm::vm-acas-addr inst))))))
-       t))
+     (with-wasm-atomic-threads (inst)
+       (let ((width (wasm-atomic-width-for-inst inst 64)))
+         (format stream "~%      ;; FR-203/FR-327 atomic CAS width=~D" width)
+         (format stream "~%      ~A"
+                 (reg-local-set reg-map (vm-dst inst)
+                                (wasm-atomic-result-box-wat
+                                 (wasm-atomic-rmw-cmpxchg-wat
+                                  reg-map (cl-cc/vm::vm-acas-addr inst)
+                                  (cl-cc/vm::vm-acas-expected inst)
+                                  (cl-cc/vm::vm-acas-newval inst)
+                                  :width width)
+                                 :width width)))))
+     t)
     (cl-cc/vm::vm-atomic-load
-     (let ((width (wasm-atomic-width-for-inst inst 64)))
-       (if (wasm-threads-feature-enabled-p)
-           (progn
-             (format stream "~%      ;; FR-203 atomic load width=~D" width)
-             (format stream "~%      ~A"
-                     (reg-local-set reg-map (vm-dst inst)
-                                    (wasm-atomic-result-box-wat
-                                      (wasm-atomic-load-wat reg-map (cl-cc/vm::vm-aload-addr inst)
-                                                           :width width)
-                                     :width width))))
-           (progn
-             (format stream "~%      ;; Wasm threads disabled; non-atomic fallback for vm-atomic-load")
-             (format stream "~%      ~A"
-                     (reg-local-set reg-map (vm-dst inst)
-                                      (reg-local-ref reg-map (cl-cc/vm::vm-aload-addr inst))))))
-       t))
+     (with-wasm-atomic-threads (inst)
+       (let ((width (wasm-atomic-width-for-inst inst 64)))
+         (format stream "~%      ;; FR-203 atomic load width=~D" width)
+         (format stream "~%      ~A"
+                 (reg-local-set reg-map (vm-dst inst)
+                                (wasm-atomic-result-box-wat
+                                 (wasm-atomic-load-wat reg-map (cl-cc/vm::vm-aload-addr inst)
+                                                       :width width)
+                                 :width width)))))
+     t)
     (cl-cc/vm::vm-atomic-store
-     (let ((width (wasm-atomic-width-for-inst inst 64)))
-       (if (wasm-threads-feature-enabled-p)
-           (progn
-             (format stream "~%      ;; FR-203 atomic store width=~D" width)
-             (format stream "~%      ~A"
-                      (wasm-atomic-store-wat reg-map (cl-cc/vm::vm-astore-addr inst)
-                                             (cl-cc/vm::vm-astore-val inst)
-                                            :width width)))
-           (progn
-             (format stream "~%      ;; Wasm threads disabled; non-atomic fallback for vm-atomic-store")
-             (format stream "~%      (local.set ~D ~A)"
-                      (wasm-reg-to-local reg-map (cl-cc/vm::vm-astore-addr inst))
-                       (reg-local-ref reg-map (cl-cc/vm::vm-astore-val inst)))))
-       t))
+     (with-wasm-atomic-threads (inst)
+       (let ((width (wasm-atomic-width-for-inst inst 64)))
+         (format stream "~%      ;; FR-203 atomic store width=~D" width)
+         (format stream "~%      ~A"
+                 (wasm-atomic-store-wat reg-map (cl-cc/vm::vm-astore-addr inst)
+                                        (cl-cc/vm::vm-astore-val inst)
+                                        :width width))))
+     t)
     (cl-cc/vm::vm-atomic-incf
-     (let ((width (wasm-atomic-width-for-inst inst 64)))
-       (if (wasm-threads-feature-enabled-p)
-           (progn
-             (format stream "~%      ;; FR-203/FR-327 atomic fetch-add width=~D" width)
-             (format stream "~%      ~A"
-                     (reg-local-set reg-map (vm-dst inst)
-                                    (wasm-atomic-result-box-wat
-                                     (wasm-atomic-rmw-add-wat
-                                       reg-map (cl-cc/vm::vm-aincf-addr inst)
-                                       (cl-cc/vm::vm-aincf-delta inst)
-                                      :width width)
-                                     :width width))))
-            (let ((old (reg-local-ref reg-map (cl-cc/vm::vm-aincf-addr inst)))
-                 (new (wasm-fixnum-box
-                       (format nil "(i64.add ~A ~A)"
-                                (wasm-fixnum-unbox reg-map (cl-cc/vm::vm-aincf-addr inst))
-                                (wasm-fixnum-unbox reg-map (cl-cc/vm::vm-aincf-delta inst))))))
-             (format stream "~%      ;; Wasm threads disabled; non-atomic fallback for vm-atomic-incf")
-             (format stream "~%      ~A" (reg-local-set reg-map (vm-dst inst) old))
-              (format stream "~%      ~A" (reg-local-set reg-map (cl-cc/vm::vm-aincf-addr inst) new))))
-       t))
+     (with-wasm-atomic-threads (inst)
+       (let ((width (wasm-atomic-width-for-inst inst 64)))
+         (format stream "~%      ;; FR-203/FR-327 atomic fetch-add width=~D" width)
+         (format stream "~%      ~A"
+                 (reg-local-set reg-map (vm-dst inst)
+                                (wasm-atomic-result-box-wat
+                                 (wasm-atomic-rmw-add-wat
+                                  reg-map (cl-cc/vm::vm-aincf-addr inst)
+                                  (cl-cc/vm::vm-aincf-delta inst)
+                                  :width width)
+                                 :width width)))))
+     t)
     (cl-cc/vm::vm-atomic-swap
-     (format stream "~%      ;; vm-atomic-swap fallback; Wasm xchg lowering pending")
-     (format stream "~%      ~A"
-             (reg-local-set reg-map (vm-dst inst)
-                             (reg-local-ref reg-map (cl-cc/vm::vm-aswap-addr inst))))
-     (format stream "~%      ~A"
-             (reg-local-set reg-map (cl-cc/vm::vm-aswap-addr inst)
-                            (reg-local-ref reg-map (cl-cc/vm::vm-aswap-newval inst))))
+     (wasm-unsupported-atomic-swap inst)
      t)
     ((or cl-cc/vm::vm-memory-barrier cl-cc/vm::vm-load-fence cl-cc/vm::vm-store-fence)
-     (if (wasm-threads-feature-enabled-p)
-         (format stream "~%      atomic.fence")
-         (format stream "~%      ;; Wasm threads disabled; fence elided"))
+     (with-wasm-atomic-threads (inst)
+       (format stream "~%      atomic.fence"))
      t)
      (vm-call
        (let* ((args (vm-args inst))

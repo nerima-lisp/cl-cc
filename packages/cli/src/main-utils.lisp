@@ -264,6 +264,13 @@ Returns :lisp, :elisp, :php, or :javascript."
           (uiop:quit 124)))
       (funcall thunk)))
 
+(defmacro %with-cli-timeout ((parsed command-name) &body body)
+  `(let ((timeout (%get-timeout ,parsed)))
+     (%call-with-cli-timeout timeout
+      (lambda ()
+        ,@body)
+      ,command-name)))
+
 ;;; FR-808: Script mode / shebang support stub
 (defun parse-cli-args (argv)
   "FR-808: Parse CLI arguments and script-mode argv conventions.

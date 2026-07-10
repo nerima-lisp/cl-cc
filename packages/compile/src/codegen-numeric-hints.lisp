@@ -121,15 +121,7 @@ unless a caller opts into FR-861 dispatch lowering."
 
 ;;; ── FR-542: Hot/Cold Code Annotations ─────────────────────────────────
 
-(defvar *code-temperature-registry* (make-hash-table :test 'eq)
-  "Maps function names to :hot or :cold temperature hints for code placement.")
-
-(defun %declare-function-temperature (name temperature)
-  "Register NAME with TEMPERATURE (:hot or :cold) for code placement.
-Hot functions go to .text.hot section; cold functions to .text.cold."
-  (setf (gethash name *code-temperature-registry*) temperature))
-
-(defmacro declare-hot ()
+  (defmacro declare-hot ()
   "FR-542: Declare the current function as hot-path.
 Equivalent to GCC __attribute__((hot)). Hot functions are placed in
 the .text.hot section for I-cache locality."

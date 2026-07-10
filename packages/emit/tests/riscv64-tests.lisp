@@ -8,7 +8,9 @@
 
 (deftest riscv64-source-scaffold-loads
   "The RISC-V 64 emitter is wired into :cl-cc-emit."
-  :timeout 5
+  ;; asdf:find-system re-scans .asd files; disk I/O under parallel CI
+  ;; load regularly exceeds 5s, so give it a generous margin.
+  :timeout 30
   (assert-true (asdf:find-system :cl-cc-emit nil))
   (assert-true (fboundp 'cl-cc/emit:make-riscv64-assembler))
   (assert-true (fboundp 'cl-cc/emit:riscv64-emit-instruction)))

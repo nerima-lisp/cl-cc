@@ -46,6 +46,11 @@
            (%copy-hash-table-shallow cl-cc/expand:*symbol-macro-table*))
          (cl-cc/expand:*compiler-macro-table*
            (%copy-hash-table-shallow cl-cc/expand:*compiler-macro-table*))
+         ;; defsetf / defstruct-accessor expansions mutate this shared table;
+         ;; give each test its own copy so concurrent workers don't race on it
+         ;; (an unsynchronized hash-table losing entries under parallel writes).
+         (cl-cc/expand:*setf-compound-place-handlers*
+           (%copy-hash-table-shallow cl-cc/expand:*setf-compound-place-handlers*))
          (cl-cc/expand::*macroexpand-step-cache*  (make-hash-table :test #'eq))
          (cl-cc/expand::*macroexpand-all-cache*   (make-hash-table :test #'eq))
          (cl-cc/expand:*macro-eval-fn*            cl-cc/expand:*macro-eval-fn*)

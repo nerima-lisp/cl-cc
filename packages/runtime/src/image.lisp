@@ -637,15 +637,13 @@ function bindings, packages, and restore hooks."
          (setf (symbol-plist sym) value)))
       (rt-image-register-global sym))))
 
-(defun rt-save-image (path &key globals heap)
+(defun rt-save-image (path &key globals)
   "Serialize registered runtime globals as a binary heap image.
 
 The image contains a fixed magic number, format version, registered global
 symbol entries, and a CRC32 checksum.  Values are encoded with PRINT/READ under
 *PRINT-READABLY* so cons/object graphs reachable from registered globals are
-preserved without requiring a concrete runtime heap object.  HEAP is accepted
-for API compatibility but is not required."
-  (declare (ignore heap))
+preserved without requiring a concrete runtime heap object."
   (let* ((symbols (remove-duplicates (or globals *rt-image-globals*) :test #'eq))
          (entries (%rt-image-global-entries symbols))
          (buffer (%rt-image-make-buffer)))

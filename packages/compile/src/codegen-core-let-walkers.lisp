@@ -153,14 +153,16 @@
 for statically materialized slots in ALLOWED-SLOT-NAMES."
   (:shadow-let t :shadow-mvb t)
   (ast-slot-value
-   (and (typep (ast-slot-value-object node) 'ast-var)
-        (eq (ast-var-name (ast-slot-value-object node)) binding-name)
-        (member (symbol-name (ast-slot-value-slot node)) allowed-slot-names :test #'string=)))
+   (let ((obj (%ast-transparent-designator-node (ast-slot-value-object node))))
+     (and (typep obj 'ast-var)
+          (eq (ast-var-name obj) binding-name)
+          (member (symbol-name (ast-slot-value-slot node)) allowed-slot-names :test #'string=))))
   (ast-set-slot-value
-   (and (typep (ast-set-slot-value-object node) 'ast-var)
-        (eq (ast-var-name (ast-set-slot-value-object node)) binding-name)
-        (member (symbol-name (ast-set-slot-value-slot node)) allowed-slot-names :test #'string=)
-        (okp (ast-set-slot-value-value node)))))
+   (let ((obj (%ast-transparent-designator-node (ast-set-slot-value-object node))))
+     (and (typep obj 'ast-var)
+          (eq (ast-var-name obj) binding-name)
+          (member (symbol-name (ast-set-slot-value-slot node)) allowed-slot-names :test #'string=)
+          (okp (ast-set-slot-value-value node))))))
 
 (%define-binding-walker %closure-binding-direct-call-only-p
   (body-forms binding-name arity)
@@ -170,10 +172,11 @@ for statically materialized slots in ALLOWED-SLOT-NAMES."
    (let ((func (ast-call-func node))
          (args (ast-call-args node)))
      (cond
-       ((and (typep func 'ast-var)
-             (eq (ast-var-name func) binding-name)
+       ((and (%ast-callable-binding-name-p func binding-name)
              (= (length args) arity)
              (every #'okp args))
         t)
-       (t (and (if (typep func 'ast-node) (okp func) t)
+       (t (and (if (typep func 'ast-node)
+                   (okp (%ast-transparent-designator-node func))
+                   t)
                (every #'okp args)))))))

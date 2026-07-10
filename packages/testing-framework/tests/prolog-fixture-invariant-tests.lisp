@@ -2,68 +2,6 @@
 
 (in-suite cl-cc-unit-suite)
 
-(defun copy-prolog-rules-table (table)
-  (let ((copy (make-hash-table :test 'eq)))
-    (maphash (lambda (k v) (setf (gethash k copy) (copy-list v))) table)
-    copy))
-
-(defparameter *baseline-prolog-rules*
-  (copy-prolog-rules-table cl-cc:*prolog-rules*)
-  "Baseline Prolog rule database captured for integration and fixture tests.")
-
-(defmacro with-baseline-prolog (&body body)
-  "Run BODY with the original built-in Prolog rule database restored."
-  (let ((saved (gensym "SAVED")))
-    `(let ((,saved (copy-prolog-rules-table cl-cc:*prolog-rules*)))
-       (cl-cc:clear-prolog-database)
-       (maphash (lambda (k v)
-                  (setf (gethash k cl-cc:*prolog-rules*) (copy-list v)))
-                *baseline-prolog-rules*)
-       (unwind-protect
-            (progn ,@body)
-         (cl-cc:clear-prolog-database)
-         (maphash (lambda (k v)
-                    (setf (gethash k cl-cc:*prolog-rules*) (copy-list v)))
-                  ,saved)))))
-
-(defun all-envs (goal)
-  "Collect all environments yielded while solving GOAL."
-  (let ((results nil))
-    (handler-case
-        (cl-cc:solve-goal goal nil (lambda (env) (push env results)))
-      (cl-cc::prolog-cut ()))
-    (nreverse results)))
-
-(defun all-prolog-substitutions (goal term)
-  "Collect TERM after substituting each environment yielded while solving GOAL."
-  (let ((results nil))
-    (handler-case
-        (cl-cc:solve-goal goal nil
-                          (lambda (env)
-                            (push (cl-cc:logic-substitute term env)
-                                  results)))
-      (cl-cc/prolog:prolog-cut ()))
-    (nreverse results)))
-
-(defun prolog-solution-count (goal)
-  "Return the number of solutions for GOAL."
-  (length (all-envs goal)))
-
-(defmacro assert-prolog-query-count= (goal expected-count)
-  (let ((count (gensym "COUNT")))
-    `(let ((,count (prolog-solution-count ,goal)))
-       (assert-= ,expected-count ,count))))
-
-(defmacro with-prolog-single-solution ((env goal) &body body)
-  `(let ((solutions (all-envs ,goal)))
-     (assert-= 1 (length solutions))
-     (let ((,env (car solutions)))
-       ,@body)))
-
-(defmacro assert-prolog-binding= (goal var expected)
-  `(with-prolog-single-solution (env ,goal)
-     (assert-= ,expected (cl-cc:logic-substitute ,var env))))
-
 ;;;; Invariant tests for with-fresh-prolog (framework-fixtures.lisp).
 ;;;;
 ;;;; The fixture snapshots cl-cc/prolog::*prolog-rules*, clears the DB,
@@ -76,7 +14,7 @@
   (let ((keys '()))
     (maphash (lambda (k v) (declare (ignore v)) (push k keys))
              cl-cc/prolog::*prolog-rules*)
-    (sort keys #'string< :key #'symbol-name)))
+    (sort keys #'string< :key #'prin1-to-string)))
 
 (defun %assert-prolog-state-restored (thunk &key absent-key)
   "Run THUNK and assert the global Prolog DB matches its pre-run state."
@@ -94,26 +32,21 @@
   (%assert-prolog-state-restored
    (lambda ()
      (with-fresh-prolog
-       (cl-cc/prolog:add-rule
-         'prolog-fixture-invariant-dummy
-         (cl-cc/prolog::make-prolog-rule
-           :head '(prolog-fixture-invariant-dummy ?x)
-           :body nil))
+       (cl-cc/prolog:def-rule (prolog-fixture-invariant-dummy ?x))
        ;; Inside the fixture, the DB is isolated and only our dummy key lives.
        (assert-= 1 (hash-table-count cl-cc/prolog::*prolog-rules*)))))
    :absent-key 'prolog-fixture-invariant-dummy)
 
 (deftest prolog-fixture-restores-keys-when-body-retracts
   "with-fresh-prolog restores the exact key set after BODY mutates the DB.
-   The public :cl-cc/prolog API exposes clear-prolog-database and add-rule,
-   but no retract-rule symbol; we emulate a retraction by clearing inside
-   the fixture, which is the most aggressive mutation the public API
-   allows. The post-state must still equal the pre-state."
+   The fixture contract is checked by clearing the isolated hash table
+   directly, which is the strongest mutation available in the test setup.
+   The post-state must still equal the pre-state."
   (%assert-prolog-state-restored
    (lambda ()
      (with-fresh-prolog
        ;; Simulate a wholesale retract by clearing the isolated copy.
-       (cl-cc/prolog:clear-prolog-database)
+       (clrhash cl-cc/prolog::*prolog-rules*)
        (assert-= 0 (hash-table-count cl-cc/prolog::*prolog-rules*))))))
 
 (deftest prolog-fixture-restores-on-non-local-exit
@@ -122,11 +55,7 @@
    (lambda ()
      (handler-case
          (with-fresh-prolog
-           (cl-cc/prolog:add-rule
-             'prolog-fixture-invariant-nle
-             (cl-cc/prolog::make-prolog-rule
-               :head '(prolog-fixture-invariant-nle ?x)
-               :body nil))
+           (cl-cc/prolog:def-rule (prolog-fixture-invariant-nle ?x))
            (error "intentional non-local exit from with-fresh-prolog body"))
        (error () nil)))
    :absent-key 'prolog-fixture-invariant-nle))

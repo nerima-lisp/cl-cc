@@ -102,11 +102,27 @@
 ;;; ─── string-upcase/downcase with :start/:end ─────────────────────────────────
 
 (deftest-each compile-string-case-bounds
-  "string-upcase and string-downcase accept :start/:end keyword args."
-  :cases (("upcase"   "hELlo" "(string-upcase \"hello\" :start 1 :end 3)")
-          ("downcase" "HellO" "(string-downcase \"HELLO\" :start 1 :end 4)"))
+  "string-upcase, string-downcase, and string-capitalize accept :start/:end keyword args."
+  :cases (("upcase"      "hELlo" "(string-upcase \"hello\" :start 1 :end 3)")
+          ("downcase"    "HellO" "(string-downcase \"HELLO\" :start 1 :end 4)")
+          ("capitalize"  "hEllo" "(string-capitalize \"hELLo\" :start 1 :end 4)"))
   (expected form)
   (assert-string= expected (run-string form)))
+
+(deftest-each compile-string-trim-bounds
+  "string-left-trim and string-right-trim remove characters from the correct side only."
+  :cases (("left"  "hello  " "(string-left-trim \" \" \"  hello  \")")
+          ("right" "  hello" "(string-right-trim \" \" \"  hello  \")"))
+  (expected form)
+  (assert-string= expected (run-string form :stdlib t)))
+
+(deftest-each compile-nstring-case-bounds
+  "nstring-upcase, nstring-downcase, and nstring-capitalize return the mutated string."
+  :cases (("upcase"      "hELLo" "(nstring-upcase \"hello\" :start 1 :end 4)")
+          ("downcase"    "HellO" "(nstring-downcase \"HELLO\" :start 1 :end 4)")
+          ("capitalize"  "hEllo" "(nstring-capitalize \"hELLo\" :start 1 :end 4)"))
+  (expected form)
+  (assert-string= expected (run-string form :stdlib t)))
 
 (deftest compile-empty-let-and-flet
   "let/flet accept empty binding lists."
@@ -229,7 +245,7 @@
   (assert-= 42 (run-string "(inspect 42)")))
 
 (deftest compile-foreign-funcall-strlen
-  "foreign-funcall provides a minimal CFFI-compatible host-backed FFI path."
+  "foreign-funcall provides a minimal host-backed FFI path."
   (assert-= 4 (run-string "(foreign-funcall \"strlen\" :string \"abcd\" :int)" :stdlib t))
   (assert-= 5 (run-string "(cffi:foreign-funcall \"strlen\" :string \"abcde\" :int)" :stdlib t)))
 
@@ -373,6 +389,19 @@
                               (cl-cc/compile:compilation-result-vm-instructions result))))
       (assert-true closure)
       (assert-eq :notinline (cl-cc/vm:vm-closure-inline-policy closure)))))
+
+;;; ─── ANSI proclaim / with-compilation-unit runtime support ─────────────────
+
+(deftest compile-proclaim-records-global-declaration
+  "proclaim returns its declaration spec and records inline declarations globally."
+  (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
+    (assert-equal '(inline proclaimed-fn)
+                  (run-string "(proclaim '(inline proclaimed-fn))" :stdlib t))
+    (assert-eq :inline (gethash 'proclaimed-fn cl-cc/expand:*declaim-inline-registry*))))
+
+(deftest compile-with-compilation-unit-evaluates-body
+  "with-compilation-unit acts as a minimal compilation-unit wrapper around its body."
+  (assert-= 11 (run-string "(with-compilation-unit () (let ((x 11)) x))" :stdlib t)))
 
 ;;; ─── FR-598: stream typep ────────────────────────────────────────────────────
 

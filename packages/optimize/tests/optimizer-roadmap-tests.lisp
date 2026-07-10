@@ -165,19 +165,6 @@ resets the current block (used by the backend doc which has ### section separato
                     contradictions))))))))
 
 ;; SKIP (doc sync): Docs need updating for current FR count and status
-#+nil (deftest optimize-roadmap-doc-summary-is-status-aware
-  "The optimize roadmap summary must not claim every FR is fully implemented."
-  (let ((doc (%optimizer-doc-content)))
-    (assert-false (search "全FR実装済み" doc))
-    (assert-true (search "175 FR を追跡中" doc))
-    (assert-true (search "✅" doc))
-    (assert-true (search "🔶" doc))))
-
-;; SKIP (doc sync): Roadmap docs need update to reflect current implementation status
-#+nil (deftest optimize-roadmap-completed-headings-avoid-incomplete-language
-  "FRs marked ✅ must not contain wording that explicitly says the implementation is absent."
-  (assert-null (%optimizer-doc-completed-heading-contradictions)))
-
 (deftest optimize-roadmap-related-implementation-paths-exist
   "Backtick paths on `関連実装` lines must point at files in the checkout."
   (assert-null (%optimizer-doc-related-implementation-missing-paths)))
@@ -185,48 +172,6 @@ resets the current block (used by the backend doc which has ### section separato
 (deftest optimize-roadmap-completed-sidecar-claims-match-heading-status
   "`完了済みFR` sidecar summaries must only list FR headings marked ✅."
   (assert-null (%optimizer-doc-completed-sidecar-contradictions)))
-
-;; SKIP (doc sync): Roadmap evidence registry needs doc update
-#+nil (deftest optimize-roadmap-evidence-covers-doc-fr-list
-  "Every docs/optimize-passes.md FR id has status-aware optimizer roadmap evidence."
-  (let* ((expected-ids (%optimizer-doc-fr-ids))
-          (features (cl-cc/optimize::optimize-roadmap-doc-features))
-          (actual-ids (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features))
-          (table (cl-cc/optimize::optimize-roadmap-register-doc-evidence))
-          (implemented 0)
-          (partial 0)
-          (profiles nil))
-     (assert-true (> (length expected-ids) 100))
-     (assert-equal expected-ids actual-ids)
-     (assert-= (length expected-ids) (hash-table-count table))
-     (assert-true (some #'cl-cc/optimize::opt-roadmap-feature-marked-complete-p features))
-     (dolist (feature features)
-       (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature))
-              (status (cl-cc/optimize::opt-roadmap-feature-status feature))
-              (evidence (cl-cc/optimize::lookup-opt-roadmap-evidence feature-id)))
-         (assert-false (search ":" feature-id))
-        (assert-true (member status '(:implemented :partial :planned)))
-         (assert-true evidence)
-        (assert-eq status (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-         (assert-equal feature-id
-                       (cl-cc/optimize::opt-roadmap-evidence-feature-id evidence))
-         (assert-true
-          (cl-cc/optimize::optimize-roadmap-evidence-well-formed-p evidence))
-        (push (cl-cc/optimize::opt-roadmap-evidence-modules evidence) profiles)
-        (case status
-          (:implemented
-           (incf implemented)
-           (assert-true
-            (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-             evidence)))
-          (:partial
-           (incf partial)
-           (assert-false
-            (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-             evidence))))))
-    (assert-true (> implemented 0))
-    (assert-true (> partial 0))
-    (assert-true (> (length (remove-duplicates profiles :test #'equal)) 5))))
 
 (deftest optimizer-roadmap-core-passes-have-evidence
   "Core optimizer FRs point at concrete pass implementations and tests."

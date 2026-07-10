@@ -57,20 +57,37 @@
   "String.prototype.match(regexp)."
   (if (js-regexp-p re)
       (if (js-regexp-global-p re)
-          ;; /g flag: collect all matches
+          ;; /g flag: collect all matches, advancing past each match's end
+          ;; (advancing only to the match index would re-find the same match).
           (let ((results (make-array 0 :element-type t :adjustable t :fill-pointer 0))
                 (pos 0))
             (loop
               (let ((m (%js-regex-exec re str pos)))
                 (when (eq m +js-null+) (return))
-                (let ((match (gethash "0" m)))
+                (let* ((match (gethash "0" m))
+                       (idx (truncate (gethash "index" m))))
                   (vector-push-extend match results)
-                  (setf pos (max (1+ pos) (truncate (gethash "index" m) ))))))
+                  (setf pos (max (1+ pos) (+ idx (max 1 (length match))))))))
             (if (zerop (length results)) +js-null+ results))
           ;; No /g: return first match object
           (%js-regex-exec re str 0))
       ;; String pattern: use substring search
       (%js-string-match str (%js-to-string re))))
+
+(defun %js-string-match-all-regex (str re)
+  "String.prototype.matchAll — collect all matches (regexp or string pattern)."
+  (if (js-regexp-p re)
+      (let ((results (make-array 0 :element-type t :adjustable t :fill-pointer 0))
+            (pos 0))
+        (loop
+          (let ((m (%js-regex-exec re str pos)))
+            (when (eq m +js-null+) (return))
+            (let* ((match (gethash "0" m))
+                   (idx (truncate (gethash "index" m))))
+              (vector-push-extend (%js-make-array match) results)
+              (setf pos (max (1+ pos) (+ idx (max 1 (length match))))))))
+        results)
+      (%js-string-match-all str (%js-to-string re))))
 
 (defun %js-string-search-regex (str re)
   "String.prototype.search(regexp) — return index or -1."
@@ -87,32 +104,28 @@
             (pos 0))
         (if fn
             (loop
-              (let ((end (funcall fn str pos nil)))
-                (when (or (null end) (> pos (length str)))
+              (let ((m (%js-regex-exec re str pos)))
+                (when (eq m +js-null+)
                   (loop for i from pos below (length str)
                         do (vector-push-extend (char str i) result))
                   (return (coerce result 'string)))
-                (loop for i from pos below (or (gethash "index" (%js-regex-exec re str pos)) pos)
-                      do (vector-push-extend (char str i) result))
-                ;; Find actual match start
-                (let ((match-start nil))
-                  (loop for i from pos to (length str)
-                        for end2 = (funcall fn str i nil)
-                        when end2
-                          do (setf match-start i)
-                             (return))
-                  (unless match-start
-                    (loop for i from pos below (length str)
+                (let* ((match-start (truncate (gethash "index" m)))
+                       (match-str (gethash "0" m))
+                       (match-end (+ match-start (length match-str)))
+                       (next-pos (if (= match-end pos) (1+ pos) match-end))
+                       (repl (if (functionp replacement)
+                                 (%js-to-string (%js-funcall replacement match-str match-start str))
+                                 (let ((r (%js-to-string replacement)))
+                                   (regex-replace-placeholders r match-str)))))
+                  (loop for i from pos below match-start
+                        do (vector-push-extend (char str i) result))
+                  (loop for c across repl
+                        do (vector-push-extend c result))
+                  (setf pos next-pos)
+                  (unless (js-regexp-global-p re)
+                    (loop for i from match-end below (length str)
                           do (vector-push-extend (char str i) result))
-                    (return (coerce result 'string)))
-                  (let* ((match-str (subseq str match-start end))
-                         (repl (if (functionp replacement)
-                                   (%js-to-string (%js-funcall replacement match-str match-start str))
-                                   (let ((r (%js-to-string replacement)))
-                                     (regex-replace-placeholders r match-str)))))
-                    (loop for c across repl do (vector-push-extend c result))
-                    (setf pos end)
-                    (unless (js-regexp-global-p re) (return nil))))))
+                    (return (coerce result 'string))))))
             (%js-string-replace str (%js-to-string (js-regexp-source re)) replacement)))
       (%js-string-replace str (%js-to-string re) replacement)))
 
@@ -134,8 +147,10 @@
       (%js-string-replace-regex str re replacement)
       (%js-string-replace-all str (%js-to-string re) replacement)))
 
-(defun %js-string-split-regex (str re &optional limit)
+(defun %js-string-split-regex (str &optional re limit)
   "String.prototype.split with regex separator."
+  (if (or (null re) (eq re +js-undefined+))
+      (%js-string-split str)
   (if (js-regexp-p re)
       (let* ((fn (js-regexp-compiled re))
              (results (make-array 0 :element-type t :adjustable t :fill-pointer 0))
@@ -143,15 +158,25 @@
              (pos 0))
         (when (or (null fn) (string= str ""))
           (return-from %js-string-split-regex (%js-string-split str (%js-to-string (js-regexp-source re)) limit)))
-        (loop while (< pos (length str))
-              do (let ((end (funcall fn str pos nil)))
-                   (if end
-                       (progn
-                         (vector-push-extend (subseq str pos (max pos end)) results)
-                         (when (>= (length results) max-count) (return))
-                         (setf pos (if (= end pos) (1+ pos) end)))
-                       (progn
-                         (vector-push-extend (subseq str pos) results)
-                         (return)))))
+        ;; Scan forward for each separator match; the text between matches is
+        ;; a field. Zero-width matches only split between characters.
+        (let ((n (length str)))
+          (loop
+            (let ((found nil) (found-end nil))
+              (loop for i from pos to n
+                    do (let ((end (funcall fn str i nil)))
+                         (when (and end
+                                    (or (> end i)
+                                        (and (> i pos) (< i n))))
+                           (setf found i found-end (max end i))
+                           (return))))
+              (if found
+                  (progn
+                    (vector-push-extend (subseq str pos found) results)
+                    (when (>= (length results) max-count) (return))
+                    (setf pos found-end))
+                  (progn
+                    (vector-push-extend (subseq str pos) results)
+                    (return))))))
         results)
-      (%js-string-split str (%js-to-string re) limit)))
+      (%js-string-split str (%js-to-string re) limit))))

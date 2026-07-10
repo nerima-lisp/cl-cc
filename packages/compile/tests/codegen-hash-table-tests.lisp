@@ -3,10 +3,37 @@
 (in-package :cl-cc/test)
 (in-suite cl-cc-codegen-unit-suite)
 
+;;; Keep this file self-contained so targeted suite runs do not depend on
+;;; loading the shared phase-2 helper file first.
+(defun make-call (func &rest arg-forms)
+  (make-ast-call :func func :args arg-forms))
+
+(defun make-int (n)
+  (make-ast-int :value n))
+
+(defun make-var (s)
+  (make-ast-var :name s))
+
+(defun make-quoted (v)
+  (make-ast-quote :value v))
+
+(defun make-fn (name)
+  (make-ast-function :name name))
+
 (deftest-each codegen-make-hash-table-test-designators
   "make-hash-table statically accepts quoted and function test designators."
   :cases (("quoted"   (make-call 'make-hash-table (make-var :test) (make-quoted 'equal)))
-          ("function" (make-call 'make-hash-table (make-var :test) (make-fn 'equalp))))
+          ("function" (make-call 'make-hash-table (make-var :test) (make-fn 'equalp)))
+          ("the-function" (make-call 'make-hash-table
+                                     (make-var :test)
+                                     (make-ast-the
+                                      :type 'function
+                                      :value (make-fn 'equal))))
+          ("the-keyword" (make-call 'make-hash-table
+                                     (make-ast-the
+                                      :type 'keyword
+                                      :value (make-var :test))
+                                     (make-quoted 'equal))))
   (form)
   (let ((ctx (make-codegen-ctx)))
     (compile-ast form ctx)
@@ -62,6 +89,22 @@
                                         (make-call 'make-hash-table
                                                    (make-var :test)
                                                    (make-quoted 'equal))))
+                  :body (list (make-call 'gethash
+                                         (make-quoted "k")
+                                         (make-var 'ht))))
+                 ctx)
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-gethash-equal))))
+
+(deftest codegen-gethash-specializes-let-bound-static-hash-table-through-ast-the
+  "gethash still specializes when the static make-hash-table form is wrapped in ast-the."
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-let
+                  :bindings (list (cons 'ht
+                                        (make-ast-the
+                                         :type '(or hash-table null)
+                                         :value (make-call 'make-hash-table
+                                                           (make-var :test)
+                                                           (make-quoted 'equal)))))
                   :body (list (make-call 'gethash
                                          (make-quoted "k")
                                          (make-var 'ht))))

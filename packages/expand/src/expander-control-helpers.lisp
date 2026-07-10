@@ -86,18 +86,38 @@ Uninterned symbols (gensyms) are canonicalized so alpha-variant forms share a ke
        (symbolp (car form))
        (eq (car form) 'list)))
 
+(defun %apply-quoted-function-designator-p (form)
+  "Return T when FORM is a quoted/function symbol designator."
+  (and (consp form)
+       (member (car form) '(quote function) :test #'eq)
+       (consp (cdr form))
+       (symbolp (second form))
+       (null (cddr form))))
+
+(defun %expand-apply-function-operand (operand)
+  "Expand dynamic APPLY function operands while preserving direct designators."
+  (if (%apply-quoted-function-designator-p operand)
+      operand
+      (compiler-macroexpand-all operand)))
+
 (defun %expand-apply-form (form)
   "Expand APPLY while preserving final (LIST ...) spreads for FR-044 codegen."
   (if (cdr form)
       (let* ((operands (cdr form))
-             (leading (butlast operands))
-             (spread (car (last operands))))
-        (append (list 'apply)
-                (mapcar #'compiler-macroexpand-all leading)
-                (list (if (%apply-final-list-form-p spread)
-                          (cons (car spread)
-                                (mapcar #'compiler-macroexpand-all (cdr spread)))
-                          (compiler-macroexpand-all spread)))))
+             (function-operand (first operands))
+             (arg-operands (rest operands)))
+        (if arg-operands
+            (let ((leading-args (butlast arg-operands))
+                  (spread (car (last arg-operands))))
+              (append (list 'apply
+                            (%expand-apply-function-operand function-operand))
+                      (mapcar #'compiler-macroexpand-all leading-args)
+                      (list (if (%apply-final-list-form-p spread)
+                                (cons (car spread)
+                                      (mapcar #'compiler-macroexpand-all
+                                              (cdr spread)))
+                                (compiler-macroexpand-all spread)))))
+            (list 'apply (%expand-apply-function-operand function-operand))))
       form))
 
 (defun %any-destructuring-let-binding-p (bindings)

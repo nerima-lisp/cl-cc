@@ -266,6 +266,27 @@ bodies are compiled/cached independently."
                       for tp in (car signature)
                       collect (cons p (type-to-scheme tp))))))))
 
+(defun %function-body-cache-bindings (ctx param-bindings body non-constant-defaults)
+  "Return cache bindings for BODY after excluding local parameter bindings."
+  (let* ((bound-names (mapcar #'car param-bindings))
+         (cache-body (append (mapcar #'cdr non-constant-defaults) body))
+         (cache-names (%function-global-cache-names ctx cache-body bound-names)))
+    (%emit-global-cache-entry-loads ctx cache-names)))
+
+(defun %restore-function-body-context (ctx old-env old-type-env old-global-var-cache
+                                       old-current-function-name
+                                       old-current-function-label
+                                       old-current-function-params
+                                       old-current-function-simple-p)
+  "Restore CTX state after function-body compilation."
+  (setf (ctx-env ctx) old-env)
+  (setf (ctx-type-env ctx) old-type-env)
+  (setf (ctx-global-var-cache ctx) old-global-var-cache)
+  (setf (ctx-current-function-name ctx) old-current-function-name)
+  (setf (ctx-current-function-label ctx) old-current-function-label)
+  (setf (ctx-current-function-params ctx) old-current-function-params)
+  (setf (ctx-current-function-simple-p ctx) old-current-function-simple-p))
+
 (defun compile-function-body (ctx params param-regs opt-bindings rest-binding
                               key-bindings non-constant-defaults body
                               &optional supplied-p-entries type-bindings
@@ -283,9 +304,8 @@ bodies are compiled/cached independently."
             (let* ((param-bindings (build-all-param-bindings params param-regs
                                                              opt-bindings rest-binding
                                                              key-bindings))
-                   (cache-body (append (mapcar #'cdr non-constant-defaults) body))
-                   (cache-names (%function-global-cache-names ctx cache-body (mapcar #'car param-bindings)))
-                   (cache-bindings (%emit-global-cache-entry-loads ctx cache-names)))
+                   (cache-bindings (%function-body-cache-bindings
+                                    ctx param-bindings body non-constant-defaults)))
               (setf (ctx-global-var-cache ctx) cache-bindings)
               (setf (ctx-env ctx)
                     (append param-bindings (ctx-env ctx))))
@@ -297,19 +317,16 @@ bodies are compiled/cached independently."
                       (null opt-bindings)
                       (null rest-binding)
                       (null key-bindings)))
-           (if type-bindings
-               (setf (ctx-type-env ctx)
-                     (type-env-extend* type-bindings (ctx-type-env ctx))))
-           (if supplied-p-entries
-               (emit-supplied-p-checks ctx supplied-p-entries))
-           (if non-constant-defaults
-               (emit-non-constant-defaults ctx non-constant-defaults))
+           (when type-bindings
+             (setf (ctx-type-env ctx)
+                   (type-env-extend* type-bindings (ctx-type-env ctx))))
+           (when supplied-p-entries
+             (emit-supplied-p-checks ctx supplied-p-entries))
+           (when non-constant-defaults
+             (emit-non-constant-defaults ctx non-constant-defaults))
            (%with-restored-tail-position ctx
              (%compile-body-with-tail-ret body t ctx))))
-      (setf (ctx-env ctx) old-env)
-      (setf (ctx-type-env ctx) old-type-env)
-      (setf (ctx-global-var-cache ctx) old-global-var-cache)
-      (setf (ctx-current-function-name ctx) old-current-function-name)
-      (setf (ctx-current-function-label ctx) old-current-function-label)
-      (setf (ctx-current-function-params ctx) old-current-function-params)
-      (setf (ctx-current-function-simple-p ctx) old-current-function-simple-p))))
+      (%restore-function-body-context
+       ctx old-env old-type-env old-global-var-cache
+       old-current-function-name old-current-function-label
+       old-current-function-params old-current-function-simple-p)))

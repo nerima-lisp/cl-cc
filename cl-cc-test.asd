@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-test
   :description "CL-CC tests"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools)
@@ -134,13 +134,31 @@
     :serial t
     :components
      ((:file "php-tests")
+      (:file "php-parser-test-support")
       (:file "php-parser-tests")
+      (:file "php-parser-core-stmt-tests")
+      (:file "php-parser-expression-tests")
+      (:file "php-parser-control-array-tests")
+      (:file "php-parser-namespace-tests")
+      (:file "php-parser-type-class-tests")
+      (:file "php-e2e-test-support")
       (:file "php-compile-tests")
+      (:file "php-compile-core-e2e-tests")
+      (:file "php-compile-object-e2e-tests")
+      (:file "php-compile-reference-e2e-tests")
+      (:file "php-compile-array-e2e-tests")
+      (:file "php-compile-builtins-e2e-tests")
       (:file "php-grammar-tests")
       (:file "php-grammar-stmt-tests")
-     (:file "php-traits-tests")
-     (:file "php-interfaces-tests")
-      (:file "php84-tests")))
+      (:file "php-traits-tests")
+      (:file "php-interfaces-tests")
+      (:file "php84-tests")
+      (:file "php84-tests-language")
+      (:file "php85-tests-language")
+      (:file "php85-tests-runtime-objects")
+      (:file "php85-tests-runtime-tokenizer")
+      (:file "php85-tests-runtime-behavior")
+      (:file "php85-tests-registration")))
    (:module "javascript-tests"
     :pathname "packages/javascript/tests"
     :serial t
@@ -155,7 +173,7 @@
       ;;   core:     shared helpers + basic programs + destructuring + JSON/Math/operators
       ;;   ast:      parse-only AST shape tests (FizzBuzz, Fibonacci, classes, generators…)
       ;;   advanced: optional chaining, typeof, class features, for-in/of, Map/Set
-      ;;   modern:   ES2022+ (private fields, Promise, WeakMap, ES2023-2026 built-ins)
+      ;;   modern:   ES2022 syntax + ES2023-2026 built-ins
       (:file "js-e2e-core-tests")
       (:file "js-e2e-ast-tests")
       (:file "js-e2e-advanced-tests")
@@ -184,15 +202,25 @@
       (:file "js-runtime-symbol-tests")
       (:file "js-runtime-typed-array-methods-tests")
       (:file "js-runtime-misc-tests")))
-   (:module "prolog-tests"
-    :pathname "packages/prolog/tests"
-    :serial t
-    :components
-    ((:file "test-support")
-     (:file "prolog-data-tests")
-     (:file "prolog-peephole-tests")
-     (:file "dcg-tests")
-     (:file "prolog-tests")))
+     (:module "prolog-tests"
+      :pathname "packages/prolog/tests"
+      :serial t
+      :components
+      ((:file "prolog-test-support-core")
+       (:file "prolog-test-support-fixtures")
+       (:file "prolog-test-support-projections")
+       (:file "prolog-test-support-unify")
+       (:file "prolog-test-support-peephole")
+       (:file "prolog-tests")
+       (:file "prolog-tests-builtins")
+       (:file "prolog-tests-builtins-internal")
+       (:file "prolog-tests-solver")
+       (:file "prolog-tests-rules")
+       (:file "prolog-data-tests")
+       (:file "prolog-peephole-tests-internal")
+       (:file "prolog-peephole-tests")
+       (:file "dcg-tests-core")
+       (:file "dcg-tests-builtins")))
    (:module "expand-tests"
     :pathname "packages/expand/tests"
     :serial t
@@ -484,7 +512,17 @@
      (:file "optimizer-dataflow-passes-tests")
       (:file "optimizer-store-analysis-tests")
       (:file "native-advanced-optimizer-tests")
-      (:file "optimizer-strength-inline-tests")))
+      (:file "optimizer-strength-inline-tests")
+      (:file "optimizer-jump-threading-tests")
+      (:file "optimizer-loop-peel-tests")
+      (:file "optimizer-loop-rotate-tests")
+      (:file "optimizer-loop-unroll-tests")
+      (:file "optimizer-loop-unswitch-tests")
+      (:file "optimizer-dead-loop-tests")
+      (:file "optimizer-dae-tests")
+      (:file "optimizer-div-const-tests")
+      (:file "optimizer-strength-reduce-tests")
+      (:file "optimizer-idiom-tests")))
    (:module "emit-tests"
     :pathname "packages/emit/tests"
     :serial t
@@ -616,7 +654,7 @@
 
 (asdf:defsystem :cl-cc-test/e2e
   :description "CL-CC self-hosting end-to-end regression tests"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-test)

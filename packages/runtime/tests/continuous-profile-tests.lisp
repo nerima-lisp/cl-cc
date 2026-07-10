@@ -176,7 +176,7 @@
                   :output nil
                   :trace-id "0123456789abcdef0123456789abcdef"
                   :span-id "0123456789abcdef")))
-    (sleep 0.05)
+    (assert-true (cl-cc/runtime:rt-wait-for-continuous-profile-sample session :timeout 1))
     (cl-cc/runtime:rt-record-profile-sample
      (list (cl-cc/runtime:make-rt-profile-frame
             :function "manual-worker"
@@ -192,4 +192,3 @@
       (assert-true (search "\"stack\"" otel))
       (assert-true (search "\"sampleType\"" pprof))
       (assert-true (search "manual-worker" pprof)))))
-

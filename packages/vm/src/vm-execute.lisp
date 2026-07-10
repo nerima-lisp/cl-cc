@@ -708,39 +708,40 @@ hook is installed, this records no target and execution remains in the interpret
 (defmethod execute-instruction ((inst vm-func-ref) state pc labels)
   (declare (ignore labels))
   ;; Try the function registry first — user-defined functions (defun) register
-  ;; closures with proper entry-label, params, and captured-values.
+  ;; closures with proper entry-label, params, and captured-vals.
   ;; Then honor the host bridge whitelist for CL functions like 1+/LENGTH.
   ;; Fall back to a bare closure only for local labels in the same compilation unit.
   (let* ((label-str (vm-label-name inst))
-          (sym (or (find-symbol label-str :cl-cc)
-                   (find-symbol label-str :cl)))
-          (registered (when sym (gethash sym (vm-function-registry state)))))
-      (vm-reg-set state (vm-dst inst)
-                  (or registered
-                      (and sym (vm-bridge-callable sym))
-             (make-instance 'vm-closure-object
-                            :entry-label label-str
-                            :params (vm-closure-params inst)
-                            :optional-params (vm-closure-optional-params inst)
-                            :rest-param (vm-closure-rest-param inst)
-                             :key-params (vm-closure-key-params inst)
-                             :rest-stack-alloc-p (vm-closure-rest-stack-alloc-p inst)
-                              :dispatch-tag (vm-func-ref-dispatch-tag inst)
-                              :captured-regs #()
-                              :captured-vals #()
-                              :program-flat *vm-exec-flat*
-                              :label-table labels))))
+         (sym (or (find-symbol label-str :cl-cc)
+                  (find-symbol label-str :cl)))
+         (registered (when sym (gethash sym (vm-function-registry state)))))
+    (vm-reg-set state (vm-dst inst)
+                (or (and (cl-cc/vm::%vm-callable-registry-entry-p registered)
+                         registered)
+                    (and sym (vm-bridge-callable sym))
+                    (make-instance 'vm-closure-object
+                                   :entry-label label-str
+                                   :params (vm-closure-params inst)
+                                   :optional-params (vm-closure-optional-params inst)
+                                   :rest-param (vm-closure-rest-param inst)
+                                   :key-params (vm-closure-key-params inst)
+                                   :rest-stack-alloc-p (vm-closure-rest-stack-alloc-p inst)
+                                   :dispatch-tag (vm-func-ref-dispatch-tag inst)
+                                   :captured-regs #()
+                                   :captured-vals #()
+                                   :program-flat *vm-exec-flat*
+                                   :label-table labels))))
   (values (1+ pc) nil nil))
 
 (defmethod execute-instruction ((inst vm-make-closure) state pc labels)
   (declare (ignore labels))
-  (let* ((captured-values (coerce (mapcar (lambda (reg) (vm-reg-get state reg)) (vm-env-regs inst)) 'vector))
+  (let* ((captured-vals (coerce (mapcar (lambda (reg) (vm-reg-get state reg)) (vm-env-regs inst)) 'vector))
            (closure (make-instance 'vm-closure-object
                                    :entry-label (vm-label-name inst)
                                    :params (vm-make-closure-params inst)
                                     :rest-stack-alloc-p nil
                                     :captured-regs #()
-                                    :captured-vals captured-values
+                                    :captured-vals captured-vals
                                     :program-flat *vm-exec-flat*
                                     :label-table labels))
          (addr (vm-heap-alloc state closure)))

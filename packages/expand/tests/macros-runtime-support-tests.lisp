@@ -98,6 +98,14 @@
 
 (deftest foreign-funcall-expands-to-vm-bridge
   "FOREIGN-FUNCALL expands directly to the VM bridge implementation."
-  (let ((result (our-macroexpand-1 '(foreign-funcall "strlen" :string "abcd" :int))))
-    (assert-string= "%FOREIGN-FUNCALL" (symbol-name (car result)))
-    (assert-string= "CL-CC/VM" (package-name (symbol-package (car result))))))
+  (dolist (head (list 'foreign-funcall
+                      (intern "FOREIGN-FUNCALL" (find-package :cffi))))
+    (let ((result (our-macroexpand-1 `(,head "strlen" :string "abcd" :int))))
+      (assert-string= "%FOREIGN-FUNCALL" (symbol-name (car result)))
+      (assert-string= "CL-CC/VM" (package-name (symbol-package (car result)))))))
+
+(deftest foreign-funcall-string-encoded-cffi-aliases-are-not-registered
+  "String-encoded CFFI compatibility aliases are not accepted as macro heads."
+  (dolist (name '("CFFI:FOREIGN-FUNCALL" "CFFI::FOREIGN-FUNCALL"))
+    (assert-false
+     (cl-cc/expand::lookup-macro (intern name :cl-cc/expand)))))

@@ -9,24 +9,6 @@
 
 (in-package :cl-cc/runtime)
 
-;; ── Unsupported operation ─────────────────────────────────────────────────
-
-(define-condition rt-unsupported-operation (simple-error)
-  ((operation :initarg :operation :reader rt-unsupported-operation-name))
-  (:report (lambda (c s)
-             (format s "Runtime operation not supported in this context: ~A"
-                     (rt-unsupported-operation-name c)))))
-
-(defun rt-unsupported (operation)
-  (cerror "Continue (may cause undefined behavior)"
-          'rt-unsupported-operation :operation operation))
-
-;; ── Thread identity ───────────────────────────────────────────────────────
-
-(defun rt-current-thread-token ()
-  "Return a stable identifier for the current thread."
-  sb-thread:*current-thread*)
-
 ;; ── Lock wrappers (map to sync.lisp API) ─────────────────────────────────
 
 (defun rt-make-lock (&optional name)
@@ -48,24 +30,3 @@
 (defun rt-try-lock (lock)
   "Try to acquire LOCK without blocking."
   (rt-mutex-lock lock :timeout 0))
-
-;; ── Thread yield ──────────────────────────────────────────────────────────
-
-(defun rt-thread-yield ()
-  "Yield the current thread."
-  (sb-thread:thread-yield))
-
-;; ── Atomic compare-and-swap ──────────────────────────────────────────────
-
-(defun rt-atomic-compare-and-swap-symbol (symbol old new)
-  "Atomically CAS the value of SYMBOL."
-  (sb-ext:compare-and-swap (symbol-value symbol) old new))
-
-;; ── Timeout macro ─────────────────────────────────────────────────────────
-
-(defmacro rt-with-timeout ((seconds &body timeout-forms) &body body)
-  "Execute BODY with a timeout of SECONDS."
-  `(handler-case
-       (sb-ext:with-timeout ,seconds ,@body)
-     (sb-ext:timeout ()
-       ,@timeout-forms)))

@@ -10,7 +10,11 @@
 Recognizes `(the (simple-array <elt> (*)) (make-array ...))` and
 `(the (array <elt> (*)) (make-array ...))` forms conservatively.
 Also recognizes `(make-array ... :element-type '<elt>)` keyword literals."
-  (labels ((recognized-elt-p (x)
+  (labels ((transparent-node (node)
+             (loop while (typep node 'ast-the)
+                   do (setf node (ast-the-value node))
+                   finally (return node)))
+           (recognized-elt-p (x)
              (member x '(fixnum single-float double-float character bit) :test #'eq))
            (from-the (node)
              (when (typep node 'ast-the)
@@ -21,18 +25,17 @@ Also recognizes `(make-array ... :element-type '<elt>)` keyword literals."
                    (let ((elt (cadr decl)))
                      (when (recognized-elt-p elt) elt))))))
            (from-make-array-keyword (node)
-             (when (typep node 'ast-call)
-               (let ((args (ast-call-args node)))
-                 (when (and (>= (length args) 3)
-                            (typep (second args) 'ast-var)
-                            (eq (ast-var-name (second args)) :element-type)
-                            (typep (third args) 'ast-quote))
-                   (let ((elt (ast-quote-value (third args))))
-                     (when (recognized-elt-p elt) elt)))))))
+             (let ((node (transparent-node node)))
+               (when (typep node 'ast-call)
+                 (let ((args (ast-call-args node)))
+                  (when (and (>= (length args) 3)
+                             (typep (transparent-node (second args)) 'ast-var)
+                             (eq (ast-var-name (transparent-node (second args))) :element-type)
+                             (typep (transparent-node (third args)) 'ast-quote))
+                    (let ((elt (ast-quote-value (transparent-node (third args)))))
+                      (when (recognized-elt-p elt) elt))))))))
     (or (from-the expr)
-        (from-make-array-keyword expr)
-        (when (typep expr 'ast-the)
-          (from-make-array-keyword (ast-the-value expr))))))
+        (from-make-array-keyword expr))))
 
 (defun %noescape-array-initial-value-for-element-type (element-type)
   "Return the default element value used for typed noescape array slots."
@@ -60,6 +63,8 @@ NIL for untyped arrays."
 
 (defun %emit-let-noescape-cons (ctx name expr)
   "Compile the two cons args and register the noescape cons binding."
+  (loop while (typep expr 'ast-the)
+        do (setf expr (ast-the-value expr)))
   (let ((car-reg (compile-ast (first  (ast-call-args expr)) ctx))
         (cdr-reg (compile-ast (second (ast-call-args expr)) ctx)))
     (push (cons name (cons car-reg cdr-reg))
@@ -244,7 +249,8 @@ NIL for untyped arrays."
               (let* ((name (car binding))
                      (test-sym (and (not (%member-eq-p name mutated))
                                     (%hash-table-static-test-from-make-hash-table-ast
-                                     (cdr binding)))))
+                                     (%transparent-hash-table-designator
+                                      (cdr binding))))))
                 (when test-sym
                   (setf (ctx-hash-table-test-bindings ctx)
                         (cons (cons name test-sym)

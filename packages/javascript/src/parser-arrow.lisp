@@ -8,8 +8,9 @@
 ;;;;   - Dynamic import()                           (%js-parse-import-expr)
 ;;;;
 ;;;; These are called by js-parse-primary (defined in parser-expr-primary.lisp).
-;;;; Load order: after parser-expr-primary.lisp (CL resolves calls at runtime,
-;;;; so the forward-reference from js-parse-primary to these helpers is fine).
+;;;; Load order: after parser-expr-args.lisp and parser-expr-primary.lisp
+;;;; (CL resolves calls at runtime, so the forward-reference from
+;;;; js-parse-primary to these helpers is fine).
 
 (in-package :cl-cc/javascript)
 

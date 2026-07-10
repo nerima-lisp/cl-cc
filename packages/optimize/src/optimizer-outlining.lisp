@@ -26,8 +26,8 @@
                       (string= prefix name :end2 (length prefix))))))
         instructions))
 
-;;; %opt-max-register-index and %opt-fresh-register-generator are defined in
-;;; optimizer-size.lisp (loaded before this file). No local copies needed.
+;;; %opt-fresh-register-generator is defined in optimizer-inline.lisp.
+;;; No local copies needed here.
 
 (defun %opt-control-or-label-p (inst)
   "Return T when INST should not be part of a straight-line outlined sequence."

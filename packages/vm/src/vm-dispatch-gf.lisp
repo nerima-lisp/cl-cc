@@ -176,7 +176,11 @@ Only single-argument eql specializers are indexed for fast lookup."
 (defun vm-get-all-applicable-methods (gf-ht state all-args)
   "Return list of all applicable method closures for GF-HT and ALL-ARGS, most-specific first.
 EQL specializers are checked first (most specific), then class-based dispatch via CPL."
-  (%vm-collect-applicable-methods (gethash :__methods__ gf-ht) state all-args))
+  (%vm-collect-applicable-methods
+   (when (and (hash-table-p gf-ht)
+              (nth-value 1 (gethash :__methods__ gf-ht)))
+     (gethash :__methods__ gf-ht))
+   state all-args))
 
 (defun %lookup-qualified-methods (gf-ht qual-key state all-arg-values)
   "Look up qualified methods for QUAL-KEY (:__BEFORE__, :__AFTER__, :__AROUND__) in GF-HT.

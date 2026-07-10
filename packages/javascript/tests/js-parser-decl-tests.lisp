@@ -9,7 +9,7 @@
 ;;;;         modifiers, class declarations with fields/methods/static/private.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Shared helpers (available to all js-parser-* files via serial load) ─────
 

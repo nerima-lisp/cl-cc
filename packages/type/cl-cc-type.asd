@@ -8,7 +8,7 @@
 
 (asdf:defsystem :cl-cc-type
   :description "cl-cc type system — kinds, multiplicity, HM inference, type classes, effects"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-ast)

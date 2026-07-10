@@ -2,7 +2,7 @@
 
 (asdf:defsystem :cl-cc-docgen
   :description "CL-CC Markdown API documentation generator"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()
@@ -13,7 +13,7 @@
 
 (asdf:defsystem :cl-cc-docgen/test
   :description "Tests for the CL-CC Markdown API documentation generator"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-docgen)

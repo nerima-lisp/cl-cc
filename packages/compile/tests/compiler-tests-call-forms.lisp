@@ -72,6 +72,8 @@
           ("evenp-true"  t "(evenp 4)")
           ("evenp-false" nil "(evenp 3)")
           ("oddp-true"   t "(oddp 3)")
+          ("not-zero" nil "(not 0)")
+          ("not-false-equality" t "(not (= 1 2))")
           ("case-match"     2  "(case 'b (a 1) (b 2) (c 3))")
           ("case-otherwise" 99 "(case 'z (a 1) (otherwise 99))"))
   (expected form)

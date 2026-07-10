@@ -1,8 +1,6 @@
 ;;;; packages/javascript/src/parser-stmt-control.lisp — JS Control-Flow Statement Parser
 ;;;;
-;;;; Contains: for-statement (C-style, for-in, for-of), switch/case/default,
-;;;; break, continue, return, throw, try/catch/finally, debugger, using
-;;;; declaration, and the main statement dispatcher (js-parse-stmt / js-parse-stmt-list).
+;;;; Contains: for-statement (C-style, for-in, for-of), switch/case/default.
 ;;;;
 ;;;; Load order: after parser-stmt.lisp (loop/if/for lowering helpers,
 ;;;; *js-stmt-parsers* variable, and early statement registrations).
@@ -292,5 +290,5 @@ Returns (values ast rest)."
                   rest3))))))
 
 
-;;; Flow-control statements (break/continue/return/throw/try/debugger/using) and
-;;; main statement dispatcher -> see parser-stmt-flow.lisp
+;;; Flow-control statements (break/continue/return/throw/try/debugger/using) live in
+;;; parser-stmt-flow.lisp.

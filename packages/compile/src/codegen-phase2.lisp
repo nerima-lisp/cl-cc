@@ -23,8 +23,15 @@ Handler lambda-list: (args result-reg ctx) → result-reg-or-nil.")
         (list 'gethash name '*phase2-builtin-handlers*)
         (cons 'lambda (cons (list args result-reg ctx) body))))
 
+(defun %phase2-transparent-node (node)
+  "Return NODE with transparent ast-the wrappers removed."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node))
+        finally (return node)))
+
 (defun %phase2-keyword-name (node)
   "Return NODE's keyword value when NODE is a keyword AST, otherwise NIL."
+  (setf node (%phase2-transparent-node node))
   (cond
     ((and (typep node 'ast-var) (keywordp (ast-var-name node)))
      (ast-var-name node))
@@ -34,6 +41,7 @@ Handler lambda-list: (args result-reg ctx) → result-reg-or-nil.")
 
 (defun %phase2-static-value (node)
   "Return NODE's literal value and whether it is statically known."
+  (setf node (%phase2-transparent-node node))
   (cond
     ((typep node 'ast-int)
      (values (ast-int-value node) t))
@@ -80,13 +88,14 @@ unknown so callers can fall through instead of silently changing semantics."
   "Return true when MAKE-ARRAY keyword TAIL can be lowered by Phase 2."
   (loop for kv on tail by #'cddr
         for key = (%phase2-keyword-name (car kv))
+        for value = (%phase2-transparent-node (cadr kv))
         always (and (cdr kv)
                     (member key '(:initial-element :initial-contents :element-type
                                   :fill-pointer :adjustable :displaced-to
                                   :displaced-index-offset)
                             :test #'eq)
                     (or (not (eq key :initial-contents))
-                        (typep (cadr kv) 'ast-quote)))))
+                        (typep value 'ast-quote)))))
 
 (defun %phase2-static-or-register-value (node ctx)
   "Return NODE's static value or compile NODE and return its value register."
@@ -115,9 +124,10 @@ unknown so callers can fall through instead of silently changing semantics."
 ;; make-array: fixed-size array
 (define-phase2-handler "MAKE-ARRAY" (args result-reg ctx)
   (let* ((tail (rest args))
-          (contents-ast (%phase2-find-keyword-arg tail :initial-contents)))
+          (contents-ast (%phase2-find-keyword-arg tail :initial-contents))
+          (contents-node (%phase2-transparent-node contents-ast)))
     (when (%phase2-keyword-args-lowerable-p tail)
-      (let ((contents (and contents-ast (ast-quote-value contents-ast))))
+      (let ((contents (and contents-node (ast-quote-value contents-node))))
         (when (or (null contents-ast) (listp contents))
           (multiple-value-bind (dimensions static-dimensions-p)
               (%phase2-static-dimensions (first args))
@@ -177,8 +187,8 @@ unknown so callers can fall through instead of silently changing semantics."
                                            :adjustable-reg adjustable-reg
                                             :element-type element-type
                                             :element-type-reg element-type-reg
-                                            :displaced-to-reg displaced-to-reg
-                                            :displaced-index-offset-reg displaced-index-offset-reg))
+                                         :displaced-to-reg displaced-to-reg
+                                         :displaced-index-offset-reg displaced-index-offset-reg))
             (when contents-ast
               (%phase2-emit-initial-contents ctx result-reg contents))
             result-reg)))))))
@@ -192,10 +202,11 @@ unknown so callers can fall through instead of silently changing semantics."
 
 ;; rt-slot-set: bootstrap/runtime helper lowered directly to slot-write.
 (define-phase2-handler "RT-SLOT-SET" (args result-reg ctx)
-  (when (and (= (length args) 3) (typep (second args) 'ast-quote))
-    (let ((obj-reg (compile-ast (first args) ctx))
-          (value-reg (compile-ast (third args) ctx))
-          (slot-name (ast-quote-value (second args))))
+  (let ((slot-ast (%phase2-transparent-node (second args))))
+    (when (and (= (length args) 3) (typep slot-ast 'ast-quote))
+      (let ((obj-reg (compile-ast (first args) ctx))
+            (value-reg (compile-ast (third args) ctx))
+            (slot-name (ast-quote-value slot-ast)))
       (emit ctx (make-vm-slot-write :obj-reg obj-reg
                                     :slot-name slot-name
                                     :value-reg value-reg))
@@ -203,7 +214,7 @@ unknown so callers can fall through instead of silently changing semantics."
           value-reg
           (progn
             (emit ctx (make-vm-move :dst result-reg :src value-reg))
-            result-reg)))))
+            result-reg))))))
 
 ;; array-row-major-index: variadic subscripts → cons-chain
 (define-phase2-handler "ARRAY-ROW-MAJOR-INDEX" (args result-reg ctx)
@@ -256,7 +267,7 @@ unknown so callers can fall through instead of silently changing semantics."
         (tail (rest args)))
     (loop for kv on tail by #'cddr
           when (cdr kv)
-            do (let ((k (car kv)) (v (cadr kv)))
+            do (let ((k (%phase2-transparent-node (car kv))) (v (cadr kv)))
                  (when (and (typep k 'ast-var) (eq (ast-var-name k) :initial-element))
                    (setf init-char-ast v)
                    (return))))
@@ -277,11 +288,12 @@ unknown so callers can fall through instead of silently changing semantics."
 
 ;; typep: fast path when type is a quoted symbol
 (define-phase2-handler "TYPEP" (args result-reg ctx)
-  (when (and (= (length args) 2) (typep (second args) 'ast-quote))
-    (let ((val-reg  (compile-ast (first args) ctx))
-          (type-sym (ast-quote-value (second args))))
+  (let ((type-ast (%phase2-transparent-node (second args))))
+    (when (and (= (length args) 2) (typep type-ast 'ast-quote))
+      (let ((val-reg  (compile-ast (first args) ctx))
+            (type-sym (ast-quote-value type-ast)))
       (emit ctx (make-vm-typep :dst result-reg :src val-reg :type-name type-sym))
-      result-reg)))
+      result-reg))))
 
 ;; call-next-method: 0 args or variadic args → cons-list
 (define-phase2-handler "CALL-NEXT-METHOD" (args result-reg ctx)
@@ -301,7 +313,7 @@ unknown so callers can fall through instead of silently changing semantics."
 (define-phase2-handler "SET-FDEFINITION" (args result-reg ctx)
   (when (= (length args) 2)
     (let* ((fn-reg (compile-ast (first args) ctx))
-           (name-ast (second args))
+           (name-ast (%phase2-transparent-node (second args)))
            (name (cond
                    ((typep name-ast 'ast-quote)
                     (ast-quote-value name-ast))

@@ -45,14 +45,7 @@ Wraps symbols with gensym bindings to prevent multiple evaluation."
   "Match PATTERN against FORM returning an alist of (var . value) bindings.
 ENV is a list of keyword symbols to match literally.
 Returns (values bindings matched-p)."
-  (labels ((match-ellipsis (pat-rest form-rest)
-             ;; Handle (pat ...) matching zero or more elements
-             (let ((pat-var (car pat-rest)))
-               (cond
-                 ((endp form-rest)
-                  (values `((,pat-var . nil)) t))
-                 (t (values `((,pat-var . ,form-rest)) t)))))
-           (match-one (pat frm)
+  (labels ((match-one (pat frm)
              (cond
                ;; Pattern variable: bind to form
                ((and (symbolp pat) (not (member pat env :test #'eq))
@@ -83,13 +76,6 @@ Returns (values bindings matched-p)."
                                 (setf bindings (append bindings (list (cons p f-rest))))
                                 (setf p-rest (cddr p-rest)
                                       f-rest nil))
-                               ;; bare ... token (legacy): match rest as list
-                               ((and (symbolp p) (string= (symbol-name p) "..."))
-                                (multiple-value-bind (b ok)
-                                    (match-ellipsis (cdr p-rest) f-rest)
-                                  (unless ok (return-from match-one (values nil nil)))
-                                  (setf bindings (append bindings b))
-                                  (return-from match-one (values bindings t))))
                                ;; normal element
                                ((null f-rest)
                                 (return-from match-one (values nil nil)))

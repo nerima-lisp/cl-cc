@@ -19,6 +19,15 @@
   "Characters skipped by the JSON parser between tokens.")
 
 ;;; -----------------------------------------------------------------------
+;;;  Raw JSON wrapper
+;;; -----------------------------------------------------------------------
+
+(defstruct (js-raw-json
+            (:constructor %js-make-raw-json (text))
+            (:conc-name js-raw-json-))
+  text)
+
+;;; -----------------------------------------------------------------------
 ;;;  Helpers
 ;;; -----------------------------------------------------------------------
 
@@ -33,6 +42,29 @@
     (and (<= end (length str))
          (string= str literal :start1 pos :end1 end))))
 
+(defun %js-json-raw-json-p (val)
+  "True when VAL is a JSON.rawJSON wrapper."
+  (js-raw-json-p val))
+
+(defun %js-json-raw-json-text (val)
+  (js-raw-json-text val))
+
+(defun %js-json-parse-full-p (str)
+  "True when STR is valid JSON text with no trailing non-whitespace data."
+  (let ((trimmed (string-trim *%json-whitespace-chars* str)))
+    (multiple-value-bind (val pos) (%js-json-parse-value trimmed 0)
+      (and (not (eq val +js-undefined+))
+           (= pos (length trimmed))))))
+
+(defun %js-json-raw-json (str)
+  "Wrap STR as a raw JSON fragment after validating it."
+  (unless (and (stringp str) (%js-json-parse-full-p str))
+    (error "JS SyntaxError: invalid JSON.rawJSON text"))
+  (%js-make-raw-json str))
+
+(defun %js-json-is-raw-json (val)
+  (%js-json-raw-json-p val))
+
 ;;; -----------------------------------------------------------------------
 ;;;  JSON serialization
 ;;; -----------------------------------------------------------------------
@@ -41,6 +73,8 @@
   "Recursively convert JS value VAL to a JSON string (depth limited to 50)."
   (when (> depth 50) (return-from %js-json-stringify-value "null"))
   (cond
+    ((%js-json-raw-json-p val)
+     (%js-json-raw-json-text val))
     ((or (eq val +js-null+) (eq val +js-undefined+)) "null")
     ((eq val nil) "false")
     ((eq val t)   "true")

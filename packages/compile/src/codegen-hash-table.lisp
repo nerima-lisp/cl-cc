@@ -9,10 +9,11 @@
 ;; make-hash-table: extract supported keywords and convert #'fn → 'fn
 (defun %hash-table-static-test-for-table-ast (ast ctx)
   "Return a statically known hash-table test for AST in CTX, if available."
-  (or (%hash-table-static-test-from-make-hash-table-ast ast)
-      (and (typep ast 'ast-var)
-           (cdr (%assoc-eq (ast-var-name ast)
-                           (ctx-hash-table-test-bindings ctx))))))
+  (let ((ast (%transparent-hash-table-designator ast)))
+    (or (%hash-table-static-test-from-make-hash-table-ast ast)
+        (and (typep ast 'ast-var)
+             (cdr (%assoc-eq (ast-var-name ast)
+                             (ctx-hash-table-test-bindings ctx)))))))
 
 (defun %hash-table-gethash-constructor-for-test (test-sym)
   "Return the specialized GETHASH constructor for TEST-SYM, or NIL."

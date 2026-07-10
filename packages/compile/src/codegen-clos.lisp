@@ -18,23 +18,25 @@
   (when (eq (ast-defclass-php-kind node) :javascript)
     (let ((name (ast-defclass-name node))
           (dst  (make-register ctx)))
-      (%with-no-tail-position ctx
-        ;; Register the class name as a known global BEFORE compiling its methods,
-        ;; so a self-reference inside a method (new A(), return A, A.staticHelper(),
-        ;; recursion) resolves to vm-get-global A rather than failing as an unbound
-        ;; variable.  set-global below sets the value; the read happens at call time.
-        (setf (gethash name (ctx-global-variables ctx)) t)
-        (let ((call-reg (compile-ast (ast-defclass-metaclass node) ctx)))
-          (emit ctx (make-vm-move :dst dst :src call-reg))
-          (emit ctx (make-vm-set-global :name name :src dst))
-          (setf (ctx-env ctx) (cons (cons name dst) (ctx-env ctx)))
-          (setf (gethash name (ctx-global-variables ctx)) dst))
-        (return-from compile-ast dst))))
+      (%call-with-no-tail-position ctx
+        (lambda ()
+          ;; Register the class name as a known global BEFORE compiling its methods,
+          ;; so a self-reference inside a method (new A(), return A, A.staticHelper(),
+          ;; recursion) resolves to vm-get-global A rather than failing as an unbound
+          ;; variable.  set-global below sets the value; the read happens at call time.
+          (setf (gethash name (ctx-global-variables ctx)) t)
+          (let ((call-reg (compile-ast (ast-defclass-metaclass node) ctx)))
+            (emit ctx (make-vm-move :dst dst :src call-reg))
+            (emit ctx (make-vm-set-global :name name :src dst))
+            (setf (ctx-env ctx) (cons (cons name dst) (ctx-env ctx)))
+            (setf (gethash name (ctx-global-variables ctx)) dst))
+          (return-from compile-ast dst)))))
   ;; JS annotation-only nodes carry metadata for tooling; skip code generation.
   (when (eq (ast-defclass-php-kind node) :js-annotation)
     (return-from compile-ast (make-register ctx)))
-  (%with-no-tail-position ctx
-    (let ((name (ast-defclass-name node))
+  (%call-with-no-tail-position ctx
+    (lambda ()
+      (let ((name (ast-defclass-name node))
           (supers (ast-defclass-superclasses node))
           (slots (ast-defclass-slots node))
           (dst (make-register ctx))
@@ -103,7 +105,7 @@
                                         (ast-slot-accessor slot) :reader)
                  (setf (gethash (ast-slot-accessor slot) *accessor-slot-map*)
                        (cons name slot-name))))
-      dst)))
+        dst))))
 
 (defun compile-slot-accessor (ctx class-reg class-name slot-name accessor-name kind)
   "Compile a slot reader or writer as a defun-style closure."

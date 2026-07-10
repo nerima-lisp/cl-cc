@@ -166,14 +166,12 @@
     (assert-output-contains out "$main_func_t")
     (assert-output-contains out "(global.set $cl_arg0")))
 
-(deftest wasm-tail-call-dispatch-falls-back-when-feature-disabled
-  "When wasm tail-call feature gate is disabled, emitter uses call_indirect."
-  (let ((out (let ((cl-cc/codegen::*wasm-tail-call-enabled* nil))
-               (%direct-wasm-emit
-                (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2))))))
-    (assert-output-contains out "call_indirect")
-    (assert-false (search "return_call_indirect" out :test #'char=))
-    (assert-output-contains out "$main_func_t")))
+(deftest wasm-tail-call-dispatch-requires-feature
+  "vm-tail-call emission signals when the wasm tail-call feature is disabled."
+  (let ((cl-cc/codegen::*wasm-tail-call-enabled* nil))
+    (assert-signals error
+      (%direct-wasm-emit
+       (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2))))))
 
 (deftest wasm-tail-call-direct-path-uses-return-call-when-callee-known
   "vm-func-ref + vm-tail-call emits direct return_call when feature enabled." 
@@ -184,14 +182,13 @@
     (assert-output-contains out "(return_call $known_fn)")
     (assert-false (search "return_call_indirect" out :test #'char=))))
 
-(deftest wasm-tail-call-direct-path-falls-back-to-call-when-feature-disabled
-  "vm-func-ref + vm-tail-call emits direct call when tailcall feature disabled." 
-  (let ((out (let ((cl-cc/codegen::*wasm-tail-call-enabled* nil))
-               (%direct-wasm-emit*
-                (list (cl-cc:make-vm-func-ref :dst :r1 :label "known_fn")
-                      (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2)))))))
-    (assert-output-contains out "(call $known_fn)")
-    (assert-false (search "return_call $known_fn" out :test #'char=))))
+(deftest wasm-tail-call-direct-path-requires-feature
+  "vm-func-ref + vm-tail-call signals when tailcall feature is disabled."
+  (let ((cl-cc/codegen::*wasm-tail-call-enabled* nil))
+    (assert-signals error
+      (%direct-wasm-emit*
+       (list (cl-cc:make-vm-func-ref :dst :r1 :label "known_fn")
+             (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2)))))))
 
 (deftest-each wasm-bitcount-lowers-to-wasm-op
   "Bit-count operations lower to their corresponding WASM i64 instructions via %wat-for."

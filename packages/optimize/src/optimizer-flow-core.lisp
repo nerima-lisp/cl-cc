@@ -211,6 +211,17 @@ The transform is skipped unless all structural checks pass."
 
 ;;; ─── Conservative loop peeling (FR-170 subset) ──────────────────────────
 
+(defun %opt-loop-peeling-safe-body-p (body)
+  "Return T when BODY is safe to duplicate in generic loop peeling."
+  (and (notany #'vm-label-p body)
+       (notany (lambda (inst)
+                 (typep inst '(or vm-jump vm-jump-zero vm-ret)))
+               body)
+       (notany (lambda (inst)
+                 (typep inst '(or vm-call vm-tail-call vm-trampoline
+                                  vm-apply vm-generic-call)))
+               body)))
+
 (defun %opt-loop-peeling-apply-candidate (instructions candidate)
   "Apply one-iteration peeling for a CFG-derived CANDIDATE."
   (let* ((vec (coerce instructions 'vector))
@@ -222,7 +233,7 @@ The transform is skipped unless all structural checks pass."
          (body-insts (loop for i from (+ header-pos 3) below back-pos
                            collect (aref vec i)))
          (result nil))
-    (when (some #'vm-label-p body-insts)
+    (unless (%opt-loop-peeling-safe-body-p body-insts)
       (return-from %opt-loop-peeling-apply-candidate nil))
     (loop for i from 0 below header-pos
           for inst = (aref vec i)
@@ -272,15 +283,20 @@ This duplicates only one first-iteration body before the original loop header."
                                     (equal (vm-label-name back-inst) header-name))
                                (let ((body-insts (loop for j from (+ i 3) below back-pos
                                                        collect (aref vec j))))
-                                 ;; peeled first iteration (without header label)
-                                 (push cond-inst result)
-                                 (push jz-inst result)
-                                 (dolist (b body-insts) (push b result))
-                                 ;; then keep original loop unchanged
-                                 (loop for j from i below (1+ exit-pos)
-                                       do (push (aref vec j) result))
-                                 (setf i (1+ exit-pos)
-                                       peeled t))
+                                 (if (%opt-loop-peeling-safe-body-p body-insts)
+                                     (progn
+                                       ;; peeled first iteration (without header label)
+                                       (push cond-inst result)
+                                       (push jz-inst result)
+                                       (dolist (b body-insts) (push b result))
+                                       ;; then keep original loop unchanged
+                                       (loop for j from i below (1+ exit-pos)
+                                             do (push (aref vec j) result))
+                                       (setf i (1+ exit-pos)
+                                             peeled t))
+                                     (progn
+                                       (push cur result)
+                                       (incf i))))
                                (progn
                                  (push cur result)
                                  (incf i))))

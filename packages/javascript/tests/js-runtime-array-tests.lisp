@@ -7,7 +7,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Array core ──────────────────────────────────────────────────────────────
 

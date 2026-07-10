@@ -25,6 +25,13 @@
         :depends-on nil
         :tags nil))
 
+(defmacro with-clcc-timings-file-env (value &body body)
+  `(%with-preserved-env-var ("CLCC_TIMINGS_FILE")
+     (if ,value
+         (sb-posix:setenv "CLCC_TIMINGS_FILE" ,value 1)
+         (sb-posix:unsetenv "CLCC_TIMINGS_FILE"))
+     ,@body))
+
 (deftest-each timing-result-carries-non-negative-duration
   "Every terminal status (pass/fail/skip) carries a non-negative integer :duration-ns."
   :cases (("pass" :pass (lambda () t))
@@ -54,8 +61,7 @@
            (result (%run-single-test plist 42 '()))
            (output (with-output-to-string (*standard-output*)
                      (%tap-print-result result))))
-      (assert-true (search "duration_ms:" output))
-      (assert-true (search "ok 42 - TIMING-TAP-PASS" output)))))
+      (assert-string-contains-all output '("duration_ms:" "ok 42 - TIMING-TAP-PASS")))))
 
 (deftest timing-tap-diagnostic-fail-preserves-existing-yaml
   "Failure results still carry their failure YAML and gain duration_ms."
@@ -67,9 +73,7 @@
            (result (%run-single-test plist 7 '()))
            (output (with-output-to-string (*standard-output*)
                      (%tap-print-result result))))
-      (assert-true (search "not ok - " output))
-      (assert-true (search "message:" output))
-      (assert-true (search "duration_ms:" output)))))
+      (assert-string-contains-all output '("not ok - " "message:" "duration_ms:")))))
 
 ;;; ── %tap-verbose-first-line (T-V) ──────────────────────────────────────────
 
@@ -93,37 +97,33 @@
 (deftest timing-tsv-row-has-five-tab-separated-columns
   "%write-timings-tsv produces rows with exactly 5 tab-separated columns in
 the frozen order suite\\ttest-name\\tduration-ns\\tstatus\\tbatch-id."
-  (let* ((results (list (list :name 'some-test
-                              :suite 'cl-cc-unit-suite
-                              :status :pass
-                              :duration-ns 123456
-                              :batch-id 3)
-                        (list :name 'other-test
-                              :suite 'cl-cc-unit-suite
-                              :status :fail
-                              :duration-ns 987
-                              :batch-id nil)))
-         (tmp (format nil "/tmp/cl-cc-timings-test-~A.tsv" (get-universal-time))))
-    (unwind-protect
-         (progn
-           (%write-timings-tsv results tmp)
-           (with-open-file (in tmp :direction :input)
-             (let ((first-line (read-line in))
-                   (second-line (read-line in)))
-               ;; Split on tab — the separator is #\Tab (character 9).
-               (let ((cols1 (uiop:split-string first-line :separator (list #\Tab)))
-                     (cols2 (uiop:split-string second-line :separator (list #\Tab))))
-                 (assert-= 5 (length cols1))
-                 (assert-= 5 (length cols2))
-                 (assert-string= "CL-CC-UNIT-SUITE" (first cols1))
-                 (assert-string= "SOME-TEST" (second cols1))
-                 (assert-string= "123456" (third cols1))
-                 (assert-string= "passed" (fourth cols1))
-                 (assert-string= "3" (fifth cols1))
-                 ;; Sequential row: batch-id absent → "-"
-                 (assert-string= "failed" (fourth cols2))
-                 (assert-string= "-" (fifth cols2))))))
-      (ignore-errors (delete-file tmp)))))
+  (let ((results (list (list :name 'some-test
+                             :suite 'cl-cc-unit-suite
+                             :status :pass
+                             :duration-ns 123456
+                             :batch-id 3)
+                       (list :name 'other-test
+                             :suite 'cl-cc-unit-suite
+                             :status :fail
+                             :duration-ns 987
+                             :batch-id nil))))
+    (uiop:with-temporary-file (:pathname tmp :type "tsv")
+      (%write-timings-tsv results tmp)
+      (destructuring-bind (first-line second-line)
+          (%read-file-lines tmp)
+        ;; Split on tab - the separator is #\Tab (character 9).
+        (let ((cols1 (uiop:split-string first-line :separator (list #\Tab)))
+              (cols2 (uiop:split-string second-line :separator (list #\Tab))))
+          (assert-= 5 (length cols1))
+          (assert-= 5 (length cols2))
+          (assert-string= "CL-CC-UNIT-SUITE" (first cols1))
+          (assert-string= "SOME-TEST" (second cols1))
+          (assert-string= "123456" (third cols1))
+          (assert-string= "passed" (fourth cols1))
+          (assert-string= "3" (fifth cols1))
+          ;; Sequential row: batch-id absent -> "-"
+          (assert-string= "failed" (fourth cols2))
+          (assert-string= "-" (fifth cols2)))))))
 
 (deftest timing-output-path-respects-env-override
   "CLCC_TIMINGS_FILE overrides the default ./test-timings.tsv path."
@@ -131,37 +131,24 @@ the frozen order suite\\ttest-name\\tduration-ns\\tstatus\\tbatch-id."
   ;; cwd (security guard against arbitrary filesystem writes). Use a cwd-relative
   ;; path so the override is accepted verbatim. The "for-test" suffix avoids
   ;; collision with real test-suite artifacts.
-  (let ((override "./cl-cc-timings-override-for-test.tsv"))
-    (sb-posix:setenv "CLCC_TIMINGS_FILE" override 1)
-    (unwind-protect
-         (let ((result (handler-bind ((warning #'muffle-warning))
-                         (%timings-output-path))))
-           (assert-string= override result))
-      (sb-posix:unsetenv "CLCC_TIMINGS_FILE"))))
+  (with-clcc-timings-file-env "./cl-cc-timings-override-for-test.tsv"
+    (let ((result (handler-bind ((warning #'muffle-warning))
+                    (%timings-output-path))))
+      (assert-string= "./cl-cc-timings-override-for-test.tsv" result))))
 
 (deftest timing-output-path-defaults-when-env-unset
   "Without the env var %timings-output-path falls back to the repo-relative default."
-  (let ((saved (uiop:getenv "CLCC_TIMINGS_FILE")))
-    (sb-posix:unsetenv "CLCC_TIMINGS_FILE")
-    (unwind-protect
-         (assert-string= "./test-timings.tsv" (%timings-output-path))
-      (if saved
-          (sb-posix:setenv "CLCC_TIMINGS_FILE" saved 1)
-          (sb-posix:unsetenv "CLCC_TIMINGS_FILE")))))
+  (with-clcc-timings-file-env nil
+    (assert-string= "./test-timings.tsv" (%timings-output-path))))
 
 (deftest timing-output-path-rejects-unsafe-absolute-path
   "CLCC_TIMINGS_FILE pointing at /etc/passwd is rejected in favor of default."
-  (let ((saved (uiop:getenv "CLCC_TIMINGS_FILE")))
-    (sb-posix:setenv "CLCC_TIMINGS_FILE" "/etc/passwd" 1)
-    (unwind-protect
-         ;; Suppress the warning from %timings-output-path — the assertion is
-         ;; that it falls back to the default, not the warning channel.
-         (let ((result (handler-bind ((warning #'muffle-warning))
-                         (%timings-output-path))))
-           (assert-string= "./test-timings.tsv" result))
-      (if saved
-          (sb-posix:setenv "CLCC_TIMINGS_FILE" saved 1)
-          (sb-posix:unsetenv "CLCC_TIMINGS_FILE")))))
+  (with-clcc-timings-file-env "/etc/passwd"
+    ;; Suppress the warning from %timings-output-path — the assertion is that
+    ;; it falls back to the default, not the warning channel.
+    (let ((result (handler-bind ((warning #'muffle-warning))
+                    (%timings-output-path))))
+      (assert-string= "./test-timings.tsv" result))))
 
 (deftest timing-pending-result-carries-duration
   "A test that signals pending-condition still reports :duration-ns."
@@ -184,20 +171,15 @@ the frozen order suite\\ttest-name\\tduration-ns\\tstatus\\tbatch-id."
                               :suite bad-suite
                               :status :pass
                               :duration-ns 1
-                              :batch-id nil)))
-         (tmp (format nil "/tmp/cl-cc-timings-sanitize-~A.tsv"
-                      (get-universal-time))))
-    (unwind-protect
-         (progn
-           (%write-timings-tsv results tmp)
-           (with-open-file (in tmp :direction :input)
-             (let* ((line (read-line in))
-                    (cols (uiop:split-string line :separator (list #\Tab))))
-               (assert-= 5 (length cols))
-               ;; Sanitizer replaces the tab with a space — exactly one column each.
-               (assert-true (search "BAD NAME" (second cols)))
-               (assert-true (search "BAD SUITE" (first cols))))))
-      (ignore-errors (delete-file tmp)))))
+                              :batch-id nil))))
+    (uiop:with-temporary-file (:pathname tmp :type "tsv")
+      (%write-timings-tsv results tmp)
+      (let* ((line (first (%read-file-lines tmp)))
+             (cols (uiop:split-string line :separator (list #\Tab))))
+        (assert-= 5 (length cols))
+        ;; Sanitizer replaces the tab with a space - exactly one column each.
+        (assert-string-contains-all (second cols) '("BAD NAME"))
+        (assert-string-contains-all (first cols) '("BAD SUITE"))))))
 
 (deftest-each timing-status-keyword-mapping
   "%status-keyword-to-string maps every framework-emitted status to its frozen TSV token."
@@ -212,87 +194,74 @@ the frozen order suite\\ttest-name\\tduration-ns\\tstatus\\tbatch-id."
 
 (deftest timing-load-prior-timings-keeps-maximum-duration-per-test
   "%load-prior-timings keeps the max duration when the TSV contains repeated test names."
-  (let ((tmp (format nil "/tmp/cl-cc-prior-timings-~A.tsv" (get-universal-time))))
-    (unwind-protect
-         (progn
-           (with-open-file (out tmp :direction :output :if-exists :supersede :if-does-not-exist :create)
-             (format out "SUITE~CFOO~C10~Cpassed~C-~%" #\Tab #\Tab #\Tab #\Tab)
-             (format out "SUITE~CFOO~C25~Cpassed~C-~%" #\Tab #\Tab #\Tab #\Tab)
-             (format out "SUITE~CBAR~C7~Cfailed~C-~%" #\Tab #\Tab #\Tab #\Tab))
-           (let ((timings (%load-prior-timings tmp)))
-              (assert-= 25 (gethash "FOO" timings))
-              (assert-= 7 (gethash "BAR" timings))))
-      (ignore-errors (delete-file tmp)))))
+  (uiop:with-temporary-file (:pathname tmp :type "tsv")
+    (%write-file-lines
+     tmp
+     (list (format nil "SUITE~CFOO~C10~Cpassed~C-" #\Tab #\Tab #\Tab #\Tab)
+           (format nil "SUITE~CFOO~C25~Cpassed~C-" #\Tab #\Tab #\Tab #\Tab)
+           (format nil "SUITE~CBAR~C7~Cfailed~C-" #\Tab #\Tab #\Tab #\Tab)))
+    (let ((timings (%load-prior-timings tmp)))
+      (assert-= 25 (gethash "FOO" timings))
+      (assert-= 7 (gethash "BAR" timings)))))
+
+(deftest timing-load-prior-timings-ignores-malformed-rows
+  "%load-prior-timings skips rows that do not have a valid test name and duration."
+  (uiop:with-temporary-file (:pathname tmp :type "tsv")
+    (%write-file-lines
+     tmp
+     (list
+      (format nil "SUITE~CFOO~C10~Cpassed~C-" #\Tab #\Tab #\Tab #\Tab)
+      (format nil "SUITE~CFOO~Cnot-an-integer~Cpassed~C-" #\Tab #\Tab #\Tab #\Tab)
+      (format nil "SUITE~C~C12~Cpassed~C-" #\Tab #\Tab #\Tab #\Tab)
+      "BROKEN\tROW"
+      (format nil "SUITE~CBAR~C7~Cfailed~C-" #\Tab #\Tab #\Tab #\Tab)))
+    (let ((timings (%load-prior-timings tmp)))
+      (assert-= 10 (gethash "FOO" timings))
+      (assert-= 7 (gethash "BAR" timings))
+      (assert-null (gethash "" timings)))))
 
 (deftest timing-set-test-timeouts-by-prefix-updates-only-matching-tests
   "set-test-timeouts-by-prefix! only rewrites matching registered tests."
-  (let ((saved *test-registry*))
-    (unwind-protect
-         (progn
-           (setf *test-registry* (persist-empty))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* 'foo-match
-                                (list :name 'foo-match :suite 'cl-cc-unit-suite :timeout nil)))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* 'bar-miss
-                                (list :name 'bar-miss :suite 'cl-cc-unit-suite :timeout nil)))
-           (set-test-timeouts-by-prefix! "FOO-" 17)
-           (assert-= 17 (getf (persist-lookup *test-registry* 'foo-match) :timeout))
-           (assert-null (getf (persist-lookup *test-registry* 'bar-miss) :timeout)))
-      (setf *test-registry* saved))))
+  (with-fresh-registry-state
+    (with-test-registry-entry ('foo-match :suite 'cl-cc-unit-suite :timeout nil)
+      (with-test-registry-entry ('bar-miss :suite 'cl-cc-unit-suite :timeout nil)
+        (set-test-timeouts-by-prefix! "FOO-" 17)
+        (assert-= 17 (getf (persist-lookup *test-registry* 'foo-match) :timeout))
+        (assert-null (getf (persist-lookup *test-registry* 'bar-miss) :timeout))))))
 
 (deftest timing-bulk-timeout-helpers-preserve-explicit-timeouts-by-default
   "Bulk timeout helpers do not overwrite explicit per-test timeouts unless asked."
-  (let ((saved-tests *test-registry*)
-        (saved-suites *suite-registry*)
-        (suite 'timing-preserve-suite))
-    (unwind-protect
-         (progn
-           (setf *suite-registry* (persist-empty))
-           (setf *test-registry* (persist-empty))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* suite
-                                (list :name suite :description "preserve" :parent nil :parallel t :before-each '() :after-each '())))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* 'foo-keep
-                                (list :name 'foo-keep :suite suite :timeout 9)))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* 'foo-fill
-                                (list :name 'foo-fill :suite suite :timeout nil)))
-           (set-test-timeouts-by-prefix! "FOO-" 17)
-           (set-suite-test-timeout! suite 23 :recursive t)
-           (assert-= 9 (getf (persist-lookup *test-registry* 'foo-keep) :timeout))
-           (assert-= 17 (getf (persist-lookup *test-registry* 'foo-fill) :timeout)))
-      (setf *test-registry* saved-tests
-            *suite-registry* saved-suites))))
+  (let ((suite 'timing-preserve-suite))
+    (with-fresh-registry-state
+      (with-suite-registry-entry (suite
+                                   :description "preserve"
+                                   :parent nil
+                                   :parallel t)
+        (with-test-registry-entry ('foo-keep :suite suite :timeout 9)
+        (with-test-registry-entry ('foo-fill :suite suite :timeout nil)
+            (set-test-timeouts-by-prefix! "FOO-" 17)
+            (set-suite-test-timeout! suite 23 :recursive t)
+            (assert-= 9 (getf (persist-lookup *test-registry* 'foo-keep) :timeout))
+            (assert-= 17 (getf (persist-lookup *test-registry* 'foo-fill) :timeout))))))))
 
 (deftest timing-set-suite-test-timeout-can-update-descendants
   "set-suite-test-timeout! optionally updates descendant suite tests too."
-  (let ((saved-tests *test-registry*)
-        (saved-suites *suite-registry*)
-        (parent 'timing-timeout-parent)
+  (let ((parent 'timing-timeout-parent)
         (child 'timing-timeout-child))
-    (unwind-protect
-         (progn
-           (setf *suite-registry* (persist-empty))
-           (setf *test-registry* (persist-empty))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* parent
-                                (list :name parent :description "parent" :parent nil :parallel t :before-each '() :after-each '())))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* child
-                                (list :name child :description "child" :parent parent :parallel t :before-each '() :after-each '())))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* 'parent-test
-                                (list :name 'parent-test :suite parent :timeout nil)))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* 'child-test
-                                (list :name 'child-test :suite child :timeout nil)))
-           (set-suite-test-timeout! parent 23 :recursive t)
-           (assert-= 23 (getf (persist-lookup *test-registry* 'parent-test) :timeout))
-           (assert-= 23 (getf (persist-lookup *test-registry* 'child-test) :timeout)))
-      (setf *test-registry* saved-tests
-            *suite-registry* saved-suites))))
+    (with-fresh-registry-state
+      (with-suite-registry-entry (parent
+                                   :description "parent"
+                                   :parent nil
+                                   :parallel t)
+      (with-suite-registry-entry (child
+                                     :description "child"
+                                     :parent parent
+                                     :parallel t)
+          (with-test-registry-entry ('parent-test :suite parent :timeout nil)
+            (with-test-registry-entry ('child-test :suite child :timeout nil)
+              (set-suite-test-timeout! parent 23 :recursive t)
+              (assert-= 23 (getf (persist-lookup *test-registry* 'parent-test) :timeout))
+              (assert-= 23 (getf (persist-lookup *test-registry* 'child-test) :timeout))))))))
 
 (deftest timing-print-result-summary-reports-failures-and-skips
   "%print-result-summary prints aggregated counts and the failed test list."
@@ -302,9 +271,7 @@ the frozen order suite\\ttest-name\\tduration-ns\\tstatus\\tbatch-id."
                         (list :name 'gamma :status :fail :number 3)))
          (output (with-output-to-string (*standard-output*)
                     (assert-true (%print-result-summary results)))))
-    (assert-true (search "1 passed" output))
-    (assert-true (search "1 failed" output))
-    (assert-true (search "1 skipped" output))))
+    (assert-string-contains-all output '("1 passed" "1 failed" "1 skipped"))))
 
 ;;; ── %detail-ends-with-yaml-terminator-p (T-Y) ──────────────────────────────
 
@@ -344,5 +311,5 @@ the frozen order suite\\ttest-name\\tduration-ns\\tstatus\\tbatch-id."
 
 (deftest source-file-display-unrelated-path-returned-unchanged
   "%source-file-display returns the original namestring for paths outside cwd."
-  (let ((path "/tmp/unrelated.lisp"))
-    (assert-string= path (%source-file-display path))))
+  (let ((path (namestring (merge-pathnames "unrelated.lisp" (uiop:temporary-directory)))))
+    (assert-string= path (%source-file-display path)))))

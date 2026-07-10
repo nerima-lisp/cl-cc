@@ -1,47 +1,61 @@
-;;;; parser-class.lisp — PHP class body parser, statement dispatcher, top-level entry point
+;;;; parser-class.lisp — PHP class body parser and top-level parser entry point
 (in-package :cl-cc/php)
+
+(declaim (special *php-interface-registry*))
 
 ;;; ─── Class Body Parser ───────────────────────────────────────────────────────
 
 (defun %php-parse-visibility-modifiers (stream)
   "Consume zero or more visibility/modifier keywords and return them as metadata."
   (let ((modifiers nil))
-    (loop while (and stream
-                     (let ((type (php-peek-type stream))
-                           (val  (php-peek-value stream)))
-                       (or (and (eq type :T-KEYWORD)
-                                (member val '(:public :private :protected :static
-                                              :abstract :final :readonly)))
-                           ;; `static` lexes as a T-TYPE because it is also the
-                           ;; `static` return-type keyword.  In modifier position
-                           ;; it is the static-member modifier — accept it here so
-                           ;; static properties/methods are flagged :static rather
-                           ;; than parsed with a bogus `static` type hint and left
-                           ;; instance-allocated (which broke C::$prop and C::m()).
-                           (and (eq type :T-TYPE) (eq val :STATIC)))))
+    (flet ((visibility-modifier-p (modifier)
+             (member modifier '(:public :protected :private) :test #'eq))
+           (set-visibility-tail-p (tail)
+             (and tail
+                  (eq (php-peek-type tail) :T-KEYWORD)
+                  (member (php-peek-value tail) '(:private :protected) :test #'eq)
+                  (cdr tail)
+                  (eq (php-peek-type (cdr tail)) :T-LPAREN)
+                  (cddr tail)
+                  (eq (php-peek-type (cddr tail)) :T-IDENT)
+                  (string-equal (php-peek-value (cddr tail)) "set")
+                  (cdddr tail)
+                  (eq (php-peek-type (cdddr tail)) :T-RPAREN))))
+      (loop while (and stream
+                       (let ((type (php-peek-type stream))
+                             (val  (php-peek-value stream)))
+                         (or (and (eq type :T-KEYWORD)
+                                  (member val '(:public :private :protected :static
+                                                :abstract :final :readonly)))
+                             ;; `static` lexes as a T-TYPE because it is also the
+                             ;; `static` return-type keyword.  In modifier position
+                             ;; it is the static-member modifier — accept it here so
+                             ;; static properties/methods are flagged :static rather
+                             ;; than parsed with a bogus `static` type hint and left
+                             ;; instance-allocated (which broke C::$prop and C::m()).
+                             (and (eq type :T-TYPE) (eq val :STATIC)))))
           do (let ((type (php-peek-type stream))
                    (val  (php-peek-value stream)))
                (cond
+                 ;; PHP 8.5 static asymmetric property visibility permits other
+                 ;; modifiers between the outer visibility and private(set), e.g.
+                 ;; public static private(set) Type $prop;
+                 ((and (visibility-modifier-p val)
+                       (set-visibility-tail-p stream)
+                       (some #'visibility-modifier-p modifiers))
+                  (push (cons :set-visibility val) modifiers)
+                  (setf stream (cdr (cdddr stream))))
                  ;; PHP 8.4 asymmetric property visibility:
                  ;; public private(set) Type $prop;
                  ((and (eq type :T-KEYWORD)
-                       (member val '(:public :protected :private) :test #'eq)
-                       (cdr stream)
-                       (eq (php-peek-type (cdr stream)) :T-KEYWORD)
-                       (member (php-peek-value (cdr stream)) '(:private :protected) :test #'eq)
-                       (cddr stream)
-                       (eq (php-peek-type (cddr stream)) :T-LPAREN)
-                       (cdddr stream)
-                       (eq (php-peek-type (cdddr stream)) :T-IDENT)
-                       (string-equal (php-peek-value (cdddr stream)) "set")
-                       (cddddr stream)
-                       (eq (php-peek-type (cddddr stream)) :T-RPAREN))
+                       (visibility-modifier-p val)
+                       (set-visibility-tail-p (cdr stream)))
                   (push val modifiers)
                   (push (cons :set-visibility (php-peek-value (cdr stream))) modifiers)
                   (setf stream (cdr (cddddr stream))))
                  (t
                   (push val modifiers)
-                  (setf stream (cdr stream))))))
+                  (setf stream (cdr stream)))))))
     (values (nreverse modifiers) stream)))
 
 (defun %php-slot-metadata (modifiers &key class-constant-p attributes target-type)
@@ -87,6 +101,8 @@
                 slots)))
       (unless (and current (eq (php-peek-type current) :T-COMMA))
         (return))
+      (when attributes
+        (error "PHP parse error: attributes on grouped const declarations require exactly one constant"))
       (setf current (cdr current)))
     (let ((ordered-slots (nreverse slots)))
       (values (first ordered-slots)
@@ -385,8 +401,7 @@ to %php-parse-expr-stmt for expression statements."
                   (when (and attributes
                              (eq (php-tok-value _) :const)
                              (ast-progn-p stmt))
-                    (dolist (form (ast-progn-forms stmt))
-                      (%php-attach-attributes-to-node form attributes target-type)))
+                    (error "PHP parse error: attributes on grouped const declarations require exactly one constant"))
                   (values (%php-attach-attributes-to-node
                            stmt attributes target-type)
                           rest2 kv2))))
@@ -440,4 +455,7 @@ Analogous to parse-all-forms for CL."
            (push (php-annotate-top-level-node stmt) stmts)))
         (setf stream rest2 kv kv2)))
     (php-finish-let-bindings
-     (%php-lower-reference-assignments (nreverse stmts) nil))))
+     (%php-lower-reference-assignments
+      (%php-validate-override-tree
+       (%php-apply-no-discard-warnings (nreverse stmts)))
+      nil))))

@@ -80,20 +80,6 @@
     (assert-eq :head (car *rt-core-test-cycle*))
     (assert-eq *rt-core-test-cycle* (cdr *rt-core-test-cycle*))))
 
-#+nil (deftest runtime-core-compression-smaller-file
-  "FR-1002: zstd/lz4 portable compression produces a smaller repetitive core."
-  (%rt-core-register-test-roots)
-  (let ((plain (%rt-core-test-path "clcc-plain"))
-        (compressed (%rt-core-test-path "clcc-compressed")))
-    (setf *rt-core-test-string* (make-string 8192 :initial-element #\A))
-    (cl-cc/runtime:rt-save-core plain :compression :none)
-    (cl-cc/runtime:rt-save-core compressed :compression :zstd)
-    (assert-true (< (%rt-core-file-size compressed)
-                    (%rt-core-file-size plain)))
-    (setf *rt-core-test-string* nil)
-    (cl-cc/runtime:rt-load-core compressed)
-    (assert-equal 8192 (length *rt-core-test-string*))))
-
 (deftest runtime-core-loading-with-mmap
   "FR-1003: rt-load-core records mmap-backed lazy-loading metadata."
   (%rt-core-register-test-roots)

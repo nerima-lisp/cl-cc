@@ -18,16 +18,13 @@
 
 (defun %compile-inline-lambda-call (lambda-node arg-asts tail ctx)
   "Compile a direct call to a non-escaping lambda without emitting vm-closure."
-  (let ((old-env (ctx-env ctx)))
-    (unwind-protect
-         (let ((arg-bindings (mapcar (lambda (p a) (cons p (compile-ast a ctx)))
-                                     (ast-lambda-params lambda-node)
-                                     arg-asts)))
-           (setf (ctx-env ctx) (append arg-bindings old-env))
-           (%with-restored-tail-position ctx
-             (%compile-body-with-tail (ast-lambda-body lambda-node) tail ctx)))
-      (setf (ctx-env ctx) old-env)
-      )))
+  (%with-restored-ctx-env (ctx-env ctx (ctx-env ctx))
+    (let ((arg-bindings (mapcar (lambda (p a) (cons p (compile-ast a ctx)))
+                                (ast-lambda-params lambda-node)
+                                arg-asts)))
+      (setf (ctx-env ctx) (append arg-bindings (ctx-env ctx)))
+      (%with-restored-tail-position ctx
+        (%compile-body-with-tail (ast-lambda-body lambda-node) tail ctx)))))
 
 (defun %emit-noescape-dispatch-loop (size index-reg label-prefix end-label hit-fn ctx)
   "Emit a runtime index-dispatch loop for a noescape array.
@@ -82,33 +79,34 @@ Falls through to an oob error when no index matches."
    Binds PARAMS to PARAM-REGS in CTX-ENV under base ENV, compiles BODY-FORMS
    in tail position, emits vm-ret with the last result register.
    Restores CTX-ENV on exit."
-  (let ((old-env (ctx-env ctx)))
-    (unwind-protect
-         (let ((*string-literal-pool* (%copy-string-literal-pool *string-literal-pool*)))
-           (setf (ctx-env ctx) (append (mapcar #'cons params param-regs) env))
-           (%with-restored-tail-position ctx
-             (%compile-body-with-tail-ret body-forms t ctx)))
-      (setf (ctx-env ctx) old-env)
-      )))
+  (%with-restored-ctx-env (ctx-env ctx (ctx-env ctx))
+    (let ((*string-literal-pool* (%copy-string-literal-pool *string-literal-pool*)))
+      (setf (ctx-env ctx) (append (mapcar #'cons params param-regs) env))
+      (%with-restored-tail-position ctx
+        (%compile-body-with-tail-ret body-forms t ctx)))))
 
 (defmethod compile-ast ((node ast-function) ctx)
   "Compile #'name — look up function by name, returning a closure reference."
-  (%with-no-tail-position ctx
-    (let* ((name (ast-function-name node))
-           (dst  (make-register ctx)))
-      (if (symbolp name)
-          (let ((entry (assoc name (ctx-env ctx) :test #'eq)))
-            (if entry
-                (if (assoc name *labels-boxed-fns* :test #'eq)
-                    (emit ctx (make-vm-car  :dst dst :src (cdr entry)))
-                    (emit ctx (make-vm-move :dst dst :src (cdr entry))))
-                (if (gethash name (ctx-global-generics ctx))
-                    (emit ctx (make-vm-get-global :dst dst :name name))
-                    (emit ctx (make-vm-func-ref   :dst dst :label (format nil "~A" name))))))
-          (if (and (consp name) (eq (car name) 'setf))
-              (emit ctx (make-vm-func-ref :dst dst :label (format nil "SETF_~A" (second name))))
-              (error "Invalid function name: ~S" name)))
-      dst)))
+  (let ((old-tail (ctx-tail-position ctx)))
+    (unwind-protect
+         (progn
+           (setf (ctx-tail-position ctx) nil)
+           (let* ((name (ast-function-name node))
+                  (dst  (make-register ctx)))
+             (if (symbolp name)
+                 (let ((entry (assoc name (ctx-env ctx) :test #'eq)))
+                   (if entry
+                       (if (assoc name *labels-boxed-fns* :test #'eq)
+                           (emit ctx (make-vm-car  :dst dst :src (cdr entry)))
+                           (emit ctx (make-vm-move :dst dst :src (cdr entry))))
+                       (if (gethash name (ctx-global-generics ctx))
+                           (emit ctx (make-vm-get-global :dst dst :name name))
+                           (emit ctx (make-vm-func-ref   :dst dst :label (format nil "~A" name))))))
+                 (if (and (consp name) (eq (car name) 'setf))
+                     (emit ctx (make-vm-func-ref :dst dst :label (format nil "SETF_~A" (second name))))
+                     (error "Invalid function name: ~S" name)))
+             dst))
+      (setf (ctx-tail-position ctx) old-tail))))
 
 ;;; ── flet ─────────────────────────────────────────────────────────────────
 
@@ -142,7 +140,7 @@ Falls through to an oob error when no index matches."
     (emit ctx (make-vm-label :name  skip-label))
     (cons name closure-reg)))
 
-(defun %shared-sibling-capture-lists (bindings env ctx)
+(defun %shared-sibling-capture-lists (bindings env)
   "Return capture alists for BINDINGS that have sibling-shared capture sets."
   (let ((captures
           (loop for binding in bindings
@@ -163,16 +161,14 @@ Falls through to an oob error when no index matches."
          (bindings (ast-flet-bindings node))
          (body     (ast-flet-body node))
          (old-env  (ctx-env ctx))
-         (shared-captures (%shared-sibling-capture-lists bindings old-env ctx)))
-    (unwind-protect
-         (progn
-           (setf (ctx-env ctx)
-                  (append (mapcar (lambda (b)
-                                    (%compile-flet-binding b old-env ctx shared-captures))
-                                  bindings)
-                         old-env))
-           (%compile-body-with-tail body tail ctx))
-      (setf (ctx-env ctx) old-env))))
+         (shared-captures (%shared-sibling-capture-lists bindings old-env)))
+    (%with-restored-ctx-env (ctx-env ctx old-env)
+      (setf (ctx-env ctx)
+            (append (mapcar (lambda (b)
+                              (%compile-flet-binding b old-env ctx shared-captures))
+                            bindings)
+                    old-env))
+      (%compile-body-with-tail body tail ctx))))
 
 ;;; ── labels ───────────────────────────────────────────────────────────────
 
@@ -182,9 +178,20 @@ Falls through to an oob error when no index matches."
 (defun %binding-body (bindings name)
   (cddr (assoc name bindings :test #'eq)))
 
+(defun %local-call-name (func)
+  "Return the local function name designator for FUNC, if any."
+  (loop while (typep func 'ast-the)
+        do (setf func (ast-the-value func)))
+  (typecase func
+    (symbol func)
+    (ast-var (ast-var-name func))
+    (ast-function (ast-function-name func))
+    (t nil)))
+
 (defun %record-local-call (func names tail calls)
-  (when (and (symbolp func) (member func names :test #'eq))
-    (push (cons func tail) (gethash func calls))))
+  (let ((name (%local-call-name func)))
+    (when (and name (member name names :test #'eq))
+      (push (cons name tail) (gethash name calls)))))
 
 (defun %collect-local-calls-in-forms (forms names tail calls)
   (loop for rest on forms
@@ -316,6 +323,40 @@ Falls through to an oob error when no index matches."
               (cons name (list label (second (assoc name bindings :test #'eq)) param-regs))))
           infos))
 
+(defun %labels-bound-function-env (bindings ctx old-env)
+  (append (mapcar (lambda (b)
+                    (let ((name (first b)))
+                      (cons name (lookup-var ctx name))))
+                  bindings)
+          old-env))
+
+(defmacro %with-restored-labels-boxed-fns ((value) &body body)
+  `(let ((old-labels-boxed-fns *labels-boxed-fns*))
+     (unwind-protect
+          (progn
+            (setf *labels-boxed-fns* ,value)
+            ,@body)
+       (setf *labels-boxed-fns* old-labels-boxed-fns))))
+
+(defmacro %with-restored-local-tail-jump-fns ((value) &body body)
+  `(let ((old-local-tail-jump-fns *local-tail-jump-fns*))
+     (unwind-protect
+          (progn
+            (setf *local-tail-jump-fns* ,value)
+            ,@body)
+       (setf *local-tail-jump-fns* old-local-tail-jump-fns))))
+
+(defun %compile-labels-boxed-bindings (bindings body tail old-env old-labels-boxes ctx)
+  (multiple-value-bind (func-infos forward-env)
+      (%labels-create-boxes bindings ctx)
+    (%with-restored-labels-boxed-fns ((append forward-env old-labels-boxes))
+      (%with-restored-ctx-env (ctx-env ctx (append forward-env old-env))
+        (let ((shared-captures (%shared-sibling-capture-lists bindings (ctx-env ctx))))
+          (dolist (info func-infos)
+            (%labels-fill-closure info bindings ctx forward-env old-env shared-captures)))
+        (setf (ctx-env ctx) (%labels-bound-function-env bindings ctx old-env))
+        (%compile-body-with-tail body tail ctx)))))
+
 (defun %compile-labels-tail-functions (infos bindings env ctx)
   (when infos
     (let ((skip-label (make-label ctx "labels_tail_skip")))
@@ -324,36 +365,28 @@ Falls through to an oob error when no index matches."
         (%compile-labels-tail-function info bindings env ctx))
       (emit ctx (make-vm-label :name skip-label)))))
 
+(defun %compile-labels-boxed-phase (boxed-bindings bindings old-env ctx)
+  (multiple-value-bind (func-infos forward-env)
+      (%labels-create-boxes boxed-bindings ctx)
+    (setf (ctx-env ctx) (append forward-env old-env))
+    (let ((shared-captures (%shared-sibling-capture-lists boxed-bindings (ctx-env ctx))))
+      (dolist (info func-infos)
+        (%labels-fill-closure info bindings ctx forward-env old-env shared-captures)))
+    (append forward-env old-env)))
+
 (defun %compile-labels-with-tail-sccs (bindings body optimized-names body-tail old-env ctx)
   "Compile optimized tail-only SCCs as jumps and other LABELS bindings boxed."
   (let* ((optimized-bindings (remove-if-not (lambda (b) (member (first b) optimized-names :test #'eq)) bindings))
          (boxed-bindings     (remove-if     (lambda (b) (member (first b) optimized-names :test #'eq)) bindings))
          (tail-infos         (mapcar (lambda (b) (%labels-jump-info b ctx)) optimized-bindings))
-         (tail-entries       (%labels-tail-jump-entries tail-infos bindings))
-         (old-tail-jumps     *local-tail-jump-fns*))
-    (unwind-protect
-         (progn
-           (setf *local-tail-jump-fns* (append tail-entries old-tail-jumps))
-           (if boxed-bindings
-               (multiple-value-bind (func-infos forward-env)
-                   (%labels-create-boxes boxed-bindings ctx)
-                 (setf *labels-boxed-fns* (append forward-env *labels-boxed-fns*))
-                  (setf (ctx-env ctx) (append forward-env old-env))
-                  (let ((shared-captures (%shared-sibling-capture-lists boxed-bindings (ctx-env ctx) ctx)))
-                    (dolist (info func-infos)
-                      (%labels-fill-closure info bindings ctx forward-env old-env shared-captures)))
-                 (%compile-labels-tail-functions tail-infos bindings (append forward-env old-env) ctx)
-                 (setf (ctx-env ctx)
-                       (append (mapcar (lambda (b)
-                                         (let ((n (first b)))
-                                           (cons n (lookup-var ctx n))))
-                                       boxed-bindings)
-                               old-env)))
-               (progn
-                 (%compile-labels-tail-functions tail-infos bindings old-env ctx)
-                 (setf (ctx-env ctx) old-env)))
-           (%compile-body-with-tail body body-tail ctx))
-      (setf *local-tail-jump-fns* old-tail-jumps))))
+         (tail-entries       (%labels-tail-jump-entries tail-infos bindings)))
+    (%with-restored-ctx-env (ctx-env ctx old-env)
+      (%with-restored-local-tail-jump-fns ((append tail-entries *local-tail-jump-fns*))
+        (let ((env (if boxed-bindings
+                       (%compile-labels-boxed-phase boxed-bindings bindings old-env ctx)
+                       old-env)))
+          (%compile-labels-tail-functions tail-infos bindings env ctx))
+        (%compile-body-with-tail body body-tail ctx)))))
 
 (defun %labels-create-boxes (bindings ctx)
   "Phase 1 of labels compilation: allocate a cons-cell box per binding.
@@ -382,12 +415,12 @@ Returns (func-infos forward-env) where each info is (name label closure-reg box-
          (closure-reg (third info))
          (box-reg     (fourth info))
          (params      (fifth info))
-          (binding-data (assoc name bindings :test #'eq))
+         (binding-data (assoc name bindings :test #'eq))
          (body-forms  (cddr binding-data))
          (free-vars   (remove-if (lambda (v) (member v params :test #'eq))
                                  (free-vars-of-list body-forms)))
-          (captured    (trim-captured-vars (%capture-candidates-from-env (ctx-env ctx))
-                                           free-vars))
+         (captured    (trim-captured-vars (%capture-candidates-from-env (ctx-env ctx))
+                                          free-vars))
          (param-regs  (loop repeat (length params) collect (make-register ctx)))
          (skip-label  (make-label ctx "labels_skip")))
     (setf captured (%canonical-shared-captures captured shared-captures))
@@ -407,25 +440,10 @@ Returns (func-infos forward-env) where each info is (name label closure-reg box-
          (old-env          (ctx-env ctx))
          (old-labels-boxes *labels-boxed-fns*)
          (optimized-names  (%tail-only-local-scc-names bindings body tail)))
-    (unwind-protect
-         (if optimized-names
-             (%compile-labels-with-tail-sccs bindings body optimized-names tail old-env ctx)
-             (multiple-value-bind (func-infos forward-env)
-                 (%labels-create-boxes bindings ctx)
-               (setf *labels-boxed-fns* (append forward-env old-labels-boxes))
-                (setf (ctx-env ctx)      (append forward-env old-env))
-                (let ((shared-captures (%shared-sibling-capture-lists bindings (ctx-env ctx) ctx)))
-                  (dolist (info func-infos)
-                    (%labels-fill-closure info bindings ctx forward-env old-env shared-captures)))
-               (setf (ctx-env ctx)
-                     (append (mapcar (lambda (b)
-                                       (let ((n (first b)))
-                                         (cons n (lookup-var ctx n))))
-                                     bindings)
-                             old-env))
-               (%compile-body-with-tail body tail ctx)))
-      (setf (ctx-env ctx)      old-env)
-      (setf *labels-boxed-fns* old-labels-boxes))))
+    (%with-restored-labels-boxed-fns (old-labels-boxes)
+      (if optimized-names
+          (%compile-labels-with-tail-sccs bindings body optimized-names tail old-env ctx)
+          (%compile-labels-boxed-bindings bindings body tail old-env old-labels-boxes ctx)))))
 
 ;;; ── Assembly and type utilities ───────────────────────────────────────────
 

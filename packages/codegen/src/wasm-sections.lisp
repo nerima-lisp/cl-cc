@@ -152,37 +152,28 @@ the generated module."
 (defun emit-wat-elem (module stream)
   "Emit element-segment initialization for $funcref_table.
 
-When FR-237 bulk table operations are enabled, emit a passive element segment
-plus a start-time table.init/elem.drop initializer.  Otherwise keep the legacy
-active segment fallback."
+Emit a passive element segment plus a start-time table.init/elem.drop
+initializer."
   (let ((funcs (wasm-module-functions module)))
     (when funcs
-      (if (wasm-bulk-table-feature-enabled-p)
-          (progn
-            (format stream "~%  ;; FR-237: passive elem segment + table.init")
-            (format stream "~%  (elem $clcc_funcrefs func")
-            (dolist (func funcs)
-              (format stream " ~A" (wasm-func-wat-name func)))
-            (format stream ")")
-            (format stream "~%  (func $clcc_init_funcref_table")
-            (format stream "~%    ~A"
-                    (emit-wasm-table-init-wat "$funcref_table" "$clcc_funcrefs"
-                                              (wasm-table-const-wat 0)
-                                              (wasm-table-const-wat 0)
-                                              (wasm-table-const-wat (length funcs))))
-            (format stream "~%    ~A" (emit-wasm-elem-drop-wat "$clcc_funcrefs"))
-            (format stream "~%  )")
-            (format stream "~%  (start $clcc_init_funcref_table)")
-            (format stream "~%  ;; FR-237 helper forms available: ~A"
-                    (emit-wasm-table-copy-wat "$funcref_table" "$funcref_table"
-                                              (wasm-table-const-wat 0)
-                                              (wasm-table-const-wat 0)
-                                              (wasm-table-const-wat 0)))
-            (format stream "~%  ;; FR-237 helper forms available: ~A"
-                    (emit-wasm-table-fill-wat "$funcref_table" (wasm-table-const-wat 0) "(ref.null func)" (wasm-table-const-wat 0))))
-          (progn
-            (format stream "~%  (elem (table $funcref_table) (~A.const 0) func"
-                    (if (wasm-table64-feature-enabled-p) "i64" "i32"))
-            (dolist (func funcs)
-              (format stream " ~A" (wasm-func-wat-name func)))
-            (format stream ")"))))))
+      (format stream "~%  ;; FR-237: passive elem segment + table.init")
+      (format stream "~%  (elem $clcc_funcrefs func")
+      (dolist (func funcs)
+        (format stream " ~A" (wasm-func-wat-name func)))
+      (format stream ")")
+      (format stream "~%  (func $clcc_init_funcref_table")
+      (format stream "~%    ~A"
+              (emit-wasm-table-init-wat "$funcref_table" "$clcc_funcrefs"
+                                        (wasm-table-const-wat 0)
+                                        (wasm-table-const-wat 0)
+                                        (wasm-table-const-wat (length funcs))))
+      (format stream "~%    ~A" (emit-wasm-elem-drop-wat "$clcc_funcrefs"))
+      (format stream "~%  )")
+      (format stream "~%  (start $clcc_init_funcref_table)")
+      (format stream "~%  ;; FR-237 helper forms available: ~A"
+              (emit-wasm-table-copy-wat "$funcref_table" "$funcref_table"
+                                        (wasm-table-const-wat 0)
+                                        (wasm-table-const-wat 0)
+                                        (wasm-table-const-wat 0)))
+      (format stream "~%  ;; FR-237 helper forms available: ~A"
+              (emit-wasm-table-fill-wat "$funcref_table" (wasm-table-const-wat 0) "(ref.null func)" (wasm-table-const-wat 0))))))

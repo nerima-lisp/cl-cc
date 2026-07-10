@@ -94,7 +94,9 @@
 
 (defun vm-invoke-debugger (condition &optional vm-state labels)
   "Invoke the debugger for CONDITION, honoring *DEBUGGER-HOOK* and restarts."
-  (when vm-state
+  (when (and vm-state
+             (or (not (typep condition 'vm-fatal-error))
+                 (vm-fatal-error-print-backtrace-p condition)))
     (ignore-errors (vm-print-backtrace vm-state :labels labels)))
   (if *debugger-hook*
       (funcall *debugger-hook* condition nil)

@@ -8,6 +8,9 @@
 
 (in-suite macros-setops-suite)
 
+(defun %quoted-form (value)
+  `(quote ,value))
+
 (deftest-each macros-setops-expand-to-let
   "All set-operation macros expand to a LET at the top level."
   :cases (("remove"            '(remove x xs))
@@ -78,3 +81,21 @@
   "set-difference removes elements of second list from first."
   (let ((result (run-string "(sort (set-difference '(1 2 3) '(2)) #'<)")))
     (assert-equal '(1 3) result)))
+
+(deftest-each macros-setops-hash-fast-path-expands
+  "Large compatible set operations expand to a hash-table fast path."
+  :cases (("union"
+           `(union ,(%quoted-form (loop for i below 24 collect i))
+                   ,(%quoted-form '(24 25))
+                   :test #'eql))
+          ("set-difference"
+           `(set-difference ,(%quoted-form (loop for i below 24 collect i))
+                            ,(%quoted-form '(1 2))
+                            :test #'eql))
+          ("intersection"
+           `(intersection ,(%quoted-form (loop for i below 24 collect i))
+                          ,(%quoted-form '(1 2))
+                          :test #'eql)))
+  (form)
+  (let ((expanded (our-macroexpand-1 form)))
+    (assert-true (%tree-contains-head-p 'make-hash-table expanded))))

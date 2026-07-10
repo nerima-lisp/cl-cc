@@ -16,14 +16,15 @@
   "Compile a top-level macro definition.
 Registers the macro expander at compile time so subsequent forms can use it.
 At runtime, defmacro evaluates to the macro name."
-  (%with-no-tail-position ctx
-    (let ((name (ast-defmacro-name node))
-        (lambda-list (ast-defmacro-lambda-list node))
-        (body (ast-defmacro-body node)))
-    (cl-cc/expand:register-macro name (cl-cc/expand:make-macro-expander lambda-list body))
-    (let ((dst (make-register ctx)))
-      (emit ctx (make-vm-const :dst dst :value name))
-      dst)))
+  (%call-with-no-tail-position ctx
+    (lambda ()
+      (let ((name (ast-defmacro-name node))
+            (lambda-list (ast-defmacro-lambda-list node))
+            (body (ast-defmacro-body node)))
+        (cl-cc/expand:register-macro name (cl-cc/expand:make-macro-expander lambda-list body))
+        (let ((dst (make-register ctx)))
+          (emit ctx (make-vm-const :dst dst :value name))
+          dst)))))
 
 ;;; Parameter-list helpers (allocate-defaulting-params, allocate-extended-params,
 ;;; rest-param-stack-alloc-p, emit-supplied-p-checks, emit-non-constant-defaults,

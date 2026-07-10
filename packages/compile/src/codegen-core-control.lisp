@@ -18,29 +18,33 @@
                  last-reg)))
     (scan body nil)))
 
-(defun %compile-body-with-tail-ret (body tail ctx)
-  "Compile BODY with tail tracking and emit a return from the last result."
-  (let ((last-reg (%compile-body-with-tail body tail ctx)))
-    (%with-no-tail-position ctx
-      (emit ctx (make-vm-ret :reg last-reg)))))
-
-(defmacro %with-no-tail-position (ctx &body body)
-  "Clear tail-position tracking for BODY without restoring the prior value."
-  `(progn
-     (setf (ctx-tail-position ,ctx) nil)
-     ,@body))
-
 (defmacro %with-restored-tail-position (ctx &body body)
   "Run BODY with CTX tail-position restored afterward."
   `(let ((old-tail (ctx-tail-position ,ctx)))
      (unwind-protect
           (progn ,@body)
        (setf (ctx-tail-position ,ctx) old-tail))))
+
+(defmacro %with-restored-ctx-env ((accessor ctx new-env) &body body)
+  "Set CTX env ACCESSOR to NEW-ENV for BODY, restoring the original afterward."
+  `(let ((old-env (,accessor ,ctx)))
+     (unwind-protect
+          (progn
+            (setf (,accessor ,ctx) ,new-env)
+            ,@body)
+       (setf (,accessor ,ctx) old-env))))
+
+(defun %compile-body-with-tail-ret (body tail ctx)
+  "Compile BODY with tail tracking and emit a return from the last result."
+  (let ((last-reg (%compile-body-with-tail body tail ctx)))
+    (%call-with-no-tail-position ctx
+      (lambda ()
+        (emit ctx (make-vm-ret :reg last-reg))))))
 ;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;; Codegen — Control Flow, Assignment, and Type Assertions
 ;;;
 ;;; Contains: %compile-body/k, %compile-body-with-tail, %compile-body-with-tail-ret,
-;;; %with-no-tail-position, %with-restored-tail-position,
+;;; %with-restored-tail-position,
 ;;; lookup-block, compile-ast for ast-block/ast-return-from,
 ;;; lookup-tag, compile-ast for ast-tagbody/ast-go,
 ;;; compile-ast for ast-setq/ast-quote/ast-the,
@@ -55,28 +59,28 @@
 ;;; ── Control flow: block / return-from ────────────────────────────────────
 ;;; (Let-binding optimization subsystem is in codegen-core-let.lisp.)
 
-(defun lookup-block (ctx name)
-  "Look up a block by name, returning (exit-label . result-reg) or error."
-  (let ((entry (%assoc-eq name (ctx-block-env ctx))))
+(defun %lookup-associated-entry (env name error-format)
+  "Return the cdr of NAME in ENV or signal ERROR-FORMAT."
+  (let ((entry (%assoc-eq name env)))
     (if entry
         (cdr entry)
-        (error "Unknown block: ~S" name))))
+        (error error-format name))))
+
+(defun lookup-block (ctx name)
+  "Look up a block by name, returning (exit-label . result-reg) or error."
+  (%lookup-associated-entry (ctx-block-env ctx) name "Unknown block: ~S"))
 
 (defmethod compile-ast ((node ast-block) ctx)
   (%with-no-tail-position ctx
     (let* ((block-name (ast-block-name node))
            (exit-label (make-label ctx "block_exit"))
            (result-reg (make-register ctx))
-           (old-block-env (ctx-block-env ctx)))
-      (unwind-protect
-           (progn
-             (setf (ctx-block-env ctx)
-                   (cons (cons block-name (cons exit-label result-reg))
-                         (ctx-block-env ctx)))
-             (emit ctx (make-vm-move
-                        :dst result-reg
-                        :src (%compile-body/k (ast-block-body node) ctx #'identity))))
-        (setf (ctx-block-env ctx) old-block-env))
+           (block-env (cons (cons block-name (cons exit-label result-reg))
+                            (ctx-block-env ctx))))
+      (%with-restored-ctx-env (ctx-block-env ctx block-env)
+        (emit ctx (make-vm-move
+                   :dst result-reg
+                   :src (%compile-body/k (ast-block-body node) ctx #'identity))))
       (emit ctx (make-vm-label :name exit-label))
       result-reg)))
 
@@ -94,10 +98,7 @@
 
 (defun lookup-tag (ctx tag)
   "Look up a tag within the current tagbody, returning its label or error."
-  (let ((entry (%assoc-eq tag (ctx-tagbody-env ctx))))
-    (if entry
-        (cdr entry)
-        (error "Unknown tag: ~S" tag))))
+  (%lookup-associated-entry (ctx-tagbody-env ctx) tag "Unknown tag: ~S"))
 
 (defmethod compile-ast ((node ast-tagbody) ctx)
   (%with-no-tail-position ctx
@@ -105,24 +106,19 @@
            (tags (ast-tagbody-tags node))
            (end-label (make-label ctx "tagbody_end"))
            (result-reg (make-register ctx))
-           (old-tagbody-env (ctx-tagbody-env ctx))
-           (tag-labels nil))
-      (setq tag-labels (loop for tag-entry in tags
+           (tag-labels (loop for tag-entry in tags
                              collect (cons (car tag-entry) (make-label ctx "tag"))))
-      (unwind-protect
-           (progn
-             (setf (ctx-tagbody-env ctx) (append tag-labels (ctx-tagbody-env ctx)))
-             (if tag-labels
-                 (emit ctx (make-vm-jump :label (cdr (car tag-labels))))
-                 (emit ctx (make-vm-const :dst result-reg :value nil)))
-             (loop for tag-entry in tags
-                   do (let* ((tag   (car tag-entry))
-                             (forms (cdr tag-entry))
-                             (label (cdr (%assoc-eq tag tag-labels))))
-                        (emit ctx (make-vm-label :name label))
-                        (dolist (form forms) (compile-ast form ctx))
-                        (when forms (emit ctx (make-vm-jump :label end-label))))))
-        (setf (ctx-tagbody-env ctx) old-tagbody-env))
+           (tagbody-env (append tag-labels (ctx-tagbody-env ctx))))
+      (%with-restored-ctx-env (ctx-tagbody-env ctx tagbody-env)
+        (if tag-labels
+            (emit ctx (make-vm-jump :label (cdr (car tag-labels))))
+            (emit ctx (make-vm-const :dst result-reg :value nil)))
+        (loop for tag-entry in tags
+              do (let* ((tag   (car tag-entry))
+                        (forms (cdr tag-entry))
+                        (label (%lookup-associated-entry tag-labels tag "Unknown tag: ~S")))
+                   (emit ctx (make-vm-label :name label))
+                   (dolist (form forms) (compile-ast form ctx)))))
       (emit ctx (make-vm-label :name end-label))
       (emit ctx (make-vm-const :dst result-reg :value nil))
       result-reg)))
@@ -130,7 +126,7 @@
 (defmethod compile-ast ((node ast-go) ctx)
   (let ((label (lookup-tag ctx (ast-go-tag node))))
     (emit ctx (make-vm-jump :label label)))
-  (make-register ctx))
+  (%emit-constant ctx nil))
 
 ;;; ── Assignment: setq / quote / the ──────────────────────────────────────
 
@@ -206,32 +202,45 @@ When EMIT-FAILURE-P is NIL, keep the lightweight type check but omit failure han
 
 (defmethod compile-ast ((node ast-the) ctx)
   "Compile a type declaration. In typed-function mode, verifies the type at compile time."
-  (let ((reg (compile-ast (ast-the-value node) ctx)))
-    (let* ((declared (ast-the-type node))
-           (declared-spec (and declared (parse-type-specifier declared))))
-      (when *compiling-typed-fn*
-        (when (and declared-spec
-                   (not (and (typep (ast-the-value node) 'ast-var)
-                             (let ((proven (%ast-proven-type ctx (ast-the-value node))))
-                               (and proven
-                                    (type-equal-p proven declared-spec))))))
-          (handler-case
-              (check (ast-the-value node) declared-spec
-                                (or (ctx-type-env ctx)
-                                    (type-env-empty)))
-            (type-mismatch-error (e)
-              (error 'ast-compilation-error
-                     :location (format nil "~A:~A"
-                                       (ast-source-file node)
-                                       (ast-source-line node))
-                     :format-control "Type error in ~A: ~A"
-                     :format-arguments (list *compiling-typed-fn*
-                                             (type-error-message-from-mismatch e))))
-            (type-inference-error () nil))))
-      (if (and declared-spec
-               (typep (ast-the-value node) 'ast-var)
-               (let ((proven (%ast-proven-type ctx (ast-the-value node))))
-                 (and proven (type-equal-p proven declared-spec))))
-           (%emit-the-runtime-assertion ctx reg declared :emit-failure-p nil)
-           (%emit-the-runtime-assertion ctx reg declared))
-      reg)))
+  (let* ((value (ast-the-value node))
+         (transparent-value (%ast-transparent-designator-node value))
+         (reg (compile-ast value ctx))
+         (declared (ast-the-type node))
+         (declared-spec (and declared (parse-type-specifier declared)))
+         (proven-type (and (typep transparent-value 'ast-var)
+                           (%ast-proven-type ctx transparent-value)))
+         (proven-type-matches-p (and proven-type
+                                     declared-spec
+                                     (type-equal-p proven-type declared-spec))))
+    (when *compiling-typed-fn*
+      (when (and declared-spec
+                 (not proven-type-matches-p))
+        (handler-case
+            (check transparent-value declared-spec
+                   (or (ctx-type-env ctx)
+                       (type-env-empty)))
+          (type-mismatch-error (e)
+            (error 'ast-compilation-error
+                   :location (format nil "~A:~A"
+                                     (ast-source-file node)
+                                     (ast-source-line node))
+                   :format-control "Type error in ~A: ~A"
+                   :format-arguments (list *compiling-typed-fn*
+                                           (type-error-message-from-mismatch e))))
+          (type-inference-error () nil))))
+    (cond
+      ;; Statically proven (e.g. nested `the`, or a type-env fact): the
+      ;; assertion is fully redundant, so emit nothing.
+      ((and proven-type-matches-p
+            (not (and (typep transparent-value 'ast-var)
+                      (member (ast-var-name transparent-value)
+                              (ctx-guard-narrowed-vars ctx)
+                              :test #'eq))))
+       nil)
+      ;; Proven only by a runtime flow guard: keep the lightweight type check
+      ;; but omit the failure path, since the guard already established the type.
+      (proven-type-matches-p
+       (%emit-the-runtime-assertion ctx reg declared :emit-failure-p nil))
+      (t
+       (%emit-the-runtime-assertion ctx reg declared)))
+    reg))

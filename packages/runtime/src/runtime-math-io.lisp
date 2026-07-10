@@ -201,9 +201,8 @@ than by host weak tables, so the backing table is always strong."
         (let ((weak-table (%make-rt-weak-hash-table
                            :table table
                            :weakness weakness
-                           :entries (cl:make-hash-table :test test
-                                                        :rehash-size rehash-size
-                                                        :rehash-threshold rehash-threshold))))
+                           :entries (%rt-make-backing-hash-table
+                                     test nil rehash-size rehash-threshold nil))))
           (pushnew weak-table *rt-weak-hash-table-registry* :test #'eq)
           weak-table)
         table)))

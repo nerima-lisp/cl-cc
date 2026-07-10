@@ -32,8 +32,9 @@
   (let (start1 end1 start2 end2)
     (loop for kv on (cddr args) by #'cddr
           while (cdr kv)
-          when (and (typep (car kv) 'ast-var) (keywordp (ast-var-name (car kv))))
-            do (let ((name (ast-var-name (car kv))) (val (cadr kv)))
+          for key = (%phase2-transparent-node (car kv))
+          when (and (typep key 'ast-var) (keywordp (ast-var-name key)))
+            do (let ((name (ast-var-name key)) (val (cadr kv)))
                  (cond ((eq name :start1) (setf start1 val))
                        ((eq name :end1)   (setf end1   val))
                        ((eq name :start2) (setf start2 val))
@@ -76,8 +77,9 @@
   (let (start end)
     (loop for kv on (cdr args) by #'cddr
           while (cdr kv)
-          when (and (typep (car kv) 'ast-var) (keywordp (ast-var-name (car kv))))
-            do (let ((name (ast-var-name (car kv))) (val (cadr kv)))
+          for key = (%phase2-transparent-node (car kv))
+          when (and (typep key 'ast-var) (keywordp (ast-var-name key)))
+            do (let ((name (ast-var-name key)) (val (cadr kv)))
                  (cond ((eq name :start) (setf start val))
                        ((eq name :end)   (setf end   val)))))
     (values (first args) start end)))

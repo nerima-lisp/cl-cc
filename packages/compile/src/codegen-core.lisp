@@ -29,6 +29,19 @@
                  pool)
       copy)))
 
+(defun %call-with-no-tail-position (ctx thunk)
+  "Call THUNK with CTX tail-position cleared, then restore the previous value."
+  (let ((old-tail (ctx-tail-position ctx)))
+    (unwind-protect
+         (progn
+           (setf (ctx-tail-position ctx) nil)
+           (funcall thunk))
+      (setf (ctx-tail-position ctx) old-tail))))
+
+(defmacro %with-no-tail-position (ctx &body body)
+  "Clear tail-position tracking while evaluating BODY."
+  `(%call-with-no-tail-position ,ctx (lambda () ,@body)))
+
 (defun %poolable-literal-p (value)
   "Return T when VALUE is a literal kind safe to deduplicate in the constant pool."
   (or (integerp value)
@@ -85,6 +98,18 @@ Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table.
         (emit ctx (make-vm-const :dst target-reg :value value))
         target-reg)))
 
+(defun %emit-vm-branch-boolean-as-cl-boolean (ctx predicate-reg result-reg label-prefix)
+  "Convert a VM branch boolean in PREDICATE-REG into Common Lisp T/NIL."
+  (let ((false-label (make-label ctx (format nil "~A_false" label-prefix)))
+        (end-label (make-label ctx (format nil "~A_end" label-prefix))))
+    (emit ctx (make-vm-jump-zero :reg predicate-reg :label false-label))
+    (%emit-constant ctx t :dst result-reg)
+    (emit ctx (make-vm-jump :label end-label))
+    (emit ctx (make-vm-label :name false-label))
+    (%emit-constant ctx nil :dst result-reg)
+    (emit ctx (make-vm-label :name end-label))
+    result-reg))
+
 ;;; ── Binary operator dispatch table (data layer) ──────────────────────────
 ;;;
 ;;; One table carries every constructor variant for a numeric/comparison operator.
@@ -102,6 +127,13 @@ Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table.
     (<= :generic make-vm-le     :fixnum make-vm-le)
     (>= :generic make-vm-ge     :fixnum make-vm-ge))
   "(operator keyword constructor ...) specs for generic/fixnum/float binop codegen.")
+
+(defparameter *numeric-comparison-binops* '(= < > <= >=)
+  "Numeric binops whose VM result must be normalized to Common Lisp T/NIL in value position.")
+
+(defun %numeric-comparison-binop-p (op)
+  "Return T when OP produces a VM branch boolean rather than an arithmetic value."
+  (member op *numeric-comparison-binops* :test #'eq))
 
 (defun %lookup-numeric-binop-ctor-symbol (op kind)
   "Return the constructor symbol for OP/KIND, or NIL when no specialization exists."
@@ -164,6 +196,8 @@ Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table.
 
 (defun %float-literal-node-p (node)
   "Return T if NODE is a quoted float literal."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node)))
   (and (typep node 'ast-quote) (floatp (ast-quote-value node))))
 
 (defun %numeric-binop-constructor (op lhs rhs ctx)
@@ -272,15 +306,18 @@ failing at compile time."
   (%with-no-tail-position ctx
     (let* ((lhs-ast (ast-binop-lhs node))
            (rhs-ast (ast-binop-rhs node))
+           (op (ast-binop-op node))
            (lhs-reg (compile-ast lhs-ast ctx))
            ;; Protect LHS-REG across RHS: if RHS contains a call (e.g.
            ;; `(+ (* n n) (f x))'), the call must save/restore the LHS temp instead
            ;; of clobbering it — incremental liveness can't see LHS's future use here.
            (rhs-reg (%compile-operand-protecting rhs-ast ctx (list lhs-reg)))
            (dst (make-register ctx))
+           (comparison-p (%numeric-comparison-binop-p op))
+           (result-reg (if comparison-p (make-register ctx) dst))
            (kind (%numeric-binop-specialization-kind lhs-ast rhs-ast ctx))
            (guard-type (%guard-type-for-numeric-kind kind))
-           (ctor (%numeric-binop-constructor (ast-binop-op node) lhs-ast rhs-ast ctx)))
+           (ctor (%numeric-binop-constructor op lhs-ast rhs-ast ctx)))
       (if (and (eq (ctx-target ctx) :vm)
                kind guard-type (> (ctx-safety ctx) 0))
           (let ((deopt-label (make-label ctx "deopt_binop"))
@@ -291,15 +328,17 @@ failing at compile time."
                        :src lhs-reg :type-name guard-type :label deopt-label :id deopt-id))
             (emit ctx (cl-cc/vm::make-vm-type-check
                        :src rhs-reg :type-name guard-type :label deopt-label :id deopt-id))
-            (emit ctx (funcall ctor :dst dst :lhs lhs-reg :rhs rhs-reg))
+            (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg))
             (emit ctx (make-vm-jump :label done-label))
             (emit ctx (make-vm-label :name deopt-label))
             (emit ctx (cl-cc/vm::make-vm-deopt
                        :label slow-label :id deopt-id :reason (list :type-check guard-type)))
             (emit ctx (make-vm-label :name slow-label))
-            (emit ctx (funcall (binop-ctor (ast-binop-op node)) :dst dst :lhs lhs-reg :rhs rhs-reg))
+            (emit ctx (funcall (binop-ctor op) :dst result-reg :lhs lhs-reg :rhs rhs-reg))
             (emit ctx (make-vm-label :name done-label)))
-          (emit ctx (funcall ctor :dst dst :lhs lhs-reg :rhs rhs-reg)))
+          (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg)))
+      (when comparison-p
+        (%emit-vm-branch-boolean-as-cl-boolean ctx result-reg dst "binop_bool"))
       dst)))
 
 (defmethod compile-ast ((node ast-progn) ctx)
@@ -357,16 +396,24 @@ Only removes the inner test when the condition matches exactly."
   "Compile one branch of an IF into CTX with type-env narrowing.
 Emits a move from the branch result into DST; optionally emits a jump to JUMP-LABEL."
   (setf (ctx-tail-position ctx) tail)
-  (let ((saved-type-env (ctx-type-env ctx)))
+  (let ((saved-type-env (ctx-type-env ctx))
+        (saved-guard-vars (ctx-guard-narrowed-vars ctx)))
     (unwind-protect
          (let ((*string-literal-pool* (%copy-string-literal-pool *string-literal-pool*)))
            (setf (ctx-type-env ctx) (%branch-type-env ctx guard-var guard-type branch))
+           ;; The :then branch proves GUARD-VAR at runtime via the guard test;
+           ;; record it so redundant `the` assertions keep a lightweight check
+           ;; but drop the failure path.
+           (when (and guard-var (eq branch :then))
+             (setf (ctx-guard-narrowed-vars ctx)
+                   (cons guard-var (ctx-guard-narrowed-vars ctx))))
            (let ((result-reg (compile-ast ast ctx)))
              (%with-no-tail-position ctx
                (emit ctx (make-vm-move :dst dst :src result-reg))
                (when jump-label
                  (emit ctx (make-vm-jump :label jump-label))))))
-      (setf (ctx-type-env ctx) saved-type-env))))
+      (setf (ctx-type-env ctx) saved-type-env)
+      (setf (ctx-guard-narrowed-vars ctx) saved-guard-vars))))
 
 (defmethod compile-ast ((node ast-if) ctx)
   (let* ((tail       (ctx-tail-position ctx))

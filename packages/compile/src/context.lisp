@@ -8,6 +8,8 @@
    (env :initform nil :accessor ctx-env)
    (type-env :initform nil :accessor ctx-type-env
               :documentation "Type environment accumulated during top-level compilation")
+   (guard-narrowed-vars :initform nil :accessor ctx-guard-narrowed-vars
+                        :documentation "Variable names whose type was proven by a runtime flow guard in the current branch. Such proofs are runtime-conditional, so redundant `the` assertions keep a lightweight type check but drop the failure path.")
    (safety :initarg :safety :initform 1 :accessor ctx-safety
            :documentation "Compiler safety level; 0 suppresses runtime type assertions.")
    (block-env :initform nil :accessor ctx-block-env
@@ -125,6 +127,7 @@ Stack-allocated noescape objects do not emit these instructions and are allowed.
     diagnostic))
 
 (defun %hash-table-keyword-ast-p (ast keyword)
+  (setf ast (%transparent-hash-table-designator ast))
   (or (and (typep ast 'ast-var) (eq (ast-var-name ast) keyword))
       (and (typep ast 'ast-quote) (eq (ast-quote-value ast) keyword))))
 
@@ -136,6 +139,8 @@ Stack-allocated noescape objects do not emit these instructions and are allowed.
 
 (defun %hash-table-test-symbol-from-ast (ast)
   (typecase ast
+    (ast-the
+     (%hash-table-test-symbol-from-ast (ast-the-value ast)))
     (ast-quote
      (let ((name (ast-quote-value ast)))
        (when (and (symbolp name) (%hash-table-test-symbol-p name)) name)))
@@ -143,9 +148,15 @@ Stack-allocated noescape objects do not emit these instructions and are allowed.
      (let ((name (ast-function-name ast)))
        (when (and (symbolp name) (%hash-table-test-symbol-p name)) name)))))
 
+(defun %transparent-hash-table-designator (node)
+  "Return NODE with transparent AST-THE wrappers stripped."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node))
+        finally (return node)))
+
 (defun %hash-table-make-hash-table-call-p (ast)
   (and (typep ast 'ast-call)
-       (let ((func (ast-call-func ast)))
+       (let ((func (%transparent-hash-table-designator (ast-call-func ast))))
          (or (eq func 'make-hash-table)
              (and (typep func 'ast-var)
                   (eq (ast-var-name func) 'make-hash-table))))))

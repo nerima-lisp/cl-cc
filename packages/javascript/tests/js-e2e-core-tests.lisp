@@ -11,7 +11,7 @@
 
 (defsuite cl-cc-javascript-e2e-serial-suite
   :description "JavaScript end-to-end execution tests"
-  :parent cl-cc-e2e-suite
+  :parent cl-cc-javascript-suite
   :parallel nil)
 
 (in-suite cl-cc-javascript-e2e-serial-suite)

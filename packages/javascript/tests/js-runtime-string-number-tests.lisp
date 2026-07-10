@@ -7,7 +7,7 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
+(in-suite cl-cc-javascript-suite)
 
 ;;; ─── String ──────────────────────────────────────────────────────────────────
 
@@ -159,15 +159,74 @@
   (fn args expected)
   (assert-= expected (apply fn args)))
 
+(deftest js-rt-math-max-min-empty
+  "Math.max() and Math.min() use the JS empty-argument identities."
+  (assert-true (cl-cc/javascript::%js-float-infinity-p
+                (cl-cc/javascript::%js-math-min)))
+  (assert-true (cl-cc/javascript::%js-float-infinity-p
+                (cl-cc/javascript::%js-math-max)))
+  (assert-true (plusp (cl-cc/javascript::%js-math-min)))
+  (assert-true (minusp (cl-cc/javascript::%js-math-max))))
+
+(deftest js-rt-math-negative-and-special-inputs
+  "Math.sqrt/log family and f16round handle NaN, infinities, zeros, and negative inputs."
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-sqrt -1.0d0)))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-log -1.0d0)))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-log2 -1.0d0)))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-log10 -1.0d0)))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-f16round cl-cc/javascript::*js-nan-float*)))
+  (assert-true (cl-cc/javascript::%js-float-infinity-p
+                (cl-cc/javascript::%js-math-f16round cl-cc/javascript::*js-inf-float*)))
+  (assert-= 0.0d0 (cl-cc/javascript::%js-math-f16round 0.0d0))
+  (assert-= 0.0d0 (cl-cc/javascript::%js-math-f16round 1.0d-8))
+  (assert-true (cl-cc/javascript::%js-float-infinity-p
+                (cl-cc/javascript::%js-math-f16round 65520.0d0))))
+
+(deftest js-rt-math-special-value-branches
+  "Math special-value branches pass through NaN/Infinity and propagate NaN."
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-abs cl-cc/javascript::*js-nan-float*)))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-sign cl-cc/javascript::*js-nan-float*)))
+  (dolist (fn (list #'cl-cc/javascript::%js-math-floor
+                    #'cl-cc/javascript::%js-math-ceil
+                    #'cl-cc/javascript::%js-math-trunc
+                    #'cl-cc/javascript::%js-math-round))
+    (assert-true (cl-cc/javascript::%js-float-nan-p
+                  (funcall fn cl-cc/javascript::*js-nan-float*)))
+    (assert-true (cl-cc/javascript::%js-float-infinity-p
+                  (funcall fn cl-cc/javascript::*js-inf-float*))))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-max 1 cl-cc/javascript::*js-nan-float* 3)))
+  (assert-true (cl-cc/javascript::%js-float-nan-p
+                (cl-cc/javascript::%js-math-min 1 cl-cc/javascript::*js-nan-float* 3))))
+
 (deftest js-rt-math-f16round
   "Math.f16round rounds numbers to IEEE binary16 precision."
   (assert-= 1.3369140625d0
             (cl-cc/javascript::%js-math-f16round 1.337d0))
   (assert-= 5.05078125d0
             (cl-cc/javascript::%js-math-f16round 5.05d0))
+  (assert-= 0.0d0
+            (cl-cc/javascript::%js-math-f16round -1.0d-8))
+  (assert-true
+   (cl-cc/javascript::%js-float-infinity-p
+    (cl-cc/javascript::%js-math-f16round -65520.0d0)))
   (assert-true
    (cl-cc/javascript::%js-float-infinity-p
     (cl-cc/javascript::%js-math-f16round 65520.0d0))))
+
+(deftest js-rt-math-round-half-even
+  "The half-even helper rounds ties toward the nearest even integer."
+  (assert-= 2 (cl-cc/javascript::%js-round-half-even 2.5d0))
+  (assert-= 4 (cl-cc/javascript::%js-round-half-even 3.5d0))
+  (assert-= -2 (cl-cc/javascript::%js-round-half-even -2.5d0))
+    (assert-= -4 (cl-cc/javascript::%js-round-half-even -3.5d0)))
 
 (deftest-each js-rt-math-extended-unary
   "Math hyperbolic and transcendental unaries map numeric inputs correctly."
@@ -179,6 +238,66 @@
           ("log1p-0"  #'cl-cc/javascript::%js-math-log1p  0     0.0d0))
   (fn x expected)
   (assert-true (< (abs (- expected (funcall fn x))) 1.0d-10)))
+
+(deftest-each js-rt-math-round-trunc
+  "Math.round() and Math.trunc() coerce and round numeric inputs correctly."
+  :cases (("round-half-up" #'cl-cc/javascript::%js-math-round 1.5d0 2.0d0)
+          ("trunc-fraction" #'cl-cc/javascript::%js-math-trunc 3.7d0 3.0d0))
+  (fn x expected)
+  (assert-= expected (funcall fn x)))
+
+(deftest-each js-rt-math-trig-basics
+  "Math trig functions map canonical inputs to canonical outputs."
+  :cases (("sin-0"   #'cl-cc/javascript::%js-math-sin   0.0d0 0.0d0)
+          ("cos-0"   #'cl-cc/javascript::%js-math-cos   0.0d0 1.0d0)
+          ("tan-0"   #'cl-cc/javascript::%js-math-tan   0.0d0 0.0d0)
+          ("asin-0"  #'cl-cc/javascript::%js-math-asin  0.0d0 0.0d0)
+          ("acos-1"  #'cl-cc/javascript::%js-math-acos  1.0d0 0.0d0)
+          ("atan-0"  #'cl-cc/javascript::%js-math-atan  0.0d0 0.0d0))
+  (fn x expected)
+  (assert-true (< (abs (- expected (funcall fn x))) 1.0d-10)))
+
+(deftest js-rt-math-atan2
+  "Math.atan2(y, x) matches the expected quadrant angle."
+  (let ((result (cl-cc/javascript::%js-math-atan2 1.0d0 1.0d0)))
+    (assert-true (< (abs (- result (atan 1.0d0))) 1.0d-10))))
+
+(deftest-each js-rt-math-exp-log
+  "Math.exp() and Math.log() family functions produce expected values."
+  :cases (("exp-0"   #'cl-cc/javascript::%js-math-exp   0.0d0 1.0d0)
+          ("log-1"   #'cl-cc/javascript::%js-math-log   1.0d0 0.0d0)
+          ("log2-8"  #'cl-cc/javascript::%js-math-log2  8.0d0 3.0d0)
+          ("log10-1k" #'cl-cc/javascript::%js-math-log10 1000.0d0 3.0d0))
+  (fn x expected)
+  (assert-true (< (abs (- expected (funcall fn x))) 1.0d-10)))
+
+(deftest js-rt-math-clz32-zero
+  "Math.clz32(0) returns 32."
+  (assert-= 32 (cl-cc/javascript::%js-math-clz32 0)))
+
+(deftest js-rt-math-imul-sign-extension
+  "Math.imul handles signed 32-bit wraparound."
+  (assert-= -2 (cl-cc/javascript::%js-math-imul -1 2)))
+
+(deftest-each js-rt-math-hypot-clz32-fround-imul
+  "Math.hypot(), clz32(), fround(), and imul() follow JS numeric behavior."
+  :cases (("hypot-3-4" #'cl-cc/javascript::%js-math-hypot '(3.0d0 4.0d0) 5.0d0)
+          ("clz32-1"   #'cl-cc/javascript::%js-math-clz32 '(1.0d0)      31.0d0)
+          ("imul-3-4"  #'cl-cc/javascript::%js-math-imul  '(3.0d0 4.0d0) 12.0d0))
+  (fn args expected)
+  (assert-= expected (apply fn args)))
+
+(deftest js-rt-math-fround
+  "Math.fround() rounds to single-precision."
+  (let* ((input 1.337d0)
+         (expected (coerce (coerce input 'single-float) 'double-float)))
+    (assert-true (< (abs (- expected (cl-cc/javascript::%js-math-fround input))) 1.0d-10))))
+
+(deftest js-rt-math-random-range
+  "Math.random() returns values in [0, 1)."
+  (let ((value (cl-cc/javascript::%js-math-random)))
+    (assert-true (<= 0.0d0 value))
+    (assert-true (< value 1.0d0))))
 
 ;;; ─── Number.prototype methods ────────────────────────────────────────────────
 

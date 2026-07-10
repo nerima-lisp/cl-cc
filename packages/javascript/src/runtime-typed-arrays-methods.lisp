@@ -1,8 +1,6 @@
 ;;;; packages/javascript/src/runtime-typed-arrays-methods.lisp — ES2023+ TypedArray methods
 ;;;;
 ;;;; ES2023 non-mutating methods (toReversed, toSorted, with, at, findLast, etc.)
-;;;; ES2025 Uint8Array hex/base64 encoding
-;;;; (toHex, toBase64, fromHex, fromBase64, setFromHex, setFromBase64)
 ;;;; *js-typed-array-methods* dispatch table (references fns from both files)
 ;;;;
 ;;;; Load order: after runtime-typed-arrays.lisp (needs struct, coerce helpers,
@@ -16,284 +14,127 @@
 
 ;;; ─── Shared helpers ─────────────────────────────────────────────────────────
 
-(defparameter +%js-base64-alphabet+
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-  "Base64 encoding alphabet (RFC 4648 standard encoding).")
-
 (defun %js-ta-clone-with-buffer (ta new-buf)
   "Return a new TypedArray with the same type/element-size as TA but backed by NEW-BUF."
   (make-js-typed-array :type-name (js-ta-type-name ta)
                         :element-size (js-ta-element-size ta)
                         :buffer new-buf :byte-offset 0 :length (length new-buf)))
 
-;;; ─── ES2023 non-mutating TypedArray methods ──────────────────────────────────
+;;; ─── Core TypedArray prototype methods ──────────────────────────────────────
 
-(defun %js-ta-to-reversed (ta)
-  "TypedArray.prototype.toReversed() — reversed copy."
+(defun %js-ta-set-from (ta source &optional (offset 0))
+  "TypedArray.prototype.set(array, offset)."
+  (let ((off (truncate (%js-to-number offset))))
+    (cond
+      ((js-typed-array-p source)
+       (dotimes (i (js-ta-length source))
+         (when (< (+ off i) (js-ta-length ta))
+           (setf (aref (js-ta-buffer ta) (+ off i))
+                 (%js-ta-coerce-element (js-ta-type-name ta) (aref (js-ta-buffer source) i))))))
+      ((%js-vec-p source)
+       (dotimes (i (length source))
+         (when (< (+ off i) (js-ta-length ta))
+           (setf (aref (js-ta-buffer ta) (+ off i))
+                 (%js-ta-coerce-element (js-ta-type-name ta) (aref source i)))))))
+    ta))
+
+(defun %js-ta-subarray (ta begin &optional end)
+  "TypedArray.prototype.subarray(begin, end)."
   (let* ((n (js-ta-length ta))
-         (new-buf (make-array n :element-type t :initial-element 0)))
+         (b (if (< begin 0) (max 0 (+ n begin)) (min begin n)))
+         (e (if (null end) n (if (< end 0) (max 0 (+ n end)) (min end n))))
+         (new-len (max 0 (- e b)))
+         (new-buf (subseq (js-ta-buffer ta) b (+ b new-len))))
+    (make-js-typed-array :type-name (js-ta-type-name ta)
+                         :element-size (js-ta-element-size ta)
+                         :buffer new-buf
+                         :byte-offset (* b (js-ta-element-size ta))
+                         :length new-len)))
+
+(defun %js-ta-slice (ta &optional (begin 0) end)
+  "TypedArray.prototype.slice — returns a copy."
+  (%js-ta-subarray ta begin end))
+
+(defun %js-ta-fill (ta value &optional (begin 0) end)
+  "TypedArray.prototype.fill(value, begin, end)."
+  (let* ((n (js-ta-length ta))
+         (b (if (< begin 0) (max 0 (+ n begin)) (min begin n)))
+         (e (if (null end) n (if (< end 0) (max 0 (+ n end)) (min end n))))
+         (coerced (%js-ta-coerce-element (js-ta-type-name ta) value)))
+    (loop for i from b below e
+          do (setf (aref (js-ta-buffer ta) i) coerced)))
+  ta)
+
+(defun %js-ta-to-array (ta)
+  "Convert TypedArray to plain JS array."
+  (let* ((n (js-ta-length ta))
+         (result (make-array n :element-type t :adjustable t :fill-pointer n)))
     (dotimes (i n)
-      (setf (aref new-buf i) (aref (js-ta-buffer ta) (- n 1 i))))
-    (%js-ta-clone-with-buffer ta new-buf)))
+      (setf (aref result i) (coerce (aref (js-ta-buffer ta) i) 'double-float)))
+    result))
 
-(defun %js-ta-to-sorted (ta &optional compare-fn)
-  "TypedArray.prototype.toSorted() — sorted copy."
-  (let* ((n (js-ta-length ta))
-         (new-buf (make-array n :element-type t :initial-element 0))
-         (sorted (sort (coerce (copy-seq (js-ta-buffer ta)) 'list)
-                       (if compare-fn
-                           (lambda (a b) (< (%js-to-number (%js-funcall compare-fn a b)) 0))
-                           #'<))))
-    (loop for v in sorted for i from 0 do (setf (aref new-buf i) v))
-    (%js-ta-clone-with-buffer ta new-buf)))
-
-(defun %js-ta-with (ta index value)
-  "TypedArray.prototype.with() — copy with one element replaced."
-  (let* ((n (js-ta-length ta))
-         (i (if (< index 0) (+ n index) index))
-         (new-buf (copy-seq (js-ta-buffer ta))))
-    (setf (aref new-buf i) (%js-ta-coerce-element (js-ta-type-name ta) value))
-    (%js-ta-clone-with-buffer ta new-buf)))
-
-(defun %js-ta-at (ta index)
-  "TypedArray.prototype.at() — negative indexing."
-  (let* ((n (js-ta-length ta))
-         (i (if (< index 0) (+ n index) index)))
-    (if (or (< i 0) (>= i n))
-        +js-undefined+
-        (coerce (aref (js-ta-buffer ta) i) 'double-float))))
-
-(defun %js-ta-find (ta fn)
-  "TypedArray.prototype.find()."
-  (dotimes (i (js-ta-length ta) +js-undefined+)
-    (let ((v (coerce (aref (js-ta-buffer ta) i) 'double-float)))
-      (when (%js-truthy (%js-funcall fn v i ta))
-        (return v)))))
-
-(defun %js-ta-find-index (ta fn)
-  "TypedArray.prototype.findIndex()."
-  (dotimes (i (js-ta-length ta) -1.0d0)
-    (let ((v (coerce (aref (js-ta-buffer ta) i) 'double-float)))
-      (when (%js-truthy (%js-funcall fn v i ta))
-        (return (coerce i 'double-float))))))
-
-(defun %js-ta-find-last (ta fn)
-  "TypedArray.prototype.findLast()."
-  (loop for i from (1- (js-ta-length ta)) downto 0
-        do (let ((v (coerce (aref (js-ta-buffer ta) i) 'double-float)))
-             (when (%js-truthy (%js-funcall fn v i ta))
-               (return v)))
-        finally (return +js-undefined+)))
-
-(defun %js-ta-find-last-index (ta fn)
-  "TypedArray.prototype.findLastIndex()."
-  (loop for i from (1- (js-ta-length ta)) downto 0
-        do (let ((v (coerce (aref (js-ta-buffer ta) i) 'double-float)))
-             (when (%js-truthy (%js-funcall fn v i ta))
-               (return (coerce i 'double-float))))
-        finally (return -1.0d0)))
-
-(defun %js-ta-every (ta fn)
-  "TypedArray.prototype.every()."
-  (dotimes (i (js-ta-length ta) t)
-    (unless (%js-truthy (%js-funcall fn (coerce (aref (js-ta-buffer ta) i) 'double-float) i ta))
-      (return nil))))
-
-(defun %js-ta-some (ta fn)
-  "TypedArray.prototype.some()."
-  (dotimes (i (js-ta-length ta) nil)
-    (when (%js-truthy (%js-funcall fn (coerce (aref (js-ta-buffer ta) i) 'double-float) i ta))
-      (return t))))
-
-(defun %js-ta-reverse (ta)
-  "TypedArray.prototype.reverse() — mutating."
-  (let ((n (js-ta-length ta)) (buf (js-ta-buffer ta)))
-    (loop for i below (floor n 2)
-          do (rotatef (aref buf i) (aref buf (- n 1 i)))))
-  ta)
-
-(defun %js-ta-sort (ta &optional compare-fn)
-  "TypedArray.prototype.sort() — mutating in-place sort."
-  (let* ((n (js-ta-length ta))
-         (sorted (if compare-fn
-                     (sort (coerce (js-ta-buffer ta) 'list)
-                           (lambda (a b) (< (%js-to-number (%js-funcall compare-fn a b)) 0)))
-                     (sort (coerce (js-ta-buffer ta) 'list) #'<))))
-    (loop for v in sorted for i from 0 do (setf (aref (js-ta-buffer ta) i) v)))
-  ta)
-
-(defun %js-ta-copy-within (ta target &optional (start 0) end)
-  "TypedArray.prototype.copyWithin()."
-  (let* ((n (js-ta-length ta))
-         (t1 (if (< target 0) (max 0 (+ n target)) (min target n)))
-         (s  (if (< start  0) (max 0 (+ n start))  (min start  n)))
-         (e  (if (null end) n (if (< end 0) (max 0 (+ n end)) (min end n)))))
-    (let ((src (subseq (js-ta-buffer ta) s e)))
-      (loop for v across src for i from t1 while (< i n)
-            do (setf (aref (js-ta-buffer ta) i) v))))
-  ta)
-
-(defun %js-ta-last-index-of (ta val &optional (from-index nil from-index-supplied-p))
-  "TypedArray.prototype.lastIndexOf()."
-  (let* ((target (%js-ta-coerce-element (js-ta-type-name ta) val))
+(defun %js-ta-index-of (ta search-element &optional (from-index 0))
+  "TypedArray.prototype.indexOf."
+  (let* ((target (%js-ta-coerce-element (js-ta-type-name ta) search-element))
          (n (js-ta-length ta))
-         (end (if from-index-supplied-p
-                  (let ((i (%js-array-to-integer from-index)))
-                    (if (< i 0) (+ n i) (min i (1- n))))
-                  (1- n))))
-    (if (< end 0)
-        -1.0d0
-        (loop for i from end downto 0
-              when (= (aref (js-ta-buffer ta) i) target)
-                return (coerce i 'double-float)
-              finally (return -1.0d0)))))
+         (start (%js-array-relative-start from-index n)))
+    (loop for i from start below n
+          when (= (aref (js-ta-buffer ta) i) target) return i
+          finally (return -1))))
 
-(defun %js-ta-values (ta)
-  "TypedArray.prototype.values() — returns an iterator."
-  (let ((i (list 0)) (n (js-ta-length ta)) (buf (js-ta-buffer ta)))
-    (%js-make-object
-     "next" (lambda ()
-               (if (< (car i) n)
-                   (prog1 (%js-make-object "value" (coerce (aref buf (car i)) 'double-float) "done" nil)
-                     (incf (car i)))
-                   (%js-make-object "value" +js-undefined+ "done" t)))
-     "@@iterator" (lambda () (gethash "@@iterator" (%js-ta-values ta))))))
-
-(defun %js-ta-keys (ta)
-  "TypedArray.prototype.keys()."
-  (let ((i (list 0)) (n (js-ta-length ta)))
-    (%js-make-object
-     "next" (lambda ()
-               (if (< (car i) n)
-                   (prog1 (%js-make-object "value" (coerce (car i) 'double-float) "done" nil)
-                     (incf (car i)))
-                   (%js-make-object "value" +js-undefined+ "done" t))))))
-
-(defun %js-ta-entries (ta)
-  "TypedArray.prototype.entries()."
-  (let ((i (list 0)) (n (js-ta-length ta)) (buf (js-ta-buffer ta)))
-    (%js-make-object
-     "next" (lambda ()
-               (if (< (car i) n)
-                   (let ((pair (%js-make-array (coerce (car i) 'double-float)
-                                               (coerce (aref buf (car i)) 'double-float))))
-                     (prog1 (%js-make-object "value" pair "done" nil)
-                       (incf (car i))))
-                   (%js-make-object "value" +js-undefined+ "done" t))))))
-
-;;; ─── ES2025: Uint8Array hex/base64 encoding ──────────────────────────────────
-
-(defun %js-uint8-to-hex (ta)
-  "Uint8Array.prototype.toHex() — ES2025. Returns lowercase hex pairs."
-  (string-downcase
-   (with-output-to-string (out)
-     (dotimes (i (js-ta-length ta))
-       (format out "~2,'0x" (aref (js-ta-buffer ta) i))))))
-
-(defun %js-uint8-from-hex (hex-str)
-  "Uint8Array.fromHex(string) — ES2025."
-  (let* ((s (%js-to-string hex-str))
-         (n (floor (length s) 2))
-         (ta (%js-make-typed-array "Uint8Array" n)))
-    (dotimes (i n ta)
-      (setf (aref (js-ta-buffer ta) i)
-            (parse-integer s :start (* 2 i) :end (* 2 (1+ i)) :radix 16)))))
-
-(defun %js-uint8-to-base64 (ta &optional opts)
-  "Uint8Array.prototype.toBase64() — ES2025."
-  (declare (ignore opts))
-  (let* ((alphabet +%js-base64-alphabet+)
+(defun %js-ta-includes (ta search-element &optional (from-index 0))
+  "TypedArray.prototype.includes."
+  (let* ((target (%js-ta-coerce-element (js-ta-type-name ta) search-element))
          (n (js-ta-length ta))
-         (buf (js-ta-buffer ta)))
+         (start (%js-array-relative-start from-index n)))
+    (loop for i from start below n
+          when (%js-same-value-zero (aref (js-ta-buffer ta) i) target) return t
+          finally (return nil))))
+
+(defun %js-ta-join (ta &optional (sep ","))
+  "TypedArray.prototype.join."
+  (let ((sep-str (%js-to-string sep)))
     (with-output-to-string (out)
-      (loop for i from 0 below n by 3
-            do (let* ((b0 (aref buf i))
-                      (b1 (if (< (1+ i) n) (aref buf (1+ i)) 0))
-                      (b2 (if (< (+ i 2) n) (aref buf (+ i 2)) 0)))
-                 (write-char (char alphabet (ash b0 -2)) out)
-                 (write-char (char alphabet (logior (ash (logand b0 3) 4) (ash b1 -4))) out)
-                 (write-char (if (< (1+ i) n) (char alphabet (logior (ash (logand b1 15) 2) (ash b2 -6))) #\=) out)
-                 (write-char (if (< (+ i 2) n) (char alphabet (logand b2 63)) #\=) out))))))
+      (dotimes (i (js-ta-length ta))
+        (when (> i 0) (write-string sep-str out))
+        (write-string (format nil "~A" (aref (js-ta-buffer ta) i)) out)))))
 
-(defun %js-uint8-from-base64 (b64-str &optional opts)
-  "Uint8Array.fromBase64(string) — ES2025."
-  (declare (ignore opts))
-  (let* ((s (string-trim '(#\Space #\Tab #\Newline #\Return) (%js-to-string b64-str)))
-         (alphabet +%js-base64-alphabet+)
-         (bytes (make-array 0 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0)))
-    (flet ((dc (ch) (or (position ch alphabet) 0)))
-      (loop for i from 0 below (length s) by 4
-            when (< (+ i 3) (length s))
-            do (let* ((g0 (dc (char s i)))
-                      (g1 (dc (char s (1+ i))))
-                      (g2 (if (char= (char s (+ i 2)) #\=) 0 (dc (char s (+ i 2)))))
-                      (g3 (if (char= (char s (+ i 3)) #\=) 0 (dc (char s (+ i 3))))))
-                 (vector-push-extend (logior (ash g0 2) (ash g1 -4)) bytes)
-                 (unless (char= (char s (+ i 2)) #\=)
-                   (vector-push-extend (logior (ash (logand g1 15) 4) (ash g2 -2)) bytes))
-                 (unless (char= (char s (+ i 3)) #\=)
-                   (vector-push-extend (logior (ash (logand g2 3) 6) g3) bytes)))))
-    (let ((ta (%js-make-typed-array "Uint8Array" (length bytes))))
-      (loop for b across bytes for i from 0 do (setf (aref (js-ta-buffer ta) i) b))
-      ta)))
+(defun %js-ta-for-each (ta fn)
+  "TypedArray.prototype.forEach."
+  (dotimes (i (js-ta-length ta))
+    (%js-funcall fn (coerce (aref (js-ta-buffer ta) i) 'double-float) i ta))
+  +js-undefined+)
 
-(defun %js-uint8-copy-decoded-into (target decoded)
-  (let ((written (min (js-ta-length target) (js-ta-length decoded))))
-    (dotimes (i written)
-      (%js-ta-set target i (aref (js-ta-buffer decoded) i)))
-    written))
+(defun %js-ta-map (ta fn)
+  "TypedArray.prototype.map."
+  (let* ((n (js-ta-length ta))
+         (result (%js-make-typed-array (js-ta-type-name ta) n)))
+    (dotimes (i n)
+      (%js-ta-set result i (%js-funcall fn (coerce (aref (js-ta-buffer ta) i) 'double-float) i ta)))
+    result))
 
-(defun %js-uint8-set-from-hex (ta hex-str)
-  "Uint8Array.prototype.setFromHex(string) — ES2025."
-  (let* ((s (%js-to-string hex-str))
-         (decoded (%js-uint8-from-hex s))
-         (written (%js-uint8-copy-decoded-into ta decoded)))
-    (%js-make-object "read" (coerce (* written 2) 'double-float)
-                     "written" (coerce written 'double-float))))
+(defun %js-ta-filter (ta fn)
+  "TypedArray.prototype.filter."
+  (let ((results nil))
+    (dotimes (i (js-ta-length ta))
+      (let ((v (coerce (aref (js-ta-buffer ta) i) 'double-float)))
+        (when (%js-truthy (%js-funcall fn v i ta))
+          (push v results))))
+    (let* ((filtered (nreverse results))
+           (result (%js-make-typed-array (js-ta-type-name ta) (length filtered))))
+      (loop for v in filtered for i from 0
+            do (%js-ta-set result i v))
+      result)))
 
-(defun %js-uint8-set-from-base64 (ta b64-str &optional opts)
-  "Uint8Array.prototype.setFromBase64(string) — ES2025."
-  (let* ((s (string-trim '(#\Space #\Tab #\Newline #\Return)
-                         (%js-to-string b64-str)))
-         (decoded (%js-uint8-from-base64 s opts))
-         (written (%js-uint8-copy-decoded-into ta decoded)))
-    (%js-make-object "read" (coerce (length s) 'double-float)
-                     "written" (coerce written 'double-float))))
+(defun %js-ta-reduce (ta fn &optional (init +js-undefined+))
+  "TypedArray.prototype.reduce."
+  (let ((acc init) (first-p (eq init +js-undefined+)))
+    (dotimes (i (js-ta-length ta))
+      (let ((v (coerce (aref (js-ta-buffer ta) i) 'double-float)))
+        (if first-p
+            (setf acc v first-p nil)
+            (setf acc (%js-funcall fn acc v i ta)))))
+    acc))
 
-(defparameter *js-typed-array-method-table*
-  (list (cons "set"           #'%js-ta-set-from)
-        (cons "subarray"      #'%js-ta-subarray)
-        (cons "slice"         #'%js-ta-slice)
-        (cons "fill"          #'%js-ta-fill)
-        (cons "indexOf"       #'%js-ta-index-of)
-        (cons "lastIndexOf"   #'%js-ta-last-index-of)
-        (cons "includes"      #'%js-ta-includes)
-        (cons "join"          #'%js-ta-join)
-        (cons "forEach"       #'%js-ta-for-each)
-        (cons "map"           #'%js-ta-map)
-        (cons "filter"        #'%js-ta-filter)
-        (cons "reduce"        #'%js-ta-reduce)
-        (cons "find"          #'%js-ta-find)
-        (cons "findIndex"     #'%js-ta-find-index)
-        (cons "findLast"      #'%js-ta-find-last)
-        (cons "findLastIndex" #'%js-ta-find-last-index)
-        (cons "every"         #'%js-ta-every)
-        (cons "some"          #'%js-ta-some)
-        (cons "reverse"       #'%js-ta-reverse)
-        (cons "sort"          #'%js-ta-sort)
-        (cons "copyWithin"    #'%js-ta-copy-within)
-        (cons "at"            #'%js-ta-at)
-        (cons "toReversed"    #'%js-ta-to-reversed)
-        (cons "toSorted"      #'%js-ta-to-sorted)
-        (cons "with"          #'%js-ta-with)
-        (cons "values"        #'%js-ta-values)
-        (cons "keys"          #'%js-ta-keys)
-        (cons "entries"       #'%js-ta-entries)
-        (cons "toArray"       #'%js-ta-to-array)
-        (cons "@@iterator"    #'%js-ta-values)
-        ;; ES2025 Uint8Array hex/base64
-        (cons "toHex"         #'%js-uint8-to-hex)
-        (cons "toBase64"      #'%js-uint8-to-base64)
-        (cons "setFromHex"    #'%js-uint8-set-from-hex)
-        (cons "setFromBase64" #'%js-uint8-set-from-base64))
-  "TypedArray.prototype method dispatch.")
+;;; ES2023 non-mutating methods, iterators, and method table live in
+;;; runtime-typed-arrays-methods-es2023.lisp.

@@ -2,6 +2,20 @@
 
 (in-package :cl-cc/php)
 
+(defun %php-register-vm-runtime-callables ()
+  (let ((installer cl-cc/bootstrap:*vm-runtime-callable-installer*))
+    (when installer
+      (funcall installer "PHP-CURRENT-CLOSURE" #'%php-current-closure)))
+  (cl-cc/vm:vm-register-host-bridge
+   '%php-current-closure
+   (lambda (&rest args)
+     (apply (cl-cc/vm::%vm-runtime-callable "PHP-CURRENT-CLOSURE") args))))
+
+(defun %php-register-host-bridges ()
+  "Register PHP-specific host bridge aliases that bypass VM instruction names."
+  (cl-cc/vm:vm-register-host-bridge 'max #'%php-max)
+  (cl-cc/vm:vm-register-host-bridge 'min #'%php-min))
+
 (defparameter *php-builtin-registry* (make-hash-table :test #'equal)
   "Map lowercase PHP builtin names to Common Lisp helper functions.")
 
@@ -25,6 +39,9 @@
     (when symbol
       (setf (gethash key *php-builtin-symbol-registry*) symbol))
     fn))
+
+(eval-when (:load-toplevel :execute)
+  (%php-register-host-bridges))
 
 (defun %php-lookup-builtin (name)
   "Return the helper function registered for PHP builtin NAME, or NIL."
@@ -55,7 +72,7 @@
   (%php-register-builtin "print_r" '%php-print-r)
   (%php-register-builtin "var_dump" '%php-var-dump)
   (%php-register-builtin "gettype" '%php-gettype)
-  (%php-register-builtin "array_key_exists" '%php-array-key-exists)
+  (%php-register-builtin "array_key_exists" '%php-builtin-array-key-exists)
 
   ;; String.
   (%php-register-builtin "strlen" '%php-strlen)
@@ -244,7 +261,7 @@
   (%php-register-builtin "array_any"      '%php-array-any)
   (%php-register-builtin "array_all"      '%php-array-all)
 
-  ;; PHP 8.1 Fiber builtins are registered in php84-features.lisp (loaded later)
+  ;; PHP 8.1 Fiber builtins are registered in the late-loaded feature module.
   ;; after those functions are defined.
 
   ;; PHP Exception / Throwable helpers.
@@ -358,6 +375,12 @@
   (%php-register-builtin "strval" '%php-strval)
   (%php-register-builtin "boolval" '%php-boolval)
   (%php-register-builtin "filter_var" '%php-filter-var)
+  (%php-register-builtin "image_type_to_extension" '%php-image-type-to-extension)
+  (%php-register-builtin "image_type_to_mime_type" '%php-image-type-to-mime-type)
+  (%php-register-builtin "getimagesize" '%php-getimagesize)
+  (%php-register-builtin "exif_imagetype" '%php-exif-imagetype)
+  (%php-register-builtin "token_get_all" '%php-token-get-all)
+  (%php-register-builtin "token_name" '%php-token-name)
   (%php-register-builtin "settype" '%php-settype)
   (%php-seed-by-ref-param-registry *php-by-ref-param-registry*)
   (%php-register-builtin "get_debug_type" '%php-gettype)
@@ -402,6 +425,7 @@
   (%php-register-builtin "fgetc" '%php-fgetc)
   (%php-register-builtin "feof" '%php-feof)
   (%php-register-builtin "fflush" '%php-fflush)
+  (%php-register-builtin "flock" '%php-flock)
   (%php-register-builtin "fseek" '%php-fseek)
   (%php-register-builtin "ftell" '%php-ftell)
   (%php-register-builtin "rewind" '%php-rewind)
@@ -422,8 +446,14 @@
   (%php-register-builtin "get_exception_handler" '%php-get-exception-handler)
   (%php-register-builtin "restore_exception_handler" '%php-restore-exception-handler)
   (%php-register-builtin "error_reporting" '%php-error-reporting)
+  (%php-register-builtin "gc_collect_cycles" '%php-gc-collect-cycles)
   (%php-register-builtin "opcache_is_script_cached_in_file_cache" '%php-opcache-is-script-cached-in-file-cache)
   (%php-register-builtin "curl_share_init_persistent" '%php-curl-share-init-persistent)
+  (%php-register-builtin "curl_multi_get_handles" '%php-curl-multi-get-handles)
+  (%php-register-builtin "enchant_dict_remove_from_session" '%php-enchant-dict-remove-from-session)
+  (%php-register-builtin "enchant_dict_remove" '%php-enchant-dict-remove)
+  (%php-register-builtin "pg_close_stmt" '%php-pg-close-stmt)
+  (%php-register-builtin "pg_service" '%php-pg-service)
   (%php-register-builtin "trigger_error" '%php-trigger-error)
   (%php-register-builtin "user_error" '%php-trigger-error)
   (%php-register-builtin "exit" '%php-exit)
@@ -440,6 +470,14 @@
   (%php-register-builtin "header" '%php-header)
   (%php-register-builtin "headers_list" '%php-headers-list)
   (%php-register-builtin "headers_sent" '%php-headers-sent)
+  (%php-register-builtin "mail" '%php-mail)
+  (%php-register-builtin "setcookie" '%php-setcookie)
+  (%php-register-builtin "setrawcookie" '%php-setrawcookie)
+  (%php-register-builtin "session_name" '%php-session-name)
+  (%php-register-builtin "session_id" '%php-session-id)
+  (%php-register-builtin "session_set_cookie_params" '%php-session-set-cookie-params)
+  (%php-register-builtin "session_get_cookie_params" '%php-session-get-cookie-params)
+  (%php-register-builtin "session_start" '%php-session-start)
   (%php-register-builtin "scanf" '%php-scanf)
 
   ;; String misc.
@@ -452,6 +490,7 @@
 
   ;; Class / OOP introspection.
   (%php-register-builtin "class_exists" '%php-class-exists)
+  (%php-register-builtin "class_alias" '%php-class-alias)
   (%php-register-builtin "interface_exists" '%php-interface-exists)
   (%php-register-builtin "function_exists" '%php-function-exists)
   (%php-register-builtin "call_user_func" '%php-call-user-func)
@@ -525,4 +564,7 @@
             %php-lookup-builtin-symbol
             %php-array-pairs)
           :cl-cc/php)
+  (setf cl-cc/bootstrap:*runtime-vm-callable-register-hook*
+        #'%php-register-vm-runtime-callables)
+  (%php-register-vm-runtime-callables)
   (%php-register-all-builtins))

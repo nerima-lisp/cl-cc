@@ -59,6 +59,31 @@
   "%ast->compile-time-value returns NIL for a non-constant variable node."
   (assert-null (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-var :name 'x))))
 
+(deftest-each ast-constant-helpers-see-through-ast-the
+  "Constant helpers treat transparent ast-the wrappers as no-ops."
+  :cases (("number-value"
+           #'cl-cc/compile::%ast-constant-number-value
+           (cl-cc/ast:make-ast-the
+            :type 'integer
+            :value (cl-cc/ast:make-ast-quote :value 7))
+           7)
+          ("constant-node-p"
+           #'cl-cc/compile::%ast-constant-node-p
+           (cl-cc/ast:make-ast-the
+            :type 'integer
+            :value (cl-cc/ast:make-ast-int :value 7))
+           t)
+          ("compile-time-value"
+           #'cl-cc/compile::%ast->compile-time-value
+           (cl-cc/ast:make-ast-the
+            :type 'integer
+            :value (cl-cc/ast:make-ast-quote :value '(a b)))
+           '(a b)))
+  (fn node expected)
+  (if (eq expected t)
+      (assert-true (funcall fn node))
+      (assert-equal expected (funcall fn node))))
+
 ;;; ─── %compile-time-value->ast ─────────────────────────────────────────────
 
 (deftest compile-time-value->ast-wraps-integers-and-symbols
@@ -167,3 +192,36 @@
            (result (cl-cc/compile::optimize-ast node)))
       (assert-true (typep result 'cl-cc::ast-quote))
       (assert-eq 'cl:car (cl-cc/ast:ast-quote-value result)))))
+
+(deftest optimize-ast-folds-call-through-ast-the
+  "optimize-ast folds calls whose function position is wrapped in ast-the."
+  (%with-clean-ct-env
+    (let* ((node (cl-cc/ast:make-ast-call
+                  :func (cl-cc/ast:make-ast-the
+                         :type 'function
+                         :value (cl-cc/ast:make-ast-var :name 'intern))
+                  :args (list (cl-cc/ast:make-ast-quote :value "CAR")
+                              (cl-cc/ast:make-ast-quote :value :cl))))
+           (result (cl-cc/compile::optimize-ast node)))
+      (assert-true (typep result 'cl-cc::ast-quote))
+      (assert-eq 'cl:car (cl-cc/ast:ast-quote-value result)))))
+
+(deftest optimize-ast-folds-call-through-ast-function
+  "optimize-ast folds calls whose function position is an ast-function designator."
+  (%with-clean-ct-env
+    (let* ((node (cl-cc/ast:make-ast-call
+                  :func (cl-cc/ast:make-ast-function :name 'not)
+                  :args (list (cl-cc/ast:make-ast-quote :value nil))))
+           (result (cl-cc/compile::optimize-ast node)))
+      (assert-true (typep result 'cl-cc::ast-quote))
+      (assert-true (cl-cc/ast:ast-quote-value result)))))
+
+(deftest optimize-ast-folds-call-through-ast-quote
+  "optimize-ast folds calls whose function position is a quoted function symbol."
+  (%with-clean-ct-env
+    (let* ((node (cl-cc/ast:make-ast-call
+                  :func (cl-cc/ast:make-ast-quote :value 'not)
+                  :args (list (cl-cc/ast:make-ast-quote :value nil))))
+           (result (cl-cc/compile::optimize-ast node)))
+      (assert-true (typep result 'cl-cc::ast-quote))
+      (assert-true (cl-cc/ast:ast-quote-value result)))))

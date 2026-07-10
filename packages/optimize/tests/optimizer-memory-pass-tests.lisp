@@ -67,6 +67,18 @@
       (assert-eq :r2 (cl-cc/vm::vm-dst inst))
       (assert-eq :r5 (cl-cc/vm::vm-lhs inst)))))
 
+(deftest rewrite-inst-regs-substitutes-ssa-keyword-registers
+  "opt-rewrite-inst-regs substitutes SSA keyword registers, not only :R-number VM registers."
+  (let ((copies (make-hash-table :test #'eq)))
+    (setf (gethash :i copies) :i.1
+          (gethash :one copies) :one.0)
+    (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
+                 (make-vm-add :dst :i.3 :lhs :i :rhs :one)
+                 copies)))
+      (assert-eq :i.3 (cl-cc/vm::vm-dst inst))
+      (assert-eq :i.1 (cl-cc/vm::vm-lhs inst))
+      (assert-eq :one.0 (cl-cc/vm::vm-rhs inst)))))
+
 (deftest rewrite-inst-regs-never-rewrites-dst
   "opt-rewrite-inst-regs leaves dst unchanged even when the register appears in the copy map."
   (let* ((copies (make-hash-table :test #'eq)))

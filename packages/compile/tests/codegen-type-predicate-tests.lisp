@@ -28,3 +28,10 @@
   (if expected
       (assert-true  (cl-cc/compile::%float-literal-node-p node))
       (assert-false (cl-cc/compile::%float-literal-node-p node))))
+
+(deftest float-literal-node-p-sees-through-ast-the
+  "%float-literal-node-p treats transparent ast-the wrappers as no-ops."
+  (assert-true
+   (cl-cc/compile::%float-literal-node-p
+    (make-ast-the :type 'float
+                  :value (make-ast-quote :value 3.14)))))

@@ -27,10 +27,17 @@
         (funcall continuation value)
         (values nil nil))))
 
+(defun %transparent-ast-node (node)
+  "Return NODE with transparent ast-the wrappers removed."
+  (loop while (typep node 'ast-the)
+        do (setf node (ast-the-value node))
+        finally (return node)))
+
 ;;; ── Binop constant-fold helpers ──────────────────────────────────────────────
 
 (defun %ast-constant-number-value (node)
   "Return NODE's integer value when NODE is a constant AST integer."
+  (setf node (%transparent-ast-node node))
   (typecase node
     (ast-int   (ast-int-value node))
     (ast-quote (let ((v (ast-quote-value node)))
@@ -133,10 +140,12 @@ filling those fields from NODE."
 ;;; ── Compile-time evaluation helpers ─────────────────────────────────────────
 
 (defun %ast-constant-node-p (node)
+  (setf node (%transparent-ast-node node))
   (or (typep node 'ast-int)
       (typep node 'ast-quote)))
 
 (defun %ast->compile-time-value (node)
+  (setf node (%transparent-ast-node node))
   (typecase node
     (ast-int   (ast-int-value node))
     (ast-quote (ast-quote-value node))))

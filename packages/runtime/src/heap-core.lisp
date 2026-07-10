@@ -155,31 +155,12 @@ offset in [0, SIZE)."
         (random max-offset)
         0)))
 
-(defvar *rt-stack-guard-registry* (make-hash-table :test #'equal)
-  "Pure CL FR-376 registry of installed logical stack guard pages.")
-
 ;;; FR-376: Guard Pages for Stack Overflow Detection
 (defun rt-install-stack-guard (stack-base stack-size)
-  "Install a guard page at the end of the stack.
-
-Pure CL cannot change host page protection, so it records guard metadata in a
-plist registry. Native backends should implement the same interface with
-mprotect(PROT_NONE) plus sigaltstack/signal handling."
+  "Install a guard page at the end of the stack."
   (check-type stack-base integer)
   (check-type stack-size integer)
-  (let* ((page-size 4096)
-          (guard-size (if *rt-stack-guard-enabled* page-size 0))
-          (guard-base (max stack-base (- (+ stack-base stack-size) guard-size)))
-          (descriptor (list :installed *rt-stack-guard-enabled*
-                            :enabled *rt-stack-guard-enabled*
-                            :guard-size guard-size
-                            :stack-base stack-base
-                            :stack-size stack-size
-                            :guard-base guard-base
-                            :fault-signal :sigsegv
-                            :portable-fallback t)))
-    (setf (gethash (list stack-base stack-size) *rt-stack-guard-registry*) descriptor)
-    descriptor))
+  (error "RT-INSTALL-STACK-GUARD requires a native mprotect/signal backend."))
 
 ;;; ------------------------------------------------------------
 ;;; Sanitizer runtime toggles (FR-489..493 minimal runtime path)

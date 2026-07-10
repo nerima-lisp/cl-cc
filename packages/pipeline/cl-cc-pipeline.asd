@@ -9,7 +9,7 @@
 
 (asdf:defsystem :cl-cc-pipeline
   :description "Public compiler API: compile-string, run-string, our-eval"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-prolog :cl-cc-parse :cl-cc-php :cl-cc-javascript
@@ -24,6 +24,7 @@
    (:file "pipeline-data")
     (:file "arena")
     (:file "pipeline-incremental")
+   (:file "pipeline-runtime-bridges")
    (:file "pipeline")
    (:file "pipeline-runtime")
    (:file "pipeline-native")

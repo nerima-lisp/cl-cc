@@ -69,6 +69,13 @@
   (let ((entry (gethash "MOD" cl-cc/compile::*builtin-registry*)))
     (assert-eq :binary (cl-cc/compile::be-convention entry))))
 
+(deftest builtin-registry-bit-array-uses-ansi-ior-name
+  "Bit-array OR is registered under ANSI BIT-IOR, not the removed BIT-OR alias."
+  (let ((entry (gethash "BIT-IOR" cl-cc/compile::*builtin-registry*)))
+    (assert-true entry)
+    (assert-eq 'cl-cc::make-vm-bit-or (cl-cc/compile::be-ctor entry))
+    (assert-null (gethash "BIT-OR" cl-cc/compile::*builtin-registry*))))
+
 (deftest builtin-registry-known-function-properties
   "FR-183: builtin registry entries expose known function properties for optimizer consumers."
   (let ((char-entry (gethash "CHAR=" cl-cc/compile::*builtin-registry*))

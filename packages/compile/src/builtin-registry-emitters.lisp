@@ -82,10 +82,11 @@
 (defun emit-builtin-zero-compare (entry args result-reg ctx)
   "Emit a comparison of a single argument against zero."
   (let ((arg-reg (compile-ast (first args) ctx))
-        (zero-reg (make-register ctx)))
+        (zero-reg (make-register ctx))
+        (predicate-reg (make-register ctx)))
     (emit ctx (make-vm-const :dst zero-reg :value 0))
-    (emit ctx (funcall (be-ctor entry) :dst result-reg :lhs arg-reg :rhs zero-reg))
-    result-reg))
+    (emit ctx (funcall (be-ctor entry) :dst predicate-reg :lhs arg-reg :rhs zero-reg))
+    (%emit-vm-branch-boolean-as-cl-boolean ctx predicate-reg result-reg "zero_compare_bool")))
 
 (defun emit-builtin-stream-input-opt (entry args result-reg ctx)
   "Emit (fn &optional stream): instruction has :dst :handle.

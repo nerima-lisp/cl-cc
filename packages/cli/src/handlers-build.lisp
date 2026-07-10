@@ -5,23 +5,20 @@
 
 (defun %do-save-core (parsed)
   "Handle `cl-cc save-core' using the CL-CC-native core image writer."
-  (let ((timeout (%get-timeout parsed)))
-    (%call-with-cli-timeout timeout
-      (lambda ()
-        (let* ((path (%required-file-arg parsed "save-core"))
-               (compression (or (flag parsed "--compression")
-                                (and (flag parsed "--compress") "zlib")))
-               (toplevel-text (flag parsed "--toplevel"))
-               (toplevel (and toplevel-text (read-from-string toplevel-text)))
-               (executable (flag parsed "--executable")))
-          (%with-cli-error-handler
-            (let ((result (cl-cc/runtime:rt-save-core path
-                                                      :toplevel toplevel
-                                                      :executable executable
-                                                      :compression compression)))
-              (format t "~A~%" result)
-              (uiop:quit 0)))))
-      "save-core")))
+  (%with-cli-timeout (parsed "save-core")
+    (let* ((path (%required-file-arg parsed "save-core"))
+           (compression (or (flag parsed "--compression")
+                            (and (flag parsed "--compress") "zlib")))
+           (toplevel-text (flag parsed "--toplevel"))
+           (toplevel (and toplevel-text (read-from-string toplevel-text)))
+           (executable (flag parsed "--executable")))
+      (%with-cli-error-handler
+        (let ((result (cl-cc/runtime:rt-save-core path
+                                                  :toplevel toplevel
+                                                  :executable executable
+                                                  :compression compression)))
+          (format t "~A~%" result)
+          (uiop:quit 0))))))
 
 (defun %default-selfhost-file ()
   "Return the default self-hosting workload file."
@@ -31,36 +28,32 @@
 
 (defun %do-selfhost (parsed)
   "Handle `cl-cc selfhost' and optionally emit VM instruction feedback."
-  (let* ((file (or (car (parsed-args-positional parsed))
-                   (namestring (%default-selfhost-file))))
-         (stdlib (flag parsed "--stdlib"))
-         (no-stdlib (flag parsed "--no-stdlib"))
-         (verbose (flag parsed "--verbose"))
-         (timeout (%get-timeout parsed))
-         (opts (%parse-compile-opts parsed))
-         (source (%read-command-source file)))
-    (when verbose
-      (format *error-output* "; cl-cc selfhost: ~A  profile=~A~%"
-              file (if (compile-opts-profile opts) "yes" "no")))
-    (%with-cli-error-handler
-      (%call-with-cli-timeout
-       timeout
-       (lambda ()
-         (%call-with-optional-output-file
-          (compile-opts-trace-json-path opts)
-          (lambda (stream)
-            (let* ((vm-state (%maybe-make-profiled-vm-state opts))
-                   (kwargs (%compile-opts-kwargs opts stream)))
-              (when (compile-opts-profile opts)
-                (cl-cc/vm:vm-reset-instruction-profile))
-              (let ((ret (let ((cl-cc/vm:*vm-instruction-profile-enabled*
-                                  (not (null (compile-opts-profile opts)))))
-                           (let* ((result (%compile-lisp-with-auto-stdlib source kwargs stdlib no-stdlib))
-                                  (value (%run-compiled-result result vm-state opts)))
-                             (%maybe-write-pgo-profile opts result vm-state)
-                             value))))
-                (when (compile-opts-profile opts)
-                  (%write-selfhost-instruction-profile))
-                (format t "~S~%" ret)
-                (uiop:quit 0))))))
-       "selfhost"))))
+  (%with-cli-timeout (parsed "selfhost")
+    (let* ((file (or (car (parsed-args-positional parsed))
+                     (namestring (%default-selfhost-file))))
+           (stdlib (flag parsed "--stdlib"))
+           (no-stdlib (flag parsed "--no-stdlib"))
+           (verbose (flag parsed "--verbose"))
+           (opts (%parse-compile-opts parsed))
+           (source (%read-command-source file)))
+      (when verbose
+        (format *error-output* "; cl-cc selfhost: ~A  profile=~A~%"
+                file (if (compile-opts-profile opts) "yes" "no")))
+      (%with-cli-error-handler
+        (%call-with-optional-output-file
+         (compile-opts-trace-json-path opts)
+         (lambda (stream)
+           (let* ((vm-state (%maybe-make-profiled-vm-state opts))
+                  (kwargs (%compile-opts-kwargs opts stream)))
+             (when (compile-opts-profile opts)
+               (cl-cc/vm:vm-reset-instruction-profile))
+             (let ((ret (let ((cl-cc/vm:*vm-instruction-profile-enabled*
+                                 (not (null (compile-opts-profile opts)))))
+                          (let* ((result (%compile-lisp-with-auto-stdlib source kwargs stdlib no-stdlib))
+                                 (value (%run-compiled-result result vm-state opts)))
+                            (%maybe-write-pgo-profile opts result vm-state)
+                            value))))
+               (when (compile-opts-profile opts)
+                 (%write-selfhost-instruction-profile))
+               (format t "~S~%" ret)
+               (uiop:quit 0)))))))))

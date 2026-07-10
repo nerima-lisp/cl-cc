@@ -93,6 +93,124 @@
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
     (assert-true (keywordp reg))))
 
+(deftest codegen-apply-the-wrapped-function-keeps-direct-call
+  "apply treats ast-the-wrapped function designators transparently."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-apply
+                             :func (make-ast-the
+                                    :type 'function
+                                    :value (make-ast-function :name '+))
+                             :args (list (make-ast-quote :value '(1 2 3))))
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-apply-quoted-function-designator-keeps-direct-call
+  "apply treats quoted function designators transparently."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-apply
+                             :func (make-ast-quote :value '+)
+                             :args (list (make-ast-quote :value '(1 2 3))))
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-funcall-the-wrapped-function-keeps-direct-call
+  "funcall treats ast-the-wrapped function designators transparently."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-call
+                             :func 'funcall
+                             :args (list (make-ast-the
+                                          :type 'function
+                                          :value (make-ast-function :name '+))
+                                         (make-ast-quote :value '(1 2 3))))
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-not-the-wrapped-predicate-tests-nil-only
+  "not tests exactly for NIL even when the predicate call is ast-the-wrapped."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-call
+                             :func 'not
+                             :args (list (make-ast-the
+                                          :type 'boolean
+                                          :value (make-ast-call
+                                                  :func (make-ast-var :name 'numberp)
+                                                  :args (list (make-ast-quote :value 42))))))
+                           ctx)))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-not))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-null-p))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-apply-the-wrapped-literal-spread-keeps-direct-call
+  "apply treats ast-the-wrapped literal spread lists transparently."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-apply
+                             :func (make-ast-function :name '+)
+                             :args (list (make-ast-the
+                                          :type 'list
+                                          :value (make-ast-quote :value '(1 2 3)))))
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-apply-the-wrapped-list-call-spread-keeps-direct-call
+  "apply treats ast-the-wrapped (LIST ...) spreads transparently."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-apply
+                             :func (make-ast-function :name '+)
+                             :args (list (make-ast-the
+                                          :type 'list
+                                          :value (make-ast-call
+                                                  :func (make-ast-var :name 'list)
+                                                  :args (list (make-ast-int :value 2)
+                                                              (make-ast-int :value 3))))))
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-apply-the-wrapped-list-call-with-wrapped-function-keeps-direct-call
+  "apply treats ast-the-wrapped (LIST ...) calls as direct spreads even when the nested callee is wrapped."
+  (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (cl-cc/ast:make-ast-apply
+                             :func (make-ast-function :name '+)
+                             :args (list (make-ast-the
+                                          :type 'list
+                                          :value (make-ast-call
+                                                  :func (make-ast-the
+                                                         :type 'function
+                                                         :value (make-ast-var :name 'list))
+                                                  :args (list (make-ast-int :value 2)
+                                                              (make-ast-int :value 3))))))
+                           ctx)))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
+(deftest codegen-apply-the-wrapped-local-list-call-keeps-dynamic-apply
+  "apply still respects local LIST bindings even when the spread node is wrapped."
+  (let* ((ctx (make-codegen-ctx))
+         (list-reg (cl-cc/compile:make-register ctx))
+         (reg (progn
+                (setf (cl-cc/compile:ctx-env ctx) (list (cons 'list list-reg)))
+                (compile-ast (cl-cc/ast:make-ast-apply
+                              :func (make-ast-function :name '+)
+                              :args (list (make-ast-the
+                                           :type 'list
+                                           :value (make-ast-call
+                                                   :func (make-ast-var :name 'list)
+                                                   :args (list (make-ast-int :value 2)
+                                                               (make-ast-int :value 3))))))
+                             ctx))))
+    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
+    (assert-true (keywordp reg))))
+
 (deftest codegen-apply-tail-literal-spread-emits-tail-call
   "Tail-position ast-apply with a literal spread list emits vm-tail-call."
   (let* ((ctx (make-codegen-ctx))

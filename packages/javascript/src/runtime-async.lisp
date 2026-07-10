@@ -71,8 +71,12 @@
   rejected-p)
 
 (defun %js-promise-resolve (value)
-  "Create a resolved promise."
-  (make-js-promise :value value :settled-p t :rejected-p nil))
+  "Create a resolved promise. A promise argument is returned as-is, adopting
+its state (per Promise.resolve semantics) — so a handler that returns a
+rejected promise propagates the rejection through the chain."
+  (if (js-promise-p value)
+      value
+      (make-js-promise :value value :settled-p t :rejected-p nil)))
 
 (defun %js-promise-reject (reason)
   "Create a rejected promise."

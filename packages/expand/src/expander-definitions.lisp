@@ -21,7 +21,7 @@
 
 ;; defsetf — register a setf expander for an accessor (FR-355)
 ;; Short form: (defsetf accessor updater) → (updater args... value)
-;; Long form: (defsetf accessor lambda-list (store-var) body...) — partial support
+;; Long form: (defsetf accessor lambda-list (store-var) body...)
 (define-expander-for defsetf (form)
   (let ((accessor (second form)))
     (cond
@@ -41,8 +41,9 @@
          (setf (gethash accessor *setf-compound-place-handlers*)
                (let ((ll lambda-list) (sv store-var) (bd body))
                  (lambda (place value)
-                   (let* ((arg-bindings (mapcar #'list ll (cdr place)))
-                          (store-binding (list (list sv value))))
+                    (let* ((arg-bindings (%normalize-let-bindings
+                                          (generate-lambda-bindings ll place)))
+                           (store-binding (list (list sv value))))
                      (compiler-macroexpand-all
                       (cons 'let
                             (cons (append arg-bindings store-binding)

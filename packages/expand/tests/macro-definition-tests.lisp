@@ -45,12 +45,33 @@
     (let ((result (cl-cc/expand:compiler-macroexpand-all `(,name 2))))
       (assert-equal 3 result))))
 
+(deftest our-defmacro-binds-whole-form
+  "our-defmacro binds &whole to the full macro call before destructuring."
+  (let ((name (gensym "M-WHOLE-")))
+    (our-macroexpand-1
+     `(our-defmacro ,name (&whole whole x)
+        (if (equal whole (list ,name 2))
+            (+ x 10)
+            whole)))
+    (assert-equal '(+ 2 10)
+                  (our-macroexpand-1 `(,name 2)))))
+
 (deftest invoke-registered-expander-supports-descriptor-backed-compiler-macros
   "Descriptor-backed compiler macro expanders still execute through invoke-registered-expander."
   (let ((cl-cc/expand:*macro-eval-fn* #'eval)
         (expander (cl-cc/expand::make-compiler-macro-expander '(x) '((+ x 1)))))
     (assert-equal 3
                   (cl-cc/expand::invoke-registered-expander expander '(foo 2) nil))))
+
+(deftest invoke-registered-expander-ignores-descriptor-leading-declarations
+  "Descriptor-backed macro expanders treat leading declarations as declarations, not calls."
+  (let ((cl-cc/expand:*macro-eval-fn* #'eval)
+        (expander '(:kind :macro-expander
+                    :lambda-list (x)
+                    :body ((declare (ignore x))
+                           (quote ok)))))
+    (assert-equal 'ok
+                  (cl-cc/expand::invoke-registered-expander expander '(declared 1) nil))))
 
 (deftest compiler-macro-function-accesses-registered-expander
   "compiler-macro-function reflects the compiler macro registry."

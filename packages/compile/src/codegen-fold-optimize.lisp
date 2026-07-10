@@ -17,21 +17,6 @@
 
 ;;; ── AST constant fold pass ───────────────────────────────────────────────────
 
-(defparameter *optimize-ast-rebuilder-table*
-  '((ast-progn       . %optimize-ast-progn-node)
-     (ast-let         . %optimize-ast-let-node)
-     (ast-if          . %optimize-ast-if-node)
-     (ast-lambda      . %optimize-ast-lambda-node)
-     (ast-defun       . %optimize-ast-defun-node)
-     (ast-defclass    . %optimize-ast-defclass-node)
-     (ast-defvar      . %optimize-ast-defvar-node)
-     (ast-block       . %optimize-ast-block-node)
-     (ast-return-from . %optimize-ast-return-from-node)
-     (ast-setq        . %optimize-ast-setq-node)
-     (ast-the         . %optimize-ast-the-node))
-  "Type symbol → rebuilder function symbol for optimize-ast's simple recursive cases.
-Special folding nodes like ast-binop and ast-call stay in optimize-ast directly.")
-
 (defun %optimize-ast-list (nodes &optional lexical-bound)
   "Optimize every AST node in NODES, preserving list order."
   (if (consp nodes)
@@ -240,11 +225,14 @@ up to 11 sequential TYPEP calls per AST node visit."
      (let* ((func (optimize-ast (ast-call-func node) lexical-bound))
             (args (%optimize-ast-list (ast-call-args node) lexical-bound))
             (call-node (%clone-source node #'make-ast-call :func func :args args)))
-       (multiple-value-bind (value ok)
-           (let ((*compile-time-value-env* *compile-time-value-env*)
-                 (*compile-time-function-env* *compile-time-function-env*))
-             (%evaluate-ast call-node *compile-time-eval-depth-limit*))
-         (if ok (%compile-time-value->ast value node) call-node))))
+       (typecase (%compile-time-callable-func-node func)
+         ((or ast-var ast-function ast-lambda ast-quote)
+          (multiple-value-bind (value ok)
+              (let ((*compile-time-value-env* *compile-time-value-env*)
+                    (*compile-time-function-env* *compile-time-function-env*))
+                (%evaluate-ast call-node *compile-time-eval-depth-limit*))
+            (if ok (%compile-time-value->ast value node) call-node)))
+         (t call-node))))
     (ast-var
      (%optimize-ast-var-node node lexical-bound))
     (t

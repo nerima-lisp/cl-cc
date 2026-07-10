@@ -1,6 +1,6 @@
 (asdf:defsystem :cl-cc-optimize
   :description "Optimizer subsystem: CFG, SSA, E-graph, peephole, pipeline"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-prolog :cl-cc-type :cl-cc-ast)
@@ -34,7 +34,10 @@
       (:file "optimizer-memory-ssa")
       (:file "optimizer-interval-data")
       (:file "optimizer-memory-interval")
-     (:file "optimizer-memory-ranges")
+      (:file "optimizer-value-ranges")
+      (:file "optimizer-induction")
+      (:file "optimizer-memory-alias-basic")
+      (:file "optimizer-register-rewrite")
      (:file "optimizer-memory-dse")
      (:file "optimizer-memory-forward")
       (:file "optimizer-memory-sink")
@@ -61,6 +64,11 @@
         (:file "optimizer-abstract-interp")
          (:file "optimizer-trans-validate")
          (:file "optimizer-loop-peel")
+         (:file "optimizer-verify-ir")
+         (:file "optimizer-devirt")
+         (:file "optimizer-pipeline-policy")
+         (:file "optimizer-scheduler")
+         (:file "optimizer-fma")
          (:file "optimizer-pipeline")
          (:file "optimizer-driver")
         (:file "optimizer-speculative-inline")
@@ -84,8 +92,6 @@
          (:file "optimizer-path-profile")
          (:file "optimizer-load-store-coalesce")
          (:file "optimizer-remarks")
-             (:file "optimizer-verify-ir")
-             (:file "optimizer-devirt")
              (:file "optimizer-sroa")
              (:file "optimizer-energy")
              (:file "optimizer-cpu-dispatch")
@@ -96,8 +102,14 @@
              (:file "optimizer-polyhedral")
             (:file "optimizer-fuzz")
             (:file "optimizer-mlgo")
-           (:file "optimizer-ml-regalloc")
+          (:file "optimizer-ml-regalloc")
           (:file "optimizer-pipeline-roadmap")
+        (:file "optimizer-roadmap-backend-data-foundation")
+        (:file "optimizer-roadmap-backend-data-baseline")
+        (:file "optimizer-roadmap-backend-data-memory-numeric")
+        (:file "optimizer-roadmap-backend-data-lowering")
+        (:file "optimizer-roadmap-backend-data-codegen")
+        (:file "optimizer-roadmap-backend-data-speculative")
         (:file "optimizer-roadmap-backend-data")
         (:file "optimizer-roadmap-backend")
         (:file "optimizer-speculative-ic-data")

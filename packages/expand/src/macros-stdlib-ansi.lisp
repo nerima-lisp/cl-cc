@@ -224,18 +224,57 @@ Supports :start, :end, and :index keyword arguments."
          (*print-level*              nil)
          (*print-lines*              nil)
          (*print-miser-width*        nil)
+         (*print-pprint-dispatch*    (copy-pprint-dispatch nil))
          (*print-pretty*             nil)
          (*print-radix*              nil)
-         (*print-readably*           nil)
+         (*print-readably*           t)
          (*print-right-margin*       nil)
          (*read-base*                10)
          (*read-default-float-format* 'single-float)
          (*read-eval*                t)
          (*read-suppress*            nil)
+         (*readtable*                (copy-readtable nil))
          (*package*                  (rt-find-package "COMMON-LISP-USER")))
      ,@body))
 
 ;; WITH-PACKAGE-ITERATOR (FR-211) — runtime-backed package iteration helper
+(defun %package-iterator-designator-list (designator)
+  "Return DESIGNATOR as a list of package designators."
+  (if (listp designator)
+      designator
+      (list designator)))
+
+(defun %package-iterator-requested-types (symbol-types)
+  "Return the requested package-iterator symbol types, defaulting to all classes."
+  (let ((types (if symbol-types
+                   (%package-iterator-designator-list symbol-types)
+                   '(:internal :external :inherited))))
+    (if types types '(:internal :external :inherited))))
+
+(defun %package-iterator-entries (packages symbol-types)
+  "Return iterator entries for PACKAGES restricted to SYMBOL-TYPES."
+  (let ((requested-types (%package-iterator-requested-types symbol-types))
+        (entries nil))
+    (dolist (package (%package-iterator-designator-list packages))
+      (let* ((pkg (cl-cc/runtime::%rt-package-metadata package))
+             (symbols (and pkg (gethash :symbols pkg)))
+             (exports (and pkg (gethash :exports pkg)))
+             (inherited (and pkg (gethash :inherited pkg))))
+        (when pkg
+          (when (member :internal requested-types :test #'eq)
+            (maphash (lambda (_name symbol)
+                       (unless (member symbol exports :test #'eq)
+                         (push (list symbol :internal pkg) entries)))
+                     symbols))
+          (when (member :external requested-types :test #'eq)
+            (dolist (symbol (copy-list exports))
+              (push (list symbol :external pkg) entries)))
+          (when (member :inherited requested-types :test #'eq)
+            (maphash (lambda (_name symbol)
+                       (push (list symbol :inherited pkg) entries))
+                     inherited)))))
+    (nreverse entries)))
+
 (register-macro 'with-package-iterator
   (lambda (form env)
     (declare (ignore env))
@@ -247,15 +286,7 @@ Supports :start, :end, and :index keyword arguments."
            (syms-var (gensym "SYMS"))
            (idx-var (gensym "IDX"))
            (len-var (gensym "LEN")))
-      (declare (ignore symbol-types))
-       ;; Collect external symbols from the given packages
-       `(let* ((,syms-var (let ((acc nil))
-                            (dolist (p (if (listp ,packages) ,packages (list ,packages)))
-                              (let ((pkg (rt-find-package p)))
-                                 (when pkg
-                                   (dolist (s (%package-external-symbols pkg))
-                                     (push (list s :external pkg) acc)))))
-                            (nreverse acc)))
+      `(let* ((,syms-var (%package-iterator-entries ,packages ',symbol-types))
               (,idx-var 0)
               (,len-var (length ,syms-var)))
          (let ((,name (lambda ()

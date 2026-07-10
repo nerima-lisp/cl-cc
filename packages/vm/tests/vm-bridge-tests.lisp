@@ -94,6 +94,11 @@
             (assert-eq :ok (funcall (cl-cc/vm::%vm-runtime-callable name))))
       (remhash name cl-cc/vm::*vm-runtime-callables*))))
 
+(deftest vm-bridge-registers-php-current-closure
+  "Closure::getCurrent() lowering is exposed through the VM bridge."
+  (assert-true (functionp (cl-cc/vm::vm-bridge-callable 'cl-cc/php::%php-current-closure)))
+  (assert-true (functionp (gethash "PHP-CURRENT-CLOSURE" cl-cc/vm::*vm-runtime-callables*))))
+
 (deftest vm-bridge-runtime-registration-uses-bootstrap-hook
   "vm-bridge can trigger runtime callable registration through the bootstrap hook without host package lookups." 
   (let ((old-hook cl-cc/bootstrap::*runtime-vm-callable-register-hook*)

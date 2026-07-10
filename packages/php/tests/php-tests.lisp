@@ -92,6 +92,18 @@
     (assert-true (every (lambda (tok) (eq :T-OP (php-tok-type tok)))
                         (butlast tokens)))))  ; exclude :T-EOF
 
+(deftest php-lex-php85-pipe-and-void-cast-tokens
+  "PHP 8.5 pipe and void-cast syntax preserves the token shapes parser support expects."
+  (let ((pipe-tokens (cl-cc/php:tokenize-php-source "<?php $value |> trim(...);"))
+        (void-tokens (cl-cc/php:tokenize-php-source "<?php (void) $value;")))
+    (let ((pipe-token (find "|>" pipe-tokens :key #'php-tok-value :test #'equal)))
+      (assert-true pipe-token)
+      (assert-eq :T-OP (php-tok-type pipe-token)))
+    (assert-eq :T-LPAREN (php-tok-type (first void-tokens)))
+    (assert-eq :T-TYPE (php-tok-type (second void-tokens)))
+    (assert-eq :void (php-tok-value (second void-tokens)))
+    (assert-eq :T-RPAREN (php-tok-type (third void-tokens)))))
+
 (deftest php-parser-expression-gap-operator-tokens
   "Characterization: PHP gap operators must be preserved at lexer level for parser support."
   (let ((tokens (cl-cc/php:tokenize-php-source
@@ -155,3 +167,7 @@
   (let ((ast (first (cl-cc/php:parse-php-source "<?php \"hello\";"))))
     (assert-true (ast-quote-p ast))
     (assert-equal "hello" (ast-quote-value ast))))
+
+(eval-when (:load-toplevel :execute)
+  (%run-registered-tests-from-source-file
+   (or *compile-file-pathname* *load-pathname*)))

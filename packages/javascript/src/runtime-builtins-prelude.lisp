@@ -16,6 +16,7 @@
 ;;; Each entry is (kind js-name cl-symbol-or-value):
 ;;;   :call      — AST call  (cl-symbol &rest no-args)    e.g. (%js-make-console)
 ;;;   :var       — AST var   cl-symbol                     e.g. *js-error-class*
+;;;   :function  — AST function reference                  e.g. %js-parse-int
 ;;;   :namespace — namespace object built from the builtin dispatch table
 ;;;   :quote     — AST quote of cl-symbol-or-value         e.g. :js-undefined
 ;;;   :builtin   — %js-builtin-ref lookup by key string     e.g. "Set"
@@ -28,7 +29,7 @@
     (:quote      "undefined"           :js-undefined)
     (:var        "Infinity"            *js-inf-float*)
     (:var        "NaN"                 *js-nan-float*)
-    (:var        "Date"                %js-make-date)
+    (:var        "Date"                *js-date-global*)
     ;; Namespace objects — built from *js-builtin-specs* entries whose key is PREFIX.PROP
     (:namespace  "JSON"                "JSON")
     (:namespace  "Math"                "Math")
@@ -42,14 +43,14 @@
     (:namespace  "Intl"                "Intl")
     (:call       "globalThis"          %js-make-object)
     (:var        "Temporal"            *js-temporal-global*)
-    (:var        "BigInt"              %js-bigint)
+    (:function   "BigInt"              %js-bigint)
     ;; URI helpers
-    (:var        "encodeURIComponent"  %js-encode-uri-component)
-    (:var        "decodeURIComponent"  %js-decode-uri-component)
-    (:var        "encodeURI"           %js-encode-uri)
-    (:var        "decodeURI"           %js-decode-uri)
-    (:var        "btoa"                %js-btoa)
-    (:var        "atob"                %js-atob)
+    (:function   "encodeURIComponent"  %js-encode-uri-component)
+    (:function   "decodeURIComponent"  %js-decode-uri-component)
+    (:function   "encodeURI"           %js-encode-uri)
+    (:function   "decodeURI"           %js-decode-uri)
+    (:function   "btoa"                %js-btoa)
+    (:function   "atob"                %js-atob)
     ;; Error class hierarchy
     (:var        "Error"               *js-error-class*)
     (:var        "TypeError"           *js-type-error-class*)
@@ -82,13 +83,14 @@
     (:builtin    "BigInt64Array"       "BigInt64Array")
     (:builtin    "BigUint64Array"      "BigUint64Array")
     ;; Numeric parsing globals
-    (:var        "parseInt"            %js-parse-int)
-    (:var        "parseFloat"          %js-parse-float)
-    (:var        "isNaN"               %js-is-nan)
-    (:var        "isFinite"            %js-is-finite)
+    (:function   "parseInt"            %js-parse-int)
+    (:function   "parseFloat"          %js-parse-float)
+    (:function   "isNaN"               %js-is-nan)
+    (:function   "isFinite"            %js-is-finite)
     ;; Standalone global builtins — bound via %js-builtin-ref (inline lambdas)
     (:builtin    "structuredClone"     "structuredClone")
     (:builtin    "queueMicrotask"      "queueMicrotask")
+    (:builtin    "Atomics"             "Atomics")
     (:builtin    "crypto"              "crypto"))
   "Declarative prelude table: (kind js-name cl-symbol) emitted as defvar AST nodes
 before every compiled JS program so standard globals are available.")
@@ -102,6 +104,7 @@ before every compiled JS program so standard globals are available.")
      :value (ecase kind
                (:call      (%js-call cl-sym))
                (:var       (make-ast-var :name cl-sym))
+               (:function  (make-ast-function :name cl-sym))
                (:namespace (%js-call '%js-make-namespace-object (make-ast-quote :value cl-sym)))
                (:quote     (make-ast-quote :value cl-sym))
                (:builtin   (%js-call '%js-builtin-ref (make-ast-quote :value cl-sym)))))))

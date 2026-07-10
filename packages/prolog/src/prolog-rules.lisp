@@ -1,6 +1,6 @@
 ;;; packages/prolog/src/prolog-rules.lisp
 ;;;
-;;; Goal and rule representation, database primitives, and cut support for
+;;; Goal and rule representation, rule store primitives, and cut support for
 ;;; CL-CC Prolog.
 
 (in-package :cl-cc/prolog)
@@ -12,68 +12,47 @@
   head
   (body nil))
 
-(defun %rename-prolog-term (term renaming)
-  "Rename TERM's logic variables via RENAMING hash table."
-  (%walk-prolog-term term
-                     (lambda (node)
-                       (or (gethash node renaming)
-                           (setf (gethash node renaming)
-                                 (gensym (symbol-name node)))))
-                     #'identity
-                     (lambda (node)
-                       (cons (%rename-prolog-term (car node) renaming)
-                             (%rename-prolog-term (cdr node) renaming)))))
+(declaim (ftype function rename-variables
+                prolog-compound-form-parts register-prolog-rule
+                prolog-cut-goal-p))
 
 (defun rename-variables (rule)
   "Rename all logic variables in RULE to fresh ones for recursive calls."
   (let ((renaming (make-hash-table :test 'eq)))
-    (make-prolog-rule :head (%rename-prolog-term (rule-head rule) renaming)
-                      :body (mapcar (lambda (b)
-                                      (%rename-prolog-term b renaming))
-                                    (rule-body rule)))))
+    (labels ((rename-term (term)
+               (cond ((logic-var-p term)
+                      (or (gethash term renaming)
+                          (setf (gethash term renaming)
+                                (gensym (symbol-name term)))))
+                     ((consp term)
+                      (cons (rename-term (car term))
+                            (rename-term (cdr term))))
+                     (t
+                      term))))
+      (make-prolog-rule :head (rename-term (rule-head rule))
+                        :body (mapcar #'rename-term (rule-body rule))))))
 
-;;; Prolog database state
+;;; Prolog rule state
 
 (defvar *prolog-rules* (make-hash-table :test 'eq)
   "Hash table mapping predicate symbols to lists of rules.")
 
-(defun clear-prolog-database ()
-  "Clear all rules from the Prolog database."
-  (clrhash *prolog-rules*))
-
-(defun add-rule (predicate rule)
-  "Add RULE to the database under PREDICATE."
-  (setf (gethash predicate *prolog-rules*)
-        (cons rule (gethash predicate *prolog-rules*))))
+(defun prolog-compound-form-parts (form)
+  "Return predicate and arguments for a Prolog compound FORM."
+  (destructuring-bind (predicate &rest arguments) form
+    (unless (and predicate (symbolp predicate))
+      (error "Prolog predicate must be a non-NIL symbol: ~S" predicate))
+    (values predicate arguments)))
 
 (defun register-prolog-rule (head &optional body)
   "Create a rule from HEAD and BODY, then register it under HEAD's predicate."
-  (let ((rule (make-prolog-rule :head head :body body)))
-    (add-rule (car head) rule)
-    rule))
-
-(defun %register-declarative-rule-spec (spec)
-  "Register a declarative rule SPEC in the Prolog database."
-  (destructuring-bind (head &optional body) spec
-    (register-prolog-rule head body)))
-
-(defun %register-type-rule-spec (spec)
-  "Register one or more type inference rules from SPEC."
-  (destructuring-bind (result-type expr-kind operators) spec
-    (dolist (op operators)
-      (register-prolog-rule
-       `(type-of (,expr-kind ,op ?a ?b) ?env (,result-type))
-       '((type-of ?a ?env (integer-type))
-         (type-of ?b ?env (integer-type)))))))
-
-(defun %register-rule-specs (specs registrar)
-  "Apply REGISTRAR to each SPEC in SPECS."
-  (dolist (spec specs)
-    (funcall registrar spec)))
-
-(defmacro def-fact (head)
-  "Define a Prolog fact. Usage: (def-fact (parent tom mary))"
-  `(register-prolog-rule ',head))
+  (multiple-value-bind (predicate _arguments)
+      (prolog-compound-form-parts head)
+    (declare (ignore _arguments))
+    (let ((rule (make-prolog-rule :head head :body body)))
+      (setf (gethash predicate *prolog-rules*)
+            (cons rule (gethash predicate *prolog-rules*)))
+      rule)))
 
 (defmacro def-rule (head &body body)
   "Define a Prolog rule. Usage: (def-rule (grandparent ?x ?z) (parent ?x ?y) (parent ?y ?z))"
@@ -81,15 +60,11 @@
 
 ;;; Cut Operator Support
 
+(defun prolog-cut-goal-p (goal)
+  "Return true when GOAL denotes the Prolog cut operator."
+  (and (symbolp goal)
+       (string= (symbol-name goal) "!")))
+
 (define-condition prolog-cut (condition)
   ()
   (:documentation "Condition signaled when cut (!) is encountered."))
-
-;;; Declarative built-in predicates and type rules.
-;;; Register them directly so this file stays data-driven without one-off
-;;; expansion macros.
-
-(%register-rule-specs *prolog-declarative-rule-specs*
-                      #'%register-declarative-rule-spec)
-(%register-rule-specs *prolog-type-rule-specs*
-                      #'%register-type-rule-spec)

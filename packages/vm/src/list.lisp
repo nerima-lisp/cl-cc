@@ -402,6 +402,18 @@ lets RT-OBJECT-POINTER-SLOTS trace slots 1 and 2 during minor/major GC."
            (%vm-managed-tree-materialize state (cdr value))))
     (t value)))
 
+(defun %vm-managed-cons-materialize (state value)
+  "Materialize VALUE when it is a managed cons pointer; otherwise return it."
+  (if (%vm-managed-cons-pointer-p value)
+      (%vm-managed-tree-materialize state value)
+      value))
+
+(defun %vm-list-structure-materialize (state value)
+  "Materialize VALUE for list operations, unwrapping managed cons and COW wrappers."
+  (if (%vm-managed-cons-pointer-p value)
+      (%vm-managed-tree-materialize state value)
+      (%vm-cow-list-materialize value)))
+
 (defmethod vm-sequence-length ((sequence integer))
   (if (%vm-managed-cons-pointer-p sequence)
       (%vm-managed-list-length *vm-managed-cons-sequence-state* sequence)

@@ -2,7 +2,7 @@
 
 (defpackage :cl-cc/runtime
   (:use :cl)
-  (:shadow #:compute-applicable-methods #:make-hash-table)
+  (:shadow #:make-hash-table)
   (:export
    ;; Tagged pointer constants (3-bit native tag values, used by runtime.lisp / heap.lisp)
    #:+tag-fixnum+ #:+rt-tag-cons+ #:+rt-tag-symbol+ #:+rt-tag-function+
@@ -108,7 +108,7 @@
    #:rt-defclass #:rt-make-instance #:rt-slot-value #:rt-slot-set
    #:rt-slot-boundp #:rt-slot-makunbound #:rt-slot-exists-p
      #:rt-class-name #:rt-class-of #:rt-find-class #:rt-register-method #:rt-call-generic
-     #:rt-compute-applicable-methods #:compute-applicable-methods
+    #:rt-compute-applicable-methods
      #:rt-make-instance-0
      #:*rt-class-registry* #:*rt-generic-function-registry*
     ;; Conditions
@@ -136,8 +136,6 @@
       #:cl-cc-error-code #:cl-cc-error-message
       #:cl-cc-init #:cl-cc-eval #:cl-cc-call #:cl-cc-cleanup
       #:cl-cc-last-error #:cl-cc-register-callback #:cl-cc-callback
-      #:|cl_cc_init| #:|cl_cc_eval| #:|cl_cc_call| #:|cl_cc_cleanup|
-      #:|cl_cc_last_error| #:|cl_cc_register_callback| #:|cl_cc_get_callback|
     #:rt-random #:rt-make-random-state
    #:rt-get-universal-time #:rt-get-internal-real-time #:rt-get-internal-run-time
     #:rt-read-from-string #:rt-read-sexp
@@ -432,7 +430,7 @@
    #:rt-make-actor #:rt-actor-send #:rt-actor-receive
    ;; ── STM (stm.lisp) ───────────────────────────────────────────────
     #:rt-tvar #:rt-tvar-p #:rt-make-tvar #:rt-read-tvar #:rt-write-tvar
-    #:rt-atomically #:atomic #:rt-retry #:rt-tvar-value-unsafe #:rt-tvar-version-unsafe
+    #:rt-atomically #:rt-retry #:rt-tvar-value-unsafe #:rt-tvar-version-unsafe
     #:rt-stm-transaction #:rt-stm-conflict #:rt-stm-retry #:opt-pass-stm
     ;; ── Fibers / green threads (fiber.lisp) ───────────────────────────
     #:rt-fiber #:rt-fiber-p #:rt-make-fiber #:rt-fiber-spawn #:rt-fiber-schedule
@@ -517,6 +515,7 @@
       #:rt-continuous-profile-session-running-p
       #:*rt-continuous-profile-session*
       #:rt-start-continuous-profile #:rt-stop-continuous-profile
+      #:rt-wait-for-continuous-profile-sample
       #:rt-record-profile-sample #:rt-continuous-profile->otel-span
       #:rt-continuous-profile-to-otel-json
       #:rt-continuous-profile-to-pprof-json
@@ -582,13 +581,8 @@
     #:rt-pinned-array-data-pointer #:rt-release-pinned-array
     #:rt-pinned-unboxed-array-buffer-released-p
     ;; ── Self-host portability facades (portable.lisp) ──
-    #:rt-unsupported-operation #:rt-unsupported-operation-name
-    #:rt-unsupported
-    #:rt-current-thread-token
     #:rt-make-lock #:rt-with-lock #:rt-lock #:rt-unlock #:rt-try-lock
-    #:rt-thread-yield
-    #:rt-atomic-compare-and-swap-symbol
-    #:rt-getenv #:rt-with-timeout))
+    #:rt-getenv))
 
 (in-package :cl-cc/runtime)
 

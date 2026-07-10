@@ -70,6 +70,7 @@
     vm-style-warning
     vm-warning
     vm-error
+    vm-fatal-error
     condition
     serious-condition
     error

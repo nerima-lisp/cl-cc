@@ -118,17 +118,142 @@ host CL closure."
         :lambda-list lambda-list
         :body (mapcar #'our-macroexpand-all body)))
 
-(defun make-host-macro-expander (lambda-list body)
-  "Build a host-evaluated macro expander for local MACROLET bindings."
+(defun %quote-uninterned-symbol-occurrences (symbol tree)
+  "Quote literal gensym occurrences in TREE without rewriting quoted data."
+  (cond
+    ((and (symbolp tree) (eq tree symbol) (null (symbol-package symbol)))
+     `(quote ,symbol))
+    ((and (consp tree) (eq (car tree) 'quote))
+     tree)
+    ((consp tree)
+     (cons (%quote-uninterned-symbol-occurrences symbol (car tree))
+           (%quote-uninterned-symbol-occurrences symbol (cdr tree))))
+    (t tree)))
+
+(defun %lambda-list-binding-names (lambda-list)
+  "Return the symbols bound by LAMBDA-LIST."
+  (let ((info (parse-lambda-list lambda-list))
+        (names nil))
+    (labels ((push-symbol (value)
+               (when (symbolp value)
+                 (pushnew value names :test #'eq)))
+             (push-pattern (value)
+               (cond
+                 ((symbolp value) (push-symbol value))
+                 ((consp value) (dolist (entry value) (push-pattern entry))))))
+      (push-symbol (lambda-list-info-whole info))
+      (push-symbol (lambda-list-info-environment info))
+      (dolist (required (lambda-list-info-required info))
+        (push-pattern required))
+      (dolist (optional (lambda-list-info-optional info))
+        (destructuring-bind (name default supplied-p) optional
+          (declare (ignore default))
+          (push-pattern name)
+          (push-symbol supplied-p)))
+      (push-symbol (lambda-list-info-rest info))
+      (push-symbol (lambda-list-info-body info))
+      (dolist (key-param (lambda-list-info-key-params info))
+        (destructuring-bind ((keyword name) default supplied-p) key-param
+          (declare (ignore keyword default))
+          (push-pattern name)
+          (push-symbol supplied-p)))
+      (dolist (aux (lambda-list-info-aux info))
+        (destructuring-bind (name init) aux
+          (declare (ignore init))
+          (push-pattern name))))
+    names))
+
+(defun %template-expression (form bound-names)
+  "Build an expression that returns FORM as syntax with bound variables spliced."
+  (cond
+    ((symbolp form)
+     (if (member form bound-names :test #'eq)
+         form
+         `(quote ,form)))
+    ((atom form) form)
+    ((and (consp form) (eq (car form) 'quote))
+     form)
+    ((%proper-list-p form)
+     `(list ,@(mapcar (lambda (entry)
+                        (%template-expression entry bound-names))
+                      form)))
+    (t
+     `(cons ,(%template-expression (car form) bound-names)
+            ,(%template-expression (cdr form) bound-names)))))
+
+(defun %our-defmacro-raw-result-form-p (form)
+  "Return T when FORM already constructs macro expansion data at runtime."
+  (and (consp form)
+       (symbolp (car form))
+       (member (car form) '(quote list list* cons append)
+               :test #'eq)))
+
+(defun %direct-our-defmacro-result-form (form bound-names)
+  "Return a result expression for a directly expanded OUR-DEFMACRO body form."
+  (if (%our-defmacro-raw-result-form-p form)
+      form
+      (%template-expression form bound-names)))
+
+(defun %direct-our-defmacro-body (body bound-names)
+  "Transform direct OUR-DEFMACRO body forms to preserve one-step expansion data."
+  (let ((last-form (car (last body)))
+        (prefix (butlast body)))
+    (append
+     prefix
+     (list
+      (if (and (consp last-form) (eq (car last-form) 'if))
+          `(if ,(second last-form)
+               ,(%direct-our-defmacro-result-form (third last-form) bound-names)
+               ,(%direct-our-defmacro-result-form (fourth last-form) bound-names))
+          last-form)))))
+
+(defun %make-direct-our-defmacro-expander (lambda-list body)
+  "Build the direct OUR-DEFMACRO expander used by OUR-MACROEXPAND-1."
+  (let ((bound-names (%lambda-list-binding-names lambda-list)))
+    (lambda (macro-form env)
+      (declare (ignore env))
+      (let* ((form-var (gensym "FORM"))
+             (eval-form `(let ((,form-var ',macro-form))
+                           ,(%nest-let-bindings
+                             (generate-lambda-bindings lambda-list form-var)
+                             (%direct-our-defmacro-body body bound-names)))))
+        (handler-bind ((style-warning #'muffle-warning))
+          (eval eval-form))))))
+
+;; OUR-DEFMACRO is a host macro at load time, but users can also submit it to
+;; OUR-MACROEXPAND-1 directly. Keep that path side-effecting like DEFMACRO.
+(register-macro 'our-defmacro
   (lambda (form env)
     (declare (ignore env))
-    (let* ((form-var  (gensym "FORM"))
-           (eval-form `(let ((,form-var ',form))
-                         ,(%nest-let-bindings
-                           (generate-lambda-bindings lambda-list form-var)
-                           body))))
-      (handler-bind ((style-warning #'muffle-warning))
-        (eval eval-form)))))
+    (let ((name (second form))
+          (lambda-list (third form))
+          (body (cdddr form)))
+      (register-macro
+       name
+       (%make-direct-our-defmacro-expander
+        lambda-list
+        (mapcar (lambda (entry)
+                  (%quote-uninterned-symbol-occurrences name entry))
+                body)))
+      `(quote ,name))))
+
+(defun make-host-macro-expander (lambda-list body)
+  "Build a host-evaluated macro expander for local MACROLET bindings."
+  (let ((environment-sym (lambda-list-info-environment
+                          (parse-lambda-list lambda-list))))
+    (lambda (form env)
+      (let* ((form-var (gensym "FORM"))
+             (effective-env (or env '(:macrolet-environment)))
+             (macro-body (if environment-sym
+                             `((let ((,environment-sym ',effective-env))
+                                 ,@body))
+                             body))
+             (eval-form `(let ((,form-var ',form))
+                           ,(%nest-let-bindings
+                             (generate-lambda-bindings lambda-list form-var)
+                             macro-body))))
+        (handler-bind ((style-warning #'muffle-warning))
+          (eval eval-form))))))
 
 (defun make-compiler-macro-expander (lambda-list body)
   "Build a compiler-macro expander for a function LAMBDA-LIST and BODY."
@@ -240,21 +365,6 @@ Evaluate BODY immediately for :compile-toplevel; include in output for :execute/
 
 (defun expand-apply-named-fn (fn-name args-form)
   "Expand (apply 'FN-NAME args-form) where FN-NAME is a known symbol.
-Variadic builtins get a dolist fold; others normalise to (apply #'fn args)."
-  (if (gethash fn-name *variadic-fold-or-list-table*) ;; FR-130: perfect hash
-      (let ((acc (gensym "ACC")) (x (gensym "X")) (lst (gensym "LST")))
-        (if (eq fn-name '-)
-            (compiler-macroexpand-all
-             `(let ((,lst ,args-form))
-                (if (null (cdr ,lst))
-                    (- 0 (car ,lst))
-                    (let ((,acc (car ,lst)))
-                      (dolist (,x (cdr ,lst) ,acc)
-                        (setq ,acc (- ,acc ,x)))))))
-            (compiler-macroexpand-all
-             (let ((id (variadic-fold-identity fn-name)))
-               `(let ((,acc ,id))
-                  (dolist (,x ,args-form ,acc)
-                    (setq ,acc (,fn-name ,acc ,x))))))))
-      (list 'apply (list 'function fn-name)
-            (compiler-macroexpand-all args-form))))
+Normalise to (apply #'fn args) so APPLY lowering keeps spread semantics visible."
+  (list 'apply (list 'function fn-name)
+        (compiler-macroexpand-all args-form)))

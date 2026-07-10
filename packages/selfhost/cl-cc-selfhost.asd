@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-selfhost
   :description "Self-hosting orchestration"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-pipeline :cl-cc-expand :cl-cc-vm

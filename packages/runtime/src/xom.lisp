@@ -2,14 +2,14 @@
 ;;;
 ;;; JIT code is compiled in a private RW mapping and finalized into an executable
 ;;; mapping whose read permission is removed when the target can represent XOM.
-;;; The implementation deliberately degrades to RX on targets without hardware
-;;; support (for example x86-64 without PKU) rather than failing compilation.
+;;; The implementation fails explicitly when XOM is requested on unsupported
+;;; hardware instead of returning readable executable memory.
 
 (in-package :cl-cc/runtime)
 
 (defparameter *xom-enabled* nil
   "When true, finalize JIT code pages as execute-only where the platform supports
-it.  Disabled by default; unsupported hardware falls back gracefully to RX.")
+it.  Disabled by default; unsupported hardware signals an explicit error.")
 
 (defparameter *rt-xom-pku-key* nil
   "Best-effort x86 PKU protection key reserved for execute-only code pages.")
@@ -89,15 +89,17 @@ after code emission."
 
 (defun rt-xom-effective-prot ()
   "Return the final protection mask for code pages under the current hardware."
-  (if (and *xom-enabled* (rt-xom-supported-p))
-      +rt-prot-exec+
-      (logior +rt-prot-read+ +rt-prot-exec+)))
+  (cond
+    ((and *xom-enabled* (rt-xom-supported-p))
+     +rt-prot-exec+)
+    (t
+     (logior +rt-prot-read+ +rt-prot-exec+))))
 
 (defun rt-finalize-xom-code-memory (region)
   "Finalize REGION after JIT compilation.
 
 AArch64 uses PROT_EXEC only.  x86-64 uses the same simulated protection when PKU
-is available; without PKU the page is executable/readable as a graceful fallback."
+is available; unsupported platforms signal an explicit error."
   (check-type region rt-xom-region)
   (let* ((mmap (rt-xom-region-mmap region))
          (prot (rt-xom-effective-prot))

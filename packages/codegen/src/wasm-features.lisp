@@ -27,11 +27,6 @@
 (defparameter *wasm-bulk-table-enabled* t
   "FR-237: Use table.init/table.copy/table.fill/elem.drop.") ;; MVP v1.1
 
-;;; ABI-sensitive proposal defaults remain NIL until all call boundaries agree.
-
-(defparameter *wasm-multi-value-enabled* nil
-  "FR-235: Use wasm multi-value returns for CL values. WARNING: changes ABI.") ;; MVP v1.1
-
 (defparameter *wasm-js-bigint-i64-enabled* nil
   "FR-236: Enable JS BigInt <-> i64 conversion at boundary. Default off for compat.")
 
@@ -195,9 +190,6 @@
 (defparameter *wasm-js-promise-integration-enabled* t
   "FR-217: Use WebAssembly.suspending/promising for async JS calls.")
 
-(defparameter *wasm-string-builtins-enabled* t
-  "FR-218: Use Wasm String Builtins for efficient string operations.")
-
 (defparameter *wasm-esm-integration-enabled* t
   "FR-230: Generate ESM-compatible .wasm exports.")
 
@@ -312,11 +304,11 @@
 (defparameter *wasm-wasi-p2-enabled* nil
   "FR-207: Full WASI Preview 2 capability-based interface.")
 
+(defparameter *wasm-wasi-preview1-compat-shim-enabled* nil
+  "FR-321: WASI Preview 1 compatibility shim for Preview 2 hosts.")
+
 (defparameter *wasm-wasi-p3-enabled* nil
   "FR-257: WASI 0.3 async-first I/O. Phase 2, experimental.")
-
-(defparameter *wasm-wasi-p1-compat-enabled* nil
-  "FR-321: WASI Preview 1 compatibility shim layer.")
 
 (defparameter *wasm-startup-snapshots-enabled* nil
   "FR-287: Use V8 heap serialization for fast startup. Phase 0, experimental.")

@@ -2,6 +2,7 @@
   pkgs,
   lib,
   sbclWithCLCC,
+  sbclWithJavascriptTests,
   sbclWithTests,
   sbclBootstrap,
   dispatchSemFix ? null,
@@ -70,8 +71,9 @@ let
         sys: "--eval ${lib.escapeShellArg "(asdf:load-system ${sys}${forceFlag})"}"
       ) loadAsdSystems;
       disableTranslationsFlag = lib.optionalString disableOutputTranslations "--eval '(asdf:disable-output-translations)'";
-      forwardArgsFlag = lib.optionalString forwardArgs '' \
-          --end-toplevel-options "$@"'';
+      forwardArgsFlag = lib.optionalString forwardArgs ''
+        \
+                 --end-toplevel-options "$@"'';
       dispatchExport = lib.optionalString (
         enableDispatchSemFix && pkgs.stdenv.isDarwin && dispatchSemFix != null
       ) ''export DYLD_INSERT_LIBRARIES="${dispatchSemFix}/lib/libdispatch_sem_fix.dylib"'';
@@ -173,31 +175,37 @@ let
         # warm-stdlib-cache rebuilds both caches under *macro-eval-fn* = #'eval
         # so workers see cache HITs and bypass both rebuild paths entirely.
         ''(format t "# starting fast test plan (unit)~%")''
-        ''(let* ((args (uiop:command-line-arguments))
-                 (filter (loop for rest on args
-                               when (and (string= (first rest) "--filter") (second rest))
-                                 collect (second rest)))
-                 (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
-                 (warm-stdlib (and (not (member "--no-warm-stdlib" args :test #'string=))
-                                   (not (and warm-env
-                                             (member (string-downcase warm-env)
-                                                     '("0" "false" "no" "off")
-                                                     :test #'string=))))))
-            (handler-case
-                (progn
-                  (if warm-stdlib
-                      (progn
-                        (format t "# warming stdlib cache~%")
-                        (cl-cc:warm-stdlib-cache)
-                        (format t "# stdlib cache ready~%"))
-                      (format t "# stdlib cache warm skipped~%"))
-                  (uiop:symbol-call :cl-cc/test (quote run-tests)
-                                    :filter filter
-                                    :warm-stdlib warm-stdlib))
-              (error (e)
-                (format t "~&not ok - run-tests fatal error: ~A~%" e)
-                (format *error-output* "~&FATAL: ~A~%" e)
-                (uiop:quit 1))))''
+        ''
+          (let* ((args (uiop:command-line-arguments))
+                           (filter (loop for rest on args
+                                         when (and (string= (first rest) "--filter") (second rest))
+                                           collect (second rest)))
+                           (workers-env (uiop:getenv "CL_CC_TEST_WORKERS"))
+                           (workers (ignore-errors (and workers-env (parse-integer workers-env))))
+                           (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
+                           (warm-stdlib (and (not (member "--no-warm-stdlib" args :test #'string=))
+                                             (not (and warm-env
+                                                       (member (string-downcase warm-env)
+                                                               '("0" "false" "no" "off")
+                                                               :test #'string=))))))
+                      (handler-case
+                          (progn
+                            (if warm-stdlib
+                                (progn
+                                  (format t "# warming stdlib cache~%")
+                                  (cl-cc:warm-stdlib-cache)
+                                  (format t "# stdlib cache ready~%"))
+                                (format t "# stdlib cache warm skipped~%"))
+                            ;; Keep the fast path for 2+ workers, but fall back to the
+                            ;; serial runner when the caller explicitly asks for 1 worker.
+                            (uiop:symbol-call :cl-cc/test (quote run-tests)
+                                              :parallel (not (and workers (<= workers 1)))
+                                              :filter filter
+                                              :warm-stdlib warm-stdlib))
+                        (error (e)
+                          (format t "~&not ok - run-tests fatal error: ~A~%" e)
+                          (format *error-output* "~&FATAL: ~A~%" e)
+                          (uiop:quit 1))))''
       ];
     };
 
@@ -208,6 +216,7 @@ let
       enableDispatchSemFix = true;
       enablePbtSanitize = true;
       enableFaslCacheCleaner = true;
+      forwardArgs = true;
       forceReload = true;
       extraTimeoutSeconds = 600;
       lispPreLoadEvalForms = [
@@ -219,9 +228,101 @@ let
       ];
       lispPostLoadEvalForms = [
         ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
-        "(asdf:load-system :cl-cc-test :force t)"
+        ''(format t "# enabling coverage before reloading :cl-cc-test~%")''
+        "(cl-cc/test:enable-coverage)"
+        ''
+          (handler-case
+                        (asdf:load-system :cl-cc-test :force t)
+                      (error (e)
+                        (format *error-output* "~&FATAL: ~A~%" e)
+                        (uiop:quit 1)))''
         ''(format t "# starting coverage test plan (sb-cover + unit)~%")''
-        ''(handler-case (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-suite) :parallel nil :random nil :coverage t :exclude-suites (quote (cl-cc/test:cl-cc-integration-suite cl-cc/test:cl-cc-e2e-suite)) :quit-p nil))) (declaim (optimize (sb-cover:store-coverage-data 0))) (uiop:quit (if failed 1 0))) (error (e) (format t "~&not ok - coverage fatal error: ~A~%" e) (format *error-output* "~&FATAL: ~A~%" e) (uiop:quit 1)))''
+        ''
+          (let* ((args (uiop:command-line-arguments))
+                           (filter (loop for rest on args
+                                         when (and (string= (first rest) "--filter") (second rest))
+                                           collect (second rest))))
+                      (handler-case
+                          (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-suite)
+                                                              :parallel nil
+                                                              :random nil
+                                                              :coverage t
+                                                              :exclude-suites (quote (cl-cc/test:cl-cc-integration-suite cl-cc/test:cl-cc-e2e-suite))
+                                                              :filter filter
+                                                              :quit-p nil)))
+                            (declaim (optimize (sb-cover:store-coverage-data 0)))
+                            (uiop:quit (if failed 1 0)))
+                        (error (e)
+                          (format t "~&not ok - coverage fatal error: ~A~%" e)
+                          (format *error-output* "~&FATAL: ~A~%" e)
+                          (uiop:quit 1))))''
+      ];
+    };
+
+    coverage-js = mkSbclScript {
+      name = "coverage-js";
+      description = "Run the JavaScript frontend tests with sb-cover instrumentation";
+      sbclPkgOverride = sbclWithJavascriptTests;
+      enableDispatchSemFix = true;
+      enablePbtSanitize = true;
+      enableFaslCacheCleaner = true;
+      forwardArgs = true;
+      forceReload = true;
+      extraTimeoutSeconds = 600;
+      loadProjectAsd = false;
+      lispPreLoadEvalForms = [
+        "(require :sb-cover)"
+        "(declaim (optimize sb-cover:store-coverage-data))"
+        "(require :asdf)"
+        "(asdf:initialize-source-registry `(:source-registry (:tree ,(uiop:getcwd)) :ignore-inherited-configuration))"
+        ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
+      ];
+      lispPostLoadEvalForms = [
+        ''(format t "# enabling coverage before reloading :cl-cc and :cl-cc-javascript-test~%")''
+        ''
+          (handler-case
+                        (asdf:load-system :cl-cc-type :force t)
+                      (error (e)
+                        (format *error-output* "~&FATAL: ~A~%" e)
+                        (uiop:quit 1)))''
+        ''
+          (handler-case
+                        (load "packages/testing-framework/src/package.lisp")
+                      (error (e)
+                        (format *error-output* "~&FATAL: ~A~%" e)
+                        (uiop:quit 1)))''
+        "(proclaim '(optimize (sb-cover:store-coverage-data 3)))"
+        ''
+          (handler-case
+                        (asdf:load-system :cl-cc :force t)
+                      (error (e)
+                        (format *error-output* "~&FATAL: ~A~%" e)
+                        (uiop:quit 1)))''
+        ''
+          (handler-case
+                        (asdf:load-system :cl-cc-javascript-test :force t)
+                      (error (e)
+                        (format *error-output* "~&FATAL: ~A~%" e)
+                        (uiop:quit 1)))''
+        ''(format t "# starting coverage test plan (sb-cover + javascript)~%")''
+        ''
+          (let* ((args (uiop:command-line-arguments))
+                           (filter (loop for rest on args
+                                         when (and (string= (first rest) "--filter") (second rest))
+                                           collect (second rest))))
+                      (handler-case
+                          (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-javascript-suite)
+                                                              :parallel nil
+                                                              :random nil
+                                                              :coverage t
+                                                              :filter filter
+                                                              :quit-p nil)))
+                            (declaim (optimize (sb-cover:store-coverage-data 0)))
+                            (uiop:quit (if failed 1 0)))
+                        (error (e)
+                          (format t "~&not ok - coverage fatal error: ~A~%" e)
+                          (format *error-output* "~&FATAL: ~A~%" e)
+                          (uiop:quit 1))))''
       ];
     };
 
@@ -246,7 +347,9 @@ let
         "(setf *default-pathname-defaults* (uiop:getcwd))"
         "(setf uiop:*temporary-directory* (uiop:temporary-directory))"
         ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
-        "(asdf:load-system :cl-cc-test :force t)"
+        # No :force — the FASLs ship pre-compiled in sbclWithTests; forcing a
+        # recompile writes into the read-only Nix store and fails on CI.
+        "(asdf:load-system :cl-cc-test)"
         ''(format t "# running all benchmarks~%")''
         ''
           (handler-case

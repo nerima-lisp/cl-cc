@@ -138,6 +138,18 @@
     (assert-eq 'x (first (first optional)))
     (assert-null (second (first optional)))))
 
+(deftest parser-lambda-list-whole-and-environment
+  "parse-compiler-lambda-list: &whole and &environment are accepted together with other sections."
+  (multiple-value-bind (required optional rest-param key-params aux-params whole-param environment-param)
+      (cl-cc/parse:parse-compiler-lambda-list '(&whole whole-form x &environment env y &key verbose))
+    (assert-eq 'whole-form whole-param)
+    (assert-eq 'env environment-param)
+    (assert-equal '(x y) required)
+    (assert-null optional)
+    (assert-null rest-param)
+    (assert-= 1 (length key-params))
+    (assert-null aux-params)))
+
 ;;; ─── NEW: full parse-then-lower pipeline ───────────────────────────────────
 
 (deftest-each parse-lower-pipeline

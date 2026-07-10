@@ -124,15 +124,22 @@ detection format can run the test-level 30s timeout."
   (assert-expanded-string-contains form expected-op))
 
 (deftest expander-setf-subseq-place
-  "(setf (subseq seq start end) new) lowers through replace with start/end keywords."
-  (assert-expanded-string-contains '(setf (subseq seq 1 4) replacement) "ASET")
-  (assert-expanded-string-contains '(setf (subseq seq 1 4) replacement) "RPLACA")
-  (assert-expanded-string-contains '(setf (subseq seq 1 4) replacement) "NTHCDR"))
+  "(setf (subseq seq start end) new) lowers through REPLACE vector and generic sequence paths."
+  (let ((result (cl-cc/expand:compiler-macroexpand-all
+                  '(setf (subseq seq 1 4) replacement))))
+    (assert-form-string-contains result "ASET")
+    (assert-form-string-contains result "SETF")
+    (assert-form-string-contains result "ELT")
+    (assert-form-string-contains result "4")))
 
 (deftest expander-setf-subseq-place-without-end
-  "(setf (subseq seq start) new) still lowers through the sequence replacement path."
-  (assert-expanded-string-contains '(setf (subseq seq 1) replacement) "ASET")
-  (assert-expanded-string-contains '(setf (subseq seq 1) replacement) "RPLACA"))
+  "(setf (subseq seq start) new) defaults the destination end to the sequence length."
+  (let ((result (cl-cc/expand:compiler-macroexpand-all
+                  '(setf (subseq seq 1) replacement))))
+    (assert-form-string-contains result "ASET")
+    (assert-form-string-contains result "SETF")
+    (assert-form-string-contains result "ELT")
+    (assert-form-string-contains result "LENGTH")))
 
 (deftest expander-setf-values-place
   "(setf (values a b) expr) lowers to LET + MULTIPLE-VALUE-LIST + SETQ chain."

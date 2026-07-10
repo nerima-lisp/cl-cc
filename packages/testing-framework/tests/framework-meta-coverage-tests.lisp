@@ -13,7 +13,7 @@
       (assert-= 0 killed)
       (assert-= 0 total)
       (let ((output (get-output-stream-string *standard-output*)))
-        (assert-true (search "Mutation Testing Report" output))))))
+        (assert-string-contains-all output '("Mutation Testing Report"))))))
 
 (deftest framework-meta-print-mutation-report-killed
   "%print-mutation-report with a killed mutant reports 100% score."
@@ -45,7 +45,7 @@
       (assert-= 0 killed)
       (assert-= 1 total)
       (let ((output (get-output-stream-string *standard-output*)))
-        (assert-true (search "Survivors" output))))))
+        (assert-string-contains-all output '("Survivors"))))))
 
 ;;; P8: %verify-metamorphic-relations — calls through the relation pipeline
 
@@ -68,13 +68,8 @@
                                   (declare (ignore lhs rhs))
                                   nil)
                       :applicable-when (lambda (expr) (eq (car expr) '+))))))
-    (handler-case
-      (progn
-        (%verify-metamorphic-relations (list '(+ 1 2)))
-        (assert-false t))
-      (test-failure (c)
-        (assert-true (search "BAD-RELATION"
-                             (string-upcase (test-failure-message c))))))))
+    (assert-failure-message-contains-upcase '("BAD-RELATION")
+      (%verify-metamorphic-relations (list '(+ 1 2))))))
 
 ;;; P9: additional mutation operator coverage
 
@@ -85,13 +80,17 @@
         (run-mutation-test :suite 'cl-cc-unit-suite)
         (assert-false t))
     (error (e)
-      (assert-true (search ":target" (princ-to-string e)))))
+      (assert-string-contains-all
+       (princ-to-string e)
+       '(":target"))))
   (handler-case
       (progn
         (run-mutation-test :target "/tmp/does-not-matter.lisp")
         (assert-false t))
     (error (e)
-      (assert-true (search ":suite" (princ-to-string e))))))
+      (assert-string-contains-all
+       (princ-to-string e)
+       '(":suite")))))
 
 (deftest framework-meta-run-mutation-test-missing-file
   "run-mutation-test rejects nonexistent files before reading forms."
@@ -101,26 +100,22 @@
                            :suite 'cl-cc-unit-suite)
         (assert-false t))
     (error (e)
-      (assert-true (search "target file not found" (princ-to-string e))))))
+      (assert-string-contains-all
+       (princ-to-string e)
+       '("target file not found")))))
 
 (deftest framework-meta-run-mutation-test-empty-operator-set
   "run-mutation-test can execute its full reporting path with an empty mutation set."
-  (let ((path "/tmp/cl-cc-mutation-smoke.lisp")
-        (*standard-output* (make-string-output-stream)))
-    (unwind-protect
-         (progn
-           (with-open-file (stream path
-                                   :direction :output
-                                   :if-exists :supersede
-                                   :if-does-not-exist :create)
-             (write-line "(defun cl-cc-mutation-smoke (x) (+ x 1))" stream))
-           (multiple-value-bind (score killed total)
-               (run-mutation-test :target path
-                                  :suite 'cl-cc-unit-suite
-                                  :mutations '())
-             (assert-= 100.0 score)
-             (assert-= 0 killed)
-             (assert-= 0 total)
-             (assert-true (search "Mutation Testing Report"
-                                  (get-output-stream-string *standard-output*)))))
-      (ignore-errors (delete-file path)))))
+  (let ((*standard-output* (make-string-output-stream)))
+    (uiop:with-temporary-file (:pathname path :type "lisp")
+      (%write-file-contents path "(defun cl-cc-mutation-smoke (x) (+ x 1))")
+      (multiple-value-bind (score killed total)
+          (run-mutation-test :target path
+                             :suite 'cl-cc-unit-suite
+                             :mutations '())
+        (assert-= 100.0 score)
+        (assert-= 0 killed)
+        (assert-= 0 total)
+        (assert-string-contains-all
+         (get-output-stream-string *standard-output*)
+         '("Mutation Testing Report"))))))

@@ -150,10 +150,6 @@
                   (rt-stm-retry ()
                     (%rt-stm-wait-for-retry ,tx ,attempt)))))))
 
-(defmacro atomic (&body body)
-  "Alias for RT-ATOMICALLY."
-  `(rt-atomically ,@body))
-
 (defun rt-retry ()
   "Abort the current transaction and retry it later."
   (signal 'rt-stm-retry))
@@ -172,5 +168,5 @@
 
 (defun opt-pass-stm (form)
   "Runtime registration hook for STM-aware compiler pipelines.
-Currently preserves FORM; compiler passes can recognize RT-ATOMICALLY/ATOMIC."
+Currently preserves FORM; compiler passes can recognize RT-ATOMICALLY."
   form)

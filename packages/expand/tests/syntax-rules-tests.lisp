@@ -32,6 +32,17 @@
     (assert-eq 'let (car expanded))
     (assert-true (null (symbol-package (caar (second expanded)))))))
 
+(deftest syntax-rules-rejects-bare-ellipsis-pattern
+  "A bare ... token is not a rest wildcard; use (var ...) instead."
+  :timeout 10
+  (cl-cc/expand:define-syntax sr-no-bare-ellipsis
+    (cl-cc/expand:syntax-rules ()
+      ((sr-no-bare-ellipsis |...| rest) rest)))
+  (multiple-value-bind (expanded expanded-p)
+      (cl-cc/expand:our-macroexpand-1 '(sr-no-bare-ellipsis a b c))
+    (assert-false expanded-p)
+    (assert-equal '(sr-no-bare-ellipsis a b c) expanded)))
+
 (deftest syntax-case-partial-supports-guarded-pattern
   "FR-804: SYNTAX-CASE partial support matches patterns with guards."
   :timeout 10

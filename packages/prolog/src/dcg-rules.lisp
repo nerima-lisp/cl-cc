@@ -8,62 +8,45 @@
 (defun dcg-fresh-var ()
   (intern (format nil "?S~D" (incf *dcg-counter*))))
 
-(defun dcg-reset-counter ()
-  "Reset the DCG variable counter (for testing)."
-  (setf *dcg-counter* 0))
-
-(defun %dcg-tagged-form-p (form name)
-  (and (consp form)
-       (symbolp (car form))
-       (string= (symbol-name (car form)) name)))
-
-(defun %dcg-terminal-goals (terminals s-in s-out)
-  "Return the goal sequence that matches TERMINALS against a difference list."
-  (if (null terminals)
+(defun %thread-dcg-elements (elements s-in s-out element->goals)
+  "Thread DCG state through ELEMENTS, calling ELEMENT->GOALS for each step."
+  (if (null elements)
       (list `(= ,s-in ,s-out))
-      (let ((goals nil)
-            (current s-in))
-        (dolist (term terminals)
-          (let ((next (dcg-fresh-var)))
-            (push `(dcg-token-match ,term ,current ,next) goals)
-            (setf current next)))
-        (push `(= ,current ,s-out) goals)
-        (nreverse goals))))
-
-(defun %dcg-brace-goal (element s-in s-out)
-  (let ((goal (cadr element)))
-    (list `(:when ,goal) `(= ,s-in ,s-out))))
+      (labels ((recurse (remaining current)
+                 (let* ((element (car remaining))
+                        (rest (cdr remaining))
+                        (next (if rest
+                                  (dcg-fresh-var)
+                                  s-out)))
+                   (append (funcall element->goals element current next)
+                           (when rest
+                             (recurse rest next))))))
+        (recurse elements s-in))))
 
 (defun dcg-transform-body-element (element s-in s-out)
   "Transform a single DCG body element into a Prolog goal."
   (cond
-    ((%dcg-tagged-form-p element "TERMINAL")
-     (%dcg-terminal-goals (cdr element) s-in s-out))
-    ((symbolp element)
-     (list (list element s-in s-out)))
-    ((%dcg-tagged-form-p element "BRACE")
-     (%dcg-brace-goal element s-in s-out))
-    ((and (consp element) (symbolp (car element)))
-     (list (append element (list s-in s-out))))
+    ((and (consp element)
+          (symbolp (car element))
+          (string= (symbol-name (car element)) "TERMINAL"))
+     (%thread-dcg-elements
+      (cdr element) s-in s-out
+      (lambda (terminal current next)
+        (list `(dcg-token-match ,terminal ,current ,next)))))
+    ((and (consp element)
+          (symbolp (car element))
+          (string= (symbol-name (car element)) "BRACE"))
+     (list `(:when ,(cadr element)) `(= ,s-in ,s-out)))
+    ((or (symbolp element) (consp element))
+     (list (if (symbolp element)
+               (list element s-in s-out)
+               (append element (list s-in s-out)))))
     (t (error "DCG: unknown body element ~S" element))))
 
 (defun dcg-transform-body (body s-in s-out)
   "Transform a DCG body (list of elements) into a list of Prolog goals,
    chaining fresh state variables between elements."
-  (if (null body)
-      (list `(= ,s-in ,s-out))
-      (labels ((walk (elements current acc)
-                 (let* ((next (if (null (cdr elements))
-                                  s-out
-                                  (dcg-fresh-var)))
-                        (chunk (dcg-transform-body-element (car elements)
-                                                           current
-                                                           next))
-                        (acc (nconc acc chunk)))
-                   (if (cdr elements)
-                       (walk (cdr elements) next acc)
-                       acc))))
-        (walk body s-in nil))))
+  (%thread-dcg-elements body s-in s-out #'dcg-transform-body-element))
 
 (defmacro def-dcg-rule (name &body body)
   "Define a DCG rule. Transforms (name --> body...) into a Prolog rule

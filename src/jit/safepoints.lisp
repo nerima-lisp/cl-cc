@@ -48,18 +48,20 @@ AArch64: LDR Wzr, [safepoint-address] (4 bytes)."
 (defun init-safepoint-page ()
   "Allocate and protect the safepoint polling page.
 The GC makes this page unreadable to trigger SEGV at safepoints."
+  (ensure-jit-native-code-enabled "initialize a safepoint page")
   (let ((page (sb-posix:mmap nil 4096
                               (logior sb-posix:prot-read sb-posix:prot-write)
-                              (logior sb-posix:map-private sb-posix:map-anonymous)
+                              (logior sb-posix:map-private
+                                      (sb-posix-map-anonymous-flag))
                               -1 0)))
     (setf *safepoint-page-address* (sb-sys:sap-int page))
-    (sb-posix:mprotect page 4096 sb-posix:prot-none) ; start protected
+    (sb-posix-mprotect page 4096 sb-posix:prot-none) ; start protected
     page))
 
 (defun arm-safepoint ()
   "Make the safepoint page readable (arm the safepoint mechanism)."
   (when *safepoint-page-address*
-    (sb-posix:mprotect (sb-sys:int-sap *safepoint-page-address*)
+    (sb-posix-mprotect (sb-sys:int-sap *safepoint-page-address*)
                        4096
                        (logior sb-posix:prot-read))
     (values)))
@@ -67,7 +69,7 @@ The GC makes this page unreadable to trigger SEGV at safepoints."
 (defun disarm-safepoint ()
   "Make the safepoint page unreadable (disarm — no polls trigger)."
   (when *safepoint-page-address*
-    (sb-posix:mprotect (sb-sys:int-sap *safepoint-page-address*)
+    (sb-posix-mprotect (sb-sys:int-sap *safepoint-page-address*)
                        4096
                        sb-posix:prot-none)
     (values)))
@@ -81,6 +83,11 @@ The GC makes this page unreadable to trigger SEGV at safepoints."
 
 (defvar *safepoint-lock* nil
   "Lock protecting safepoint coordination.")
+
+;;; ──── Atomic increment helper ────
+(defmacro atomic-incf (place)
+  "Increment PLACE by 1. Placeholder for host atomic coordination."
+  `(incf ,place))
 
 (defun enter-safepoint ()
   "Called by a thread when it hits a safepoint poll during STW."
@@ -96,8 +103,3 @@ The GC makes this page unreadable to trigger SEGV at safepoints."
   `(let ((*safepoint-enabled* t)
          (*bytes-since-last-safepoint* 0))
      ,@body))
-
-;;; ──── Atomic increment helper ────
-(defun atomic-incf (place)
-  "Atomically increment PLACE by 1. Uses SBCL atomic-incf if available."
-  (sb-ext:atomic-incf place))

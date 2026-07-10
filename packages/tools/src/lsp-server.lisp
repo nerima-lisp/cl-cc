@@ -239,8 +239,14 @@
         (gethash uri (lsp-server-symbols server)) (%scan-document-symbols uri text))
   text)
 
+(defun %uri-language (uri)
+  (let ((lower (string-downcase uri)))
+    (cond ((or (search ".elisp" lower :from-end t)
+               (search ".el" lower :from-end t))
+           :elisp)
+          (t :lisp))))
+
 (defun %diagnostics-for-source (uri text)
-  (declare (ignore uri))
   (let ((diagnostics nil))
     (multiple-value-bind (open close) (%count-parens text)
       (when (/= open close)
@@ -251,7 +257,7 @@
                 ("message" . ,(format nil "Unbalanced parentheses: ~D open, ~D close" open close)))
               diagnostics)))
     (handler-case
-        (progn (cl-cc:compile-string text :target :vm :language :lisp) nil)
+        (progn (cl-cc:compile-string text :target :vm :language (%uri-language uri)) nil)
       (error (e)
         (unless diagnostics
           (push `(("range" . (("start" . (("line" . 0) ("character" . 0)))

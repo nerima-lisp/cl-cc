@@ -7,12 +7,6 @@
    (format nil "cl-cc-fr-350-~(~A~)-~D-~D/" name (get-universal-time) (random 1000000))
    (uiop:temporary-directory)))
 
-(defun %fr-350-read-file (path)
-  (with-open-file (stream path :direction :input)
-    (let ((contents (make-string (file-length stream))))
-      (read-sequence contents stream)
-      contents)))
-
 (defun %fr-350-clean-dir (dir)
   (when (and dir (probe-file dir))
     (uiop:delete-directory-tree dir :validate t)))
@@ -88,8 +82,9 @@
            (generate-coverage-report :directory dir :entries nil)
            (assert-true (coverage-report-exists-p dir))
            (assert-true (coverage-report-empty-p dir))
-           (assert-true (search "No code coverage data found"
-                                (%fr-350-read-file (coverage-report-index-path dir)))))
+           (assert-string-contains-all
+            (%read-file-contents (coverage-report-index-path dir))
+            '("No code coverage data found")))
       (%fr-350-clean-dir dir))))
 
 (deftest fr-350-non-empty-html-report-is-not-empty
@@ -101,9 +96,10 @@
            (generate-coverage-report :directory dir :entries *fr-350-sample-entries*)
            (assert-true (coverage-report-exists-p dir))
            (assert-false (coverage-report-empty-p dir))
-           (let ((html (%fr-350-read-file (coverage-report-index-path dir))))
-             (assert-true (search "packages/testing-framework/tests/sample.lisp" html))
-             (assert-true (search "<table>" html))))
+           (let ((html (%read-file-contents (coverage-report-index-path dir))))
+             (assert-string-contains-all
+              html
+              '("packages/testing-framework/tests/sample.lisp" "<table>"))))
       (%fr-350-clean-dir dir))))
 
 (deftest fr-350-lcov-output-shape-includes-line-and-branch-records
@@ -114,18 +110,20 @@
     (unwind-protect
          (progn
            (write-lcov-report *fr-350-sample-entries* lcov :test-name "fr-350")
-           (let ((text (%fr-350-read-file lcov)))
-             (assert-true (search "TN:fr-350" text))
-             (assert-true (search "SF:packages/testing-framework/tests/sample.lisp" text))
-             (assert-true (search "DA:10,1" text))
-             (assert-true (search "DA:11,0" text))
-             (assert-true (search "LF:2" text))
-             (assert-true (search "LH:1" text))
-             (assert-true (search "BRDA:10,0,0,1" text))
-             (assert-true (search "BRDA:10,0,1,0" text))
-             (assert-true (search "BRF:2" text))
-             (assert-true (search "BRH:1" text))
-             (assert-true (search "end_of_record" text))))
+           (let ((text (%read-file-contents lcov)))
+             (assert-string-contains-all
+              text
+              '("TN:fr-350"
+                "SF:packages/testing-framework/tests/sample.lisp"
+                "DA:10,1"
+                "DA:11,0"
+                "LF:2"
+                "LH:1"
+                "BRDA:10,0,0,1"
+                "BRDA:10,0,1,0"
+                "BRF:2"
+                "BRH:1"
+                "end_of_record"))))
       (%fr-350-clean-dir dir))))
 
 (deftest fr-351-mcdc-report-is-written-next-to-lcov
@@ -143,10 +141,10 @@
                                      :mcdc-coverage coverage)
            (assert-true (probe-file lcov))
            (assert-true (probe-file mcdc))
-           (let ((text (%fr-350-read-file mcdc)))
-             (assert-true (search "CL-CC MC/DC Coverage Report" text))
-             (assert-true (search "Decision:" text))
-             (assert-true (search "Condition 0" text))))
+           (let ((text (%read-file-contents mcdc)))
+             (assert-string-contains-all
+              text
+              '("CL-CC MC/DC Coverage Report" "Decision:" "Condition 0"))))
       (%fr-350-clean-dir dir))))
 
 (deftest fr-350-with-coverage-cleans-up-and-writes-reports
@@ -194,44 +192,43 @@
         (saved-warm (symbol-function 'cl-cc::warm-stdlib-cache)))
     (unwind-protect
          (progn
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* root
-                                (list :name root :description "tmp" :parent nil :parallel t
-                                      :before-each '() :after-each '())))
-           (setf *test-registry*
-                 (persist-assoc *test-registry* test-name
-                                (list :name test-name
-                                      :suite root
-                                      :fn (lambda () t)
-                                      :skip nil
-                                      :xfail nil
-                                      :depends-on nil
-                                      :timeout nil
-                                      :tags '(:fr-350-private))))
-           (setf (symbol-function 'enable-coverage) (lambda () (setf *coverage-enabled* t)))
-           (setf (symbol-function 'disable-coverage) (lambda () (setf *coverage-enabled* nil)))
-           (setf (symbol-function '%print-coverage-report)
-                 (lambda (results)
-                   (setf report-called (and (= 1 (length results))
-                                            (eq :pass (getf (first results) :status))))
-                   (format t "# mocked coverage report~%")))
-           (setf (symbol-function 'cl-cc::warm-stdlib-cache) (lambda () nil))
-           (let ((output (with-output-to-string (stream)
-                           (let ((*standard-output* stream))
-                             (assert-false
-                              (run-suite root
-                                         :coverage t
-                                         :parallel t
-                                         :random nil
-                                         :workers 8
-                                         :warm-stdlib nil
-                                         :quit-p nil))))))
-             (assert-true report-called)
-             (assert-false (coverage-enabled-p))
-             (assert-true (search "Coverage mode: parallel disabled" output))
-             (assert-true (search "Workers: 1" output))
-             (assert-true (search "Coverage report enabled" output))
-             (assert-true (search "mocked coverage report" output))))
+           (with-fresh-registry-state
+             (with-suite-registry-entry (root
+                                          :description "tmp"
+                                          :parent nil
+                                          :parallel t)
+               (with-test-registry-entry (test-name
+                                           :suite root
+                                           :fn (lambda () t)
+                                           :depends-on nil
+                                           :timeout nil
+                                           :tags '(:fr-350-private))
+                 (setf (symbol-function 'enable-coverage) (lambda () (setf *coverage-enabled* t)))
+                 (setf (symbol-function 'disable-coverage) (lambda () (setf *coverage-enabled* nil)))
+                 (setf (symbol-function '%print-coverage-report)
+                       (lambda (results)
+                         (setf report-called (and (= 1 (length results))
+                                                  (eq :pass (getf (first results) :status))))
+                         (format t "# mocked coverage report~%")))
+                 (setf (symbol-function 'cl-cc::warm-stdlib-cache) (lambda () nil))
+                 (let ((output (with-output-to-string (stream)
+                                 (let ((*standard-output* stream))
+                                   (assert-false
+                                    (run-suite root
+                                               :coverage t
+                                               :parallel t
+                                               :random nil
+                                               :workers 8
+                                               :warm-stdlib nil
+                                               :quit-p nil))))))
+                   (assert-true report-called)
+                   (assert-false (coverage-enabled-p))
+                   (assert-string-contains-all
+                    output
+                    '("Coverage mode: parallel disabled"
+                      "Workers: 1"
+                      "Coverage report enabled"
+                      "mocked coverage report"))))))
       (setf (symbol-function 'enable-coverage) saved-enable)
       (setf (symbol-function 'disable-coverage) saved-disable)
       (setf (symbol-function '%print-coverage-report) saved-report)
@@ -239,5 +236,6 @@
       (setf *test-registry* (persist-remove *test-registry* test-name))
       (setf *suite-registry* (persist-remove *suite-registry* root))
       (disable-coverage))))
+)
 
 (in-suite cl-cc-unit-suite)

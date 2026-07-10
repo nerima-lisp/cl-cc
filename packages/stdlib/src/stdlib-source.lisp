@@ -22,6 +22,26 @@
 
     "(defun identity (x) x)"
 
+    ;; ANSI CL proclamations and compilation units.
+    "(defun proclaim (declaration-spec)
+   (when (consp declaration-spec)
+     (cl-cc/expand::%record-declaim-inline-clause declaration-spec)
+     (cl-cc/expand::%record-declaim-optimize-clause declaration-spec)
+     (cl-cc/expand::%record-declaim-type-clause declaration-spec)
+     (cl-cc/expand::%record-declaim-ftype-clause declaration-spec)
+     (cl-cc/expand::%record-declaim-special-clause declaration-spec))
+   declaration-spec)"
+
+    "(defun short-site-name ()
+       (or (cl-cc/vm::short-site-name) \"unknown\"))"
+
+    "(defun long-site-name ()
+       (or (cl-cc/vm::long-site-name) \"unknown\"))"
+
+    "(defmacro with-compilation-unit (options &body body)
+   (declare (ignore options))
+   `(locally ,@body))"
+
     ;; FR-589: minimal compile-file shim for the VM interpreter.
     "(defun compile-file (input-file &key output-file verbose print external-format)
    (declare (ignore output-file external-format))

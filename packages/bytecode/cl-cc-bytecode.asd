@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-bytecode
   :description "cl-cc bytecode ISA v2 — 32-bit instruction encoding, builder, decoder"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

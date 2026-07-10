@@ -25,7 +25,16 @@
        ;; Skip loops with internal control transfer; preserving those requires CFG cloning.
        (notany (lambda (inst) (typep inst '(or vm-jump vm-jump-zero vm-ret))) body)
        ;; Skip stateful calls whose first iteration may have special observable behavior.
-       (notany (lambda (inst) (typep inst '(or vm-call vm-tail-call vm-trampoline))) body)))
+       (notany (lambda (inst)
+                 (typep inst '(or vm-call vm-tail-call vm-trampoline
+                                  vm-apply vm-generic-call)))
+               body)))
+
+(defun %opt-loop-peel-check-slice (body iv-reg)
+  "Return the boundary-check slice duplicated before the original loop header."
+  (remove-if-not (lambda (inst)
+                   (%opt-loop-peel-boundary-check-inst-p inst iv-reg))
+                 body))
 
 (defun %opt-loop-peel-count (body)
   "Return a conservative peel count for BODY."
@@ -64,7 +73,10 @@
     (when (and (%opt-loop-peel-safe-body-p body)
                (%opt-loop-peel-body-needs-peeling-p body iv-reg))
       (let ((result nil)
-            (peeled-body (%opt-loop-peel-mark-bce (copy-list body) iv-reg)))
+            (peeled-body (%opt-loop-peel-mark-bce
+                          (mapcar #'%opt-copy-inst
+                                  (%opt-loop-peel-check-slice body iv-reg))
+                          iv-reg)))
         (loop for i from 0 below header-pos
               do (push (aref vec i) result))
         (setf result (%opt-loop-peel-emit-copies cond-inst jz-inst peeled-body
@@ -77,12 +89,12 @@
 (defun opt-pass-loop-peel (instructions)
   "FR-682 loop peeling pass.
 
-Peels the first iteration of conservative single-latch counted loops whose body
-contains array boundary checks or null/type checks.  The peeled copy is emitted
-before the original header with the original guard, and array accesses in the
-peeled copy are annotated for BCE.  Loops with labels, calls, internal branches,
-or other shapes that could make the first iteration semantically distinct are
-left unchanged."
+Peels the first-iteration boundary-check slice of conservative single-latch
+counted loops whose body contains array boundary checks or null/type checks.
+The peeled copy is emitted before the original header with the original guard,
+and array accesses in the peeled copy are annotated for BCE.  Loops with labels,
+calls, internal branches, or other shapes that could make the first iteration
+semantically distinct are left unchanged."
   (let* ((vec (coerce instructions 'vector))
          (n (length vec))
          (i 0))

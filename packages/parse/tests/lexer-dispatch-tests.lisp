@@ -22,6 +22,16 @@
   "Tokenize SOURCE and return the value of the first non-EOF token."
   (cl-cc:lexer-token-value (first (cl-cc:lex-all source))))
 
+(defun lexer-dispatch-lex-types-with-features (features source)
+  "Tokenize SOURCE with FEATURES bound in *FEATURES* and return token types."
+  (let ((*features* features))
+    (lexer-dispatch-lex-types source)))
+
+(defun lexer-dispatch-first-value-with-features (features source)
+  "Tokenize SOURCE with FEATURES bound in *FEATURES* and return the first value."
+  (let ((*features* features))
+    (lexer-dispatch-first-value source)))
+
 (defun lexer-dispatch-read-form-text (source)
   "Use internal lex-read-form-text to extract the raw form text from SOURCE."
   (let ((state (cl-cc/parse:make-lexer source)))
@@ -31,30 +41,30 @@
 
 (deftest-each lex-feature-present-p-keyword-lookup
   "lex-feature-present-p returns T for features in *features*, NIL otherwise."
-  :cases (("present"  :sbcl   t)
+  :cases (("present"  :cl-cc-present   t)
           ("absent"   :no-such-feature nil))
   (feature expected)
-  (let ((*features* '(:sbcl :common-lisp)))
+  (let ((*features* '(:cl-cc-present :common-lisp)))
     (assert-parse-boolean-case expected
-      (cl-cc/parse::lex-feature-present-p feature))))
+        (cl-cc/parse::lex-feature-present-p feature))))
 
 (deftest lex-feature-present-p-or-any-present
   "lex-feature-present-p: :or succeeds when any member is present; fails when none are."
-  (let ((*features* '(:sbcl)))
-    (assert-true (cl-cc/parse::lex-feature-present-p '(:or :sbcl :ccl)))
-    (assert-null (cl-cc/parse::lex-feature-present-p '(:or :ccl :ecl)))))
+  (let ((*features* '(:cl-cc-present)))
+      (assert-true (cl-cc/parse::lex-feature-present-p '(:or :cl-cc-present :ccl)))
+      (assert-null (cl-cc/parse::lex-feature-present-p '(:or :ccl :ecl)))))
 
 (deftest lex-feature-present-p-and-all-required
   "lex-feature-present-p: :and succeeds when all members present; fails when any absent."
-  (let ((*features* '(:sbcl :common-lisp)))
-    (assert-true (cl-cc/parse::lex-feature-present-p '(:and :sbcl :common-lisp)))
-    (assert-null (cl-cc/parse::lex-feature-present-p '(:and :sbcl :ccl)))))
+  (let ((*features* '(:cl-cc-present :common-lisp)))
+      (assert-true (cl-cc/parse::lex-feature-present-p '(:and :cl-cc-present :common-lisp)))
+      (assert-null (cl-cc/parse::lex-feature-present-p '(:and :cl-cc-present :ccl)))))
 
 (deftest lex-feature-present-p-not-negates
   "lex-feature-present-p: :not returns nil for present features and t for absent."
-  (let ((*features* '(:sbcl)))
-    (assert-null (cl-cc/parse::lex-feature-present-p '(:not :sbcl)))
-    (assert-true (cl-cc/parse::lex-feature-present-p '(:not :ccl)))))
+  (let ((*features* '(:cl-cc-present)))
+      (assert-null (cl-cc/parse::lex-feature-present-p '(:not :cl-cc-present)))
+      (assert-true (cl-cc/parse::lex-feature-present-p '(:not :ccl)))))
 
 (deftest lex-feature-present-p-unknown-returns-nil
   "lex-feature-present-p: non-list atoms and unknown combinators return nil."
@@ -76,7 +86,7 @@
 
 (deftest lex-read-form-text-list-with-string
   "lex-read-form-text handles lists containing strings with parens inside."
-  (let ((text (lexer-dispatch-read-form-text "(f \")\")"))  )
+  (let ((text (lexer-dispatch-read-form-text "(f \")\")")))
     ;; The ) inside the string must not close the list
     (assert-string= "(f \")\")" text)))
 
@@ -130,25 +140,39 @@
 
 (deftest lexer-dispatch-hash-plus-includes-when-feature-present
   "#+feature includes the next form when the feature is present."
-  (let ((*features* '(:sbcl)))
-    (assert-equal '(:t-int) (lexer-dispatch-lex-types "#+sbcl 42"))))
+  (assert-equal '(:t-int)
+                (lexer-dispatch-lex-types-with-features
+                 '(:cl-cc-present)
+                 "#+cl-cc-present 42")))
 
 (deftest lexer-dispatch-hash-plus-skips-when-feature-absent
   "#+feature skips the first form and includes the second when the feature is absent."
-  (let ((*features* '()))
-    (assert-equal '(:t-int) (lexer-dispatch-lex-types "#+no-such-feature 42 99"))
-    (assert-= 99 (lexer-dispatch-first-value "#+no-such-feature 42 99"))))
+  (assert-equal '(:t-int)
+                (lexer-dispatch-lex-types-with-features
+                 '()
+                 "#+no-such-feature 42 99"))
+  (assert-= 99
+            (lexer-dispatch-first-value-with-features
+             '()
+             "#+no-such-feature 42 99")))
 
 (deftest lexer-dispatch-hash-minus-skips-when-feature-present
   "#-feature skips the first form and includes the second when the feature is present."
-  (let ((*features* '(:sbcl)))
-    (assert-equal '(:t-int) (lexer-dispatch-lex-types "#-sbcl 42 99"))
-    (assert-= 99 (lexer-dispatch-first-value "#-sbcl 42 99"))))
+  (assert-equal '(:t-int)
+                (lexer-dispatch-lex-types-with-features
+                 '(:cl-cc-present)
+                 "#-cl-cc-present 42 99"))
+  (assert-= 99
+            (lexer-dispatch-first-value-with-features
+             '(:cl-cc-present)
+             "#-cl-cc-present 42 99")))
 
 (deftest lexer-dispatch-hash-minus-includes-when-feature-absent
   "#-feature includes the next form when the feature is absent."
-  (let ((*features* '()))
-    (assert-equal '(:t-int) (lexer-dispatch-lex-types "#-no-such-feature 42"))))
+  (assert-equal '(:t-int)
+                (lexer-dispatch-lex-types-with-features
+                 '()
+                 "#-no-such-feature 42")))
 
 ;;; ─── Hash Dispatch: Arbitrary Radix #nR ─────────────────────────────────────
 
@@ -175,14 +199,14 @@
           ("string" "#-skip-me \"hello (world)\" 42"  42)
           ("atom"   "#-skip-me some-symbol 77"        77))
   (source expected)
-  (let ((*features* '(:skip-me)))
-    (assert-= expected (lexer-dispatch-first-value source))))
+  (assert-= expected
+            (lexer-dispatch-first-value-with-features '(:skip-me) source)))
 
 (deftest lex-skip-list-with-comment
   "lex-skip-form handles lists containing ; line comments (body paren after comment)."
-  (let ((*features* '(:skip-me)))
-    ;; The ; comment inside the list must not prevent the closing ) from being found
-    (let ((val (lexer-dispatch-first-value
-                "#-skip-me (foo ; comment
-                 bar) 55")))
-      (assert-= 55 val))))
+  ;; The ; comment inside the list must not prevent the closing ) from being found
+  (let ((val (lexer-dispatch-first-value-with-features
+              '(:skip-me)
+              "#-skip-me (foo ; comment
+               bar) 55")))
+    (assert-= 55 val)))

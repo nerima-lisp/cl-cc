@@ -80,9 +80,18 @@
    #:%php-get-error-handler
    #:%php-get-exception-handler
    #:%php-current-closure
+   #:%php-grapheme-levenshtein
    #:%php-locale-is-right-to-left
+   #:%php-locale-add-likely-subtags
+   #:%php-locale-minimize-subtags
+   #:%php-predefined-class-constant
    #:%php-opcache-is-script-cached-in-file-cache
    #:%php-curl-share-init-persistent
+   #:%php-curl-multi-get-handles
+   #:%php-enchant-dict-remove-from-session
+   #:%php-enchant-dict-remove
+   #:%php-pg-close-stmt
+   #:%php-pg-service
    #:%php-filter-var
    ;; Reference / by-ref semantics
    #:php-ref-p

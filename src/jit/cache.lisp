@@ -47,78 +47,82 @@ Returns a string suitable for a filename."
 (defun jit-cache-lookup (source-hash cpu-features optimize-level)
   "Look up a cached JIT compilation result.
 Returns the jit-cache-entry or NIL if not found."
-  (let* ((key (compute-cache-key source-hash cpu-features optimize-level))
-         (entry (or (gethash key *jit-cache*)
-                    (jit-cache-deserialize key))))
-    (when entry
-      (setf (gethash key *jit-cache*) entry))
-    entry))
+  (when *jit-cache-enabled*
+    (let* ((key (compute-cache-key source-hash cpu-features optimize-level))
+           (entry (or (gethash key *jit-cache*)
+                      (jit-cache-deserialize key))))
+      (when entry
+        (setf (gethash key *jit-cache*) entry))
+      entry)))
 
 (defun jit-cache-insert (entry)
   "Insert a JIT compilation result into the cache.
 Both in-memory and on-disk."
-  (let ((key (compute-cache-key (jce-source-hash entry)
-                                (jce-cpu-features entry)
-                                (jce-optimize-level entry))))
-    (setf (gethash key *jit-cache*) entry)
-    (jit-cache-serialize key entry)))
+  (when *jit-cache-enabled*
+    (let ((key (compute-cache-key (jce-source-hash entry)
+                                  (jce-cpu-features entry)
+                                  (jce-optimize-level entry))))
+      (setf (gethash key *jit-cache*) entry)
+      (jit-cache-serialize key entry))))
 
 ;;; ──── Serialization ────
 (defun jit-cache-serialize (cache-key entry)
   "Serialize JIT-CACHE-ENTRY to disk under CACHE-KEY.
 Writes compiled code bytes + metadata to a .jit file."
-  (let ((path (cache-file-path cache-key)))
-    (ensure-directories-exist path)
-    (with-open-file (out path
-                         :direction :output
-                         :if-exists :supersede
-                         :if-does-not-exist :create
-                         :element-type '(unsigned-byte 8))
-      ;; Write magic bytes: #xCL #xCC #xJIT
-      (write-byte #x43 out) ; 'C'
-      (write-byte #x4C out) ; 'L'
-      (write-byte #x4A out) ; 'J'
-      ;; Write header: version, flags, size
-      (write-byte 1 out) ; version
-      (write-byte (jce-optimize-level entry) out)
-      ;; Write code length (32-bit LE)
-      (let ((code (jce-compiled-code entry)))
-        (write-sequence (encode-int32 (if code (length code) 0)) out)
-        ;; Write code bytes
-        (when code
-          (write-sequence code out))))
-    path))
+  (when *jit-cache-enabled*
+    (let ((path (cache-file-path cache-key)))
+      (ensure-directories-exist path)
+      (with-open-file (out path
+                           :direction :output
+                           :if-exists :supersede
+                           :if-does-not-exist :create
+                           :element-type '(unsigned-byte 8))
+        ;; Write magic bytes: #xCL #xCC #xJIT
+        (write-byte #x43 out) ; 'C'
+        (write-byte #x4C out) ; 'L'
+        (write-byte #x4A out) ; 'J'
+        ;; Write header: version, flags, size
+        (write-byte 1 out) ; version
+        (write-byte (jce-optimize-level entry) out)
+        ;; Write code length (32-bit LE)
+        (let ((code (jce-compiled-code entry)))
+          (write-sequence (encode-int32 (if code (length code) 0)) out)
+          ;; Write code bytes
+          (when code
+            (write-sequence code out))))
+      path)))
 
 (defun jit-cache-deserialize (cache-key)
   "Deserialize a JIT cache entry from disk.
 Returns jit-cache-entry or NIL if file not found/corrupt."
-  (let ((path (cache-file-path cache-key)))
-    (when (probe-file path)
-      (with-open-file (in path
-                          :direction :input
-                          :element-type '(unsigned-byte 8))
-        (handler-case
-            (let ((magic1 (read-byte in))
-                  (magic2 (read-byte in))
-                  (magic3 (read-byte in)))
-              (unless (and (= magic1 #x43) (= magic2 #x4C) (= magic3 #x4A))
-                (return-from jit-cache-deserialize nil))
-              (let ((version (read-byte in))
-                    (opt-level (read-byte in)))
-                (declare (ignore version))
-                ;; Read code length
-                (let ((code-len (decode-int32 in)))
-                  ;; Read code bytes
-                  (let ((code (make-array code-len
-                                          :element-type '(unsigned-byte 8))))
-                    (read-sequence code in)
-                    (make-jit-cache-entry
-                     :source-hash cache-key
-                     :optimize-level opt-level
-                     :compiled-code code
-                     :timestamp (get-universal-time))))))
-          (error ()
-            nil))))))
+  (when *jit-cache-enabled*
+    (let ((path (cache-file-path cache-key)))
+      (when (probe-file path)
+        (with-open-file (in path
+                            :direction :input
+                            :element-type '(unsigned-byte 8))
+          (handler-case
+              (let ((magic1 (read-byte in))
+                    (magic2 (read-byte in))
+                    (magic3 (read-byte in)))
+                (unless (and (= magic1 #x43) (= magic2 #x4C) (= magic3 #x4A))
+                  (return-from jit-cache-deserialize nil))
+                (let ((version (read-byte in))
+                      (opt-level (read-byte in)))
+                  (declare (ignore version))
+                  ;; Read code length
+                  (let ((code-len (decode-int32 in)))
+                    ;; Read code bytes
+                    (let ((code (make-array code-len
+                                            :element-type '(unsigned-byte 8))))
+                      (read-sequence code in)
+                      (make-jit-cache-entry
+                       :source-hash cache-key
+                       :optimize-level opt-level
+                       :compiled-code code
+                       :timestamp (get-universal-time))))))
+            (error ()
+              nil)))))))
 
 ;;; ──── Helpers ────
 (defun encode-int32 (value)
@@ -141,8 +145,7 @@ Returns jit-cache-entry or NIL if file not found/corrupt."
 ;;; ──── Cache statistics ────
 (defun jit-cache-stats ()
   "Return cache hit/miss statistics."
-  (let ((hits 0) (misses 0)
-        (total-size 0))
+  (let ((total-size 0))
     (maphash (lambda (k v)
                (declare (ignore k))
                (let ((code (jce-compiled-code v)))
