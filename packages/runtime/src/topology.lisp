@@ -1,7 +1,8 @@
 (in-package :cl-cc/runtime)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  #+(and sbcl linux) (require :sb-alien))
+;; SB-ALIEN is part of the SBCL core (not a loadable contrib), so no
+;; (require :sb-alien) — requiring it fails on SBCL builds without a
+;; module provider for it, e.g. the Nix sandbox on Linux.
 
 #+(and sbcl linux)
 (sb-alien:define-alien-routine ("sched_getaffinity" %rt-sched-getaffinity) sb-alien:int
