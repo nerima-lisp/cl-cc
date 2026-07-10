@@ -24,11 +24,13 @@ cl-cc run repro.lisp
 ## Actual output
 
 ```
+
 ```
 
 ## Expected output
 
 ```
+
 ```
 
 ## Environment

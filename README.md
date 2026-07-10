@@ -441,7 +441,7 @@ cl-cc check file.php --strict
 **Expressions**
 
 | PHP                                         | Lowering                                                     |
-| ------------------------------------------- | ------------------------------------------------------------ |
+| ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
 | `[1, 2, 3]` / `array(1, 2, 3)`              | `%php-array` call                                            |
 | `["a" => 1, "b" => 2]`                      | `%php-array` with key/value pairs                            |
 | `$a[0]`                                     | `%php-array-ref`                                             |
@@ -454,9 +454,9 @@ cl-cc check file.php --strict
 | `$a <=> $b`                                 | `%php-spaceship`                                             |
 | `$a >> $n`                                  | `%php-shift-right`                                           |
 | `$a instanceof C`                           | `%php-instanceof`                                            |
-| `$value |> f(...)`                          | PHP 8.5 pipe helper with first-class callable lowering        |
-| `(void) $expr`                              | side-effect evaluation followed by PHP null                   |
-| `clone($obj, ["prop" => $value])`           | PHP 8.5 clone-with helper after `__clone` dispatch            |
+| `$value                                     | > f(...)`                                                    | PHP 8.5 pipe helper with first-class callable lowering |
+| `(void) $expr`                              | side-effect evaluation followed by PHP null                  |
+| `clone($obj, ["prop" => $value])`           | PHP 8.5 clone-with helper after `__clone` dispatch           |
 | `Closure::getCurrent()`                     | currently executing Closure or PHP null                      |
 
 **Type annotations** — parameter and return type annotations (`int`, `?string`, `int\|string`, `void`, `never`, `mixed`, `static`, nullable/union/intersection types) are preserved as `:php-param-types` / `:php-return-type` in the `ast-defun` declarations. Class properties and constants preserve their declared PHP types on `ast-slot-def` nodes.
