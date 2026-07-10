@@ -7,7 +7,7 @@
 
 (asdf:defsystem :cl-cc-runtime
   :description "cl-cc runtime library — rt-* primitives, GC, heap, frame, value codec"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

@@ -8,7 +8,7 @@
 
 (asdf:defsystem :cl-cc-expand
   :description "Macro expansion subsystem: macro-env, defmacro, macroexpand, lambda-list, LOOP"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-type :cl-cc-vm)

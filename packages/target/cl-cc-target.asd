@@ -7,7 +7,7 @@
 
 (asdf:defsystem :cl-cc-target
   :description "Target descriptors (target-desc API; absorbs calling-convention.lisp callers in Phase 3)"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

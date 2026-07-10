@@ -4,7 +4,7 @@
 (asdf:defsystem "cl-cc-jit"
   :description "JIT compilation subsystem: stack maps, safepoints, write barriers, call stubs, code cache, trace JIT"
   :version "0.1.0"
-  :author "cl-cc team"
+  :author "takeokunn"
   :license "MIT"
   :depends-on ("sb-posix" "cl-cc-runtime" "cl-cc-vm" "cl-cc-codegen" "cl-cc-compile")
   :serial t

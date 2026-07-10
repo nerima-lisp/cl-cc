@@ -2,7 +2,7 @@
 
 (asdf:defsystem :cl-cc-php
   :description "CL-CC PHP frontend: lexer, parser, and grammar"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-ast :cl-cc-bootstrap :cl-cc-parse :cl-cc-vm)

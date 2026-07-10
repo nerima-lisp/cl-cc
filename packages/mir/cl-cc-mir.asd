@@ -8,7 +8,7 @@
 
 (asdf:defsystem :cl-cc-mir
   :description "Machine IR: SSA CFG, dominators, phi nodes, target descriptors"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

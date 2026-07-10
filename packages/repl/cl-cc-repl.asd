@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-repl
   :description "REPL state machine"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-pipeline :cl-cc-selfhost :cl-cc-expand

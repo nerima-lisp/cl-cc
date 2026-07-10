@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-regalloc
   :description "Register allocation passes (linear scan, spilling, live-range)"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-mir :cl-cc-target :cl-cc-optimize)

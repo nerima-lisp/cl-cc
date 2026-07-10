@@ -7,7 +7,7 @@
 
 (asdf:defsystem :cl-cc-ir
   :description "Compile-level SSA IR: basic blocks, CFG, dominators, phi nodes, printer"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

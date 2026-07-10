@@ -2,7 +2,7 @@
 
 (asdf:defsystem :cl-cc-javascript-test
   :description "Tests for the CL-CC JavaScript frontend"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-testing-framework :cl-cc-javascript)

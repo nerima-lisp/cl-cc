@@ -4,7 +4,7 @@
 
 (asdf:defsystem :cl-cc-cli
   :description "CL-CC CLI tool"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-docgen)

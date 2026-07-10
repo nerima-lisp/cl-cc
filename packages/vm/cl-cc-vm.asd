@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-vm
   :description "VM instruction set, executor, I/O, CLOS, conditions, collections"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-runtime)
@@ -119,7 +119,7 @@
 ;;;; Tests — run with (asdf:test-system :cl-cc-vm) or :cl-cc-vm/tests.
 (asdf:defsystem :cl-cc-vm/tests
   :description "Tests for the CL-CC VM subsystem"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-testing-framework)

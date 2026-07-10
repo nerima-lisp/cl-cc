@@ -1,6 +1,6 @@
 (asdf:defsystem :cl-cc-optimize
   :description "Optimizer subsystem: CFG, SSA, E-graph, peephole, pipeline"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-prolog :cl-cc-type :cl-cc-ast)

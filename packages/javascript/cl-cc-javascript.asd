@@ -2,7 +2,7 @@
 
 (asdf:defsystem :cl-cc-javascript
   :description "CL-CC JavaScript frontend: lexer, parser, and runtime helpers"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-ast :cl-cc-bootstrap :cl-cc-parse)

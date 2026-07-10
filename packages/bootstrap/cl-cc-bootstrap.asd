@@ -8,7 +8,7 @@
 
 (asdf:defsystem :cl-cc-bootstrap
   :description "cl-cc bootstrap: pre-interned symbols shared by cl-cc/prolog and cl-cc/compile"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on ()

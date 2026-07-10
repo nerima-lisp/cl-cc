@@ -6,7 +6,7 @@
 
 (asdf:defsystem :cl-cc-test
   :description "CL-CC tests"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools)
@@ -654,7 +654,7 @@
 
 (asdf:defsystem :cl-cc-test/e2e
   :description "CL-CC self-hosting end-to-end regression tests"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-test)

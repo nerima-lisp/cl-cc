@@ -1,5 +1,9 @@
 # cl-cc
 
+[![CI](https://github.com/takeokunn/cl-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/takeokunn/cl-cc/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Built with Nix](https://img.shields.io/badge/Built_with-Nix-5277C3.svg?logo=nixos)](https://nixos.org)
+
 A self-hosting Common Lisp compiler and runtime implemented in pure Common Lisp — no project C source; the VM interpreter includes a minimal SBCL host-backed CFFI-compatible FFI shim.
 
 cl-cc compiles ANSI Common Lisp to a register-based bytecode VM, and from there to native x86-64, AArch64, and WebAssembly. The compiler is itself written in Common Lisp, and its core design — CLOS dispatch, Prolog-based optimization, CPS transformation, Hindley–Milner type inference — is implemented using the same language features it compiles.
@@ -584,3 +588,15 @@ cl-cc selfhost [file]     Run the self-hosting workload
   --timeout <seconds>     Maximum execution time (default: 30)
   --no-timeout            Disable CLI timeout for debugging
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development environment setup and
+the pull-request workflow, and [ARCHITECTURE.md](ARCHITECTURE.md) for a
+subsystem-level tour of the compiler. Security issues should be reported
+privately per [SECURITY.md](SECURITY.md). This project follows the
+[Contributor Covenant](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE)

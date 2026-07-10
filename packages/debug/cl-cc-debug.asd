@@ -2,7 +2,7 @@
 
 (asdf:defsystem :cl-cc-debug
   :description "Debugging support: minimal Swank protocol, object inspector, step debugger"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-vm)
@@ -15,7 +15,7 @@
 
 (asdf:defsystem :cl-cc-debug/tests
   :description "Tests for the CL-CC debugging subsystem"
-  :author "CL-CC"
+  :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
   :depends-on (:cl-cc-debug :cl-cc-testing-framework)
