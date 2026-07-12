@@ -38,58 +38,8 @@
           (or (read in nil nil) nil))
         nil)))
 
-(defun %write-system-registry (registry)
-  (let ((path (%cl-cc-registry-path)))
-    (ensure-directories-exist path)
-    (with-open-file (out path :direction :output :if-exists :supersede :if-does-not-exist :create)
-      (write registry :stream out :pretty t))
-    registry))
-
 (defun %normalize-system-name (thing)
   (string-downcase (string thing)))
-
-(defun %read-asd-forms (path)
-  (with-open-file (in path :direction :input)
-    (loop for form = (read in nil :eof)
-          until (eq form :eof)
-          collect form)))
-
-(defun %asd-defsystem-form (path)
-  (find-if (lambda (form)
-             (and (consp form)
-                  (member (car form) '(asdf:defsystem defsystem) :test #'eq)))
-           (%read-asd-forms path)))
-
-(defun %plist-value (plist key)
-  (loop for (k v) on plist by #'cddr
-        when (eq k key) do (return v)))
-
-(defun %asd-system-name (path)
-  (let ((form (%asd-defsystem-form path)))
-    (or (and form (second form)) (pathname-name path))))
-
-(defun %asd-dependencies (path)
-  "Parse PATH's DEFSYSTEM :DEPENDS-ON without invoking Quicklisp shell commands."
-  (let ((form (%asd-defsystem-form path)))
-    (mapcar #'%normalize-system-name
-            (or (and form (%plist-value (cddr form) :depends-on)) nil))))
-
-(defun %register-asd (path)
-  (let* ((truename (namestring (truename path)))
-         (name (%normalize-system-name (%asd-system-name path)))
-         (entry (list :name name :path truename :depends-on (%asd-dependencies path)))
-         (registry (remove name (%read-system-registry)
-                           :key (lambda (e) (getf e :name))
-                           :test #'string=)))
-    (%write-system-registry (cons entry registry))
-    entry))
-
-(defun %unregister-system (name)
-  (let* ((normalized (%normalize-system-name name))
-         (old (%read-system-registry))
-         (new (remove normalized old :key (lambda (e) (getf e :name)) :test #'string=)))
-    (%write-system-registry new)
-    (/= (length old) (length new))))
 
 (defun %registry-system-entry (name)
   (find (%normalize-system-name name) (%read-system-registry)
@@ -134,11 +84,6 @@
                               :name (second words)
                               :args (cddr words)))))))
 
-(defun %read-qlfile-lock (&optional (path #P"qlfile.lock"))
-  (when (probe-file path)
-    (with-open-file (in path :direction :input)
-      (read in nil nil))))
-
 (defun %write-qlfile-lock (entries &optional (path #P"qlfile.lock"))
   (ensure-directories-exist path)
   (with-open-file (out path :direction :output :if-exists :supersede :if-does-not-exist :create)
@@ -148,54 +93,19 @@
            :stream out :pretty t))
   path)
 
-(defun %sha256-file (path)
-  "Return a SHA256 hex digest for PATH using the existing codegen helper."
-  (cl-cc/codegen:wasm-file-content-hash path :bits 256))
-
-(defun %verify-sha256 (path expected)
-  (let ((actual (%sha256-file path)))
-    (unless (or (null expected) (string= (string-downcase expected) (string-downcase actual)))
-      (error "SHA256 mismatch for ~A: expected ~A, got ~A" path expected actual))
-    actual))
-
-(defparameter *download-timeout-seconds* 300
-  "Maximum wall-clock seconds allowed for a single file download.")
-
-(defun %download-file (url output &key sha256)
-  "Download URL to OUTPUT using curl/fetch and verify optional SHA256."
-  (ensure-directories-exist output)
-  (let ((timeout (write-to-string *download-timeout-seconds*)))
-    (cond
-      ((let ((fe (find-symbol "FIND-EXECUTABLE" :uiop))) (and fe (funcall fe "curl")))
-       (uiop:run-program (list "curl" "--max-time" timeout "-L" "-f" "-o" (namestring output) url)
-                         :output :interactive :error-output :interactive))
-      ((let ((fe (find-symbol "FIND-EXECUTABLE" :uiop))) (and fe (funcall fe "fetch")))
-       (uiop:run-program (list "fetch" "-T" timeout "-o" (namestring output) url)
-                         :output :interactive :error-output :interactive))
-      (t (error "No HTTP downloader found (need curl or fetch)"))))
-  (%verify-sha256 output sha256)
-  output)
-
-(defun %extract-tar-gz (archive directory)
-  "Extract ARCHIVE into DIRECTORY with the system tar implementation."
-  (ensure-directories-exist (merge-pathnames #P".keep" directory))
-  (unless (let ((fe (find-symbol "FIND-EXECUTABLE" :uiop))) (and fe (funcall fe "tar")))
-    (error "Cannot extract ~A: tar executable not found" archive))
-  (uiop:run-program (list "tar" "-xzf" (namestring archive) "-C" (namestring directory))
-                    :output :interactive :error-output :interactive)
-  directory)
-
-(defun %quicklisp-dist-url ()
-  "Return a conservative Quicklisp dist archive URL used by cl-cc update."
-  "https://beta.quicklisp.org/quicklisp/quicklisp.tar")
+(defun %quicklisp-function (name wrapper)
+  (let* ((ql-package (find-package :ql))
+         (function (and ql-package (find-symbol name ql-package))))
+    (and function
+         (fboundp function)
+         (not (eq (symbol-function function) wrapper))
+         function)))
 
 (defun %quicklisp-update-dists (&optional package)
   "Update Quicklisp metadata when Quicklisp exists, otherwise refresh qlfile.lock."
-  (let* ((ql-package (find-package :ql))
-         (update (and ql-package (find-symbol "UPDATE-ALL-DISTS" ql-package))))
+  (let ((update (%quicklisp-function "UPDATE-ALL-DISTS" #'ql-update-all-dists)))
     (cond
-      ((and update (fboundp update)
-            (not (eq (symbol-function update) #'ql-update-all-dists)))
+      (update
        (funcall update :prompt nil))
       (t
        (let* ((entries (%parse-qlfile))
@@ -242,11 +152,8 @@
 (defun %quickload-system-if-available (name)
   "Try to load NAME through Quicklisp when Quicklisp is present.
 Returns true when Quicklisp successfully loaded the system."
-  (let* ((ql-package (find-package :ql))
-          (quickload (and ql-package (find-symbol "QUICKLOAD" ql-package))))
-    (when (and quickload
-               (fboundp quickload)
-               (not (eq (symbol-function quickload) #'ql-quickload)))
+  (let ((quickload (%quicklisp-function "QUICKLOAD" #'ql-quickload)))
+    (when quickload
       (handler-case
           (progn
             (funcall quickload name :silent t)

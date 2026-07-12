@@ -6,8 +6,6 @@
 ;;;   - %dump-phase-label, %parse-ir-phase — IR phase helpers
 ;;;   - %ensure-list, %source-location-comment, %print-source-comment
 ;;;   - %call-with-optional-output-file
-;;;   - %svg-escape, %flamegraph-color, %flamegraph-build-tree,
-;;;     %flamegraph-children-list, %write-flamegraph-svg — flamegraph rendering
 ;;;   - %ssa-block-name
 ;;;
 ;;; Dump-specific helpers and compile-option parsing live in main-dump.lisp.
@@ -135,84 +133,6 @@ Returns :lisp, :elisp, :php, or :javascript."
             (cl-cc/vm:vm-profile-call-stack vm-state) (list "<toplevel>"))
       vm-state)))
 
-(defparameter *svg-char-entities*
-  '((#\& . "&amp;") (#\< . "&lt;") (#\> . "&gt;") (#\" . "&quot;"))
-  "Alist mapping special SVG/XML characters to their entity references.")
-
-(defun %svg-escape (text)
-  (with-output-to-string (out)
-    (loop for ch across (princ-to-string text)
-          do (let ((entity (cdr (assoc ch *svg-char-entities*))))
-               (if entity (princ entity out) (write-char ch out))))))
-
-(defparameter *flamegraph-color-overrides*
-  '(("gc"  . "rgb(90,140,255)")
-    ("jit" . "rgb(255,165,0)"))
-  "Special-case frame colors keyed by substring match (first match wins).")
-
-(defun %flamegraph-color (name)
-  (let ((s (string-downcase (princ-to-string name))))
-    (or (cdr (assoc-if (lambda (k) (search k s)) *flamegraph-color-overrides*))
-        (format nil "hsl(8,75%,~D%)" (+ 45 (mod (sxhash s) 20))))))
-
-(defun %flamegraph-build-tree (samples)
-  (let ((root (list :name "root" :count 0 :children (make-hash-table :test #'equal))))
-    (maphash
-     (lambda (stack count)
-       (incf (getf root :count) count)
-       (let ((node root))
-         (dolist (name (uiop:split-string stack :separator '(#\;)))
-           (let* ((children (getf node :children))
-                  (child (or (gethash name children)
-                             (setf (gethash name children)
-                                   (list :name name :count 0 :children (make-hash-table :test #'equal))))))
-             (incf (getf child :count) count)
-             (setf node child)))))
-     samples)
-    root))
-
-(defun %flamegraph-children-list (node)
-  (let (children)
-    (let ((table (getf node :children)))
-      (when table
-        (maphash (lambda (_ child) (declare (ignore _)) (push child children)) table)))
-    (sort children #'string< :key (lambda (c) (princ-to-string (getf c :name))))))
-
-(defun %flamegraph-depth-of (node depth max-depth-cell)
-  "Compute max nesting depth by DFS; store result in (car MAX-DEPTH-CELL)."
-  (setf (car max-depth-cell) (max (car max-depth-cell) depth))
-  (dolist (child (%flamegraph-children-list node))
-    (%flamegraph-depth-of child (1+ depth) max-depth-cell)))
-
-(defun %flamegraph-emit-node (stream node depth x scale max-depth frame-height)
-  "Recursively emit SVG rect+text for NODE and its children."
-  (let ((cursor x))
-    (dolist (child (%flamegraph-children-list node))
-      (let* ((count (getf child :count))
-             (w (* count scale))
-             (y (- (+ 20 (* max-depth frame-height)) (* depth frame-height))))
-        (format stream "<g><title>~A (~D samples)</title><rect x='~,2f' y='~,2f' width='~,2f' height='~D' fill='~A' stroke='white' stroke-width='0.5'/><text x='~,2f' y='~,2f' font-size='12' fill='black'>~A</text></g>~%"
-                (%svg-escape (getf child :name)) count cursor y w (- frame-height 2)
-                (%flamegraph-color (getf child :name)) (+ cursor 3) (+ y 13)
-                (%svg-escape (getf child :name)))
-        (%flamegraph-emit-node stream child (1+ depth) cursor scale max-depth frame-height)
-        (incf cursor w)))))
-
-(defun %write-flamegraph-svg (path samples)
-  (let* ((tree          (%flamegraph-build-tree samples))
-         (total         (max 1 (getf tree :count)))
-         (frame-height  18)
-         (width         1200)
-         (max-depth-cell (list 0)))
-    (%flamegraph-depth-of tree 0 max-depth-cell)
-    (let ((max-depth (car max-depth-cell)))
-      (with-open-file (out path :direction :output :if-exists :supersede :if-does-not-exist :create)
-        (format out "<svg xmlns='http://www.w3.org/2000/svg' width='~D' height='~D'>~%" width (+ 40 (* (1+ max-depth) frame-height)))
-        (format out "<rect width='100%' height='100%' fill='rgb(250,250,250)'/>~%")
-        (%flamegraph-emit-node out tree 0 0 (/ width total) max-depth frame-height)
-        (format out "</svg>~%")))
-    path))
-
 (defun %ssa-block-name (blk)
   (let ((label (cl-cc/optimize:bb-label blk)))
     (string-downcase
@@ -271,12 +191,6 @@ Returns :lisp, :elisp, :php, or :javascript."
         ,@body)
       ,command-name)))
 
-;;; FR-808: Script mode / shebang support stub
-(defun parse-cli-args (argv)
-  "FR-808: Parse CLI arguments and script-mode argv conventions.
-Returns a parsed-args structure."
-  (parse-args argv))
-
 ;;; FR-809: Command-line arguments API stub
 (defvar *command-line-arguments* nil
   "Stable CLI-level view of script arguments after the script/expression.")
@@ -284,10 +198,6 @@ Returns a parsed-args structure."
 (defun cl-cc-argv ()
   "FR-809: Return the command-line arguments as a list of strings."
   (copy-list *command-line-arguments*))
-
-(defun %script-argv-from-parsed (parsed)
-  "Return script-visible argv: positional arguments after file/expression."
-  (copy-list (cdr (parsed-args-positional parsed))))
 
 (defun %set-vm-global-if-package (package-name symbol-name value &optional (state nil state-p))
   (let ((package (find-package package-name)))
@@ -311,9 +221,8 @@ Returns a parsed-args structure."
       (%set-vm-global-if-package :cl-cc name args vm-state))
     args))
 
-(defun getopt (_program option-spec argv)
+(defun getopt (option-spec argv)
   "FR-809: Minimal script getopt helper. Returns option plist and positionals."
-  (declare (ignore _program))
   (let ((opts nil)
         (positionals nil)
         (rest (copy-list argv)))
@@ -344,13 +253,6 @@ Returns a parsed-args structure."
   "Wrap SOURCE with script argv initialization and optional CL-CC:MAIN call."
   (format nil "(progn~%  (defparameter cl-cc:*command-line-arguments* '~S)~%  ~A~%  (when (fboundp 'cl-cc:main) (funcall #'cl-cc:main)))~%"
           argv source))
-
-;;; FR-917: Reproducible build support stub
-(defun cl-cc-deterministic-build-p ()
-  "FR-917: Return T when building in reproducible/deterministic mode."
-  (let ((env (or (ignore-errors (uiop:getenv "CLCC_DETERMINISTIC"))
-                 (ignore-errors (uiop:getenv "SOURCE_DATE_EPOCH")))))
-    (and env (not (member (string-downcase env) '("" "0" "false" "no") :test #'string=)))))
 
 (defun configure-reproducible-build (&key (epoch "0") (seed 0))
   "Enable deterministic build defaults for this process and return metadata."

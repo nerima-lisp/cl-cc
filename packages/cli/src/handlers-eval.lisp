@@ -17,7 +17,7 @@ used to produce it."
                              (lambda ()
                                (run-compiled (compilation-result-program compiled)
                                              :state vm-state)))))
-                (values result compiled))))
+               (values result compiled))))
     (cond
       (stdlib
        (compile-and-run #'cl-cc:compile-string-with-stdlib))

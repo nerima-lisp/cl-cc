@@ -51,6 +51,12 @@ with a source caret and type trace on failure."
               (format *error-output* "~A~%" trace)))
             (uiop:quit 1))))))
 
+(defun %emit-status-lines (parsed command-name &rest lines)
+  "Run a timeout-protected command that prints static status lines."
+  (%with-cli-timeout (parsed command-name)
+    (dolist (line lines)
+      (format t "~A~%" line))))
+
 ;;; ──── Phase 129-160: Advanced Compilation III Handlers ────
 
 (defun %do-fuzz (parsed)
@@ -69,9 +75,9 @@ with a source caret and type trace on failure."
 
 (defun %do-audit (parsed)
   "Dependency auditing: FR-814. Scan dependencies for known CVEs."
-  (%with-cli-timeout (parsed "audit")
-    (format t "Auditing dependencies...~%")
-    (format t "Audit complete. No known vulnerabilities found.~%")))
+  (%emit-status-lines parsed "audit"
+                      "Auditing dependencies..."
+                      "Audit complete. No known vulnerabilities found."))
 
 (defun %do-doc (parsed)
   "API documentation generation: FR-321. Extract docstrings to Markdown."
@@ -86,30 +92,30 @@ with a source caret and type trace on failure."
 
 (defun %do-doctest (parsed)
   "Doctest runner: FR-903. Execute docstring code examples."
-  (%with-cli-timeout (parsed "doctest")
-    (format t "Running doctests...~%")
-    (format t "Doctests: 0 failures.~%")))
+  (%emit-status-lines parsed "doctest"
+                      "Running doctests..."
+                      "Doctests: 0 failures."))
 
 (defun %do-show-types (parsed)
   "Type signature display: FR-904. Show inferred types."
-  (%with-cli-timeout (parsed "show-types")
-    (format t "Inferred type signatures:~%")
-    (format t "(no file specified)~%")))
+  (%emit-status-lines parsed "show-types"
+                      "Inferred type signatures:"
+                      "(no file specified)"))
 
 (defun %do-assert-density (parsed)
   "Assertion density analysis: FR-905. Measure code defense level."
-  (%with-cli-timeout (parsed "assert-density")
-    (format t "Assertion density: 0.0 assertions/LOC~%")))
+  (%emit-status-lines parsed "assert-density"
+                      "Assertion density: 0.0 assertions/LOC"))
 
 (defun %do-abi-dump (parsed)
   "ABI dump: FR-777. Dump public API surface."
-  (%with-cli-timeout (parsed "abi-dump")
-    (format t "ABI dump complete.~%")))
+  (%emit-status-lines parsed "abi-dump"
+                      "ABI dump complete."))
 
 (defun %do-abi-check (parsed)
   "ABI compatibility check: FR-777. Compare ABI manifests."
-  (%with-cli-timeout (parsed "abi-check")
-    (format t "ABI check: compatible.~%")))
+  (%emit-status-lines parsed "abi-check"
+                      "ABI check: compatible."))
 
 (defun %do-demangle (parsed)
   "Name demangling: FR-776. Demangle C++ ABI symbols."
@@ -134,7 +140,7 @@ with a source caret and type trace on failure."
         ((flag parsed "--decompile")
          (%run-wasm-tool-command "wasm-decompile" (list file)
                                  "wasm-decompile is not available in this environment."))
-        ((or (flag parsed "--wat") t)
+        (t
          (%run-wasm-tool-command "wasm2wat" (list file)
                                  "wasm2wat is not available in this environment."))))))
 
@@ -157,29 +163,29 @@ with a source caret and type trace on failure."
 
 (defun %do-macrostep (parsed)
   "Macro debugger: FR-836. Step through macro expansion."
-  (%with-cli-timeout (parsed "macrostep")
-    (format t "Macro stepping...~%")
-    (format t "Expansion complete.~%")))
+  (%emit-status-lines parsed "macrostep"
+                      "Macro stepping..."
+                      "Expansion complete."))
 
 (defun %do-bisect (parsed)
   "Regression bisection: FR-809. Find regression-introducing commit."
-  (%with-cli-timeout (parsed "bisect")
-    (format t "Bisecting...~%")
-    (format t "Bisection complete. Regression found at HEAD.~%")))
+  (%emit-status-lines parsed "bisect"
+                      "Bisecting..."
+                      "Bisection complete. Regression found at HEAD."))
 
 (defun %do-features (parsed)
   "Feature flags: FR-812. List available feature flags."
-  (%with-cli-timeout (parsed "features")
-    (format t "Feature flags:~%")
-    (format t "  jit-enabled       (default: nil) - Enable JIT compilation~%")
-    (format t "  gc-epsilon        (default: nil) - No-op GC mode~%")
-    (format t "  fast-math         (default: nil) - Non-strict FP optimizations~%")
-    (format t "  sandbox           (default: nil) - Seccomp runtime sandbox~%")))
+  (%emit-status-lines parsed "features"
+                      "Feature flags:"
+                      "  jit-enabled       (default: nil) - Enable JIT compilation"
+                      "  gc-epsilon        (default: nil) - No-op GC mode"
+                      "  fast-math         (default: nil) - Non-strict FP optimizations"
+                      "  sandbox           (default: nil) - Seccomp runtime sandbox"))
 
 (defun %do-generate (parsed)
   "Build-time codegen: FR-815. Generate code from schema."
-  (%with-cli-timeout (parsed "generate")
-    (format t "Code generation complete.~%")))
+  (%emit-status-lines parsed "generate"
+                      "Code generation complete."))
 
 (defun %do-update (parsed)
   "Package update: FR-813/FR-1039. Update Quicklisp deps and qlfile.lock."

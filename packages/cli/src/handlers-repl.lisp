@@ -101,6 +101,10 @@ inside strings for REPL input balancing."
     (:php "PHP")
     (:javascript "JavaScript")))
 
+(defun %repl-command-argument (trimmed prefix)
+  "Return the argument tail of TRIMMED after PREFIX, trimming outer whitespace."
+  (string-trim '(#\Space #\Tab) (subseq trimmed (length prefix))))
+
 (defun %repl-inspect (expr language)
   "Evaluate EXPR and print object type plus slot/container details."
   (let ((object (cl-cc:run-string-repl expr :language language)))
@@ -152,7 +156,7 @@ inside strings for REPL input balancing."
     (when (and watch watch-file)
       (let ((source (%read-command-source watch-file)))
         (%record-hot-reload-source watch-file source nil)
-        (%start-watch-file-poll-thread watch-file cl-cc/repl::*repl-vm-state*)))
+        (%start-watch-file-poll-thread watch-file cl-cc/repl::*repl-vm-state* language)))
     (format t "CL-CC ~A  —  ~A~%" *version* (%repl-language-label language))
     (format t "Type a form and press Return. (exit) or Ctrl+D to quit.~%~%")
     (force-output)
@@ -203,7 +207,7 @@ inside strings for REPL input balancing."
           (let ((trimmed (string-trim '(#\Space #\Tab #\Newline) buffer)))
             (cond
               ((string= trimmed "") nil)
-               ((or (string= trimmed "(exit)")
+              ((or (string= trimmed "(exit)")
                     (string= trimmed ":quit")
                     (string= trimmed ":q"))
                 (%save-repl-history-file)
@@ -211,12 +215,12 @@ inside strings for REPL input balancing."
                 (uiop:quit 0))
                ((uiop:string-prefix-p ":inspect " trimmed)
                 (handler-case
-                    (%repl-inspect (string-trim '(#\Space #\Tab) (subseq trimmed 9))
+                    (%repl-inspect (%repl-command-argument trimmed ":inspect ")
                                    language)
                   (error (e) (format t "; Error: ~A~%" e))))
                ((uiop:string-prefix-p ":describe " trimmed)
                 (handler-case
-                    (%repl-describe (string-trim '(#\Space #\Tab) (subseq trimmed 10))
+                    (%repl-describe (%repl-command-argument trimmed ":describe ")
                                     language)
                   (error (e) (format t "; Error: ~A~%" e))))
                (t

@@ -39,205 +39,21 @@
                         compile-opts-gc-min-heap
                         compile-opts-gc-max-heap))
 
-(defun %call-with-runtime-sanitizer-flags (opts thunk)
+(defun %call-with-runtime-sanitizer-flags (opts thunk &rest args)
   "Execute THUNK with runtime sanitizer toggles derived from OPTS."
-  (let ((cl-cc/runtime::*rt-asan-enabled* (not (null (compile-opts-asan opts))))
-        (cl-cc/runtime::*rt-msan-enabled* (not (null (compile-opts-msan opts))))
-        (cl-cc/runtime::*rt-tsan-enabled* (not (null (compile-opts-tsan opts))))
-        (cl-cc/runtime::*rt-hwasan-enabled* (not (null (compile-opts-hwasan opts))))
-        (cl-cc/runtime::*rt-ubsan-enabled* (not (null (compile-opts-ubsan opts))))
+  (let ((cl-cc/runtime:*rt-asan-enabled* (not (null (compile-opts-asan opts))))
+        (cl-cc/runtime:*rt-msan-enabled* (not (null (compile-opts-msan opts))))
+        (cl-cc/runtime:*rt-tsan-enabled* (not (null (compile-opts-tsan opts))))
+        (cl-cc/runtime:*rt-hwasan-enabled* (not (null (compile-opts-hwasan opts))))
+        (cl-cc/runtime:*rt-ubsan-enabled* (not (null (compile-opts-ubsan opts))))
         (cl-cc/runtime:*gc-young-size-words*
          (or (compile-opts-gc-min-heap opts)
              cl-cc/runtime:*gc-young-size-words*))
         (cl-cc/runtime:*gc-old-size-words*
          (or (compile-opts-gc-max-heap opts)
              cl-cc/runtime:*gc-old-size-words*))
-        (cl-cc/parse::*werror-p* (not (null (compile-opts-werror opts)))))
-    (funcall thunk)))
-
-(defun %pgo-profile-instructions (result)
-  "Return instruction list to profile from RESULT, preferring optimized stream."
-  (or (cl-cc/compile:compilation-result-optimized-instructions result)
-      (cl-cc/compile:compilation-result-vm-instructions result)
-      (cl-cc/vm:vm-program-instructions (cl-cc/compile:compilation-result-program result))))
-
-(defun %write-pgo-profile (path result &optional vm-state)
-  "Write a lightweight PGO profile for RESULT to PATH.
-
-RESULT supplies instruction streams and the optional counter plan. VM-STATE,
-when provided, contributes runtime basic-block, branch, and counter counts.
-The file is written as a readable plist-like form and PATH's parent directory
-is created as needed."
-  (let ((counts (make-hash-table :test #'equal))
-         (insts (%pgo-profile-instructions result))
-         (bb (and vm-state (cl-cc/vm:vm-get-profile-bb-counts vm-state)))
-         (branches (and vm-state (cl-cc/vm:vm-get-profile-branch-counts vm-state)))
-         (calls (and vm-state (cl-cc/vm:vm-get-profile-call-counts vm-state)))
-         (type-feedback (and vm-state (cl-cc/vm:vm-get-profile-type-feedback vm-state)))
-        (counter-plan (cl-cc/compile:compilation-result-pgo-counter-plan result))
-        (counter-template nil)
-        (bb-counter-counts nil)
-        (edge-counter-counts nil))
-    (when counter-plan
-      (setf counter-template (cl-cc/optimize:opt-pgo-make-profile-template counter-plan))
-      (setf bb-counter-counts
-            (loop for (bb-id . pc) in (getf counter-plan :bb-runtime-keys)
-                  collect (cons bb-id (if bb (gethash pc bb 0) 0))))
-      (setf edge-counter-counts
-            (loop for (edge-id . runtime-key) in (getf counter-plan :edge-runtime-keys)
-                  collect (cons edge-id (if branches (gethash runtime-key branches 0) 0)))))
-    (dolist (inst insts)
-      (let ((op (string-upcase (symbol-name (type-of inst)))))
-        (incf (gethash op counts 0))))
-    (ensure-directories-exist path)
-    (with-open-file (out path
-                         :direction :output
-                         :if-exists :supersede
-                         :if-does-not-exist :create)
-      (flet ((write-ht-section (key ht)
-               (format out " ~A (~%" key)
-               (when ht
-                 (maphash (lambda (k v) (format out "   (~S . ~D)~%" k v)) ht))
-               (format out " )~%")))
-        (format out "(:format :cl-cc-pgo-v1~%")
-        (format out " :total-instructions ~D~%" (length insts))
-        (write-ht-section ":op-counts"            counts)
-        (write-ht-section ":bb-counts"            bb)
-        (write-ht-section ":branch-counts"        branches)
-        (write-ht-section ":function-call-counts" calls)
-        (write-ht-section ":type-feedback"        type-feedback)
-        (when counter-plan
-          (format out " :counter-plan ~S~%"         counter-plan)
-          (format out " :counter-template ~S~%"     counter-template)
-          (format out " :bb-counter-counts ~S~%"    bb-counter-counts)
-          (format out " :edge-counter-counts ~S~%"  edge-counter-counts))
-        (format out " )~%")))))
-
-(defun %print-jit-cache-stats (&optional (stream *standard-output*))
-  "Print runtime JIT code-cache statistics when requested by the CLI."
-  (let ((stats (cl-cc/runtime:rt-code-cache-stats)))
-    (format stream "JIT code cache: size=~D capacity=~D entries=~D hits=~D misses=~D hit-rate=~,2F%% evictions=~D~%"
-            (getf stats :size)
-            (getf stats :capacity)
-            (getf stats :entries)
-            (getf stats :hits)
-            (getf stats :misses)
-            (* 100.0 (getf stats :hit-rate))
-            (getf stats :evictions))))
-
-(defun %maybe-print-jit-cache-stats (opts)
-  "Print JIT cache stats when --jit-cache-stats is set."
-  (when (compile-opts-jit-cache-stats opts)
-    (%print-jit-cache-stats)))
-
-(defun %maybe-write-pgo-profile (opts result &optional vm-state)
-  "Emit a profile file when --pgo-generate is set."
-  (let ((path (compile-opts-pgo-generate-path opts)))
-    (when path
-      (%write-pgo-profile path result vm-state))))
-
-(defun %write-selfhost-instruction-profile (&optional (path *selfhost-profile-path*))
-  "Write the self-hosting VM instruction histogram to PATH."
-  (cl-cc/vm:vm-write-instruction-profile path)
-  (format *error-output* "; cl-cc selfhost: wrote VM instruction profile to ~A~%" path))
-
-(defun print-profile (vm-state &optional (stream *standard-output*))
-  "Print a simple collapsed-stack profile report for VM-STATE."
-  (let ((samples (and vm-state (cl-cc/vm:vm-get-profile-samples vm-state))))
-    (when samples
-      (format stream "~&Profile samples:~%")
-      (let ((rows nil))
-        (maphash (lambda (stack count) (push (cons stack count) rows)) samples)
-        (dolist (row (sort rows #'> :key #'cdr))
-          (format stream "~D ~A~%" (cdr row) (car row)))))))
-
-(defmacro %with-cli-error-handler (&body body)
-  "Evaluate BODY and convert unhandled errors into CLI diagnostics.
-
-Expands to a HANDLER-CASE around BODY. On ERROR, the condition message is
-formatted through the optimizer diagnostic formatter, written to
-*ERROR-OUTPUT*, and the process exits with status 1."
-  `(handler-case
-       (progn ,@body)
-     (error (e)
-       (format *error-output* "~A~%"
-               (cl-cc/optimize:opt-format-diagnostic-reason
-                "cli"
-                "failed"
-                (princ-to-string e)))
-       (uiop:quit 1))))
-
-(defun %first-line (text)
-  "Return first line of TEXT, or empty string when TEXT is NIL."
-  (let* ((s (or text ""))
-         (newline-pos (position #\Newline s)))
-    (if newline-pos
-        (subseq s 0 newline-pos)
-        s)))
-
-(defun %source-line-at (source line-number)
-  "Return LINE-NUMBER (1-based) from SOURCE, or first line when unavailable."
-  (if (and (integerp line-number) (plusp line-number))
-      (with-input-from-string (in (or source ""))
-        (loop for idx from 1
-              for line = (read-line in nil nil)
-              while line
-              when (= idx line-number) do (return line)
-              finally (return (%first-line source))))
-      (%first-line source)))
-
-(defun %extract-line-column-from-location (location)
-  "Parse LOCATION like file:line:column or file:line.
-
-Returns two values: the parsed 1-based line number and optional column number.
-Unreadable or absent fields return NIL rather than signaling."
-  (when (stringp location)
-    (let* ((last-colon (position #\: location :from-end t))
-           (prev-colon (and last-colon
-                            (position #\: location :from-end t :end last-colon))))
-      (cond
-        ((and prev-colon last-colon)
-         (values (ignore-errors (parse-integer (subseq location (1+ prev-colon) last-colon)))
-                 (ignore-errors (parse-integer (subseq location (1+ last-colon))))))
-        (last-colon
-         (values (ignore-errors (parse-integer (subseq location (1+ last-colon))))
-                 nil))
-        (t
-         (values nil nil))))))
-
-(defun %run-compiled-result (result vm-state opts)
-  "Execute RESULT's program in VM-STATE under runtime options from OPTS.
-
-When OPTS request trace emission or flamegraph output, write those artifacts
-around the execution. Returns the value produced by RUN-COMPILED."
-  (when (compile-opts-trace-emit opts)
-    (%trace-emit-stages result *standard-output*))
-  (%call-with-runtime-sanitizer-flags
-   opts
-         (lambda ()
-      (prog1 (run-compiled (compilation-result-program result) :state vm-state)
-        (%maybe-print-jit-cache-stats opts)
-        (when (compile-opts-profile opts)
-          (print-profile vm-state))
-        (when (compile-opts-flamegraph-path opts)
-          (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
-            (if (plusp (hash-table-count samples))
-                (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
-                (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))))))
-
-(defun %compile-lisp-with-auto-stdlib (source kwargs stdlib no-stdlib)
-  "Compile Lisp SOURCE, lazily falling back to stdlib on first unresolved use.
---stdlib keeps the old eager behaviour; --no-stdlib disables the fallback."
-  (cond
-    (stdlib
-     (apply #'cl-cc:compile-string-with-stdlib source :target :vm kwargs))
-    (no-stdlib
-     (apply #'compile-string source :target :vm kwargs))
-    (t
-     (handler-case
-         (apply #'compile-string source :target :vm kwargs)
-        (error ()
-          (apply #'cl-cc:compile-string-with-stdlib source :target :vm kwargs))))))
+        (cl-cc/parse:*werror-p* (not (null (compile-opts-werror opts)))))
+    (apply thunk args)))
 
 ;;; ─── Watch mode + hot-reload (FR-808 / FR-916/917) ──────────────────────────
 ;;;
@@ -248,94 +64,52 @@ around the execution. Returns the value produced by RUN-COMPILED."
 ;;; entry points were referenced by the handlers but never defined, so every
 ;;; `cl-cc run` crashed with "%RECORD-HOT-RELOAD-SOURCE is undefined".
 
-(defvar *hot-reload-sources* (make-hash-table :test #'equal)
-  "Registry mapping a source file's namestring to the text last run from it.
-Lets watch mode detect edits and gives hot-reload the previous source to diff.")
+(defvar *hot-reload-records* (make-hash-table :test #'equal)
+  "In-memory metadata for watch-mode sources and their last reload result.")
 
-(defun %record-hot-reload-source (file source result)
-  "Record SOURCE as the latest text run from FILE for watch/hot-reload.
-RESULT (the run's return value) is accepted for call-site symmetry and ignored.
-Returns SOURCE."
-  (declare (ignore result))
-  (when file
-    (setf (gethash (namestring file) *hot-reload-sources*) source))
-  source)
+(defun %file-write-date-or-nil (path)
+  "Return PATH's write date, or NIL if it cannot be probed."
+  (ignore-errors
+    (when path
+      (file-write-date path))))
 
-(defun %watch-recompile-and-run (file source vm-state)
-  "Recompile SOURCE (language detected from FILE) and run it in VM-STATE.
-Lisp sources use the auto-stdlib fallback; other languages compile directly."
-  (let* ((language (%detect-language file ""))
-         (result (if (member language '(:lisp :elisp))
-                     (%compile-lisp-with-auto-stdlib source nil nil nil)
-                     (compile-string source :target :vm :language language))))
-    (run-compiled (compilation-result-program result) :state vm-state)))
+(defun %hot-reload-record-key (path)
+  (let ((truename (ignore-errors (truename path))))
+    (namestring (or truename path))))
 
-(defun %watch-file-poll (file vm-state &key (interval 0.3))
-  "Block, polling FILE's write-date; on each change recompile and re-run FILE in
-VM-STATE. Loops until interrupted with Ctrl-C, then returns NIL.
+(defun %record-hot-reload-source (path source result)
+  "Record SOURCE metadata for PATH and return RESULT unchanged."
+  (setf (gethash (%hot-reload-record-key path) *hot-reload-records*)
+        (list :source source :result result))
+  result)
 
-Powers `cl-cc run FILE --watch`: edit-save-rerun without restarting the
-process, reusing one VM state so prior global definitions remain visible."
-  (let ((last-write (ignore-errors (file-write-date file))))
-    (format *error-output*
-            "~&; watching ~A — save to re-run, Ctrl-C to stop~%" (namestring file))
+(defun %watch-file-poll (path vm-state &key (interval 1) language)
+  "Poll PATH and hot-reload changed definitions into VM-STATE."
+  (let ((language (or language (%detect-language path nil)))
+        (last-write-date (%file-write-date-or-nil path)))
+    (format *error-output* "; cl-cc watch: polling ~A every ~A second~:P~%" path interval)
     (force-output *error-output*)
-    (handler-case
-        (loop
-          (sleep interval)
-          (let ((now (ignore-errors (file-write-date file))))
-            (when (and now (not (eql now last-write)))
-              (setf last-write now)
-              (let ((source (%read-command-source file)))
-                (%record-hot-reload-source file source nil)
-                (handler-case
-                    (progn
-                      (%watch-recompile-and-run file source vm-state)
-                      (format *error-output* "~&; reloaded ~A~%" (namestring file)))
-                  (error (e)
-                    (format *error-output* "~&; reload error: ~A~%" e)))
-                (force-output *error-output*)))))
-      (sb-sys:interactive-interrupt ()
-        (format *error-output* "~&; watch stopped~%")
-        (force-output *error-output*)
-        nil))))
+    (loop
+      (sleep interval)
+      (let ((write-date (%file-write-date-or-nil path)))
+        (when (and write-date
+                   (or (null last-write-date) (> write-date last-write-date)))
+          (setf last-write-date write-date)
+          (handler-case
+              (let ((cl-cc/repl::*repl-vm-state* vm-state))
+                (let* ((source (%strip-shebang-line (%read-file path)))
+                       (result (cl-cc:run-string-repl source :language language)))
+                  (%record-hot-reload-source path source result)
+                  (format *error-output* "; cl-cc watch: hot-reloaded ~A => ~S~%" path result)
+                  (force-output *error-output*)))
+            (error (e)
+              (format *error-output* "; cl-cc watch: reload failed: ~A~%" e)
+              (force-output *error-output*))))))))
 
-(defun %start-watch-file-poll-thread (file vm-state)
-  "Run %watch-file-poll on FILE in a background thread so the REPL stays
-interactive while watching. Returns the new thread."
+(defun %start-watch-file-poll-thread (path vm-state &optional language)
+  "Start a background polling watcher for PATH."
   (sb-thread:make-thread
-   (lambda () (%watch-file-poll file vm-state))
-   :name "cl-cc-watch"))
-
-(defun %do-install (parsed)
-  "Handle `cl-cc install' for local ASDF system files and Quicklisp packages.
-Accepts either a path to a .asd file or a system name for Quicklisp installation."
-  (let ((spec (%positional-arg parsed "install")))
-    (%with-cli-error-handler
-      (cond
-        ;; Path to .asd file: register locally
-        ((uiop:file-exists-p spec)
-         (let* ((entry (%register-asd spec))
-                (order (%toposort-systems (list (getf entry :name)))))
-           (dolist (system order) (ignore-errors (asdf:load-system system)))
-           (format t "Installed ~A from ~A~%" (getf entry :name) (getf entry :path))
-           (when (getf entry :depends-on)
-             (format t "Dependencies: ~{~A~^, ~}~%" (getf entry :depends-on)))))
-        ;; System name: try Quicklisp
-        (t
-         (if (%quickload-system-if-available spec)
-             (format t "Installed ~A via Quicklisp~%" spec)
-             (error "Cannot install ~A: not a file path and Quicklisp not available.~
-                     ~%  Use `cl-cc install path/to/system.asd` for local systems.~
-                     ~%  Ensure Quicklisp is loaded with (ql:quickload ...) for remote packages."
-                    spec))))
-      (uiop:quit 0))))
-
-(defun %do-uninstall (parsed)
-  "Handle `cl-cc uninstall' for local ASDF system registry entries."
-  (let ((name (%required-file-arg parsed "uninstall")))
-    (%with-cli-error-handler
-      (if (%unregister-system name)
-          (format t "Uninstalled ~A~%" name)
-          (format t "System not registered: ~A~%" name))
-      (uiop:quit 0))))
+   (lambda ()
+     (let ((cl-cc/repl::*repl-vm-state* vm-state))
+       (%watch-file-poll path vm-state :language language)))
+   :name (format nil "cl-cc hot reload watcher: ~A" path)))

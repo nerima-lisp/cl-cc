@@ -126,6 +126,42 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
   (cl-cc/cli::%read-file "/tmp/cl-cc-nonexistent-99999.lisp")))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
+;;; Watch mode helpers
+;;; ─────────────────────────────────────────────────────────────────────────
+
+(deftest cli-repl-command-argument-helper
+  "repl helpers: command argument extraction trims the prefix tail only."
+  (assert-string= "foo bar"
+                  (cl-cc/cli::%repl-command-argument ":inspect   foo bar  "
+                                                     ":inspect "))
+  (assert-string= ""
+                  (cl-cc/cli::%repl-command-argument ":describe   "
+                                                     ":describe ")))
+
+(deftest cli-watch-file-write-date-helper
+  "watch helpers: write-date helper probes existing files and returns NIL for missing paths."
+  (%with-temp-file (path "(defun watch-helper () 1)")
+    (assert-true (integerp (cl-cc/cli::%file-write-date-or-nil path)))
+    (assert-null (cl-cc/cli::%file-write-date-or-nil "/tmp/cl-cc-watch-missing-99999.lisp"))))
+
+(deftest cli-watch-record-hot-reload-source-stores-metadata
+  "watch helpers: hot-reload records capture source and result metadata."
+  (%with-temp-file (path "(defun watch-helper () 1)")
+    (let ((result :ok))
+      (unwind-protect
+           (progn
+             (clrhash cl-cc/cli::*hot-reload-records*)
+             (assert-eq result
+                        (cl-cc/cli::%record-hot-reload-source path
+                                                              "(defun watch-helper () 1)"
+                                                              result))
+             (let* ((key (namestring (truename path)))
+                    (entry (gethash key cl-cc/cli::*hot-reload-records*)))
+               (assert-string= "(defun watch-helper () 1)" (getf entry :source))
+               (assert-eq result (getf entry :result))))
+        (clrhash cl-cc/cli::*hot-reload-records*)))))
+
+;;; ─────────────────────────────────────────────────────────────────────────
 ;;; handlers.lisp — stable helper-level coverage
 ;;; ─────────────────────────────────────────────────────────────────────────
 

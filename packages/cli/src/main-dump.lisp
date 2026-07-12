@@ -16,9 +16,7 @@
 
 (defparameter +ansi-esc+     (string (code-char 27)))
 (defparameter +ansi-reset+   (concatenate 'string +ansi-esc+ "[0m"))
-(defparameter +ansi-label+   (concatenate 'string +ansi-esc+ "[32m"))
 (defparameter +ansi-opcode+  (concatenate 'string +ansi-esc+ "[34m"))
-(defparameter +ansi-comment+ (concatenate 'string +ansi-esc+ "[90m"))
 
 (defparameter *selfhost-profile-path* ".cl-cc-profile.sexp"
   "Default instruction histogram emitted by `cl-cc selfhost --profile` and read by later compilations.")
@@ -37,13 +35,15 @@ starts with parsed/expanded stdlib forms and the VM snapshot already resident."
                               :executable t
                               :compression t)))
 
+(defun %emit-source-annotation (annotate-source stream ast) (when annotate-source
+        (%print-source-comment stream (%source-location-comment ast))))
+
 (defun %dump-ast-phase (result stream annotate-source)
   (let ((asts (%ensure-list (cl-cc:compilation-result-ast result))))
     (when (null asts)
       (format stream "; no AST available~%"))
     (dolist (ast asts)
-      (when annotate-source
-        (%print-source-comment stream (%source-location-comment ast)))
+      (%emit-source-annotation annotate-source stream ast)
       (format stream "~S~%" (cl-cc:ast-to-sexp ast)))))
 
 (defun %dump-cps-phase (result stream annotate-source)
@@ -144,10 +144,6 @@ starts with parsed/expanded stdlib forms and the VM snapshot already resident."
     ("wasm64"  :wasm64 :wasm)
     ("wasm32-wasi" :wasm32-wasi :wasm))
   "Architecture string aliases: (input-string arch-keyword compile-target-keyword).")
-
-(defun %wasm-arch-keyword-p (arch)
-  "Return true when ARCH denotes a WebAssembly target."
-  (member arch '(:wasm32 :wasm64 :wasm32-wasi) :test #'eq))
 
 (defun %arch-keyword (arch-str)
   "Convert ARCH-STR to its canonical arch keyword. Calls (uiop:quit 2) on unknown values."

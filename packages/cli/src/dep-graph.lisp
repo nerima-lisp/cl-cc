@@ -7,22 +7,16 @@
 ;;; of the current ASDF system in Graphviz DOT or JSON format.
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(defun %dep-graph-edge-dot (from to &optional (label nil))
-  (format t "  ~S -> ~S~@[ [label=~S]~];~%"
+(defun %dep-graph-edge-dot (from to)
+  (format t "  ~S -> ~S;~%"
           (string-downcase (string from))
-          (string-downcase (string to))
-          label))
-
-(defun %dep-graph-edge-json (from edges-seen)
-  (unless (gethash from edges-seen)
-    (format t "  ~S: []~%" (string-downcase (string from)))
-    (setf (gethash from edges-seen) t)))
+          (string-downcase (string to))))
 
 (defun %asdf-system-dependencies (system)
   "Return a list of (system-name . dep-system-name) pairs for SYSTEM."
   (let ((edges nil)
         (system-name (asdf:component-name system)))
-    (when (subtypep (type-of system) 'asdf:system)
+    (when (typep system 'asdf:system)
       (dolist (dep (asdf:system-depends-on system))
         (push (cons system-name dep) edges)))
     edges))
@@ -83,12 +77,16 @@ OUTPUT-FORMAT can be :dot (Graphviz DOT) or :json (JSON adjacency list)."
 (defun %parse-dep-graph-args (args)
   "Parse --format dot|json from ARGS. Returns :dot or :json."
   (let ((format :dot))
-    (loop for arg in args
-          for next-arg = (nth (1+ (position arg args :test #'string=)) args)
+    (loop for rest on args
+          for arg = (car rest)
+          for next-arg = (cadr rest)
+          while arg
           when (string= arg "--format")
           do (cond
-               ((string-equal next-arg "json") (setf format :json))
-               ((string-equal next-arg "dot")  (setf format :dot))))
+               ((and next-arg (string-equal next-arg "json"))
+                (setf format :json))
+               ((and next-arg (string-equal next-arg "dot"))
+                (setf format :dot))))
     format))
 
 (defun %handle-dep-graph (args)

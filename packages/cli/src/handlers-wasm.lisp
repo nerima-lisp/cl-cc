@@ -90,21 +90,25 @@ export async function instantiate(imports = {}) {~%
 
 (defun %wasm-validate-file (path)
   "Validate PATH with WebAssembly.validate and wasmtime when available."
-  (let ((ok t))
-    (when (cl-cc/codegen:wasm-tool-available-p "node")
-      (let ((script (format nil "const fs=require('fs');process.exit(WebAssembly.validate(fs.readFileSync(~S))?0:1)" path)))
-        (handler-case
-            (uiop:run-program (list "node" "-e" script) :ignore-error-status nil)
-          (error (e)
-            (setf ok nil)
-            (format *error-output* "WebAssembly.validate failed: ~A~%" e)))))
-    (when (cl-cc/codegen:wasm-tool-available-p "wasmtime")
-      (handler-case
-          (uiop:run-program (list "wasmtime" "validate" path) :ignore-error-status nil)
-        (error (e)
-          (setf ok nil)
-          (format *error-output* "wasmtime validate failed: ~A~%" e))))
-    ok))
+  (flet ((run-validation-command (command error-label)
+           (handler-case
+               (progn
+                 (uiop:run-program command :ignore-error-status nil)
+                 t)
+             (error (e)
+               (format *error-output* "~A failed: ~A~%" error-label e)
+               nil))))
+    (let ((ok t))
+      (when (cl-cc/codegen:wasm-tool-available-p "node")
+        (let ((script (format nil "const fs=require('fs');process.exit(WebAssembly.validate(fs.readFileSync(~S))?0:1)" path)))
+          (unless (run-validation-command (list "node" "-e" script)
+                                           "WebAssembly.validate")
+            (setf ok nil))))
+      (when (cl-cc/codegen:wasm-tool-available-p "wasmtime")
+        (unless (run-validation-command (list "wasmtime" "validate" path)
+                                         "wasmtime validate")
+          (setf ok nil)))
+      ok)))
 
 (defun %write-wasm-metadata (output metadata &key integrity sha256 sha384 streaming-js)
   "Write build output metadata as a small deterministic JSON file."
