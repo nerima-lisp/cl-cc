@@ -25,6 +25,7 @@
    vm-method-qualifier
    vm-method-reg
    vm-generic-call
+   vm-pgo-specializer
    collect-inherited-slots
    collect-inherited-initargs
    compute-class-precedence-list
