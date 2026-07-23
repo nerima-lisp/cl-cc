@@ -691,10 +691,9 @@ top-level, and optimization stages."
   (multiple-value-bind (forms source-locations)
       (parse-source-for-language source language :source-file source-file)
     (%register-backend-runtime-bridges)
+    (%install-backend-vm-integrations)
     (when (eq language :php)
       (php-check-supported-forms forms))
-    (when (eq language :javascript)
-      (%register-js-runtime-bridges))
     (let* ((opts  (%make-pipeline-opts
                     :target target :type-check type-check :safety safety
                      :speed speed
@@ -770,10 +769,9 @@ arguments are forwarded to the expression, top-level, and optimization stages."
    (multiple-value-bind (forms source-locations)
        (parse-source-for-language source language :source-file source-file)
      (%register-backend-runtime-bridges)
+     (%install-backend-vm-integrations)
      (when (eq language :php)
        (php-check-supported-forms forms))
-     (when (eq language :javascript)
-       (%register-js-runtime-bridges))
      (let* ((opts  (%make-pipeline-opts
                      :target target :type-check type-check :safety safety
                       :speed speed

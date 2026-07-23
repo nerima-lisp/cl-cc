@@ -64,7 +64,14 @@
     ;; installs them into the VM host bridge without referencing any backend
     ;; package. Lives in bootstrap because php/js and pipeline all use it.
     #:register-backend-bridge-provider
-    #:backend-bridge-providers))
+    #:backend-bridge-providers
+    ;; Backend VM integration: a backend that must wire itself into the VM
+    ;; (e.g. JS closure invocation) registers an installer thunk; the pipeline
+    ;; runs them. Per-run global seeders take the vm-state.
+    #:register-backend-vm-integration-installer
+    #:backend-vm-integration-installers
+    #:register-backend-global-seeder
+    #:backend-global-seeders))
 
 (in-package :cl-cc/bootstrap)
 
@@ -111,3 +118,23 @@
 (defun backend-bridge-providers ()
   "Return the registered backend runtime-bridge provider thunks."
   *backend-bridge-providers*)
+
+(defvar *backend-vm-integration-installers* '()
+  "Thunks that wire a backend into the VM (idempotent); run at pipeline setup.")
+
+(defun register-backend-vm-integration-installer (fn)
+  (pushnew fn *backend-vm-integration-installers* :test #'eq)
+  fn)
+
+(defun backend-vm-integration-installers ()
+  *backend-vm-integration-installers*)
+
+(defvar *backend-global-seeders* '()
+  "Functions of (vm-state); seed a backend's runtime globals before execution.")
+
+(defun register-backend-global-seeder (fn)
+  (pushnew fn *backend-global-seeders* :test #'eq)
+  fn)
+
+(defun backend-global-seeders ()
+  *backend-global-seeders*)

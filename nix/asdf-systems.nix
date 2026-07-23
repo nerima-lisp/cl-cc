@@ -114,6 +114,8 @@ let
         "cl-cc-ast"
         "cl-cc-bootstrap"
         "cl-cc-parse"
+        # vm-integration.lisp wires the JS runtime into the VM (§5-1 step B).
+        "cl-cc-vm"
       ];
     };
     cl-cc-optimize = {

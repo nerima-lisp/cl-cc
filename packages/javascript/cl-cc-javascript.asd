@@ -5,7 +5,7 @@
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (:cl-cc-ast :cl-cc-bootstrap :cl-cc-parse)
+  :depends-on (:cl-cc-ast :cl-cc-bootstrap :cl-cc-parse :cl-cc-vm)
   :pathname "src"
   :serial t
   :components
@@ -104,4 +104,8 @@
    (:file "runtime-method-resolver-dispatch")
    ;; Registers JS's %JS-* helpers as a backend bridge provider. Must load
    ;; last, after every %JS-* function is defined.
-   (:file "runtime-bridge-provider")))
+   (:file "runtime-bridge-provider")
+   ;; Installs the JS↔VM closure integration + prelude-global seeder, and
+   ;; self-registers with cl-cc/bootstrap. Depends on the runtime specials
+   ;; (*js-apply-fn* etc.) so it loads after runtime-call.
+   (:file "vm-integration")))
