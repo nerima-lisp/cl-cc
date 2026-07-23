@@ -16,6 +16,7 @@
     (:file "args")
     (:file "main")              ; Help system (%print-global-help, %print-command-help)
     (:file "main-utils")        ; Utilities, flamegraph, SSA block name helpers
+    (:file "plugins")           ; FR-720 plugin architecture (extension registries)
     (:file "flamegraph")
     (:file "main-dump")         ; ANSI colors, dump-*-phase functions, compile-opts struct
     (:file "tty")               ; cl-tty-kit-backed terminal styling (REPL colors)
