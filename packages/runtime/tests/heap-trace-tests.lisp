@@ -12,11 +12,7 @@
 ;;; Suite
 ;;; ------------------------------------------------------------
 
-(defsuite heap-trace-suite
-  :description "Card table and address predicate tests (heap-trace.lisp)"
-  :parent cl-cc-unit-suite)
 
-(in-suite heap-trace-suite)
 
 ;;; ------------------------------------------------------------
 ;;; Helpers
@@ -39,126 +35,181 @@
 ;;; Card Table: rt-card-index
 ;;; ------------------------------------------------------------
 
-(deftest heap-trace-card-index-at-old-base-is-zero
-  "rt-card-index at old-base address returns 0."
+(it-sequential "heap-trace-card-index-at-old-base-is-zero"
   (let* ((heap     (%make-trace-heap))
          (old-base (cl-cc/runtime:rt-heap-old-base heap)))
-    (assert-= 0 (cl-cc/runtime:rt-card-index heap old-base))))
+    (expect (= 0 (cl-cc/runtime:rt-card-index heap old-base)) :to-be-truthy)))
 
-(deftest heap-trace-card-index-within-first-card-is-zero
-  "rt-card-index 10 bytes past old-base returns 0 (same card, card-size=64)."
+(it-sequential "heap-trace-card-index-within-first-card-is-zero"
   (let* ((heap     (%make-trace-heap))
          (old-base (cl-cc/runtime:rt-heap-old-base heap)))
-    (assert-= 0 (cl-cc/runtime:rt-card-index heap (+ old-base 10)))))
+    (expect (= 0 (cl-cc/runtime:rt-card-index heap (+ old-base 10))) :to-be-truthy)))
 
 ;;; ------------------------------------------------------------
 ;;; Card Table: mark / clear / dirty-p
 ;;; ------------------------------------------------------------
 
-(deftest heap-trace-card-mark-clear-lifecycle
-  "Card starts clean; mark-dirty makes dirty-p true; clear reverts it; clear-all clears all."
+(it-sequential "heap-trace-card-mark-clear-lifecycle"
   (let* ((heap     (%make-trace-heap))
          (old-base (cl-cc/runtime:rt-heap-old-base heap)))
-    (assert-false (cl-cc/runtime:rt-card-dirty-p heap old-base))
+    (expect (cl-cc/runtime:rt-card-dirty-p heap old-base) :to-be-falsy)
     (cl-cc/runtime:rt-card-mark-dirty heap old-base)
-    (assert-true (cl-cc/runtime:rt-card-dirty-p heap old-base))
+    (expect (cl-cc/runtime:rt-card-dirty-p heap old-base) :to-be-truthy)
     (cl-cc/runtime:rt-card-clear heap old-base)
-    (assert-false (cl-cc/runtime:rt-card-dirty-p heap old-base))
+    (expect (cl-cc/runtime:rt-card-dirty-p heap old-base) :to-be-falsy)
     (cl-cc/runtime:rt-card-mark-dirty heap old-base)
     (cl-cc/runtime:rt-card-clear-all heap)
-    (assert-false (cl-cc/runtime:rt-card-dirty-p heap old-base))))
+    (expect (cl-cc/runtime:rt-card-dirty-p heap old-base) :to-be-falsy)))
 
 ;;; ------------------------------------------------------------
 ;;; Address Predicates
 ;;; ------------------------------------------------------------
 
-(deftest-each heap-trace-young-addr-p-cases
-  "rt-young-addr-p returns true iff addr is within young from-space [0, 16)."
-  :cases (("in-range-0"  0  t)
-          ("in-range-10" 10 t)
-          ("in-range-15" 15 t)
-          ("boundary-16" 16 nil)
-          ("old-base-32" 32 nil)
-          ("negative"    -1 nil))
-  (addr expected)
-  (let ((heap (%make-trace-heap)))
-    (assert-equal expected (not (not (cl-cc/runtime:rt-young-addr-p heap addr))))))
+(it-sequential "heap-trace-young-addr-p-cases in-range-0"
+  (destructuring-bind (addr expected) (list 0 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-young-addr-p heap addr))) :to-equal expected))))
 
-(deftest-each heap-trace-old-addr-p-cases
-  "rt-old-addr-p returns true iff addr is within old-space [32, 64)."
-  :cases (("below-old-31" 31 nil)
-          ("old-base-32"  32 t)
-          ("old-mid-40"   40 t)
-          ("old-end-63"   63 t)
-          ("beyond-64"    64 nil)
-          ("young-0"      0  nil))
-  (addr expected)
-  (let ((heap (%make-trace-heap)))
-    (assert-equal expected (not (not (cl-cc/runtime:rt-old-addr-p heap addr))))))
+(it-sequential "heap-trace-young-addr-p-cases in-range-10"
+  (destructuring-bind (addr expected) (list 10 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-young-addr-p heap addr))) :to-equal expected))))
 
-(deftest-each heap-trace-heap-addr-p-cases
-  "rt-heap-addr-p is the union of young, old, and large-obj: true for 0..15, 32..63, and 64..95."
-  :cases (("young-0"      0  t)
-          ("young-15"     15 t)
-          ("gap-16"       16 nil)
-          ("gap-31"       31 nil)
-          ("old-32"       32 t)
-          ("old-63"       63 t)
-          ("large-obj-64" 64 t)
-          ("large-obj-95" 95 t)
-          ("beyond-96"    96 nil))
-  (addr expected)
-  (let ((heap (%make-trace-heap)))
-    (assert-equal expected (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))))))
+(it-sequential "heap-trace-young-addr-p-cases in-range-15"
+  (destructuring-bind (addr expected) (list 15 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-young-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-young-addr-p-cases boundary-16"
+  (destructuring-bind (addr expected) (list 16 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-young-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-young-addr-p-cases old-base-32"
+  (destructuring-bind (addr expected) (list 32 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-young-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-young-addr-p-cases negative"
+  (destructuring-bind (addr expected) (list -1 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-young-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-old-addr-p-cases below-old-31"
+  (destructuring-bind (addr expected) (list 31 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-old-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-old-addr-p-cases old-base-32"
+  (destructuring-bind (addr expected) (list 32 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-old-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-old-addr-p-cases old-mid-40"
+  (destructuring-bind (addr expected) (list 40 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-old-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-old-addr-p-cases old-end-63"
+  (destructuring-bind (addr expected) (list 63 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-old-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-old-addr-p-cases beyond-64"
+  (destructuring-bind (addr expected) (list 64 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-old-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-old-addr-p-cases young-0"
+  (destructuring-bind (addr expected) (list 0 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-old-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases young-0"
+  (destructuring-bind (addr expected) (list 0 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases young-15"
+  (destructuring-bind (addr expected) (list 15 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases gap-16"
+  (destructuring-bind (addr expected) (list 16 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases gap-31"
+  (destructuring-bind (addr expected) (list 31 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases old-32"
+  (destructuring-bind (addr expected) (list 32 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases old-63"
+  (destructuring-bind (addr expected) (list 63 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases large-obj-64"
+  (destructuring-bind (addr expected) (list 64 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases large-obj-95"
+  (destructuring-bind (addr expected) (list 95 t)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
+
+(it-sequential "heap-trace-heap-addr-p-cases beyond-96"
+  (destructuring-bind (addr expected) (list 96 nil)
+    (let ((heap (%make-trace-heap)))
+    (expect (not (not (cl-cc/runtime:rt-heap-addr-p heap addr))) :to-equal expected))))
 
 ;;; ------------------------------------------------------------
 ;;; rt-object-pointer-slots
 ;;; ------------------------------------------------------------
 
-(deftest heap-trace-pointer-slots-cons-tag
-  "Cons (size=3, tag=1): pointer slots are (1 2) — car and cdr."
+(it-sequential "heap-trace-pointer-slots-cons-tag"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 3 1)
-    (assert-equal '(1 2) (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal '(1 2))))
 
-(deftest heap-trace-pointer-slots-symbol-tag
-  "Symbol (size=4, tag=2): pointer slots are (1 2 3) — name, pkg, value."
+(it-sequential "heap-trace-pointer-slots-symbol-tag"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 4 2)
-    (assert-equal '(1 2 3) (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal '(1 2 3))))
 
-(deftest heap-trace-pointer-slots-closure-4-tag
-  "Closure-4 (size=4, tag=3): pointer slots are (2 3) — env and code."
+(it-sequential "heap-trace-pointer-slots-closure-4-tag"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 4 3)
-    (assert-equal '(2 3) (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal '(2 3))))
 
-(deftest heap-trace-pointer-slots-closure-2-tag
-  "Closure-2 (size=2, tag=3): pointer slots are () — no pointer fields."
+(it-sequential "heap-trace-pointer-slots-closure-2-tag"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 2 3)
-    (assert-equal '() (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal '())))
 
-(deftest heap-trace-pointer-slots-array-4-tag
-  "Array-4 (size=4, tag=5): pointer slots are (2 3) — elements."
+(it-sequential "heap-trace-pointer-slots-array-4-tag"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 4 5)
-    (assert-equal '(2 3) (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal '(2 3))))
 
-(deftest heap-trace-pointer-slots-other-3-tag
-  "Other-3 (size=3, tag=7): pointer slots are (1 2)."
+(it-sequential "heap-trace-pointer-slots-other-3-tag"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 3 7)
-    (assert-equal '(1 2) (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal '(1 2))))
 
-(deftest heap-trace-pointer-slots-string-tag-returns-nil
-  "String (size=5, tag=6): rt-object-pointer-slots returns nil."
+(it-sequential "heap-trace-pointer-slots-string-tag-returns-nil"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 5 6)
-    (assert-equal nil (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal nil)))
 
-(deftest heap-trace-pointer-slots-unknown-tag-returns-nil
-  "Unknown object (size=2, tag=0): rt-object-pointer-slots returns nil."
+(it-sequential "heap-trace-pointer-slots-unknown-tag-returns-nil"
   (let ((heap (%make-trace-heap)))
     (%write-obj-header heap 0 2 0)
-    (assert-equal nil (cl-cc/runtime:rt-object-pointer-slots heap 0))))
+    (expect (cl-cc/runtime:rt-object-pointer-slots heap 0) :to-equal nil)))

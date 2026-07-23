@@ -11,62 +11,55 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Heap Allocation Tests
 
-(deftest vm-heap-alloc-first-returns-addr-1
-  "First vm-heap-alloc returns address 1 and sets counter to 1."
+(it-sequential "vm-heap-alloc-first-returns-addr-1"
   (let* ((state (make-instance 'vm-io-state))
          (addr (vm-heap-alloc state nil)))
-    (assert-= addr 1)
-    (assert-= (vm-heap-counter state) 1)))
+    (expect (= addr 1) :to-be-truthy)
+    (expect (= (vm-heap-counter state) 1) :to-be-truthy)))
 
-(deftest vm-heap-alloc-multiple-yields-unique-addrs
-  "Three sequential vm-heap-alloc calls yield unique addresses."
+(it-sequential "vm-heap-alloc-multiple-yields-unique-addrs"
   (let* ((state (make-instance 'vm-io-state))
          (addr1 (vm-heap-alloc state nil))
          (addr2 (vm-heap-alloc state nil))
          (addr3 (vm-heap-alloc state nil)))
-    (assert-true (/= addr1 addr2))
-    (assert-true (/= addr2 addr3))
-    (assert-= (vm-heap-counter state) 3)))
+    (expect (/= addr1 addr2) :to-be-truthy)
+    (expect (/= addr2 addr3) :to-be-truthy)
+    (expect (= (vm-heap-counter state) 3) :to-be-truthy)))
 
-(deftest vm-heap-get-set-roundtrip
-  "vm-heap-set stores a value; vm-heap-get retrieves it."
+(it-sequential "vm-heap-get-set-roundtrip"
   (let* ((state (make-instance 'vm-io-state))
          (addr (incf (vm-heap-counter state))))
     (vm-heap-set state addr :test-value)
-    (assert-eq (vm-heap-get state addr) :test-value)))
+    (expect :test-value :to-be (vm-heap-get state addr))))
 
 ;;; Cons Cell Tests
 
-(deftest vm-cons-creation-with-non-nil-cdr
-  "vm-cons creates a cons cell with both car and cdr set to non-nil values."
+(it-sequential "vm-cons-creation-with-non-nil-cdr"
   (let* ((state (make-instance 'vm-io-state))
          (inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2)))
     (vm-reg-set state 1 10)
     (vm-reg-set state 2 20)
     (execute-instruction inst state 0 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-true (consp cell))
-      (assert-= (car cell) 10)
-      (assert-= (cdr cell) 20))))
+      (expect (consp cell) :to-be-truthy)
+      (expect (= (car cell) 10) :to-be-truthy)
+      (expect (= (cdr cell) 20) :to-be-truthy))))
 
-(deftest vm-cons-creation-with-nil-cdr
-  "vm-cons creates a cons cell where cdr is nil."
+(it-sequential "vm-cons-creation-with-nil-cdr"
   (let* ((state (make-instance 'vm-io-state))
          (inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2)))
     (vm-reg-set state 1 42)
     (vm-reg-set state 2 nil)
     (execute-instruction inst state 0 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-true (consp cell))
-      (assert-= (car cell) 42)
-      (assert-null (cdr cell)))))
+      (expect (consp cell) :to-be-truthy)
+      (expect (= (car cell) 42) :to-be-truthy)
+      (expect (cdr cell) :to-be-null))))
 
-(deftest vm-cons-nested
-  "Test that nested cons cells work correctly."
+(it-sequential "vm-cons-nested"
   (let* ((state (make-instance 'vm-io-state))
          ;; Create first cons: (2 . nil)
          (inst1 (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
@@ -80,14 +73,13 @@
     ;; Verify structure
     (let* ((outer-cell (vm-reg-get state 3))
            (inner-cell (cdr outer-cell)))
-      (assert-= (car outer-cell) 1)
-      (assert-= (car inner-cell) 2)
-      (assert-null (cdr inner-cell)))))
+      (expect (= (car outer-cell) 1) :to-be-truthy)
+      (expect (= (car inner-cell) 2) :to-be-truthy)
+      (expect (cdr inner-cell) :to-be-null))))
 
 ;;; Car/Cdr Tests
 
-(deftest vm-car-extracts-car-of-cons
-  "vm-car extracts the car half of a cons cell."
+(it-sequential "vm-car-extracts-car-of-cons"
   (let* ((state (make-instance 'vm-io-state))
          (cons-inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
          (car-inst (make-vm-car :dst 3 :src 0)))
@@ -95,10 +87,9 @@
     (vm-reg-set state 2 456)
     (execute-instruction cons-inst state 0 (make-hash-table))
     (execute-instruction car-inst state 1 (make-hash-table))
-    (assert-= (vm-reg-get state 3) 123)))
+    (expect (= (vm-reg-get state 3) 123) :to-be-truthy)))
 
-(deftest vm-cdr-extracts-cdr-of-cons
-  "vm-cdr extracts the cdr half of a cons cell."
+(it-sequential "vm-cdr-extracts-cdr-of-cons"
   (let* ((state (make-instance 'vm-io-state))
          (cons-inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
          (cdr-inst (make-vm-cdr :dst 3 :src 0)))
@@ -106,10 +97,9 @@
     (vm-reg-set state 2 456)
     (execute-instruction cons-inst state 0 (make-hash-table))
     (execute-instruction cdr-inst state 1 (make-hash-table))
-    (assert-= (vm-reg-get state 3) 456)))
+    (expect (= (vm-reg-get state 3) 456) :to-be-truthy)))
 
-(deftest vm-car-traverses-nested-cons
-  "vm-car on a nested cons ((2.3).4) followed by car-of-car gives the inner car (2)."
+(it-sequential "vm-car-traverses-nested-cons"
   (let* ((state (make-instance 'vm-io-state))
          (inst1 (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
          (inst2 (make-vm-cons :dst 3 :car-src 0 :cdr-src 4))
@@ -122,12 +112,11 @@
     (execute-instruction inst2 state 1 (make-hash-table))
     (execute-instruction car-inst state 2 (make-hash-table))
     (execute-instruction car-inst2 state 3 (make-hash-table))
-    (assert-= (vm-reg-get state 6) 2)))
+    (expect (= (vm-reg-get state 6) 2) :to-be-truthy)))
 
 ;;; Rplaca/Rplacd Tests
 
-(deftest vm-rplaca-mutates-car
-  "vm-rplaca mutates the car of a cons cell; cdr is unchanged."
+(it-sequential "vm-rplaca-mutates-car"
   (cl-cc/vm::vm-clear-hash-cons-table)
   (let* ((state (make-instance 'vm-io-state))
          (cons-inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
@@ -136,15 +125,14 @@
     (vm-reg-set state 2 20)
     (execute-instruction cons-inst state 0 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-= 10 (car cell)))
+      (expect (= 10 (car cell)) :to-be-truthy))
     (vm-reg-set state 3 99)
     (execute-instruction rplaca-inst state 1 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-= 99 (car cell))
-      (assert-= 20 (cdr cell)))))
+      (expect (= 99 (car cell)) :to-be-truthy)
+      (expect (= 20 (cdr cell)) :to-be-truthy))))
 
-(deftest vm-rplacd-mutates-cdr
-  "vm-rplacd mutates the cdr of a cons cell; car is unchanged."
+(it-sequential "vm-rplacd-mutates-cdr"
   (cl-cc/vm::vm-clear-hash-cons-table)
   (let* ((state (make-instance 'vm-io-state))
          (cons-inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
@@ -153,15 +141,14 @@
     (vm-reg-set state 2 21)
     (execute-instruction cons-inst state 0 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-= 21 (cdr cell)))
+      (expect (= 21 (cdr cell)) :to-be-truthy))
     (vm-reg-set state 3 88)
     (execute-instruction rplacd-inst state 1 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-= 11 (car cell))
-      (assert-= 88 (cdr cell)))))
+      (expect (= 11 (car cell)) :to-be-truthy)
+      (expect (= 88 (cdr cell)) :to-be-truthy))))
 
-(deftest vm-rplaca-and-rplacd-together
-  "Both vm-rplaca and vm-rplacd can be applied to the same cons cell independently."
+(it-sequential "vm-rplaca-and-rplacd-together"
   (let* ((state (make-instance 'vm-io-state))
          (cons-inst (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
          (rplaca-inst (make-vm-rplaca :cons 0 :val 3))
@@ -174,13 +161,12 @@
     (vm-reg-set state 4 200)
     (execute-instruction rplacd-inst state 2 (make-hash-table))
     (let ((cell (vm-reg-get state 0)))
-      (assert-= (car cell) 100)
-      (assert-= (cdr cell) 200))))
+      (expect (= (car cell) 100) :to-be-truthy)
+      (expect (= (cdr cell) 200) :to-be-truthy))))
 
 ;;; Closure Heap Operations Tests
 
-(deftest vm-make-closure-heap-alloc
-  "Test that vm-make-closure allocates on heap."
+(it-sequential "vm-make-closure-heap-alloc"
   (let* ((state (make-instance 'vm-io-state))
          (labels (make-hash-table))
          (inst (make-vm-make-closure
@@ -194,12 +180,11 @@
     (execute-instruction inst state 0 labels)
     (let* ((addr (vm-reg-get state 0))
            (closure (vm-heap-get state addr)))
-      (assert-type vm-closure-object closure)
-      (assert-eq (vm-closure-entry-label closure) :func)
-      (assert-equal (vm-closure-params closure) '(:x)))))
+      (expect (typep closure 'vm-closure-object) :to-be-truthy)
+      (expect :func :to-be (vm-closure-entry-label closure))
+      (expect '(:x) :to-equal (vm-closure-params closure)))))
 
-(deftest vm-closure-ref-idx-accesses-value
-  "Test that vm-closure-ref-idx accesses captured values."
+(it-sequential "vm-closure-ref-idx-accesses-value"
   (let* ((state (make-instance 'vm-io-state))
          (labels (make-hash-table))
          (make-inst (make-vm-make-closure
@@ -226,12 +211,11 @@
     (execute-instruction ref-inst-0 state 1 labels)
     (execute-instruction ref-inst-1 state 2 labels)
     (execute-instruction ref-inst-2 state 3 labels)
-    (assert-= (vm-reg-get state 4) 10)
-    (assert-= (vm-reg-get state 5) 20)
-    (assert-= (vm-reg-get state 6) 30)))
+    (expect (= (vm-reg-get state 4) 10) :to-be-truthy)
+    (expect (= (vm-reg-get state 5) 20) :to-be-truthy)
+    (expect (= (vm-reg-get state 6) 30) :to-be-truthy)))
 
-(deftest vm-closure-ref-idx-out-of-bounds
-  "Test that vm-closure-ref-idx signals error for invalid index."
+(it-sequential "vm-closure-ref-idx-out-of-bounds"
   (let* ((state (make-instance 'vm-io-state))
          (labels (make-hash-table))
          (make-inst (make-vm-make-closure

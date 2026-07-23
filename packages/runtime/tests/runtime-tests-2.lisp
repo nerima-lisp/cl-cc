@@ -5,7 +5,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── List Operations ───────────────────────────────────────────────────────
 
@@ -13,164 +12,240 @@
   (let ((base '(1 2 3)))
     (values base (cl-cc/runtime:rt-copy-list base))))
 
-(deftest rt-cons-creation-and-mutation
-  "rt-cons/car/cdr create cons; rt-rplaca/rt-rplacd mutate in place."
+(it-sequential "rt-cons-creation-and-mutation"
   (let ((c (cl-cc/runtime:rt-cons 1 2)))
-    (assert-= 1 (cl-cc/runtime:rt-car c))
-    (assert-= 2 (cl-cc/runtime:rt-cdr c))
+    (expect (= 1 (cl-cc/runtime:rt-car c)) :to-be-truthy)
+    (expect (= 2 (cl-cc/runtime:rt-cdr c)) :to-be-truthy)
     (cl-cc/runtime:rt-rplaca c 10)
     (cl-cc/runtime:rt-rplacd c 20)
-    (assert-= 10 (cl-cc/runtime:rt-car c))
-    (assert-= 20 (cl-cc/runtime:rt-cdr c))))
+    (expect (= 10 (cl-cc/runtime:rt-car c)) :to-be-truthy)
+    (expect (= 20 (cl-cc/runtime:rt-cdr c)) :to-be-truthy)))
 
-(deftest rt-copy-list-cow-read-path
-  "rt-copy-list returns a COW-capable value that preserves list reads."
+(it-sequential "rt-copy-list-cow-read-path"
   (multiple-value-bind (base copy) (%prepare-rt-copy-list-fixture)
     (declare (ignore base))
-    (assert-= 1 (cl-cc/runtime:rt-car copy))
-    (assert-equal '(2 3) (cl-cc/runtime:rt-cdr copy))
-    (assert-= 3 (cl-cc/runtime:rt-list-length copy))))
+    (expect (= 1 (cl-cc/runtime:rt-car copy)) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-cdr copy) :to-equal '(2 3))
+    (expect (= 3 (cl-cc/runtime:rt-list-length copy)) :to-be-truthy)))
 
-(deftest rt-copy-list-cow-write-does-not-mutate-base-list
-  "Mutating a copied COW list does not mutate the original shared list."
+(it-sequential "rt-copy-list-cow-write-does-not-mutate-base-list"
   (multiple-value-bind (base copy) (%prepare-rt-copy-list-fixture)
     (cl-cc/runtime:rt-rplaca copy 99)
-    (assert-= 99 (cl-cc/runtime:rt-car copy))
-    (assert-= 1 (car base))))
+    (expect (= 99 (cl-cc/runtime:rt-car copy)) :to-be-truthy)
+    (expect (= 1 (car base)) :to-be-truthy)))
 
-(deftest rt-list-push-pop
-  "rt-pop-list returns head+tail; rt-push-list conses onto front."
+(it-sequential "rt-list-push-pop"
   (multiple-value-bind (head tail)
       (cl-cc/runtime:rt-pop-list '(a b c))
-    (assert-eq 'a head)
-    (assert-equal '(b c) tail))
-  (assert-equal '(x a b) (cl-cc/runtime:rt-push-list 'x '(a b))))
+    (expect head :to-be 'a)
+    (expect tail :to-equal '(b c)))
+  (expect (cl-cc/runtime:rt-push-list 'x '(a b)) :to-equal '(x a b)))
 
-(deftest-each rt-endp-convention
-  "rt-endp: 1 for nil (end of list); 0 for non-empty list."
-  :cases (("nil-end"   nil  1)
-          ("non-empty" '(1) 0))
-  (input expected)
-  (assert-= expected (cl-cc/runtime:rt-endp input)))
+(it-sequential "rt-endp-convention nil-end"
+  (destructuring-bind (input expected) (list nil 1)
+    (expect (= expected (cl-cc/runtime:rt-endp input)) :to-be-truthy)))
 
-(deftest-each rt-equal-convention
-  "rt-equal: 1 when structurally equal; 0 when not."
-  :cases (("equal"     '(1 2) '(1 2) 1)
-          ("not-equal" '(1 2) '(1 3) 0))
-  (a b expected)
-  (assert-= expected (cl-cc/runtime:rt-equal a b)))
+(it-sequential "rt-endp-convention non-empty"
+  (destructuring-bind (input expected) (list '(1) 0)
+    (expect (= expected (cl-cc/runtime:rt-endp input)) :to-be-truthy)))
+
+(it-sequential "rt-equal-convention equal"
+  (destructuring-bind (a b expected) (list '(1 2) '(1 2) 1)
+    (expect (= expected (cl-cc/runtime:rt-equal a b)) :to-be-truthy)))
+
+(it-sequential "rt-equal-convention not-equal"
+  (destructuring-bind (a b expected) (list '(1 2) '(1 3) 0)
+    (expect (= expected (cl-cc/runtime:rt-equal a b)) :to-be-truthy)))
 
 ;;; ─── Array Operations ─────────────────────────────────────────────────────
 
-(deftest rt-make-array-creation
-  "rt-make-array: correct length; :initial-element initializes all slots."
+(it-sequential "rt-make-array-creation"
   (let ((a5 (cl-cc/runtime:rt-make-array 5))
         (a3 (cl-cc/runtime:rt-make-array 3 :initial-element 0)))
-    (assert-= 5 (cl-cc/runtime:rt-array-length a5))
-    (assert-= 0 (cl-cc/runtime:rt-aref a3 0))))
+    (expect (= 5 (cl-cc/runtime:rt-array-length a5)) :to-be-truthy)
+    (expect (= 0 (cl-cc/runtime:rt-aref a3 0)) :to-be-truthy)))
 
-(deftest rt-array-mutation-ops
-  "rt-aset/rt-aref, rt-svref/rt-svset, rt-bit-set/rt-bit-access all mutate correctly."
+(it-sequential "rt-array-mutation-ops"
   (let ((a (cl-cc/runtime:rt-make-array 3 :initial-element 0)))
     (cl-cc/runtime:rt-aset a 1 42)
-    (assert-= 42 (cl-cc/runtime:rt-aref a 1)))
+    (expect (= 42 (cl-cc/runtime:rt-aref a 1)) :to-be-truthy))
   (let ((v (vector 1 2 3)))
-    (assert-= 2 (cl-cc/runtime:rt-svref v 1))
+    (expect (= 2 (cl-cc/runtime:rt-svref v 1)) :to-be-truthy)
     (cl-cc/runtime:rt-svset v 1 99)
-    (assert-= 99 (cl-cc/runtime:rt-svref v 1)))
+    (expect (= 99 (cl-cc/runtime:rt-svref v 1)) :to-be-truthy))
   (let ((bv (make-array 4 :element-type 'bit :initial-element 0)))
     (cl-cc/runtime:rt-bit-set bv 2 1)
-    (assert-= 1 (cl-cc/runtime:rt-bit-access bv 2))
-    (assert-= 0 (cl-cc/runtime:rt-bit-access bv 0))))
+    (expect (= 1 (cl-cc/runtime:rt-bit-access bv 2)) :to-be-truthy)
+    (expect (= 0 (cl-cc/runtime:rt-bit-access bv 0)) :to-be-truthy)))
 
 ;;; ─── Arithmetic Helpers ────────────────────────────────────────────────────
 
-(deftest-each rt-basic-arithmetic
-  "rt-add/sub/mul/div/mod/rem: binary arithmetic operations."
-  :cases (("add" #'cl-cc/runtime:rt-add 3  4   7)
-          ("sub" #'cl-cc/runtime:rt-sub 3  4  -1)
-          ("mul" #'cl-cc/runtime:rt-mul 3  4  12)
-          ("div" #'cl-cc/runtime:rt-div 5  2   5/2)
-          ("mod" #'cl-cc/runtime:rt-mod 7  3   1)
-          ("rem" #'cl-cc/runtime:rt-rem 7  3   1))
-  (fn a b expected)
-  (assert-= expected (funcall fn a b)))
+(it-sequential "rt-basic-arithmetic add"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-add 3 4 7)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest-each rt-unary-arithmetic
-  "rt-neg/abs/inc/dec/lognot: unary arithmetic and bitwise operations."
-  :cases (("neg"    #'cl-cc/runtime:rt-neg     5   -5)
-          ("abs"    #'cl-cc/runtime:rt-abs    -5    5)
-          ("inc"    #'cl-cc/runtime:rt-inc     5    6)
-          ("dec"    #'cl-cc/runtime:rt-dec     5    4)
-          ("lognot" #'cl-cc/runtime:rt-lognot  42  -43))
-  (fn input expected)
-  (assert-= expected (funcall fn input)))
+(it-sequential "rt-basic-arithmetic sub"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-sub 3 4 -1)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest-each rt-not-convention
-  "rt-not: 1 for falsy (nil); 0 for truthy (t, integer)."
-  :cases (("nil"     nil  1)
-          ("true"    t    0)
-          ("integer" 42   0))
-  (input expected)
-  (assert-= expected (cl-cc/runtime:rt-not input)))
+(it-sequential "rt-basic-arithmetic mul"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-mul 3 4 12)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest-each rt-numeric-predicates
-  "Numeric predicates return 1/0."
-  :cases (("evenp-t"  #'cl-cc/runtime:rt-evenp  4  1)
-          ("evenp-f"  #'cl-cc/runtime:rt-evenp  3  0)
-          ("oddp-t"   #'cl-cc/runtime:rt-oddp   3  1)
-          ("oddp-f"   #'cl-cc/runtime:rt-oddp   4  0)
-          ("zerop-t"  #'cl-cc/runtime:rt-zerop  0  1)
-          ("zerop-f"  #'cl-cc/runtime:rt-zerop  1  0)
-          ("plusp-t"  #'cl-cc/runtime:rt-plusp   5  1)
-          ("plusp-f"  #'cl-cc/runtime:rt-plusp  -1  0)
-          ("minusp-t" #'cl-cc/runtime:rt-minusp -1  1)
-          ("minusp-f" #'cl-cc/runtime:rt-minusp  1  0))
-  (pred-fn input expected)
-  (assert-= expected (funcall pred-fn input)))
+(it-sequential "rt-basic-arithmetic div"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-div 5 2 5/2)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-basic-arithmetic mod"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-mod 7 3 1)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-basic-arithmetic rem"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-rem 7 3 1)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-unary-arithmetic neg"
+  (destructuring-bind (fn input expected) (list #'cl-cc/runtime:rt-neg 5 -5)
+    (expect (= expected (funcall fn input)) :to-be-truthy)))
+
+(it-sequential "rt-unary-arithmetic abs"
+  (destructuring-bind (fn input expected) (list #'cl-cc/runtime:rt-abs -5 5)
+    (expect (= expected (funcall fn input)) :to-be-truthy)))
+
+(it-sequential "rt-unary-arithmetic inc"
+  (destructuring-bind (fn input expected) (list #'cl-cc/runtime:rt-inc 5 6)
+    (expect (= expected (funcall fn input)) :to-be-truthy)))
+
+(it-sequential "rt-unary-arithmetic dec"
+  (destructuring-bind (fn input expected) (list #'cl-cc/runtime:rt-dec 5 4)
+    (expect (= expected (funcall fn input)) :to-be-truthy)))
+
+(it-sequential "rt-unary-arithmetic lognot"
+  (destructuring-bind (fn input expected) (list #'cl-cc/runtime:rt-lognot 42 -43)
+    (expect (= expected (funcall fn input)) :to-be-truthy)))
+
+(it-sequential "rt-not-convention nil"
+  (destructuring-bind (input expected) (list nil 1)
+    (expect (= expected (cl-cc/runtime:rt-not input)) :to-be-truthy)))
+
+(it-sequential "rt-not-convention true"
+  (destructuring-bind (input expected) (list t 0)
+    (expect (= expected (cl-cc/runtime:rt-not input)) :to-be-truthy)))
+
+(it-sequential "rt-not-convention integer"
+  (destructuring-bind (input expected) (list 42 0)
+    (expect (= expected (cl-cc/runtime:rt-not input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates evenp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-evenp 4 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates evenp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-evenp 3 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates oddp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-oddp 3 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates oddp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-oddp 4 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates zerop-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-zerop 0 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates zerop-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-zerop 1 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates plusp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-plusp 5 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates plusp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-plusp -1 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates minusp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-minusp -1 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-numeric-predicates minusp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-minusp 1 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
 
 ;;; ─── Comparisons ───────────────────────────────────────────────────────────
 
-(deftest-each rt-comparisons
-  "Comparison helpers return 1/0."
-  :cases (("lt-t"     #'cl-cc/runtime:rt-lt     1 2 1)
-          ("lt-f"     #'cl-cc/runtime:rt-lt     2 1 0)
-          ("gt-t"     #'cl-cc/runtime:rt-gt     2 1 1)
-          ("gt-f"     #'cl-cc/runtime:rt-gt     1 2 0)
-          ("le-eq"    #'cl-cc/runtime:rt-le     2 2 1)
-          ("ge-eq"    #'cl-cc/runtime:rt-ge     2 2 1)
-          ("num-eq-t" #'cl-cc/runtime:rt-num-eq 5 5 1)
-          ("num-eq-f" #'cl-cc/runtime:rt-num-eq 5 6 0)
-          ("eq-t"     #'cl-cc/runtime:rt-eq     :a :a 1)
-          ("eq-f"     #'cl-cc/runtime:rt-eq     :a :b 0)
-          ("eql-t"    #'cl-cc/runtime:rt-eql    42 42 1)
-          ("eql-f"    #'cl-cc/runtime:rt-eql    42 43 0))
-  (cmp-fn a b expected)
-  (assert-= expected (funcall cmp-fn a b)))
+(it-sequential "rt-comparisons lt-t"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-lt 1 2 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons lt-f"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-lt 2 1 0)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons gt-t"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-gt 2 1 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons gt-f"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-gt 1 2 0)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons le-eq"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-le 2 2 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons ge-eq"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-ge 2 2 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons num-eq-t"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-num-eq 5 5 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons num-eq-f"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-num-eq 5 6 0)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons eq-t"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-eq :a :a 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons eq-f"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-eq :a :b 0)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons eql-t"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-eql 42 42 1)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-comparisons eql-f"
+  (destructuring-bind (cmp-fn a b expected) (list #'cl-cc/runtime:rt-eql 42 43 0)
+    (expect (= expected (funcall cmp-fn a b)) :to-be-truthy)))
 
 ;;; ─── Runtime Region Operations ─────────────────────────────────────────────
 
-(deftest rt-region-lifetime-guards-references
-  "rt-with-region/alloc/deref enforce region lifetime at runtime." 
+(it-sequential "rt-region-lifetime-guards-references"
   (let (escaped-ref)
     (cl-cc/runtime:rt-with-region (region)
-      (assert-true (cl-cc/runtime:rt-region-active-p region))
+      (expect (cl-cc/runtime:rt-region-active-p region) :to-be-truthy)
       (let ((ref (cl-cc/runtime:rt-region-alloc region 42)))
         (setf escaped-ref ref)
-        (assert-true (cl-cc/runtime:rt-region-ref-valid-p ref))
-        (assert-= 42 (cl-cc/runtime:rt-region-deref ref))))
-    (assert-false (cl-cc/runtime:rt-region-ref-valid-p escaped-ref))
-    (assert-signals error
-      (cl-cc/runtime:rt-region-deref escaped-ref))))
+        (expect (cl-cc/runtime:rt-region-ref-valid-p ref) :to-be-truthy)
+        (expect (= 42 (cl-cc/runtime:rt-region-deref ref)) :to-be-truthy)))
+    (expect (cl-cc/runtime:rt-region-ref-valid-p escaped-ref) :to-be-falsy)
+    (signals error (cl-cc/runtime:rt-region-deref escaped-ref))))
 
-(deftest rt-region-bump-pointer-accounting
-  "Region allocation advances bump index and close resets usage." 
+(it-sequential "rt-region-bump-pointer-accounting"
   (let ((r (cl-cc/runtime:rt-make-region)))
-    (assert-= 0 (cl-cc/runtime:rt-region-used r))
+    (expect (= 0 (cl-cc/runtime:rt-region-used r)) :to-be-truthy)
     (let ((cap (cl-cc/runtime:rt-region-capacity r)))
-      (assert-true (> cap 0))
+      (expect (> cap 0) :to-be-truthy)
       (cl-cc/runtime:rt-region-alloc r :a)
       (cl-cc/runtime:rt-region-alloc r :b)
-      (assert-= 2 (cl-cc/runtime:rt-region-used r))
+      (expect (= 2 (cl-cc/runtime:rt-region-used r)) :to-be-truthy)
       (cl-cc/runtime:rt-close-region r)
-      (assert-= 0 (cl-cc/runtime:rt-region-used r)))))
+      (expect (= 0 (cl-cc/runtime:rt-region-used r)) :to-be-truthy))))

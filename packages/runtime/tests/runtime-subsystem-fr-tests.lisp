@@ -15,68 +15,57 @@
 
 (in-package :cl-cc/test)
 
-(defsuite runtime-subsystem-fr-suite
-  :description "Runtime Subsystem FR evidence tests (docs/runtime-subsystem.md)"
-  :parent cl-cc-unit-suite)
 
-(in-suite runtime-subsystem-fr-suite)
 
 ;;; =================================================================
 ;;; Wave 0: Load-Graph Verification
 ;;; =================================================================
 
-(deftest runtime-subsystem-all-source-files-loadable
-  "Verify all runtime subsystem source files are loadable through ASDF."
-  (assert-true (asdf:find-system :cl-cc-runtime nil))
-  (assert-true (asdf:find-system :cl-cc-vm nil)))
+(it-sequential "runtime-subsystem-all-source-files-loadable"
+  (expect (asdf:find-system :cl-cc-runtime nil) :to-be-truthy)
+  (expect (asdf:find-system :cl-cc-vm nil) :to-be-truthy))
 
-(deftest runtime-subsystem-c-embedding-api-loaded
-  "FR-812: C embedding API exports state, value, error, eval, call, cleanup, and callbacks."
-  (assert-true (probe-file (asdf:system-relative-pathname :cl-cc-runtime "include/cl-cc.h")))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-init))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-eval))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-call))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-cleanup))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-last-error))
-  (assert-true (fboundp 'cl-cc/runtime:cl-cc-register-callback)))
+(it-sequential "runtime-subsystem-c-embedding-api-loaded"
+  (expect (probe-file (asdf:system-relative-pathname :cl-cc-runtime "include/cl-cc.h")) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime:cl-cc-init) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime:cl-cc-eval) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime:cl-cc-call) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime:cl-cc-cleanup) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime:cl-cc-last-error) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime:cl-cc-register-callback) :to-be-truthy))
 
-(deftest runtime-subsystem-c-embedding-api-eval-call-cleanup
-  "FR-812: embedding states evaluate strings, call functions, track errors, and clean up."
+(it-sequential "runtime-subsystem-c-embedding-api-eval-call-cleanup"
   (let ((state (cl-cc/runtime:cl-cc-init)))
     (unwind-protect
          (progn
            (let ((value (cl-cc/runtime:cl-cc-eval state "(+ 20 22)")))
-             (assert-eq :integer (cl-cc/runtime:cl-cc-value-kind value))
-             (assert-= 42 (cl-cc/runtime:cl-cc-value-payload value)))
+             (expect (cl-cc/runtime:cl-cc-value-kind value) :to-be :integer)
+             (expect (= 42 (cl-cc/runtime:cl-cc-value-payload value)) :to-be-truthy))
            (cl-cc/runtime:cl-cc-eval state "(defun embedded-add (a b) (+ a b))")
            (let ((value (cl-cc/runtime:cl-cc-call state "embedded-add" 7 8)))
-             (assert-eq :integer (cl-cc/runtime:cl-cc-value-kind value))
-             (assert-= 15 (cl-cc/runtime:cl-cc-value-payload value)))
+             (expect (cl-cc/runtime:cl-cc-value-kind value) :to-be :integer)
+             (expect (= 15 (cl-cc/runtime:cl-cc-value-payload value)) :to-be-truthy))
            #+(and sbcl sb-alien-callback)
            (let ((callback (cl-cc/runtime:cl-cc-register-callback
                             state "identity" #'identity :arg-types '(:pointer) :return-type :pointer)))
-             (assert-true callback)
-             (assert-eq callback (cl-cc/runtime:cl-cc-callback state "identity")))
+             (expect callback :to-be-truthy)
+             (expect (cl-cc/runtime:cl-cc-callback state "identity") :to-be callback))
            #-(and sbcl sb-alien-callback)
-           (assert-signals error
-             (cl-cc/runtime:cl-cc-register-callback
+           (signals error (cl-cc/runtime:cl-cc-register-callback
               state "identity" #'identity :arg-types '(:pointer) :return-type :pointer))
            (let ((value (cl-cc/runtime:cl-cc-eval state "(/ 1 0)")))
-             (assert-eq :error (cl-cc/runtime:cl-cc-value-kind value))
-             (assert-= 1 (cl-cc/runtime:cl-cc-error-code
-                          (cl-cc/runtime:cl-cc-last-error state)))))
+             (expect (cl-cc/runtime:cl-cc-value-kind value) :to-be :error)
+             (expect (= 1 (cl-cc/runtime:cl-cc-error-code
+                          (cl-cc/runtime:cl-cc-last-error state))) :to-be-truthy)))
       (cl-cc/runtime:cl-cc-cleanup state))
-    (assert-true (cl-cc/runtime:cl-cc-state-closed-p state))))
+    (expect (cl-cc/runtime:cl-cc-state-closed-p state) :to-be-truthy)))
 
-(deftest runtime-subsystem-deopt-trampoline-signals-fatal-error
-  "FR-522: deopt trampoline fails explicitly until interpreter reconstruction exists."
+(it-sequential "runtime-subsystem-deopt-trampoline-signals-fatal-error"
   (let ((frame-count cl-cc/runtime::*rt-deopt-frame-count*))
-    (assert-signals error
-      (cl-cc/runtime::rt-deopt-trampoline 7 '((:r0 . 42))))
-    (assert-= (1+ frame-count) cl-cc/runtime::*rt-deopt-frame-count*)))
+    (signals error (cl-cc/runtime::rt-deopt-trampoline 7 '((:r0 . 42))))
+    (expect (= (1+ frame-count) cl-cc/runtime::*rt-deopt-frame-count*) :to-be-truthy)))
 
-(deftest runtime-subsystem-multiple-vm-instances-isolated
-  "FR-813: VM instances have independent stores and can share read-only parent environments."
+(it-sequential "runtime-subsystem-multiple-vm-instances-isolated"
   (let* ((parent-globals (make-hash-table :test #'eq))
          (parent-env (cl-cc/vm:make-vm-parent-environment :globals parent-globals))
          (left (cl-cc/vm:make-vm-instance :parent-env parent-env))
@@ -84,16 +73,16 @@
     (setf (gethash 'shared parent-globals) 99)
     (setf (gethash 'local (cl-cc/vm:vm-global-vars left)) :left)
     (setf (gethash 'local (cl-cc/vm:vm-global-vars right)) :right)
-    (assert-false (eq left right))
-    (assert-false (eq (cl-cc/vm:vm-state-heap left)
-                      (cl-cc/vm:vm-state-heap right)))
-    (assert-eq :left (cl-cc/vm:vm-instance-global-value left 'local))
-    (assert-eq :right (cl-cc/vm:vm-instance-global-value right 'local))
-    (assert-= 99 (cl-cc/vm:vm-instance-global-value left 'shared))
-    (assert-= 99 (cl-cc/vm:vm-instance-global-value right 'shared))
+    (expect (eq left right) :to-be-falsy)
+    (expect (eq (cl-cc/vm:vm-state-heap left)
+                      (cl-cc/vm:vm-state-heap right)) :to-be-falsy)
+    (expect (cl-cc/vm:vm-instance-global-value left 'local) :to-be :left)
+    (expect (cl-cc/vm:vm-instance-global-value right 'local) :to-be :right)
+    (expect (= 99 (cl-cc/vm:vm-instance-global-value left 'shared)) :to-be-truthy)
+    (expect (= 99 (cl-cc/vm:vm-instance-global-value right 'shared)) :to-be-truthy)
     (let ((transferred (cl-cc/vm:transfer-value '(1 2 3) left right)))
-      (assert-equal '(1 2 3) transferred)
-      (assert-false (eq transferred '(1 2 3))))))
+      (expect transferred :to-equal '(1 2 3))
+      (expect (eq transferred '(1 2 3)) :to-be-falsy))))
 
 
 ;;; =================================================================
@@ -110,7 +99,7 @@
   "Existence test: assert every SYMBOL in the list is fboundp."
   `(deftest ,name
      ,fr-doc
-     ,@(mapcar (lambda (sym) `(assert-true (fboundp ',sym))) symbols)))
+     ,@(mapcar (lambda (sym) `(expect (fboundp ',sym) :to-be-truthy)) symbols)))
 
 (defmacro define-fr-existence-test (name fr-doc &rest checks)
   "Existence test supporting mixed check types.
@@ -119,9 +108,9 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
      ,fr-doc
      ,@(mapcar (lambda (check)
                  (ecase (car check)
-                   (:f `(assert-true (fboundp  ',(second check))))
-                   (:b `(assert-true (boundp   ',(second check))))
-                   (:s `(assert-true (find-symbol ,(second check) ,(third check))))))
+                   (:f `(expect (fboundp  ',(second check)) :to-be-truthy))
+                   (:b `(expect (boundp   ',(second check)) :to-be-truthy))
+                   (:s `(expect (find-symbol ,(second check) ,(third check)) :to-be-truthy))))
                checks)))
 
 ;;; =================================================================
@@ -330,52 +319,46 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
 ;;; FR semantic evidence tests
 ;;; -----------------------------------------------------------------
 
-(deftest runtime-subsystem-sync-mutex-prevents-reentrant-access
-  "FR-370: A non-recursive mutex cannot be acquired re-entrantly."
+(it-sequential "runtime-subsystem-sync-mutex-prevents-reentrant-access"
   (let ((m (cl-cc/runtime:rt-make-mutex)))
-    (assert-true (cl-cc/runtime:rt-mutex-lock m))
+    (expect (cl-cc/runtime:rt-mutex-lock m) :to-be-truthy)
     (unwind-protect
-         (assert-true (not (cl-cc/runtime::rt-mutex-try-lock m)))
+         (expect (not (cl-cc/runtime::rt-mutex-try-lock m)) :to-be-truthy)
       (cl-cc/runtime:rt-mutex-unlock m))))
 
-(deftest runtime-subsystem-sync-semaphore-counts-correctly
-  "FR-370: Semaphore permits exactly COUNT waits before being exhausted."
+(it-sequential "runtime-subsystem-sync-semaphore-counts-correctly"
   (let ((s (cl-cc/runtime:rt-make-semaphore :count 2)))
-    (assert-true (cl-cc/runtime::rt-semaphore-try-wait s))
-    (assert-true (cl-cc/runtime::rt-semaphore-try-wait s))
-    (assert-true (not (cl-cc/runtime::rt-semaphore-try-wait s)))
-    (assert-= 2 (cl-cc/runtime:rt-semaphore-signal s 2))
-    (assert-true (cl-cc/runtime::rt-semaphore-try-wait s))
-    (assert-true (cl-cc/runtime::rt-semaphore-try-wait s))))
+    (expect (cl-cc/runtime::rt-semaphore-try-wait s) :to-be-truthy)
+    (expect (cl-cc/runtime::rt-semaphore-try-wait s) :to-be-truthy)
+    (expect (not (cl-cc/runtime::rt-semaphore-try-wait s)) :to-be-truthy)
+    (expect (= 2 (cl-cc/runtime:rt-semaphore-signal s 2)) :to-be-truthy)
+    (expect (cl-cc/runtime::rt-semaphore-try-wait s) :to-be-truthy)
+    (expect (cl-cc/runtime::rt-semaphore-try-wait s) :to-be-truthy)))
 
-(deftest runtime-subsystem-sync-barrier-releases-waiters
-  "FR-372: Barrier releases all waiters when the required count arrives."
+(it-sequential "runtime-subsystem-sync-barrier-releases-waiters"
   (let ((b (cl-cc/runtime:rt-make-barrier 1)))
-    (assert-= 0 (cl-cc/runtime::rt-barrier-gen b))
-    (assert-true (cl-cc/runtime:rt-barrier-wait b :timeout 0.1))
-    (assert-= 0 (cl-cc/runtime::rt-barrier-count b))
-    (assert-= 1 (cl-cc/runtime::rt-barrier-gen b))))
+    (expect (= 0 (cl-cc/runtime::rt-barrier-gen b)) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-barrier-wait b :timeout 0.1) :to-be-truthy)
+    (expect (= 0 (cl-cc/runtime::rt-barrier-count b)) :to-be-truthy)
+    (expect (= 1 (cl-cc/runtime::rt-barrier-gen b)) :to-be-truthy)))
 
-(deftest runtime-subsystem-sync-once-call-executes-once
-  "FR-373: Once-call executes only the first thunk and reuses its result."
+(it-sequential "runtime-subsystem-sync-once-call-executes-once"
   (let ((o (cl-cc/runtime:rt-make-once))
         (calls '()))
-    (assert-eq :first (cl-cc/runtime:rt-once-call o (lambda () (push :first calls) :first)))
-    (assert-eq :first (cl-cc/runtime:rt-once-call o (lambda () (push :second calls) :second)))
-    (assert-equal '(:first) calls)))
+    (expect (cl-cc/runtime:rt-once-call o (lambda () (push :first calls) :first)) :to-be :first)
+    (expect (cl-cc/runtime:rt-once-call o (lambda () (push :second calls) :second)) :to-be :first)
+    (expect calls :to-equal '(:first))))
 
-(deftest runtime-subsystem-scheduler-spawned-tasks-execute-in-order
-  "FR-257: Spawned tasks execute in deterministic scheduler priority order."
+(it-sequential "runtime-subsystem-scheduler-spawned-tasks-execute-in-order"
   (let ((cl-cc/runtime::*rt-global-scheduler* (cl-cc/runtime:rt-make-scheduler)))
     (let ((events '()))
       (cl-cc/runtime:rt-spawn (lambda () (push :low events)) :priority :low)
       (cl-cc/runtime:rt-spawn (lambda () (push :normal events)) :priority :normal)
       (cl-cc/runtime:rt-spawn (lambda () (push :high events)) :priority :high)
       (cl-cc/runtime:rt-scheduler-run)
-      (assert-equal '(:low :normal :high) events))))
+      (expect events :to-equal '(:low :normal :high)))))
 
-(deftest runtime-subsystem-scheduler-sleep-task-records-wake-time
-  "FR-257: Sleep-task records a future wake time for the current task."
+(it-sequential "runtime-subsystem-scheduler-sleep-task-records-wake-time"
   (let ((cl-cc/runtime::*rt-global-scheduler* (cl-cc/runtime:rt-make-scheduler)))
     (sb-ext:without-package-locks
       (with-replaced-function (get-internal-real-time (lambda () 1000))
@@ -387,93 +370,82 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
                    (cl-cc/runtime::rt-green-thread-wake-time
                     cl-cc/runtime::*rt-current-green-thread*))))
           (cl-cc/runtime:rt-scheduler-run :once t)
-          (assert-= (+ 1000 internal-time-units-per-second) observed-wake-time))))))
+          (expect (= (+ 1000 internal-time-units-per-second) observed-wake-time) :to-be-truthy))))))
 
-(deftest runtime-subsystem-channel-buffered-preserves-order
-  "FR-282: Buffered channels receive values in send order."
+(it-sequential "runtime-subsystem-channel-buffered-preserves-order"
   (let ((ch (cl-cc/runtime:rt-make-channel :capacity 3)))
     (cl-cc/runtime:rt-channel-send ch :a)
     (cl-cc/runtime:rt-channel-send ch :b)
     (cl-cc/runtime:rt-channel-send ch :c)
-    (assert-equal '(:a t) (multiple-value-list (cl-cc/runtime:rt-channel-recv ch)))
-    (assert-equal '(:b t) (multiple-value-list (cl-cc/runtime:rt-channel-recv ch)))
-    (assert-equal '(:c t) (multiple-value-list (cl-cc/runtime:rt-channel-recv ch)))))
+    (expect (multiple-value-list (cl-cc/runtime:rt-channel-recv ch)) :to-equal '(:a t))
+    (expect (multiple-value-list (cl-cc/runtime:rt-channel-recv ch)) :to-equal '(:b t))
+    (expect (multiple-value-list (cl-cc/runtime:rt-channel-recv ch)) :to-equal '(:c t))))
 
-(deftest runtime-subsystem-channel-close-prevents-further-sends
-  "FR-282: Closed channels reject sends."
+(it-sequential "runtime-subsystem-channel-close-prevents-further-sends"
   (let ((ch (cl-cc/runtime:rt-make-channel :capacity 1)))
-    (assert-true (cl-cc/runtime:rt-channel-close ch))
-    (assert-true (handler-case
+    (expect (cl-cc/runtime:rt-channel-close ch) :to-be-truthy)
+    (expect (handler-case
             (progn (cl-cc/runtime:rt-channel-send ch :after-close) nil)
-          (error () t)))))
+          (error () t)) :to-be-truthy)))
 
-(deftest runtime-subsystem-channel-select-returns-first-available
-  "FR-282: Select returns the first available channel/value pair."
+(it-sequential "runtime-subsystem-channel-select-returns-first-available"
   (let ((empty (cl-cc/runtime:rt-make-channel :capacity 1))
         (ready (cl-cc/runtime:rt-make-channel :capacity 1)))
     (cl-cc/runtime:rt-channel-send ready :ready)
     (multiple-value-bind (value channel ok)
         (cl-cc/runtime::rt-channel-select (list empty ready) :timeout 0.01)
-      (assert-true ok)
-      (assert-eq :ready value)
-      (assert-eq ready channel))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be :ready)
+      (expect channel :to-be ready))))
 
-(deftest runtime-subsystem-actor-processes-messages-in-order
-  "FR-290: Actor receive processes queued messages in mailbox order."
+(it-sequential "runtime-subsystem-actor-processes-messages-in-order"
   (let ((a (cl-cc/runtime:rt-make-actor #'identity)))
     (cl-cc/runtime:rt-actor-send a :first)
     (cl-cc/runtime:rt-actor-send a :second)
     (cl-cc/runtime:rt-actor-send a :third)
-    (assert-equal '(:third :second :first)
-               (list (cl-cc/runtime:rt-actor-receive a :timeout 0.1)
+    (expect (list (cl-cc/runtime:rt-actor-receive a :timeout 0.1)
                      (cl-cc/runtime:rt-actor-receive a :timeout 0.1)
-                     (cl-cc/runtime:rt-actor-receive a :timeout 0.1)))))
+                     (cl-cc/runtime:rt-actor-receive a :timeout 0.1)) :to-equal '(:third :second :first))))
 
-(deftest runtime-subsystem-stm-atomically-commits-transaction
-  "FR-300: Atomically commits tvar writes."
+(it-sequential "runtime-subsystem-stm-atomically-commits-transaction"
   (let ((cell (cl-cc/runtime::rt-make-tvar 10)))
-    (assert-= 15 (cl-cc/runtime:rt-atomically
+    (expect (= 15 (cl-cc/runtime:rt-atomically
                 (let ((old (cl-cc/runtime::rt-read-tvar cell)))
-                  (cl-cc/runtime::rt-write-tvar cell (+ old 5)))))
-    (assert-= 15 (cl-cc/runtime::rt-tvar-value-unsafe cell))))
+                  (cl-cc/runtime::rt-write-tvar cell (+ old 5))))) :to-be-truthy)
+    (expect (= 15 (cl-cc/runtime::rt-tvar-value-unsafe cell)) :to-be-truthy)))
 
-(deftest runtime-subsystem-stm-retries-on-conflict
-  "FR-300: Atomically retries when a read tvar version changes before commit."
+(it-sequential "runtime-subsystem-stm-retries-on-conflict"
   (let ((cell (cl-cc/runtime::rt-make-tvar 0))
         (attempts 0))
-    (assert-= 20 (cl-cc/runtime:rt-atomically
+    (expect (= 20 (cl-cc/runtime:rt-atomically
                 (incf attempts)
                 (cl-cc/runtime::rt-read-tvar cell)
                 (when (= attempts 1)
                   (setf (cl-cc/runtime::rt-tvar-value cell) 10
                         (cl-cc/runtime::rt-tvar-version cell)
                         (1+ (cl-cc/runtime::rt-tvar-version cell))))
-                (cl-cc/runtime::rt-write-tvar cell 20)))
-    (assert-= 2 attempts)
-    (assert-= 20 (cl-cc/runtime::rt-tvar-value-unsafe cell))))
+                (cl-cc/runtime::rt-write-tvar cell 20))) :to-be-truthy)
+    (expect (= 2 attempts) :to-be-truthy)
+    (expect (= 20 (cl-cc/runtime::rt-tvar-value-unsafe cell)) :to-be-truthy)))
 
-(deftest runtime-subsystem-fr-740-stm-isolates-staged-writes-until-commit
-  "FR-740: STM writes are staged in the transaction and become visible at commit."
+(it-sequential "runtime-subsystem-fr-740-stm-isolates-staged-writes-until-commit"
   (let ((cell (cl-cc/runtime:rt-make-tvar 1))
         (observed-before-commit nil))
-    (assert-= 2
-              (cl-cc/runtime:rt-atomically
+    (expect (= 2 (cl-cc/runtime:rt-atomically
                 (cl-cc/runtime:rt-write-tvar cell 2)
                 (setf observed-before-commit
                       (cl-cc/runtime:rt-tvar-value-unsafe cell))
-                (cl-cc/runtime:rt-read-tvar cell)))
-    (assert-= 1 observed-before-commit)
-    (assert-= 2 (cl-cc/runtime:rt-tvar-value-unsafe cell))))
+                (cl-cc/runtime:rt-read-tvar cell))) :to-be-truthy)
+    (expect (= 1 observed-before-commit) :to-be-truthy)
+    (expect (= 2 (cl-cc/runtime:rt-tvar-value-unsafe cell)) :to-be-truthy)))
 
-(deftest runtime-subsystem-fr-741-async-await-runs-through-scheduler
-  "FR-741: Async tasks resolve futures and await drains scheduler work."
+(it-sequential "runtime-subsystem-fr-741-async-await-runs-through-scheduler"
   (let ((cl-cc/runtime::*rt-global-scheduler* (cl-cc/runtime:rt-make-scheduler)))
     (let ((future (cl-cc/runtime:rt-async (+ 20 22))))
-      (assert-= 42 (cl-cc/runtime:rt-await future :timeout 0.1))
-      (assert-true (cl-cc/runtime:rt-future-done-p future)))))
+      (expect (= 42 (cl-cc/runtime:rt-await future :timeout 0.1)) :to-be-truthy)
+      (expect (cl-cc/runtime:rt-future-done-p future) :to-be-truthy))))
 
-(deftest runtime-subsystem-fr-742-work-stealing-runs-local-and-stolen-tasks
-  "FR-742: Work-stealing workers execute own deque work and can steal from peers."
+(it-sequential "runtime-subsystem-fr-742-work-stealing-runs-local-and-stolen-tasks"
   (let* ((scheduler (cl-cc/runtime:rt-make-work-stealing-scheduler :workers 2))
          (workers (cl-cc/runtime::rt-work-stealing-scheduler-workers scheduler))
          (w0 (first workers))
@@ -481,18 +453,17 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
          (events nil))
     (cl-cc/runtime:rt-work-stealing-submit scheduler (lambda () (push :first events)))
     (cl-cc/runtime:rt-work-stealing-submit scheduler (lambda () (push :second events)))
-    (assert-true (cl-cc/runtime:rt-worker-run-once w0))
-    (assert-true (cl-cc/runtime:rt-worker-run-once w1))
-    (assert-= 2 (length events))
+    (expect (cl-cc/runtime:rt-worker-run-once w0) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-worker-run-once w1) :to-be-truthy)
+    (expect (= 2 (length events)) :to-be-truthy)
     (cl-cc/runtime:rt-work-deque-push-front
      (cl-cc/runtime::rt-worker-deque w0)
      (cl-cc/runtime::%make-rt-green-thread :thunk (lambda () (push :stolen events))))
-    (assert-true (cl-cc/runtime:rt-worker-run-once w1))
-    (assert-true (member :stolen events))
-    (assert-true (>= (cl-cc/runtime::rt-worker-steals w1) 1))))
+    (expect (cl-cc/runtime:rt-worker-run-once w1) :to-be-truthy)
+    (expect (member :stolen events) :to-be-truthy)
+    (expect (>= (cl-cc/runtime::rt-worker-steals w1) 1) :to-be-truthy)))
 
-(deftest runtime-subsystem-fr-743-fiber-yield-and-resume-preserve-state
-  "FR-743: Fibers can suspend with a continuation and resume cooperatively."
+(it-sequential "runtime-subsystem-fr-743-fiber-yield-and-resume-preserve-state"
   (let ((steps nil)
         (fiber nil))
     (setf fiber
@@ -504,44 +475,40 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
                 (push :resume steps)
                 :done)
               :blocked))))
-    (assert-eq :blocked (cl-cc/runtime:rt-fiber-resume fiber))
-    (assert-eq :ready (cl-cc/runtime::rt-fiber-status fiber))
-    (assert-eq :done (cl-cc/runtime:rt-fiber-resume fiber))
-    (assert-true (cl-cc/runtime:rt-fiber-done-p fiber))
-    (assert-equal '(:resume :start) steps)))
+    (expect (cl-cc/runtime:rt-fiber-resume fiber) :to-be :blocked)
+    (expect (cl-cc/runtime::rt-fiber-status fiber) :to-be :ready)
+    (expect (cl-cc/runtime:rt-fiber-resume fiber) :to-be :done)
+    (expect (cl-cc/runtime:rt-fiber-done-p fiber) :to-be-truthy)
+    (expect steps :to-equal '(:resume :start))))
 
-(deftest runtime-subsystem-lockfree-stack-is-lifo
-  "FR-322: Lock-free stack pops the most recently pushed value first."
+(it-sequential "runtime-subsystem-lockfree-stack-is-lifo"
   (let ((s (cl-cc/runtime:rt-make-lfstack)))
     (cl-cc/runtime:rt-lfstack-push s :first)
     (cl-cc/runtime:rt-lfstack-push s :second)
     (cl-cc/runtime:rt-lfstack-push s :third)
-    (assert-equal '(:third t) (multiple-value-list (cl-cc/runtime:rt-lfstack-pop s)))
-    (assert-equal '(:second t) (multiple-value-list (cl-cc/runtime:rt-lfstack-pop s)))
-    (assert-equal '(:first t) (multiple-value-list (cl-cc/runtime:rt-lfstack-pop s)))))
+    (expect (multiple-value-list (cl-cc/runtime:rt-lfstack-pop s)) :to-equal '(:third t))
+    (expect (multiple-value-list (cl-cc/runtime:rt-lfstack-pop s)) :to-equal '(:second t))
+    (expect (multiple-value-list (cl-cc/runtime:rt-lfstack-pop s)) :to-equal '(:first t))))
 
-(deftest runtime-subsystem-lockfree-queue-is-fifo
-  "FR-322: Lock-free queue pops values in push order."
+(it-sequential "runtime-subsystem-lockfree-queue-is-fifo"
   (let ((q (cl-cc/runtime:rt-make-lfqueue)))
     (cl-cc/runtime::rt-lfqueue-push q :first)
     (cl-cc/runtime::rt-lfqueue-push q :second)
     (cl-cc/runtime::rt-lfqueue-push q :third)
-    (assert-equal '(:first t) (multiple-value-list (cl-cc/runtime::rt-lfqueue-pop q)))
-    (assert-equal '(:second t) (multiple-value-list (cl-cc/runtime::rt-lfqueue-pop q)))
-    (assert-equal '(:third t) (multiple-value-list (cl-cc/runtime::rt-lfqueue-pop q)))))
+    (expect (multiple-value-list (cl-cc/runtime::rt-lfqueue-pop q)) :to-equal '(:first t))
+    (expect (multiple-value-list (cl-cc/runtime::rt-lfqueue-pop q)) :to-equal '(:second t))
+    (expect (multiple-value-list (cl-cc/runtime::rt-lfqueue-pop q)) :to-equal '(:third t))))
 
-(deftest runtime-subsystem-ebr-retire-reclaim-cycle
-  "FR-320: EBR retire/collect advances epochs and reclaims safe retired objects."
+(it-sequential "runtime-subsystem-ebr-retire-reclaim-cycle"
   (let ((freed '()))
     (cl-cc/runtime:rt-ebr-init (lambda (obj) (push obj freed)))
     (let ((local (cl-cc/runtime:rt-ebr-register-thread)))
       (cl-cc/runtime::rt-ebr-retire local :old-node)
-      (assert-= 0 (cl-cc/runtime::rt-ebr-collect local))
-      (assert-= 1 (cl-cc/runtime::rt-ebr-collect local))
-      (assert-equal '(:old-node) freed))))
+      (expect (= 0 (cl-cc/runtime::rt-ebr-collect local)) :to-be-truthy)
+      (expect (= 1 (cl-cc/runtime::rt-ebr-collect local)) :to-be-truthy)
+      (expect freed :to-equal '(:old-node)))))
 
-(deftest runtime-subsystem-hazard-retire-defers-protected-objects
-  "FR-321: Hazard pointers defer protected objects and reclaim them after clear."
+(it-sequential "runtime-subsystem-hazard-retire-defers-protected-objects"
   (let ((freed nil)
         (thread sb-thread:*current-thread*)
         (protected (list :protected))
@@ -557,34 +524,31 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
                                                   :thread thread
                                                   :free-fn #'free-object
                                                   :threshold 1)
-             (assert-equal nil freed)
+             (expect freed :to-equal nil)
              (cl-cc/runtime::rt-hp-retire-object unprotected
                                                   :thread thread
                                                   :free-fn #'free-object
                                                   :threshold 1)
-             (assert-equal (list unprotected) freed)
-             (assert-equal (list protected)
-                           (gethash thread cl-cc/runtime::*hazard-retired*))
+             (expect freed :to-equal (list unprotected))
+             (expect (gethash thread cl-cc/runtime::*hazard-retired*) :to-equal (list protected))
              (cl-cc/runtime::rt-hp-clear 0 thread)
-             (assert-= 1 (cl-cc/runtime::rt-hp-reclaim
+             (expect (= 1 (cl-cc/runtime::rt-hp-reclaim
                           :thread thread
-                          :free-fn #'free-object))
-             (assert-equal (list protected unprotected) freed))
+                          :free-fn #'free-object)) :to-be-truthy)
+             (expect freed :to-equal (list protected unprotected)))
         (cl-cc/runtime::rt-hp-init)))))
 
-(deftest runtime-subsystem-spsc-preserves-single-producer-consumer-semantics
-  "FR-462: SPSC queue preserves ordered single-producer/single-consumer handoff."
+(it-sequential "runtime-subsystem-spsc-preserves-single-producer-consumer-semantics"
   (let ((q (cl-cc/runtime:rt-make-spsc-queue 2)))
-    (assert-true (cl-cc/runtime:rt-spsc-try-push q :first))
-    (assert-true (cl-cc/runtime:rt-spsc-try-push q :second))
-    (assert-true (cl-cc/runtime::rt-spsc-full-p q))
-    (assert-true (not (cl-cc/runtime:rt-spsc-try-push q :third)))
-    (assert-equal '(:first t) (multiple-value-list (cl-cc/runtime:rt-spsc-try-pop q)))
-    (assert-equal '(:second t) (multiple-value-list (cl-cc/runtime:rt-spsc-try-pop q)))
-    (assert-equal '(nil nil) (multiple-value-list (cl-cc/runtime:rt-spsc-try-pop q)))))
+    (expect (cl-cc/runtime:rt-spsc-try-push q :first) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-spsc-try-push q :second) :to-be-truthy)
+    (expect (cl-cc/runtime::rt-spsc-full-p q) :to-be-truthy)
+    (expect (not (cl-cc/runtime:rt-spsc-try-push q :third)) :to-be-truthy)
+    (expect (multiple-value-list (cl-cc/runtime:rt-spsc-try-pop q)) :to-equal '(:first t))
+    (expect (multiple-value-list (cl-cc/runtime:rt-spsc-try-pop q)) :to-equal '(:second t))
+    (expect (multiple-value-list (cl-cc/runtime:rt-spsc-try-pop q)) :to-equal '(nil nil))))
 
-(deftest runtime-subsystem-crdt-gcounter-merges-by-node-max
-  "FR-431: GCounter merge keeps the per-node maximum and sums merged slots."
+(it-sequential "runtime-subsystem-crdt-gcounter-merges-by-node-max"
   (let ((a (cl-cc/runtime:rt-make-gcounter))
         (b (cl-cc/runtime:rt-make-gcounter)))
     (cl-cc/runtime:rt-gcounter-increment a :n1 1)
@@ -592,119 +556,104 @@ Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
     (cl-cc/runtime:rt-gcounter-increment b :n1 3)
     (cl-cc/runtime:rt-gcounter-increment b :n3 7)
     (cl-cc/runtime::rt-gcounter-merge a b)
-    (assert-= 15 (cl-cc/runtime:rt-gcounter-value a))))
+    (expect (= 15 (cl-cc/runtime:rt-gcounter-value a)) :to-be-truthy)))
 
-(deftest runtime-subsystem-crdt-pncounter-value-is-pos-minus-neg
-  "FR-431: PNCounter value is positive count minus negative count."
+(it-sequential "runtime-subsystem-crdt-pncounter-value-is-pos-minus-neg"
   (let ((c (cl-cc/runtime:rt-make-pncounter)))
     (cl-cc/runtime::rt-pncounter-increment c :n1 10)
     (cl-cc/runtime::rt-pncounter-increment c :n2 4)
     (cl-cc/runtime::rt-pncounter-decrement c :n1 3)
     (cl-cc/runtime::rt-pncounter-decrement c :n3 2)
-    (assert-= 9 (cl-cc/runtime::rt-pncounter-value c))))
+    (expect (= 9 (cl-cc/runtime::rt-pncounter-value c)) :to-be-truthy)))
 
-(deftest runtime-subsystem-raft-leader-election-picks-leader
-  "FR-432: Starting an election picks a majority-backed leader."
+(it-sequential "runtime-subsystem-raft-leader-election-picks-leader"
   (let* ((cluster (cl-cc/runtime:rt-make-raft-cluster '("n1" "n2" "n3")))
          (node (gethash "n1" (cl-cc/runtime:rt-raft-cluster-nodes cluster))))
-    (assert-true (cl-cc/runtime::rt-raft-start-election node cluster))
-    (assert-string= "n1" (cl-cc/runtime::rt-raft-cluster-leader-id cluster))
-    (assert-= cl-cc/runtime::+raft-leader+ (cl-cc/runtime::rt-raft-node-state node))))
+    (expect (cl-cc/runtime::rt-raft-start-election node cluster) :to-be-truthy)
+    (expect (cl-cc/runtime::rt-raft-cluster-leader-id cluster) :to-equal "n1")
+    (expect (= cl-cc/runtime::+raft-leader+ (cl-cc/runtime::rt-raft-node-state node)) :to-be-truthy)))
 
-(deftest runtime-subsystem-raft-log-entries-are-replicated
-  "FR-432: Proposed log entries are replicated to every in-memory cluster node."
+(it-sequential "runtime-subsystem-raft-log-entries-are-replicated"
   (let* ((cluster (cl-cc/runtime:rt-make-raft-cluster '("n1" "n2" "n3")))
          (leader (gethash "n1" (cl-cc/runtime:rt-raft-cluster-nodes cluster))))
-    (assert-true (cl-cc/runtime::rt-raft-start-election leader cluster))
-    (assert-eq :set-x (cl-cc/runtime:rt-raft-propose cluster :set-x))
+    (expect (cl-cc/runtime::rt-raft-start-election leader cluster) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-raft-propose cluster :set-x) :to-be :set-x)
     (maphash
      (lambda (id node)
        (declare (ignore id))
        (let ((commands (mapcar #'cl-cc/runtime::rt-raft-entry-command
                                (cl-cc/runtime::rt-raft-node-log node))))
-         (assert-true (member :set-x commands))))
+         (expect (member :set-x commands) :to-be-truthy)))
      (cl-cc/runtime:rt-raft-cluster-nodes cluster))))
 
-(deftest runtime-subsystem-sync-mutex-basic
-  "FR-370: Basic mutex lock/unlock."
+(it-sequential "runtime-subsystem-sync-mutex-basic"
   (let ((m (cl-cc/runtime:rt-make-mutex)))
-    (assert-true (cl-cc/runtime:rt-mutex-lock m))
+    (expect (cl-cc/runtime:rt-mutex-lock m) :to-be-truthy)
     (cl-cc/runtime:rt-mutex-unlock m)
     t))
 
-(deftest runtime-subsystem-sync-semaphore-basic
-  "FR-370: Basic semaphore wait/signal."
+(it-sequential "runtime-subsystem-sync-semaphore-basic"
   (let ((s (cl-cc/runtime:rt-make-semaphore :count 1)))
-    (assert-true (cl-cc/runtime:rt-semaphore-wait s :timeout 0.1))
-    (assert-true (cl-cc/runtime:rt-semaphore-signal s))))
+    (expect (cl-cc/runtime:rt-semaphore-wait s :timeout 0.1) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-semaphore-signal s) :to-be-truthy)))
 
-(deftest runtime-subsystem-sync-barrier-basic
-  "FR-372: Basic barrier wait."
+(it-sequential "runtime-subsystem-sync-barrier-basic"
   (let ((b (cl-cc/runtime:rt-make-barrier 1)))
-    (assert-true (cl-cc/runtime:rt-barrier-wait b :timeout 0.1))))
+    (expect (cl-cc/runtime:rt-barrier-wait b :timeout 0.1) :to-be-truthy)))
 
-(deftest runtime-subsystem-sync-once-basic
-  "FR-373: Basic once call."
+(it-sequential "runtime-subsystem-sync-once-basic"
   (let ((o (cl-cc/runtime:rt-make-once))
         (count 0))
     (cl-cc/runtime:rt-once-call o (lambda () (incf count)))
-    (assert-= 1 count)
+    (expect (= 1 count) :to-be-truthy)
     (cl-cc/runtime:rt-once-call o (lambda () (incf count)))
-    (assert-= 1 count)))
+    (expect (= 1 count) :to-be-truthy)))
 
-(deftest runtime-subsystem-scheduler-spawn-basic
-  "FR-257: Basic spawn and run."
+(it-sequential "runtime-subsystem-scheduler-spawn-basic"
   (let ((cl-cc/runtime::*rt-global-scheduler* (cl-cc/runtime:rt-make-scheduler)))
     (let ((result nil))
       (cl-cc/runtime:rt-spawn (lambda () (setf result 42)))
       (cl-cc/runtime:rt-scheduler-run)
-      (assert-eql 42 result))))
+      (expect result :to-be 42))))
 
-(deftest runtime-subsystem-future-basic
-  "FR-283: Basic future resolve/await."
+(it-sequential "runtime-subsystem-future-basic"
   (let ((f (cl-cc/runtime:rt-make-future)))
     (cl-cc/runtime:rt-future-resolve f 99)
-    (assert-eql 99 (cl-cc/runtime:rt-future-await f :timeout 0.1))))
+    (expect (cl-cc/runtime:rt-future-await f :timeout 0.1) :to-be 99)))
 
-(deftest runtime-subsystem-channel-basic
-  "FR-282: Basic channel send/recv."
+(it-sequential "runtime-subsystem-channel-basic"
   (let ((ch (cl-cc/runtime:rt-make-channel :capacity 1)))
-    (assert-eql 7 (cl-cc/runtime:rt-channel-send ch 7))
-    (assert-eql 7 (cl-cc/runtime:rt-channel-recv ch))))
+    (expect (cl-cc/runtime:rt-channel-send ch 7) :to-be 7)
+    (expect (cl-cc/runtime:rt-channel-recv ch) :to-be 7)))
 
-(deftest runtime-subsystem-actor-basic
-  "FR-290: Basic actor send/receive."
+(it-sequential "runtime-subsystem-actor-basic"
   (let ((a (cl-cc/runtime:rt-make-actor #'identity)))
     (cl-cc/runtime:rt-actor-send a :hello)
-    (assert-eq :hello (cl-cc/runtime:rt-actor-receive a :timeout 0.1))))
+    (expect (cl-cc/runtime:rt-actor-receive a :timeout 0.1) :to-be :hello)))
 
-(deftest runtime-subsystem-lockfree-stack-basic
-  "FR-322: Basic lock-free stack push/pop."
+(it-sequential "runtime-subsystem-lockfree-stack-basic"
   (let ((s (cl-cc/runtime:rt-make-lfstack)))
     (cl-cc/runtime:rt-lfstack-push s 1)
     (cl-cc/runtime:rt-lfstack-push s 2)
     (multiple-value-bind (val ok) (cl-cc/runtime:rt-lfstack-pop s)
-      (assert-true ok)
-      (assert-eql 2 val))))
+      (expect ok :to-be-truthy)
+      (expect val :to-be 2))))
 
-(deftest runtime-subsystem-spsc-basic
-  "FR-462: Basic SPSC push/pop."
+(it-sequential "runtime-subsystem-spsc-basic"
   (let ((q (cl-cc/runtime:rt-make-spsc-queue 4)))
-    (assert-true (cl-cc/runtime:rt-spsc-try-push q 10))
+    (expect (cl-cc/runtime:rt-spsc-try-push q 10) :to-be-truthy)
     (multiple-value-bind (val ok) (cl-cc/runtime:rt-spsc-try-pop q)
-      (assert-true ok)
-      (assert-eql 10 val))))
+      (expect ok :to-be-truthy)
+      (expect val :to-be 10))))
 
-(deftest runtime-subsystem-crdt-gcounter-basic
-  "FR-431: Basic GCounter increment."
+(it-sequential "runtime-subsystem-crdt-gcounter-basic"
   (let ((c (cl-cc/runtime:rt-make-gcounter)))
     (cl-cc/runtime:rt-gcounter-increment c 1 5)
-    (assert-= 5 (cl-cc/runtime:rt-gcounter-value c))))
+    (expect (= 5 (cl-cc/runtime:rt-gcounter-value c)) :to-be-truthy)))
 
-(deftest runtime-subsystem-consensus-raft-basic
-  "FR-432: Basic Raft cluster creation."
+(it-sequential "runtime-subsystem-consensus-raft-basic"
   (let ((c (cl-cc/runtime:rt-make-raft-cluster '("n1" "n2" "n3"))))
-    (assert-true (gethash "n1" (cl-cc/runtime:rt-raft-cluster-nodes c)))))
+    (expect (gethash "n1" (cl-cc/runtime:rt-raft-cluster-nodes c)) :to-be-truthy)))
 
 
 ;;; =================================================================
@@ -740,9 +689,7 @@ Each clause is either a single numeric FR ID or an inclusive (START END) range."
    '(600 602) '(605 607) '(610 612) '(615 617) '(620 622) '(625 627)
    '(630 634) '(638 640) '(643 646) '(650 654)))
 
-(deftest runtime-subsystem-fr-coverage-complete
-  "Verify all runtime subsystem FR IDs are tracked."
-  (assert-= +runtime-subsystem-fr-coverage-count+
-            (length *runtime-subsystem-fr-coverage*))
+(it-sequential "runtime-subsystem-fr-coverage-complete"
+  (expect (= +runtime-subsystem-fr-coverage-count+ (length *runtime-subsystem-fr-coverage*)) :to-be-truthy)
   (dolist (fr-id *runtime-subsystem-fr-coverage-sentinels*)
-    (assert-true (member fr-id *runtime-subsystem-fr-coverage*))))
+    (expect (member fr-id *runtime-subsystem-fr-coverage*) :to-be-truthy)))

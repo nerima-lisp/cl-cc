@@ -2,7 +2,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (defparameter *rt-core-test-root* nil)
 (defparameter *rt-core-test-closure* nil)
@@ -30,8 +29,7 @@
           *rt-core-test-cycle*
           *rt-core-test-string*)))
 
-(deftest runtime-core-roundtrip-full-heap-roots
-  "FR-1002/FR-1003: core save/load restores registered reachable heap graph."
+(it-sequential "runtime-core-roundtrip-full-heap-roots"
   (%rt-core-register-test-roots)
   (let ((path (%rt-core-test-path "clcc-roundtrip")))
     (setf *rt-core-test-root* (list :numbers #(1 2 3) :table (make-hash-table :test 'equal)))
@@ -39,22 +37,20 @@
     (cl-cc/runtime:rt-save-core path :compression :none)
     (setf *rt-core-test-root* :mutated)
     (cl-cc/runtime:rt-load-core path)
-    (assert-equal :numbers (first *rt-core-test-root*))
-    (assert-true (equalp #(1 2 3) (second *rt-core-test-root*)))
-    (assert-equal '(4 2) (gethash "answer" (getf *rt-core-test-root* :table)))))
+    (expect (first *rt-core-test-root*) :to-equal :numbers)
+    (expect (equalp #(1 2 3) (second *rt-core-test-root*)) :to-be-truthy)
+    (expect (gethash "answer" (getf *rt-core-test-root* :table)) :to-equal '(4 2))))
 
-(deftest runtime-core-closure-serialization
-  "FR-1002: saved host closures are reattached through the function registry."
+(it-sequential "runtime-core-closure-serialization"
   (%rt-core-register-test-roots)
   (let ((path (%rt-core-test-path "clcc-closure")))
     (setf *rt-core-test-closure* (let ((n 40)) (lambda (x) (+ n x))))
     (cl-cc/runtime:rt-save-core path :compression :none)
     (setf *rt-core-test-closure* (lambda (x) x))
     (cl-cc/runtime:rt-load-core path)
-    (assert-equal 42 (funcall *rt-core-test-closure* 2))))
+    (expect (funcall *rt-core-test-closure* 2) :to-equal 42)))
 
-(deftest runtime-core-clos-instance-serialization
-  "FR-1002: core serializer preserves CLOS class identity and slot values."
+(it-sequential "runtime-core-clos-instance-serialization"
   (%rt-core-register-test-roots)
   (let ((path (%rt-core-test-path "clcc-clos"))
         (node (make-instance 'rt-core-test-node :name "root")))
@@ -63,12 +59,10 @@
     (cl-cc/runtime:rt-save-core path :compression :none)
     (setf *rt-core-test-instance* nil)
     (cl-cc/runtime:rt-load-core path)
-    (assert-equal "root" (rt-core-test-node-name *rt-core-test-instance*))
-    (assert-eq *rt-core-test-instance*
-               (rt-core-test-node-next *rt-core-test-instance*))))
+    (expect (rt-core-test-node-name *rt-core-test-instance*) :to-equal "root")
+    (expect (rt-core-test-node-next *rt-core-test-instance*) :to-be *rt-core-test-instance*)))
 
-(deftest runtime-core-circular-structure-serialization
-  "FR-1002: forwarding-table graph copy preserves circular cons references."
+(it-sequential "runtime-core-circular-structure-serialization"
   (%rt-core-register-test-roots)
   (let ((path (%rt-core-test-path "clcc-cycle"))
         (cell (cons :head nil)))
@@ -77,17 +71,16 @@
     (cl-cc/runtime:rt-save-core path :compression :none)
     (setf *rt-core-test-cycle* nil)
     (cl-cc/runtime:rt-load-core path)
-    (assert-eq :head (car *rt-core-test-cycle*))
-    (assert-eq *rt-core-test-cycle* (cdr *rt-core-test-cycle*))))
+    (expect (car *rt-core-test-cycle*) :to-be :head)
+    (expect (cdr *rt-core-test-cycle*) :to-be *rt-core-test-cycle*)))
 
-(deftest runtime-core-loading-with-mmap
-  "FR-1003: rt-load-core records mmap-backed lazy-loading metadata."
+(it-sequential "runtime-core-loading-with-mmap"
   (%rt-core-register-test-roots)
   (let ((path (%rt-core-test-path "clcc-mmap")))
     (setf *rt-core-test-root* '(:mmap t))
     (cl-cc/runtime:rt-save-core path :compression :none)
     (let ((core (cl-cc/runtime:rt-load-core path)))
-      (assert-equal (pathname path) cl-cc/runtime:*saved-core-pathname*)
-      (assert-true (getf core :lazy-loading))
-      (assert-equal :offset-relative (getf core :aslr))
-      (assert-equal '(:mmap t) *rt-core-test-root*))))
+      (expect cl-cc/runtime:*saved-core-pathname* :to-equal (pathname path))
+      (expect (getf core :lazy-loading) :to-be-truthy)
+      (expect (getf core :aslr) :to-equal :offset-relative)
+      (expect *rt-core-test-root* :to-equal '(:mmap t)))))

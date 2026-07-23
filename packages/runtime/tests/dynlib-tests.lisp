@@ -13,60 +13,53 @@
                #:load-shared-library #:load-framework #:unload-shared-library
                #:list-loaded-libraries #:find-foreign-symbol))))
 
-(in-suite cl-cc-unit-suite)
 
-(deftest fr-417-pinned-unboxed-array-provides-data-pointer
-  "Pinned unboxed arrays expose a stable FFI data pointer/token until released."
+(it-sequential "fr-417-pinned-unboxed-array-provides-data-pointer"
   (let* ((array (make-array 4 :element-type '(unsigned-byte 8)
                             :initial-contents '(1 2 3 4)))
          (buffer (cl-cc/runtime:rt-pin-unboxed-array array)))
-    (assert-true (cl-cc/runtime:rt-pinned-unboxed-array-buffer-p buffer))
-    (assert-eq array (cl-cc/runtime:rt-pinned-unboxed-array-buffer-array buffer))
-    (assert-= 4 (cl-cc/runtime:rt-pinned-unboxed-array-buffer-length buffer))
-    (assert-true (cl-cc/runtime:rt-pinned-array-data-pointer buffer))
+    (expect (cl-cc/runtime:rt-pinned-unboxed-array-buffer-p buffer) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-pinned-unboxed-array-buffer-array buffer) :to-be array)
+    (expect (= 4 (cl-cc/runtime:rt-pinned-unboxed-array-buffer-length buffer)) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-pinned-array-data-pointer buffer) :to-be-truthy)
     (cl-cc/runtime:rt-release-pinned-array buffer)
-    (assert-true (cl-cc/runtime:rt-pinned-unboxed-array-buffer-released-p buffer))
-    (assert-signals error
-      (cl-cc/runtime:rt-pinned-array-data-pointer buffer))))
+    (expect (cl-cc/runtime:rt-pinned-unboxed-array-buffer-released-p buffer) :to-be-truthy)
+    (signals error (cl-cc/runtime:rt-pinned-array-data-pointer buffer))))
 
 (defun %test-libc-path ()
   #+darwin "/usr/lib/libSystem.B.dylib"
   #+linux "libc.so.6"
   #-(or darwin linux) nil)
 
-(deftest dynlib-load-find-unload-libc-symbol
-  "load-shared-library/find-foreign-symbol/unload-shared-library handle a host libc symbol."
+(it-sequential "dynlib-load-find-unload-libc-symbol"
   (let ((path (%test-libc-path)))
     (when path
       (let ((library (cl-cc/ffi:load-shared-library path)))
         (unwind-protect
              (progn
-               (assert-true (cl-cc/ffi:dl-lib-p library))
-               (assert-equal path (cl-cc/ffi:dl-lib-name library))
-               (assert-true (cl-cc/ffi:dl-lib-loaded library))
-               (assert-true (functionp (cl-cc/ffi:find-foreign-symbol "printf" library)))
-               (assert-null (cl-cc/ffi:find-foreign-symbol "cl_cc_symbol_that_does_not_exist" library)))
+               (expect (cl-cc/ffi:dl-lib-p library) :to-be-truthy)
+               (expect (cl-cc/ffi:dl-lib-name library) :to-equal path)
+               (expect (cl-cc/ffi:dl-lib-loaded library) :to-be-truthy)
+               (expect (functionp (cl-cc/ffi:find-foreign-symbol "printf" library)) :to-be-truthy)
+               (expect (cl-cc/ffi:find-foreign-symbol "cl_cc_symbol_that_does_not_exist" library) :to-be-null))
           (cl-cc/ffi:unload-shared-library library))
-        (assert-false (cl-cc/ffi:dl-lib-loaded library))))))
+        (expect (cl-cc/ffi:dl-lib-loaded library) :to-be-falsy)))))
 
-(deftest dynlib-found-symbol-is-callable
-  "find-foreign-symbol returns a callable host-backed function object for no-arg int functions."
+(it-sequential "dynlib-found-symbol-is-callable"
   (let ((path (%test-libc-path)))
     (when path
       (let ((library (cl-cc/ffi:load-shared-library path)))
         (unwind-protect
              (let ((getpid (cl-cc/ffi:find-foreign-symbol "getpid" library)))
-               (assert-true (functionp getpid))
-               (assert-true (integerp (funcall getpid))))
+               (expect (functionp getpid) :to-be-truthy)
+               (expect (integerp (funcall getpid)) :to-be-truthy))
           (cl-cc/ffi:unload-shared-library library))))))
 
 #+darwin
-(deftest dynlib-load-framework-foundation
-  "load-framework resolves and loads a macOS framework by framework name."
+(it-sequential "dynlib-load-framework-foundation"
   (let ((library (cl-cc/ffi:load-framework "Foundation")))
     (unwind-protect
          (progn
-            (assert-true (cl-cc/ffi:dl-lib-p library))
-            (assert-equal "/System/Library/Frameworks/Foundation.framework/Foundation"
-                          (cl-cc/ffi:dl-lib-name library)))
+            (expect (cl-cc/ffi:dl-lib-p library) :to-be-truthy)
+            (expect (cl-cc/ffi:dl-lib-name library) :to-equal "/System/Library/Frameworks/Foundation.framework/Foundation"))
       (cl-cc/ffi:unload-shared-library library))))

@@ -21,11 +21,7 @@
 ;;; Suite
 ;;; ------------------------------------------------------------
 
-(defsuite gc-write-barrier-suite
-  :description "SATB pre-write barrier + card table write barrier tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite gc-write-barrier-suite)
 
 ;;; ------------------------------------------------------------
 ;;; Helpers
@@ -52,29 +48,26 @@
 ;;; Test: Write actually stores the value
 ;;; ------------------------------------------------------------
 
-(deftest gc-write-barrier-performs-write
-  "rt-gc-write-barrier stores new-val at (obj-addr + slot-offset)."
+(it-sequential "gc-write-barrier-performs-write"
   (let* ((heap (%make-wb-heap))
          (obj  32)   ; old-space object
          (slot 1))
     (%wb-write-unmarked-header heap obj 3 7)
     (cl-cc/runtime:rt-gc-write-barrier heap obj slot 99)
-    (assert-= 99 (cl-cc/runtime:rt-heap-ref heap (+ obj slot)))))
+    (expect (= 99 (cl-cc/runtime:rt-heap-ref heap (+ obj slot))) :to-be-truthy)))
 
 ;;; ------------------------------------------------------------
 ;;; SATB Snapshot Tests
 ;;; ------------------------------------------------------------
 
-(deftest gc-write-barrier-no-satb-during-normal-gc
-  "During :normal state, SATB queue stays empty regardless of mark bit."
+(it-sequential "gc-write-barrier-no-satb-during-normal-gc"
   (let* ((heap (%make-wb-heap)))
     (%wb-write-marked-header heap 32 3 7)
     (cl-cc/runtime:rt-heap-set heap 33 5)
     (cl-cc/runtime:rt-gc-write-barrier heap 32 1 99)
-    (assert-null (cl-cc/runtime:rt-heap-satb-queue heap))))
+    (expect (cl-cc/runtime:rt-heap-satb-queue heap) :to-be-null)))
 
-(deftest gc-write-barrier-satb-snapshot-major-gc-black-object
-  "During :major-gc, writing over a heap pointer in a black object snapshots the old value."
+(it-sequential "gc-write-barrier-satb-snapshot-major-gc-black-object"
   (let* ((heap (%make-wb-heap))
          (obj  32)   ; old-space
          (slot 1))
@@ -85,10 +78,9 @@
     ;; Overwrite with a different value
     (cl-cc/runtime:rt-gc-write-barrier heap obj slot 42)
     ;; Old value 5 should be in the SATB queue
-    (assert-true (member 5 (cl-cc/runtime:rt-heap-satb-queue heap)))))
+    (expect (member 5 (cl-cc/runtime:rt-heap-satb-queue heap)) :to-be-truthy)))
 
-(deftest gc-write-barrier-no-satb-unmarked-object
-  "During :major-gc, writing to an UNMARKED (white/gray) object does not snapshot."
+(it-sequential "gc-write-barrier-no-satb-unmarked-object"
   (let* ((heap (%make-wb-heap))
          (obj  32)
          (slot 1))
@@ -96,10 +88,9 @@
     (cl-cc/runtime:rt-heap-set heap (+ obj slot) 5)  ; old-value = young addr
     (setf (cl-cc/runtime:rt-heap-gc-state heap) :major-gc)
     (cl-cc/runtime:rt-gc-write-barrier heap obj slot 42)
-    (assert-equal nil (cl-cc/runtime:rt-heap-satb-queue heap))))
+    (expect (cl-cc/runtime:rt-heap-satb-queue heap) :to-equal nil)))
 
-(deftest gc-write-barrier-satb-snapshot-major-gc-concurrent-black-object
-  "During :major-gc-concurrent, overwriting a heap pointer in a black object snapshots old value."
+(it-sequential "gc-write-barrier-satb-snapshot-major-gc-concurrent-black-object"
   (let* ((heap (%make-wb-heap))
          (obj 32)
          (slot 1))
@@ -107,10 +98,9 @@
     (cl-cc/runtime:rt-heap-set heap (+ obj slot) 5)
     (setf (cl-cc/runtime:rt-heap-gc-state heap) :major-gc-concurrent)
     (cl-cc/runtime:rt-gc-write-barrier heap obj slot 42)
-    (assert-true (member 5 (cl-cc/runtime:rt-gc-drain-satb-thread-queues heap)))))
+    (expect (member 5 (cl-cc/runtime:rt-gc-drain-satb-thread-queues heap)) :to-be-truthy)))
 
-(deftest gc-write-barrier-no-satb-old-value-not-heap-addr
-  "During :major-gc, old value that is not a heap address is not snapshotted."
+(it-sequential "gc-write-barrier-no-satb-old-value-not-heap-addr"
   (let* ((heap (%make-wb-heap))
          (obj  32)
          (slot 1))
@@ -119,26 +109,32 @@
     (cl-cc/runtime:rt-heap-set heap (+ obj slot) 999)
     (setf (cl-cc/runtime:rt-heap-gc-state heap) :major-gc)
     (cl-cc/runtime:rt-gc-write-barrier heap obj slot 42)
-    (assert-equal nil (cl-cc/runtime:rt-heap-satb-queue heap))))
+    (expect (cl-cc/runtime:rt-heap-satb-queue heap) :to-equal nil)))
 
 ;;; ------------------------------------------------------------
 ;;; Card Table Tests
 ;;; ------------------------------------------------------------
 
-(deftest-each gc-write-barrier-card-table-behavior
-  ;; Card table truth table: old-obj × young-ptr → dirty.
-  "rt-gc-write-barrier marks card dirty only when writing a young ptr into old-space."
-  :cases (("old-to-young"   32 5
-           (lambda (heap)
-             (assert-true (cl-cc/runtime:rt-card-dirty-p heap 32)))) ; old obj + young ptr → dirty
-          ("old-to-old"     32 40
-           (lambda (heap)
-             (assert-false (cl-cc/runtime:rt-card-dirty-p heap 32)))) ; old obj + old ptr → clean
-          ("young-to-young"  0 5
-           (lambda (heap)
-             (assert-false (cl-cc/runtime:rt-card-dirty-p heap 32))))) ; young obj + young ptr → clean
-  (obj new-val verify)
-  (let* ((heap (%make-wb-heap)))
+(it-sequential "gc-write-barrier-card-table-behavior old-to-young"
+  (destructuring-bind (obj new-val verify) (list 32 5 (lambda (heap)
+             (expect (cl-cc/runtime:rt-card-dirty-p heap 32) :to-be-truthy)))
+    (let* ((heap (%make-wb-heap)))
     (%wb-write-unmarked-header heap obj 3 7)
     (cl-cc/runtime:rt-gc-write-barrier heap obj 1 new-val)
-    (funcall verify heap)))
+    (funcall verify heap))))
+
+(it-sequential "gc-write-barrier-card-table-behavior old-to-old"
+  (destructuring-bind (obj new-val verify) (list 32 40 (lambda (heap)
+             (expect (cl-cc/runtime:rt-card-dirty-p heap 32) :to-be-falsy)))
+    (let* ((heap (%make-wb-heap)))
+    (%wb-write-unmarked-header heap obj 3 7)
+    (cl-cc/runtime:rt-gc-write-barrier heap obj 1 new-val)
+    (funcall verify heap))))
+
+(it-sequential "gc-write-barrier-card-table-behavior young-to-young"
+  (destructuring-bind (obj new-val verify) (list 0 5 (lambda (heap)
+             (expect (cl-cc/runtime:rt-card-dirty-p heap 32) :to-be-falsy)))
+    (let* ((heap (%make-wb-heap)))
+    (%wb-write-unmarked-header heap obj 3 7)
+    (cl-cc/runtime:rt-gc-write-barrier heap obj 1 new-val)
+    (funcall verify heap))))

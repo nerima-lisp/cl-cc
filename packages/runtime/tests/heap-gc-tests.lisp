@@ -10,112 +10,158 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Instruction <-> S-exp Conversion Tests
 
-(deftest-each instruction->sexp-heap-instructions
-  "instruction->sexp produces correct s-expression for each heap instruction type."
-  :cases (("vm-cons"         (make-vm-cons :dst 0 :car-src 1 :cdr-src 2)
-           '(:cons 0 1 2))
-          ("vm-car"          (make-vm-car :dst 0 :src 1)
-           '(:car 0 1))
-          ("vm-cdr"          (make-vm-cdr :dst 0 :src 1)
-           '(:cdr 0 1))
-          ("vm-rplaca"       (make-vm-rplaca :cons 0 :val 1)
-           '(:rplaca 0 1))
-          ("vm-rplacd"       (make-vm-rplacd :cons 0 :val 1)
-           '(:rplacd 0 1))
-           ("vm-make-closure" (make-vm-make-closure :dst 0 :label :func :params '(:x :y) :env-regs '(1 2))
-            '(:make-closure 0 :func (:x :y) 1 2))
-           ("vm-func-ref"     (make-vm-func-ref :dst 0 :label :func :params '(:x :y)
+(it-sequential "instruction->sexp-heap-instructions vm-cons"
+  (destructuring-bind (inst expected) (list (make-vm-cons :dst 0 :car-src 1 :cdr-src 2) '(:cons 0 1 2))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "instruction->sexp-heap-instructions vm-car"
+  (destructuring-bind (inst expected) (list (make-vm-car :dst 0 :src 1) '(:car 0 1))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "instruction->sexp-heap-instructions vm-cdr"
+  (destructuring-bind (inst expected) (list (make-vm-cdr :dst 0 :src 1) '(:cdr 0 1))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "instruction->sexp-heap-instructions vm-rplaca"
+  (destructuring-bind (inst expected) (list (make-vm-rplaca :cons 0 :val 1) '(:rplaca 0 1))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "instruction->sexp-heap-instructions vm-rplacd"
+  (destructuring-bind (inst expected) (list (make-vm-rplacd :cons 0 :val 1) '(:rplacd 0 1))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "instruction->sexp-heap-instructions vm-make-closure"
+  (destructuring-bind (inst expected) (list (make-vm-make-closure :dst 0 :label :func :params '(:x :y) :env-regs '(1 2)) '(:make-closure 0 :func (:x :y) 1 2))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "instruction->sexp-heap-instructions vm-func-ref"
+  (destructuring-bind (inst expected) (list (make-vm-func-ref :dst 0 :label :func :params '(:x :y)
                                                  :optional-params nil :rest-param nil
                                                  :key-params nil :rest-stack-alloc-p nil
-                                                 :inline-policy nil :dispatch-tag '(:anonymous))
-            '(:func-ref 0 :func (:x :y) nil nil nil nil nil (:anonymous)))
-           ("vm-closure-ref"  (make-vm-closure-ref-idx :dst 0 :closure 1 :index 2)
-            '(:closure-ref-idx 0 1 2)))
-  (inst expected)
-  (assert-equal expected (instruction->sexp inst)))
+                                                 :inline-policy nil :dispatch-tag '(:anonymous)) '(:func-ref 0 :func (:x :y) nil nil nil nil nil (:anonymous)))
+    (expect (instruction->sexp inst) :to-equal expected)))
 
-(deftest sexp->instruction-vm-cons
-  "Test sexp->instruction for vm-cons."
+(it-sequential "instruction->sexp-heap-instructions vm-closure-ref"
+  (destructuring-bind (inst expected) (list (make-vm-closure-ref-idx :dst 0 :closure 1 :index 2) '(:closure-ref-idx 0 1 2))
+    (expect (instruction->sexp inst) :to-equal expected)))
+
+(it-sequential "sexp->instruction-vm-cons"
   (let ((inst (sexp->instruction '(:cons 0 1 2))))
-    (assert-type vm-cons inst)
-    (assert-eq (vm-dst inst) 0)
-    (assert-eq (vm-car-reg inst) 1)
-    (assert-eq (vm-cdr-reg inst) 2)))
+    (expect (typep inst 'vm-cons) :to-be-truthy)
+    (expect 0 :to-be (vm-dst inst))
+    (expect 1 :to-be (vm-car-reg inst))
+    (expect 2 :to-be (vm-cdr-reg inst))))
 
-(deftest-each sexp->instruction-dst-src-ops
-  "sexp->instruction produces the correct type with :dst and :src for car/cdr."
-  :cases (("car" '(:car 0 1) 'vm-car)
-          ("cdr" '(:cdr 0 1) 'vm-cdr))
-  (sexp expected-type)
-  (let ((inst (sexp->instruction sexp)))
-    (assert-true (typep inst expected-type))
-    (assert-eq (vm-dst inst) 0)
-    (assert-eq (vm-src inst) 1)))
+(it-sequential "sexp->instruction-dst-src-ops car"
+  (destructuring-bind (sexp expected-type) (list '(:car 0 1) 'vm-car)
+    (let ((inst (sexp->instruction sexp)))
+    (expect (typep inst expected-type) :to-be-truthy)
+    (expect 0 :to-be (vm-dst inst))
+    (expect 1 :to-be (vm-src inst)))))
 
-(deftest-each sexp->instruction-cons-val-ops
-  "sexp->instruction produces correct type with :cons and :val for rplaca/rplacd."
-  :cases (("rplaca" '(:rplaca 0 1) 'vm-rplaca)
-          ("rplacd" '(:rplacd 0 1) 'vm-rplacd))
-  (sexp expected-type)
-  (let ((inst (sexp->instruction sexp)))
-    (assert-true (typep inst expected-type))
-    (assert-eq (vm-cons-reg inst) 0)
-    (assert-eq (vm-val-reg inst) 1)))
+(it-sequential "sexp->instruction-dst-src-ops cdr"
+  (destructuring-bind (sexp expected-type) (list '(:cdr 0 1) 'vm-cdr)
+    (let ((inst (sexp->instruction sexp)))
+    (expect (typep inst expected-type) :to-be-truthy)
+    (expect 0 :to-be (vm-dst inst))
+    (expect 1 :to-be (vm-src inst)))))
 
-(deftest sexp->instruction-vm-make-closure
-  "Test sexp->instruction for vm-make-closure."
+(it-sequential "sexp->instruction-cons-val-ops rplaca"
+  (destructuring-bind (sexp expected-type) (list '(:rplaca 0 1) 'vm-rplaca)
+    (let ((inst (sexp->instruction sexp)))
+    (expect (typep inst expected-type) :to-be-truthy)
+    (expect 0 :to-be (vm-cons-reg inst))
+    (expect 1 :to-be (vm-val-reg inst)))))
+
+(it-sequential "sexp->instruction-cons-val-ops rplacd"
+  (destructuring-bind (sexp expected-type) (list '(:rplacd 0 1) 'vm-rplacd)
+    (let ((inst (sexp->instruction sexp)))
+    (expect (typep inst expected-type) :to-be-truthy)
+    (expect 0 :to-be (vm-cons-reg inst))
+    (expect 1 :to-be (vm-val-reg inst)))))
+
+(it-sequential "sexp->instruction-vm-make-closure"
   (let ((inst (sexp->instruction '(:make-closure 0 :func (:x) 1))))
-    (assert-type vm-make-closure inst)
-    (assert-eq (vm-dst inst) 0)
-    (assert-eq (vm-label-name inst) :func)
-    (assert-equal (vm-make-closure-params inst) '(:x))
-    (assert-equal (vm-env-regs inst) '(1))))
+    (expect (typep inst 'vm-make-closure) :to-be-truthy)
+    (expect 0 :to-be (vm-dst inst))
+    (expect :func :to-be (vm-label-name inst))
+    (expect '(:x) :to-equal (vm-make-closure-params inst))
+    (expect '(1) :to-equal (vm-env-regs inst))))
 
-(deftest sexp->instruction-vm-func-ref
-  "Test sexp->instruction for vm-func-ref."
+(it-sequential "sexp->instruction-vm-func-ref"
   (let ((inst (sexp->instruction '(:func-ref 0 :func (:x) nil nil nil nil nil (:anonymous)))))
-    (assert-type vm-func-ref inst)
-    (assert-eq (vm-dst inst) 0)
-    (assert-eq (vm-label-name inst) :func)
-    (assert-equal (vm-closure-params inst) '(:x))
-    (assert-equal (vm-func-ref-dispatch-tag inst) '(:anonymous))))
+    (expect (typep inst 'vm-func-ref) :to-be-truthy)
+    (expect 0 :to-be (vm-dst inst))
+    (expect :func :to-be (vm-label-name inst))
+    (expect '(:x) :to-equal (vm-closure-params inst))
+    (expect '(:anonymous) :to-equal (vm-func-ref-dispatch-tag inst))))
 
-(deftest sexp->instruction-vm-closure-ref-idx
-  "Test sexp->instruction for vm-closure-ref-idx."
+(it-sequential "sexp->instruction-vm-closure-ref-idx"
   (let ((inst (sexp->instruction '(:closure-ref-idx 0 1 3))))
-    (assert-type vm-closure-ref-idx inst)
-    (assert-eq (vm-dst inst) 0)
-    (assert-eq (vm-closure-reg inst) 1)
-    (assert-= (vm-closure-index inst) 3)))
+    (expect (typep inst 'vm-closure-ref-idx) :to-be-truthy)
+    (expect 0 :to-be (vm-dst inst))
+    (expect 1 :to-be (vm-closure-reg inst))
+    (expect (= (vm-closure-index inst) 3) :to-be-truthy)))
 
 ;;; Round-trip Tests
 
-(deftest-each roundtrip-heap-instructions
-  "instruction->sexp→sexp->instruction roundtrip preserves s-expression for each heap instruction."
-  :cases (("vm-cons"         (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
-          ("vm-car"          (make-vm-car :dst 0 :src 1))
-          ("vm-cdr"          (make-vm-cdr :dst 0 :src 1))
-           ("vm-rplaca"       (make-vm-rplaca :cons 0 :val 1))
-           ("vm-rplacd"       (make-vm-rplacd :cons 0 :val 1))
-           ("vm-make-closure" (make-vm-make-closure :dst 0 :label :func :params '(:x :y) :env-regs '(1 2)))
-           ("vm-func-ref"     (make-vm-func-ref :dst 0 :label :func :params '(:x :y)
+(it-sequential "roundtrip-heap-instructions vm-cons"
+  (destructuring-bind (original) (list (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-car"
+  (destructuring-bind (original) (list (make-vm-car :dst 0 :src 1))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-cdr"
+  (destructuring-bind (original) (list (make-vm-cdr :dst 0 :src 1))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-rplaca"
+  (destructuring-bind (original) (list (make-vm-rplaca :cons 0 :val 1))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-rplacd"
+  (destructuring-bind (original) (list (make-vm-rplacd :cons 0 :val 1))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-make-closure"
+  (destructuring-bind (original) (list (make-vm-make-closure :dst 0 :label :func :params '(:x :y) :env-regs '(1 2)))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-func-ref"
+  (destructuring-bind (original) (list (make-vm-func-ref :dst 0 :label :func :params '(:x :y)
                                                  :optional-params nil :rest-param nil
                                                  :key-params nil :rest-stack-alloc-p nil
                                                  :inline-policy nil :dispatch-tag '(:anonymous)))
-           ("vm-closure-ref"  (make-vm-closure-ref-idx :dst 0 :closure 1 :index 5)))
-  (original)
-  (let* ((sexp     (instruction->sexp original))
+    (let* ((sexp     (instruction->sexp original))
          (restored (sexp->instruction sexp)))
-    (assert-equal sexp (instruction->sexp restored))))
+    (expect (instruction->sexp restored) :to-equal sexp))))
+
+(it-sequential "roundtrip-heap-instructions vm-closure-ref"
+  (destructuring-bind (original) (list (make-vm-closure-ref-idx :dst 0 :closure 1 :index 5))
+    (let* ((sexp     (instruction->sexp original))
+         (restored (sexp->instruction sexp)))
+    (expect (instruction->sexp restored) :to-equal sexp))))
 
 ;;; Integration: Building Lists
 
-(deftest build-list-of-three-elements
-  "Test building a list of three elements using cons."
+(it-sequential "build-list-of-three-elements"
   (let* ((state (make-instance 'vm-io-state))
          ;; Create (3 . nil)
          (inst1 (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
@@ -134,13 +180,12 @@
     (let* ((cell1 (vm-reg-get state 5))
            (cell2 (cdr cell1))
            (cell3 (cdr cell2)))
-      (assert-= (car cell1) 1)
-      (assert-= (car cell2) 2)
-      (assert-= (car cell3) 3)
-      (assert-null (cdr cell3)))))
+      (expect (= (car cell1) 1) :to-be-truthy)
+      (expect (= (car cell2) 2) :to-be-truthy)
+      (expect (= (car cell3) 3) :to-be-truthy)
+      (expect (cdr cell3) :to-be-null))))
 
-(deftest traverse-list-with-car-cdr
-  "Test traversing a list using car and cdr."
+(it-sequential "traverse-list-with-car-cdr"
   (let* ((state (make-instance 'vm-io-state))
          ;; Build list (10 20 30)
          (inst1 (make-vm-cons :dst 0 :car-src 1 :cdr-src 2))
@@ -158,12 +203,12 @@
       ;; Get first element (car list)
       (vm-reg-set state 10 list-cell)
       (execute-instruction (make-vm-car :dst 11 :src 10) state 3 (make-hash-table))
-      (assert-= (vm-reg-get state 11) 10)
+      (expect (= (vm-reg-get state 11) 10) :to-be-truthy)
       ;; Move to second element (car (cdr list))
       (execute-instruction (make-vm-cdr :dst 12 :src 10) state 4 (make-hash-table))
       (execute-instruction (make-vm-car :dst 13 :src 12) state 5 (make-hash-table))
-      (assert-= (vm-reg-get state 13) 20)
+      (expect (= (vm-reg-get state 13) 20) :to-be-truthy)
       ;; Move to third element (car (cdr (cdr list)))
       (execute-instruction (make-vm-cdr :dst 14 :src 12) state 6 (make-hash-table))
       (execute-instruction (make-vm-car :dst 15 :src 14) state 7 (make-hash-table))
-      (assert-= (vm-reg-get state 15) 30))))
+      (expect (= (vm-reg-get state 15) 30) :to-be-truthy))))

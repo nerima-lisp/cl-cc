@@ -8,98 +8,105 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Bitwise ───────────────────────────────────────────────────────────────
 
-(deftest-each rt-bitwise-ops
-  "rt-logand/logior/logxor/ash: binary bitwise and shift operations."
-  :cases (("and"   #'cl-cc/runtime:rt-logand #b1110  #b1011 #b1010)
-          ("or"    #'cl-cc/runtime:rt-logior #b1010  #b0101 #b1111)
-          ("xor"   #'cl-cc/runtime:rt-logxor #b1010  #b0101 #b1111)
-          ("ash-l" #'cl-cc/runtime:rt-ash    2       2      8)
-          ("ash-r" #'cl-cc/runtime:rt-ash    8      -2      2))
-  (fn a b expected)
-  (assert-= expected (funcall fn a b)))
+(it-sequential "rt-bitwise-ops and"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-logand #b1110 #b1011 #b1010)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest-each rt-bitwise-predicate-conventions
-  "rt-logtest and rt-logbitp return 1/0 (bit overlap and bit position tests)."
-  :cases (("logtest-overlap"  #'cl-cc/runtime:rt-logtest  #b1010 #b1000 1)
-          ("logtest-disjoint" #'cl-cc/runtime:rt-logtest  #b1010 #b0101 0)
-          ("logbitp-set"      #'cl-cc/runtime:rt-logbitp  0      1      1)
-          ("logbitp-clear"    #'cl-cc/runtime:rt-logbitp  1      1      0))
-  (pred-fn a b expected)
-  (assert-= expected (funcall pred-fn a b)))
+(it-sequential "rt-bitwise-ops or"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-logior #b1010 #b0101 #b1111)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-ops xor"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-logxor #b1010 #b0101 #b1111)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-ops ash-l"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-ash 2 2 8)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-ops ash-r"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/runtime:rt-ash 8 -2 2)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-predicate-conventions logtest-overlap"
+  (destructuring-bind (pred-fn a b expected) (list #'cl-cc/runtime:rt-logtest #b1010 #b1000 1)
+    (expect (= expected (funcall pred-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-predicate-conventions logtest-disjoint"
+  (destructuring-bind (pred-fn a b expected) (list #'cl-cc/runtime:rt-logtest #b1010 #b0101 0)
+    (expect (= expected (funcall pred-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-predicate-conventions logbitp-set"
+  (destructuring-bind (pred-fn a b expected) (list #'cl-cc/runtime:rt-logbitp 0 1 1)
+    (expect (= expected (funcall pred-fn a b)) :to-be-truthy)))
+
+(it-sequential "rt-bitwise-predicate-conventions logbitp-clear"
+  (destructuring-bind (pred-fn a b expected) (list #'cl-cc/runtime:rt-logbitp 1 1 0)
+    (expect (= expected (funcall pred-fn a b)) :to-be-truthy)))
 
 ;;; ─── Symbol Operations ─────────────────────────────────────────────────────
 
-(deftest rt-symbol-name-returns-upcased-string
-  "rt-symbol-name returns the symbol name as a string."
-  (assert-equal "FOO" (cl-cc/runtime:rt-symbol-name 'foo)))
+(it-sequential "rt-symbol-name-returns-upcased-string"
+  (expect (cl-cc/runtime:rt-symbol-name 'foo) :to-equal "FOO"))
 
-(deftest rt-make-symbol-creates-uninterned
-  "rt-make-symbol creates an uninterned symbol with the given name."
+(it-sequential "rt-make-symbol-creates-uninterned"
   (let ((s (cl-cc/runtime:rt-make-symbol "TEST")))
-    (assert-equal "TEST" (symbol-name s))
-    (assert-false (symbol-package s))))
+    (expect (symbol-name s) :to-equal "TEST")
+    (expect (symbol-package s) :to-be-falsy)))
 
-(deftest rt-gensym-returns-unique-symbols
-  "rt-gensym returns a different symbol on each call."
-  (assert-false (eq (cl-cc/runtime:rt-gensym) (cl-cc/runtime:rt-gensym))))
+(it-sequential "rt-gensym-returns-unique-symbols"
+  (expect (eq (cl-cc/runtime:rt-gensym) (cl-cc/runtime:rt-gensym)) :to-be-falsy))
 
-(deftest rt-symbol-plist-roundtrip
-  "rt-put-prop / rt-get-prop / rt-remprop roundtrip."
+(it-sequential "rt-symbol-plist-roundtrip"
   (let ((sym (cl-cc/runtime:rt-make-symbol "PLIST-TEST")))
     (cl-cc/runtime:rt-put-prop sym :color 'red)
-    (assert-eq 'red (cl-cc/runtime:rt-get-prop sym :color))
+    (expect (cl-cc/runtime:rt-get-prop sym :color) :to-be 'red)
     (cl-cc/runtime:rt-remprop sym :color)
-    (assert-false (cl-cc/runtime:rt-get-prop sym :color))))
+    (expect (cl-cc/runtime:rt-get-prop sym :color) :to-be-falsy)))
 
-(deftest rt-intern-in-package
-  "rt-intern interns through the runtime package registry and preserves identity per package/name."
+(it-sequential "rt-intern-in-package"
   (let* ((pkg (find-package :cl-cc/test))
          (sym (cl-cc/runtime:rt-intern "RT-INTERN-TEST-SYM" pkg))
          (sym2 (cl-cc/runtime:rt-intern "RT-INTERN-TEST-SYM" pkg)))
-    (assert-true (symbolp sym))
-    (assert-equal "RT-INTERN-TEST-SYM" (symbol-name sym))
-    (assert-eq sym sym2)))
+    (expect (symbolp sym) :to-be-truthy)
+    (expect (symbol-name sym) :to-equal "RT-INTERN-TEST-SYM")
+    (expect sym2 :to-be sym)))
 
 ;;; ─── Hash Table Operations ─────────────────────────────────────────────────
 
-(deftest rt-hash-table-set-get-rem-count
-  "rt-sethash/rt-gethash/rt-remhash/rt-hash-count operate correctly."
+(it-sequential "rt-hash-table-set-get-rem-count"
   (let ((ht (cl-cc/runtime:rt-make-hash-table)))
     (cl-cc/runtime:rt-sethash :a ht 1)
     (cl-cc/runtime:rt-sethash :b ht 2)
-    (assert-= 1 (cl-cc/runtime:rt-gethash :a ht))
-    (assert-= 2 (cl-cc/runtime:rt-hash-count ht))
+    (expect (= 1 (cl-cc/runtime:rt-gethash :a ht)) :to-be-truthy)
+    (expect (= 2 (cl-cc/runtime:rt-hash-count ht)) :to-be-truthy)
     (cl-cc/runtime:rt-remhash :a ht)
-    (assert-= 1 (cl-cc/runtime:rt-hash-count ht))))
+    (expect (= 1 (cl-cc/runtime:rt-hash-count ht)) :to-be-truthy)))
 
-(deftest rt-hash-table-keys-values-clrhash
-  "rt-hash-keys/rt-hash-values enumerate entries; rt-clrhash empties the table."
+(it-sequential "rt-hash-table-keys-values-clrhash"
   (let ((ht (cl-cc/runtime:rt-make-hash-table)))
     (cl-cc/runtime:rt-sethash :x ht 10)
     (cl-cc/runtime:rt-sethash :y ht 20)
-    (assert-= 2 (length (cl-cc/runtime:rt-hash-keys ht)))
-    (assert-= 2 (length (cl-cc/runtime:rt-hash-values ht)))
-    (assert-true (member :x (cl-cc/runtime:rt-hash-keys ht)))
-    (assert-true (member 10 (cl-cc/runtime:rt-hash-values ht)))
+    (expect (= 2 (length (cl-cc/runtime:rt-hash-keys ht))) :to-be-truthy)
+    (expect (= 2 (length (cl-cc/runtime:rt-hash-values ht))) :to-be-truthy)
+    (expect (member :x (cl-cc/runtime:rt-hash-keys ht)) :to-be-truthy)
+    (expect (member 10 (cl-cc/runtime:rt-hash-values ht)) :to-be-truthy)
     (cl-cc/runtime:rt-clrhash ht)
-    (assert-= 0 (cl-cc/runtime:rt-hash-count ht))))
+    (expect (= 0 (cl-cc/runtime:rt-hash-count ht)) :to-be-truthy)))
 
-(deftest rt-maphash-and-hash-test
-  "rt-maphash iterates all entries; rt-hash-test returns the test function."
+(it-sequential "rt-maphash-and-hash-test"
   (let ((ht (cl-cc/runtime:rt-make-hash-table :test #'equal)))
     (cl-cc/runtime:rt-sethash "a" ht 1)
     (cl-cc/runtime:rt-sethash "b" ht 2)
     (let ((collected nil))
       (cl-cc/runtime:rt-maphash (lambda (k v) (push (cons k v) collected)) ht)
-      (assert-= 2 (length collected)))
-    (assert-equal 'equal (cl-cc/runtime:rt-hash-test ht))))
+      (expect (= 2 (length collected)) :to-be-truthy))
+    (expect (cl-cc/runtime:rt-hash-test ht) :to-equal 'equal)))
 
-(deftest rt-hash-table-resizing-accessors
-  "rt-make-hash-table accepts ANSI resizing keys and exposes them."
+(it-sequential "rt-hash-table-resizing-accessors"
   (let ((ht (cl-cc/runtime:rt-make-hash-table :test #'equal
                                               :size 4
                                               :rehash-size 2.0
@@ -109,130 +116,130 @@
                                                 :rehash-size 3.0
                                                 :rehash-threshold 0.6
                                                 :weakness :key)))
-    (assert-equal 'equal (cl-cc/runtime:rt-hash-test ht))
-    (assert-true (>= (cl-cc/runtime:rt-hash-size ht) 4))
-    (assert-= 2.0 (cl-cc/runtime:rt-hash-rehash-size ht))
-    (assert-= 0.75 (cl-cc/runtime:rt-hash-rehash-threshold ht))
-    (assert-equal :key (cl-cc/runtime:rt-hash-table-weakness weak))
-    (assert-true (>= (cl-cc/runtime:rt-hash-size weak) 4))
-    (assert-= 3.0 (cl-cc/runtime:rt-hash-rehash-size weak))
-    (assert-= 0.6 (cl-cc/runtime:rt-hash-rehash-threshold weak))))
+    (expect (cl-cc/runtime:rt-hash-test ht) :to-equal 'equal)
+    (expect (>= (cl-cc/runtime:rt-hash-size ht) 4) :to-be-truthy)
+    (expect (= 2.0 (cl-cc/runtime:rt-hash-rehash-size ht)) :to-be-truthy)
+    (expect (= 0.75 (cl-cc/runtime:rt-hash-rehash-threshold ht)) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-hash-table-weakness weak) :to-equal :key)
+    (expect (>= (cl-cc/runtime:rt-hash-size weak) 4) :to-be-truthy)
+    (expect (= 3.0 (cl-cc/runtime:rt-hash-rehash-size weak)) :to-be-truthy)
+    (expect (= 0.6 (cl-cc/runtime:rt-hash-rehash-threshold weak)) :to-be-truthy)))
 
 ;;; ─── Conditions ────────────────────────────────────────────────────────────
 
-(deftest rt-signal-error-signals
-  "rt-signal-error signals the given condition."
-  (assert-signals error (cl-cc/runtime:rt-signal-error "test error")))
+(it-sequential "rt-signal-error-signals"
+  (signals error (cl-cc/runtime:rt-signal-error "test error")))
 
-(deftest rt-signal-conditions
-  "rt-signal signals a condition (not an error); rt-warn-fn issues a warning."
-  (assert-signals simple-condition
-    (cl-cc/runtime:rt-signal (make-condition 'simple-condition :format-control "test")))
-  (assert-signals warning (cl-cc/runtime:rt-warn-fn "a warning")))
+(it-sequential "rt-signal-conditions"
+  (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/runtime:rt-signal (make-condition 'simple-condition :format-control "test"))) (simple-condition () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy))
+  (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/runtime:rt-warn-fn "a warning")) (warning () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy)))
 
 ;;; ─── Misc ──────────────────────────────────────────────────────────────────
 
-(deftest rt-fboundp-uses-runtime-function-registry
-  "rt-fboundp reflects the explicit runtime function registry rather than scanning the host namespace on demand." 
+(it-sequential "rt-fboundp-uses-runtime-function-registry"
   (let ((sym (gensym "RT-FBOUNDP-TEST-")))
     (setf (gethash sym cl-cc/runtime::*rt-function-registry*) t)
-    (assert-= 1 (cl-cc/runtime:rt-fboundp sym))
+    (expect (= 1 (cl-cc/runtime:rt-fboundp sym)) :to-be-truthy)
     (remhash sym cl-cc/runtime::*rt-function-registry*)
-    (assert-= 0 (cl-cc/runtime:rt-fboundp sym))))
+    (expect (= 0 (cl-cc/runtime:rt-fboundp sym)) :to-be-truthy)))
 
-(deftest rt-bootstrap-function-registry-uses-explicit-seed-list
-  "%rt-bootstrap-function-registry registers the explicit seed list without consulting host function cells." 
+(it-sequential "rt-bootstrap-function-registry-uses-explicit-seed-list"
   (let ((cl-cc/runtime::*rt-function-registry* (make-hash-table :test #'eq)))
     (cl-cc/runtime::%rt-bootstrap-function-registry)
     (dolist (sym cl-cc/runtime::*rt-bootstrap-function-symbols*)
-      (assert-true (gethash sym cl-cc/runtime::*rt-function-registry*)))))
+      (expect (gethash sym cl-cc/runtime::*rt-function-registry*) :to-be-truthy))))
 
-(deftest rt-package-registry-is-seeded-conservatively
-  "The runtime package registry is seeded from an explicit package list, not the full host universe." 
-  (assert-true (find :cl-cc/runtime cl-cc/runtime::*rt-bootstrap-package-names*))
-  (assert-true (find :cl-cc/bootstrap cl-cc/runtime::*rt-bootstrap-package-names*))
-  (assert-true (find :cl cl-cc/runtime::*rt-bootstrap-package-names*))
-  (assert-true (gethash "CL-CC/RUNTIME" cl-cc/runtime:*rt-package-registry*)))
+(it-sequential "rt-package-registry-is-seeded-conservatively"
+  (expect (find :cl-cc/runtime cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
+  (expect (find :cl-cc/bootstrap cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
+  (expect (find :cl cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
+  (expect (gethash "CL-CC/RUNTIME" cl-cc/runtime:*rt-package-registry*) :to-be-truthy))
 
-(deftest rt-intern-preserves-seeded-host-package-symbols
-  "rt-intern returns the real symbol for explicitly seeded host packages."
-  ;; Rebind *rt-package-registry* locally so %rt-bootstrap-package-registry's
-  ;; clrhash + repopulate doesn't race with parallel workers reading the global.
+(it-sequential "rt-intern-preserves-seeded-host-package-symbols"
   (let ((cl-cc/runtime:*rt-package-registry* (make-hash-table :test #'equal)))
     (cl-cc/runtime::%rt-bootstrap-package-registry)
     (let* ((pkg (cl-cc/runtime:rt-find-package :cl-cc/bootstrap))
            (sym (cl-cc/runtime:rt-intern "*VM-PARSE-FORMS-HOOK-INSTALLER*" pkg)))
-      (assert-eq 'cl-cc/bootstrap:*vm-parse-forms-hook-installer* sym))))
+      (expect sym :to-be 'cl-cc/bootstrap:*vm-parse-forms-hook-installer*))))
 
-(deftest rt-runtime-callable-registration-publishes-bootstrap-hook
-  "runtime-io publishes its VM callable registration hook through cl-cc/bootstrap." 
-  (assert-true cl-cc/bootstrap::*runtime-vm-callable-register-hook*))
+(it-sequential "rt-runtime-callable-registration-publishes-bootstrap-hook"
+  (expect cl-cc/bootstrap::*runtime-vm-callable-register-hook* :to-be-truthy))
 
-(deftest rt-package-layer-publishes-bootstrap-function-hooks
-  "runtime-io publishes package/intern/symbol-value hooks through cl-cc/bootstrap." 
-  (assert-true cl-cc/bootstrap::*runtime-find-package-fn*)
-  (assert-true cl-cc/bootstrap::*runtime-intern-fn*)
-  (assert-true cl-cc/bootstrap::*runtime-set-symbol-value-fn*))
+(it-sequential "rt-package-layer-publishes-bootstrap-function-hooks"
+  (expect cl-cc/bootstrap::*runtime-find-package-fn* :to-be-truthy)
+  (expect cl-cc/bootstrap::*runtime-intern-fn* :to-be-truthy)
+  (expect cl-cc/bootstrap::*runtime-set-symbol-value-fn* :to-be-truthy))
 
-(deftest rt-boundp-and-makunbound
-  "rt-boundp detects runtime-registry bindings; rt-makunbound removes them."
+(it-sequential "rt-boundp-and-makunbound"
   (let ((sym (gensym "RT-BOUND-TEST-")))
-    (assert-= 0 (cl-cc/runtime:rt-boundp sym))
+    (expect (= 0 (cl-cc/runtime:rt-boundp sym)) :to-be-truthy)
     (cl-cc/runtime:rt-set-symbol-value sym 42)
-    (assert-= 1 (cl-cc/runtime:rt-boundp sym))
+    (expect (= 1 (cl-cc/runtime:rt-boundp sym)) :to-be-truthy)
     (cl-cc/runtime:rt-makunbound sym)
-    (assert-= 0 (cl-cc/runtime:rt-boundp sym))))
+    (expect (= 0 (cl-cc/runtime:rt-boundp sym)) :to-be-truthy)))
 
-(deftest rt-coerce-works
-  "rt-coerce delegates to CL coerce."
-  (assert-equal '(1 2 3) (cl-cc/runtime:rt-coerce #(1 2 3) 'list)))
+(it-sequential "rt-coerce-works"
+  (expect (cl-cc/runtime:rt-coerce #(1 2 3) 'list) :to-equal '(1 2 3)))
 
-(deftest rt-read-write-to-string
-  "rt-read-from-string and rt-write-to-string roundtrip."
-  (assert-= 42 (cl-cc/runtime:rt-read-from-string "42"))
-  (assert-equal "(1 2 3)" (cl-cc/runtime:rt-write-to-string '(1 2 3))))
+(it-sequential "rt-read-write-to-string"
+  (expect (= 42 (cl-cc/runtime:rt-read-from-string "42")) :to-be-truthy)
+  (expect (cl-cc/runtime:rt-write-to-string '(1 2 3)) :to-equal "(1 2 3)"))
 
-(deftest rt-random-and-time
-  "rt-random returns integer in range; rt-get-universal-time returns an integer."
+(it-sequential "rt-random-and-time"
   (let ((r (cl-cc/runtime:rt-random 100)))
-    (assert-true (integerp r))
-    (assert-true (and (>= r 0) (< r 100))))
-  (assert-true (integerp (cl-cc/runtime:rt-get-universal-time))))
+    (expect (integerp r) :to-be-truthy)
+    (expect (and (>= r 0) (< r 100)) :to-be-truthy))
+  (expect (integerp (cl-cc/runtime:rt-get-universal-time)) :to-be-truthy))
 
 ;;; ─── I/O Wrappers ──────────────────────────────────────────────────────────
 
-(deftest rt-string-stream-creation-and-io
-  "String stream creation: input-stream read-char, output-stream write+get, output-stream roundtrip."
+(it-sequential "rt-string-stream-creation-and-io"
   (let ((s (cl-cc/runtime:rt-make-string-stream "hello")))
-    (assert-equal #\h (cl-cc/runtime:rt-read-char s)))
+    (expect (cl-cc/runtime:rt-read-char s) :to-equal #\h))
   (let ((s (cl-cc/runtime:rt-make-string-stream "" :direction :output)))
     (cl-cc/runtime:rt-write-string "world" s)
-    (assert-equal "world" (cl-cc/runtime:rt-get-output-stream-string s)))
+    (expect (cl-cc/runtime:rt-get-output-stream-string s) :to-equal "world"))
   (let ((s (cl-cc/runtime:rt-make-string-output-stream)))
     (cl-cc/runtime:rt-stream-write-string s "test")
-    (assert-equal "test" (cl-cc/runtime:rt-get-output-stream-string s))))
+    (expect (cl-cc/runtime:rt-get-output-stream-string s) :to-equal "test")))
 
-(deftest-each rt-stream-predicates
-  "rt-input-stream-p / rt-output-stream-p / rt-open-stream-p return 1/0."
-  :cases (("input-true"   #'cl-cc/runtime:rt-input-stream-p  :input
-           (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
-          ("input-false"  #'cl-cc/runtime:rt-input-stream-p  :output
-           (lambda (pred-fn stream) (assert-= 0 (funcall pred-fn stream))))
-          ("output-true"  #'cl-cc/runtime:rt-output-stream-p :output
-           (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
-          ("output-false" #'cl-cc/runtime:rt-output-stream-p :input
-           (lambda (pred-fn stream) (assert-= 0 (funcall pred-fn stream))))
-          ("open-true"    #'cl-cc/runtime:rt-open-stream-p   :input
-           (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream)))))
-  (pred-fn direction verify)
-  (let ((stream (ecase direction
+(it-sequential "rt-stream-predicates input-true"
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-input-stream-p :input (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
+    (let ((stream (ecase direction
                   (:input  (make-string-input-stream "x"))
                   (:output (make-string-output-stream)))))
-    (funcall verify pred-fn stream)))
+    (funcall verify pred-fn stream))))
 
-(deftest rt-read-write-char-roundtrip
-  "rt-write-char / rt-read-char via string streams."
+(it-sequential "rt-stream-predicates input-false"
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-input-stream-p :output (lambda (pred-fn stream) (assert-= 0 (funcall pred-fn stream))))
+    (let ((stream (ecase direction
+                  (:input  (make-string-input-stream "x"))
+                  (:output (make-string-output-stream)))))
+    (funcall verify pred-fn stream))))
+
+(it-sequential "rt-stream-predicates output-true"
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-output-stream-p :output (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
+    (let ((stream (ecase direction
+                  (:input  (make-string-input-stream "x"))
+                  (:output (make-string-output-stream)))))
+    (funcall verify pred-fn stream))))
+
+(it-sequential "rt-stream-predicates output-false"
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-output-stream-p :input (lambda (pred-fn stream) (assert-= 0 (funcall pred-fn stream))))
+    (let ((stream (ecase direction
+                  (:input  (make-string-input-stream "x"))
+                  (:output (make-string-output-stream)))))
+    (funcall verify pred-fn stream))))
+
+(it-sequential "rt-stream-predicates open-true"
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-open-stream-p :input (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
+    (let ((stream (ecase direction
+                  (:input  (make-string-input-stream "x"))
+                  (:output (make-string-output-stream)))))
+    (funcall verify pred-fn stream))))
+
+(it-sequential "rt-read-write-char-roundtrip"
   (let ((out (make-string-output-stream)))
     (cl-cc/runtime:rt-write-char #\Z out)
     (let ((in (make-string-input-stream (get-output-stream-string out))))
-      (assert-equal #\Z (cl-cc/runtime:rt-read-char in)))))
+      (expect (cl-cc/runtime:rt-read-char in) :to-equal #\Z))))
