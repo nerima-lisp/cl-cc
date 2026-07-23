@@ -8,7 +8,6 @@
 ;;;;   parse-cl-source (simple integer, symbol, list).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Token construction helpers ──────────────────────────────────────────
 
@@ -23,111 +22,99 @@
 
 ;;; ─── ts-peek ─────────────────────────────────────────────────────────────
 
-(deftest ts-peek-behavior
-  "ts-peek returns first token without consuming it; returns nil on empty stream."
+(it-sequential "ts-peek-behavior"
   (let* ((tok (make-test-token :T-INT 42))
          (ts  (make-test-ts (list tok))))
-    (assert-eq tok (cl-cc/parse::ts-peek ts))
-    (assert-eq tok (cl-cc/parse::ts-peek ts)))
-  (assert-null (cl-cc/parse::ts-peek (make-test-ts nil))))
+    (expect (cl-cc/parse::ts-peek ts) :to-be tok)
+    (expect (cl-cc/parse::ts-peek ts) :to-be tok))
+  (expect (cl-cc/parse::ts-peek (make-test-ts nil)) :to-be-null))
 
 ;;; ─── ts-advance ──────────────────────────────────────────────────────────
 
-(deftest ts-advance-behavior
-  "ts-advance: consumes and returns first token, advancing stream; nil on empty."
+(it-sequential "ts-advance-behavior"
   (let* ((t1  (make-test-token :T-INT 1))
          (t2  (make-test-token :T-INT 2))
          (ts  (make-test-ts (list t1 t2))))
     (let ((consumed (cl-cc/parse::ts-advance ts)))
-      (assert-eq t1 consumed)
-      (assert-eq t2 (cl-cc/parse::ts-peek ts))))
-  (assert-null (cl-cc/parse::ts-advance (make-test-ts nil))))
+      (expect consumed :to-be t1)
+      (expect (cl-cc/parse::ts-peek ts) :to-be t2)))
+  (expect (cl-cc/parse::ts-advance (make-test-ts nil)) :to-be-null))
 
 ;;; ─── ts-peek-type ────────────────────────────────────────────────────────
 
-(deftest ts-peek-type-behavior
-  "ts-peek-type returns type of head token; returns nil on empty stream."
+(it-sequential "ts-peek-type-behavior"
   (let* ((tok (make-test-token :T-IDENT 'foo))
          (ts  (make-test-ts (list tok))))
-    (assert-eq :T-IDENT (cl-cc/parse::ts-peek-type ts)))
-  (assert-null (cl-cc/parse::ts-peek-type (make-test-ts nil))))
+    (expect (cl-cc/parse::ts-peek-type ts) :to-be :T-IDENT))
+  (expect (cl-cc/parse::ts-peek-type (make-test-ts nil)) :to-be-null))
 
 ;;; ─── ts-at-end-p ─────────────────────────────────────────────────────────
 
-(deftest ts-at-end-p-behavior
-  "ts-at-end-p: T for empty stream or :T-EOF head; NIL when real tokens remain."
-  (assert-true  (cl-cc/parse::ts-at-end-p (make-test-ts nil)))
-  (assert-false (cl-cc/parse::ts-at-end-p (make-test-ts (list (make-test-token :T-INT 1)))))
-  (assert-true  (cl-cc/parse::ts-at-end-p (make-test-ts (list (make-test-token :T-EOF nil))))))
+(it-sequential "ts-at-end-p-behavior"
+  (expect (cl-cc/parse::ts-at-end-p (make-test-ts nil)) :to-be-truthy)
+  (expect (cl-cc/parse::ts-at-end-p (make-test-ts (list (make-test-token :T-INT 1)))) :to-be-falsy)
+  (expect (cl-cc/parse::ts-at-end-p (make-test-ts (list (make-test-token :T-EOF nil)))) :to-be-truthy))
 
 ;;; ─── ts-token-value ──────────────────────────────────────────────────────
 
-(deftest ts-token-value-behavior
-  "ts-token-value returns :value of head token; returns nil on empty stream."
+(it-sequential "ts-token-value-behavior"
   (let* ((tok (make-test-token :T-INT 99))
          (ts  (make-test-ts (list tok))))
-    (assert-= 99 (cl-cc/parse::ts-token-value ts)))
-  (assert-null (cl-cc/parse::ts-token-value (make-test-ts nil))))
+    (expect (= 99 (cl-cc/parse::ts-token-value ts)) :to-be-truthy))
+  (expect (cl-cc/parse::ts-token-value (make-test-ts nil)) :to-be-null))
 
 ;;; ─── ts-expect ───────────────────────────────────────────────────────────
 
-(deftest ts-expect-behavior
-  "ts-expect: returns token on match; records diagnostic on type-mismatch; diagnostic on empty."
+(it-sequential "ts-expect-behavior"
   (let* ((tok (make-test-token :T-INT 5))
          (ts  (make-test-ts (list tok))))
     (let ((result (cl-cc/parse::ts-expect ts :T-INT)))
-      (assert-eq tok result)
-      (assert-true (cl-cc/parse::ts-at-end-p ts))))
+      (expect result :to-be tok)
+      (expect (cl-cc/parse::ts-at-end-p ts) :to-be-truthy)))
   (let* ((tok (make-test-token :T-IDENT 'x))
          (ts  (make-test-ts (list tok))))
     (cl-cc/parse::ts-expect ts :T-INT "ctx")
-    (assert-true (> (length (cl-cc/parse::token-stream-diagnostics ts)) 0)))
+    (expect (> (length (cl-cc/parse::token-stream-diagnostics ts)) 0) :to-be-truthy))
   (let ((ts (make-test-ts nil)))
     (cl-cc/parse::ts-expect ts :T-INT "end")
-    (assert-true (> (length (cl-cc/parse::token-stream-diagnostics ts)) 0))))
+    (expect (> (length (cl-cc/parse::token-stream-diagnostics ts)) 0) :to-be-truthy)))
 
 ;;; ─── %tok-to-cst ─────────────────────────────────────────────────────────
 
-(deftest tok-to-cst-converts-lexer-token
-  "%tok-to-cst converts a lexer token to a cst-token preserving kind, value, and byte span."
+(it-sequential "tok-to-cst-converts-lexer-token"
   (let* ((tok (make-test-token :T-INT 7 0 3))
          (cst (cl-cc/parse::%tok-to-cst tok)))
-    (assert-true (cl-cc/parse:cst-token-p cst))
-    (assert-eq :T-INT (cl-cc/parse::cst-node-kind cst))
-    (assert-= 7 (cl-cc/parse:cst-token-value cst))
-    (assert-= 0 (cl-cc/parse:cst-node-start-byte cst))
-    (assert-= 3 (cl-cc/parse:cst-node-end-byte cst))))
+    (expect (cl-cc/parse:cst-token-p cst) :to-be-truthy)
+    (expect (cl-cc/parse::cst-node-kind cst) :to-be :T-INT)
+    (expect (= 7 (cl-cc/parse:cst-token-value cst)) :to-be-truthy)
+    (expect (= 0 (cl-cc/parse:cst-node-start-byte cst)) :to-be-truthy)
+    (expect (= 3 (cl-cc/parse:cst-node-end-byte cst)) :to-be-truthy)))
 
-(deftest tok-to-cst-returns-nil-for-nil-input
-  "%tok-to-cst returns nil when given nil (no token)."
-  (assert-null (cl-cc/parse::%tok-to-cst nil)))
+(it-sequential "tok-to-cst-returns-nil-for-nil-input"
+  (expect (cl-cc/parse::%tok-to-cst nil) :to-be-null))
 
 ;;; ─── %make-list-cst ──────────────────────────────────────────────────────
 
-(deftest make-list-cst-creates-interior-with-kind-and-span
-  "%make-list-cst creates a cst-interior node with the given kind and byte span."
+(it-sequential "make-list-cst-creates-interior-with-kind-and-span"
   (let ((node (cl-cc/parse::%make-list-cst :defun '() 0 10)))
-    (assert-true (cl-cc/parse:cst-interior-p node))
-    (assert-eq :defun (cl-cc/parse::cst-node-kind node))
-    (assert-= 0  (cl-cc/parse:cst-node-start-byte node))
-    (assert-= 10 (cl-cc/parse:cst-node-end-byte node))))
+    (expect (cl-cc/parse:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc/parse::cst-node-kind node) :to-be :defun)
+    (expect (= 0 (cl-cc/parse:cst-node-start-byte node)) :to-be-truthy)
+    (expect (= 10 (cl-cc/parse:cst-node-end-byte node)) :to-be-truthy)))
 
-(deftest make-list-cst-stores-children
-  "%make-list-cst stores and retrieves child nodes by identity."
+(it-sequential "make-list-cst-stores-children"
   (let* ((child (cl-cc/parse::%tok-to-cst (make-test-token :T-INT 1)))
          (node  (cl-cc/parse::%make-list-cst :call (list child) 0 5)))
-    (assert-= 1 (length (cl-cc/parse:cst-interior-children node)))
-    (assert-eq child (first (cl-cc/parse:cst-interior-children node)))))
+    (expect (= 1 (length (cl-cc/parse:cst-interior-children node))) :to-be-truthy)
+    (expect (first (cl-cc/parse:cst-interior-children node)) :to-be child)))
 
 ;;; ─── parse-cl-source ─────────────────────────────────────────────────────
 
-(deftest parse-cl-source-non-empty-for-valid-forms
-  "parse-cl-source: integer, symbol, and list all produce non-empty result lists."
+(it-sequential "parse-cl-source-non-empty-for-valid-forms"
   (dolist (src '("42" "foo" "(+ 1 2)"))
     (let ((result (cl-cc/parse:parse-cl-source src)))
-      (assert-true (listp result))
-      (assert-true (> (length result) 0)))))
+      (expect (listp result) :to-be-truthy)
+      (expect (> (length result) 0) :to-be-truthy))))
 
-(deftest parse-cl-source-empty-string-returns-list
-  "parse-cl-source: empty string returns a list (possibly empty, not an error)."
-  (assert-true (listp (cl-cc/parse:parse-cl-source ""))))
+(it-sequential "parse-cl-source-empty-string-returns-list"
+  (expect (listp (cl-cc/parse:parse-cl-source "")) :to-be-truthy))

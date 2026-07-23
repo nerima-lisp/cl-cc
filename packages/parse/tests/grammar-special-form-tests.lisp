@@ -5,7 +5,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (defun %grammar-symbol-name-tree (form)
   (cond
@@ -19,82 +18,114 @@
 
 ;;; ─── parse-cl-source: special form dispatch ────────────────────────────────
 
-(deftest-each grammar-special-form-kinds
-  "parse-cl-source: special form heads map to the expected CST kind"
-  :cases (("defun"   "(defun f (x) x)"                  :defun)
-          ("let"     "(let ((x 1)) x)"                  :let)
-          ("if"      "(if t 1 2)"                        :if)
-          ("lambda"  "(lambda (x) x)"                    :lambda)
-          ("progn"   "(progn 1 2 3)"                     :progn)
-          ("setq"    "(setq x 1)"                        :setq)
-          ("block"   "(block nil 1)"                     :block)
-          ("cond"    "(cond (t 1))"                      :cond)
-          ("loop"    "(loop for x from 1 to 10 collect x)" :loop)
-          ("call"    "(foo 1 2)"                         :call))
-  (source expected-kind)
-  (assert-eq expected-kind (parse-first-kind source)))
+(it-sequential "grammar-special-form-kinds defun"
+  (destructuring-bind (source expected-kind) (list "(defun f (x) x)" :defun)
+    (expect (parse-first-kind source) :to-be expected-kind)))
 
-(deftest-each grammar-parse-special-form-child-count
-  "parse-cl-source: special forms produce the correct number of CST children."
-  :cases (("defun" "(defun f (x) x)" 4)   ; defun name params body
-          ("if"    "(if t 1 2)"      4))   ; if cond then else
-  (source expected-count)
-  (let ((node (parse-first-form source)))
-    (assert-= expected-count (length (cl-cc:cst-interior-children node)))))
+(it-sequential "grammar-special-form-kinds let"
+  (destructuring-bind (source expected-kind) (list "(let ((x 1)) x)" :let)
+    (expect (parse-first-kind source) :to-be expected-kind)))
 
-(deftest grammar-parse-quote-form-kind
-  "parse-cl-source: (quote x) is an interior node with children"
-  ;; Note: (quote x) is parsed as a list form; sexp-head-to-kind
-  ;; does not exist for the generic path, but the kind check does.
-  ;; The generic parser sees QUOTE as head ident and maps via sexp-head-to-kind.
+(it-sequential "grammar-special-form-kinds if"
+  (destructuring-bind (source expected-kind) (list "(if t 1 2)" :if)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds lambda"
+  (destructuring-bind (source expected-kind) (list "(lambda (x) x)" :lambda)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds progn"
+  (destructuring-bind (source expected-kind) (list "(progn 1 2 3)" :progn)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds setq"
+  (destructuring-bind (source expected-kind) (list "(setq x 1)" :setq)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds block"
+  (destructuring-bind (source expected-kind) (list "(block nil 1)" :block)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds cond"
+  (destructuring-bind (source expected-kind) (list "(cond (t 1))" :cond)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds loop"
+  (destructuring-bind (source expected-kind) (list "(loop for x from 1 to 10 collect x)" :loop)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-special-form-kinds call"
+  (destructuring-bind (source expected-kind) (list "(foo 1 2)" :call)
+    (expect (parse-first-kind source) :to-be expected-kind)))
+
+(it-sequential "grammar-parse-special-form-child-count defun"
+  (destructuring-bind (source expected-count) (list "(defun f (x) x)" 4)
+    (let ((node (parse-first-form source)))
+    (expect (= expected-count (length (cl-cc:cst-interior-children node))) :to-be-truthy))))
+
+(it-sequential "grammar-parse-special-form-child-count if"
+  (destructuring-bind (source expected-count) (list "(if t 1 2)" 4)
+    (let ((node (parse-first-form source)))
+    (expect (= expected-count (length (cl-cc:cst-interior-children node))) :to-be-truthy))))
+
+(it-sequential "grammar-parse-quote-form-kind"
   (let ((node (parse-first-form "(quote x)")))
-    (assert-true (cl-cc:cst-interior-p node))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
     ;; sexp-head-to-kind does not map "QUOTE" since the case checks symbol eq,
     ;; but the head is an interned symbol. Verify the node is an interior node.
-    (assert-true (not (null (cl-cc:cst-interior-children node))))))
+    (expect (not (null (cl-cc:cst-interior-children node))) :to-be-truthy)))
 
 ;;; ─── Unquote-splicing ──────────────────────────────────────────────────────
 
-(deftest grammar-parse-unquote-splicing
-  "parse-cl-source: ,@x produces :unquote-splicing CST"
+(it-sequential "grammar-parse-unquote-splicing"
   (let ((node (parse-first-form ",@x")))
-    (assert-true (cl-cc:cst-interior-p node))
-    (assert-eq :unquote-splicing (cl-cc:cst-node-kind node))
-    (assert-= 1 (length (cl-cc:cst-interior-children node)))))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be :unquote-splicing)
+    (expect (= 1 (length (cl-cc:cst-interior-children node))) :to-be-truthy)))
 
 ;;; ─── Vector edge cases ─────────────────────────────────────────────────────
 
-(deftest grammar-parse-empty-vector
-  "parse-cl-source: #() produces :vector with 0 children"
+(it-sequential "grammar-parse-empty-vector"
   (let ((node (parse-first-form "#()")))
-    (assert-true (cl-cc:cst-interior-p node))
-    (assert-eq :vector (cl-cc:cst-node-kind node))
-    (assert-= 0 (length (cl-cc:cst-interior-children node)))))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be :vector)
+    (expect (= 0 (length (cl-cc:cst-interior-children node))) :to-be-truthy)))
 
 ;;; ─── CST-to-sexp roundtrip through grammar ────────────────────────────────
 
-(deftest-each grammar-cst-to-sexp-roundtrip
-  "parse-cl-source -> cst-to-sexp produces expected S-expression"
-  :cases (("integer"   "42"           42)
-          ("string"    "\"hi\""       "hi")
-          ("empty-list" "()"          nil)
-          ("simple-call" "(+ 1 2)"    '(+ 1 2))
-          ("nested"    "(if t 1 2)"   '(if t 1 2)))
-  (source expected)
-  (let ((node (parse-first-form source)))
-    (assert-equal expected (cl-cc:cst-to-sexp node))))
+(it-sequential "grammar-cst-to-sexp-roundtrip integer"
+  (destructuring-bind (source expected) (list "42" 42)
+    (let ((node (parse-first-form source)))
+    (expect (cl-cc:cst-to-sexp node) :to-equal expected))))
 
-(deftest grammar-cst-to-sexp-quote
-  "parse-cl-source -> cst-to-sexp for quoted symbol checks structure"
+(it-sequential "grammar-cst-to-sexp-roundtrip string"
+  (destructuring-bind (source expected) (list "\"hi\"" "hi")
+    (let ((node (parse-first-form source)))
+    (expect (cl-cc:cst-to-sexp node) :to-equal expected))))
+
+(it-sequential "grammar-cst-to-sexp-roundtrip empty-list"
+  (destructuring-bind (source expected) (list "()" nil)
+    (let ((node (parse-first-form source)))
+    (expect (cl-cc:cst-to-sexp node) :to-equal expected))))
+
+(it-sequential "grammar-cst-to-sexp-roundtrip simple-call"
+  (destructuring-bind (source expected) (list "(+ 1 2)" '(+ 1 2))
+    (let ((node (parse-first-form source)))
+    (expect (cl-cc:cst-to-sexp node) :to-equal expected))))
+
+(it-sequential "grammar-cst-to-sexp-roundtrip nested"
+  (destructuring-bind (source expected) (list "(if t 1 2)" '(if t 1 2))
+    (let ((node (parse-first-form source)))
+    (expect (cl-cc:cst-to-sexp node) :to-equal expected))))
+
+(it-sequential "grammar-cst-to-sexp-quote"
   (let* ((node (parse-first-form "'x"))
          (sexp (cl-cc:cst-to-sexp node)))
-    (assert-true (consp sexp))
-    (assert-eq 'quote (car sexp))
-    (assert-equal "X" (symbol-name (second sexp)))))
+    (expect (consp sexp) :to-be-truthy)
+    (expect (car sexp) :to-be 'quote)
+    (expect (symbol-name (second sexp)) :to-equal "X")))
 
-(deftest grammar-cst-to-sexp-quasiquote
-  "parse-cl-source -> cst-to-sexp preserves quasiquote, unquote, and unquote-splicing."
+(it-sequential "grammar-cst-to-sexp-quasiquote"
   (let* ((node (parse-first-form "`(a ,x ,@xs)"))
          (sexp (cl-cc:cst-to-sexp node)))
-    (assert-equal '("QUASIQUOTE" ("A" ("UNQUOTE" "X") ("UNQUOTE-SPLICING" "XS")))
-                  (%grammar-symbol-name-tree sexp))))
+    (expect (%grammar-symbol-name-tree sexp) :to-equal '("QUASIQUOTE" ("A" ("UNQUOTE" "X") ("UNQUOTE-SPLICING" "XS"))))))

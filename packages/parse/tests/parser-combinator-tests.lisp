@@ -3,7 +3,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Helpers
 
@@ -13,171 +12,151 @@
 
 ;;; Grammar rule management
 
-(deftest grammar-rule-management
-  "def-grammar-rule registers rules; unknown keys return nil."
+(it-sequential "grammar-rule-management"
   (clear-grammar-rules)
   (def-grammar-rule :test-rule (token :T-INT))
-  (assert-equal '(token :T-INT) (query-grammar :test-rule))
-  (assert-null (query-grammar :no-such-rule))
+  (expect (query-grammar :test-rule) :to-equal '(token :T-INT))
+  (expect (query-grammar :no-such-rule) :to-be-null)
   (clear-grammar-rules))
 
 ;;; Token matching
 
-(deftest parse-token-succeeds-on-matching-type
-  "Token combinator returns the value and consumes the token when type matches."
+(it-sequential "parse-token-succeeds-on-matching-type"
   (let ((stream (list (make-tok :T-INT 42))))
     (multiple-value-bind (ast rest) (parse-combinator '(token :T-INT) stream)
-      (assert-true (parse-ok-p ast))
-      (assert-= 42 ast)
-      (assert-null rest))))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect (= 42 ast) :to-be-truthy)
+      (expect rest :to-be-null))))
 
-(deftest parse-token-succeeds-with-value-constraint
-  "Token combinator with an explicit value matches only that exact token."
+(it-sequential "parse-token-succeeds-with-value-constraint"
   (let ((stream (list (make-tok :T-OP "+") (make-tok :T-INT 1))))
     (multiple-value-bind (ast rest) (parse-combinator '(token :T-OP "+") stream)
-      (assert-true (parse-ok-p ast))
-      (assert-equal "+" ast)
-      (assert-= 1 (length rest)))))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect ast :to-equal "+")
+      (expect (= 1 (length rest)) :to-be-truthy))))
 
-(deftest parse-token-fails-on-wrong-type
-  "Token combinator returns failure when the stream head has a different type."
+(it-sequential "parse-token-fails-on-wrong-type"
   (let ((stream (list (make-tok :T-IDENT "foo"))))
     (multiple-value-bind (ast rest) (parse-combinator '(token :T-INT) stream)
       (declare (ignore rest))
-      (assert-false (parse-ok-p ast)))))
+      (expect (parse-ok-p ast) :to-be-falsy))))
 
-(deftest parse-token-fails-on-empty-stream
-  "Token combinator returns failure when the input stream is empty."
+(it-sequential "parse-token-fails-on-empty-stream"
   (multiple-value-bind (ast rest) (parse-combinator '(token :T-INT) nil)
     (declare (ignore rest))
-    (assert-false (parse-ok-p ast))))
+    (expect (parse-ok-p ast) :to-be-falsy)))
 
 ;;; Sequence
 
-(deftest parse-seq-succeeds-on-full-match
-  "seq collects all matched tokens into a list when all parts match."
+(it-sequential "parse-seq-succeeds-on-full-match"
   (let ((stream (list (make-tok :T-INT 1) (make-tok :T-OP "+") (make-tok :T-INT 2))))
     (multiple-value-bind (ast rest)
         (parse-combinator '(seq (token :T-INT) (token :T-OP "+") (token :T-INT)) stream)
-      (assert-true (parse-ok-p ast))
-      (assert-equal '(1 "+" 2) ast)
-      (assert-null rest))))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect ast :to-equal '(1 "+" 2))
+      (expect rest :to-be-null))))
 
-(deftest parse-seq-fails-on-partial-mismatch
-  "seq returns failure when any element in the sequence does not match."
+(it-sequential "parse-seq-fails-on-partial-mismatch"
   (let ((stream (list (make-tok :T-INT 1) (make-tok :T-IDENT "foo"))))
     (multiple-value-bind (ast rest)
         (parse-combinator '(seq (token :T-INT) (token :T-OP "+")) stream)
       (declare (ignore rest))
-      (assert-false (parse-ok-p ast)))))
+      (expect (parse-ok-p ast) :to-be-falsy))))
 
 ;;; Alternation
 
-(deftest parse-alt-matches-first-branch
-  "alt succeeds on the first branch when the first alternative matches."
+(it-sequential "parse-alt-matches-first-branch"
   (multiple-value-bind (ast rest)
       (parse-combinator '(alt (token :T-INT) (token :T-IDENT)) (list (make-tok :T-INT 42)))
     (declare (ignore rest))
-    (assert-true (parse-ok-p ast))
-    (assert-= 42 ast)))
+    (expect (parse-ok-p ast) :to-be-truthy)
+    (expect (= 42 ast) :to-be-truthy)))
 
-(deftest parse-alt-matches-second-branch
-  "alt succeeds on the second branch when the first fails but second matches."
+(it-sequential "parse-alt-matches-second-branch"
   (multiple-value-bind (ast rest)
       (parse-combinator '(alt (token :T-INT) (token :T-IDENT)) (list (make-tok :T-IDENT "foo")))
     (declare (ignore rest))
-    (assert-true (parse-ok-p ast))
-    (assert-equal "foo" ast)))
+    (expect (parse-ok-p ast) :to-be-truthy)
+    (expect ast :to-equal "foo")))
 
-(deftest parse-alt-fails-when-no-branch-matches
-  "alt returns failure when neither alternative matches."
+(it-sequential "parse-alt-fails-when-no-branch-matches"
   (multiple-value-bind (ast rest)
       (parse-combinator '(alt (token :T-INT) (token :T-IDENT)) (list (make-tok :T-OP "+")))
     (declare (ignore rest))
-    (assert-false (parse-ok-p ast))))
+    (expect (parse-ok-p ast) :to-be-falsy)))
 
 ;;; Repetition
 
-(deftest parse-many-returns-nil-on-zero-matches
-  "many succeeds with nil when no tokens match (zero-or-more semantics)."
+(it-sequential "parse-many-returns-nil-on-zero-matches"
   (let ((stream (list (make-tok :T-IDENT "x"))))
     (multiple-value-bind (ast rest) (parse-combinator '(many (token :T-INT)) stream)
-      (assert-true (parse-ok-p ast))
-      (assert-null ast)
-      (assert-= 1 (length rest)))))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect ast :to-be-null)
+      (expect (= 1 (length rest)) :to-be-truthy))))
 
-(deftest parse-many1-fails-on-zero-matches
-  "many1 returns failure when no tokens match (one-or-more semantics)."
+(it-sequential "parse-many1-fails-on-zero-matches"
   (multiple-value-bind (ast rest)
       (parse-combinator '(many1 (token :T-INT)) (list (make-tok :T-IDENT "x")))
     (declare (ignore rest))
-    (assert-false (parse-ok-p ast))))
+    (expect (parse-ok-p ast) :to-be-falsy)))
 
-(deftest parse-many-collects-all-matches
-  "many collects all consecutive matching tokens into a list."
+(it-sequential "parse-many-collects-all-matches"
   (let ((stream (list (make-tok :T-INT 1) (make-tok :T-INT 2) (make-tok :T-INT 3)
                       (make-tok :T-EOF nil))))
     (multiple-value-bind (ast rest) (parse-combinator '(many (token :T-INT)) stream)
-      (assert-true (parse-ok-p ast))
-      (assert-equal '(1 2 3) ast)
-      (assert-= 1 (length rest))))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect ast :to-equal '(1 2 3))
+      (expect (= 1 (length rest)) :to-be-truthy)))
   (multiple-value-bind (ast rest)
       (parse-combinator '(many1 (token :T-INT)) (list (make-tok :T-INT 7) (make-tok :T-IDENT "x")))
     (declare (ignore rest))
-    (assert-true (parse-ok-p ast))
-    (assert-equal '(7) ast)))
+    (expect (parse-ok-p ast) :to-be-truthy)
+    (expect ast :to-equal '(7))))
 
 ;;; Optional
 
-(deftest parse-opt-returns-value-when-present
-  "opt parses and returns the value when the token is present."
+(it-sequential "parse-opt-returns-value-when-present"
   (multiple-value-bind (ast rest)
       (parse-combinator '(opt (token :T-INT)) (list (make-tok :T-INT 5)))
-    (assert-true (parse-ok-p ast))
-    (assert-= 5 ast)
-    (assert-null rest)))
+    (expect (parse-ok-p ast) :to-be-truthy)
+    (expect (= 5 ast) :to-be-truthy)
+    (expect rest :to-be-null)))
 
-(deftest parse-opt-returns-absent-sentinel-when-missing
-  "opt returns :opt-absent without consuming the stream when the token is absent."
+(it-sequential "parse-opt-returns-absent-sentinel-when-missing"
   (multiple-value-bind (ast rest)
       (parse-combinator '(opt (token :T-INT)) (list (make-tok :T-IDENT "x")))
-    (assert-eq :opt-absent ast)
-    (assert-= 1 (length rest))))
+    (expect ast :to-be :opt-absent)
+    (expect (= 1 (length rest)) :to-be-truthy)))
 
 ;;; Named rule reference
 
-(deftest parse-named-rule-and-keyword-shorthand
-  "Named rule and keyword shorthand both resolve via the grammar registry."
+(it-sequential "parse-named-rule-and-keyword-shorthand"
   (clear-grammar-rules)
   (def-grammar-rule :my-int (token :T-INT))
   (let ((stream (list (make-tok :T-INT 99))))
     (multiple-value-bind (ast rest) (parse-combinator '(rule :my-int) stream)
       (declare (ignore rest))
-      (assert-true (parse-ok-p ast))
-      (assert-= 99 ast)))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect (= 99 ast) :to-be-truthy)))
   (def-grammar-rule :my-ident (token :T-IDENT))
   (let ((stream (list (make-tok :T-IDENT "hello"))))
     (multiple-value-bind (ast rest) (parse-combinator :my-ident stream)
       (declare (ignore rest))
-      (assert-true (parse-ok-p ast))
-      (assert-equal "hello" ast)))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect ast :to-equal "hello")))
   (clear-grammar-rules))
 
 ;;; Integration: arithmetic expression grammar
 
-(deftest grammar-arithmetic-expression
-  "Multi-rule grammar parses a left-associative arithmetic expression with no remainder."
+(it-sequential "grammar-arithmetic-expression"
   (clear-grammar-rules)
-  ;; atom = integer | identifier
   (def-grammar-rule :atom (alt (token :T-INT) (token :T-IDENT)))
-  ;; addop = "+" | "-"
   (def-grammar-rule :addop (alt (token :T-OP "+") (token :T-OP "-")))
-  ;; expr = atom (addop atom)*
   (def-grammar-rule :expr (seq (rule :atom) (many (seq (rule :addop) (rule :atom)))))
   (let ((stream (list (make-tok :T-INT 1) (make-tok :T-OP "+")
                       (make-tok :T-INT 2) (make-tok :T-OP "-")
                       (make-tok :T-INT 3))))
     (multiple-value-bind (ast rest) (parse-with-grammar :expr stream)
-      (assert-true (parse-ok-p ast))
-      (assert-null rest)))
+      (expect (parse-ok-p ast) :to-be-truthy)
+      (expect rest :to-be-null)))
   (clear-grammar-rules))

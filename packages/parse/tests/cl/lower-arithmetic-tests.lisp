@@ -7,229 +7,278 @@
 ;;;; The cl-lower-suite defsuite is in lower-tests.lisp (loaded first).
 
 (in-package :cl-cc/test)
-(in-suite cl-lower-suite)
 
 ;;; ─── Nullary and unary arithmetic (*arith-op-descriptors* table) ────────
 
-(deftest-each lower-nullary-arithmetic
-  "Nullary +/* lower to ast-int identity elements: + → 0, * → 1."
-  :cases (("plus" '(+) 0)
-          ("mul"  '(*) 1))
-  (form expected)
-  (let ((node (lower form)))
-    (assert-true (cl-cc::ast-int-p node))
-    (assert-= expected (cl-cc::ast-int-value node))))
+(it-sequential "lower-nullary-arithmetic plus"
+  (destructuring-bind (form expected) (list '(+) 0)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-int-p node) :to-be-truthy)
+    (expect (= expected (cl-cc::ast-int-value node)) :to-be-truthy))))
 
-(deftest lower-unary-plus-returns-arg
-  "(+ x) lowers to just x (no wrapping binop)."
+(it-sequential "lower-nullary-arithmetic mul"
+  (destructuring-bind (form expected) (list '(*) 1)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-int-p node) :to-be-truthy)
+    (expect (= expected (cl-cc::ast-int-value node)) :to-be-truthy))))
+
+(it-sequential "lower-unary-plus-returns-arg"
   (let ((node (lower '(+ 42))))
-    (assert-true (cl-cc::ast-int-p node))
-    (assert-= 42 (cl-cc::ast-int-value node))))
+    (expect (cl-cc::ast-int-p node) :to-be-truthy)
+    (expect (= 42 (cl-cc::ast-int-value node)) :to-be-truthy)))
 
-(deftest lower-unary-divide-becomes-reciprocal
-  "(/ x) lowers to (/ 1 x) — unary reciprocal form."
+(it-sequential "lower-unary-divide-becomes-reciprocal"
   (let ((node (lower '(/ 2))))
-    (assert-true (cl-cc::ast-binop-p node))
-    (assert-eq '/ (cl-cc::ast-binop-op node))
-    (assert-= 1 (cl-cc::ast-int-value (cl-cc::ast-binop-lhs node)))))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be '/)
+    (expect (= 1 (cl-cc::ast-int-value (cl-cc::ast-binop-lhs node))) :to-be-truthy)))
 
 ;;; ─── N-ary arithmetic left-fold ──────────────────────────────────────────
 
-(deftest lower-nary-plus-folds-left
-  "(+ 1 2 3) lowers to nested left-assoc binops: (+ (+ 1 2) 3)."
+(it-sequential "lower-nary-plus-folds-left"
   (let ((node (lower '(+ 1 2 3))))
-    (assert-true (cl-cc::ast-binop-p node))
-    (assert-eq '+ (cl-cc::ast-binop-op node))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be '+)
     ;; rhs is 3
-    (assert-= 3 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs node)))
+    (expect (= 3 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs node))) :to-be-truthy)
     ;; lhs is (+ 1 2)
-    (assert-true (cl-cc::ast-binop-p (cl-cc::ast-binop-lhs node)))))
+    (expect (cl-cc::ast-binop-p (cl-cc::ast-binop-lhs node)) :to-be-truthy)))
 
-(deftest-each lower-comparison-ops-produce-binop
-  "Each comparison op lowers to ast-binop with the correct op."
-  :cases (("eq" '(= 3 4)  '=)
-          ("lt" '(< 1 2)  '<)
-          ("gt" '(> 2 1)  '>)
-          ("le" '(<= 1 1) '<=)
-          ("ge" '(>= 2 1) '>=))
-  (form expected-op)
-  (let ((node (lower form)))
-    (assert-true (cl-cc::ast-binop-p node))
-    (assert-eq expected-op (cl-cc::ast-binop-op node))))
+(it-sequential "lower-comparison-ops-produce-binop eq"
+  (destructuring-bind (form expected-op) (list '(= 3 4) '=)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be expected-op))))
+
+(it-sequential "lower-comparison-ops-produce-binop lt"
+  (destructuring-bind (form expected-op) (list '(< 1 2) '<)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be expected-op))))
+
+(it-sequential "lower-comparison-ops-produce-binop gt"
+  (destructuring-bind (form expected-op) (list '(> 2 1) '>)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be expected-op))))
+
+(it-sequential "lower-comparison-ops-produce-binop le"
+  (destructuring-bind (form expected-op) (list '(<= 1 1) '<=)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be expected-op))))
+
+(it-sequential "lower-comparison-ops-produce-binop ge"
+  (destructuring-bind (form expected-op) (list '(>= 2 1) '>=)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be expected-op))))
 
 ;;; ─── Sequence (progn) ────────────────────────────────────────────────────
 
-(deftest lower-empty-progn-returns-nil-quote
-  "(progn) lowers to (quote nil)."
+(it-sequential "lower-empty-progn-returns-nil-quote"
   (let ((node (lower '(progn))))
-    (assert-true (cl-cc::ast-quote-p node))
-    (assert-null (cl-cc::ast-quote-value node))))
+    (expect (cl-cc::ast-quote-p node) :to-be-truthy)
+    (expect (cl-cc::ast-quote-value node) :to-be-null)))
 
-(deftest-each lower-progn-form-count
-  "(progn forms) lowers to ast-progn with the correct number of forms."
-  :cases (("single"   '(progn 42)    1)
-          ("multiple" '(progn 1 2 3) 3))
-  (form expected-count)
-  (let ((node (lower form)))
-    (assert-true (cl-cc::ast-progn-p node))
-    (assert-= expected-count (length (cl-cc::ast-progn-forms node)))))
+(it-sequential "lower-progn-form-count single"
+  (destructuring-bind (form expected-count) (list '(progn 42) 1)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-progn-p node) :to-be-truthy)
+    (expect (= expected-count (length (cl-cc::ast-progn-forms node))) :to-be-truthy))))
+
+(it-sequential "lower-progn-form-count multiple"
+  (destructuring-bind (form expected-count) (list '(progn 1 2 3) 3)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-progn-p node) :to-be-truthy)
+    (expect (= expected-count (length (cl-cc::ast-progn-forms node))) :to-be-truthy))))
 
 ;;; ─── Let binding ──────────────────────────────────────────────────────────
 
-(deftest lower-let-produces-ast-let
-  "(let ((x 1)) x) lowers to ast-let with one binding."
+(it-sequential "lower-let-produces-ast-let"
   (let ((node (lower '(let ((x 1)) x))))
-    (assert-true (cl-cc::ast-let-p node))
-    (assert-= 1 (length (cl-cc::ast-let-bindings node)))
-    (assert-eq 'x (car (first (cl-cc::ast-let-bindings node))))))
+    (expect (cl-cc::ast-let-p node) :to-be-truthy)
+    (expect (= 1 (length (cl-cc::ast-let-bindings node))) :to-be-truthy)
+    (expect (car (first (cl-cc::ast-let-bindings node))) :to-be 'x)))
 
-(deftest-each lower-let-default-nil-binding-forms
-  "Bare symbol and single-element binding both default to (quote nil) value."
-  :cases (("bare-symbol"    '(let (x) x))
-          ("single-element" '(let ((x)) x)))
-  (form)
-  (let* ((node (lower form))
+(it-sequential "lower-let-default-nil-binding-forms bare-symbol"
+  (destructuring-bind (form) (list '(let (x) x))
+    (let* ((node (lower form))
          (binding (first (cl-cc::ast-let-bindings node))))
-    (assert-true (cl-cc::ast-let-p node))
-    (assert-eq 'x (car binding))
-    (assert-true (cl-cc::ast-quote-p (cdr binding)))))
+    (expect (cl-cc::ast-let-p node) :to-be-truthy)
+    (expect (car binding) :to-be 'x)
+    (expect (cl-cc::ast-quote-p (cdr binding)) :to-be-truthy))))
+
+(it-sequential "lower-let-default-nil-binding-forms single-element"
+  (destructuring-bind (form) (list '(let ((x)) x))
+    (let* ((node (lower form))
+         (binding (first (cl-cc::ast-let-bindings node))))
+    (expect (cl-cc::ast-let-p node) :to-be-truthy)
+    (expect (car binding) :to-be 'x)
+    (expect (cl-cc::ast-quote-p (cdr binding)) :to-be-truthy))))
 
 ;;; ─── Lambda ───────────────────────────────────────────────────────────────
 
-(deftest-each lower-lambda-cases
-  "lambda with params and without both produce ast-lambda."
-  :cases (("with-params"  '(lambda (a b) (+ a b)) 2 'a)
-          ("empty-params" '(lambda () 42)           0 nil))
-  (form expected-count expected-first)
-  (let ((node (lower form)))
-    (assert-true (cl-cc::ast-lambda-p node))
-    (assert-= expected-count (length (cl-cc::ast-lambda-params node)))
+(it-sequential "lower-lambda-cases with-params"
+  (destructuring-bind (form expected-count expected-first) (list '(lambda (a b) (+ a b)) 2 'a)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-lambda-p node) :to-be-truthy)
+    (expect (= expected-count (length (cl-cc::ast-lambda-params node))) :to-be-truthy)
     (when expected-first
-      (assert-eq expected-first (first (cl-cc::ast-lambda-params node))))))
+      (expect (first (cl-cc::ast-lambda-params node)) :to-be expected-first)))))
+
+(it-sequential "lower-lambda-cases empty-params"
+  (destructuring-bind (form expected-count expected-first) (list '(lambda () 42) 0 nil)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-lambda-p node) :to-be-truthy)
+    (expect (= expected-count (length (cl-cc::ast-lambda-params node))) :to-be-truthy)
+    (when expected-first
+      (expect (first (cl-cc::ast-lambda-params node)) :to-be expected-first)))))
 
 ;;; ─── Function reference ───────────────────────────────────────────────────
 
-(deftest-each lower-function-reference-cases
-  "#'sym → ast-function; #'(lambda ...) → ast-lambda directly."
-  :cases (("symbol" '(function cons)         #'cl-cc::ast-function-p)
-          ("lambda" '(function (lambda (x) x)) #'cl-cc::ast-lambda-p))
-  (form pred)
-  (assert-true (funcall pred (lower form))))
+(it-sequential "lower-function-reference-cases symbol"
+  (destructuring-bind (form pred) (list '(function cons) #'cl-cc::ast-function-p)
+    (expect (funcall pred (lower form)) :to-be-truthy)))
+
+(it-sequential "lower-function-reference-cases lambda"
+  (destructuring-bind (form pred) (list '(function (lambda (x) x)) #'cl-cc::ast-lambda-p)
+    (expect (funcall pred (lower form)) :to-be-truthy)))
 
 ;;; ─── Block / return-from ─────────────────────────────────────────────────
 
-(deftest-each lower-block-cases
-  "block with body has the given name; block with empty body gets (quote nil) body."
-  :cases (("with-body"  '(block outer (+ 1 2)) 'outer nil)
-          ("empty-body" '(block foo)            'foo   t))
-  (form expected-name empty-body-p)
-  (let ((node (lower form)))
-    (assert-true (cl-cc::ast-block-p node))
-    (assert-eq expected-name (cl-cc::ast-block-name node))
+(it-sequential "lower-block-cases with-body"
+  (destructuring-bind (form expected-name empty-body-p) (list '(block outer (+ 1 2)) 'outer nil)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-block-p node) :to-be-truthy)
+    (expect (cl-cc::ast-block-name node) :to-be expected-name)
     (when empty-body-p
-      (assert-true (cl-cc::ast-quote-p (first (cl-cc::ast-block-body node)))))))
+      (expect (cl-cc::ast-quote-p (first (cl-cc::ast-block-body node))) :to-be-truthy)))))
 
-(deftest-each lower-return-from-cases
-  "return-from: with value → ast-int; without value → (quote nil)."
-  :cases (("with-value"    '(return-from outer 42) t)
-          ("without-value" '(return-from outer)    nil))
-  (form has-value-p)
-  (let ((node (lower form)))
-    (assert-true (cl-cc::ast-return-from-p node))
-    (assert-eq 'outer (cl-cc::ast-return-from-name node))
+(it-sequential "lower-block-cases empty-body"
+  (destructuring-bind (form expected-name empty-body-p) (list '(block foo) 'foo t)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-block-p node) :to-be-truthy)
+    (expect (cl-cc::ast-block-name node) :to-be expected-name)
+    (when empty-body-p
+      (expect (cl-cc::ast-quote-p (first (cl-cc::ast-block-body node))) :to-be-truthy)))))
+
+(it-sequential "lower-return-from-cases with-value"
+  (destructuring-bind (form has-value-p) (list '(return-from outer 42) t)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-return-from-p node) :to-be-truthy)
+    (expect (cl-cc::ast-return-from-name node) :to-be 'outer)
     (if has-value-p
-        (assert-= 42 (cl-cc::ast-int-value (cl-cc::ast-return-from-value node)))
-        (assert-true (cl-cc::ast-quote-p (cl-cc::ast-return-from-value node))))))
+        (expect (= 42 (cl-cc::ast-int-value (cl-cc::ast-return-from-value node))) :to-be-truthy)
+        (expect (cl-cc::ast-quote-p (cl-cc::ast-return-from-value node)) :to-be-truthy)))))
+
+(it-sequential "lower-return-from-cases without-value"
+  (destructuring-bind (form has-value-p) (list '(return-from outer) nil)
+    (let ((node (lower form)))
+    (expect (cl-cc::ast-return-from-p node) :to-be-truthy)
+    (expect (cl-cc::ast-return-from-name node) :to-be 'outer)
+    (if has-value-p
+        (expect (= 42 (cl-cc::ast-int-value (cl-cc::ast-return-from-value node))) :to-be-truthy)
+        (expect (cl-cc::ast-quote-p (cl-cc::ast-return-from-value node)) :to-be-truthy)))))
 
 ;;; ─── Tagbody / go ────────────────────────────────────────────────────────
 
-(deftest lower-go-and-tagbody
-  "(go top) → ast-go with tag; (tagbody top ...) → ast-tagbody with one tag entry."
+(it-sequential "lower-go-and-tagbody"
   (let ((go-node (lower '(go top))))
-    (assert-true (cl-cc::ast-go-p go-node))
-    (assert-eq 'top (cl-cc::ast-go-tag go-node)))
+    (expect (cl-cc::ast-go-p go-node) :to-be-truthy)
+    (expect (cl-cc::ast-go-tag go-node) :to-be 'top))
   (let ((tb-node (lower '(tagbody top (go top)))))
-    (assert-true (cl-cc::ast-tagbody-p tb-node))
-    (assert-= 1 (length (cl-cc::ast-tagbody-tags tb-node)))
-    (assert-eq 'top (car (first (cl-cc::ast-tagbody-tags tb-node))))))
+    (expect (cl-cc::ast-tagbody-p tb-node) :to-be-truthy)
+    (expect (= 1 (length (cl-cc::ast-tagbody-tags tb-node))) :to-be-truthy)
+    (expect (car (first (cl-cc::ast-tagbody-tags tb-node))) :to-be 'top)))
 
 ;;; ─── setf (compound places) ──────────────────────────────────────────────
 
-(deftest lower-setf-symbol-place-produces-setq
-  "(setf x 5) with symbol place lowers to ast-setq."
+(it-sequential "lower-setf-symbol-place-produces-setq"
   (let ((node (lower '(setf x 5))))
-    (assert-true (cl-cc::ast-setq-p node))
-    (assert-eq 'x (cl-cc::ast-setq-var node))))
+    (expect (cl-cc::ast-setq-p node) :to-be-truthy)
+    (expect (cl-cc::ast-setq-var node) :to-be 'x)))
 
-(deftest lower-empty-setf-returns-nil-quote
-  "(setf) lowers to (quote nil)."
+(it-sequential "lower-empty-setf-returns-nil-quote"
   (let ((node (lower '(setf))))
-    (assert-true (cl-cc::ast-quote-p node))
-    (assert-null (cl-cc::ast-quote-value node))))
+    (expect (cl-cc::ast-quote-p node) :to-be-truthy)
+    (expect (cl-cc::ast-quote-value node) :to-be-null)))
 
-(deftest lower-setf-multiple-symbol-places-produces-progn
-  "(setf a 1 b 2) lowers to ast-progn of two assignments."
+(it-sequential "lower-setf-multiple-symbol-places-produces-progn"
   (let ((node (lower '(setf a 1 b 2))))
-    (assert-true (cl-cc::ast-progn-p node))
-    (assert-= 2 (length (cl-cc::ast-progn-forms node)))
-    (assert-true (every #'cl-cc::ast-setq-p (cl-cc::ast-progn-forms node)))))
+    (expect (cl-cc::ast-progn-p node) :to-be-truthy)
+    (expect (= 2 (length (cl-cc::ast-progn-forms node))) :to-be-truthy)
+    (expect (every #'cl-cc::ast-setq-p (cl-cc::ast-progn-forms node)) :to-be-truthy)))
 
-(deftest-each lower-setf-compound-place-cases
-  "setf compound places: gethash → ast-set-gethash; slot-value → ast-set-slot-value."
-  :cases (("gethash"    '(setf (gethash :k ht) v)      #'cl-cc::ast-set-gethash-p)
-          ("slot-value" '(setf (slot-value obj 'x) 5)  #'cl-cc::ast-set-slot-value-p))
-  (form pred)
-  (assert-true (funcall pred (lower form))))
+(it-sequential "lower-setf-compound-place-cases gethash"
+  (destructuring-bind (form pred) (list '(setf (gethash :k ht) v) #'cl-cc::ast-set-gethash-p)
+    (expect (funcall pred (lower form)) :to-be-truthy)))
 
-(deftest-each lower-setf-list-accessor-rewrites
-  "setf list accessors lower to the corresponding destructive list update call."
-  :cases (("first"  '(setf (first xs) v)  '(rplaca xs v))
-          ("rest"   '(setf (rest xs) v)   '(rplacd xs v))
-          ("second" '(setf (second xs) v) '(rplaca (cdr xs) v))
-          ("tenth"  '(setf (tenth xs) v)  '(rplaca (cdr (cdr (cdr (cdr (cdr (cdr (cdr (cdr (cdr xs))))))))) v))
-          ("cadr"   '(setf (cadr xs) v)   '(rplaca (cdr xs) v))
-          ("cddr"   '(setf (cddr xs) v)   '(rplacd (cdr xs) v))
-          ("caddr"  '(setf (caddr xs) v)  '(rplaca (cdr (cdr xs)) v)))
-  (form expected)
-  (assert-equal expected (cl-cc::ast-to-sexp (lower form))))
+(it-sequential "lower-setf-compound-place-cases slot-value"
+  (destructuring-bind (form pred) (list '(setf (slot-value obj 'x) 5) #'cl-cc::ast-set-slot-value-p)
+    (expect (funcall pred (lower form)) :to-be-truthy)))
 
-(deftest lower-setf-multiple-compound-places-produces-progn
-  "(setf (gethash :a ht) 1 (slot-value obj 'x) 2) lowers both places."
+(it-sequential "lower-setf-list-accessor-rewrites first"
+  (destructuring-bind (form expected) (list '(setf (first xs) v) '(rplaca xs v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-list-accessor-rewrites rest"
+  (destructuring-bind (form expected) (list '(setf (rest xs) v) '(rplacd xs v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-list-accessor-rewrites second"
+  (destructuring-bind (form expected) (list '(setf (second xs) v) '(rplaca (cdr xs) v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-list-accessor-rewrites tenth"
+  (destructuring-bind (form expected) (list '(setf (tenth xs) v) '(rplaca (cdr (cdr (cdr (cdr (cdr (cdr (cdr (cdr (cdr xs))))))))) v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-list-accessor-rewrites cadr"
+  (destructuring-bind (form expected) (list '(setf (cadr xs) v) '(rplaca (cdr xs) v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-list-accessor-rewrites cddr"
+  (destructuring-bind (form expected) (list '(setf (cddr xs) v) '(rplacd (cdr xs) v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-list-accessor-rewrites caddr"
+  (destructuring-bind (form expected) (list '(setf (caddr xs) v) '(rplaca (cdr (cdr xs)) v))
+    (expect (cl-cc::ast-to-sexp (lower form)) :to-equal expected)))
+
+(it-sequential "lower-setf-multiple-compound-places-produces-progn"
   (let* ((node (lower '(setf (gethash :a ht) 1 (slot-value obj 'x) 2)))
          (forms (cl-cc::ast-progn-forms node)))
-    (assert-true (cl-cc::ast-progn-p node))
-    (assert-= 2 (length forms))
-    (assert-true (cl-cc::ast-set-gethash-p (first forms)))
-    (assert-true (cl-cc::ast-set-slot-value-p (second forms)))))
+    (expect (cl-cc::ast-progn-p node) :to-be-truthy)
+    (expect (= 2 (length forms)) :to-be-truthy)
+    (expect (cl-cc::ast-set-gethash-p (first forms)) :to-be-truthy)
+    (expect (cl-cc::ast-set-slot-value-p (second forms)) :to-be-truthy)))
 
-(deftest lower-incf-symbol-place-produces-setq-update
-  "(incf x) lowers through setf into x := (+ x 1)."
+(it-sequential "lower-incf-symbol-place-produces-setq-update"
   (let* ((node (lower '(incf x)))
          (value (cl-cc::ast-setq-value node)))
-    (assert-true (cl-cc::ast-setq-p node))
-    (assert-eq 'x (cl-cc::ast-setq-var node))
-    (assert-true (cl-cc::ast-binop-p value))
-    (assert-eq '+ (cl-cc::ast-binop-op value))
-    (assert-eq 'x (cl-cc::ast-var-name (cl-cc::ast-binop-lhs value)))
-    (assert-= 1 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs value)))))
+    (expect (cl-cc::ast-setq-p node) :to-be-truthy)
+    (expect (cl-cc::ast-setq-var node) :to-be 'x)
+    (expect (cl-cc::ast-binop-p value) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op value) :to-be '+)
+    (expect (cl-cc::ast-var-name (cl-cc::ast-binop-lhs value)) :to-be 'x)
+    (expect (= 1 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs value))) :to-be-truthy)))
 
-(deftest lower-decf-symbol-place-with-delta-produces-setq-update
-  "(decf x 3) lowers through setf into x := (- x 3)."
+(it-sequential "lower-decf-symbol-place-with-delta-produces-setq-update"
   (let* ((node (lower '(decf x 3)))
          (value (cl-cc::ast-setq-value node)))
-    (assert-true (cl-cc::ast-setq-p node))
-    (assert-eq 'x (cl-cc::ast-setq-var node))
-    (assert-true (cl-cc::ast-binop-p value))
-    (assert-eq '- (cl-cc::ast-binop-op value))
-    (assert-eq 'x (cl-cc::ast-var-name (cl-cc::ast-binop-lhs value)))
-    (assert-= 3 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs value)))))
+    (expect (cl-cc::ast-setq-p node) :to-be-truthy)
+    (expect (cl-cc::ast-setq-var node) :to-be 'x)
+    (expect (cl-cc::ast-binop-p value) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op value) :to-be '-)
+    (expect (cl-cc::ast-var-name (cl-cc::ast-binop-lhs value)) :to-be 'x)
+    (expect (= 3 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs value))) :to-be-truthy)))
 
-(deftest lower-incf-gethash-place-produces-set-gethash-update
-  "(incf (gethash k ht) 2) lowers through the existing gethash setf place."
+(it-sequential "lower-incf-gethash-place-produces-set-gethash-update"
   (let* ((node (lower '(incf (gethash k ht) 2)))
          (value (cl-cc::ast-set-gethash-value node)))
-    (assert-true (cl-cc::ast-set-gethash-p node))
-    (assert-true (cl-cc::ast-binop-p value))
-    (assert-eq '+ (cl-cc::ast-binop-op value))
-    (assert-true (cl-cc::ast-call-p (cl-cc::ast-binop-lhs value)))
-    (assert-= 2 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs value)))))
+    (expect (cl-cc::ast-set-gethash-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-p value) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op value) :to-be '+)
+    (expect (cl-cc::ast-call-p (cl-cc::ast-binop-lhs value)) :to-be-truthy)
+    (expect (= 2 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs value))) :to-be-truthy)))

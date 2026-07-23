@@ -6,193 +6,283 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── NEW: ast-to-sexp roundtrip additional forms ──────────────────────────
 
-(deftest-each ast-roundtrip-head-preserved
-  "ast-to-sexp roundtrip: each form round-trips with its head symbol intact."
-  :cases (("return-from"   '(return-from blk 42)          'return-from)
-          ("go"            '(go my-tag)                   'go)
-          ("catch"         '(catch 'tag 1 2)              'catch)
-          ("throw"         '(throw 'tag 99)               'throw)
-          ("the"           '(the fixnum x)                'the)
-          ("values"        '(values 1 2 3)                'values)
-          ("print"         '(print 42)                    'print)
-          ("make-instance" '(make-instance 'point :x 1 :y 2) 'make-instance))
-  (form expected-head)
-  (assert-eq expected-head (first (ast-roundtrip form))))
+(it-sequential "ast-roundtrip-head-preserved return-from"
+  (destructuring-bind (form expected-head) (list '(return-from blk 42) 'return-from)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
 
-(deftest-each ast-roundtrip-local-fn-forms
-  "ast-to-sexp roundtrip: flet/labels preserve structure with one binding."
-  :cases (("flet"   'flet   '(flet ((f (x) x)) (f 1)))
-          ("labels" 'labels '(labels ((f (n) (if (= n 0) 1 (f (- n 1))))) (f 5))))
-  (expected-head form)
-  (let ((result (ast-roundtrip form)))
-    (assert-eq expected-head (first result))
-    (assert-= 1 (length (second result)))))
+(it-sequential "ast-roundtrip-head-preserved go"
+  (destructuring-bind (form expected-head) (list '(go my-tag) 'go)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
 
-(deftest-each ast-roundtrip-condition-control
-  "ast-to-sexp roundtrip: handler-case and unwind-protect preserve head and structure length."
-  :cases (("handler-case"   '(handler-case (risky) (error (e) (print e)))       'handler-case   3)
-          ("unwind-protect" '(unwind-protect (risky) (cleanup1) (cleanup2))     'unwind-protect 4))
-  (form expected-head expected-min-len)
-  (let ((result (ast-roundtrip form)))
-    (assert-eq expected-head (first result))
-    (assert-true (>= (length result) expected-min-len))))
+(it-sequential "ast-roundtrip-head-preserved catch"
+  (destructuring-bind (form expected-head) (list '(catch 'tag 1 2) 'catch)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
 
-(deftest-each ast-roundtrip-definition-forms
-  "ast-to-sexp roundtrip: defvar-no-value, defclass, and defmethod preserve their head and key fields."
-  :cases (("defvar-no-value" '(defvar *x*)
-           'defvar '*x* nil)
-          ("defclass"        '(defclass point (shape) (x y))
-           'defclass 'point '(shape))
-          ("defmethod"       '(defmethod area ((s circle)) (* 3 (slot-value s 'r)))
-           'defmethod 'area nil))
-  (form expected-head expected-second expected-third)
-  (let ((result (ast-roundtrip form)))
-    (assert-eq expected-head (first result))
-    (assert-eq expected-second (second result))
+(it-sequential "ast-roundtrip-head-preserved throw"
+  (destructuring-bind (form expected-head) (list '(throw 'tag 99) 'throw)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-head-preserved the"
+  (destructuring-bind (form expected-head) (list '(the fixnum x) 'the)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-head-preserved values"
+  (destructuring-bind (form expected-head) (list '(values 1 2 3) 'values)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-head-preserved print"
+  (destructuring-bind (form expected-head) (list '(print 42) 'print)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-head-preserved make-instance"
+  (destructuring-bind (form expected-head) (list '(make-instance 'point :x 1 :y 2) 'make-instance)
+    (expect (first (ast-roundtrip form)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-local-fn-forms flet"
+  (destructuring-bind (expected-head form) (list 'flet '(flet ((f (x) x)) (f 1)))
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (= 1 (length (second result))) :to-be-truthy))))
+
+(it-sequential "ast-roundtrip-local-fn-forms labels"
+  (destructuring-bind (expected-head form) (list 'labels '(labels ((f (n) (if (= n 0) 1 (f (- n 1))))) (f 5)))
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (= 1 (length (second result))) :to-be-truthy))))
+
+(it-sequential "ast-roundtrip-condition-control handler-case"
+  (destructuring-bind (form expected-head expected-min-len) (list '(handler-case (risky) (error (e) (print e))) 'handler-case 3)
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (>= (length result) expected-min-len) :to-be-truthy))))
+
+(it-sequential "ast-roundtrip-condition-control unwind-protect"
+  (destructuring-bind (form expected-head expected-min-len) (list '(unwind-protect (risky) (cleanup1) (cleanup2)) 'unwind-protect 4)
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (>= (length result) expected-min-len) :to-be-truthy))))
+
+(it-sequential "ast-roundtrip-definition-forms defvar-no-value"
+  (destructuring-bind (form expected-head expected-second expected-third) (list '(defvar *x*) 'defvar '*x* nil)
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (second result) :to-be expected-second)
     (when expected-third
-      (assert-equal expected-third (third result)))))
+      (expect (third result) :to-equal expected-third)))))
+
+(it-sequential "ast-roundtrip-definition-forms defclass"
+  (destructuring-bind (form expected-head expected-second expected-third) (list '(defclass point (shape) (x y)) 'defclass 'point '(shape))
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (second result) :to-be expected-second)
+    (when expected-third
+      (expect (third result) :to-equal expected-third)))))
+
+(it-sequential "ast-roundtrip-definition-forms defmethod"
+  (destructuring-bind (form expected-head expected-second expected-third) (list '(defmethod area ((s circle)) (* 3 (slot-value s 'r))) 'defmethod 'area nil)
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (expect (second result) :to-be expected-second)
+    (when expected-third
+      (expect (third result) :to-equal expected-third)))))
 
 ;;; ─── NEW: parse-slot-spec ──────────────────────────────────────────────────
 
-(deftest parse-slot-spec-bare-symbol
-  "parse-slot-spec: bare symbol produces slot with nil initarg and reader."
+(it-sequential "parse-slot-spec-bare-symbol"
   (let ((slot (cl-cc/parse:parse-slot-spec 'x)))
-    (assert-eq 'x (cl-cc::ast-slot-name slot))
-    (assert-null (cl-cc::ast-slot-initarg slot))
-    (assert-null (cl-cc::ast-slot-reader slot))))
+    (expect (cl-cc::ast-slot-name slot) :to-be 'x)
+    (expect (cl-cc::ast-slot-initarg slot) :to-be-null)
+    (expect (cl-cc::ast-slot-reader slot) :to-be-null)))
 
-(deftest parse-slot-spec-full-options
-  "parse-slot-spec: list form with all options stores each slot attribute."
+(it-sequential "parse-slot-spec-full-options"
   (let ((slot (cl-cc/parse:parse-slot-spec
                '(x :initarg :x :reader get-x :writer set-x :accessor x-acc :type integer))))
-    (assert-eq 'x       (cl-cc::ast-slot-name     slot))
-    (assert-eq :x       (cl-cc::ast-slot-initarg   slot))
-    (assert-eq 'get-x   (cl-cc::ast-slot-reader    slot))
-    (assert-eq 'set-x   (cl-cc::ast-slot-writer    slot))
-    (assert-eq 'x-acc   (cl-cc::ast-slot-accessor  slot))
-    (assert-eq 'integer (cl-cc::ast-slot-type      slot))))
+    (expect (cl-cc::ast-slot-name     slot) :to-be 'x)
+    (expect (cl-cc::ast-slot-initarg   slot) :to-be :x)
+    (expect (cl-cc::ast-slot-reader    slot) :to-be 'get-x)
+    (expect (cl-cc::ast-slot-writer    slot) :to-be 'set-x)
+    (expect (cl-cc::ast-slot-accessor  slot) :to-be 'x-acc)
+    (expect (cl-cc::ast-slot-type      slot) :to-be 'integer)))
 
-(deftest parse-slot-spec-initform
-  "parse-slot-spec: :initform is parsed as an AST integer node."
+(it-sequential "parse-slot-spec-initform"
   (let ((slot (cl-cc/parse:parse-slot-spec '(count :initform 0))))
-    (assert-eq 'count (cl-cc::ast-slot-name slot))
-    (assert-true (cl-cc/ast:ast-int-p (cl-cc::ast-slot-initform slot)))
-    (assert-= 0 (cl-cc/ast:ast-int-value (cl-cc::ast-slot-initform slot)))))
+    (expect (cl-cc::ast-slot-name slot) :to-be 'count)
+    (expect (cl-cc/ast:ast-int-p (cl-cc::ast-slot-initform slot)) :to-be-truthy)
+    (expect (= 0 (cl-cc/ast:ast-int-value (cl-cc::ast-slot-initform slot))) :to-be-truthy)))
 
 ;;; ─── NEW: parse-compiler-lambda-list edge cases ────────────────────────────
 
-(deftest parser-lambda-list-rest-and-key
-  "parse-compiler-lambda-list: &rest followed by &key stores both rest-param and key-params."
+(it-sequential "parser-lambda-list-rest-and-key"
   (multiple-value-bind (required optional rest-param key-params)
       (cl-cc/parse:parse-compiler-lambda-list '(x &rest args &key verbose))
-    (assert-equal '(x) required)
-    (assert-null optional)
-    (assert-eq 'args rest-param)
-    (assert-= 1 (length key-params))
-    (assert-eq 'verbose (first (first key-params)))))
+    (expect required :to-equal '(x))
+    (expect optional :to-be-null)
+    (expect rest-param :to-be 'args)
+    (expect (= 1 (length key-params)) :to-be-truthy)
+    (expect (first (first key-params)) :to-be 'verbose)))
 
-(deftest parser-lambda-list-allow-other-keys
-  "parse-compiler-lambda-list: &allow-other-keys is accepted without error."
+(it-sequential "parser-lambda-list-allow-other-keys"
   (multiple-value-bind (required optional rest-param key-params)
       (cl-cc/parse:parse-compiler-lambda-list '(&key x &allow-other-keys))
-    (assert-null required)
-    (assert-null optional)
-    (assert-null rest-param)
-    (assert-= 1 (length key-params))))
+    (expect required :to-be-null)
+    (expect optional :to-be-null)
+    (expect rest-param :to-be-null)
+    (expect (= 1 (length key-params)) :to-be-truthy)))
 
-(deftest parser-lambda-list-aux-after-key
-  "parse-compiler-lambda-list: &aux entries are accepted after keyword parameters."
+(it-sequential "parser-lambda-list-aux-after-key"
   (multiple-value-bind (required optional rest-param key-params aux-params)
       (cl-cc/parse:parse-compiler-lambda-list '(x &key verbose &aux (count 0) flag))
-    (assert-equal '(x) required)
-    (assert-null optional)
-    (assert-null rest-param)
-    (assert-= 1 (length key-params))
-    (assert-eq 'verbose (first (first key-params)))
-    (assert-= 2 (length aux-params))
-    (assert-eq 'count (first (first aux-params)))
-    (assert-= 0 (second (first aux-params)))
-    (assert-eq 'flag (first (second aux-params)))
-    (assert-null (second (second aux-params)))))
+    (expect required :to-equal '(x))
+    (expect optional :to-be-null)
+    (expect rest-param :to-be-null)
+    (expect (= 1 (length key-params)) :to-be-truthy)
+    (expect (first (first key-params)) :to-be 'verbose)
+    (expect (= 2 (length aux-params)) :to-be-truthy)
+    (expect (first (first aux-params)) :to-be 'count)
+    (expect (= 0 (second (first aux-params))) :to-be-truthy)
+    (expect (first (second aux-params)) :to-be 'flag)
+    (expect (second (second aux-params)) :to-be-null)))
 
-(deftest parser-lambda-list-body-treated-as-rest
-  "parse-compiler-lambda-list: &body stores its parameter as rest-param."
+(it-sequential "parser-lambda-list-body-treated-as-rest"
   (multiple-value-bind (required optional rest-param key-params)
       (cl-cc/parse:parse-compiler-lambda-list '(x &body forms))
     (declare (ignore optional))
-    (assert-equal '(x) required)
-    (assert-eq 'forms rest-param)
-    (assert-null key-params)))
+    (expect required :to-equal '(x))
+    (expect rest-param :to-be 'forms)
+    (expect key-params :to-be-null)))
 
-(deftest parser-lambda-list-bare-optional
-  "parse-compiler-lambda-list: bare &optional symbol stores a (name nil) pair."
+(it-sequential "parser-lambda-list-bare-optional"
   (multiple-value-bind (required optional rest-param key-params)
       (cl-cc/parse:parse-compiler-lambda-list '(&optional x))
     (declare (ignore rest-param key-params))
-    (assert-null required)
-    (assert-= 1 (length optional))
-    (assert-eq 'x (first (first optional)))
-    (assert-null (second (first optional)))))
+    (expect required :to-be-null)
+    (expect (= 1 (length optional)) :to-be-truthy)
+    (expect (first (first optional)) :to-be 'x)
+    (expect (second (first optional)) :to-be-null)))
 
-(deftest parser-lambda-list-whole-and-environment
-  "parse-compiler-lambda-list: &whole and &environment are accepted together with other sections."
+(it-sequential "parser-lambda-list-whole-and-environment"
   (multiple-value-bind (required optional rest-param key-params aux-params whole-param environment-param)
       (cl-cc/parse:parse-compiler-lambda-list '(&whole whole-form x &environment env y &key verbose))
-    (assert-eq 'whole-form whole-param)
-    (assert-eq 'env environment-param)
-    (assert-equal '(x y) required)
-    (assert-null optional)
-    (assert-null rest-param)
-    (assert-= 1 (length key-params))
-    (assert-null aux-params)))
+    (expect whole-param :to-be 'whole-form)
+    (expect environment-param :to-be 'env)
+    (expect required :to-equal '(x y))
+    (expect optional :to-be-null)
+    (expect rest-param :to-be-null)
+    (expect (= 1 (length key-params)) :to-be-truthy)
+    (expect aux-params :to-be-null)))
 
 ;;; ─── NEW: full parse-then-lower pipeline ───────────────────────────────────
 
-(deftest-each parse-lower-pipeline
-  "parse-source then lower-sexp-to-ast: end-to-end for various forms"
-  :cases (("integer"     "42"                    #'cl-cc/ast:ast-int-p)
-          ("string"      "\"hi\""                #'cl-cc/ast:ast-quote-p)
-          ("nil"         "nil"                    #'cl-cc/ast:ast-quote-p)
-          ("t"           "t"                      #'cl-cc/ast:ast-quote-p)
-          ("symbol"      "foo"                    #'cl-cc/ast:ast-var-p)
-          ("hole"        "_"                      #'cl-cc/ast:ast-hole-p)
-          ("if"          "(if x 1 2)"             #'cl-cc/ast:ast-if-p)
-          ("let"         "(let ((x 1)) x)"        #'cl-cc/ast:ast-let-p)
-          ("lambda"      "(lambda (x) x)"         #'cl-cc/ast:ast-lambda-p)
-          ("defun"       "(defun f (x) x)"        #'cl-cc/ast:ast-defun-p)
-          ("quote"       "'hello"                  #'cl-cc/ast:ast-quote-p)
-          ("progn"       "(progn 1 2)"             #'cl-cc/ast:ast-progn-p)
-          ("setq"        "(setq x 1)"              #'cl-cc/ast:ast-setq-p)
-          ("block"       "(block b 1)"             #'cl-cc/ast:ast-block-p)
-          ("call"        "(foo 1 2)"               #'cl-cc/ast:ast-call-p))
-  (source pred)
-  (let* ((sexp (parse-one source))
+(it-sequential "parse-lower-pipeline integer"
+  (destructuring-bind (source pred) (list "42" #'cl-cc/ast:ast-int-p)
+    (let* ((sexp (parse-one source))
          (node (lower sexp)))
-    (assert-true (funcall pred node))))
+    (expect (funcall pred node) :to-be-truthy))))
 
-(deftest lower-lambda-aux-wraps-body
-  "lower-sexp-to-ast: lambda &aux params are lowered into nested let bodies."
+(it-sequential "parse-lower-pipeline string"
+  (destructuring-bind (source pred) (list "\"hi\"" #'cl-cc/ast:ast-quote-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline nil"
+  (destructuring-bind (source pred) (list "nil" #'cl-cc/ast:ast-quote-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline t"
+  (destructuring-bind (source pred) (list "t" #'cl-cc/ast:ast-quote-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline symbol"
+  (destructuring-bind (source pred) (list "foo" #'cl-cc/ast:ast-var-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline hole"
+  (destructuring-bind (source pred) (list "_" #'cl-cc/ast:ast-hole-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline if"
+  (destructuring-bind (source pred) (list "(if x 1 2)" #'cl-cc/ast:ast-if-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline let"
+  (destructuring-bind (source pred) (list "(let ((x 1)) x)" #'cl-cc/ast:ast-let-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline lambda"
+  (destructuring-bind (source pred) (list "(lambda (x) x)" #'cl-cc/ast:ast-lambda-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline defun"
+  (destructuring-bind (source pred) (list "(defun f (x) x)" #'cl-cc/ast:ast-defun-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline quote"
+  (destructuring-bind (source pred) (list "'hello" #'cl-cc/ast:ast-quote-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline progn"
+  (destructuring-bind (source pred) (list "(progn 1 2)" #'cl-cc/ast:ast-progn-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline setq"
+  (destructuring-bind (source pred) (list "(setq x 1)" #'cl-cc/ast:ast-setq-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline block"
+  (destructuring-bind (source pred) (list "(block b 1)" #'cl-cc/ast:ast-block-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "parse-lower-pipeline call"
+  (destructuring-bind (source pred) (list "(foo 1 2)" #'cl-cc/ast:ast-call-p)
+    (let* ((sexp (parse-one source))
+         (node (lower sexp)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "lower-lambda-aux-wraps-body"
   (let* ((node (lower '(lambda (x &aux (y 1) z) (+ x y))))
          (outer (first (cl-cc::ast-lambda-body node)))
          (inner (first (cl-cc/ast:ast-let-body outer))))
-    (assert-true (cl-cc/ast:ast-lambda-p node))
-    (assert-true (cl-cc/ast:ast-let-p outer))
-    (assert-eq 'y (car (first (cl-cc/ast:ast-let-bindings outer))))
-    (assert-true (cl-cc/ast:ast-int-p (cdr (first (cl-cc/ast:ast-let-bindings outer)))))
-    (assert-true (cl-cc/ast:ast-let-p inner))
-    (assert-eq 'z (car (first (cl-cc/ast:ast-let-bindings inner))))
-    (assert-true (cl-cc/ast:ast-quote-p (cdr (first (cl-cc/ast:ast-let-bindings inner)))))
-    (assert-= 1 (length (cl-cc/ast:ast-let-body inner)))))
+    (expect (cl-cc/ast:ast-lambda-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-let-p outer) :to-be-truthy)
+    (expect (car (first (cl-cc/ast:ast-let-bindings outer))) :to-be 'y)
+    (expect (cl-cc/ast:ast-int-p (cdr (first (cl-cc/ast:ast-let-bindings outer)))) :to-be-truthy)
+    (expect (cl-cc/ast:ast-let-p inner) :to-be-truthy)
+    (expect (car (first (cl-cc/ast:ast-let-bindings inner))) :to-be 'z)
+    (expect (cl-cc/ast:ast-quote-p (cdr (first (cl-cc/ast:ast-let-bindings inner)))) :to-be-truthy)
+    (expect (= 1 (length (cl-cc/ast:ast-let-body inner))) :to-be-truthy)))
 
-(deftest lower-defun-aux-wraps-block-body
-  "lower-sexp-to-ast: defun &aux params wrap the implicit block body."
+(it-sequential "lower-defun-aux-wraps-block-body"
   (let* ((node (lower '(defun f (x &aux (y 1)) (+ x y))))
          (outer (first (cl-cc::ast-defun-body node))))
-    (assert-true (cl-cc/ast:ast-defun-p node))
-    (assert-true (cl-cc/ast:ast-let-p outer))
-    (assert-eq 'y (car (first (cl-cc/ast:ast-let-bindings outer))))
-    (assert-= 1 (length (cl-cc/ast:ast-let-body outer)))))
+    (expect (cl-cc/ast:ast-defun-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-let-p outer) :to-be-truthy)
+    (expect (car (first (cl-cc/ast:ast-let-bindings outer))) :to-be 'y)
+    (expect (= 1 (length (cl-cc/ast:ast-let-body outer))) :to-be-truthy)))

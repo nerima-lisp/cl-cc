@@ -6,7 +6,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -27,177 +26,207 @@
 
 ;;; ─── Integer Tokens ──────────────────────────────────────────────────────────
 
-(deftest-each lexer-integer-literals
-  "Lexer correctly tokenizes integer literals: type :T-INT and correct numeric value."
-  :cases (("simple"   "42"  42)
-          ("zero"     "0"   0)
-          ("negative" "-7"  -7))
-  (source expected-value)
-  (assert-eq :T-INT (first-token-type source))
-  (assert-= expected-value (first-token-value source)))
+(it-sequential "lexer-integer-literals simple"
+  (destructuring-bind (source expected-value) (list "42" 42)
+    (expect (first-token-type source) :to-be :T-INT) (expect (= expected-value (first-token-value source)) :to-be-truthy)))
+
+(it-sequential "lexer-integer-literals zero"
+  (destructuring-bind (source expected-value) (list "0" 0)
+    (expect (first-token-type source) :to-be :T-INT) (expect (= expected-value (first-token-value source)) :to-be-truthy)))
+
+(it-sequential "lexer-integer-literals negative"
+  (destructuring-bind (source expected-value) (list "-7" -7)
+    (expect (first-token-type source) :to-be :T-INT) (expect (= expected-value (first-token-value source)) :to-be-truthy)))
 
 ;;; ─── Float Tokens ────────────────────────────────────────────────────────────
 
-(deftest lexer-float-simple-type-and-value
-  "Lexer: 3.14 produces :T-FLOAT with value within double-float precision."
-  (assert-eq :T-FLOAT (first-token-type "3.14"))
+(it-sequential "lexer-float-simple-type-and-value"
+  (expect (first-token-type "3.14") :to-be :T-FLOAT)
   (let ((val (first-token-value "3.14")))
-    (assert-true (< (abs (- val 3.14d0)) 0.001))))
+    (expect (< (abs (- val 3.14d0)) 0.001) :to-be-truthy)))
 
-(deftest lexer-float-exponent-notation-is-float
-  "Lexer: exponent notation 1.0e5 is classified as :T-FLOAT."
-  (assert-eq :T-FLOAT (first-token-type "1.0e5")))
+(it-sequential "lexer-float-exponent-notation-is-float"
+  (expect (first-token-type "1.0e5") :to-be :T-FLOAT))
 
 ;;; ─── Ratio Tokens ────────────────────────────────────────────────────────────
 
-(deftest lexer-ratio
-  "Lexer: ratio literal"
-  (assert-eq :T-RATIO (first-token-type "3/4"))
-  (assert-eql 3/4 (first-token-value "3/4")))
+(it-sequential "lexer-ratio"
+  (expect (first-token-type "3/4") :to-be :T-RATIO)
+  (expect (first-token-value "3/4") :to-be 3/4))
 
 ;;; ─── String Tokens ──────────────────────────────────────────────────────────
 
-(deftest lexer-string-type-and-value
-  "Lexer: a quoted string produces :T-STRING with the unquoted content."
-  (assert-eq :T-STRING (first-token-type "\"hello\""))
-  (assert-string= "hello" (first-token-value "\"hello\"")))
+(it-sequential "lexer-string-type-and-value"
+  (expect (first-token-type "\"hello\"") :to-be :T-STRING)
+  (expect (first-token-value "\"hello\"") :to-equal "hello"))
 
-(deftest-each lexer-string-escape-sequences
-  "All *lex-string-escape-table* entries produce the correct middle character."
-  :cases (("newline"   "\"a\\nb\""   #\Newline)
-          ("tab"       "\"a\\tb\""   #\Tab)
-          ("return"    "\"a\\rb\""   #\Return)
-          ("backslash" "\"a\\\\b\""  #\\)
-          ("nul"       "\"a\\0b\""   #\Nul)
-          ("unknown"   "\"a\\xb\""   #\x))
-  (input expected-middle)
-  (let ((val (first-token-value input)))
-    (assert-= 3 (length val))
-    (assert-true (char= (char val 1) expected-middle))))
+(it-sequential "lexer-string-escape-sequences newline"
+  (destructuring-bind (input expected-middle) (list "\"a\\nb\"" #\Newline)
+    (let ((val (first-token-value input)))
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (char= (char val 1) expected-middle) :to-be-truthy))))
 
-(deftest lexer-string-escape-table-has-six-entries
-  "*lex-string-escape-table* has exactly 6 entries (\\n \\t \\r \\\\ \\\" \\0)."
-  (assert-= 6 (length cl-cc/parse::*lex-string-escape-table*)))
+(it-sequential "lexer-string-escape-sequences tab"
+  (destructuring-bind (input expected-middle) (list "\"a\\tb\"" #\Tab)
+    (let ((val (first-token-value input)))
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (char= (char val 1) expected-middle) :to-be-truthy))))
+
+(it-sequential "lexer-string-escape-sequences return"
+  (destructuring-bind (input expected-middle) (list "\"a\\rb\"" #\Return)
+    (let ((val (first-token-value input)))
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (char= (char val 1) expected-middle) :to-be-truthy))))
+
+(it-sequential "lexer-string-escape-sequences backslash"
+  (destructuring-bind (input expected-middle) (list "\"a\\\\b\"" #\\)
+    (let ((val (first-token-value input)))
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (char= (char val 1) expected-middle) :to-be-truthy))))
+
+(it-sequential "lexer-string-escape-sequences nul"
+  (destructuring-bind (input expected-middle) (list "\"a\\0b\"" #\Nul)
+    (let ((val (first-token-value input)))
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (char= (char val 1) expected-middle) :to-be-truthy))))
+
+(it-sequential "lexer-string-escape-sequences unknown"
+  (destructuring-bind (input expected-middle) (list "\"a\\xb\"" #\x)
+    (let ((val (first-token-value input)))
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (char= (char val 1) expected-middle) :to-be-truthy))))
+
+(it-sequential "lexer-string-escape-table-has-six-entries"
+  (expect (= 6 (length cl-cc/parse::*lex-string-escape-table*)) :to-be-truthy))
 
 ;;; ─── Symbol Tokens ──────────────────────────────────────────────────────────
 
-(deftest lexer-symbol-plain-is-upcased
-  "Lexer: plain symbol 'foo' produces :T-IDENT with upcased name FOO."
-  (assert-eq :T-IDENT (first-token-type "foo"))
-  (assert-string= "FOO" (symbol-name (first-token-value "foo"))))
+(it-sequential "lexer-symbol-plain-is-upcased"
+  (expect (first-token-type "foo") :to-be :T-IDENT)
+  (expect (symbol-name (first-token-value "foo")) :to-equal "FOO"))
 
-(deftest lexer-symbol-pipe-quoted-preserves-case
-  "Lexer: pipe-quoted |MixedCase| preserves exact case in the symbol name."
+(it-sequential "lexer-symbol-pipe-quoted-preserves-case"
   (let ((val (first-token-value "|MixedCase|")))
-    (assert-string= "MixedCase" (symbol-name val))))
+    (expect (symbol-name val) :to-equal "MixedCase")))
 
-(deftest-each lexer-bool-tokens
-  "Lexer: T is :T-BOOL-TRUE and NIL is :T-BOOL-FALSE."
-  :cases (("true"  "t"   :T-BOOL-TRUE)
-          ("false" "nil" :T-BOOL-FALSE))
-  (source expected-type)
-  (assert-eq expected-type (first-token-type source)))
+(it-sequential "lexer-bool-tokens true"
+  (destructuring-bind (source expected-type) (list "t" :T-BOOL-TRUE)
+    (expect (first-token-type source) :to-be expected-type)))
+
+(it-sequential "lexer-bool-tokens false"
+  (destructuring-bind (source expected-type) (list "nil" :T-BOOL-FALSE)
+    (expect (first-token-type source) :to-be expected-type)))
 
 ;;; ─── Keyword Tokens ─────────────────────────────────────────────────────────
 
-(deftest lexer-keyword
-  "Lexer: keyword symbol"
-  (assert-eq :T-KEYWORD (first-token-type ":foo"))
-  (assert-eq :FOO (first-token-value ":foo")))
+(it-sequential "lexer-keyword"
+  (expect (first-token-type ":foo") :to-be :T-KEYWORD)
+  (expect (first-token-value ":foo") :to-be :FOO))
 
 ;;; ─── Parens ─────────────────────────────────────────────────────────────────
 
-(deftest lexer-parens
-  "Lexer: parentheses"
+(it-sequential "lexer-parens"
   (let ((types (token-types "()")))
-    (assert-equal '(:T-LPAREN :T-RPAREN) types)))
+    (expect types :to-equal '(:T-LPAREN :T-RPAREN))))
 
 ;;; ─── Quote Macros ───────────────────────────────────────────────────────────
 
-(deftest-each lexer-quote-macros
-  "Lexer: quote macro characters produce correct token types"
-  :cases (("quote" "'x"  :T-QUOTE)
-          ("backquote" "`x"  :T-BACKQUOTE)
-          ("unquote" ",x"  :T-UNQUOTE)
-          ("splice" ",@x"  :T-UNQUOTE-SPLICING))
-  (input expected-token-type)
-  (assert-eq expected-token-type (first-token-type input)))
+(it-sequential "lexer-quote-macros quote"
+  (destructuring-bind (input expected-token-type) (list "'x" :T-QUOTE)
+    (expect (first-token-type input) :to-be expected-token-type)))
+
+(it-sequential "lexer-quote-macros backquote"
+  (destructuring-bind (input expected-token-type) (list "`x" :T-BACKQUOTE)
+    (expect (first-token-type input) :to-be expected-token-type)))
+
+(it-sequential "lexer-quote-macros unquote"
+  (destructuring-bind (input expected-token-type) (list ",x" :T-UNQUOTE)
+    (expect (first-token-type input) :to-be expected-token-type)))
+
+(it-sequential "lexer-quote-macros splice"
+  (destructuring-bind (input expected-token-type) (list ",@x" :T-UNQUOTE-SPLICING)
+    (expect (first-token-type input) :to-be expected-token-type)))
 
 ;;; ─── Hash Dispatch ──────────────────────────────────────────────────────────
 
-(deftest lexer-hash-function-shorthand
-  "Lexer: #' produces a :T-FUNCTION token."
-  (assert-eq :T-FUNCTION (first-token-type "#'foo")))
+(it-sequential "lexer-hash-function-shorthand"
+  (expect (first-token-type "#'foo") :to-be :T-FUNCTION))
 
-(deftest lexer-hash-vector-start
-  "Lexer: #( produces a :T-VECTOR-START token."
-  (assert-eq :T-VECTOR-START (first-token-type "#(1 2)")))
+(it-sequential "lexer-hash-vector-start"
+  (expect (first-token-type "#(1 2)") :to-be :T-VECTOR-START))
 
-(deftest-each lexer-hash-char-dispatch
-  "Lexer: #\\char produces :T-CHAR tokens for regular and named character forms."
-  :cases (("letter" "#\\a"     #\a)
-          ("space"  "#\\Space" #\Space))
-  (source expected-char)
-  (assert-eq :T-CHAR (first-token-type source))
-  (assert-true (char= expected-char (first-token-value source))))
+(it-sequential "lexer-hash-char-dispatch letter"
+  (destructuring-bind (source expected-char) (list "#\\a" #\a)
+    (expect (first-token-type source) :to-be :T-CHAR) (expect (char= expected-char (first-token-value source)) :to-be-truthy)))
+
+(it-sequential "lexer-hash-char-dispatch space"
+  (destructuring-bind (source expected-char) (list "#\\Space" #\Space)
+    (expect (first-token-type source) :to-be :T-CHAR) (expect (char= expected-char (first-token-value source)) :to-be-truthy)))
 
 
 ;;; ─── Radix Dispatch ─────────────────────────────────────────────────────────
 
-(deftest-each lexer-radix-dispatch
-  "Lexer: radix dispatch produces correct integer values"
-  :cases (("binary" "#b101" 5)
-          ("octal" "#o10" 8)
-          ("hex" "#xFF" 255))
-  (input expected-value)
-  (assert-= expected-value (first-token-value input)))
+(it-sequential "lexer-radix-dispatch binary"
+  (destructuring-bind (input expected-value) (list "#b101" 5)
+    (expect (= expected-value (first-token-value input)) :to-be-truthy)))
+
+(it-sequential "lexer-radix-dispatch octal"
+  (destructuring-bind (input expected-value) (list "#o10" 8)
+    (expect (= expected-value (first-token-value input)) :to-be-truthy)))
+
+(it-sequential "lexer-radix-dispatch hex"
+  (destructuring-bind (input expected-value) (list "#xFF" 255)
+    (expect (= expected-value (first-token-value input)) :to-be-truthy)))
 
 ;;; ─── Comments ───────────────────────────────────────────────────────────────
 
-(deftest-each lexer-comment-forms
-  "Both line and block comments are stripped from the token stream."
-  :cases (("line"  (format nil "; comment~%42"))
-          ("block" "#| block |# 99"))
-  (source)
-  (assert-equal '(:T-INT) (token-types source)))
+(it-sequential "lexer-comment-forms line"
+  (destructuring-bind (source) (list (format nil "; comment~%42"))
+    (expect (token-types source) :to-equal '(:T-INT))))
+
+(it-sequential "lexer-comment-forms block"
+  (destructuring-bind (source) (list "#| block |# 99")
+    (expect (token-types source) :to-equal '(:T-INT))))
 
 ;;; ─── Position Tracking ──────────────────────────────────────────────────────
 
-(deftest lexer-position-start-byte
-  "Lexer: start-byte tracks position"
+(it-sequential "lexer-position-start-byte"
   (let* ((tokens (cl-cc:lex-all "  42"))
          (tok (first tokens)))
-    (assert-= 2 (cl-cc:lexer-token-start-byte tok))))
+    (expect (= 2 (cl-cc:lexer-token-start-byte tok)) :to-be-truthy)))
 
 ;;; ─── Dot Token ──────────────────────────────────────────────────────────────
 
-(deftest lexer-dot
-  "Lexer: dot token for dotted pairs"
+(it-sequential "lexer-dot"
   (let ((types (token-types "(a . b)")))
-    (assert-equal '(:T-LPAREN :T-IDENT :T-DOT :T-IDENT :T-RPAREN) types)))
+    (expect types :to-equal '(:T-LPAREN :T-IDENT :T-DOT :T-IDENT :T-RPAREN))))
 
 ;;; ─── lex-all Full Forms ─────────────────────────────────────────────────────
 
-(deftest-each lexer-full-form-token-types
-  "lex-all produces the correct token type sequence for complete forms."
-  :cases (("simple-list" "(+ 1 2)"  '(:T-LPAREN :T-IDENT :T-INT :T-INT :T-RPAREN))
-          ("quoted-list" "'(a b)"   '(:T-QUOTE :T-LPAREN :T-IDENT :T-IDENT :T-RPAREN)))
-  (source expected-types)
-  (assert-equal expected-types (token-types source)))
+(it-sequential "lexer-full-form-token-types simple-list"
+  (destructuring-bind (source expected-types) (list "(+ 1 2)" '(:T-LPAREN :T-IDENT :T-INT :T-INT :T-RPAREN))
+    (expect (token-types source) :to-equal expected-types)))
 
-(deftest lexer-full-form-defun
-  "Lexer: lex-all on (defun f (x) x) produces 8 tokens wrapped in parens."
+(it-sequential "lexer-full-form-token-types quoted-list"
+  (destructuring-bind (source expected-types) (list "'(a b)" '(:T-QUOTE :T-LPAREN :T-IDENT :T-IDENT :T-RPAREN))
+    (expect (token-types source) :to-equal expected-types)))
+
+(it-sequential "lexer-full-form-defun"
   (let ((types (token-types "(defun f (x) x)")))
-    (assert-= 8 (length types))
-    (assert-eq :T-LPAREN (first types))
-    (assert-eq :T-RPAREN (car (last types)))))
+    (expect (= 8 (length types)) :to-be-truthy)
+    (expect (first types) :to-be :T-LPAREN)
+    (expect (car (last types)) :to-be :T-RPAREN)))
 
-(deftest-each lexer-eof-always-present
-  "lex-all always terminates with a :T-EOF token."
-  :cases (("non-empty" "42" nil)
-          ("empty"     ""   1))
-  (source expected-count)
-  (let ((tokens (cl-cc:lex-all source)))
-    (assert-eq :T-EOF (cl-cc:lexer-token-type (car (last tokens))))
+(it-sequential "lexer-eof-always-present non-empty"
+  (destructuring-bind (source expected-count) (list "42" nil)
+    (let ((tokens (cl-cc:lex-all source)))
+    (expect (cl-cc:lexer-token-type (car (last tokens))) :to-be :T-EOF)
     (when expected-count
-      (assert-= expected-count (length tokens)))))
+      (expect (= expected-count (length tokens)) :to-be-truthy)))))
+
+(it-sequential "lexer-eof-always-present empty"
+  (destructuring-bind (source expected-count) (list "" 1)
+    (let ((tokens (cl-cc:lex-all source)))
+    (expect (cl-cc:lexer-token-type (car (last tokens))) :to-be :T-EOF)
+    (when expected-count
+      (expect (= expected-count (length tokens)) :to-be-truthy)))))
