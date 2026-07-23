@@ -3,7 +3,7 @@
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (:cl-cc-vm :cl-prolog :cl-cc-type :cl-cc-ast)
+  :depends-on (:cl-cc-vm :cl-prolog :cl-cc-type :cl-cc-ast :cl-parser-kit)
   :pathname "src"
   :serial t
   :components

@@ -14,11 +14,14 @@
 
 (in-package :cl-cc/cli)
 
+;;; ANSI color codes for IR dumps, built with cl-tty-kit's SGR builder rather
+;;; than hand-assembled escape strings.  ansi-sgr N yields exactly ESC[Nm, so
+;;; these remain byte-identical to the previous hand-written constants.
 (defparameter +ansi-esc+     (string (code-char 27)))
-(defparameter +ansi-reset+   (concatenate 'string +ansi-esc+ "[0m"))
-(defparameter +ansi-label+   (concatenate 'string +ansi-esc+ "[32m"))
-(defparameter +ansi-opcode+  (concatenate 'string +ansi-esc+ "[34m"))
-(defparameter +ansi-comment+ (concatenate 'string +ansi-esc+ "[90m"))
+(defparameter +ansi-reset+   (cl-tty-kit:ansi-sgr 0))
+(defparameter +ansi-label+   (cl-tty-kit:ansi-sgr 32))
+(defparameter +ansi-opcode+  (cl-tty-kit:ansi-sgr 34))
+(defparameter +ansi-comment+ (cl-tty-kit:ansi-sgr 90))
 
 (defparameter *selfhost-profile-path* ".cl-cc-profile.sexp"
   "Default instruction histogram emitted by `cl-cc selfhost --profile` and read by later compilations.")
@@ -150,12 +153,12 @@ starts with parsed/expanded stdlib forms and the VM snapshot already resident."
   (member arch '(:wasm32 :wasm64 :wasm32-wasi) :test #'eq))
 
 (defun %arch-keyword (arch-str)
-  "Convert ARCH-STR to its canonical arch keyword. Calls (uiop:quit 2) on unknown values."
+  "Convert ARCH-STR to its canonical arch keyword. Calls (%cli-exit 2) on unknown values."
   (let ((entry (assoc arch-str *arch-aliases* :test #'string=)))
     (or (and entry (second entry))
         (progn
           (format *error-output* "Unknown architecture: ~A (use x86-64, arm64, wasm32, wasm64, or wasm32-wasi)~%" arch-str)
-          (uiop:quit 2)))))
+          (%cli-exit 2)))))
 
 (defun %compile-target-keyword (arch-str)
   "Convert ARCH-STR to its compilation target keyword. Signals error on unknown values."
@@ -180,7 +183,7 @@ starts with parsed/expanded stdlib forms and the VM snapshot already resident."
                 (format *error-output* "Unknown opt-remarks mode: ~A (use all|changed|missed)~%" mode-str)
                 (when suggestions
                   (format *error-output* "did you mean: ~{~A~^, ~}~%" suggestions)))
-              (uiop:quit 2))))))
+              (%cli-exit 2))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Compile options — shared pipeline/tracing flags
@@ -307,7 +310,7 @@ Returns T for plain coverage, :MCDC for MC/DC, NIL when unset."
     (let ((bytes (ignore-errors (parse-integer spec :junk-allowed nil))))
       (unless (and (integerp bytes) (plusp bytes))
         (format *error-output* "Invalid ~A: ~A (expected positive byte count)~%" flag-name spec)
-        (uiop:quit 2))
+        (%cli-exit 2))
       (ceiling bytes 8))))
 
 (defun %parse-opt-level (spec)
@@ -324,7 +327,7 @@ Returns an integer 0-3 or NIL."
       (let ((limit (ignore-errors (parse-integer text :junk-allowed nil))))
         (unless (and (integerp limit) (<= 0 limit))
           (format *error-output* "Invalid opt bisect limit: ~A (expected non-negative integer)~%" spec)
-          (uiop:quit 2))
+          (%cli-exit 2))
         limit))))
 
 (defun %compile-opts-kwargs (opts stream)

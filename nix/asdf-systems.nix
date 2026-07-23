@@ -3,6 +3,11 @@
   sbcl,
   clProlog,
   clWeave,
+  clParserKit,
+  clDataflow,
+  clBoundaryKit,
+  clCli,
+  clTtyKit,
   ...
 }:
 let
@@ -117,7 +122,12 @@ let
         "cl-cc-vm"
         "cl-cc-type"
       ];
-      extraLispLibs = [ clProlog ];
+      # clProlog backs the peephole/e-graph rewrite rules; clParserKit tokenizes
+      # and parses the `--pass-pipeline` spec string.
+      extraLispLibs = [
+        clProlog
+        clParserKit
+      ];
     };
     cl-cc-target = {
       src = "packages/target";
@@ -239,6 +249,13 @@ let
         "cl-cc-emit"
         "cl-cc-stdlib"
       ];
+      # cl-tty-kit provides ANSI/style/screen + input-decoder primitives for
+      # the interactive REPL front-end; cl-boundary-kit models its console/
+      # system-exit I/O as swappable, testable boundaries.
+      extraLispLibs = [
+        clTtyKit
+        clBoundaryKit
+      ];
     };
   };
 
@@ -261,6 +278,17 @@ let
       deps = [
         "cl-cc"
         "cl-cc-docgen"
+      ];
+      # cl-cli is the declarative argument parser behind the cl-cc command
+      # tree; cl-boundary-kit models console/args/system-exit as testable I/O
+      # boundaries at the CLI edge; cl-tty-kit provides the ANSI/style helpers
+      # for the interactive REPL and colored IR dumps; cl-dataflow backs the
+      # `dep-graph` command's graph model + DOT/Mermaid/topological export.
+      extraLispLibs = [
+        clCli
+        clBoundaryKit
+        clTtyKit
+        clDataflow
       ];
     };
     cl-cc-testing-framework = {
@@ -287,7 +315,12 @@ let
         extraLispLibs ? [ ],
       }:
       mkAsdfSystem {
-        inherit name src deps extraLispLibs;
+        inherit
+          name
+          src
+          deps
+          extraLispLibs
+          ;
         allSystems = sys;
       }
     ) (leafSpec // derivedSpec)

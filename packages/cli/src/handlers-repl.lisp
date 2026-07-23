@@ -153,8 +153,11 @@ inside strings for REPL input balancing."
       (let ((source (%read-command-source watch-file)))
         (%record-hot-reload-source watch-file source nil)
         (%start-watch-file-poll-thread watch-file cl-cc/repl::*repl-vm-state*)))
-    (format t "CL-CC ~A  —  ~A~%" *version* (%repl-language-label language))
-    (format t "Type a form and press Return. (exit) or Ctrl+D to quit.~%~%")
+    (format t "~A~%"
+            (%style-banner (format nil "CL-CC ~A  —  ~A"
+                                   *version* (%repl-language-label language))))
+    (format t "~A~%~%"
+            (%style-note "Type a form and press Return. (exit) or Ctrl+D to quit."))
     (force-output)
     (let ((stdlib-loaded-p stdlib))
        (flet ((eval-and-print (form)
@@ -174,10 +177,10 @@ inside strings for REPL input balancing."
                                       (list result))))
                  (%update-repl-completeness-globals form values-list)
                  (when (not (null result))
-                   (format t "=> ~S~%" result))
+                   (format t "=> ~A~%" (%style-result (prin1-to-string result))))
                  (force-output))))
       (loop
-        (format t "* ")
+        (format t "~A" (%style-prompt "* "))
         (force-output)
         (let ((buffer ""))
           (loop
@@ -186,7 +189,7 @@ inside strings for REPL input balancing."
               (when (null line)
                 (%save-repl-history-file)
                 (format t "~%Goodbye.~%")
-                (uiop:quit 0))
+                (%cli-exit 0))
               (multiple-value-bind (edited-line candidates edited-p)
                   (cl-cc:repl-edit-input-line line)
                 (declare (ignore edited-p))
@@ -208,17 +211,17 @@ inside strings for REPL input balancing."
                     (string= trimmed ":q"))
                 (%save-repl-history-file)
                 (format t "Goodbye.~%")
-                (uiop:quit 0))
+                (%cli-exit 0))
                ((uiop:string-prefix-p ":inspect " trimmed)
                 (handler-case
                     (%repl-inspect (string-trim '(#\Space #\Tab) (subseq trimmed 9))
                                    language)
-                  (error (e) (format t "; Error: ~A~%" e))))
+                  (error (e) (format t "~A~%" (%style-error (format nil "; Error: ~A" e))))))
                ((uiop:string-prefix-p ":describe " trimmed)
                 (handler-case
                     (%repl-describe (string-trim '(#\Space #\Tab) (subseq trimmed 10))
                                     language)
-                  (error (e) (format t "; Error: ~A~%" e))))
+                  (error (e) (format t "~A~%" (%style-error (format nil "; Error: ~A" e))))))
                (t
                (cl-cc:%repl-record-history trimmed)
                 (handler-case
@@ -232,5 +235,5 @@ inside strings for REPL input balancing."
                             (force-output)))
                         (eval-and-print trimmed))
                   (error (e)
-                    (format t "; Error: ~A~%" e)
+                    (format t "~A~%" (%style-error (format nil "; Error: ~A" e)))
                      (force-output))))))))))))

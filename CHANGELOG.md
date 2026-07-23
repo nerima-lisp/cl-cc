@@ -2,6 +2,34 @@
 
 All notable changes to cl-cc will be documented in this file.
 
+## [Unreleased]
+
+### External library adoption
+
+Five further nerima-lisp toolkits are adopted the same way cl-prolog and
+cl-weave were — pulled in as plain source trees and built with cl-cc's own
+`sbcl.buildASDFSystem`, replacing hand-rolled in-tree code with a thin compat
+layer over the external library:
+
+- **cl-cli** is now the CLI argument parser: `parse-args` runs
+  `cl-cli:parse-argv` against an application spec generated from the CLI's own
+  `*flag-spec*` / dispatch table, and still returns the legacy `parsed-args`
+  struct so every handler is unchanged. The generated spec also powers three
+  new commands — `cl-cc completion <shell>` (bash/zsh/fish/powershell/nushell/
+  elvish), `cl-cc docs [markdown|man|json]`, and `cl-cc version`.
+- **cl-tty-kit** backs all terminal styling: the interactive REPL's banner,
+  prompt, results, and errors are colored through `cl-tty-kit:ansi-sgr`
+  (gated on an interactive TTY, so captured/piped output stays plain), and the
+  IR-dump color constants are built with the same SGR builder.
+- **cl-boundary-kit** models every CLI process exit as a swappable system
+  boundary (`%cli-exit`), so tests can capture exit codes without terminating
+  the image.
+- **cl-dataflow** models the `dep-graph` command as a real dataflow graph, with
+  DOT / JSON / Mermaid / topological-order rendering from the library.
+- **cl-parser-kit** tokenizes and parses the optimizer `--pass-pipeline` spec
+  (`sccp,cse,dce`) with a whitespace-tolerant tokenizer + `sep-by` combinator
+  instead of a hand-rolled comma split.
+
 ## [0.1.0] — 2026-07-11 — Initial Release
 
 ### Infrastructure

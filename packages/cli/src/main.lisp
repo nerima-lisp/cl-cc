@@ -49,9 +49,12 @@ Commands:
   macrostep <file>        Step through macro expansion (FR-836)
   bisect    [range]       Find regression commit (FR-809)
   features                List feature flags (FR-812)
-  dep-graph               Generate ASDF dependency graph (FR-361)
+  dep-graph [--format F]  ASDF dependency graph via cl-dataflow: dot|json|mermaid|topo (FR-361)
   generate  <schema>      Build-time code generation (FR-815)
   update    [pkg]         Update dependencies (FR-813)
+  completion <shell>      Print a shell completion script (bash/zsh/fish/…)
+  docs      [format]      Render reference docs (markdown|man|json)
+  version                 Print the cl-cc version
   help     [command]      Show this help or command-specific help
 
 Options:
@@ -303,6 +306,34 @@ Options:
 
   Remove a previously registered local ASDF system from the cl-cc registry.
 ")
+    ("completion" . "Usage: cl-cc completion <shell>
+
+  Print a shell completion script generated from the cl-cli application spec.
+
+Supported shells:
+  bash, zsh, fish, powershell, nushell, elvish
+
+Examples:
+  cl-cc completion bash > /etc/bash_completion.d/cl-cc
+  cl-cc completion zsh  > ~/.zsh/completions/_cl-cc
+")
+    ("docs" . "Usage: cl-cc docs [format]
+
+  Render reference documentation for the whole command tree via cl-cli.
+
+Formats (default: markdown):
+  markdown   GitHub-flavored Markdown reference
+  man        troff man page
+  json       machine-readable command/option schema
+
+Examples:
+  cl-cc docs markdown > docs/cli.md
+  cl-cc docs man      > cl-cc.1
+")
+    ("version" . "Usage: cl-cc version
+
+  Print the cl-cc version string carried by the cl-cli application spec.
+")
   )
   "Alist mapping command name strings to their help text strings.")
 
@@ -354,7 +385,11 @@ Options:
      ("features"     . %do-features)
      ("dep-graph"    . %do-dep-graph)
      ("generate"     . %do-generate)
-    ("update"       . %do-update))
+    ("update"       . %do-update)
+    ;; cl-cli-backed commands (handlers defined in cli-spec.lisp).
+    ("completion"   . %do-completion)
+    ("docs"         . %do-docs)
+    ("version"      . %do-version))
   "Alist mapping command name strings to their handler functions.")
 
 (defun main ()
@@ -367,11 +402,11 @@ subcommands, then dispatches to the appropriate handler."
                      (format *error-output* "~A~%" (arg-parse-error-message e))
                      (terpri *error-output*)
                      (%print-global-help)
-                     (uiop:quit 2)))))
+                     (%cli-exit 2)))))
     (when (or (flag parsed "--help") (flag parsed "-h"))
       (%print-help (or (parsed-args-command parsed)
                        (car (parsed-args-positional parsed))))
-      (uiop:quit 0))
+      (%cli-exit 0))
 
     (when (or (flag parsed "--deterministic")
               (flag parsed "--reproducible"))
@@ -384,10 +419,10 @@ subcommands, then dispatches to the appropriate handler."
       (cond
         ((null command)
          (%print-global-help)
-         (uiop:quit 0))
+         (%cli-exit 0))
         ((string= command "help")
            (%print-help (car (parsed-args-positional parsed)))
-           (uiop:quit 0))
+           (%cli-exit 0))
          ((string= command "install")
           (%with-cli-timeout (parsed "install")
             (%do-install parsed)))
@@ -408,7 +443,7 @@ subcommands, then dispatches to the appropriate handler."
                 (progn
                   (format *error-output* "Unknown command: ~A~%~%" command)
                   (%print-global-help)
-                  (uiop:quit 2)))))))))
+                  (%cli-exit 2)))))))))
 
 
 ;;; (Utilities, dump functions, and compile options

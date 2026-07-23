@@ -18,7 +18,7 @@
                                                   :executable executable
                                                   :compression compression)))
           (format t "~A~%" result)
-          (uiop:quit 0))))))
+          (%cli-exit 0))))))
 
 (defun %default-selfhost-file ()
   "Return the default self-hosting workload file."
@@ -56,4 +56,4 @@
                (when (compile-opts-profile opts)
                  (%write-selfhost-instruction-profile))
                (format t "~S~%" ret)
-               (uiop:quit 0)))))))))
+               (%cli-exit 0)))))))))

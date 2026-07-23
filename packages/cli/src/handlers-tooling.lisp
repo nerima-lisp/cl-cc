@@ -131,7 +131,7 @@
            (query (flag parsed "--fuzzy")))
       (%with-cli-error-handler
         (%print-symbol-index (%filter-symbol-index (%build-symbol-index root) query))
-        (uiop:quit 0)))))
+        (%cli-exit 0)))))
 
 (defun %json-escape (text)
   "Return TEXT escaped for JSON string literals."
@@ -182,7 +182,7 @@
           (output (or (flag-or parsed "--output" "-o") "compile_commands.json")))
       (%with-cli-error-handler
         (format t "~A~%" (%generate-compile-commands :root root :output output))
-        (uiop:quit 0)))))
+        (%cli-exit 0)))))
 
 (defun %do-profile (parsed)
   "Handle `cl-cc profile' folded-stack to SVG flame graph generation."
@@ -194,4 +194,4 @@
       (%with-cli-error-handler
         (%write-flamegraph-from-perf-data output :input-path input)
         (format t "~A~%" output)
-        (uiop:quit 0)))))
+        (%cli-exit 0)))))

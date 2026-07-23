@@ -24,6 +24,33 @@
       url = "github:nerima-lisp/cl-weave";
       flake = false;
     };
+    # Five further nerima-lisp toolkits are adopted the same way (plain source
+    # trees, built with cl-cc's own sbcl.buildASDFSystem): cl-parser-kit backs
+    # packages/parse's tokenizer/combinator/Pratt layer, cl-dataflow backs the
+    # packages/pipeline pass-graph orchestration, cl-boundary-kit provides the
+    # testable I/O boundaries used by packages/cli + packages/repl, cl-cli is
+    # the declarative argument parser behind packages/cli, and cl-tty-kit
+    # provides the ANSI/screen/input primitives for the interactive REPL.
+    cl-parser-kit = {
+      url = "github:nerima-lisp/cl-parser-kit";
+      flake = false;
+    };
+    cl-dataflow = {
+      url = "github:nerima-lisp/cl-dataflow";
+      flake = false;
+    };
+    cl-boundary-kit = {
+      url = "github:nerima-lisp/cl-boundary-kit";
+      flake = false;
+    };
+    cl-cli = {
+      url = "github:nerima-lisp/cl-cli";
+      flake = false;
+    };
+    cl-tty-kit = {
+      url = "github:nerima-lisp/cl-tty-kit";
+      flake = false;
+    };
   };
 
   outputs =
@@ -55,7 +82,57 @@
             src = inputs.cl-weave;
             systems = [ "cl-weave" ];
           };
-          asdf = import ./nix/asdf-systems.nix { inherit pkgs lib sbcl clProlog clWeave; };
+          # cl-parser-kit / cl-tty-kit / cl-boundary-kit are self-contained
+          # (tty-kit only pulls the SBCL-bundled sb-posix). cl-dataflow and
+          # cl-cli both depend on the external cl-prolog engine in production,
+          # so clProlog is threaded into their lispLibs and thereby reaches any
+          # cl-cc package that consumes them transitively.
+          clParserKit = sbcl.buildASDFSystem {
+            pname = "cl-parser-kit";
+            version = "0.2.0";
+            src = inputs.cl-parser-kit;
+            systems = [ "cl-parser-kit" ];
+          };
+          clDataflow = sbcl.buildASDFSystem {
+            pname = "cl-dataflow";
+            version = "0.2.0";
+            src = inputs.cl-dataflow;
+            systems = [ "cl-dataflow" ];
+            lispLibs = [ clProlog ];
+          };
+          clBoundaryKit = sbcl.buildASDFSystem {
+            pname = "cl-boundary-kit";
+            version = "0.4.0";
+            src = inputs.cl-boundary-kit;
+            systems = [ "cl-boundary-kit" ];
+          };
+          clCli = sbcl.buildASDFSystem {
+            pname = "cl-cli";
+            version = "0.2.0";
+            src = inputs.cl-cli;
+            systems = [ "cl-cli" ];
+            lispLibs = [ clProlog ];
+          };
+          clTtyKit = sbcl.buildASDFSystem {
+            pname = "cl-tty-kit";
+            version = "0.3.0";
+            src = inputs.cl-tty-kit;
+            systems = [ "cl-tty-kit" ];
+          };
+          asdf = import ./nix/asdf-systems.nix {
+            inherit
+              pkgs
+              lib
+              sbcl
+              clProlog
+              clWeave
+              clParserKit
+              clDataflow
+              clBoundaryKit
+              clCli
+              clTtyKit
+              ;
+          };
           inherit (asdf)
             productionAsdfSystems
             testAsdfSystems
@@ -87,7 +164,13 @@
               ;
           };
           checksModule = import ./nix/checks.nix {
-            inherit pkgs lib sbclWithTests clProlog clWeave;
+            inherit
+              pkgs
+              lib
+              sbclWithTests
+              clProlog
+              clWeave
+              ;
             inherit (appsModule) apps;
             packagesDefault = binaryModule.default;
           };

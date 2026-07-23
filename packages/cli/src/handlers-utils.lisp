@@ -165,7 +165,7 @@ formatted through the optimizer diagnostic formatter, written to
                 "cli"
                 "failed"
                 (princ-to-string e)))
-       (uiop:quit 1))))
+       (%cli-exit 1))))
 
 (defun %first-line (text)
   "Return first line of TEXT, or empty string when TEXT is NIL."
@@ -329,7 +329,7 @@ Accepts either a path to a .asd file or a system name for Quicklisp installation
                      ~%  Use `cl-cc install path/to/system.asd` for local systems.~
                      ~%  Ensure Quicklisp is loaded with (ql:quickload ...) for remote packages."
                     spec))))
-      (uiop:quit 0))))
+      (%cli-exit 0))))
 
 (defun %do-uninstall (parsed)
   "Handle `cl-cc uninstall' for local ASDF system registry entries."
@@ -338,4 +338,4 @@ Accepts either a path to a .asd file or a system name for Quicklisp installation
       (if (%unregister-system name)
           (format t "Uninstalled ~A~%" name)
           (format t "System not registered: ~A~%" name))
-      (uiop:quit 0))))
+      (%cli-exit 0))))

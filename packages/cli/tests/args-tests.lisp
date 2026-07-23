@@ -146,11 +146,11 @@
 ;;; Edge cases — special tokens
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cli-args-single-dash-is-positional
-  "parse-args: a lone '-' is not a flag — it becomes the command"
-  (let ((p (cl-cc/cli:parse-args '("-"))))
-    (assert-string= "-" (cl-cc/cli:parsed-args-command p))
-    (assert-null (cl-cc/cli:parsed-args-positional p))))
+(deftest cli-args-single-dash-signals-unexpected
+  "parse-args: since the migration onto cl-cli, a lone '-' is an unexpected
+positional (there is no subcommand named '-'), so it signals arg-parse-error
+rather than being accepted as a command."
+  (assert-signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args '("-"))))
 
 (deftest cli-args-empty-inline-value
   "parse-args: '--output=' stores the empty string as the value"
@@ -184,14 +184,23 @@
 
 (deftest-each cli-args-error-cases
   "Various invalid argv inputs signal arg-parse-error."
+  ;; NOTE: since the migration onto cl-cli, a bare "--" is the standard
+  ;; end-of-options separator (no longer an error); see
+  ;; cli-args-double-dash-separator below.
   :cases (("unknown-flag"         '("run" "--totally-unknown"))
-          ("double-dash"          '("--"))
           ("bool-with-value"      '("run" "--stdlib=true"))
           ("triple-dash"          '("run" "---foo"))
           ("missing-output-long"  '("compile" "f.lisp" "--output"))
           ("missing-output-short" '("compile" "f.lisp" "-o")))
   (argv)
   (assert-signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv)))
+
+(deftest cli-args-double-dash-separator
+  "parse-args: a bare '--' is the end-of-options separator (cl-cli semantics),
+yielding an empty parse rather than signalling an error."
+  (let ((p (cl-cc/cli:parse-args '("--"))))
+    (assert-null (cl-cc/cli:parsed-args-command p))
+    (assert-null (cl-cc/cli:parsed-args-positional p))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Combined invocations

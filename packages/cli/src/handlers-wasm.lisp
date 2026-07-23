@@ -164,7 +164,7 @@ export async function instantiate(imports = {}) {~%
           (%write-string-file (%wasm-sidecar-path out "wat") (cl-cc/codegen:wasm-aot-result-wat result))
           (when (flag parsed "--validate")
             (unless (%wasm-validate-file out)
-              (uiop:quit 1)))
+              (%cli-exit 1)))
           (let* ((sha256 (cl-cc/codegen:wasm-file-content-hash out :bits 256))
                  (sha384 (cl-cc/codegen:wasm-file-content-hash out :bits 384))
                  (integrity (when (or (flag parsed "--sri") (flag parsed "--streaming"))

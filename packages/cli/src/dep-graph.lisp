@@ -1,22 +1,18 @@
 ;;;; cli/src/dep-graph.lisp — FR-361 Dependency Graph Visualization
+;;;;
+;;;; The ASDF dependency graph is modeled with the external cl-dataflow library:
+;;;; systems and their dependencies become a real cl-dataflow graph, and the
+;;;; DOT / Mermaid renderings and the topological build order come straight from
+;;;; cl-dataflow (graph->dot, graph->mermaid, topological-sort, graph-acyclic-p)
+;;;; rather than hand-assembled output.
+
 (in-package :cl-cc/cli)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; FR-361: Dependency Graph Visualization
-;;; `./cl-cc dep-graph [--format dot|json]` outputs a dependency graph
-;;; of the current ASDF system in Graphviz DOT or JSON format.
+;;; `./cl-cc dep-graph [--format dot|json|mermaid|topo]` outputs a dependency
+;;; graph of the registered ASDF systems.
 ;;; ─────────────────────────────────────────────────────────────────────────
-
-(defun %dep-graph-edge-dot (from to &optional (label nil))
-  (format t "  ~S -> ~S~@[ [label=~S]~];~%"
-          (string-downcase (string from))
-          (string-downcase (string to))
-          label))
-
-(defun %dep-graph-edge-json (from edges-seen)
-  (unless (gethash from edges-seen)
-    (format t "  ~S: []~%" (string-downcase (string from)))
-    (setf (gethash from edges-seen) t)))
 
 (defun %asdf-system-dependencies (system)
   "Return a list of (system-name . dep-system-name) pairs for SYSTEM."
@@ -41,58 +37,86 @@
           (error () nil))))
     edges))
 
-(defun %dep-graph-dot (edges)
-  "Output edges in Graphviz DOT format."
-  (format t "digraph ASDF_Dependencies {~%")
-  (format t "  node [shape=box, style=rounded];~%")
-  (format t "  rankdir=TB;~%")
-  (dolist (edge edges)
-    (%dep-graph-edge-dot (car edge) (cdr edge)))
-  (format t "}~%"))
+(defun %dep-node-name (name)
+  "Normalize an ASDF system/dependency designator to a lowercased node name."
+  (string-downcase (string name)))
 
-(defun %dep-graph-json (edges)
-  "Output edges in simple JSON adjacency list format."
+(defun %build-dependency-graph ()
+  "Build a cl-dataflow graph of registered ASDF systems: every system and
+dependency becomes a node, and each dependency becomes a directed edge."
+  (let ((graph (cl-dataflow:make-graph))
+        (added (make-hash-table :test #'equal)))
+    (flet ((ensure-node (name)
+             (unless (gethash name added)
+               (setf (gethash name added) t)
+               (cl-dataflow:add-node graph (cl-dataflow:make-node name)))))
+      (dolist (edge (%collect-asdf-dependency-edges))
+        (let ((from (%dep-node-name (car edge)))
+              (to   (%dep-node-name (cdr edge))))
+          (ensure-node from)
+          (ensure-node to)
+          (ignore-errors (cl-dataflow:add-edge graph from to)))))
+    graph))
+
+(defun %dep-graph-json (graph)
+  "Render GRAPH as a simple JSON adjacency list, sourced from the cl-dataflow
+graph's edges."
+  ;; cl-dataflow's edge-from / edge-to already return the endpoint node name.
   (let ((nodes (make-hash-table :test #'equal)))
-    (dolist (edge edges)
-      (let* ((from (string-downcase (string (car edge))))
-             (to   (string-downcase (string (cdr edge)))))
-        (push to (gethash from nodes))))
+    (dolist (edge (cl-dataflow:graph-edges graph))
+      (push (cl-dataflow:edge-to edge)
+            (gethash (cl-dataflow:edge-from edge) nodes)))
     (format t "{~%")
     (let ((first t))
       (maphash (lambda (node deps)
-                 (if first
-                     (setf first nil)
-                     (format t ",~%"))
-                 (setf deps (delete-duplicates deps :test #'equal))
-                 (format t "  ~S: [~{~S~^, ~}]" node deps))
+                 (if first (setf first nil) (format t ",~%"))
+                 (format t "  ~S: [~{~S~^, ~}]"
+                         node (delete-duplicates deps :test #'equal)))
                nodes))
     (format t "~%}~%")))
 
+(defun %dep-graph-topo (graph)
+  "Print the topological build order of GRAPH (a genuine cl-dataflow query),
+noting whether the dependency graph is acyclic."
+  (if (cl-dataflow:graph-acyclic-p graph)
+      (progn
+        (format t "; topological build order (~:[has cycles~;acyclic~]):~%"
+                (cl-dataflow:graph-acyclic-p graph))
+        (dolist (node (cl-dataflow:topological-sort graph))
+          (format t "~A~%" (cl-dataflow:node-name node))))
+      (format t "; dependency graph has cycles; no topological order~%")))
+
 (defun dep-graph (&key (output-format :dot))
   "Generate a dependency graph of registered ASDF systems.
-OUTPUT-FORMAT can be :dot (Graphviz DOT) or :json (JSON adjacency list)."
-  (let ((edges (%collect-asdf-dependency-edges)))
+OUTPUT-FORMAT is :dot, :json, :mermaid, or :topo."
+  (let ((graph (%build-dependency-graph)))
     (ecase output-format
-      (:dot  (%dep-graph-dot edges))
-      (:json (%dep-graph-json edges)))))
+      (:dot     (princ (cl-dataflow:graph->dot graph :name "ASDF_Dependencies"))
+                (terpri))
+      (:mermaid (princ (cl-dataflow:graph->mermaid graph))
+                (terpri))
+      (:topo    (%dep-graph-topo graph))
+      (:json    (%dep-graph-json graph)))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CLI entry point
 ;;; ─────────────────────────────────────────────────────────────────────────
 
 (defun %parse-dep-graph-args (args)
-  "Parse --format dot|json from ARGS. Returns :dot or :json."
+  "Parse --format dot|json|mermaid|topo from ARGS.  Returns a keyword."
   (let ((format :dot))
     (loop for arg in args
           for next-arg = (nth (1+ (position arg args :test #'string=)) args)
           when (string= arg "--format")
-          do (cond
-               ((string-equal next-arg "json") (setf format :json))
-               ((string-equal next-arg "dot")  (setf format :dot))))
+            do (cond
+                 ((string-equal next-arg "json")    (setf format :json))
+                 ((string-equal next-arg "mermaid") (setf format :mermaid))
+                 ((string-equal next-arg "topo")    (setf format :topo))
+                 ((string-equal next-arg "dot")     (setf format :dot))))
     format))
 
 (defun %handle-dep-graph (args)
-  "CLI handler for `cl-cc dep-graph [--format dot|json]`."
+  "CLI handler for `cl-cc dep-graph [--format dot|json|mermaid|topo]`."
   (let ((format (%parse-dep-graph-args args)))
     (if (find-package :asdf)
         (progn

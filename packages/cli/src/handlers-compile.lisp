@@ -33,7 +33,7 @@ For files: compiles a single source file to native binary or IR dump."
                                                    :bolt (flag parsed "--bolt")
                                                    :bolt-profile (flag parsed "--bolt-profile"))))
             (format t "~A~%" result)
-            (uiop:quit 0))
+            (%cli-exit 0))
           "system-compile")
         (return-from %do-compile))
       ;; ── File compilation path ──
@@ -86,13 +86,13 @@ For files: compiles a single source file to native binary or IR dump."
                   (let ((phase (%parse-ir-phase dump-ir)))
                     (unless phase
                       (format *error-output* "Error: unknown IR phase ~A~%" dump-ir)
-                      (uiop:quit 2))
+                      (%cli-exit 2))
                     (let* ((source (%read-command-source file))
                            (result (apply #'compile-source source
                                           :target (%compile-target-keyword arch-str)
                                           (%compile-opts-kwargs opts nil))))
                       (%dump-ir-phase phase result *standard-output* annotate)
-                      (uiop:quit 0)))
+                      (%cli-exit 0)))
                   (%call-with-optional-output-file
                    (compile-opts-trace-json-path opts)
                    (lambda (stream)
@@ -129,4 +129,4 @@ For files: compiles a single source file to native binary or IR dump."
                                  (compile-opts-build-id opts))
                          (%apply-reproducible-build-options result parsed))
                        (format t "~A~%" result)
-                       (uiop:quit 0))))))))))))
+                       (%cli-exit 0))))))))))))

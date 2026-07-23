@@ -25,7 +25,7 @@ with a source caret and type trace on failure."
               (if inferred-type
                   (format t "~A~%" (type-to-string inferred-type))
                   (format t "<no type inferred>~%")))
-            (uiop:quit 0))
+            (%cli-exit 0))
         (error (e)
           (let* ((message (princ-to-string e))
                  (location (and (typep e 'cl-cc/ast:ast-compilation-error)
@@ -49,7 +49,7 @@ with a source caret and type trace on failure."
                 (format *error-output* "at ~A~%" location))
               (format *error-output* "~A~%" snippet)
               (format *error-output* "~A~%" trace)))
-            (uiop:quit 1))))))
+            (%cli-exit 1))))))
 
 ;;; ──── Phase 129-160: Advanced Compilation III Handlers ────
 
@@ -189,7 +189,7 @@ with a source caret and type trace on failure."
         (format t "Updating ~A...~%" (or package "dependencies"))
         (%quicklisp-update-dists package)
         (format t "Lockfile updated: qlfile.lock~%"))
-      (uiop:quit 0))))
+      (%cli-exit 0))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; FR-361: Dependency Graph Visualization

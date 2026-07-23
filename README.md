@@ -588,7 +588,23 @@ cl-cc check <file>        Type-check without executing
 cl-cc selfhost [file]     Run the self-hosting workload
   --timeout <seconds>     Maximum execution time (default: 30)
   --no-timeout            Disable CLI timeout for debugging
+cl-cc dep-graph           ASDF dependency graph (cl-dataflow)
+  --format dot|json|mermaid|topo   Output format (default: dot)
+cl-cc completion <shell>  Shell completion script (bash|zsh|fish|powershell|nushell|elvish)
+cl-cc docs [format]       Reference docs (markdown|man|json)
+cl-cc version             Print the cl-cc version
 ```
+
+The CLI argument parser is the external
+[cl-cli](https://github.com/nerima-lisp/cl-cli) library; `completion`, `docs`,
+and `version` are generated from the same declarative application spec.
+Terminal styling (REPL + IR dumps) uses
+[cl-tty-kit](https://github.com/nerima-lisp/cl-tty-kit), process-exit I/O flows
+through [cl-boundary-kit](https://github.com/nerima-lisp/cl-boundary-kit), the
+`dep-graph` command is modeled with
+[cl-dataflow](https://github.com/nerima-lisp/cl-dataflow), and the optimizer
+`--pass-pipeline` spec is tokenized with
+[cl-parser-kit](https://github.com/nerima-lisp/cl-parser-kit).
 
 ## Contributing
 

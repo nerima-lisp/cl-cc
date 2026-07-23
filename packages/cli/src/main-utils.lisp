@@ -109,7 +109,7 @@ Returns :lisp, :elisp, :php, or :javascript."
   "Print MESSAGE, show command help, and exit with usage status 2."
   (format *error-output* "Error: ~A~%" message)
   (%print-help command)
-  (uiop:quit 2))
+  (%cli-exit 2))
 
 (defun %required-file-arg (parsed command)
   "Return the first positional file argument or exit with command usage help."
@@ -122,7 +122,7 @@ Returns :lisp, :elisp, :php, or :javascript."
   (handler-case (%strip-shebang-line (%read-file file))
     (error (e)
       (format *error-output* "Error reading ~A: ~A~%" file e)
-      (uiop:quit 1))))
+      (%cli-exit 1))))
 
 (defun %maybe-make-profiled-vm-state (opts)
   "Create a profiled VM state when profiling outputs are requested."
@@ -261,7 +261,7 @@ Returns :lisp, :elisp, :php, or :javascript."
       (handler-case (sb-ext:with-timeout seconds (funcall thunk))
         (sb-ext:timeout (c) (declare (ignore c))
           (format *error-output* "~&Error: ~A timed out after ~A second~:P~%" command-name seconds)
-          (uiop:quit 124)))
+          (%cli-exit 124)))
       (funcall thunk)))
 
 (defmacro %with-cli-timeout ((parsed command-name) &body body)

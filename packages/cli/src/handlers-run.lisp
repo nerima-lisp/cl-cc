@@ -66,4 +66,4 @@ exits with status 0 on success."
                     (if watch
                         (%watch-file-poll file vm-state)
                         ret))))))
-           (uiop:quit 0)))))))
+           (%cli-exit 0)))))))

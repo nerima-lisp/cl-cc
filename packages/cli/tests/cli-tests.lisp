@@ -140,8 +140,112 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
   "The CLI dispatch table still exposes the expected public commands."
   (let ((commands (mapcar #'car cl-cc/cli::*cli-command-dispatch*)))
     (dolist (expected '("run" "compile" "eval" "repl" "check" "selfhost"
-                        "symbols" "profile" "compile-commands"))
+                        "symbols" "profile" "compile-commands"
+                        ;; cl-cli-backed commands added by the migration
+                        "completion" "docs" "version"))
       (assert-true (member expected commands :test #'string=)))))
+
+;;; ─────────────────────────────────────────────────────────────────────────
+;;; cl-cli integration — the migrated parser + generated app spec
+;;; ─────────────────────────────────────────────────────────────────────────
+
+(deftest cli-cl-cli-app-covers-every-flag-spec-entry
+  "Every non-short flag in *flag-spec* is represented as a cl-cli option in the
+generated application spec, so the parser and the generated docs/completions
+can never drift from the accepted flag set."
+  (let* ((app cl-cc/cli::*cl-cc-cli-app*)
+         (option-names (loop for opt in (cl-cli:app-global-options app)
+                             append (cl-cli:option-names opt))))
+    (assert-true app)
+    (dolist (entry cl-cc/cli::*flag-spec*)
+      (let ((flag (car entry)))
+        (unless (member flag cl-cc/cli::*cli-skip-flags* :test #'string=)
+          ;; option-names carries the dashless long name (e.g. "arch");
+          ;; cl-cli canonicalizes case, so compare case-insensitively.
+          (assert-true
+           (member (string-left-trim "-" flag) option-names :test #'string-equal)))))))
+
+(deftest cli-cl-cli-completion-renders-for-each-shell
+  "cl-cc completion delegates to cl-cli and renders a non-empty script for
+every supported shell."
+  (dolist (shell '("bash" "zsh" "fish" "powershell" "nushell" "elvish"))
+    (let ((script (with-output-to-string (out)
+                    (cl-cli:render-completion cl-cc/cli::*cl-cc-cli-app* shell out))))
+      (assert-true (> (length script) 50)))))
+
+(deftest cli-cl-cli-docs-render-markdown-and-json
+  "cl-cc docs renders reference documentation in markdown and JSON via cl-cli."
+  (let ((md (with-output-to-string (out)
+              (cl-cli:render-docs cl-cc/cli::*cl-cc-cli-app* "markdown" out)))
+        (json (with-output-to-string (out)
+                (cl-cli:render-docs cl-cc/cli::*cl-cc-cli-app* "json" out))))
+    (assert-true (search "cl-cc" md))
+    (assert-true (search "compile" md))
+    (assert-true (search "cl-cc" json))))
+
+(deftest cli-version-command-prints-version
+  "cl-cc version prints the version carried by the cl-cli app spec."
+  (let ((out (with-output-to-string (*standard-output*)
+               (cl-cc/cli::%do-version (cl-cc/cli:make-parsed-args)))))
+    (assert-true (search cl-cc/cli::*version* out))))
+
+;;; ─────────────────────────────────────────────────────────────────────────
+;;; cl-tty-kit integration — terminal styling
+;;; ─────────────────────────────────────────────────────────────────────────
+
+(deftest cli-tty-ansi-constants-are-cl-tty-kit-sgr
+  "The IR-dump ANSI color constants are built by cl-tty-kit:ansi-sgr and remain
+byte-identical to raw ESC[Nm sequences."
+  (let ((esc (string (code-char 27))))
+    (assert-string= (concatenate 'string esc "[0m") cl-cc/cli::+ansi-reset+)
+    (assert-string= (concatenate 'string esc "[34m") cl-cc/cli::+ansi-opcode+)
+    (assert-string= (cl-tty-kit:ansi-sgr 32) cl-cc/cli::+ansi-label+)))
+
+(deftest cli-tty-style-gating
+  "REPL styling wraps text in SGR when *repl-color* is forced on and leaves it
+untouched when forced off (so captured/piped output stays plain)."
+  (let ((cl-cc/cli::*repl-color* t))
+    (assert-string= (concatenate 'string (cl-tty-kit:ansi-sgr 32) "* "
+                                 (cl-tty-kit:ansi-sgr 0))
+                    (cl-cc/cli::%style-prompt "* ")))
+  (let ((cl-cc/cli::*repl-color* nil))
+    (assert-string= "hi" (cl-cc/cli::%style-banner "hi"))
+    (assert-string= "oops" (cl-cc/cli::%style-error "oops"))))
+
+;;; ─────────────────────────────────────────────────────────────────────────
+;;; cl-boundary-kit integration — process exit boundary
+;;; ─────────────────────────────────────────────────────────────────────────
+
+(deftest cli-boundary-exit-captured-by-test-boundary
+  "%cli-exit routes CLI termination through the cl-boundary-kit system boundary,
+so a test system boundary records the exit codes instead of terminating the
+image — the whole point of modeling process exit as a boundary."
+  (let* ((system (cl-boundary-kit:make-test-system-boundary))
+         (cl-cc/cli::*cli-boundaries*
+           (cl-boundary-kit:make-boundary-context :system system)))
+    (cl-cc/cli::%cli-exit 2)
+    (cl-cc/cli::%cli-exit 0)
+    (assert-equal '(2 0) (cl-boundary-kit:test-system-exit-codes system))))
+
+;;; ─────────────────────────────────────────────────────────────────────────
+;;; cl-dataflow integration — dependency graph modeling
+;;; ─────────────────────────────────────────────────────────────────────────
+
+(deftest cli-dep-graph-backed-by-cl-dataflow
+  "dep-graph builds a real cl-dataflow graph of the registered ASDF systems and
+renders it through cl-dataflow in DOT / JSON / Mermaid / topological form."
+  (let ((graph (cl-cc/cli::%build-dependency-graph)))
+    (assert-true (member "cl-cc" (cl-dataflow:graph-node-names graph)
+                         :test #'string=))
+    ;; every renderer produces non-empty output mentioning cl-cc systems
+    (dolist (fmt '(:dot :json :mermaid :topo))
+      (let ((out (with-output-to-string (*standard-output*)
+                   (cl-cc/cli::dep-graph :output-format fmt))))
+        (assert-true (search "cl-cc" out))))
+    ;; DOT output is a real Graphviz digraph
+    (let ((dot (with-output-to-string (*standard-output*)
+                 (cl-cc/cli::dep-graph :output-format :dot))))
+      (assert-true (search "digraph" dot)))))
 
 (deftest cli-symbol-index-fuzzy-finds-definitions
   "FR-440: workspace symbol index covers core definition forms and fuzzy search."

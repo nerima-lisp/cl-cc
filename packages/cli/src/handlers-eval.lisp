@@ -45,7 +45,7 @@ status 0 on success or 2 when the expression is missing."
     (unless expr
       (format *error-output* "Error: 'eval' requires an expression argument.~%")
       (%print-help "eval")
-      (uiop:quit 2))
+      (%cli-exit 2))
     (%with-cli-timeout (parsed "eval")
       (let* ((stdlib (flag parsed "--stdlib"))
              (lang-flag (or (flag parsed "--lang") ""))
@@ -80,4 +80,4 @@ status 0 on success or 2 when the expression is missing."
                          (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
                          (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))
                  (format t "~S~%" result))))
-            (uiop:quit 0)))))))
+            (%cli-exit 0)))))))
