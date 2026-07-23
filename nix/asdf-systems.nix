@@ -8,6 +8,12 @@
   clBoundaryKit,
   clCli,
   clTtyKit,
+  # cl-cc-ast / cl-cc-type were split into their own repos. They are supplied
+  # here as prebuilt external derivations and injected into the internal
+  # system graph under their original names (see externalCcSystems below), so
+  # every `deps = [ "cl-cc-ast" ... ]` keeps resolving without change.
+  clCcAst,
+  clCcType,
   ...
 }:
 let
@@ -47,14 +53,11 @@ let
       lispLibs = (map (n: allSystems.${n}) deps) ++ extraLispLibs;
     };
 
-  # 14 leaf systems — preserved verbatim from the original flake.nix.
+  # Leaf systems built from packages/. cl-cc-ast and cl-cc-type used to live
+  # here but are now external (externalCcSystems, overlaid into the fixpoint).
   leafSpec = {
     cl-cc-bootstrap = {
       src = "packages/bootstrap";
-      deps = [ ];
-    };
-    cl-cc-ast = {
-      src = "packages/ast";
       deps = [ ];
     };
     cl-cc-binary = {
@@ -76,10 +79,6 @@ let
     cl-cc-mir = {
       src = "packages/mir";
       deps = [ ];
-    };
-    cl-cc-type = {
-      src = "packages/type";
-      deps = [ "cl-cc-ast" ];
     };
     cl-cc-parse = {
       src = "packages/parse";
@@ -271,7 +270,12 @@ let
         (projectRoot + "/cl-cc.asd")
         (projectRoot + "/cl-cc-test.asd")
       ];
-      deps = leafNames;
+      # leafNames no longer includes the externalised ast/type; add them
+      # explicitly so the umbrella closure still pulls both external systems.
+      deps = leafNames ++ [
+        "cl-cc-ast"
+        "cl-cc-type"
+      ];
     };
     cl-cc-cli = {
       src = "packages/cli";
@@ -305,9 +309,16 @@ let
     };
   };
 
+  # External subsystems, keyed by the names the internal graph depends on.
+  # Overlaid onto the fixpoint below so `deps` lookups resolve to them.
+  externalCcSystems = {
+    cl-cc-ast = clCcAst;
+    cl-cc-type = clCcType;
+  };
+
   productionAsdfSystems = lib.fix (
     sys:
-    lib.mapAttrs (
+    (lib.mapAttrs (
       name:
       {
         src,
@@ -323,7 +334,8 @@ let
           ;
         allSystems = sys;
       }
-    ) (leafSpec // derivedSpec)
+    ) (leafSpec // derivedSpec))
+    // externalCcSystems
   );
 
   # Prolog-based call-graph analysis tools (packages/prolog-tools), built on
