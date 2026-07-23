@@ -1,16 +1,8 @@
 ;;;; tests/unit/cli/main-tests.lisp — CLI main help tests
 (in-package :cl-cc/test)
 
-(defsuite cl-cc-cli-serial-suite
-  :description "Serial CLI unit tests that temporarily override process-wide quit hooks"
-  :parent cl-cc-unit-suite
-  :parallel nil)
 
-(defsuite cl-cc-cli-pure-suite
-  :description "Parallel CLI unit tests (pure helpers, no function replacement)"
-  :parent cl-cc-unit-suite)
 
-(in-suite cl-cc-cli-serial-suite)
 
 (defmacro %with-cli-function-overrides (bindings &body body)
   "Temporarily override global function bindings used by CLI unit tests."
@@ -36,72 +28,197 @@
      (catch 'cl-cc-cli-quit
        ,@body)))
 
-(deftest-each cli-print-global-help
-  "Global help text includes the command usage banner, shared flags, and version."
-  :cases (("usage"       "Usage: cl-cc <command>")
-          ("debug"       "--debug")
-          ("opt-remarks" "--opt-remarks <mode>")
-          ("time-passes" "--time-passes")
-          ("trace-json"  "--trace-json <file>")
-           ("flamegraph"  "--flamegraph <file>")
-           ("stats"       "--stats")
-           ("trace-emit"  "--trace-emit")
-          ("timeout"     "--timeout <seconds>")
-          ("no-timeout"  "--no-timeout")
-           ("version"     "Version: 0.1.0"))
-  (expected-str)
-  (let ((out (with-output-to-string (s)
+(it-sequential "cli-print-global-help usage"
+  (destructuring-bind (expected-str) (list "Usage: cl-cc <command>")
+    (let ((out (with-output-to-string (s)
                (let ((*standard-output* s)
                      (*error-output* s))
                  (cl-cc/cli::%print-global-help)))))
-    (assert-true (search expected-str out))))
+    (expect (search expected-str out) :to-be-truthy))))
 
-(deftest-each cli-print-command-help
-  "Command help for 'run' includes shared flags and its own description."
-  :cases (("usage"       "Usage: cl-cc run")
-          ("opt-remarks" "--opt-remarks <mode>")
-          ("time-passes" "--time-passes")
-          ("trace-json"  "--trace-json <file>")
-          ("flamegraph"  "--flamegraph <file>")
-           ("stats"       "--stats")
-           ("trace-emit"  "--trace-emit")
-          ("timeout"     "default: 30 seconds")
-          ("no-timeout"  "--no-timeout")
-          ("stdlib"      "Prepend standard library"))
-  (expected-str)
-  (let ((out (with-output-to-string (s)
+(it-sequential "cli-print-global-help debug"
+  (destructuring-bind (expected-str) (list "--debug")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help opt-remarks"
+  (destructuring-bind (expected-str) (list "--opt-remarks <mode>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help time-passes"
+  (destructuring-bind (expected-str) (list "--time-passes")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help trace-json"
+  (destructuring-bind (expected-str) (list "--trace-json <file>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help flamegraph"
+  (destructuring-bind (expected-str) (list "--flamegraph <file>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help stats"
+  (destructuring-bind (expected-str) (list "--stats")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help trace-emit"
+  (destructuring-bind (expected-str) (list "--trace-emit")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help timeout"
+  (destructuring-bind (expected-str) (list "--timeout <seconds>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help no-timeout"
+  (destructuring-bind (expected-str) (list "--no-timeout")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-global-help version"
+  (destructuring-bind (expected-str) (list "Version: 0.1.0")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-global-help)))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help usage"
+  (destructuring-bind (expected-str) (list "Usage: cl-cc run")
+    (let ((out (with-output-to-string (s)
                (let ((*standard-output* s)
                      (*error-output* s))
                  (cl-cc/cli::%print-command-help "run")))))
-    (assert-true (search expected-str out))))
+    (expect (search expected-str out) :to-be-truthy))))
 
-(deftest cli-print-compile-help-includes-debug-flag
-  "Compile help text documents the --debug frame-pointer opt-out flag."
+(it-sequential "cli-print-command-help opt-remarks"
+  (destructuring-bind (expected-str) (list "--opt-remarks <mode>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help time-passes"
+  (destructuring-bind (expected-str) (list "--time-passes")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help trace-json"
+  (destructuring-bind (expected-str) (list "--trace-json <file>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help flamegraph"
+  (destructuring-bind (expected-str) (list "--flamegraph <file>")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help stats"
+  (destructuring-bind (expected-str) (list "--stats")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help trace-emit"
+  (destructuring-bind (expected-str) (list "--trace-emit")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help timeout"
+  (destructuring-bind (expected-str) (list "default: 30 seconds")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help no-timeout"
+  (destructuring-bind (expected-str) (list "--no-timeout")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-command-help stdlib"
+  (destructuring-bind (expected-str) (list "Prepend standard library")
+    (let ((out (with-output-to-string (s)
+               (let ((*standard-output* s)
+                     (*error-output* s))
+                 (cl-cc/cli::%print-command-help "run")))))
+    (expect (search expected-str out) :to-be-truthy))))
+
+(it-sequential "cli-print-compile-help-includes-debug-flag"
   (let ((out (with-output-to-string (s)
                (let ((*standard-output* s)
                      (*error-output* s))
                  (cl-cc/cli::%print-command-help "compile")))))
-    (assert-true (search "--debug" out))))
+    (expect (search "--debug" out) :to-be-truthy)))
 
-(deftest cli-print-repl-help-is-language-neutral
-  "REPL help no longer claims ANSI Common Lisp only and documents --lang."
+(it-sequential "cli-print-repl-help-is-language-neutral"
   (let ((out (with-output-to-string (s)
                (let ((*standard-output* s)
                      (*error-output* s))
                  (cl-cc/cli::%print-command-help "repl")))))
-    (assert-false (search "ANSI Common Lisp" out))
-    (assert-true (search "--lang lisp|elisp|php|js|javascript" out))))
+    (expect (search "ANSI Common Lisp" out) :to-be-falsy)
+    (expect (search "--lang lisp|elisp|php|js|javascript" out) :to-be-truthy)))
 
-(deftest cli-print-eval-help-documents-elisp-language
-  "Eval help documents the expanded language selector."
+(it-sequential "cli-print-eval-help-documents-elisp-language"
   (let ((out (with-output-to-string (s)
                (let ((*standard-output* s)
                      (*error-output* s))
                  (cl-cc/cli::%print-command-help "eval")))))
-    (assert-true (search "--lang lisp|elisp|php|js|javascript" out))))
+    (expect (search "--lang lisp|elisp|php|js|javascript" out) :to-be-truthy)))
 
-(deftest cli-print-unknown-command-falls-back
-  "Unknown command help prints an error and falls back to global help."
+(it-sequential "cli-print-unknown-command-falls-back"
   (let ((out (make-string-output-stream))
         (err (make-string-output-stream)))
     (let ((*standard-output* out)
@@ -109,39 +226,35 @@
       (cl-cc/cli::%print-command-help "not-a-command"))
     (let ((stdout (get-output-stream-string out))
           (stderr (get-output-stream-string err)))
-      (assert-true (search "Usage: cl-cc <command>" stdout))
-      (assert-true (search "Unknown command: not-a-command" stderr)))))
+      (expect (search "Usage: cl-cc <command>" stdout) :to-be-truthy)
+      (expect (search "Unknown command: not-a-command" stderr) :to-be-truthy))))
 
-(deftest cli-main-shows-global-help-with-no-command
-  "main prints global help and exits 0 when no command is supplied."
+(it-sequential "cli-main-shows-global-help-with-no-command"
   (%with-cli-function-overrides
       ((uiop:command-line-arguments (lambda () '())))
     (let ((out (with-output-to-string (s)
                  (let ((*standard-output* s)
                        (*error-output* s))
-                   (assert-equal 0 (%with-captured-quit (cl-cc/cli:main)))))))
-      (assert-true (search "Usage: cl-cc <command>" out)))))
+                   (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)))))
+      (expect (search "Usage: cl-cc <command>" out) :to-be-truthy))))
 
-(deftest cli-main-top-level-help-uses-command-help
-  "main dispatches top-level --help through %print-help and exits 0."
+(it-sequential "cli-main-top-level-help-uses-command-help"
   (let ((printed-command :unset))
     (%with-cli-function-overrides
         ((uiop:command-line-arguments (lambda () '("run" "--help")))
          (cl-cc/cli::%print-help (lambda (&optional command) (setf printed-command command))))
-      (assert-equal 0 (%with-captured-quit (cl-cc/cli:main)))
-      (assert-string= "run" printed-command))))
+      (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)
+      (expect printed-command :to-equal "run"))))
 
-(deftest cli-main-help-subcommand-prints-positional-help
-  "main handles the explicit help subcommand and forwards its positional command."
+(it-sequential "cli-main-help-subcommand-prints-positional-help"
   (let ((printed-command :unset))
     (%with-cli-function-overrides
         ((uiop:command-line-arguments (lambda () '("help" "compile")))
          (cl-cc/cli::%print-help (lambda (&optional command) (setf printed-command command))))
-      (assert-equal 0 (%with-captured-quit (cl-cc/cli:main)))
-      (assert-string= "compile" printed-command))))
+      (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)
+      (expect printed-command :to-equal "compile"))))
 
-(deftest cli-main-unknown-command-prints-error-and-exits-2
-  "main reports unknown commands, prints global help, and exits 2."
+(it-sequential "cli-main-unknown-command-prints-error-and-exits-2"
   (let ((printed-help nil))
     (%with-cli-function-overrides
         ((uiop:command-line-arguments (lambda () '("bogus")))
@@ -149,12 +262,11 @@
       (let ((err (with-output-to-string (s)
                    (let ((*standard-output* s)
                          (*error-output* s))
-                     (assert-equal 2 (%with-captured-quit (cl-cc/cli:main)))))))
-        (assert-true printed-help)
-        (assert-true (search "Unknown command: bogus" err))))))
+                     (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 2)))))
+        (expect printed-help :to-be-truthy)
+        (expect (search "Unknown command: bogus" err) :to-be-truthy)))))
 
-(deftest cli-main-parse-error-prints-message-and-exits-2
-  "main catches arg-parse-error, prints the message and help, and exits 2."
+(it-sequential "cli-main-parse-error-prints-message-and-exits-2"
   (let ((printed-help nil))
     (%with-cli-function-overrides
         ((uiop:command-line-arguments (lambda () '("--bad")))
@@ -165,12 +277,11 @@
       (let ((err (with-output-to-string (s)
                    (let ((*standard-output* s)
                          (*error-output* s))
-                     (assert-equal 2 (%with-captured-quit (cl-cc/cli:main)))))))
-        (assert-true printed-help)
-        (assert-true (search "boom" err))))))
+                     (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 2)))))
+        (expect printed-help :to-be-truthy)
+        (expect (search "boom" err) :to-be-truthy)))))
 
-(deftest cli-do-repl-forwards-elisp-language
-  "repl passes the selected language through to run-string-repl and prints it."
+(it-sequential "cli-do-repl-forwards-elisp-language"
   (let ((captured-language :unset)
         (captured-source :unset))
     (%with-cli-function-overrides
@@ -192,14 +303,13 @@
                     (let ((*standard-input* (make-string-input-stream (format nil "(+ 1 2)~%")))
                          (*standard-output* s)
                          (*error-output* s))
-                     (assert-equal 0 (%with-captured-quit (cl-cc/cli:main)))))))
-        (assert-equal :elisp captured-language)
-        (assert-string= "(+ 1 2)" captured-source)
-        (assert-true (search "Emacs Lisp" out))
-        (assert-true (search "=> 42" out))))))
+                     (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)))))
+        (expect captured-language :to-equal :elisp)
+        (expect captured-source :to-equal "(+ 1 2)")
+        (expect (search "Emacs Lisp" out) :to-be-truthy)
+        (expect (search "=> 42" out) :to-be-truthy)))))
 
-(deftest cli-do-eval-forwards-elisp-language
-  "eval forwards --lang elisp to compile-string and run-compiled."
+(it-sequential "cli-do-eval-forwards-elisp-language"
   (let ((captured-language :unset)
         (captured-source :unset)
         (run-called nil))
@@ -216,13 +326,12 @@
                                (setf run-called program)
                                99)))
       (let ((result (cl-cc/cli::%compile-and-run-eval-form "(+ 1 2)" nil nil :elisp nil nil nil)))
-        (assert-equal 99 result)
-        (assert-string= "(+ 1 2)" captured-source)
-        (assert-equal :elisp captured-language)
-        (assert-equal :dummy run-called)))))
+        (expect result :to-equal 99)
+        (expect captured-source :to-equal "(+ 1 2)")
+        (expect captured-language :to-equal :elisp)
+        (expect run-called :to-equal :dummy)))))
 
-(deftest cli-do-compile-dump-ir-forwards-elisp-language
-  "compile passes --lang elisp through the dump-ir path."
+(it-sequential "cli-do-compile-dump-ir-forwards-elisp-language"
   (let ((captured-language :unset)
         (captured-source :unset))
     (labels ((%run-dump-ir-compile-path (file language)
@@ -246,11 +355,10 @@
                                        captured-language (getf args :language))
                                  (cl-cc:make-compilation-result :program :dummy))))
         (%run-dump-ir-compile-path "input.el" :elisp)
-      (assert-string= "(+ 1 2)" captured-source)
-      (assert-equal :elisp captured-language)))))
+      (expect captured-source :to-equal "(+ 1 2)")
+      (expect captured-language :to-equal :elisp)))))
 
-(deftest cli-wasm-helper-forwards-elisp-language
-  "wasm helper preserves elisp instead of downcasting it."
+(it-sequential "cli-wasm-helper-forwards-elisp-language"
   (let ((captured-language :unset)
         (captured-source :unset))
     (%with-cli-function-overrides
@@ -259,6 +367,6 @@
                                        captured-language (getf args :language))
                                  (cl-cc:make-compilation-result :program :dummy))))
       (let ((result (cl-cc/cli::%wasm-compile-source-to-vm-result "(+ 1 2)" "input.el" :elisp nil)))
-        (assert-equal :dummy (cl-cc:compilation-result-program result))
-        (assert-string= "(+ 1 2)" captured-source)
-        (assert-equal :elisp captured-language)))))
+        (expect (cl-cc:compilation-result-program result) :to-equal :dummy)
+        (expect captured-source :to-equal "(+ 1 2)")
+        (expect captured-language :to-equal :elisp)))))
