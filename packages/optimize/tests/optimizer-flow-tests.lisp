@@ -7,7 +7,6 @@
 ;;;;   opt-pass-dominated-type-check-elim, opt-passes-preserve-straight-line.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Test helpers ────────────────────────────────────────────────────────
 
@@ -86,158 +85,145 @@
 
 ;;; ─── opt-pass-dce / opt-build-label-index / opt-thread-label ────────────
 
-(deftest dce-eliminates-unread-const
-  "opt-pass-dce removes a vm-const whose destination register is never subsequently read."
+(it-sequential "dce-eliminates-unread-const"
   (let* ((insts (list (make-vm-const :dst :r0 :value 42)
                       (make-vm-const :dst :r1 :value 1)
                       (make-vm-ret   :reg :r1)))
          (result (cl-cc/optimize::opt-pass-dce insts)))
-    (assert-false (some (lambda (i)
+    (expect (some (lambda (i)
                           (and (typep i 'cl-cc/vm::vm-const)
                                (eq (cl-cc/vm::vm-dst i) :r0)))
-                        result))
-    (assert-true (some (lambda (i)
+                        result) :to-be-falsy)
+    (expect (some (lambda (i)
                          (and (typep i 'cl-cc/vm::vm-const)
                               (eq (cl-cc/vm::vm-dst i) :r1)))
-                       result))))
+                       result) :to-be-truthy)))
 
-(deftest dce-keeps-read-const
-  "opt-pass-dce preserves a vm-const whose destination is read by a later instruction."
+(it-sequential "dce-keeps-read-const"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret   :reg :r2)))
          (result (cl-cc/optimize::opt-pass-dce insts)))
-    (assert-true (some (lambda (i)
+    (expect (some (lambda (i)
                          (and (typep i 'cl-cc/vm::vm-const)
                               (eq (cl-cc/vm::vm-dst i) :r0)))
-                       result))
-     (assert-true (some (lambda (i)
+                       result) :to-be-truthy)
+     (expect (some (lambda (i)
                           (and (typep i 'cl-cc/vm::vm-const)
                                (eq (cl-cc/vm::vm-dst i) :r1)))
-                        result))))
+                        result) :to-be-truthy)))
 
-(deftest function-outlining-outlines-duplicate-sequences
-  "opt-pass-function-outlining replaces duplicate pure straight-line sequences with helper calls."
+(it-sequential "function-outlining-outlines-duplicate-sequences"
   (let* ((seq (list (make-vm-const :dst :r0 :value 1)
                     (make-vm-const :dst :r1 :value 2)
                     (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
          (insts (append seq seq (list (make-vm-ret :reg :r2))))
          (out (cl-cc/optimize::opt-pass-function-outlining insts)))
-    (assert-= 2 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-call)) out))
-    (assert-true
-     (some (lambda (i)
+    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-call)) out)) :to-be-truthy)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-label)
                   (search cl-cc/optimize::*opt-outlined-label-prefix*
                           (cl-cc/vm::vm-name i))))
-           out))))
+           out) :to-be-truthy)))
 
-(deftest function-outlining-leaves-nonduplicate-sequences-unchanged
-  "opt-pass-function-outlining does not add helper labels when no duplicate sequence exists."
+(it-sequential "function-outlining-leaves-nonduplicate-sequences-unchanged"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret :reg :r2)))
          (out (cl-cc/optimize::opt-pass-function-outlining insts)))
-    (assert-equal (mapcar #'cl-cc/vm::instruction->sexp insts)
-                  (mapcar #'cl-cc/vm::instruction->sexp out))
-    (assert-false
-     (some (lambda (i)
+    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-label)
                   (search cl-cc/optimize::*opt-outlined-label-prefix*
                           (cl-cc/vm::vm-name i))))
-            out))))
+            out) :to-be-falsy)))
 
-(deftest slp-vectorize-packs-four-adjacent-arithmetic-lanes
-  "FR-227 SLP packs four adjacent scalar array-map lanes into one vm-simd-vector-op."
+(it-sequential "slp-vectorize-packs-four-adjacent-arithmetic-lanes"
   (let* ((insts (%make-slp-array-map :op :add))
          (out (cl-cc/optimize:opt-pass-slp-vectorize insts))
          (simd (find-if (lambda (inst) (typep inst 'cl-cc/vm:vm-simd-vector-op)) out)))
-    (assert-true simd)
-    (assert-eq :add (cl-cc/vm:vm-simd-vector-op-op simd))
-    (assert-eq :array-a (cl-cc/vm:vm-simd-vector-op-lhs-array simd))
-    (assert-eq :array-b (cl-cc/vm:vm-simd-vector-op-rhs-array simd))
-    (assert-eq :array-c (cl-cc/vm:vm-simd-vector-op-dst-array simd))
-    (assert-= 4 (cl-cc/vm:vm-simd-vector-op-lanes simd))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm:vm-add)) out))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm:vm-aset)) out))))
+    (expect simd :to-be-truthy)
+    (expect (cl-cc/vm:vm-simd-vector-op-op simd) :to-be :add)
+    (expect (cl-cc/vm:vm-simd-vector-op-lhs-array simd) :to-be :array-a)
+    (expect (cl-cc/vm:vm-simd-vector-op-rhs-array simd) :to-be :array-b)
+    (expect (cl-cc/vm:vm-simd-vector-op-dst-array simd) :to-be :array-c)
+    (expect (= 4 (cl-cc/vm:vm-simd-vector-op-lanes simd)) :to-be-truthy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-add)) out) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-aset)) out) :to-be-falsy)))
 
-(deftest slp-vectorize-packs-bitwise-lanes
-  "FR-227 SLP also packs supported bitwise operations."
+(it-sequential "slp-vectorize-packs-bitwise-lanes"
   (let* ((insts (%make-slp-array-map :op :logxor))
          (out (cl-cc/optimize:opt-pass-slp-vectorize insts))
          (simd (find-if (lambda (inst) (typep inst 'cl-cc/vm:vm-simd-vector-op)) out)))
-    (assert-true simd)
-    (assert-eq :logxor (cl-cc/vm:vm-simd-vector-op-op simd))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm:vm-logxor)) out))))
+    (expect simd :to-be-truthy)
+    (expect (cl-cc/vm:vm-simd-vector-op-op simd) :to-be :logxor)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-logxor)) out) :to-be-falsy)))
 
-(deftest slp-vectorize-is-idempotent
-  "Running FR-227 SLP twice leaves the SIMD-packed stream unchanged."
+(it-sequential "slp-vectorize-is-idempotent"
   (let* ((once (cl-cc/optimize:opt-pass-slp-vectorize (%make-slp-array-map :op :add)))
          (twice (cl-cc/optimize:opt-pass-slp-vectorize once)))
-    (assert-equal (mapcar #'cl-cc/vm:instruction->sexp once)
-                  (mapcar #'cl-cc/vm:instruction->sexp twice))))
+    (expect (mapcar #'cl-cc/vm:instruction->sexp twice) :to-equal (mapcar #'cl-cc/vm:instruction->sexp once))))
 
-(deftest dce-eliminates-unread-move
-  "opt-pass-dce removes a vm-move whose destination register is never subsequently read."
+(it-sequential "dce-eliminates-unread-move"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-move  :dst :r5 :src :r0)
                       (make-vm-ret   :reg :r0)))
          (result (cl-cc/optimize::opt-pass-dce insts)))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-move)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move)) result) :to-be-falsy)))
 
-(deftest dce-nil-input-returns-nil
-  "opt-pass-dce on an empty instruction list returns nil."
-  (assert-null (cl-cc/optimize::opt-pass-dce nil)))
+(it-sequential "dce-nil-input-returns-nil"
+  (expect (cl-cc/optimize::opt-pass-dce nil) :to-be-null))
 
-(deftest build-label-index-maps-names-to-positions
-  "opt-build-label-index maps each label name to its 0-based position in the instruction vector."
+(it-sequential "build-label-index-maps-names-to-positions"
   (let* ((lab (make-vm-label :name "loop"))
          (c   (make-vm-const :dst :r0 :value 1)))
     (multiple-value-bind (vec idx)
         (cl-cc/optimize::opt-build-label-index (list c lab))
-      (assert-= 2 (length vec))
-      (assert-= 1 (gethash "loop" idx)))))
+      (expect (= 2 (length vec)) :to-be-truthy)
+      (expect (= 1 (gethash "loop" idx)) :to-be-truthy))))
 
-(deftest build-label-index-empty-input
-  "opt-build-label-index on an empty list returns an empty vector and an empty index."
+(it-sequential "build-label-index-empty-input"
   (multiple-value-bind (vec idx)
       (cl-cc/optimize::opt-build-label-index nil)
-    (assert-= 0 (length vec))
-    (assert-= 0 (hash-table-count idx))))
+    (expect (= 0 (length vec)) :to-be-truthy)
+    (expect (= 0 (hash-table-count idx)) :to-be-truthy)))
 
-(deftest-each thread-label-returns-input-unchanged
-  "opt-thread-label returns the queried label name unchanged — no jump chain, or unknown label."
-  :cases (("no-chain"  (list (make-vm-label :name "end") (make-vm-ret :reg :r0))  "end")
-          ("unknown"   nil                                                          "nowhere"))
-  (insts query)
-  (multiple-value-bind (vec idx)
+(it-sequential "thread-label-returns-input-unchanged no-chain"
+  (destructuring-bind (insts query) (list (list (make-vm-label :name "end") (make-vm-ret :reg :r0)) "end")
+    (multiple-value-bind (vec idx)
       (cl-cc/optimize::opt-build-label-index insts)
-    (assert-equal query (cl-cc/optimize::opt-thread-label query idx vec))))
+    (expect (cl-cc/optimize::opt-thread-label query idx vec) :to-equal query))))
+
+(it-sequential "thread-label-returns-input-unchanged unknown"
+  (destructuring-bind (insts query) (list nil "nowhere")
+    (multiple-value-bind (vec idx)
+      (cl-cc/optimize::opt-build-label-index insts)
+    (expect (cl-cc/optimize::opt-thread-label query idx vec) :to-equal query))))
 
 ;;; ─── opt-pass-jump / %opt-rewrite-block-terminator / opt-pass-unreachable ─
 
-(deftest-each jump-pass-fallthrough-and-non-fallthrough
-  "opt-pass-jump removes fallthrough jumps but preserves jumps over intervening instructions."
-  :cases (("removes-fallthrough"
-           (list (make-vm-jump  :label "next")
+(it-sequential "jump-pass-fallthrough-and-non-fallthrough removes-fallthrough"
+  (destructuring-bind (insts expect-jump) (list (list (make-vm-jump  :label "next")
                  (make-vm-label :name  "next")
-                 (make-vm-ret   :reg   :r0))
-           nil)
-          ("keeps-non-fallthrough"
-           (list (make-vm-jump  :label "far")
+                 (make-vm-ret   :reg   :r0)) nil)
+    (let ((result (cl-cc/optimize::opt-pass-jump insts)))
+    (if expect-jump
+        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result) :to-be-truthy)
+        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result) :to-be-falsy)))))
+
+(it-sequential "jump-pass-fallthrough-and-non-fallthrough keeps-non-fallthrough"
+  (destructuring-bind (insts expect-jump) (list (list (make-vm-jump  :label "far")
                  (make-vm-const :dst :r0 :value 1)
                  (make-vm-label :name "far")
-                 (make-vm-ret   :reg :r0))
-           t))
-  (insts expect-jump)
-  (let ((result (cl-cc/optimize::opt-pass-jump insts)))
+                 (make-vm-ret   :reg :r0)) t)
+    (let ((result (cl-cc/optimize::opt-pass-jump insts)))
     (if expect-jump
-        (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result))
-        (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result)))))
+        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result) :to-be-truthy)
+        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result) :to-be-falsy)))))
 
-(deftest jump-pass-threads-through-jump-only-block
-  "opt-pass-jump rewrites a jump to a jump-only block to point directly to the final target."
+(it-sequential "jump-pass-threads-through-jump-only-block"
   (let* ((insts (list (make-vm-const :dst :r0 :value 0)
                       (make-vm-jump  :label "middle")
                       (make-vm-label :name  "middle")
@@ -247,46 +233,55 @@
          (result (cl-cc/optimize::opt-pass-jump insts))
          (jumps  (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-jump)) result)))
     (when jumps
-      (assert-equal "end" (cl-cc/vm::vm-label-name (first jumps))))))
+      (expect (cl-cc/vm::vm-label-name (first jumps)) :to-equal "end"))))
 
-(deftest-each opt-rewrite-block-terminator-cases
-  "%opt-rewrite-block-terminator rewrites matching jump labels or leaves non-matching blocks unchanged."
-  :cases (("vm-jump-rewrites-label"
-           (list (make-vm-const :dst :r0 :value 1) (make-vm-jump :label "old"))
-           'cl-cc/vm::vm-jump "new" nil)
-          ("vm-jump-zero-rewrites-label-preserves-reg"
-           (list (make-vm-jump-zero :reg :r0 :label "old"))
-           'cl-cc/vm::vm-jump-zero "new" :r0)
-          ("no-match-unchanged"
-           (list (make-vm-jump :label "other"))
-           'cl-cc/vm::vm-jump "other" nil))
-  (instructions expected-type expected-label expected-reg)
-  (let ((b (%make-test-basic-block)))
+(it-sequential "opt-rewrite-block-terminator-cases vm-jump-rewrites-label"
+  (destructuring-bind (instructions expected-type expected-label expected-reg) (list (list (make-vm-const :dst :r0 :value 1) (make-vm-jump :label "old")) 'cl-cc/vm::vm-jump "new" nil)
+    (let ((b (%make-test-basic-block)))
     (setf (cl-cc/optimize:bb-instructions b) instructions)
     (cl-cc/optimize::%opt-rewrite-block-terminator b "old" "new")
     (let ((term (car (last (cl-cc/optimize:bb-instructions b)))))
-      (assert-true (typep term expected-type))
-      (assert-equal expected-label (cl-cc/vm::vm-label-name term))
+      (expect (typep term expected-type) :to-be-truthy)
+      (expect (cl-cc/vm::vm-label-name term) :to-equal expected-label)
       (when expected-reg
-        (assert-eq expected-reg (cl-cc/vm::vm-reg term))))))
+        (expect (cl-cc/vm::vm-reg term) :to-be expected-reg))))))
 
-(deftest opt-jump-thread-table-covers-both-jump-types
-  "*opt-jump-thread-table* contains exactly 2 entries: vm-jump and vm-jump-zero."
-  (assert-= 2 (length cl-cc/optimize::*opt-jump-thread-table*))
-  (assert-true (assoc 'vm-jump      cl-cc/optimize::*opt-jump-thread-table*))
-  (assert-true (assoc 'vm-jump-zero cl-cc/optimize::*opt-jump-thread-table*)))
+(it-sequential "opt-rewrite-block-terminator-cases vm-jump-zero-rewrites-label-preserves-reg"
+  (destructuring-bind (instructions expected-type expected-label expected-reg) (list (list (make-vm-jump-zero :reg :r0 :label "old")) 'cl-cc/vm::vm-jump-zero "new" :r0)
+    (let ((b (%make-test-basic-block)))
+    (setf (cl-cc/optimize:bb-instructions b) instructions)
+    (cl-cc/optimize::%opt-rewrite-block-terminator b "old" "new")
+    (let ((term (car (last (cl-cc/optimize:bb-instructions b)))))
+      (expect (typep term expected-type) :to-be-truthy)
+      (expect (cl-cc/vm::vm-label-name term) :to-equal expected-label)
+      (when expected-reg
+        (expect (cl-cc/vm::vm-reg term) :to-be expected-reg))))))
 
-(deftest opt-thread-jump-returns-nil-for-fallthrough
-  "%opt-thread-jump returns NIL when the target label immediately follows the jump (fallthrough)."
+(it-sequential "opt-rewrite-block-terminator-cases no-match-unchanged"
+  (destructuring-bind (instructions expected-type expected-label expected-reg) (list (list (make-vm-jump :label "other")) 'cl-cc/vm::vm-jump "other" nil)
+    (let ((b (%make-test-basic-block)))
+    (setf (cl-cc/optimize:bb-instructions b) instructions)
+    (cl-cc/optimize::%opt-rewrite-block-terminator b "old" "new")
+    (let ((term (car (last (cl-cc/optimize:bb-instructions b)))))
+      (expect (typep term expected-type) :to-be-truthy)
+      (expect (cl-cc/vm::vm-label-name term) :to-equal expected-label)
+      (when expected-reg
+        (expect (cl-cc/vm::vm-reg term) :to-be expected-reg))))))
+
+(it-sequential "opt-jump-thread-table-covers-both-jump-types"
+  (expect (= 2 (length cl-cc/optimize::*opt-jump-thread-table*)) :to-be-truthy)
+  (expect (assoc 'vm-jump      cl-cc/optimize::*opt-jump-thread-table*) :to-be-truthy)
+  (expect (assoc 'vm-jump-zero cl-cc/optimize::*opt-jump-thread-table*) :to-be-truthy))
+
+(it-sequential "opt-thread-jump-returns-nil-for-fallthrough"
   (let* ((insts (list (make-vm-jump  :label "next")
                       (make-vm-label :name  "next")
                       (make-vm-ret   :reg   :r0))))
     (multiple-value-bind (vec idx) (cl-cc/optimize::opt-build-label-index insts)
-      (assert-null (cl-cc/optimize::%opt-thread-jump
-                    (make-vm-jump :label "next") vec 0 idx)))))
+      (expect (cl-cc/optimize::%opt-thread-jump
+                    (make-vm-jump :label "next") vec 0 idx) :to-be-null))))
 
-(deftest opt-thread-jump-returns-relabeled-when-threading
-  "%opt-thread-jump returns a new vm-jump pointing to the final target when the target threads."
+(it-sequential "opt-thread-jump-returns-relabeled-when-threading"
   (let* ((insts (list (make-vm-jump  :label "middle")
                       (make-vm-label :name  "middle")
                       (make-vm-jump  :label "end")
@@ -295,22 +290,19 @@
     (multiple-value-bind (vec idx) (cl-cc/optimize::opt-build-label-index insts)
       (let ((result (cl-cc/optimize::%opt-thread-jump
                      (make-vm-jump :label "middle") vec 0 idx)))
-        (assert-true result)
-        (assert-equal "end" (cl-cc/vm::vm-label-name result))))))
+        (expect result :to-be-truthy)
+        (expect (cl-cc/vm::vm-label-name result) :to-equal "end")))))
 
-(deftest opt-thread-jump-zero-always-returns-instruction
-  "%opt-thread-jump-zero always returns an instruction — conditional jumps are never eliminated."
+(it-sequential "opt-thread-jump-zero-always-returns-instruction"
   (let* ((inst  (make-vm-jump-zero :reg :r0 :label "next"))
          (insts (list inst (make-vm-label :name "next") (make-vm-ret :reg :r0))))
     (multiple-value-bind (vec idx) (cl-cc/optimize::opt-build-label-index insts)
       (let ((result (cl-cc/optimize::%opt-thread-jump-zero inst vec 0 idx)))
-        (assert-true result)
-        (assert-true (typep result 'cl-cc/vm::vm-jump-zero))))))
+        (expect result :to-be-truthy)
+        (expect (typep result 'cl-cc/vm::vm-jump-zero) :to-be-truthy)))))
 
-(deftest-each jump-pass-comparison-constant-propagation-cases
-  "opt-pass-jump replaces a repeated comparison in the fallthrough or taken successor with the known constant."
-  :cases (("fallthrough-gets-1"
-           (list (make-vm-const :dst :i :value 1)
+(it-sequential "jump-pass-comparison-constant-propagation-cases fallthrough-gets-1"
+  (destructuring-bind (insts expected-value) (list (list (make-vm-const :dst :i :value 1)
                  (make-vm-const :dst :lim :value 3)
                  (make-vm-lt :dst :c :lhs :i :rhs :lim)
                  (make-vm-jump-zero :reg :c :label "false")
@@ -318,10 +310,16 @@
                  (make-vm-lt :dst :c2 :lhs :i :rhs :lim)
                  (make-vm-ret :reg :c2)
                  (make-vm-label :name "false")
-                 (make-vm-ret :reg :c))
-           1)
-          ("taken-gets-0"
-           (list (make-vm-const :dst :i :value 5)
+                 (make-vm-ret :reg :c)) 1)
+    (let ((out (cl-cc/optimize::opt-pass-jump insts)))
+    (expect (some (lambda (i)
+             (and (typep i 'cl-cc/vm::vm-const)
+                  (eq (cl-cc/vm::vm-dst i) :c2)
+                  (eql (cl-cc/vm::vm-value i) expected-value)))
+           out) :to-be-truthy))))
+
+(it-sequential "jump-pass-comparison-constant-propagation-cases taken-gets-0"
+  (destructuring-bind (insts expected-value) (list (list (make-vm-const :dst :i :value 5)
                  (make-vm-const :dst :lim :value 3)
                  (make-vm-lt :dst :c :lhs :i :rhs :lim)
                  (make-vm-jump-zero :reg :c :label "false")
@@ -329,19 +327,15 @@
                  (make-vm-ret :reg :c)
                  (make-vm-label :name "false")
                  (make-vm-lt :dst :c2 :lhs :i :rhs :lim)
-                 (make-vm-ret :reg :c2))
-           0))
-  (insts expected-value)
-  (let ((out (cl-cc/optimize::opt-pass-jump insts)))
-    (assert-true
-     (some (lambda (i)
+                 (make-vm-ret :reg :c2)) 0)
+    (let ((out (cl-cc/optimize::opt-pass-jump insts)))
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-const)
                   (eq (cl-cc/vm::vm-dst i) :c2)
                   (eql (cl-cc/vm::vm-value i) expected-value)))
-           out))))
+           out) :to-be-truthy))))
 
-(deftest if-conversion-simple-diamond-emits-vm-select
-  "opt-pass-if-conversion converts a simple if diamond into one vm-select."
+(it-sequential "if-conversion-simple-diamond-emits-vm-select"
   (let* ((insts (list (make-vm-lt :dst :c :lhs :r0 :rhs :r1)
                       (make-vm-jump-zero :reg :c :label "else")
                       (make-vm-move :dst :out :src :then)
@@ -352,18 +346,17 @@
                       (make-vm-ret :reg :out)))
          (out (cl-cc/optimize::opt-pass-if-conversion insts))
          (selects (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-select)) out)))
-    (assert-= 1 (length selects))
+    (expect (= 1 (length selects)) :to-be-truthy)
     (let ((sel (first selects)))
-      (assert-eq :out (cl-cc/vm::vm-dst sel))
-      (assert-eq :c (cl-cc/vm::vm-select-cond-reg sel))
-      (assert-eq :then (cl-cc/vm::vm-select-then-reg sel))
-      (assert-eq :else (cl-cc/vm::vm-select-else-reg sel)))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-lt)) out))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) out))))
+      (expect (cl-cc/vm::vm-dst sel) :to-be :out)
+      (expect (cl-cc/vm::vm-select-cond-reg sel) :to-be :c)
+      (expect (cl-cc/vm::vm-select-then-reg sel) :to-be :then)
+      (expect (cl-cc/vm::vm-select-else-reg sel) :to-be :else))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-lt)) out) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) out) :to-be-falsy)))
 
-(deftest if-conversion-skips-externally-referenced-diamond-label
-  "opt-pass-if-conversion preserves diamonds whose internal labels have outside references."
+(it-sequential "if-conversion-skips-externally-referenced-diamond-label"
   (let* ((insts (list (make-vm-jump :label "else")
                       (make-vm-lt :dst :c :lhs :r0 :rhs :r1)
                       (make-vm-jump-zero :reg :c :label "else")
@@ -374,11 +367,10 @@
                       (make-vm-label :name "join")
                       (make-vm-ret :reg :out)))
          (out (cl-cc/optimize::opt-pass-if-conversion insts)))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-select)) out))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-select)) out) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out) :to-be-truthy)))
 
-(deftest jump-pass-kills-comparison-fact-on-source-redefinition
-  "opt-pass-jump does not rewrite after a comparison source register is redefined."
+(it-sequential "jump-pass-kills-comparison-fact-on-source-redefinition"
   (let* ((insts (list (make-vm-const :dst :i :value 1)
                       (make-vm-const :dst :lim :value 3)
                       (make-vm-lt :dst :c :lhs :i :rhs :lim)
@@ -390,19 +382,16 @@
                       (make-vm-lt :dst :c2 :lhs :i :rhs :lim)
                       (make-vm-ret :reg :c2)))
          (out (cl-cc/optimize::opt-pass-jump insts)))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-lt)
                   (eq (cl-cc/vm::vm-dst i) :c2)))
-           out))
-    (assert-false
-     (some (lambda (i)
+           out) :to-be-truthy)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-const)
                   (eq (cl-cc/vm::vm-dst i) :c2)))
-           out))))
+           out) :to-be-falsy)))
 
-(deftest jump-pass-does-not-propagate-across-loop-back-edge
-  "opt-pass-jump does not carry comparison facts from a loop body back to the header."
+(it-sequential "jump-pass-does-not-propagate-across-loop-back-edge"
   (let* ((insts (list (make-vm-const :dst :i :value 1)
                       (make-vm-const :dst :lim :value 3)
                       (make-vm-label :name "header")
@@ -415,14 +404,12 @@
                       (make-vm-label :name "exit")
                       (make-vm-ret :reg :c)))
          (out (cl-cc/optimize::opt-pass-jump insts)))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-lt)
                   (eq (cl-cc/vm::vm-dst i) :c2)))
-           out))))
+           out) :to-be-truthy)))
 
-(deftest jump-pass-combines-chain-threading-with-value-propagation
-  "opt-pass-jump still threads jump chains while propagating facts to the fallthrough successor."
+(it-sequential "jump-pass-combines-chain-threading-with-value-propagation"
   (let* ((insts (list (make-vm-const :dst :i :value 1)
                       (make-vm-const :dst :lim :value 3)
                       (make-vm-lt :dst :c :lhs :i :rhs :lim)
@@ -435,31 +422,27 @@
                       (make-vm-label :name "final")
                       (make-vm-ret :reg :c)))
          (out (cl-cc/optimize::opt-pass-jump insts)))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-jump-zero)
                   (equal (cl-cc/vm::vm-label-name i) "final")))
-            out))
-     (assert-true
-      (some (lambda (i)
+            out) :to-be-truthy)
+     (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-const)
                   (eq (cl-cc/vm::vm-dst i) :c2)
                    (eql (cl-cc/vm::vm-value i) 1)))
-            out))))
+            out) :to-be-truthy)))
 
 ;;; ─── opt-pass-hot-cold-layout ─────────────────────────────────────────────
 
-(deftest hot-cold-layout-registers-before-dce
-  "The hot/cold layout pass is registered in the convergence pipeline before DCE."
+(it-sequential "hot-cold-layout-registers-before-dce"
   (let ((layout-pos (position :hot-cold-layout cl-cc/optimize::*opt-default-convergence-pass-keys*))
         (dce-pos    (position :dce cl-cc/optimize::*opt-default-convergence-pass-keys*)))
-    (assert-true (assoc :hot-cold-layout cl-cc/optimize::*opt-pass-table*))
-    (assert-true layout-pos)
-    (assert-true dce-pos)
-    (assert-true (< layout-pos dce-pos))))
+    (expect (assoc :hot-cold-layout cl-cc/optimize::*opt-pass-table*) :to-be-truthy)
+    (expect layout-pos :to-be-truthy)
+    (expect dce-pos :to-be-truthy)
+    (expect (< layout-pos dce-pos) :to-be-truthy)))
 
-(deftest hot-cold-layout-keeps-conditional-fallthrough-contiguous
-  "opt-pass-hot-cold-layout places the vm-jump-zero fall-through hot block immediately next."
+(it-sequential "hot-cold-layout-keeps-conditional-fallthrough-contiguous"
   (let* ((insts (list (make-vm-const :dst :cond :value 1)
                       (make-vm-jump-zero :reg :cond :label "cold")
                       (make-vm-label :name "hot")
@@ -473,14 +456,13 @@
          (jz-pos   (%test-jump-zero-position out "cold"))
          (hot-pos  (%test-label-position out "hot"))
          (cold-pos (%test-label-position out "cold")))
-    (assert-true jz-pos)
-    (assert-true hot-pos)
-    (assert-true cold-pos)
-    (assert-= (1+ jz-pos) hot-pos)
-    (assert-true (< hot-pos cold-pos))))
+    (expect jz-pos :to-be-truthy)
+    (expect hot-pos :to-be-truthy)
+    (expect cold-pos :to-be-truthy)
+    (expect (= (1+ jz-pos) hot-pos) :to-be-truthy)
+    (expect (< hot-pos cold-pos) :to-be-truthy)))
 
-(deftest hot-cold-layout-moves-signal-block-to-tail
-  "opt-pass-hot-cold-layout moves error/signalling cold blocks behind ordinary blocks."
+(it-sequential "hot-cold-layout-moves-signal-block-to-tail"
   (let* ((insts (list (make-vm-const :dst :cond :value 1)
                       (make-vm-jump-zero :reg :cond :label "cold")
                       (make-vm-label :name "hot")
@@ -493,12 +475,11 @@
          (out      (cl-cc/optimize::opt-pass-hot-cold-layout insts))
          (end-pos  (%test-label-position out "end"))
          (cold-pos (%test-label-position out "cold")))
-    (assert-true end-pos)
-    (assert-true cold-pos)
-    (assert-true (< end-pos cold-pos))))
+    (expect end-pos :to-be-truthy)
+    (expect cold-pos :to-be-truthy)
+    (expect (< end-pos cold-pos) :to-be-truthy)))
 
-(deftest hot-cold-layout-preserves-conditional-jump-target
-  "opt-pass-hot-cold-layout preserves vm-jump-zero target labels after reordering."
+(it-sequential "hot-cold-layout-preserves-conditional-jump-target"
   (let* ((insts (list (make-vm-const :dst :cond :value 1)
                       (make-vm-jump-zero :reg :cond :label "cold")
                       (make-vm-label :name "hot")
@@ -507,12 +488,11 @@
                       (make-vm-signal-error :error-reg :cond)))
          (out   (cl-cc/optimize::opt-pass-hot-cold-layout insts))
          (jz    (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) out)))
-    (assert-true jz)
-    (assert-equal "cold" (cl-cc/vm::vm-label-name jz))
-    (assert-true (%test-label-position out "cold"))))
+    (expect jz :to-be-truthy)
+    (expect (cl-cc/vm::vm-label-name jz) :to-equal "cold")
+    (expect (%test-label-position out "cold") :to-be-truthy)))
 
-(deftest loop-rotation-rotates-simple-while-shape
-  "opt-pass-loop-rotation rewrites a simple while-shape into guard+body form."
+(it-sequential "loop-rotation-rotates-simple-while-shape"
   (let* ((insts (list (make-vm-label :name "Lh")
                       (cl-cc:make-vm-integer-p :dst :r1 :src :r0)
                       (make-vm-jump-zero :reg :r1 :label "Lexit")
@@ -530,53 +510,43 @@
                                   (and (typep i 'cl-cc/vm::vm-jump-zero)
                                        (equal (cl-cc/vm::vm-label-name i) "Lexit")))
                                 out)))
-    (assert-true (typep first-inst 'cl-cc/vm::vm-jump))
-    (assert-= 0 jumps-to-lh)
-    (assert-= 1 guard-jumps)))
+    (expect (typep first-inst 'cl-cc/vm::vm-jump) :to-be-truthy)
+    (expect (= 0 jumps-to-lh) :to-be-truthy)
+    (expect (= 1 guard-jumps) :to-be-truthy)))
 
-(deftest-each loop-transforms-noop-on-nonmatching-shape
-  "Loop rotation and peeling are no-ops on non-matching control-flow shapes."
-  :cases (("rotation" #'cl-cc/optimize::opt-pass-loop-rotation)
-          ("peeling"  #'cl-cc/optimize::opt-pass-loop-peel))
-  (pass)
-  (let* ((insts (list (make-vm-label :name "A")
+(it-sequential "loop-transforms-noop-on-nonmatching-shape rotation"
+  (destructuring-bind (pass) (list #'cl-cc/optimize::opt-pass-loop-rotation)
+    (let* ((insts (list (make-vm-label :name "A")
                       (make-vm-const :dst :r0 :value 1)
                       (make-vm-jump :label "B")
                       (make-vm-label :name "B")
                       (make-vm-ret :reg :r0)))
          (out (funcall pass insts)))
-    (assert-= (length insts) (length out))))
+    (expect (= (length insts) (length out)) :to-be-truthy))))
 
-(deftest loop-unrolling-fully-unrolls-small-counted-loop
-  "opt-pass-loop-unrolling fully unrolls a tiny counted loop with known trip count."
+(it-sequential "loop-transforms-noop-on-nonmatching-shape peeling"
+  (destructuring-bind (pass) (list #'cl-cc/optimize::opt-pass-loop-peel)
+    (let* ((insts (list (make-vm-label :name "A")
+                      (make-vm-const :dst :r0 :value 1)
+                      (make-vm-jump :label "B")
+                      (make-vm-label :name "B")
+                      (make-vm-ret :reg :r0)))
+         (out (funcall pass insts)))
+    (expect (= (length insts) (length out)) :to-be-truthy))))
+
+(it-sequential "loop-unrolling-fully-unrolls-small-counted-loop"
   (let* ((insts (%make-counted-loop-program :limit 3))
          (out (cl-cc/optimize::opt-pass-loop-unrolling insts))
          (jump-to-lh (%count-vm-jumps-to-label out "Lh"))
          (lt-count (%count-vm-instructions-of-type out 'cl-cc/vm::vm-lt))
          (step-count (%count-index-steps out)))
-    (assert-= 0 jump-to-lh)
-    (assert-= 0 lt-count)
-    (assert-= 3 step-count)))
+    (expect (= 0 jump-to-lh) :to-be-truthy)
+    (expect (= 0 lt-count) :to-be-truthy)
+    (expect (= 3 step-count) :to-be-truthy)))
 
-(deftest-each loop-unrolling-non-lt-comparisons
-  "opt-pass-loop-unrolling fully unrolls small counted loops with non-vm-lt comparisons."
-  :cases (("le" (make-vm-const :dst :i :value 0)
-                 (make-vm-const :dst :lim :value 2)
-                 (make-vm-const :dst :step :value 1)
-                 (make-vm-le :dst :c :lhs :i :rhs :lim)
-                 'cl-cc/vm::vm-le 3)
-          ("ge" (make-vm-const :dst :i :value 3)
-                 (make-vm-const :dst :lim :value 1)
-                 (make-vm-const :dst :step :value -1)
-                 (make-vm-ge :dst :c :lhs :i :rhs :lim)
-                 'cl-cc/vm::vm-ge 3)
-          ("eq" (make-vm-const :dst :i :value 0)
-                 (make-vm-const :dst :lim :value 0)
-                 (make-vm-const :dst :step :value 1)
-                 (make-vm-eq :dst :c :lhs :i :rhs :lim)
-                 'cl-cc/vm::vm-eq 1))
-  (init-inst lim-inst step-inst cmp-inst cmp-type expected-steps)
-  (let* ((insts (list init-inst lim-inst step-inst
+(it-sequential "loop-unrolling-non-lt-comparisons le"
+  (destructuring-bind (init-inst lim-inst step-inst cmp-inst cmp-type expected-steps) (list (make-vm-const :dst :i :value 0) (make-vm-const :dst :lim :value 2) (make-vm-const :dst :step :value 1) (make-vm-le :dst :c :lhs :i :rhs :lim) 'cl-cc/vm::vm-le 3)
+    (let* ((insts (list init-inst lim-inst step-inst
                       (make-vm-label :name "Lh")
                       cmp-inst
                       (make-vm-jump-zero :reg :c :label "Lexit")
@@ -595,32 +565,79 @@
                                  (and (typep x 'cl-cc/vm::vm-jump)
                                       (equal (cl-cc/vm::vm-label-name x) "Lh")))
                                out)))
-    (assert-= 0 cmp-count)
-    (assert-= expected-steps step-count)
-    (assert-= 0 jump-to-lh)))
+    (expect (= 0 cmp-count) :to-be-truthy)
+    (expect (= expected-steps step-count) :to-be-truthy)
+    (expect (= 0 jump-to-lh) :to-be-truthy))))
 
-(deftest loop-unrolling-partially-unrolls-when-trip-count-too-large
-  "opt-pass-loop-unrolling partially unrolls small loops when trip count exceeds budget."
+(it-sequential "loop-unrolling-non-lt-comparisons ge"
+  (destructuring-bind (init-inst lim-inst step-inst cmp-inst cmp-type expected-steps) (list (make-vm-const :dst :i :value 3) (make-vm-const :dst :lim :value 1) (make-vm-const :dst :step :value -1) (make-vm-ge :dst :c :lhs :i :rhs :lim) 'cl-cc/vm::vm-ge 3)
+    (let* ((insts (list init-inst lim-inst step-inst
+                      (make-vm-label :name "Lh")
+                      cmp-inst
+                      (make-vm-jump-zero :reg :c :label "Lexit")
+                      (make-vm-add :dst :sum :lhs :sum :rhs :i)
+                      (make-vm-add :dst :i :lhs :i :rhs :step)
+                      (make-vm-jump :label "Lh")
+                      (make-vm-label :name "Lexit")
+                      (make-vm-ret :reg :sum)))
+         (out (cl-cc/optimize::opt-pass-loop-unrolling insts))
+         (cmp-count (count-if (lambda (x) (typep x cmp-type)) out))
+         (step-count (count-if (lambda (x)
+                                 (and (typep x 'cl-cc/vm::vm-add)
+                                      (eq (cl-cc/vm::vm-dst x) :i)))
+                               out))
+         (jump-to-lh (count-if (lambda (x)
+                                 (and (typep x 'cl-cc/vm::vm-jump)
+                                      (equal (cl-cc/vm::vm-label-name x) "Lh")))
+                               out)))
+    (expect (= 0 cmp-count) :to-be-truthy)
+    (expect (= expected-steps step-count) :to-be-truthy)
+    (expect (= 0 jump-to-lh) :to-be-truthy))))
+
+(it-sequential "loop-unrolling-non-lt-comparisons eq"
+  (destructuring-bind (init-inst lim-inst step-inst cmp-inst cmp-type expected-steps) (list (make-vm-const :dst :i :value 0) (make-vm-const :dst :lim :value 0) (make-vm-const :dst :step :value 1) (make-vm-eq :dst :c :lhs :i :rhs :lim) 'cl-cc/vm::vm-eq 1)
+    (let* ((insts (list init-inst lim-inst step-inst
+                      (make-vm-label :name "Lh")
+                      cmp-inst
+                      (make-vm-jump-zero :reg :c :label "Lexit")
+                      (make-vm-add :dst :sum :lhs :sum :rhs :i)
+                      (make-vm-add :dst :i :lhs :i :rhs :step)
+                      (make-vm-jump :label "Lh")
+                      (make-vm-label :name "Lexit")
+                      (make-vm-ret :reg :sum)))
+         (out (cl-cc/optimize::opt-pass-loop-unrolling insts))
+         (cmp-count (count-if (lambda (x) (typep x cmp-type)) out))
+         (step-count (count-if (lambda (x)
+                                 (and (typep x 'cl-cc/vm::vm-add)
+                                      (eq (cl-cc/vm::vm-dst x) :i)))
+                               out))
+         (jump-to-lh (count-if (lambda (x)
+                                 (and (typep x 'cl-cc/vm::vm-jump)
+                                      (equal (cl-cc/vm::vm-label-name x) "Lh")))
+                               out)))
+    (expect (= 0 cmp-count) :to-be-truthy)
+    (expect (= expected-steps step-count) :to-be-truthy)
+    (expect (= 0 jump-to-lh) :to-be-truthy))))
+
+(it-sequential "loop-unrolling-partially-unrolls-when-trip-count-too-large"
   (let* ((insts (%make-counted-loop-program :limit 10))
           (out (cl-cc/optimize::opt-pass-loop-unrolling insts))
           (jump-to-lh (%count-vm-jumps-to-label out "Lh"))
           (lt-count (%count-vm-instructions-of-type out 'cl-cc/vm::vm-lt))
           (step-count (%count-index-steps out)))
-    (assert-= 1 jump-to-lh)
-    (assert-= 3 lt-count)
-    (assert-= 3 step-count)))
+    (expect (= 1 jump-to-lh) :to-be-truthy)
+    (expect (= 3 lt-count) :to-be-truthy)
+    (expect (= 3 step-count) :to-be-truthy)))
 
-(deftest loop-unrolling-partially-unrolls-unknown-trip-with-remainder
-  "opt-pass-loop-unrolling emits guarded partial copies plus the original loop for unknown trips."
+(it-sequential "loop-unrolling-partially-unrolls-unknown-trip-with-remainder"
   (let* ((insts (%make-counted-loop-program :include-limit-p nil))
          (out (cl-cc/optimize::opt-pass-loop-unrolling insts))
          (lt-count (%count-vm-instructions-of-type out 'cl-cc/vm::vm-lt))
          (jump-to-lh (%count-vm-jumps-to-label out "Lh")))
-    (assert-= 3 lt-count)
-    (assert-= 1 jump-to-lh)))
+    (expect (= 3 lt-count) :to-be-truthy)
+    (expect (= 1 jump-to-lh) :to-be-truthy)))
 
-(deftest loop-rotation-detects-cfg-natural-loop
-  "opt-pass-loop-rotation rotates a CFG-detected natural loop while preserving the exit branch."
+(it-sequential "loop-rotation-detects-cfg-natural-loop"
   (let* ((insts (list (make-vm-label :name "Entry")
                       (make-vm-jump :label "Lh")
                       (make-vm-label :name "Lh")
@@ -631,33 +648,29 @@
                       (make-vm-label :name "Lexit")
                       (make-vm-ret :reg :r0)))
          (out (cl-cc/optimize::opt-pass-loop-rotation insts)))
-    (assert-true (some (lambda (x)
+    (expect (some (lambda (x)
                          (and (typep x 'cl-cc/vm::vm-jump-zero)
                               (equal (cl-cc/vm::vm-label-name x) "Lexit")))
-                       out))
-    (assert-false (some (lambda (x)
+                       out) :to-be-truthy)
+    (expect (some (lambda (x)
                           (and (typep x 'cl-cc/vm::vm-jump)
                                (equal (cl-cc/vm::vm-label-name x) "Lh")))
-                        out))))
+                        out) :to-be-falsy)))
 
 
 
-(deftest loop-unrolling-partial-keeps-remainder-loop
-  "opt-pass-loop-unrolling partially unrolls larger loops and keeps a back-edge remainder loop."
+(it-sequential "loop-unrolling-partial-keeps-remainder-loop"
   (let* ((insts (%make-counted-loop-program :limit 10))
          (out (cl-cc/optimize::opt-pass-loop-unrolling insts))
          (lt-count (%count-vm-instructions-of-type out 'cl-cc/vm::vm-lt))
          (step-count (%count-index-steps out))
          (jump-to-lh (%count-vm-jumps-to-label out "Lh")))
-    (assert-= 3 lt-count)
-    (assert-= 3 step-count)
-    (assert-= 1 jump-to-lh)))
+    (expect (= 3 lt-count) :to-be-truthy)
+    (expect (= 3 step-count) :to-be-truthy)
+    (expect (= 1 jump-to-lh) :to-be-truthy)))
 
-(deftest-each cfg-natural-loop-transforms-detected
-  "CFG-based loop rotation and peeling detect single-latch natural loops, including plain while-shape."
-  :cases (("rotation"
-           #'cl-cc/optimize::opt-pass-loop-rotation
-           (list (make-vm-const :dst :one :value 1)
+(it-sequential "cfg-natural-loop-transforms-detected rotation"
+  (destructuring-bind (pass insts expected-jumps-to-lh expected-adds) (list #'cl-cc/optimize::opt-pass-loop-rotation (list (make-vm-const :dst :one :value 1)
                  (make-vm-jump :label "Lh")
                  (make-vm-label :name "Lh")
                  (cl-cc:make-vm-integer-p :dst :c :src :i)
@@ -665,44 +678,53 @@
                  (make-vm-add :dst :i :lhs :i :rhs :one)
                  (make-vm-jump :label "Lh")
                  (make-vm-label :name "Lexit")
-                 (make-vm-ret :reg :i))
-           0 1)
-          ("peeling"
-           #'cl-cc/optimize::opt-pass-loop-peel
-           (list (make-vm-const :dst :one :value 1)
-                 (make-vm-jump :label "Lh")
-                 (make-vm-label :name "Lh")
-                 (cl-cc:make-vm-integer-p :dst :c :src :i)
-                 (make-vm-jump-zero :reg :c :label "Lexit")
-                 (make-vm-add :dst :i :lhs :i :rhs :one)
-                 (make-vm-jump :label "Lh")
-                 (make-vm-label :name "Lexit")
-                 (make-vm-ret :reg :i))
-           1 2)
-          ("peeling-plain-while"
-           #'cl-cc/optimize::opt-pass-loop-peel
-           (list (make-vm-label :name "Lh")
-                 (cl-cc:make-vm-integer-p :dst :r1 :src :r0)
-                 (make-vm-jump-zero :reg :r1 :label "Lexit")
-                 (make-vm-add :dst :r0 :lhs :r0 :rhs :r2)
-                 (make-vm-jump :label "Lh")
-                 (make-vm-label :name "Lexit")
-                 (make-vm-ret :reg :r0))
-           ;; After peeling: peeled iteration (no back-jump) +
-           ;; original loop (with its back-jump). Total: 1 jump to Lh, 2 adds.
-           1 2))
-  (pass insts expected-jumps-to-lh expected-adds)
-  (let* ((out (funcall pass insts))
+                 (make-vm-ret :reg :i)) 0 1)
+    (let* ((out (funcall pass insts))
          (jumps-to-lh (count-if (lambda (x)
                                   (and (typep x 'cl-cc/vm::vm-jump)
                                        (equal (cl-cc/vm::vm-label-name x) "Lh")))
                                 out))
          (add-count (count-if (lambda (x) (typep x 'cl-cc/vm::vm-add)) out)))
-    (assert-= expected-jumps-to-lh jumps-to-lh)
-    (assert-= expected-adds add-count)))
+    (expect (= expected-jumps-to-lh jumps-to-lh) :to-be-truthy)
+    (expect (= expected-adds add-count) :to-be-truthy))))
 
-(deftest code-sinking-moves-const-into-target-block
-  "opt-pass-code-sinking moves a uniquely-used const into its jump target block entry."
+(it-sequential "cfg-natural-loop-transforms-detected peeling"
+  (destructuring-bind (pass insts expected-jumps-to-lh expected-adds) (list #'cl-cc/optimize::opt-pass-loop-peel (list (make-vm-const :dst :one :value 1)
+                 (make-vm-jump :label "Lh")
+                 (make-vm-label :name "Lh")
+                 (cl-cc:make-vm-integer-p :dst :c :src :i)
+                 (make-vm-jump-zero :reg :c :label "Lexit")
+                 (make-vm-add :dst :i :lhs :i :rhs :one)
+                 (make-vm-jump :label "Lh")
+                 (make-vm-label :name "Lexit")
+                 (make-vm-ret :reg :i)) 1 2)
+    (let* ((out (funcall pass insts))
+         (jumps-to-lh (count-if (lambda (x)
+                                  (and (typep x 'cl-cc/vm::vm-jump)
+                                       (equal (cl-cc/vm::vm-label-name x) "Lh")))
+                                out))
+         (add-count (count-if (lambda (x) (typep x 'cl-cc/vm::vm-add)) out)))
+    (expect (= expected-jumps-to-lh jumps-to-lh) :to-be-truthy)
+    (expect (= expected-adds add-count) :to-be-truthy))))
+
+(it-sequential "cfg-natural-loop-transforms-detected peeling-plain-while"
+  (destructuring-bind (pass insts expected-jumps-to-lh expected-adds) (list #'cl-cc/optimize::opt-pass-loop-peel (list (make-vm-label :name "Lh")
+                 (cl-cc:make-vm-integer-p :dst :r1 :src :r0)
+                 (make-vm-jump-zero :reg :r1 :label "Lexit")
+                 (make-vm-add :dst :r0 :lhs :r0 :rhs :r2)
+                 (make-vm-jump :label "Lh")
+                 (make-vm-label :name "Lexit")
+                 (make-vm-ret :reg :r0)) 1 2)
+    (let* ((out (funcall pass insts))
+         (jumps-to-lh (count-if (lambda (x)
+                                  (and (typep x 'cl-cc/vm::vm-jump)
+                                       (equal (cl-cc/vm::vm-label-name x) "Lh")))
+                                out))
+         (add-count (count-if (lambda (x) (typep x 'cl-cc/vm::vm-add)) out)))
+    (expect (= expected-jumps-to-lh jumps-to-lh) :to-be-truthy)
+    (expect (= expected-adds add-count) :to-be-truthy))))
+
+(it-sequential "code-sinking-moves-const-into-target-block"
   (let* ((insts (list (make-vm-const :dst :r1 :value 42)
                       (make-vm-jump :label "Luse")
                       (make-vm-label :name "Ldead")
@@ -719,12 +741,11 @@
                                   (and (typep x 'cl-cc/vm::vm-label)
                                        (equal (cl-cc/vm::vm-name x) "Luse")))
                                 out)))
-    (assert-true r1-const-pos)
-    (assert-true luse-pos)
-    (assert-true (> r1-const-pos luse-pos))))
+    (expect r1-const-pos :to-be-truthy)
+    (expect luse-pos :to-be-truthy)
+    (expect (> r1-const-pos luse-pos) :to-be-truthy)))
 
-(deftest code-sinking-noop-when-value-is-read-multiple-times
-  "opt-pass-code-sinking does not move const when the value has multiple reads."
+(it-sequential "code-sinking-noop-when-value-is-read-multiple-times"
   (let* ((insts (list (make-vm-const :dst :r1 :value 7)
                       (make-vm-jump :label "Luse")
                       (make-vm-label :name "Luse")
@@ -737,12 +758,11 @@
                                            (eq (cl-cc/vm::vm-dst x) :r1)))
                                     out))
          (jump-pos (position-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out)))
-    (assert-true r1-const-pos)
-    (assert-true jump-pos)
-    (assert-true (< r1-const-pos jump-pos))))
+    (expect r1-const-pos :to-be-truthy)
+    (expect jump-pos :to-be-truthy)
+    (expect (< r1-const-pos jump-pos) :to-be-truthy)))
 
-(deftest code-sinking-moves-cons-into-target-block
-  "opt-pass-code-sinking moves a uniquely-used vm-cons into its jump target block entry."
+(it-sequential "code-sinking-moves-cons-into-target-block"
   (let* ((insts (list (make-vm-cons :dst :pair :car-src :r0 :cdr-src :r1)
                       (make-vm-jump :label "Luse")
                       (make-vm-label :name "Ldead")
@@ -759,27 +779,18 @@
                                   (and (typep x 'cl-cc/vm::vm-label)
                                        (equal (cl-cc/vm::vm-name x) "Luse")))
                                 out)))
-    (assert-true pair-cons-pos)
-    (assert-true luse-pos)
-    (assert-true (> pair-cons-pos luse-pos))))
+    (expect pair-cons-pos :to-be-truthy)
+    (expect luse-pos :to-be-truthy)
+    (expect (> pair-cons-pos luse-pos) :to-be-truthy)))
 
-(deftest-each code-sinking-moves-arithmetic-and-move-into-target-block
-  "opt-pass-code-sinking moves constant-operand arithmetic and constant-source moves to the use block."
-  :cases (("add"  (list (make-vm-const :dst :a :value 2)
+(it-sequential "code-sinking-moves-arithmetic-and-move-into-target-block add"
+  (destructuring-bind (insts moved-type) (list (list (make-vm-const :dst :a :value 2)
                          (make-vm-const :dst :b :value 3)
                          (make-vm-add   :dst :v :lhs :a :rhs :b)
                          (make-vm-jump  :label "Luse")
                          (make-vm-label :name "Luse")
-                         (make-vm-ret   :reg :v))
-            'cl-cc/vm::vm-add)
-          ("move" (list (make-vm-const :dst :a :value 2)
-                         (make-vm-move  :dst :v :src :a)
-                         (make-vm-jump  :label "Luse")
-                         (make-vm-label :name "Luse")
-                         (make-vm-ret   :reg :v))
-            'cl-cc/vm::vm-move))
-  (insts moved-type)
-  (let* ((out (cl-cc/optimize::opt-pass-code-sinking insts))
+                         (make-vm-ret   :reg :v)) 'cl-cc/vm::vm-add)
+    (let* ((out (cl-cc/optimize::opt-pass-code-sinking insts))
          (moved-pos (position-if (lambda (x)
                                    (and (typep x moved-type)
                                         (eq (cl-cc/optimize::opt-inst-dst x) :v)))
@@ -788,12 +799,30 @@
                                   (and (typep x 'cl-cc/vm::vm-label)
                                        (equal (cl-cc/vm::vm-name x) "Luse")))
                                 out)))
-    (assert-true moved-pos)
-    (assert-true luse-pos)
-    (assert-true (> moved-pos luse-pos))))
+    (expect moved-pos :to-be-truthy)
+    (expect luse-pos :to-be-truthy)
+    (expect (> moved-pos luse-pos) :to-be-truthy))))
 
-(deftest code-sinking-does-not-sink-impure-random
-  "opt-pass-code-sinking does not move side-effecting vm-random instructions."
+(it-sequential "code-sinking-moves-arithmetic-and-move-into-target-block move"
+  (destructuring-bind (insts moved-type) (list (list (make-vm-const :dst :a :value 2)
+                         (make-vm-move  :dst :v :src :a)
+                         (make-vm-jump  :label "Luse")
+                         (make-vm-label :name "Luse")
+                         (make-vm-ret   :reg :v)) 'cl-cc/vm::vm-move)
+    (let* ((out (cl-cc/optimize::opt-pass-code-sinking insts))
+         (moved-pos (position-if (lambda (x)
+                                   (and (typep x moved-type)
+                                        (eq (cl-cc/optimize::opt-inst-dst x) :v)))
+                                 out))
+         (luse-pos (position-if (lambda (x)
+                                  (and (typep x 'cl-cc/vm::vm-label)
+                                       (equal (cl-cc/vm::vm-name x) "Luse")))
+                                out)))
+    (expect moved-pos :to-be-truthy)
+    (expect luse-pos :to-be-truthy)
+    (expect (> moved-pos luse-pos) :to-be-truthy))))
+
+(it-sequential "code-sinking-does-not-sink-impure-random"
   (let* ((insts (list (make-vm-const :dst :limit :value 10)
                       (cl-cc/vm::make-vm-random :dst :v :src :limit)
                       (make-vm-jump :label "Luse")
@@ -802,12 +831,11 @@
          (out (cl-cc/optimize::opt-pass-code-sinking insts))
          (random-pos (position-if (lambda (x) (typep x 'cl-cc/vm::vm-random)) out))
          (jump-pos (position-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out)))
-    (assert-true random-pos)
-    (assert-true jump-pos)
-    (assert-true (< random-pos jump-pos))))
+    (expect random-pos :to-be-truthy)
+    (expect jump-pos :to-be-truthy)
+    (expect (< random-pos jump-pos) :to-be-truthy)))
 
-(deftest code-sinking-duplicates-cheap-const-into-conditional-targets
-  "opt-pass-code-sinking duplicates a cheap const into both conditional successors when both use it."
+(it-sequential "code-sinking-duplicates-cheap-const-into-conditional-targets"
   (let* ((insts (list (make-vm-const :dst :v :value 1)
                       (make-vm-jump-zero :reg :cond :label "Lzero")
                       (make-vm-label :name "Lnonzero")
@@ -821,10 +849,9 @@
                                   (and (typep x 'cl-cc/vm::vm-const)
                                        (eq (cl-cc/vm::vm-dst x) :v)))
                                 out)))
-    (assert-true (<= 1 const-count 2))))
+    (expect (<= 1 const-count 2) :to-be-truthy)))
 
-(deftest code-sinking-noop-for-cons-read-multiple-times
-  "opt-pass-code-sinking does not move vm-cons when its result is read multiple times."
+(it-sequential "code-sinking-noop-for-cons-read-multiple-times"
   (let* ((insts (list (make-vm-cons :dst :pair :car-src :r0 :cdr-src :r1)
                       (make-vm-jump :label "Luse")
                       (make-vm-label :name "Luse")
@@ -837,12 +864,11 @@
                                             (eq (cl-cc/vm::vm-dst x) :pair)))
                                      out))
          (jump-pos (position-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out)))
-    (assert-true pair-cons-pos)
-    (assert-true jump-pos)
-    (assert-true (< pair-cons-pos jump-pos))))
+    (expect pair-cons-pos :to-be-truthy)
+    (expect jump-pos :to-be-truthy)
+    (expect (< pair-cons-pos jump-pos) :to-be-truthy)))
 
-(deftest code-sinking-does-not-sink-slot-read-across-aliased-write
-  "opt-pass-code-sinking does not move a slot read below an aliased slot write."
+(it-sequential "code-sinking-does-not-sink-slot-read-across-aliased-write"
   (let* ((read  (cl-cc:make-vm-slot-read :dst :v :obj-reg :obj :slot-name 'x))
          (write (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :new))
          (insts (list (make-vm-cons :dst :obj :car-src :r0 :cdr-src :r1)
@@ -852,13 +878,12 @@
                       (make-vm-label :name "Luse")
                       (make-vm-ret :reg :v)))
          (out (cl-cc/optimize::opt-pass-code-sinking insts)))
-    (assert-true (member read out :test #'eq))
-    (assert-true (member write out :test #'eq))
-    (assert-true (< (position read out :test #'eq)
-                    (position write out :test #'eq)))))
+    (expect (member read out :test #'eq) :to-be-truthy)
+    (expect (member write out :test #'eq) :to-be-truthy)
+    (expect (< (position read out :test #'eq)
+                    (position write out :test #'eq)) :to-be-truthy)))
 
-(deftest code-sinking-sinks-slot-read-across-tbaa-disjoint-write
-  "opt-pass-code-sinking uses TBAA to move a slot read across a disjoint-kind write."
+(it-sequential "code-sinking-sinks-slot-read-across-tbaa-disjoint-write"
   (let* ((read  (cl-cc:make-vm-slot-read :dst :v :obj-reg :obj :slot-name 'x))
          (write (cl-cc:make-vm-slot-write :obj-reg :arr :slot-name 'x :value-reg :new))
          (insts (list (make-vm-const :dst :n :value 4)
@@ -872,55 +897,52 @@
                       (make-vm-label :name "Luse")
                       (make-vm-ret :reg :v)))
          (out (cl-cc/optimize::opt-pass-code-sinking insts)))
-    (assert-true (member read out :test #'eq))
-    (assert-true (member write out :test #'eq))
-    (assert-true (> (position read out :test #'eq)
-                    (position write out :test #'eq)))))
+    (expect (member read out :test #'eq) :to-be-truthy)
+    (expect (member write out :test #'eq) :to-be-truthy)
+    (expect (> (position read out :test #'eq)
+                    (position write out :test #'eq)) :to-be-truthy)))
 
-(deftest-each unreachable-removes-dead-code-cases
-  "opt-pass-unreachable drops instructions between vm-ret/vm-jump and next label."
-  :cases (("after-ret"  (list (make-vm-const :dst :r0 :value 1)
+(it-sequential "unreachable-removes-dead-code-cases after-ret"
+  (destructuring-bind (insts dead-pred) (list (list (make-vm-const :dst :r0 :value 1)
                                (make-vm-ret   :reg :r0)
                                (make-vm-const :dst :r1 :value 2)
                                (make-vm-label :name "ok")
-                               (make-vm-ret   :reg :r0))
-           (lambda (i) (and (typep i 'cl-cc/vm::vm-const) (eq (cl-cc/vm::vm-dst i) :r1))))
-          ("after-jump" (list (make-vm-jump  :label "end")
+                               (make-vm-ret   :reg :r0)) (lambda (i) (and (typep i 'cl-cc/vm::vm-const) (eq (cl-cc/vm::vm-dst i) :r1))))
+    (let ((result (cl-cc/optimize::opt-pass-unreachable insts)))
+    (expect (some dead-pred result) :to-be-falsy))))
+
+(it-sequential "unreachable-removes-dead-code-cases after-jump"
+  (destructuring-bind (insts dead-pred) (list (list (make-vm-jump  :label "end")
                                (make-vm-const :dst :r0 :value 99)
                                (make-vm-label :name "end")
-                               (make-vm-ret   :reg :r0))
-           (lambda (i) (and (typep i 'cl-cc/vm::vm-const)
+                               (make-vm-ret   :reg :r0)) (lambda (i) (and (typep i 'cl-cc/vm::vm-const)
                             (eq (cl-cc/vm::vm-dst i) :r0)
-                            (= 99 (cl-cc/vm::vm-value i))))))
-  (insts dead-pred)
-  (let ((result (cl-cc/optimize::opt-pass-unreachable insts)))
-    (assert-false (some dead-pred result))))
+                            (= 99 (cl-cc/vm::vm-value i)))))
+    (let ((result (cl-cc/optimize::opt-pass-unreachable insts)))
+    (expect (some dead-pred result) :to-be-falsy))))
 
-(deftest unreachable-preserves-label-after-ret
-  "opt-pass-unreachable keeps a vm-label that immediately follows a vm-ret."
+(it-sequential "unreachable-preserves-label-after-ret"
   (let* ((insts (list (make-vm-ret   :reg :r0)
                       (make-vm-label :name "resume")
                       (make-vm-ret   :reg :r0)))
          (result (cl-cc/optimize::opt-pass-unreachable insts)))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-truthy)))
 
-(deftest unreachable-straight-line-code-unchanged
-  "opt-pass-unreachable leaves pure straight-line code (no dead instructions) untouched."
+(it-sequential "unreachable-straight-line-code-unchanged"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret   :reg :r2)))
          (result (cl-cc/optimize::opt-pass-unreachable insts)))
-    (assert-= (length insts) (length result))))
+    (expect (= (length insts) (length result)) :to-be-truthy)))
 
-(deftest type-check-elim-forget-def-removes-matching-facts
-  "%type-check-elim-forget-def removes facts that mention the killed register as either src or dst."
+(it-sequential "type-check-elim-forget-def-removes-matching-facts"
   (let* ((f1    (list :pred 'p :src :r0 :dst :r1))
          (f2    (list :pred 'q :src :r2 :dst :r3))
          (facts (list f1 f2)))
     (let ((after (cl-cc/optimize::%type-check-elim-forget-def facts :r0)))
-      (assert-false (member f1 after))
-      (assert-true  (member f2 after)))
+      (expect (member f1 after) :to-be-falsy)
+      (expect (member f2 after) :to-be-truthy))
     (let ((after (cl-cc/optimize::%type-check-elim-forget-def facts :r1)))
-      (assert-false (member f1 after))
-      (assert-true  (member f2 after)))))
+      (expect (member f1 after) :to-be-falsy)
+      (expect (member f2 after) :to-be-truthy))))

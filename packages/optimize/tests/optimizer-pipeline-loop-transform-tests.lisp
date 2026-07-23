@@ -6,22 +6,19 @@
 ;;;;   FR-527 ML inline scoring, FR-528 learned codegen costs.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── FR-523 Affine loop analysis ────────────────────────────────────────────
 
-(deftest optimize-affine-loop-summary-builds-descriptor
-  "FR-523: affine-loop analysis helper returns structured summary metadata."
+(it-sequential "optimize-affine-loop-summary-builds-descriptor"
   (let ((summary (cl-cc/optimize::opt-build-affine-loop-summary
                   :induction-vars '(:i)
                   :bounds '((:i 0 100))
                   :accesses '((:a :i)))))
-    (assert-eq :affine-loop-summary (getf summary :kind))
-    (assert-equal '(:i) (getf summary :induction-vars))
-    (assert-equal '((:i 0 100)) (getf summary :bounds))))
+    (expect (getf summary :kind) :to-be :affine-loop-summary)
+    (expect (getf summary :induction-vars) :to-equal '(:i))
+    (expect (getf summary :bounds) :to-equal '((:i 0 100)))))
 
-(deftest optimize-pass-affine-loop-analysis-captures-real-loop-summary
-  "FR-523: affine analysis pass extracts summaries from canonical loop instructions."
+(it-sequential "optimize-pass-affine-loop-analysis-captures-real-loop-summary"
   (let* ((program (list (make-vm-const :dst :ri :value 0)
                         (make-vm-const :dst :rlim :value 8)
                         (make-vm-const :dst :rstep :value 1)
@@ -35,29 +32,33 @@
          (_ (cl-cc/optimize::opt-pass-affine-loop-analysis program))
          (summaries cl-cc/optimize::*opt-last-affine-loop-summaries*)
          (summary (first summaries)))
-    (assert-true (listp summaries))
-    (assert-true summary)
-    (assert-eq :affine-loop-summary (getf summary :kind))
-    (assert-equal '(:ri) (getf summary :induction-vars))
-    (assert-true (some (lambda (access)
+    (expect (listp summaries) :to-be-truthy)
+    (expect summary :to-be-truthy)
+    (expect (getf summary :kind) :to-be :affine-loop-summary)
+    (expect (getf summary :induction-vars) :to-equal '(:ri))
+    (expect (some (lambda (access)
                          (eq (getf access :kind) :read-global))
-                       (getf summary :accesses)))))
+                       (getf summary :accesses)) :to-be-truthy)))
 
 ;;; ─── FR-524 Loop interchange ─────────────────────────────────────────────────
 
-(deftest-each optimize-loop-interchange-plan-safety-gate
-  "FR-524: loop interchange plan applies when dependence-safe, is blocked otherwise."
-  :cases (("safe-applies"   t   t)
-          ("unsafe-blocked" nil nil))
-  (dependence-safe-p expected-applied)
-  (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
+(it-sequential "optimize-loop-interchange-plan-safety-gate safe-applies"
+  (destructuring-bind (dependence-safe-p expected-applied) (list t t)
+    (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
                :loops '(:i :j)
                :cache-locality-score 3
                :dependence-safe-p dependence-safe-p)))
-    (assert-equal expected-applied (not (null (getf plan :applied-p))))))
+    (expect (not (null (getf plan :applied-p))) :to-equal expected-applied))))
 
-(deftest optimize-pass-loop-interchange-handles-nested-canonical-loop
-  "FR-524: safe canonical-loop core ops are interchanged (independent swap)."
+(it-sequential "optimize-loop-interchange-plan-safety-gate unsafe-blocked"
+  (destructuring-bind (dependence-safe-p expected-applied) (list nil nil)
+    (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
+               :loops '(:i :j)
+               :cache-locality-score 3
+               :dependence-safe-p dependence-safe-p)))
+    (expect (not (null (getf plan :applied-p))) :to-equal expected-applied))))
+
+(it-sequential "optimize-pass-loop-interchange-handles-nested-canonical-loop"
   (let* ((program (list (make-vm-const :dst :ri :value 0)
                         (make-vm-const :dst :rlim :value 8)
                         (make-vm-const :dst :rstep :value 1)
@@ -70,13 +71,12 @@
                         (make-vm-jump :label :l0)
                         (make-vm-label :name :l1)))
          (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+    (expect (equal (mapcar #'instruction->sexp optimized)
+                         (mapcar #'instruction->sexp program)) :to-be-falsy)
+    (expect (typep (nth 6 optimized) 'vm-move) :to-be-truthy)
+    (expect (typep (nth 7 optimized) 'vm-mul) :to-be-truthy)))
 
-(deftest optimize-pass-loop-interchange-skips-side-effecting-loop
-  "FR-524 safety: side-effecting loop bodies are not interchanged."
+(it-sequential "optimize-pass-loop-interchange-skips-side-effecting-loop"
   (let* ((program (list (make-vm-const :dst :ri :value 0)
                         (make-vm-const :dst :rlim :value 8)
                         (make-vm-const :dst :rstep :value 1)
@@ -88,23 +88,20 @@
                         (make-vm-jump :label :l0)
                         (make-vm-label :name :l1)))
          (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
-    (assert-equal (mapcar #'instruction->sexp optimized)
-                  (mapcar #'instruction->sexp program))))
+    (expect (mapcar #'instruction->sexp program) :to-equal (mapcar #'instruction->sexp optimized))))
 
 ;;; ─── FR-525 Polyhedral scheduling ───────────────────────────────────────────
 
-(deftest optimize-polyhedral-schedule-plan-preserves-objective
-  "FR-525: polyhedral schedule helper keeps statement/constraint/objective payloads."
+(it-sequential "optimize-polyhedral-schedule-plan-preserves-objective"
   (let ((plan (cl-cc/optimize::opt-polyhedral-schedule-plan
                :statements '(:s0 :s1)
                :constraints '((:s0-before :s1))
                :objective :throughput-max)))
-    (assert-eq :polyhedral-schedule (getf plan :kind))
-    (assert-eq :throughput-max (getf plan :objective))
-    (assert-equal '(:s0 :s1) (getf plan :statements))))
+    (expect (getf plan :kind) :to-be :polyhedral-schedule)
+    (expect (getf plan :objective) :to-be :throughput-max)
+    (expect (getf plan :statements) :to-equal '(:s0 :s1))))
 
-(deftest optimize-pass-polyhedral-schedule-reorders-loop-body
-  "FR-525: schedule pass reorders sortable body ops inside canonical loop."
+(it-sequential "optimize-pass-polyhedral-schedule-reorders-loop-body"
   (let* ((program (list (make-vm-const :dst :ri :value 0)
                         (make-vm-const :dst :rlim :value 8)
                         (make-vm-const :dst :rstep :value 1)
@@ -117,26 +114,30 @@
                         (make-vm-jump :label :l0)
                         (make-vm-label :name :l1)))
          (optimized (cl-cc/optimize::opt-pass-polyhedral-schedule program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+    (expect (equal (mapcar #'instruction->sexp optimized)
+                         (mapcar #'instruction->sexp program)) :to-be-falsy)
+    (expect (typep (nth 6 optimized) 'vm-move) :to-be-truthy)
+    (expect (typep (nth 7 optimized) 'vm-mul) :to-be-truthy)))
 
 ;;; ─── FR-526 Loop fusion / fission ───────────────────────────────────────────
 
-(deftest-each optimize-loop-fusion-fission-strategy-selection
-  "FR-526: fusion/fission selects :fusion for low register pressure, :fission for high."
-  :cases (("fusion-low-pressure"   16 :fusion)
-          ("fission-high-pressure" 64 :fission))
-  (register-pressure expected-strategy)
-  (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
+(it-sequential "optimize-loop-fusion-fission-strategy-selection fusion-low-pressure"
+  (destructuring-bind (register-pressure expected-strategy) (list 16 :fusion)
+    (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
                :loops '(:l0 :l1)
                :register-pressure register-pressure
                :instruction-budget 20)))
-    (assert-eq expected-strategy (getf plan :strategy))))
+    (expect (getf plan :strategy) :to-be expected-strategy))))
 
-(deftest optimize-pass-loop-fusion-fission-fuses-adjacent-loops
-  "FR-526: adjacent compatible pure loops are fused into one canonical loop."
+(it-sequential "optimize-loop-fusion-fission-strategy-selection fission-high-pressure"
+  (destructuring-bind (register-pressure expected-strategy) (list 64 :fission)
+    (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
+               :loops '(:l0 :l1)
+               :register-pressure register-pressure
+               :instruction-budget 20)))
+    (expect (getf plan :strategy) :to-be expected-strategy))))
+
+(it-sequential "optimize-pass-loop-fusion-fission-fuses-adjacent-loops"
   (let* ((program
            (list (make-vm-const :dst :ri :value 0)
                  (make-vm-const :dst :rj :value 0)
@@ -159,19 +160,18 @@
                   (make-vm-jump :label :lb)
                   (make-vm-label :name :lbx)))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-= 1 (count-if (lambda (inst)
+    (expect (equal (mapcar #'instruction->sexp optimized)
+                         (mapcar #'instruction->sexp program)) :to-be-falsy)
+    (expect (= 1 (count-if (lambda (inst)
                             (and (typep inst 'vm-label)
                                  (eq (cl-cc/vm::vm-name inst) :la)))
-                          optimized))
-    (assert-= 0 (count-if (lambda (inst)
+                          optimized)) :to-be-truthy)
+    (expect (= 0 (count-if (lambda (inst)
                             (and (typep inst 'vm-label)
                                  (eq (cl-cc/vm::vm-name inst) :lb)))
-                          optimized))))
+                          optimized)) :to-be-truthy)))
 
-(deftest optimize-pass-loop-fusion-fission-skips-unsafe-fusion
-  "FR-526 safety: fusion is skipped when iteration spaces are not equivalent."
+(it-sequential "optimize-pass-loop-fusion-fission-skips-unsafe-fusion"
   (let* ((program (list (make-vm-const :dst :ri :value 0)
                         (make-vm-const :dst :rj :value 1) ;; different init
                         (make-vm-const :dst :rlim :value 4)
@@ -191,11 +191,9 @@
                         (make-vm-jump :label :lb)
                         (make-vm-label :name :lbx)))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-equal (mapcar #'instruction->sexp optimized)
-                  (mapcar #'instruction->sexp program))))
+    (expect (mapcar #'instruction->sexp program) :to-equal (mapcar #'instruction->sexp optimized))))
 
-(deftest optimize-pass-loop-fusion-fission-splits-oversized-loop
-  "FR-526: oversized pure loops are split into two core regions with a split marker."
+(it-sequential "optimize-pass-loop-fusion-fission-splits-oversized-loop"
   (let* ((core (loop for idx from 0 below 36
                      collect (make-vm-move :dst :r8 :src :r5)))
          (program (append (list (make-vm-const :dst :ri :value 0)
@@ -209,39 +207,37 @@
                                 (make-vm-jump :label :l0)
                                 (make-vm-label :name :l1))))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
-    (assert-false (equal (mapcar #'instruction->sexp optimized)
-                         (mapcar #'instruction->sexp program)))
-    (assert-true (some (lambda (inst)
+    (expect (equal (mapcar #'instruction->sexp optimized)
+                         (mapcar #'instruction->sexp program)) :to-be-falsy)
+    (expect (some (lambda (inst)
                          (and (typep inst 'vm-label)
                               (search "__SPLIT" (string (cl-cc/vm::vm-name inst)))))
-                       optimized))))
+                       optimized) :to-be-truthy)))
 
 ;;; ─── FR-527 ML inline scoring ────────────────────────────────────────────────
 
-(deftest optimize-ml-inline-score-plan-is-deterministic
-  "FR-527: MLGO-style scoring helper is deterministic for identical features."
+(it-sequential "optimize-ml-inline-score-plan-is-deterministic"
   (let ((a (cl-cc/optimize::opt-ml-inline-score-plan
             :features '(:hot-loop :small-body)
             :model-version "mlgo-v2"))
         (b (cl-cc/optimize::opt-ml-inline-score-plan
             :features '(:hot-loop :small-body)
             :model-version "mlgo-v2")))
-    (assert-eq :ml-inline-score (getf a :kind))
-    (assert-= (getf a :score) (getf b :score))
-    (assert-= 2 (getf a :feature-count))))
+    (expect (getf a :kind) :to-be :ml-inline-score)
+    (expect (= (getf a :score) (getf b :score)) :to-be-truthy)
+    (expect (= 2 (getf a :feature-count)) :to-be-truthy)))
 
 ;;; ─── FR-528 Learned codegen cost ─────────────────────────────────────────────
 
-(deftest optimize-learned-codegen-cost-plan-is-target-aware
-  "FR-528: learned codegen cost helper reflects target-specific base costs."
+(it-sequential "optimize-learned-codegen-cost-plan-is-target-aware"
   (let ((x86 (cl-cc/optimize::opt-learned-codegen-cost-plan
               :opcode-features '(:mul :add)
               :target :x86-64))
         (arm (cl-cc/optimize::opt-learned-codegen-cost-plan
               :opcode-features '(:mul :add)
               :target :aarch64)))
-    (assert-eq :learned-codegen-cost (getf x86 :kind))
-    (assert-eq :x86-64 (getf x86 :target))
-    (assert-eq :aarch64 (getf arm :target))
-    (assert-true (/= (getf x86 :predicted-cost)
-                     (getf arm :predicted-cost)))))
+    (expect (getf x86 :kind) :to-be :learned-codegen-cost)
+    (expect (getf x86 :target) :to-be :x86-64)
+    (expect (getf arm :target) :to-be :aarch64)
+    (expect (/= (getf x86 :predicted-cost)
+                     (getf arm :predicted-cost)) :to-be-truthy)))

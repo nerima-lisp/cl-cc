@@ -7,7 +7,6 @@
 ;;; egraph-tests.lisp (loaded first).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-coverage-unstable-unit-suite)
 
 (defmacro assert-egraph-boolean-case (expected then-form else-form)
   `(if ,expected
@@ -16,66 +15,58 @@
 
 ;;; ─── Saturation ──────────────────────────────────────────────────────────
 
-(deftest egraph-saturate-empty-graph-terminates-at-iter-0
-  "Saturating an empty e-graph with builtin rules terminates immediately at iteration 0."
+(it-sequential "egraph-saturate-empty-graph-terminates-at-iter-0"
   (let* ((eg (make-test-egraph))
          (rules (cl-cc/optimize:egraph-builtin-rules)))
     (multiple-value-bind (saturated iter _fuel)
         (cl-cc/optimize:egraph-saturate eg rules :limit 10 :fuel 1000)
-      (assert-true saturated)
-      (assert-= 0 iter))))
+      (expect saturated :to-be-truthy)
+      (expect (= 0 iter) :to-be-truthy))))
 
-(deftest egraph-saturate-with-empty-rules-terminates
-  "Saturating a non-empty e-graph with an empty rule set terminates as saturated."
+(it-sequential "egraph-saturate-with-empty-rules-terminates"
   (let* ((eg (make-test-egraph)))
     (cl-cc/optimize:egraph-add eg 'const)
     (multiple-value-bind (saturated _iter _fuel)
         (cl-cc/optimize:egraph-saturate eg nil :limit 5 :fuel 1000)
-      (assert-true saturated))))
+      (expect saturated :to-be-truthy))))
 
 ;;; ─── Extraction ──────────────────────────────────────────────────────────
 
-(deftest egraph-extract-nullary-node-returns-non-nil
-  "Extracting from an e-class containing a nullary const node returns a non-nil result."
+(it-sequential "egraph-extract-nullary-node-returns-non-nil"
   (let* ((eg (make-test-egraph))
          (id (cl-cc/optimize:egraph-add eg 'const)))
     (let ((cls (gethash (cl-cc/optimize:egraph-find eg id) (cl-cc:eg-classes eg))))
       (when cls (setf (cl-cc:ec-data cls) 42)))
-    (assert-true (cl-cc/optimize:egraph-extract eg id))))
+    (expect (cl-cc/optimize:egraph-extract eg id) :to-be-truthy)))
 
-(deftest egraph-extract-binary-add-returns-compound
-  "Extracting from a binary (add c1 c2) e-class returns a compound expression."
+(it-sequential "egraph-extract-binary-add-returns-compound"
   (let* ((eg  (make-test-egraph))
          (c1  (cl-cc/optimize:egraph-add eg 'const))
          (c2  (cl-cc/optimize:egraph-add eg 'const))
          (add (cl-cc/optimize:egraph-add eg 'add c1 c2)))
-    (assert-true (cl-cc/optimize:egraph-extract eg add))))
+    (expect (cl-cc/optimize:egraph-extract eg add) :to-be-truthy)))
 
 ;;; ─── Optimize-With-Egraph ────────────────────────────────────────────────
 
-(deftest optimize-with-egraph-simple-sequence-returns-non-empty
-  "optimize-with-egraph on a simple const+ret sequence returns at least one instruction."
+(it-sequential "optimize-with-egraph-simple-sequence-returns-non-empty"
   (let* ((insts (list (make-vm-const :dst :r0 :value 42)
                       (make-vm-ret   :reg :r0)))
          (result (cl-cc/optimize:optimize-with-egraph insts)))
-    (assert-true (>= (length result) 1))))
+    (expect (>= (length result) 1) :to-be-truthy)))
 
-(deftest optimize-with-egraph-empty-input-returns-nil
-  "optimize-with-egraph on nil input returns nil."
-  (assert-null (cl-cc/optimize:optimize-with-egraph nil)))
+(it-sequential "optimize-with-egraph-empty-input-returns-nil"
+  (expect (cl-cc/optimize:optimize-with-egraph nil) :to-be-null))
 
-(deftest optimize-with-egraph-lowers-const
-  "A class proven equal to a constant is rewritten as vm-const."
+(it-sequential "optimize-with-egraph-lowers-const"
   (let* ((insts (list (cl-cc:make-vm-const :dst :r0 :value 7)
                       (cl-cc:make-vm-sub   :dst :r1 :lhs :r0 :rhs :r0)
                       (cl-cc:make-vm-ret   :reg :r1)))
          (out (cl-cc/optimize:optimize-with-egraph insts))
          (r1  (egraph-find-dst-inst out :r1)))
-    (assert-true (cl-cc:vm-const-p r1))
-    (assert-equal 0 (cl-cc/vm::vm-value r1))))
+    (expect (cl-cc:vm-const-p r1) :to-be-truthy)
+    (expect (cl-cc/vm::vm-value r1) :to-equal 0)))
 
-(deftest optimize-with-egraph-lowers-alias
-  "A class proven equal to another register is rewritten as vm-move."
+(it-sequential "optimize-with-egraph-lowers-alias"
   (let* ((insts (list (cl-cc:make-vm-const :dst :r0 :value 0)
                       (cl-cc:make-vm-const :dst :r1 :value 5)
                       (cl-cc:make-vm-cons  :dst :r2 :car-src :r1 :cdr-src :r0)
@@ -83,33 +74,38 @@
                       (cl-cc:make-vm-ret   :reg :r3)))
          (out (cl-cc/optimize:optimize-with-egraph insts))
          (r3  (egraph-find-dst-inst out :r3)))
-    (assert-true (cl-cc:vm-move-p r3))
-    (assert-equal :r2 (cl-cc/vm::vm-src r3))))
+    (expect (cl-cc:vm-move-p r3) :to-be-truthy)
+    (expect (cl-cc/vm::vm-src r3) :to-equal :r2)))
 
 ;;; ─── Cost Model ──────────────────────────────────────────────────────────
 
-(deftest-each egraph-cost-model-cases
-  "egraph-default-cost returns the correct cost for each node type."
-  :cases (("const"  'const nil   0)
-          ("add"    'add   '(1 1) 3)
-          ("call"   'call  nil   10))
-  (op children expected)
-  (assert-= expected (cl-cc/optimize:egraph-default-cost op children)))
+(it-sequential "egraph-cost-model-cases const"
+  (destructuring-bind (op children expected) (list 'const nil 0)
+    (expect (= expected (cl-cc/optimize:egraph-default-cost op children)) :to-be-truthy)))
+
+(it-sequential "egraph-cost-model-cases add"
+  (destructuring-bind (op children expected) (list 'add '(1 1) 3)
+    (expect (= expected (cl-cc/optimize:egraph-default-cost op children)) :to-be-truthy)))
+
+(it-sequential "egraph-cost-model-cases call"
+  (destructuring-bind (op children expected) (list 'call nil 10)
+    (expect (= expected (cl-cc/optimize:egraph-default-cost op children)) :to-be-truthy)))
 
 ;;; ─── enode-memo-key ──────────────────────────────────────────────────────
 
-(deftest-each enode-memo-key
-  "enode-memo-key returns a list of op followed by child class IDs."
-  :cases (("nullary" 'const nil    '(const))
-          ("binary"  'add   '(0 1) '(add 0 1)))
-  (op children expected)
-  (let ((node (cl-cc/optimize:make-e-node :op op :children children)))
-    (assert-equal expected (cl-cc/optimize::enode-memo-key node))))
+(it-sequential "enode-memo-key nullary"
+  (destructuring-bind (op children expected) (list 'const nil '(const))
+    (let ((node (cl-cc/optimize:make-e-node :op op :children children)))
+    (expect (cl-cc/optimize::enode-memo-key node) :to-equal expected))))
+
+(it-sequential "enode-memo-key binary"
+  (destructuring-bind (op children expected) (list 'add '(0 1) '(add 0 1))
+    (let ((node (cl-cc/optimize:make-e-node :op op :children children)))
+    (expect (cl-cc/optimize::enode-memo-key node) :to-equal expected))))
 
 ;;; ─── egraph-canonical-enode ──────────────────────────────────────────────
 
-(deftest egraph-canonical-enode-updates-children
-  "egraph-canonical-enode returns a new e-node with children resolved via union-find."
+(it-sequential "egraph-canonical-enode-updates-children"
   (let* ((eg  (make-test-egraph))
          (id0 (cl-cc/optimize:egraph-add eg 'const))
          (id1 (cl-cc/optimize:egraph-add eg 'var))
@@ -117,145 +113,171 @@
          (canon (cl-cc/optimize:egraph-merge eg id0 id1))
          (node  (cl-cc/optimize:make-e-node :op 'add :children (list id1))))
     (let ((cnode (cl-cc/optimize::egraph-canonical-enode eg node)))
-      (assert-eq 'add (cl-cc:en-op cnode))
-      (assert-= canon (first (cl-cc:en-children cnode))))))
+      (expect (cl-cc:en-op cnode) :to-be 'add)
+      (expect (= canon (first (cl-cc:en-children cnode))) :to-be-truthy))))
 
 ;;; ─── egraph-build-rhs ────────────────────────────────────────────────────
 
-(deftest egraph-build-rhs-pattern-var-looks-up-binding
-  "egraph-build-rhs: a pattern variable (?x) returns the bound e-class ID."
+(it-sequential "egraph-build-rhs-pattern-var-looks-up-binding"
   (let* ((eg      (make-test-egraph))
          (id      (cl-cc/optimize:egraph-add eg 'const))
          (bindings (list (cons '?x id))))
-    (assert-= id (cl-cc/optimize::egraph-build-rhs eg '?x bindings))))
+    (expect (= id (cl-cc/optimize::egraph-build-rhs eg '?x bindings)) :to-be-truthy)))
 
-(deftest egraph-build-rhs-symbol-adds-nullary-node
-  "egraph-build-rhs: a plain symbol adds a nullary e-node and returns an integer class ID."
+(it-sequential "egraph-build-rhs-symbol-adds-nullary-node"
   (let* ((eg (make-test-egraph)))
-    (assert-true (integerp (cl-cc/optimize::egraph-build-rhs eg 'zero nil)))))
+    (expect (integerp (cl-cc/optimize::egraph-build-rhs eg 'zero nil)) :to-be-truthy)))
 
-(deftest egraph-build-rhs-compound-builds-tree-with-op
-  "egraph-build-rhs: a compound form (neg ?x) adds a neg node and returns its class."
+(it-sequential "egraph-build-rhs-compound-builds-tree-with-op"
   (let* ((eg      (make-test-egraph))
          (id0     (cl-cc/optimize:egraph-add eg 'const))
          (bindings (list (cons '?x id0)))
          (result  (cl-cc/optimize::egraph-build-rhs eg '(neg ?x) bindings)))
-    (assert-true (integerp result))
-    (assert-true (cl-cc/optimize::egraph-class-has-op-p eg result 'neg))))
+    (expect (integerp result) :to-be-truthy)
+    (expect (cl-cc/optimize::egraph-class-has-op-p eg result 'neg) :to-be-truthy)))
 
-(deftest egraph-build-rhs-numeric-sets-ec-data
-  "egraph-build-rhs: a numeric literal creates a const e-class with that value as ec-data."
+(it-sequential "egraph-build-rhs-numeric-sets-ec-data"
   (let* ((eg     (make-test-egraph))
          (result (cl-cc/optimize::egraph-build-rhs eg 42 nil)))
-    (assert-true (integerp result))
-    (assert-= 42 (cl-cc/optimize::egraph-class-const-value eg result))))
+    (expect (integerp result) :to-be-truthy)
+    (expect (= 42 (cl-cc/optimize::egraph-class-const-value eg result)) :to-be-truthy)))
 
 ;;; ─── egraph-class-has-op-p / egraph-class-const-value ───────────────────
 
-(deftest-each egraph-class-has-op-p
-  "egraph-class-has-op-p is true only when the e-class holds a node with the queried op."
-  :cases (("matching-op"  'const t)
-          ("different-op" 'add   nil))
-  (query-op expected)
-  (let* ((eg (make-test-egraph))
+(it-sequential "egraph-class-has-op-p matching-op"
+  (destructuring-bind (query-op expected) (list 'const t)
+    (let* ((eg (make-test-egraph))
          (id (cl-cc/optimize:egraph-add eg 'const)))
     (assert-egraph-boolean-case expected
-      (assert-true  (cl-cc/optimize::egraph-class-has-op-p eg id query-op))
-      (assert-false (cl-cc/optimize::egraph-class-has-op-p eg id query-op)))))
+      (expect (cl-cc/optimize::egraph-class-has-op-p eg id query-op) :to-be-truthy)
+      (expect (cl-cc/optimize::egraph-class-has-op-p eg id query-op) :to-be-falsy)))))
 
-(deftest-each egraph-class-const-value-cases
-  "egraph-class-const-value: returns ec-data for a const node; nil for a non-const node."
-  :cases (("const-returns-data" 'const t   99)
-          ("non-const-nil"      'add   nil nil))
-  (op set-data-p expected)
-  (let* ((eg (make-test-egraph))
+(it-sequential "egraph-class-has-op-p different-op"
+  (destructuring-bind (query-op expected) (list 'add nil)
+    (let* ((eg (make-test-egraph))
+         (id (cl-cc/optimize:egraph-add eg 'const)))
+    (assert-egraph-boolean-case expected
+      (expect (cl-cc/optimize::egraph-class-has-op-p eg id query-op) :to-be-truthy)
+      (expect (cl-cc/optimize::egraph-class-has-op-p eg id query-op) :to-be-falsy)))))
+
+(it-sequential "egraph-class-const-value-cases const-returns-data"
+  (destructuring-bind (op set-data-p expected) (list 'const t 99)
+    (let* ((eg (make-test-egraph))
          (id (cl-cc/optimize:egraph-add eg op)))
     (when set-data-p
       (let ((cls (gethash (cl-cc/optimize:egraph-find eg id) (cl-cc:eg-classes eg))))
         (setf (cl-cc:ec-data cls) 99)))
     (assert-egraph-boolean-case expected
-      (assert-= expected (cl-cc/optimize::egraph-class-const-value eg id))
-      (assert-null (cl-cc/optimize::egraph-class-const-value eg id)))))
+      (expect (= expected (cl-cc/optimize::egraph-class-const-value eg id)) :to-be-truthy)
+      (expect (cl-cc/optimize::egraph-class-const-value eg id) :to-be-null)))))
+
+(it-sequential "egraph-class-const-value-cases non-const-nil"
+  (destructuring-bind (op set-data-p expected) (list 'add nil nil)
+    (let* ((eg (make-test-egraph))
+         (id (cl-cc/optimize:egraph-add eg op)))
+    (when set-data-p
+      (let ((cls (gethash (cl-cc/optimize:egraph-find eg id) (cl-cc:eg-classes eg))))
+        (setf (cl-cc:ec-data cls) 99)))
+    (assert-egraph-boolean-case expected
+      (expect (= expected (cl-cc/optimize::egraph-class-const-value eg id)) :to-be-truthy)
+      (expect (cl-cc/optimize::egraph-class-const-value eg id) :to-be-null)))))
 
 ;;; ─── vm-inst-to-enode-op ─────────────────────────────────────────────────
 
-(deftest-each vm-inst-to-enode-op-strips-vm-prefix
-  "vm-inst-to-enode-op strips the VM- prefix from instruction type names."
-  :cases (("const" 'vm-const (cl-cc:make-vm-const :dst :r0 :value 1))
-          ("move"  'vm-move  (cl-cc:make-vm-move  :dst :r0 :src :r1))
-          ("add"   'vm-add   (cl-cc:make-vm-add   :dst :r0 :lhs :r1 :rhs :r2)))
-  (expected-op-prefix inst)
-  (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
-    (assert-true (symbolp op))
+(it-sequential "vm-inst-to-enode-op-strips-vm-prefix const"
+  (destructuring-bind (expected-op-prefix inst) (list 'vm-const (cl-cc:make-vm-const :dst :r0 :value 1))
+    (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
+    (expect (symbolp op) :to-be-truthy)
     ;; The result op should NOT start with VM-
-    (assert-false (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))))))
+    (expect (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))) :to-be-falsy))))
+
+(it-sequential "vm-inst-to-enode-op-strips-vm-prefix move"
+  (destructuring-bind (expected-op-prefix inst) (list 'vm-move (cl-cc:make-vm-move  :dst :r0 :src :r1))
+    (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
+    (expect (symbolp op) :to-be-truthy)
+    ;; The result op should NOT start with VM-
+    (expect (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))) :to-be-falsy))))
+
+(it-sequential "vm-inst-to-enode-op-strips-vm-prefix add"
+  (destructuring-bind (expected-op-prefix inst) (list 'vm-add (cl-cc:make-vm-add   :dst :r0 :lhs :r1 :rhs :r2))
+    (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
+    (expect (symbolp op) :to-be-truthy)
+    ;; The result op should NOT start with VM-
+    (expect (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))) :to-be-falsy))))
 
 ;;; ─── egraph-add-instructions ─────────────────────────────────────────────
 
-(deftest egraph-add-instructions-maps-dst-registers-to-distinct-classes
-  "egraph-add-instructions maps dst registers to integer class IDs; add dst differs from its operands."
+(it-sequential "egraph-add-instructions-maps-dst-registers-to-distinct-classes"
   (let* ((eg    (make-test-egraph))
          (insts (list (cl-cc:make-vm-const :dst :r0 :value 7)
                       (cl-cc:make-vm-add   :dst :r1 :lhs :r0 :rhs :r0)))
          (reg->class (cl-cc/optimize::egraph-add-instructions eg insts)))
-    (assert-true (integerp (gethash :r0 reg->class)))
-    (assert-true (integerp (gethash :r1 reg->class)))
-    (assert-true (/= (gethash :r0 reg->class) (gethash :r1 reg->class)))))
+    (expect (integerp (gethash :r0 reg->class)) :to-be-truthy)
+    (expect (integerp (gethash :r1 reg->class)) :to-be-truthy)
+    (expect (/= (gethash :r0 reg->class) (gethash :r1 reg->class)) :to-be-truthy)))
 
-(deftest egraph-add-instructions-const-stores-ec-data
-  "egraph-add-instructions stores the integer value as ec-data for vm-const instructions."
+(it-sequential "egraph-add-instructions-const-stores-ec-data"
   (let* ((eg    (make-test-egraph))
          (insts (list (cl-cc:make-vm-const :dst :r0 :value 42)))
          (reg->class (cl-cc/optimize::egraph-add-instructions eg insts)))
-    (assert-= 42 (cl-cc/optimize::egraph-class-const-value eg (gethash :r0 reg->class)))))
+    (expect (= 42 (cl-cc/optimize::egraph-class-const-value eg (gethash :r0 reg->class))) :to-be-truthy)))
 
 ;;; ─── Compound pattern matching ───────────────────────────────────────────
 
-(deftest egraph-match-pattern-compound-binds-pattern-vars
-  "egraph-match-pattern on (add ?x ?y) returns matches with both ?x and ?y bound."
+(it-sequential "egraph-match-pattern-compound-binds-pattern-vars"
   (let* ((eg  (make-test-egraph))
          (c1  (cl-cc/optimize:egraph-add eg 'const))
          (c2  (cl-cc/optimize:egraph-add eg 'var))
          (add (cl-cc/optimize:egraph-add eg 'add c1 c2))
          (matches (cl-cc/optimize:egraph-match-pattern eg '(add ?x ?y) add)))
-    (assert-true (>= (length matches) 1))
+    (expect (>= (length matches) 1) :to-be-truthy)
     (let ((b (car matches)))
-      (assert-true (assoc '?x b))
-      (assert-true (assoc '?y b)))))
+      (expect (assoc '?x b) :to-be-truthy)
+      (expect (assoc '?y b) :to-be-truthy))))
 
-(deftest egraph-match-pattern-literal-symbol-matches-nullary-node
-  "egraph-match-pattern on a literal symbol produces exactly one match for a nullary node."
+(it-sequential "egraph-match-pattern-literal-symbol-matches-nullary-node"
   (let* ((eg  (make-test-egraph))
          (id  (cl-cc/optimize:egraph-add eg 'zero))
          (matches (cl-cc/optimize:egraph-match-pattern eg 'zero id)))
-    (assert-= 1 (length matches))))
+    (expect (= 1 (length matches)) :to-be-truthy)))
 
 ;;; ─── *opt-iteration-budget-thresholds* data coverage ────────────────────
 
-(deftest-each opt-iteration-budget-thresholds-content
-  "*opt-iteration-budget-thresholds* contains all four expected threshold entries."
-  :cases (("tiny-threshold"   50  -12)
-          ("small-threshold"  150 -6)
-          ("medium-threshold" 400 0)
-          ("large-threshold"  800 8))
-  (threshold delta)
-  (let ((entry (assoc threshold cl-cc/optimize::*opt-iteration-budget-thresholds*)))
-    (assert-true entry)
-    (assert-= delta (cdr entry))))
+(it-sequential "opt-iteration-budget-thresholds-content tiny-threshold"
+  (destructuring-bind (threshold delta) (list 50 -12)
+    (let ((entry (assoc threshold cl-cc/optimize::*opt-iteration-budget-thresholds*)))
+    (expect entry :to-be-truthy)
+    (expect (= delta (cdr entry)) :to-be-truthy))))
+
+(it-sequential "opt-iteration-budget-thresholds-content small-threshold"
+  (destructuring-bind (threshold delta) (list 150 -6)
+    (let ((entry (assoc threshold cl-cc/optimize::*opt-iteration-budget-thresholds*)))
+    (expect entry :to-be-truthy)
+    (expect (= delta (cdr entry)) :to-be-truthy))))
+
+(it-sequential "opt-iteration-budget-thresholds-content medium-threshold"
+  (destructuring-bind (threshold delta) (list 400 0)
+    (let ((entry (assoc threshold cl-cc/optimize::*opt-iteration-budget-thresholds*)))
+    (expect entry :to-be-truthy)
+    (expect (= delta (cdr entry)) :to-be-truthy))))
+
+(it-sequential "opt-iteration-budget-thresholds-content large-threshold"
+  (destructuring-bind (threshold delta) (list 800 8)
+    (let ((entry (assoc threshold cl-cc/optimize::*opt-iteration-budget-thresholds*)))
+    (expect entry :to-be-truthy)
+    (expect (= delta (cdr entry)) :to-be-truthy))))
 
 ;;; ─── %egraph-rewrite-inst ────────────────────────────────────────────────
 
-(deftest egraph-rewrite-inst-no-dst-returns-unchanged
-  "%egraph-rewrite-inst: instruction with no dst (e.g. vm-ret) is returned unchanged."
+(it-sequential "egraph-rewrite-inst-no-dst-returns-unchanged"
   (let* ((eg         (make-test-egraph))
          (reg-map    (make-hash-table :test #'eq))
          (class->regs (make-hash-table :test #'equal))
          (ret        (make-vm-ret :reg :r0)))
     (let ((result (cl-cc/optimize::%egraph-rewrite-inst ret eg reg-map class->regs)))
-      (assert-eq ret result))))
+      (expect result :to-be ret))))
 
-(deftest egraph-rewrite-inst-dst-in-const-class-becomes-vm-const
-  "%egraph-rewrite-inst rewrites to vm-const when the dst class is proven constant."
+(it-sequential "egraph-rewrite-inst-dst-in-const-class-becomes-vm-const"
   (let* ((eg         (make-test-egraph))
          (class-id   (cl-cc/optimize:egraph-add eg 'const))
          (class-ht   (gethash (cl-cc/optimize:egraph-find eg class-id) (cl-cc:eg-classes eg)))
@@ -265,12 +287,11 @@
     (setf (cl-cc:ec-data class-ht) 42)
     (setf (gethash :r1 reg-map) class-id)
     (let ((result (cl-cc/optimize::%egraph-rewrite-inst move eg reg-map class->regs)))
-      (assert-true (cl-cc:vm-const-p result))
-      (assert-eq :r1 (cl-cc:vm-dst result))
-      (assert-equal 42 (cl-cc/vm::vm-value result)))))
+      (expect (cl-cc:vm-const-p result) :to-be-truthy)
+      (expect (cl-cc:vm-dst result) :to-be :r1)
+      (expect (cl-cc/vm::vm-value result) :to-equal 42))))
 
-(deftest egraph-rewrite-inst-dst-with-alias-becomes-vm-move
-  "%egraph-rewrite-inst rewrites to vm-move when dst has an alias in the same e-class."
+(it-sequential "egraph-rewrite-inst-dst-with-alias-becomes-vm-move"
   (let* ((eg         (make-test-egraph))
          (class-id   (cl-cc/optimize:egraph-add eg 'add
                        (cl-cc/optimize:egraph-add eg 'const)
@@ -282,6 +303,6 @@
     (setf (gethash :r2 reg-map) class-id)
     (setf (gethash canon class->regs) (list :r2 :r3))
     (let ((result (cl-cc/optimize::%egraph-rewrite-inst add-inst eg reg-map class->regs)))
-      (assert-true (cl-cc:vm-move-p result))
-      (assert-eq :r2 (cl-cc:vm-dst result))
-      (assert-eq :r3 (cl-cc/vm::vm-src result)))))
+      (expect (cl-cc:vm-move-p result) :to-be-truthy)
+      (expect (cl-cc:vm-dst result) :to-be :r2)
+      (expect (cl-cc/vm::vm-src result) :to-be :r3))))

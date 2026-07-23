@@ -5,60 +5,80 @@
 ;;;;   opt-pass-bswap-recognition (pass-through), opt-pass-rotate-recognition.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── opt-power-of-2-p ────────────────────────────────────────────────────
 
-(deftest-each opt-power-of-2-p-true-for-powers-of-two
-  "opt-power-of-2-p is true for 2, 4, 8, 16, 256."
-  :cases (("two"         2)
-          ("four"        4)
-          ("eight"       8)
-          ("sixteen"     16)
-          ("two-fifty-six" 256))
-  (n)
-  (assert-true (cl-cc/optimize::opt-power-of-2-p n)))
+(it-sequential "opt-power-of-2-p-true-for-powers-of-two two"
+  (destructuring-bind (n) (list 2)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-truthy)))
 
-(deftest-each opt-power-of-2-p-false-for-non-powers
-  "opt-power-of-2-p is false for 0, 1, 3, 6, 7, and non-integers."
-  :cases (("zero"        0)
-          ("one"         1)
-          ("three"       3)
-          ("six"         6)
-          ("seven"       7)
-          ("negative"    -4)
-          ("float"       4.0))
-  (n)
-  (assert-false (cl-cc/optimize::opt-power-of-2-p n)))
+(it-sequential "opt-power-of-2-p-true-for-powers-of-two four"
+  (destructuring-bind (n) (list 4)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-truthy)))
+
+(it-sequential "opt-power-of-2-p-true-for-powers-of-two eight"
+  (destructuring-bind (n) (list 8)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-truthy)))
+
+(it-sequential "opt-power-of-2-p-true-for-powers-of-two sixteen"
+  (destructuring-bind (n) (list 16)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-truthy)))
+
+(it-sequential "opt-power-of-2-p-true-for-powers-of-two two-fifty-six"
+  (destructuring-bind (n) (list 256)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-truthy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers zero"
+  (destructuring-bind (n) (list 0)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers one"
+  (destructuring-bind (n) (list 1)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers three"
+  (destructuring-bind (n) (list 3)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers six"
+  (destructuring-bind (n) (list 6)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers seven"
+  (destructuring-bind (n) (list 7)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers negative"
+  (destructuring-bind (n) (list -4)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
+
+(it-sequential "opt-power-of-2-p-false-for-non-powers float"
+  (destructuring-bind (n) (list 4.0)
+    (expect (cl-cc/optimize::opt-power-of-2-p n) :to-be-falsy)))
 
 ;;; ─── opt-pass-strength-reduce — multiply by power of 2 ──────────────────
 
-(deftest strength-reduce-mul-by-power-of-2-emits-ash
-  "opt-pass-strength-reduce replaces (* x 4) with (ash x 2) via vm-ash."
-  ;; Input: CONST :R0 ← 4 ;  MUL :R1 ← :X * :R0
+(it-sequential "strength-reduce-mul-by-power-of-2-emits-ash"
   (let* ((const-4 (make-vm-const :dst :r0 :value 4))
          (mul     (make-vm-mul   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-4 mul))))
     ;; The mul should become ash; check no vm-mul in output
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest strength-reduce-mul-rhs-power-of-2-emits-ash
-  "opt-pass-strength-reduce handles commutative case (power-of-2 on lhs)."
-  ;; Input: CONST :R0 ← 8 ;  MUL :R1 ← :R0 * :X
+(it-sequential "strength-reduce-mul-rhs-power-of-2-emits-ash"
   (let* ((const-8 (make-vm-const :dst :r0 :value 8))
          (mul     (make-vm-mul   :dst :r1 :lhs :r0 :rhs :x))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-8 mul))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest strength-reduce-div-by-power-of-2-emits-ash
-  "opt-pass-strength-reduce replaces (/ x 8) with (ash x -3) via vm-ash."
+(it-sequential "strength-reduce-div-by-power-of-2-emits-ash"
   (let* ((const-8 (make-vm-const :dst :r0 :value 8))
          (div     (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-8 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)
     ;; The shift count must be negative (right shift)
     (let ((ash-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result)))
       (when ash-inst
@@ -68,17 +88,16 @@
                                             (eq (cl-cc/vm::vm-dst i) shift-dst)))
                                      result)))
             (when const-inst
-              (assert-true (minusp (cl-cc/vm::vm-value const-inst))))))))))
+              (expect (minusp (cl-cc/vm::vm-value const-inst)) :to-be-truthy))))))))
 
 ;;; ─── FR-282: Division by constant — targeted tests ─────────────────────────
 
-(deftest fr-282-div-by-2-emits-ash-neg-1
-  "FR-282 partial: (/ x 2) → (ash x -1). Power-of-2 divisor."
+(it-sequential "fr-282-div-by-2-emits-ash-neg-1"
   (let* ((const-2 (make-vm-const :dst :r0 :value 2))
          (div     (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-2 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)
     ;; Shift count must be -1
     (let ((ash-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result)))
       (when ash-inst
@@ -88,15 +107,14 @@
                                            (eq (cl-cc/vm::vm-dst i) shift-dst)))
                                     result)))
           (when const-inst
-            (assert-= -1 (cl-cc/vm::vm-value const-inst))))))))
+            (expect (= -1 (cl-cc/vm::vm-value const-inst)) :to-be-truthy)))))))
 
-(deftest fr-282-div-by-256-emits-ash-neg-8
-  "FR-282 partial: (/ x 256) → (ash x -8). Larger power-of-2 divisor."
+(it-sequential "fr-282-div-by-256-emits-ash-neg-8"
   (let* ((const-256 (make-vm-const :dst :r0 :value 256))
          (div       (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result    (cl-cc/optimize::opt-pass-strength-reduce (list const-256 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)
     (let ((ash-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result)))
       (when ash-inst
         (let* ((shift-dst (cl-cc/vm::vm-rhs ash-inst))
@@ -105,10 +123,9 @@
                                            (eq (cl-cc/vm::vm-dst i) shift-dst)))
                                     result)))
           (when const-inst
-            (assert-= -8 (cl-cc/vm::vm-value const-inst))))))))
+            (expect (= -8 (cl-cc/vm::vm-value const-inst)) :to-be-truthy)))))))
 
-(deftest fr-282-div-by-3-bounded-nonnegative-dividend-emits-reciprocal-seq
-  "FR-282: (/ x 3) becomes mul+ash when x is proved non-negative and bounded."
+(it-sequential "fr-282-div-by-3-bounded-nonnegative-dividend-emits-reciprocal-seq"
   (let* ((const-4 (make-vm-const :dst :r0 :value 4))
          (const-8 (make-vm-const :dst :r1 :value 8))
          (sum     (make-vm-add   :dst :x :lhs :r0 :rhs :r1))
@@ -116,12 +133,11 @@
          (div     (make-vm-div   :dst :r3 :lhs :x :rhs :r2))
          (result  (cl-cc/optimize::opt-pass-strength-reduce
                    (list const-4 const-8 sum const-3 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest fr-282-div-by-7-bounded-nonnegative-dividend-emits-reciprocal-seq
-  "FR-282: (/ x 7) becomes mul+ash when x is proved non-negative and bounded."
+(it-sequential "fr-282-div-by-7-bounded-nonnegative-dividend-emits-reciprocal-seq"
   (let* ((const-8 (make-vm-const :dst :r0 :value 8))
          (const-6 (make-vm-const :dst :r1 :value 6))
          (sum     (make-vm-add   :dst :x :lhs :r0 :rhs :r1))
@@ -129,31 +145,28 @@
          (div     (make-vm-div   :dst :r3 :lhs :x :rhs :r2))
          (result  (cl-cc/optimize::opt-pass-strength-reduce
                    (list const-8 const-6 sum const-7 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest fr-282-div-by-3-unknown-dividend-not-transformed
-  "FR-282: (/ x 3) stays as vm-div when x has no proved non-negative bounded range."
+(it-sequential "fr-282-div-by-3-unknown-dividend-not-transformed"
   (let* ((const-3 (make-vm-const :dst :r0 :value 3))
          (div     (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-3 div))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-falsy)))
 
-(deftest fr-282-div-by-7-unknown-dividend-not-transformed
-  "FR-282: (/ x 7) stays as vm-div when x has no proved non-negative bounded range."
+(it-sequential "fr-282-div-by-7-unknown-dividend-not-transformed"
   (let* ((const-7 (make-vm-const :dst :r0 :value 7))
          (div     (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-7 div))))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-falsy)))
 
 
-(deftest fr-282-div-by-3-word64-range-emits-unsigned-mul-high-seq
-  "FR-282: proved unsigned 64-bit dividend range uses magic-number mul-high lowering."
+(it-sequential "fr-282-div-by-3-word64-range-emits-unsigned-mul-high-seq"
   (let* ((mask    (make-vm-const  :dst :mask :value #xffffffffffffffff))
          (masked  (make-vm-logand :dst :x64 :lhs :x :rhs :mask))
          (const-3 (make-vm-const  :dst :d :value 3))
@@ -162,13 +175,12 @@
                    (list mask masked const-3 div))))
     (flet ((has-inst-p (name)
              (some (lambda (i) (typep i (find-class (intern name "CL-CC/VM")))) result)))
-      (assert-false (has-inst-p "VM-DIV"))
-      (assert-true  (has-inst-p "VM-INTEGER-MUL-HIGH-U"))
-      (assert-true  (has-inst-p "VM-ASH"))
-      (assert-false (has-inst-p "VM-SUB")))))
+      (expect (has-inst-p "VM-DIV") :to-be-falsy)
+      (expect (has-inst-p "VM-INTEGER-MUL-HIGH-U") :to-be-truthy)
+      (expect (has-inst-p "VM-ASH") :to-be-truthy)
+      (expect (has-inst-p "VM-SUB") :to-be-falsy))))
 
-(deftest fr-282-div-by-7-word64-range-emits-add-adjusted-unsigned-mul-high-seq
-  "FR-282: uncooperative divisor uses the add-adjusted unsigned magic sequence."
+(it-sequential "fr-282-div-by-7-word64-range-emits-add-adjusted-unsigned-mul-high-seq"
   (let* ((mask    (make-vm-const  :dst :mask :value #xffffffffffffffff))
          (masked  (make-vm-logand :dst :x64 :lhs :x :rhs :mask))
          (const-7 (make-vm-const  :dst :d :value 7))
@@ -177,25 +189,23 @@
                    (list mask masked const-7 div))))
     (flet ((has-inst-p (name)
              (some (lambda (i) (typep i (find-class (intern name "CL-CC/VM")))) result)))
-      (assert-false (has-inst-p "VM-DIV"))
-      (assert-true  (has-inst-p "VM-INTEGER-MUL-HIGH-U"))
-      (assert-true  (has-inst-p "VM-SUB"))
-      (assert-true  (has-inst-p "VM-ADD"))
-      (assert-true  (has-inst-p "VM-ASH")))))
+      (expect (has-inst-p "VM-DIV") :to-be-falsy)
+      (expect (has-inst-p "VM-INTEGER-MUL-HIGH-U") :to-be-truthy)
+      (expect (has-inst-p "VM-SUB") :to-be-truthy)
+      (expect (has-inst-p "VM-ADD") :to-be-truthy)
+      (expect (has-inst-p "VM-ASH") :to-be-truthy))))
 
-(deftest fr-282-div-by-3-negative-dividend-transformed-when-bounded
-  "FR-282 extension: (/ x 3) can be lowered on bounded negative intervals via affine reciprocal."
+(it-sequential "fr-282-div-by-3-negative-dividend-transformed-when-bounded"
   (let* ((const-neg (make-vm-const :dst :x :value -9))
           (const-3   (make-vm-const :dst :r0 :value 3))
           (div       (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
           (result    (cl-cc/optimize::opt-pass-strength-reduce
                       (list const-neg const-3 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest fr-282-div-by-3-bounded-negative-dividend-emits-reciprocal-seq
-  "FR-282 extension: bounded negative dividend can be lowered via reciprocal+ bias sequence."
+(it-sequential "fr-282-div-by-3-bounded-negative-dividend-emits-reciprocal-seq"
   (let* ((const-neg9 (make-vm-const :dst :r0 :value -9))
          (const-neg3 (make-vm-const :dst :r1 :value -3))
          (add        (make-vm-add   :dst :x :lhs :r0 :rhs :r1)) ; x=-12
@@ -203,13 +213,12 @@
          (div        (make-vm-div   :dst :r3 :lhs :x :rhs :r2))
          (result     (cl-cc/optimize::opt-pass-strength-reduce
                       (list const-neg9 const-neg3 add const-3 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-add)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest fr-282-div-by-7-bounded-mixed-sign-dividend-emits-reciprocal-seq
-  "FR-282 extension: bounded mixed-sign interval can use verified affine reciprocal."
+(it-sequential "fr-282-div-by-7-bounded-mixed-sign-dividend-emits-reciprocal-seq"
   (let* ((cneg4  (make-vm-const :dst :r0 :value -4))
          (cpos9  (make-vm-const :dst :r1 :value 9))
          (add    (make-vm-add   :dst :x :lhs :r0 :rhs :r1)) ; x=5 (bounded mixed-source)
@@ -217,89 +226,78 @@
          (div    (make-vm-div   :dst :r3 :lhs :x :rhs :r2))
          (result (cl-cc/optimize::opt-pass-strength-reduce
                   (list cneg4 cpos9 add c7 div))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)))
 
-(deftest fr-282-div-by-0-not-transformed
-  "FR-282 partial: (/ x 0) stays as vm-div. Zero is not a power of 2."
+(it-sequential "fr-282-div-by-0-not-transformed"
   (let* ((const-0 (make-vm-const :dst :r0 :value 0))
          (div     (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-0 div))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-truthy)))
 
-(deftest fr-282-div-by-negative-not-transformed
-  "FR-282 partial: (/ x -4) stays as vm-div. Negative divisors are not transformed."
+(it-sequential "fr-282-div-by-negative-not-transformed"
   (let* ((const-neg (make-vm-const :dst :r0 :value -4))
          (div       (make-vm-div   :dst :r1 :lhs :x :rhs :r0))
          (result    (cl-cc/optimize::opt-pass-strength-reduce (list const-neg div))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-truthy)))
 
-(deftest fr-282-div-non-constant-rhs-not-transformed
-  "FR-282 partial: (/ x y) stays as vm-div when y is not a known constant."
+(it-sequential "fr-282-div-non-constant-rhs-not-transformed"
   (let* ((div    (make-vm-div :dst :r1 :lhs :x :rhs :y))
          (result (cl-cc/optimize::opt-pass-strength-reduce (list div))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-div)) result) :to-be-truthy)))
 
 ;;; ─── mod by power of 2 (existing FR-302 coverage) ─────────────────────────
 
-(deftest strength-reduce-mod-by-power-of-2-emits-logand
-  "opt-pass-strength-reduce replaces (mod x 8) with (logand x 7) via vm-logand."
+(it-sequential "strength-reduce-mod-by-power-of-2-emits-logand"
   (let* ((const-8 (make-vm-const :dst :r0 :value 8))
          (mod     (make-vm-mod   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-8 mod))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mod)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) result))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mod)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) result) :to-be-truthy)
     ;; The mask constant should be 7 (= 8 - 1)
     (let ((mask-inst (find-if (lambda (i)
                                 (and (typep i 'cl-cc/vm::vm-const)
                                      (= (cl-cc/vm::vm-value i) 7)))
                               result)))
-      (assert-true mask-inst))))
+      (expect mask-inst :to-be-truthy))))
 
-(deftest strength-reduce-non-power-of-2-mul-passthrough
-  "opt-pass-strength-reduce passes through (* x 7) unchanged (7 is not power-of-2 and has 3 set bits)."
+(it-sequential "strength-reduce-non-power-of-2-mul-passthrough"
   (let* ((const-7 (make-vm-const :dst :r0 :value 7))
          (mul     (make-vm-mul   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-7 mul))))
     ;; 7 has 3 bits set — logcount(7)=3 > 2, so no decomposition
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)))
 
-(deftest strength-reduce-label-clears-constant-env
-  "opt-pass-strength-reduce flushes its constant tracking at vm-label boundaries."
-  ;; CONST R0←4 ; LABEL top ; MUL R1←X*R0 — after label, R0 is unknown, so no strength reduce
+(it-sequential "strength-reduce-label-clears-constant-env"
   (let* ((const-4 (make-vm-const :dst :r0 :value 4))
          (lbl     (make-vm-label :name "top"))
          (mul     (make-vm-mul   :dst :r1 :lhs :x :rhs :r0))
          (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-4 lbl mul))))
     ;; After label, constant env is cleared so mul should pass through unchanged
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result) :to-be-truthy)))
 
 ;;; ─── opt-pass-bswap-recognition ──────────────────────────────────────────
 
-(deftest bswap-recognition-passes-through-non-bswap
-  "opt-pass-bswap-recognition passes through ordinary instructions unchanged."
+(it-sequential "bswap-recognition-passes-through-non-bswap"
   (let* ((const (make-vm-const :dst :r0 :value 42))
          (move  (make-vm-move  :dst :r1 :src :r0))
          (result (cl-cc/optimize::opt-pass-bswap-recognition (list const move))))
-    (assert-= 2 (length result))
-    (assert-true (typep (first result)  'cl-cc/vm::vm-const))
-    (assert-true (typep (second result) 'cl-cc/vm::vm-move))))
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (typep (first result)  'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm::vm-move) :to-be-truthy)))
 
 ;;; ─── opt-pass-rotate-recognition ─────────────────────────────────────────
 
-(deftest rotate-recognition-passes-through-non-rotate
-  "opt-pass-rotate-recognition passes through ordinary instructions unchanged."
+(it-sequential "rotate-recognition-passes-through-non-rotate"
   (let* ((const (make-vm-const :dst :r0 :value 10))
          (add   (make-vm-add   :dst :r1 :lhs :r0 :rhs :r0))
          (result (cl-cc/optimize::opt-pass-rotate-recognition (list const add))))
-    (assert-= 2 (length result))
-    (assert-true (typep (first result)  'cl-cc/vm::vm-const))
-    (assert-true (typep (second result) 'cl-cc/vm::vm-add))))
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (typep (first result)  'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm::vm-add) :to-be-truthy)))
 
-(deftest rotate-recognition-collapses-rotate-idiom
-  "opt-pass-rotate-recognition collapses (ash x k) | (ash x (k-64)) to vm-rotate."
-  ;; Build: CONST K0←8  ASH A0←X,K0  CONST K1←-56  ASH A1←X,K1  LOGIOR OUT←A0,A1
+(it-sequential "rotate-recognition-collapses-rotate-idiom"
   (let* ((k0  (make-vm-const :dst :rc0 :value 8))
          (a0  (make-vm-ash   :dst :ra0 :lhs :x :rhs :rc0))
          (k1  (make-vm-const :dst :rc1 :value -56))
@@ -307,21 +305,19 @@
          (or0 (make-vm-logior :dst :rout :lhs :ra0 :rhs :ra1))
          (result (cl-cc/optimize::opt-pass-rotate-recognition (list k0 a0 k1 a1 or0))))
     ;; Should collapse to two instructions: a vm-const + vm-rotate
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-rotate)) result))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-rotate)) result) :to-be-truthy)
     ;; vm-logior should not appear in the output
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-logior)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logior)) result) :to-be-falsy)))
 
-(deftest rotate-recognition-skips-out-of-range-shift-constants
-  "Rotate recognition must not fire when shift constants are outside 64-bit canonical range."
-  ;; k0=64 is invalid for canonical rotate idiom; keep logior tree unchanged.
+(it-sequential "rotate-recognition-skips-out-of-range-shift-constants"
   (let* ((k0  (make-vm-const :dst :rc0 :value 64))
          (a0  (make-vm-ash   :dst :ra0 :lhs :x :rhs :rc0))
          (k1  (make-vm-const :dst :rc1 :value 0))
          (a1  (make-vm-ash   :dst :ra1 :lhs :x :rhs :rc1))
          (or0 (make-vm-logior :dst :rout :lhs :ra0 :rhs :ra1))
          (result (cl-cc/optimize::opt-pass-rotate-recognition (list k0 a0 k1 a1 or0))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-rotate)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-logior)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-rotate)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logior)) result) :to-be-truthy)))
 
 ;;; ─── opt-pass-fill-recognition ───────────────────────────────────────────
 
@@ -344,24 +340,22 @@
 (defun fill-inst-p (inst)
   (eq (type-of inst) 'cl-cc/vm::vm-fill))
 
-(deftest fill-recognition-collapses-canonical-fill-loop
-  "opt-pass-fill-recognition replaces a private zero-based aset loop with vm-fill."
+(it-sequential "fill-recognition-collapses-canonical-fill-loop"
   (let ((result (cl-cc/optimize::opt-pass-fill-recognition (make-fill-loop-instructions))))
-    (assert-= 1 (count-if #'fill-inst-p result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) result))
-    (assert-true (some (lambda (i)
+    (expect (= 1 (count-if #'fill-inst-p result)) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) result) :to-be-falsy)
+    (expect (some (lambda (i)
                          (and (typep i 'cl-cc/vm::vm-move)
                               (eq (cl-cc/vm::vm-dst i) :ri)
                               (eq (cl-cc/vm::vm-src i) :rlen)))
-                       result))))
+                       result) :to-be-truthy)))
 
-(deftest fill-recognition-skips-externally-targeted-exit
-  "opt-pass-fill-recognition leaves the loop unchanged when another jump targets the exit label."
+(it-sequential "fill-recognition-skips-externally-targeted-exit"
   (let ((result (cl-cc/optimize::opt-pass-fill-recognition
                  (make-fill-loop-instructions :extra-exit-jump t))))
-    (assert-false (some #'fill-inst-p result))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))))
+    (expect (some #'fill-inst-p result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-truthy)))
 
 ;;; ─── opt-pass-copy-recognition ───────────────────────────────────────────
 
@@ -390,30 +384,27 @@
        (equal (cl-cc/vm::vm-args inst)
               '(:rdst :rsrc :rcond :rlen :rone :rlen))))
 
-(deftest copy-recognition-collapses-canonical-copy-loop
-  "opt-pass-copy-recognition replaces a private aref/aset loop with a bounded bulk copy call."
+(it-sequential "copy-recognition-collapses-canonical-copy-loop"
   (let ((result (cl-cc/optimize::opt-pass-copy-recognition (make-copy-loop-instructions))))
-    (assert-= 1 (count-if #'copy-call-inst-p result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-aref)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) result))
-    (assert-true (some (lambda (i)
+    (expect (= 1 (count-if #'copy-call-inst-p result)) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aref)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) result) :to-be-falsy)
+    (expect (some (lambda (i)
                          (and (typep i 'cl-cc/vm::vm-move)
                               (eq (cl-cc/vm::vm-dst i) :ri)
                               (eq (cl-cc/vm::vm-src i) :rlen)))
-                       result))))
+                       result) :to-be-truthy)))
 
-(deftest copy-recognition-skips-unknown-alias-arrays
-  "opt-pass-copy-recognition leaves a copy loop unchanged without distinct heap-root facts."
+(it-sequential "copy-recognition-skips-unknown-alias-arrays"
   (let ((result (cl-cc/optimize::opt-pass-copy-recognition
                  (make-copy-loop-instructions :unknown-alias-p t))))
-    (assert-false (some #'copy-call-inst-p result))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-aref)) result))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))))
+    (expect (some #'copy-call-inst-p result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aref)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-truthy)))
 
-(deftest copy-recognition-skips-self-copy-loop
-  "opt-pass-copy-recognition leaves self-copy loops unchanged to avoid alias-sensitive rewrites."
+(it-sequential "copy-recognition-skips-self-copy-loop"
   (let ((result (cl-cc/optimize::opt-pass-copy-recognition
                  (make-copy-loop-instructions :same-array-p t))))
-    (assert-false (some #'copy-call-inst-p result))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))))
+    (expect (some #'copy-call-inst-p result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-truthy)))

@@ -7,112 +7,113 @@
 ;;;;   cfg-value-ranges, simple-induction-variable detection.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── opt-heap-root-inst-p ───────────────────────────────────────────────
 
-(deftest-each heap-root-inst-p-true-cases
-  "opt-heap-root-inst-p returns T for heap-allocating instructions."
-  :cases (("vm-cons"         (make-vm-cons        :dst :r0 :car-src :r1 :cdr-src :r2))
-          ("vm-make-array"   (make-vm-make-array  :dst :r0 :size-reg :r1))
-          ("vm-make-closure" (make-vm-make-closure :dst :r0 :label "f" :env-regs '(:r1))))
-  (inst)
-  (assert-true (cl-cc/optimize::opt-heap-root-inst-p inst)))
+(it-sequential "heap-root-inst-p-true-cases vm-cons"
+  (destructuring-bind (inst) (list (make-vm-cons        :dst :r0 :car-src :r1 :cdr-src :r2))
+    (expect (cl-cc/optimize::opt-heap-root-inst-p inst) :to-be-truthy)))
 
-(deftest-each heap-root-inst-p-false-cases
-  "opt-heap-root-inst-p returns NIL for non-allocating instructions."
-  :cases (("vm-const" (make-vm-const :dst :r0 :value 1))
-          ("vm-add"   (make-vm-add   :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-move"  (make-vm-move  :dst :r0 :src :r1)))
-  (inst)
-  (assert-false (cl-cc/optimize::opt-heap-root-inst-p inst)))
+(it-sequential "heap-root-inst-p-true-cases vm-make-array"
+  (destructuring-bind (inst) (list (make-vm-make-array  :dst :r0 :size-reg :r1))
+    (expect (cl-cc/optimize::opt-heap-root-inst-p inst) :to-be-truthy)))
+
+(it-sequential "heap-root-inst-p-true-cases vm-make-closure"
+  (destructuring-bind (inst) (list (make-vm-make-closure :dst :r0 :label "f" :env-regs '(:r1)))
+    (expect (cl-cc/optimize::opt-heap-root-inst-p inst) :to-be-truthy)))
+
+(it-sequential "heap-root-inst-p-false-cases vm-const"
+  (destructuring-bind (inst) (list (make-vm-const :dst :r0 :value 1))
+    (expect (cl-cc/optimize::opt-heap-root-inst-p inst) :to-be-falsy)))
+
+(it-sequential "heap-root-inst-p-false-cases vm-add"
+  (destructuring-bind (inst) (list (make-vm-add   :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-heap-root-inst-p inst) :to-be-falsy)))
+
+(it-sequential "heap-root-inst-p-false-cases vm-move"
+  (destructuring-bind (inst) (list (make-vm-move  :dst :r0 :src :r1))
+    (expect (cl-cc/optimize::opt-heap-root-inst-p inst) :to-be-falsy)))
 
 ;;; ─── opt-heap-root-kind ─────────────────────────────────────────────────
 
-(deftest-each heap-root-kind-values
-  "opt-heap-root-kind returns the expected symbolic heap kind."
-  :cases (("cons"    (make-vm-cons        :dst :r0 :car-src :r1 :cdr-src :r2) :cons)
-          ("array"   (make-vm-make-array  :dst :r0 :size-reg :r1)             :array)
-          ("closure" (make-vm-make-closure :dst :r0 :label "f" :env-regs '(:r1)) :closure))
-  (inst expected-kind)
-  (assert-eq expected-kind (cl-cc/optimize::opt-heap-root-kind inst)))
+(it-sequential "heap-root-kind-values cons"
+  (destructuring-bind (inst expected-kind) (list (make-vm-cons        :dst :r0 :car-src :r1 :cdr-src :r2) :cons)
+    (expect (cl-cc/optimize::opt-heap-root-kind inst) :to-be expected-kind)))
+
+(it-sequential "heap-root-kind-values array"
+  (destructuring-bind (inst expected-kind) (list (make-vm-make-array  :dst :r0 :size-reg :r1) :array)
+    (expect (cl-cc/optimize::opt-heap-root-kind inst) :to-be expected-kind)))
+
+(it-sequential "heap-root-kind-values closure"
+  (destructuring-bind (inst expected-kind) (list (make-vm-make-closure :dst :r0 :label "f" :env-regs '(:r1)) :closure)
+    (expect (cl-cc/optimize::opt-heap-root-kind inst) :to-be expected-kind)))
 
 ;;; ─── %opt-build-root-map / opt-compute-heap-aliases ────────────────────
 
-(deftest heap-alias-cons-sets-own-root
-  "opt-compute-heap-aliases: a vm-cons instruction sets its dst register as its own canonical root."
+(it-sequential "heap-alias-cons-sets-own-root"
   (let* ((inst (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))
          (roots (cl-cc/optimize:opt-compute-heap-aliases (list inst))))
-    (assert-eq :r0 (gethash :r0 roots))))
+    (expect (gethash :r0 roots) :to-be :r0)))
 
-(deftest heap-alias-move-propagates-root
-  "opt-compute-heap-aliases: a vm-move propagates the cons root to the destination register."
+(it-sequential "heap-alias-move-propagates-root"
   (let* ((cons-inst (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))
          (move-inst (make-vm-move :dst :r3 :src :r0))
          (roots (cl-cc/optimize:opt-compute-heap-aliases (list cons-inst move-inst))))
-    (assert-eq :r0 (gethash :r3 roots))))
+    (expect (gethash :r3 roots) :to-be :r0)))
 
-(deftest heap-alias-non-heap-write-kills-root
-  "opt-compute-heap-aliases: overwriting a heap root with a non-heap instruction removes the root entry."
+(it-sequential "heap-alias-non-heap-write-kills-root"
   (let* ((cons-inst (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))
          (add-inst  (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2))
          (roots (cl-cc/optimize:opt-compute-heap-aliases (list cons-inst add-inst))))
-    (assert-false (nth-value 1 (gethash :r0 roots)))))
+    (expect (nth-value 1 (gethash :r0 roots)) :to-be-falsy)))
 
-(deftest heap-alias-unknown-register-returns-nil
-  "An unregistered key in a fresh alias table returns nil."
+(it-sequential "heap-alias-unknown-register-returns-nil"
   (let ((pt (make-hash-table :test #'eq)))
-    (assert-null (gethash :r99 pt))))
+    (expect (gethash :r99 pt) :to-be-null)))
 
-(deftest heap-alias-known-register-returns-canonical-root
-  "A manually set alias table entry returns the canonical root for a known register."
+(it-sequential "heap-alias-known-register-returns-canonical-root"
   (let ((pt (make-hash-table :test #'eq)))
     (setf (gethash :r0 pt) :r0)
-    (assert-eq :r0 (gethash :r0 pt))))
+    (expect (gethash :r0 pt) :to-be :r0)))
 
-(deftest points-to-tracks-fresh-root-and-move
-  "opt-compute-points-to tracks fresh heap roots and vm-move aliases."
+(it-sequential "points-to-tracks-fresh-root-and-move"
   (let* ((insts (list (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2)
                       (make-vm-move :dst :r3 :src :r0)))
          (points-to (cl-cc/optimize:opt-compute-points-to insts)))
-    (assert-eq :r0 (cl-cc/optimize:opt-points-to-root :r0 points-to))
-    (assert-eq :r0 (cl-cc/optimize:opt-points-to-root :r3 points-to))))
+    (expect (cl-cc/optimize:opt-points-to-root :r0 points-to) :to-be :r0)
+    (expect (cl-cc/optimize:opt-points-to-root :r3 points-to) :to-be :r0)))
 
-(deftest points-to-root-reports-unknown-register
-  "opt-points-to-root returns NIL/NIL for an unknown register."
+(it-sequential "points-to-root-reports-unknown-register"
   (let ((points-to (cl-cc/optimize:opt-compute-points-to nil)))
     (multiple-value-bind (root found-p)
         (cl-cc/optimize:opt-points-to-root :missing points-to)
-      (assert-null root)
-      (assert-false found-p))))
+      (expect root :to-be-null)
+      (expect found-p :to-be-falsy))))
 
-(deftest points-to-overwrite-kills-stale-root
-  "opt-compute-points-to kills a stale points-to fact after a non-heap write."
+(it-sequential "points-to-overwrite-kills-stale-root"
   (let* ((insts (list (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2)
                       (make-vm-add :dst :r0 :lhs :r1 :rhs :r2)))
          (points-to (cl-cc/optimize:opt-compute-points-to insts)))
-    (assert-false (nth-value 1 (cl-cc/optimize:opt-points-to-root :r0 points-to)))))
+    (expect (nth-value 1 (cl-cc/optimize:opt-points-to-root :r0 points-to)) :to-be-falsy)))
 
 ;;; ─── Memory SSA snapshot (FR-217 partial) ───────────────────────────────
 
-(deftest memory-ssa-snapshot-assigns-monotonic-versions-for-def-use-chain
-  "Memory-SSA snapshot assigns monotonic versions and threads uses to latest version."
+(it-sequential "memory-ssa-snapshot-assigns-monotonic-versions-for-def-use-chain"
   (let* ((set1 (make-vm-set-global :src :r0 :name 'g))
          (get1 (make-vm-get-global :dst :r1 :name 'g))
          (set2 (make-vm-set-global :src :r2 :name 'g))
          (get2 (make-vm-get-global :dst :r3 :name 'g))
          (ann  (cl-cc/optimize::opt-compute-memory-ssa-snapshot
                 (list set1 get1 set2 get2))))
-    (assert-= 0 (cl-cc/optimize::opt-memory-ssa-version-at set1 ann :point :in))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at set1 ann :point :out))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :out))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at set2 ann :point :in))
-    (assert-= 2 (cl-cc/optimize::opt-memory-ssa-version-at set2 ann :point :out))
-    (assert-= 2 (cl-cc/optimize::opt-memory-ssa-version-at get2 ann :point :in))))
+    (expect (= 0 (cl-cc/optimize::opt-memory-ssa-version-at set1 ann :point :in)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at set1 ann :point :out)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :out)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at set2 ann :point :in)) :to-be-truthy)
+    (expect (= 2 (cl-cc/optimize::opt-memory-ssa-version-at set2 ann :point :out)) :to-be-truthy)
+    (expect (= 2 (cl-cc/optimize::opt-memory-ssa-version-at get2 ann :point :in)) :to-be-truthy)))
 
-(deftest memory-ssa-snapshot-slot-location-uses-alias-root
-  "Slot read/write on moved aliases share canonical location key in snapshot."
+(it-sequential "memory-ssa-snapshot-slot-location-uses-alias-root"
   (let* ((mk   (make-vm-cons :dst :obj :car-src :a :cdr-src :b))
          (mv   (make-vm-move :dst :alias :src :obj))
          (wr   (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'slot :value-reg :v))
@@ -120,11 +121,10 @@
          (ann  (cl-cc/optimize::opt-compute-memory-ssa-snapshot (list mk mv wr rd)))
          (wr-loc (getf (gethash wr ann) :location))
          (rd-loc (getf (gethash rd ann) :location)))
-    (assert-equal wr-loc rd-loc)
-    (assert-= 2 (cl-cc/optimize::opt-memory-ssa-version-at rd ann :point :in))))
+    (expect rd-loc :to-equal wr-loc)
+    (expect (= 2 (cl-cc/optimize::opt-memory-ssa-version-at rd ann :point :in)) :to-be-truthy)))
 
-(deftest memory-ssa-cfg-snapshot-cross-block-dominating-store-threads-version
-  "CFG-aware memory snapshot threads dominating global store version across join."
+(it-sequential "memory-ssa-cfg-snapshot-cross-block-dominating-store-threads-version"
   (let* ((set1 (make-vm-set-global :src :r0 :name 'g))
          (get1 (make-vm-get-global :dst :r1 :name 'g))
          (ann  (cl-cc/optimize::opt-compute-memory-ssa-cfg-snapshot
@@ -137,12 +137,11 @@
                        (make-vm-label :name "join")
                        get1
                        (make-vm-ret :reg :r1)))))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at set1 ann :point :out))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in))
-    (assert-eq :state (getf (gethash get1 ann) :incoming-from))))
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at set1 ann :point :out)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in)) :to-be-truthy)
+    (expect (getf (gethash get1 ann) :incoming-from) :to-be :state)))
 
-(deftest memory-ssa-cfg-snapshot-join-disagree-synthesizes-phi-version
-  "CFG-aware memory snapshot synthesizes a MemoryPhi-like version at join on disagreement."
+(it-sequential "memory-ssa-cfg-snapshot-join-disagree-synthesizes-phi-version"
   (let* ((set-a (make-vm-set-global :src :r0 :name 'g))
          (set-b (make-vm-set-global :src :r1 :name 'g))
          (get1  (make-vm-get-global :dst :r2 :name 'g))
@@ -157,13 +156,12 @@
                         (make-vm-ret :reg :r2)))))
     (let ((join-in (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in))
           (entry (gethash get1 ann)))
-    (assert-= 1 (cl-cc/optimize::opt-memory-ssa-version-at set-a ann :point :out))
-    (assert-= 2 (cl-cc/optimize::opt-memory-ssa-version-at set-b ann :point :out))
-      (assert-true (and (integerp join-in) (> join-in 2)))
-      (assert-eq :phi (getf entry :incoming-from)))))
+    (expect (= 1 (cl-cc/optimize::opt-memory-ssa-version-at set-a ann :point :out)) :to-be-truthy)
+    (expect (= 2 (cl-cc/optimize::opt-memory-ssa-version-at set-b ann :point :out)) :to-be-truthy)
+      (expect (and (integerp join-in) (> join-in 2)) :to-be-truthy)
+      (expect (getf entry :incoming-from) :to-be :phi))))
 
-(deftest memory-ssa-cfg-snapshot-empty-join-propagates-synthetic-phi-to-successor
-  "Synthetic join phi should propagate through an empty join block to successor uses."
+(it-sequential "memory-ssa-cfg-snapshot-empty-join-propagates-synthetic-phi-to-successor"
   (let* ((set-a (make-vm-set-global :src :r0 :name 'g))
          (set-b (make-vm-set-global :src :r1 :name 'g))
          (get1  (make-vm-get-global :dst :r2 :name 'g))
@@ -180,11 +178,10 @@
                        (make-vm-ret :reg :r2)))))
     (let ((join-in (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in))
           (entry (gethash get1 ann)))
-      (assert-true (and (integerp join-in) (> join-in 2)))
-      (assert-eq :state (getf entry :incoming-from)))))
+      (expect (and (integerp join-in) (> join-in 2)) :to-be-truthy)
+      (expect (getf entry :incoming-from) :to-be :state))))
 
-(deftest memory-ssa-cfg-snapshot-local-def-overrides-phi-origin-for-following-use
-  "A local memory def should switch incoming origin from :phi to :state for later uses in block."
+(it-sequential "memory-ssa-cfg-snapshot-local-def-overrides-phi-origin-for-following-use"
   (let* ((set-a (make-vm-set-global :src :r0 :name 'g))
          (set-b (make-vm-set-global :src :r1 :name 'g))
          (set-c (make-vm-set-global :src :r3 :name 'g))
@@ -199,13 +196,11 @@
                        set-c
                        get1
                        (make-vm-ret :reg :r2)))))
-    (assert-eq :phi (getf (gethash set-c ann) :incoming-from))
-    (assert-eq :state (getf (gethash get1 ann) :incoming-from))
-    (assert-eql (cl-cc/optimize::opt-memory-ssa-version-at set-c ann :point :out)
-                (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in))))
+    (expect (getf (gethash set-c ann) :incoming-from) :to-be :phi)
+    (expect (getf (gethash get1 ann) :incoming-from) :to-be :state)
+    (expect (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in) :to-be (cl-cc/optimize::opt-memory-ssa-version-at set-c ann :point :out))))
 
-(deftest memory-ssa-cfg-snapshot-records-explicit-memory-phi-nodes
-  "CFG-aware memory snapshot records explicit MemoryPhi node metadata at join blocks."
+(it-sequential "memory-ssa-cfg-snapshot-records-explicit-memory-phi-nodes"
   (let* ((set-a (make-vm-set-global :src :r0 :name 'g))
          (set-b (make-vm-set-global :src :r1 :name 'g))
          (get1  (make-vm-get-global :dst :r2 :name 'g))
@@ -223,16 +218,15 @@
     (maphash (lambda (_block nodes)
                (setf all-phis (nconc all-phis (copy-list nodes))))
              phi-map)
-    (assert-true (consp all-phis))
+    (expect (consp all-phis) :to-be-truthy)
     (let ((phi (find (list :global 'g) all-phis
                      :key #'cl-cc/optimize::opt-memory-phi-location
                      :test #'equal)))
-      (assert-true phi)
-      (assert-true (> (cl-cc/optimize::opt-memory-phi-version phi) 2))
-      (assert-= 2 (length (cl-cc/optimize::opt-memory-phi-incoming phi))))))
+      (expect phi :to-be-truthy)
+      (expect (> (cl-cc/optimize::opt-memory-phi-version phi) 2) :to-be-truthy)
+      (expect (= 2 (length (cl-cc/optimize::opt-memory-phi-incoming phi))) :to-be-truthy))))
 
-(deftest memory-ssa-cfg-snapshot-branch-constant-prunes-infeasible-edge
-  "Memory SSA join excludes infeasible predecessor when branch condition is constant." 
+(it-sequential "memory-ssa-cfg-snapshot-branch-constant-prunes-infeasible-edge"
   (let* ((set-a (make-vm-set-global :src :r0 :name 'g))
          (set-b (make-vm-set-global :src :r1 :name 'g))
          (get1  (make-vm-get-global :dst :r2 :name 'g))
@@ -247,85 +241,96 @@
                        get1
                        (make-vm-ret :reg :r2)))))
     ;; only else edge is feasible => join should take set-b version directly
-    (assert-= (cl-cc/optimize::opt-memory-ssa-version-at set-b ann :point :out)
-              (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in))
-    (assert-eq :state (getf (gethash get1 ann) :incoming-from))))
+    (expect (= (cl-cc/optimize::opt-memory-ssa-version-at set-b ann :point :out) (cl-cc/optimize::opt-memory-ssa-version-at get1 ann :point :in)) :to-be-truthy)
+    (expect (getf (gethash get1 ann) :incoming-from) :to-be :state)))
 
 ;;; ─── opt-interval-* arithmetic ───────────────────────────────────────────
 
-(deftest interval-make-and-read-lo-hi
-  "opt-make-interval sets lo and hi accessible via opt-interval-lo and opt-interval-hi."
+(it-sequential "interval-make-and-read-lo-hi"
   (let ((iv (cl-cc/optimize::opt-make-interval 3 7)))
-    (assert-= 3 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 7 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect (= 3 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 7 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest-each interval-arithmetic-cases
-  "Interval arithmetic produces expected [lo, hi] bounds for add, sub, and mul."
-  :cases (("add"       #'cl-cc/optimize:opt-interval-add  1  2  3  4   4  6)
-          ("sub"       #'cl-cc/optimize:opt-interval-sub  5  8  1  3   2  7)
-          ("mul-pos"   #'cl-cc/optimize::opt-interval-mul  2  3  4  5   8 15)
-          ("mul-mixed" #'cl-cc/optimize::opt-interval-mul -1  2  3  4  -4  8))
-  (op a-lo a-hi b-lo b-hi expected-lo expected-hi)
-  (let* ((a (cl-cc/optimize::opt-make-interval a-lo a-hi))
+(it-sequential "interval-arithmetic-cases add"
+  (destructuring-bind (op a-lo a-hi b-lo b-hi expected-lo expected-hi) (list #'cl-cc/optimize:opt-interval-add 1 2 3 4 4 6)
+    (let* ((a (cl-cc/optimize::opt-make-interval a-lo a-hi))
          (b (cl-cc/optimize::opt-make-interval b-lo b-hi))
          (r (funcall op a b)))
-    (assert-= expected-lo (cl-cc/optimize::opt-interval-lo r))
-    (assert-= expected-hi (cl-cc/optimize::opt-interval-hi r))))
+    (expect (= expected-lo (cl-cc/optimize::opt-interval-lo r)) :to-be-truthy)
+    (expect (= expected-hi (cl-cc/optimize::opt-interval-hi r)) :to-be-truthy))))
+
+(it-sequential "interval-arithmetic-cases sub"
+  (destructuring-bind (op a-lo a-hi b-lo b-hi expected-lo expected-hi) (list #'cl-cc/optimize:opt-interval-sub 5 8 1 3 2 7)
+    (let* ((a (cl-cc/optimize::opt-make-interval a-lo a-hi))
+         (b (cl-cc/optimize::opt-make-interval b-lo b-hi))
+         (r (funcall op a b)))
+    (expect (= expected-lo (cl-cc/optimize::opt-interval-lo r)) :to-be-truthy)
+    (expect (= expected-hi (cl-cc/optimize::opt-interval-hi r)) :to-be-truthy))))
+
+(it-sequential "interval-arithmetic-cases mul-pos"
+  (destructuring-bind (op a-lo a-hi b-lo b-hi expected-lo expected-hi) (list #'cl-cc/optimize::opt-interval-mul 2 3 4 5 8 15)
+    (let* ((a (cl-cc/optimize::opt-make-interval a-lo a-hi))
+         (b (cl-cc/optimize::opt-make-interval b-lo b-hi))
+         (r (funcall op a b)))
+    (expect (= expected-lo (cl-cc/optimize::opt-interval-lo r)) :to-be-truthy)
+    (expect (= expected-hi (cl-cc/optimize::opt-interval-hi r)) :to-be-truthy))))
+
+(it-sequential "interval-arithmetic-cases mul-mixed"
+  (destructuring-bind (op a-lo a-hi b-lo b-hi expected-lo expected-hi) (list #'cl-cc/optimize::opt-interval-mul -1 2 3 4 -4 8)
+    (let* ((a (cl-cc/optimize::opt-make-interval a-lo a-hi))
+         (b (cl-cc/optimize::opt-make-interval b-lo b-hi))
+         (r (funcall op a b)))
+    (expect (= expected-lo (cl-cc/optimize::opt-interval-lo r)) :to-be-truthy)
+    (expect (= expected-hi (cl-cc/optimize::opt-interval-hi r)) :to-be-truthy))))
 
 ;;; ─── opt-compute-constant-intervals ─────────────────────────────────────
 
-(deftest constant-intervals-integer-const-yields-singleton
-  "opt-compute-constant-intervals: an integer vm-const produces a [v,v] singleton interval."
+(it-sequential "constant-intervals-integer-const-yields-singleton"
   (let* ((insts (list (make-vm-const :dst :r0 :value 5)))
          (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
     (let ((iv (gethash :r0 ivals)))
-      (assert-true iv)
-      (assert-= 5 (cl-cc/optimize::opt-interval-lo iv))
-      (assert-= 5 (cl-cc/optimize::opt-interval-hi iv)))))
+      (expect iv :to-be-truthy)
+      (expect (= 5 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+      (expect (= 5 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy))))
 
-(deftest constant-intervals-float-const-yields-no-entry
-  "opt-compute-constant-intervals: a float vm-const does not produce an interval entry."
+(it-sequential "constant-intervals-float-const-yields-no-entry"
   (let* ((insts (list (make-vm-const :dst :r0 :value 3.14)))
          (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
-    (assert-false (nth-value 1 (gethash :r0 ivals)))))
+    (expect (nth-value 1 (gethash :r0 ivals)) :to-be-falsy)))
 
-(deftest constant-intervals-add-two-known-yields-sum-interval
-  "opt-compute-constant-intervals: adding two known constants yields their sum as an interval."
+(it-sequential "constant-intervals-add-two-known-yields-sum-interval"
   (let* ((insts (list (make-vm-const :dst :r0 :value 2)
                       (make-vm-const :dst :r1 :value 3)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)))
          (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
     (let ((iv (gethash :r2 ivals)))
-      (assert-true iv)
-      (assert-= 5 (cl-cc/optimize::opt-interval-lo iv)))))
+      (expect iv :to-be-truthy)
+      (expect (= 5 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy))))
 
-(deftest value-ranges-propagate-move-and-arithmetic
-  "opt-compute-value-ranges propagates intervals through moves and arithmetic."
+(it-sequential "value-ranges-propagate-move-and-arithmetic"
   (let* ((insts (list (make-vm-const :dst :r0 :value 4)
                       (make-vm-move  :dst :r1 :src :r0)
                       (make-vm-const :dst :r2 :value 6)
                       (make-vm-add   :dst :r3 :lhs :r1 :rhs :r2)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :r3 ivals)))
-     (assert-true iv)
-     (assert-= 10 (cl-cc/optimize::opt-interval-lo iv))
-     (assert-= 10 (cl-cc/optimize::opt-interval-hi iv))))
+     (expect iv :to-be-truthy)
+     (expect (= 10 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+     (expect (= 10 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest value-ranges-logand-mask-with-unknown-input-narrows-to-8-bit
-  "A non-negative LOGAND mask bounds the result even when the other operand is unknown."
+(it-sequential "value-ranges-logand-mask-with-unknown-input-narrows-to-8-bit"
   (let* ((insts (list (make-vm-get-global :dst :x :name 'x)
                       (make-vm-const :dst :mask :value #xFF)
                       (make-vm-logand :dst :masked :lhs :x :rhs :mask)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :masked ivals)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= #xFF (cl-cc/optimize::opt-interval-hi iv))
-    (assert-= 8 (cl-cc/optimize::opt-interval-bit-width iv))
-    (assert-= #xFF (cl-cc/optimize::opt-interval-known-bits-mask iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= #xFF (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)
+    (expect (= 8 (cl-cc/optimize::opt-interval-bit-width iv)) :to-be-truthy)
+    (expect (= #xFF (cl-cc/optimize::opt-interval-known-bits-mask iv)) :to-be-truthy)))
 
-(deftest value-ranges-add-of-masked-8-bit-values-is-9-bit-wide
-  "Two independently masked 8-bit values add to a conservative 9-bit interval."
+(it-sequential "value-ranges-add-of-masked-8-bit-values-is-9-bit-wide"
   (let* ((insts (list (make-vm-get-global :dst :x :name 'x)
                       (make-vm-get-global :dst :y :name 'y)
                       (make-vm-const :dst :mask :value #xFF)
@@ -334,15 +339,14 @@
                       (make-vm-add :dst :sum :lhs :x8 :rhs :y8)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :sum ivals)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= #x1FE (cl-cc/optimize::opt-interval-hi iv))
-    (assert-= 9 (cl-cc/optimize::opt-interval-bit-width iv))
-     (assert-= #x1FF (cl-cc/optimize::opt-interval-known-bits-mask iv))
-     (assert-true (cl-cc/optimize::opt-interval-fits-fixnum-width-p iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= #x1FE (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)
+    (expect (= 9 (cl-cc/optimize::opt-interval-bit-width iv)) :to-be-truthy)
+     (expect (= #x1FF (cl-cc/optimize::opt-interval-known-bits-mask iv)) :to-be-truthy)
+     (expect (cl-cc/optimize::opt-interval-fits-fixnum-width-p iv) :to-be-truthy)))
 
-(deftest value-ranges-logior-of-masked-8-bit-values-stays-8-bit
-  "LOGIOR of two masked 8-bit values remains within [0,255]."
+(it-sequential "value-ranges-logior-of-masked-8-bit-values-stays-8-bit"
   (let* ((insts (list (make-vm-get-global :dst :x :name 'x)
                       (make-vm-get-global :dst :y :name 'y)
                       (make-vm-const :dst :mask :value #xFF)
@@ -351,13 +355,12 @@
                       (make-vm-logior :dst :out :lhs :x8 :rhs :y8)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :out ivals)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= #xFF (cl-cc/optimize::opt-interval-hi iv))
-    (assert-= 8 (cl-cc/optimize::opt-interval-bit-width iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= #xFF (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)
+    (expect (= 8 (cl-cc/optimize::opt-interval-bit-width iv)) :to-be-truthy)))
 
-(deftest value-ranges-logxor-of-masked-8-bit-values-stays-8-bit
-  "LOGXOR of two masked 8-bit values remains within [0,255]."
+(it-sequential "value-ranges-logxor-of-masked-8-bit-values-stays-8-bit"
   (let* ((insts (list (make-vm-get-global :dst :x :name 'x)
                       (make-vm-get-global :dst :y :name 'y)
                       (make-vm-const :dst :mask :value #xFF)
@@ -366,24 +369,22 @@
                       (make-vm-logxor :dst :out :lhs :x8 :rhs :y8)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :out ivals)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= #xFF (cl-cc/optimize::opt-interval-hi iv))
-    (assert-= 8 (cl-cc/optimize::opt-interval-bit-width iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= #xFF (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)
+    (expect (= 8 (cl-cc/optimize::opt-interval-bit-width iv)) :to-be-truthy)))
 
-(deftest value-ranges-ash-left-shift-scales-interval
-  "ASH with a known positive shift scales interval bounds by 2^k."
+(it-sequential "value-ranges-ash-left-shift-scales-interval"
   (let* ((insts (list (make-vm-const :dst :x :value 5)
                       (make-vm-const :dst :k :value 3)
                       (make-vm-ash :dst :y :lhs :x :rhs :k)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :y ivals)))
-    (assert-true iv)
-    (assert-= 40 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 40 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 40 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 40 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest value-ranges-ash-right-shift-shrinks-interval
-  "ASH with a known negative shift shrinks integer interval bounds."
+(it-sequential "value-ranges-ash-right-shift-shrinks-interval"
   (let* ((insts (list (make-vm-const :dst :x0 :value 8)
                       (make-vm-const :dst :x1 :value 12)
                       (make-vm-add :dst :x :lhs :x0 :rhs :x1)
@@ -391,26 +392,23 @@
                       (make-vm-ash :dst :y :lhs :x :rhs :k)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :y ivals)))
-    (assert-true iv)
-    (assert-= 5 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 5 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 5 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 5 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest value-ranges-prove-array-index-in-bounds
-  "opt-array-bounds-check-eliminable-p proves simple non-negative index ranges."
+(it-sequential "value-ranges-prove-array-index-in-bounds"
   (let* ((insts (list (make-vm-const :dst :idx :value 2)
                       (make-vm-const :dst :len :value 5)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts)))
-    (assert-true (cl-cc/optimize::opt-array-bounds-check-eliminable-p :idx :len ivals))))
+    (expect (cl-cc/optimize::opt-array-bounds-check-eliminable-p :idx :len ivals) :to-be-truthy)))
 
-(deftest value-ranges-reject-out-of-bounds-index
-  "opt-array-bounds-check-eliminable-p stays conservative for invalid index ranges."
+(it-sequential "value-ranges-reject-out-of-bounds-index"
   (let* ((insts (list (make-vm-const :dst :idx :value 5)
                       (make-vm-const :dst :len :value 5)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts)))
-    (assert-false (cl-cc/optimize::opt-array-bounds-check-eliminable-p :idx :len ivals))))
+    (expect (cl-cc/optimize::opt-array-bounds-check-eliminable-p :idx :len ivals) :to-be-falsy)))
 
-(deftest cfg-value-ranges-join-unions-constant-predecessors
-  "CFG range analysis unions predecessor intervals at joins conservatively."
+(it-sequential "cfg-value-ranges-join-unions-constant-predecessors"
   (let* ((cfg (cl-cc/optimize:cfg-build
                (list (make-vm-jump-zero :reg :cond :label "else")
                      (make-vm-const :dst :r0 :value 1)
@@ -423,12 +421,11 @@
          (result (cl-cc/optimize:opt-compute-cfg-value-ranges cfg))
          (join-in (gethash join (cl-cc/optimize:opt-dataflow-result-in result)))
          (iv (gethash :r0 join-in)))
-    (assert-true iv)
-    (assert-= 1 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 3 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 3 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest cfg-value-ranges-join-drops-missing-predecessor-fact
-  "CFG range analysis drops a register that is not known on every predecessor."
+(it-sequential "cfg-value-ranges-join-drops-missing-predecessor-fact"
   (let* ((cfg (cl-cc/optimize:cfg-build
                (list (make-vm-jump-zero :reg :cond :label "else")
                      (make-vm-const :dst :r0 :value 1)
@@ -440,10 +437,9 @@
          (join (cl-cc/optimize:cfg-get-block-by-label cfg "join"))
          (result (cl-cc/optimize:opt-compute-cfg-value-ranges cfg))
          (join-in (gethash join (cl-cc/optimize:opt-dataflow-result-in result))))
-    (assert-false (nth-value 1 (gethash :r0 join-in)))))
+    (expect (nth-value 1 (gethash :r0 join-in)) :to-be-falsy)))
 
-(deftest cfg-value-ranges-loop-self-update-kills-unsafe-fact
-  "Loop-carried self-updates kill their destination fact instead of diverging."
+(it-sequential "cfg-value-ranges-loop-self-update-kills-unsafe-fact"
   (let* ((cfg (cl-cc/optimize:cfg-build
                (list (make-vm-const :dst :i :value 0)
                      (make-vm-label :name "loop")
@@ -459,12 +455,11 @@
          (loop-in (gethash loop-block (cl-cc/optimize:opt-dataflow-result-in result)))
          (loop-out (gethash loop-block (cl-cc/optimize:opt-dataflow-result-out result)))
          (exit-in (gethash exit-block (cl-cc/optimize:opt-dataflow-result-in result))))
-    (assert-false (nth-value 1 (gethash :i loop-in)))
-    (assert-false (nth-value 1 (gethash :i loop-out)))
-    (assert-false (nth-value 1 (gethash :i exit-in)))))
+    (expect (nth-value 1 (gethash :i loop-in)) :to-be-falsy)
+    (expect (nth-value 1 (gethash :i loop-out)) :to-be-falsy)
+    (expect (nth-value 1 (gethash :i exit-in)) :to-be-falsy)))
 
-(deftest value-ranges-convenience-wrapper-merges-branch-exit-ranges
-  "opt-compute-value-ranges keeps the old API while using CFG analysis on branches."
+(it-sequential "value-ranges-convenience-wrapper-merges-branch-exit-ranges"
   (let* ((insts (list (make-vm-jump-zero :reg :cond :label "else")
                       (make-vm-const :dst :r0 :value 1)
                       (make-vm-jump :label "join")
@@ -474,9 +469,9 @@
                       (make-vm-ret :reg :r0)))
          (ivals (cl-cc/optimize::opt-compute-value-ranges insts))
          (iv (gethash :r0 ivals)))
-    (assert-true iv)
-    (assert-= 1 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 3 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 3 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
 (defun %test-path-sensitive-branch-cfg ()
   (cl-cc/optimize:cfg-build
@@ -492,20 +487,16 @@
          (make-vm-label :name "join")
          (make-vm-ret :reg :idx))))
 
-(deftest path-sensitive-ranges-narrow-jump-target-branch-from-lt
-  "opt-compute-path-sensitive-ranges narrows the jump-target (false) branch for vm-lt.
-vm-jump-zero jumps when the condition is false, so the jump target gets idx >= 10."
+(it-sequential "path-sensitive-ranges-narrow-jump-target-branch-from-lt"
   (let* ((cfg (%test-path-sensitive-branch-cfg))
          (then-block (cl-cc/optimize:cfg-get-block-by-label cfg "then"))
          (ranges (cl-cc/optimize:opt-compute-path-sensitive-ranges cfg))
          (iv (gethash (cons then-block :idx) ranges)))
-    (assert-true iv)
-    (assert-= 10 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 255 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 10 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 255 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest path-sensitive-ranges-narrow-fallthrough-branch-from-lt
-  "opt-compute-path-sensitive-ranges narrows the fallthrough (true) branch for vm-lt.
-vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets idx < 10."
+(it-sequential "path-sensitive-ranges-narrow-fallthrough-branch-from-lt"
   (let* ((cfg (%test-path-sensitive-branch-cfg))
          (entry (cl-cc/optimize:cfg-entry cfg))
          (then-block (cl-cc/optimize:cfg-get-block-by-label cfg "then"))
@@ -513,22 +504,20 @@ vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets 
                                      (cl-cc/optimize:bb-successors entry)))
          (ranges (cl-cc/optimize:opt-compute-path-sensitive-ranges cfg))
          (iv (gethash (cons fallthrough-block :idx) ranges)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= 9 (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= 9 (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest path-sensitive-ranges-join-unions-narrowed-predecessors
-  "Path-sensitive range analysis unions narrowed true/false facts at joins."
+(it-sequential "path-sensitive-ranges-join-unions-narrowed-predecessors"
   (let* ((cfg (%test-path-sensitive-branch-cfg))
          (join-block (cl-cc/optimize:cfg-get-block-by-label cfg "join"))
          (ranges (cl-cc/optimize:opt-compute-path-sensitive-ranges cfg))
          (iv (gethash (cons join-block :idx) ranges)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo iv))
-    (assert-= #xFF (cl-cc/optimize::opt-interval-hi iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
+    (expect (= #xFF (cl-cc/optimize::opt-interval-hi iv)) :to-be-truthy)))
 
-(deftest bounds-check-elimination-uses-path-sensitive-ranges
-  "opt-array-bounds-check-eliminable-p uses path-sensitive block facts on the safe fallthrough."
+(it-sequential "bounds-check-elimination-uses-path-sensitive-ranges"
   (let* ((cfg (%test-path-sensitive-branch-cfg))
          (entry (cl-cc/optimize:cfg-entry cfg))
          (then-block (cl-cc/optimize:cfg-get-block-by-label cfg "then"))
@@ -536,14 +525,11 @@ vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets 
                                      (cl-cc/optimize:bb-successors entry)))
          (ranges (cl-cc/optimize:opt-compute-path-sensitive-ranges cfg)))
     ;; jump-target (then) is the false branch: idx >= 10 — NOT bounds-check-eliminable
-    (assert-false
-     (cl-cc/optimize:opt-array-bounds-check-eliminable-p :idx :len ranges then-block))
+    (expect (cl-cc/optimize:opt-array-bounds-check-eliminable-p :idx :len ranges then-block) :to-be-falsy)
     ;; fallthrough is the true branch: idx < 10 — bounds-check-eliminable
-    (assert-true
-     (cl-cc/optimize:opt-array-bounds-check-eliminable-p :idx :len ranges fallthrough-block))))
+    (expect (cl-cc/optimize:opt-array-bounds-check-eliminable-p :idx :len ranges fallthrough-block) :to-be-truthy)))
 
-(deftest path-sensitive-ranges-expose-block-local-query-api
-  "opt-block-reg-range exposes branch-local facts after path-sensitive analysis."
+(it-sequential "path-sensitive-ranges-expose-block-local-query-api"
   (let* ((cfg (%test-path-sensitive-branch-cfg))
          (entry (cl-cc/optimize:cfg-entry cfg))
          (false-block (cl-cc/optimize:cfg-get-block-by-label cfg "then"))
@@ -552,16 +538,15 @@ vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets 
     (cl-cc/optimize:opt-compute-path-sensitive-ranges cfg)
     (let ((true-range (cl-cc/optimize:opt-block-reg-range true-block :idx))
           (false-range (cl-cc/optimize:opt-block-reg-range false-block :idx)))
-      (assert-equal '(0 . 9) true-range)
-      (assert-equal '(10 . 255) false-range))))
+      (expect true-range :to-equal '(0 . 9))
+      (expect false-range :to-equal '(10 . 255)))))
 
-(deftest interval-widen-expands-moving-bound-to-sentinel
-  "Interval widening sends monotone upper-bound growth to the configured top bound."
+(it-sequential "interval-widen-expands-moving-bound-to-sentinel"
   (let ((widened (cl-cc/optimize:opt-interval-widen
                   (cl-cc/optimize::opt-make-interval 0 0)
                   (cl-cc/optimize::opt-make-interval 0 1))))
-    (assert-= 0 (cl-cc/optimize::opt-interval-lo widened))
-    (assert-= most-positive-fixnum (cl-cc/optimize::opt-interval-hi widened))))
+    (expect (= 0 (cl-cc/optimize::opt-interval-lo widened)) :to-be-truthy)
+    (expect (= most-positive-fixnum (cl-cc/optimize::opt-interval-hi widened)) :to-be-truthy)))
 
 (defun %test-path-sensitive-counted-loop-cfg ()
   (cl-cc/optimize:cfg-build
@@ -577,69 +562,57 @@ vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets 
          (make-vm-label :name "exit")
          (make-vm-ret :reg :i))))
 
-(deftest path-sensitive-ranges-widen-loop-header-and-converge
-  "Loop-header widening reaches a fixed point while branch edges keep local facts."
+(it-sequential "path-sensitive-ranges-widen-loop-header-and-converge"
   (let* ((cfg (%test-path-sensitive-counted-loop-cfg))
          (loop-block (cl-cc/optimize:cfg-get-block-by-label cfg "loop"))
          (exit-block (cl-cc/optimize:cfg-get-block-by-label cfg "exit"))
          (body-block (find-if (lambda (succ) (not (eq succ exit-block)))
                               (cl-cc/optimize:bb-successors loop-block))))
     (cl-cc/optimize:opt-compute-path-sensitive-ranges cfg)
-    (assert-equal
-     (cons 0 cl-cc/optimize::+opt-range-positive-infinity+)
-     (cl-cc/optimize:opt-block-reg-range loop-block :i))
-    (assert-equal '(0 . 3)
-                  (cl-cc/optimize:opt-block-reg-range body-block :i))
-    (assert-equal
-     (cons 4 cl-cc/optimize::+opt-range-positive-infinity+)
-     (cl-cc/optimize:opt-block-reg-range exit-block :i))))
+    (expect (cl-cc/optimize:opt-block-reg-range loop-block :i) :to-equal (cons 0 cl-cc/optimize::+opt-range-positive-infinity+))
+    (expect (cl-cc/optimize:opt-block-reg-range body-block :i) :to-equal '(0 . 3))
+    (expect (cl-cc/optimize:opt-block-reg-range exit-block :i) :to-equal (cons 4 cl-cc/optimize::+opt-range-positive-infinity+))))
 
-(deftest simple-induction-detects-affine-update
-  "opt-compute-simple-inductions records init and step for affine self updates."
+(it-sequential "simple-induction-detects-affine-update"
   (let* ((insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :one :value 1)
                       (make-vm-add   :dst :i :lhs :i :rhs :one)))
          (ivs (cl-cc/optimize::opt-compute-simple-inductions insts))
          (iv (gethash :i ivs)))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize::opt-iv-init iv))
-    (assert-= 1 (cl-cc/optimize::opt-iv-step iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize::opt-iv-init iv)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-iv-step iv)) :to-be-truthy)))
 
-(deftest simple-induction-kills-stale-fact-after-overwrite
-  "opt-compute-simple-inductions removes an induction fact after a later write."
+(it-sequential "simple-induction-kills-stale-fact-after-overwrite"
   (let* ((insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :one :value 1)
                       (make-vm-add   :dst :i :lhs :i :rhs :one)
                       (make-vm-const :dst :i :value 42)))
          (ivs (cl-cc/optimize::opt-compute-simple-inductions insts)))
-    (assert-false (nth-value 1 (gethash :i ivs)))))
+    (expect (nth-value 1 (gethash :i ivs)) :to-be-falsy)))
 
-(deftest induction-trip-count-cases
-  "opt-induction-trip-count handles positive, inclusive, and negative steps."
-  (assert-= 5 (cl-cc/optimize::opt-induction-trip-count 0 10 2))
-  (assert-= 6 (cl-cc/optimize::opt-induction-trip-count 0 10 2 :inclusive-p t))
-  (assert-= 4 (cl-cc/optimize::opt-induction-trip-count 10 0 -3)))
+(it-sequential "induction-trip-count-cases"
+  (expect (= 5 (cl-cc/optimize::opt-induction-trip-count 0 10 2)) :to-be-truthy)
+  (expect (= 6 (cl-cc/optimize::opt-induction-trip-count 0 10 2 :inclusive-p t)) :to-be-truthy)
+  (expect (= 4 (cl-cc/optimize::opt-induction-trip-count 10 0 -3)) :to-be-truthy))
 
-(deftest simple-induction-detects-inc-and-dec-updates
-  "SCEV recognizes vm-inc and vm-dec as unit induction updates."
+(it-sequential "simple-induction-detects-inc-and-dec-updates"
   (let* ((inc-insts (list (make-vm-const :dst :i :value 0)
                           (make-vm-inc :dst :i :src :i)))
          (dec-insts (list (make-vm-const :dst :j :value 10)
                           (make-vm-dec :dst :j :src :j)))
          (inc-ivs (cl-cc/optimize:opt-compute-simple-inductions inc-insts))
          (dec-ivs (cl-cc/optimize:opt-compute-simple-inductions dec-insts)))
-    (assert-= 1 (cl-cc/optimize:opt-iv-step (gethash :i inc-ivs)))
-    (assert-= -1 (cl-cc/optimize:opt-iv-step (gethash :j dec-ivs)))))
+    (expect (= 1 (cl-cc/optimize:opt-iv-step (gethash :i inc-ivs))) :to-be-truthy)
+    (expect (= -1 (cl-cc/optimize:opt-iv-step (gethash :j dec-ivs))) :to-be-truthy)))
 
-(deftest induction-trip-count-comparison-predicates
-  "SCEV trip-count helper handles vm-le, vm-ge, and vm-eq predicates."
-  (assert-= 6 (cl-cc/optimize:opt-induction-trip-count 0 10 2 :predicate 'vm-le))
-  (assert-= 6 (cl-cc/optimize:opt-induction-trip-count 10 0 -2 :predicate 'vm-ge))
-  (assert-= 1 (cl-cc/optimize:opt-induction-trip-count 4 4 1 :predicate 'vm-eq))
-  (assert-= 0 (cl-cc/optimize:opt-induction-trip-count 3 4 1 :predicate 'vm-eq)))
+(it-sequential "induction-trip-count-comparison-predicates"
+  (expect (= 6 (cl-cc/optimize:opt-induction-trip-count 0 10 2 :predicate 'vm-le)) :to-be-truthy)
+  (expect (= 6 (cl-cc/optimize:opt-induction-trip-count 10 0 -2 :predicate 'vm-ge)) :to-be-truthy)
+  (expect (= 1 (cl-cc/optimize:opt-induction-trip-count 4 4 1 :predicate 'vm-eq)) :to-be-truthy)
+  (expect (= 0 (cl-cc/optimize:opt-induction-trip-count 3 4 1 :predicate 'vm-eq)) :to-be-truthy))
 
-(deftest loop-induction-analysis-is-scoped-to-natural-loop
-  "opt-compute-loop-inductions uses CFG natural loops and seeds constants from the preheader."
+(it-sequential "loop-induction-analysis-is-scoped-to-natural-loop"
   (let* ((insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-label :name "loop")
                       (make-vm-inc :dst :i :src :i)
@@ -649,12 +622,11 @@ vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets 
          (loops (cl-cc/optimize:opt-compute-loop-inductions cfg))
          (ivs (gethash header loops))
          (iv (and ivs (gethash :i ivs))))
-    (assert-true iv)
-    (assert-= 0 (cl-cc/optimize:opt-iv-init iv))
-    (assert-= 1 (cl-cc/optimize:opt-iv-step iv))))
+    (expect iv :to-be-truthy)
+    (expect (= 0 (cl-cc/optimize:opt-iv-init iv)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize:opt-iv-step iv)) :to-be-truthy)))
 
-(deftest bounds-check-elimination-annotates-provably-safe-loop-access
-  "BCE annotates an array access in a simple loop when index and length ranges are proven safe."
+(it-sequential "bounds-check-elimination-annotates-provably-safe-loop-access"
   (let* ((aref-inst (cl-cc:make-vm-aref :dst :out :array-reg :arr :index-reg :idx))
          (insts (list (make-vm-const :dst :len :value 4)
                       (make-vm-make-array :dst :arr :size-reg :len)
@@ -663,24 +635,22 @@ vm-jump-zero does NOT jump when condition is non-zero/true, so fallthrough gets 
                       aref-inst
                       (make-vm-jump :label "loop")))
          (result (cl-cc/optimize:opt-pass-bounds-check-elimination insts)))
-    (assert-equal insts result)
-    (assert-true (cl-cc/optimize:opt-bounds-check-eliminable-marked-p aref-inst))
-    (assert-eq :idx (getf (cl-cc/optimize:opt-bounds-check-eliminable-metadata aref-inst)
-                          :index-reg))))
+    (expect result :to-equal insts)
+    (expect (cl-cc/optimize:opt-bounds-check-eliminable-marked-p aref-inst) :to-be-truthy)
+    (expect (getf (cl-cc/optimize:opt-bounds-check-eliminable-metadata aref-inst)
+                          :index-reg) :to-be :idx)))
 
-(deftest bounds-check-elimination-keeps-out-of-bounds-access-checked
-  "BCE does not annotate an array access when the proven index equals the length."
+(it-sequential "bounds-check-elimination-keeps-out-of-bounds-access-checked"
   (let* ((aref-inst (cl-cc:make-vm-aref :dst :out :array-reg :arr :index-reg :idx))
          (insts (list (make-vm-const :dst :len :value 4)
                       (make-vm-make-array :dst :arr :size-reg :len)
                       (make-vm-const :dst :idx :value 4)
                       aref-inst)))
     (cl-cc/optimize:opt-pass-bounds-check-elimination insts)
-    (assert-false (cl-cc/optimize:opt-bounds-check-eliminable-marked-p aref-inst))))
+    (expect (cl-cc/optimize:opt-bounds-check-eliminable-marked-p aref-inst) :to-be-falsy)))
 
-(deftest constant-intervals-unknown-operand-kills-dst
-  "opt-compute-constant-intervals: an unknown operand in a binary op removes the dst interval."
+(it-sequential "constant-intervals-unknown-operand-kills-dst"
   (let* ((insts (list (make-vm-const :dst :r0 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r99)))
          (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
-    (assert-false (nth-value 1 (gethash :r2 ivals)))))
+    (expect (nth-value 1 (gethash :r2 ivals)) :to-be-falsy)))

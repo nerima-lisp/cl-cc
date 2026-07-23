@@ -5,16 +5,8 @@
 
 (in-package :cl-cc/test)
 
-(defsuite cl-cc-coverage-unstable-unit-suite
-  :description "Unit tests that are known to be unstable under source instrumentation coverage runs"
-  :parent cl-cc-unit-suite)
 
-(defsuite cl-cc-egraph-prolog-serial-suite
-  :description "Serial egraph tests requiring CL-PROLOG:QUERY-PROLOG replacement"
-  :parent cl-cc-coverage-unstable-unit-suite
-  :parallel nil)
 
-(in-suite cl-cc-coverage-unstable-unit-suite)
 
 ;;; ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -28,76 +20,93 @@
 
 ;;; ─── Union-Find ──────────────────────────────────────────────────────────
 
-(deftest egraph-find-self
-  "A newly added e-class is its own canonical representative."
+(it-sequential "egraph-find-self"
   (let* ((eg  (make-test-egraph))
          (id  (cl-cc/optimize:egraph-add eg 'const)))
-    (assert-= id (cl-cc/optimize:egraph-find eg id))))
+    (expect (= id (cl-cc/optimize:egraph-find eg id)) :to-be-truthy)))
 
-(deftest-each egraph-add-id-identity
-  "egraph-add: same node → same class ID (memo); different nodes → distinct IDs."
-  :cases (("deduplicates" 'const 'const t)
-          ("different"    'const 'var   nil))
-  (op1 op2 expect-equal)
-  (let* ((eg  (make-test-egraph))
+(it-sequential "egraph-add-id-identity deduplicates"
+  (destructuring-bind (op1 op2 expect-equal) (list 'const 'const t)
+    (let* ((eg  (make-test-egraph))
          (id0 (cl-cc/optimize:egraph-add eg op1))
          (id1 (cl-cc/optimize:egraph-add eg op2)))
     (if expect-equal
-        (assert-= id0 id1)
-        (assert-true (/= id0 id1)))))
+        (expect (= id0 id1) :to-be-truthy)
+        (expect (/= id0 id1) :to-be-truthy)))))
+
+(it-sequential "egraph-add-id-identity different"
+  (destructuring-bind (op1 op2 expect-equal) (list 'const 'var nil)
+    (let* ((eg  (make-test-egraph))
+         (id0 (cl-cc/optimize:egraph-add eg op1))
+         (id1 (cl-cc/optimize:egraph-add eg op2)))
+    (if expect-equal
+        (expect (= id0 id1) :to-be-truthy)
+        (expect (/= id0 id1) :to-be-truthy)))))
 
 ;;; ─── Merge ───────────────────────────────────────────────────────────────
 
-(deftest egraph-merge-same-class
-  "Merging a class with itself is a no-op."
+(it-sequential "egraph-merge-same-class"
   (let* ((eg (make-test-egraph))
          (id (cl-cc/optimize:egraph-add eg 'const)))
     (cl-cc/optimize:egraph-merge eg id id)
-    (assert-= id (cl-cc/optimize:egraph-find eg id))))
+    (expect (= id (cl-cc/optimize:egraph-find eg id)) :to-be-truthy)))
 
-(deftest egraph-merge-two-classes
-  "After merging two classes, egraph-find returns the same canonical ID for both."
+(it-sequential "egraph-merge-two-classes"
   (let* ((eg  (make-test-egraph))
          (id0 (cl-cc/optimize:egraph-add eg 'const))
          (id1 (cl-cc/optimize:egraph-add eg 'var)))
     (cl-cc/optimize:egraph-merge eg id0 id1)
     (cl-cc/optimize:egraph-rebuild eg)
-    (assert-= (cl-cc/optimize:egraph-find eg id0) (cl-cc/optimize:egraph-find eg id1))))
+    (expect (= (cl-cc/optimize:egraph-find eg id0) (cl-cc/optimize:egraph-find eg id1)) :to-be-truthy)))
 
 ;;; ─── E-Graph Statistics ──────────────────────────────────────────────────
 
-(deftest-each egraph-stats-class-count
-  "egraph-stats :classes is 0 for an empty graph; 1 after adding one node."
-  :cases (("empty"    nil    0)
-          ("one-node" 'const 1))
-  (node-op expected-classes)
-  (let ((eg (make-test-egraph)))
+(it-sequential "egraph-stats-class-count empty"
+  (destructuring-bind (node-op expected-classes) (list nil 0)
+    (let ((eg (make-test-egraph)))
     (when node-op (cl-cc/optimize:egraph-add eg node-op))
-    (assert-= expected-classes (getf (cl-cc/optimize:egraph-stats eg) :classes))))
+    (expect (= expected-classes (getf (cl-cc/optimize:egraph-stats eg) :classes)) :to-be-truthy))))
+
+(it-sequential "egraph-stats-class-count one-node"
+  (destructuring-bind (node-op expected-classes) (list 'const 1)
+    (let ((eg (make-test-egraph)))
+    (when node-op (cl-cc/optimize:egraph-add eg node-op))
+    (expect (= expected-classes (getf (cl-cc/optimize:egraph-stats eg) :classes)) :to-be-truthy))))
 
 ;;; ─── Pattern Matching ────────────────────────────────────────────────────
 
-(deftest-each egraph-pattern-var-p
-  "egraph-pattern-var-p recognizes ?-prefixed symbols and rejects non-variables."
-  :cases (("var-x"     t   '?x)
-          ("var-foo"   t   '?foo)
-          ("no-prefix" nil 'x)
-          ("number"    nil 42))
-  (expected sym)
-  (if expected
-      (assert-true  (cl-cc/optimize:egraph-pattern-var-p sym))
-      (assert-false (cl-cc/optimize:egraph-pattern-var-p sym))))
+(it-sequential "egraph-pattern-var-p var-x"
+  (destructuring-bind (expected sym) (list t '?x)
+    (if expected
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-truthy)
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-falsy))))
 
-(deftest egraph-match-pattern-variable
-  "A pattern variable matches any e-class."
+(it-sequential "egraph-pattern-var-p var-foo"
+  (destructuring-bind (expected sym) (list t '?foo)
+    (if expected
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-truthy)
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-falsy))))
+
+(it-sequential "egraph-pattern-var-p no-prefix"
+  (destructuring-bind (expected sym) (list nil 'x)
+    (if expected
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-truthy)
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-falsy))))
+
+(it-sequential "egraph-pattern-var-p number"
+  (destructuring-bind (expected sym) (list nil 42)
+    (if expected
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-truthy)
+      (expect (cl-cc/optimize:egraph-pattern-var-p sym) :to-be-falsy))))
+
+(it-sequential "egraph-match-pattern-variable"
   (let* ((eg  (make-test-egraph))
          (id  (cl-cc/optimize:egraph-add eg 'const))
          (matches (cl-cc/optimize:egraph-match-pattern eg '?x id)))
-    (assert-= 1 (length matches))
-    (assert-= id (cdr (assoc '?x (car matches))))))
+    (expect (= 1 (length matches)) :to-be-truthy)
+    (expect (= id (cdr (assoc '?x (car matches)))) :to-be-truthy)))
 
-(deftest egraph-match-pattern-consistent-binding
-  "Same pattern variable must bind to same e-class."
+(it-sequential "egraph-match-pattern-consistent-binding"
   (let* ((eg  (make-test-egraph))
          (id0 (cl-cc/optimize:egraph-add eg 'const))
          (id1 (cl-cc/optimize:egraph-add eg 'var))
@@ -105,28 +114,30 @@
          (bindings (list (cons '?x id0)))
          (matches (cl-cc/optimize:egraph-match-pattern eg '?x id1 bindings)))
     ;; Should fail — ?x is already bound to id0, not id1
-    (assert-null matches)))
+    (expect matches :to-be-null)))
 
 ;;; ─── Rule Application ────────────────────────────────────────────────────
 
-(deftest-each egraph-rule-registered
-  "Each builtin rewrite rule name is present in egraph-builtin-rules."
-  :cases (("add-zero-r"  'cl-cc/optimize::add-zero-r)
-          ("fold-add"    'cl-cc/optimize::fold-add)
-          ("mul-pow2"    'cl-cc/optimize::mul-pow2))
-  (rule-name)
-  (let ((rules (cl-cc/optimize:egraph-builtin-rules)))
-    (assert-true (find rule-name rules
-                        :key (lambda (r) (getf r :name))))))
+(it-sequential "egraph-rule-registered add-zero-r"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::add-zero-r)
+    (let ((rules (cl-cc/optimize:egraph-builtin-rules)))
+    (expect (find rule-name rules
+                        :key (lambda (r) (getf r :name))) :to-be-truthy))))
 
-(in-suite cl-cc-egraph-prolog-serial-suite)
+(it-sequential "egraph-rule-registered fold-add"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-add)
+    (let ((rules (cl-cc/optimize:egraph-builtin-rules)))
+    (expect (find rule-name rules
+                        :key (lambda (r) (getf r :name))) :to-be-truthy))))
 
-(deftest egraph-builtin-rules-consults-prolog-facts
-  "egraph-builtin-rules consults the Prolog egraph-rule facts when they are available."
-  ;; The binding-alist keys below must be the exact ?NAME/?LHS/?RHS symbols
-  ;; CL-CC/OPTIMIZE::EGRAPH-BUILTIN-RULES queries with (package-qualified,
-  ;; since this file is (in-package :cl-cc/test)) — CL-PROLOG:SOLUTION-BINDING
-  ;; looks a variable up by symbol identity, not name.
+(it-sequential "egraph-rule-registered mul-pow2"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::mul-pow2)
+    (let ((rules (cl-cc/optimize:egraph-builtin-rules)))
+    (expect (find rule-name rules
+                        :key (lambda (r) (getf r :name))) :to-be-truthy))))
+
+
+(it-sequential "egraph-builtin-rules-consults-prolog-facts"
   (let ((called nil))
     (with-replaced-function (cl-prolog:query-prolog
                              (lambda (rulebase goal)
@@ -136,11 +147,10 @@
                                            (cons 'cl-cc/optimize::?lhs '(add (const ?a) (const ?b)))
                                            (cons 'cl-cc/optimize::?rhs '(const))))))
       (let ((rules (cl-cc/optimize:egraph-builtin-rules)))
-        (assert-true called)
+        (expect called :to-be-truthy)
         (let ((rule (find 'cl-cc/optimize::fold-add rules
                           :key (lambda (r) (getf r :name)))))
-          (assert-true rule)
-          (assert-equal '(add (const ?a) (const ?b)) (getf rule :lhs))
-          (assert-equal '(const) (getf rule :rhs)))))))
+          (expect rule :to-be-truthy)
+          (expect (getf rule :lhs) :to-equal '(add (const ?a) (const ?b)))
+          (expect (getf rule :rhs) :to-equal '(const)))))))
 
-(in-suite cl-cc-coverage-unstable-unit-suite)

@@ -7,43 +7,36 @@
 ;;;;   Full passes     — opt-pass-global-dce, opt-pass-inline
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── opt-inline-inst-cost ───────────────────────────────────────────────────
 
-(deftest opt-inline-inst-cost-returns-number
-  "opt-inline-inst-cost returns a non-negative number for common instructions."
+(it-sequential "opt-inline-inst-cost-returns-number"
   (dolist (inst (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-move  :dst :r1 :src :r0)
                       (make-vm-ret   :reg :r0)))
-    (assert-true (>= (cl-cc/optimize::opt-inline-inst-cost inst) 0))))
+    (expect (>= (cl-cc/optimize::opt-inline-inst-cost inst) 0) :to-be-truthy)))
 
-(deftest opt-inline-inst-cost-target-difference
-  "Learned target-aware normalization keeps x86-64/aarch64 cost differences visible."
+(it-sequential "opt-inline-inst-cost-target-difference"
   (let ((inst (make-vm-add :dst :r0 :lhs :r1 :rhs :r2)))
     (let ((cl-cc/optimize::*opt-learned-cost-target* :x86-64))
       (let ((x86-cost (cl-cc/optimize::opt-inline-inst-cost inst)))
         (let ((cl-cc/optimize::*opt-learned-cost-target* :aarch64))
           (let ((a64-cost (cl-cc/optimize::opt-inline-inst-cost inst)))
-            (assert-true (/= x86-cost a64-cost))))))))
+            (expect (/= x86-cost a64-cost) :to-be-truthy)))))))
 
 ;;; ─── opt-inline-body-cost ───────────────────────────────────────────────────
 
-(deftest-each opt-inline-body-cost-cases
-  "opt-inline-body-cost sums non-ret costs: [const, ret]→cost(const); [ret]→0."
-  :cases (("excludes-ret"
-           (list (make-vm-const :dst :r0 :value 1) (make-vm-ret :reg :r0))
-           (cl-cc/optimize::opt-inline-inst-cost (make-vm-const :dst :r0 :value 1)))
-          ("only-ret"
-           (list (make-vm-ret :reg :r0))
-           0))
-  (body expected-cost)
-  (assert-= expected-cost (cl-cc/optimize::opt-inline-body-cost body)))
+(it-sequential "opt-inline-body-cost-cases excludes-ret"
+  (destructuring-bind (body expected-cost) (list (list (make-vm-const :dst :r0 :value 1) (make-vm-ret :reg :r0)) (cl-cc/optimize::opt-inline-inst-cost (make-vm-const :dst :r0 :value 1)))
+    (expect (= expected-cost (cl-cc/optimize::opt-inline-body-cost body)) :to-be-truthy)))
+
+(it-sequential "opt-inline-body-cost-cases only-ret"
+  (destructuring-bind (body expected-cost) (list (list (make-vm-ret :reg :r0)) 0)
+    (expect (= expected-cost (cl-cc/optimize::opt-inline-body-cost body)) :to-be-truthy)))
 
 ;;; ─── opt-adaptive-inline-threshold ──────────────────────────────────────────
 
-(deftest opt-adaptive-threshold-cheap-body
-  "opt-adaptive-inline-threshold returns higher threshold for all-cheap instructions."
+(it-sequential "opt-adaptive-threshold-cheap-body"
   (let* ((ci   (make-vm-closure :dst :r9 :label "cheap" :params '(:r0) :captured nil))
          ;; vm-move has cost ≤ 1 — saturate cheap-ratio to 1.0
          (body (loop repeat 5
@@ -51,17 +44,15 @@
          (def  (list :closure ci :params '(:r0) :body (append body (list (make-vm-ret :reg :r1)))))
          (threshold (cl-cc/optimize::opt-adaptive-inline-threshold def)))
     ;; Should be > base (15) because cheap-ratio >= 0.75
-    (assert-true (>= threshold 15))))
+    (expect (>= threshold 15) :to-be-truthy)))
 
-(deftest opt-adaptive-threshold-has-floor
-  "opt-adaptive-inline-threshold returns at least 8 even for empty bodies."
+(it-sequential "opt-adaptive-threshold-has-floor"
   (let* ((ci  (make-vm-closure :dst :r9 :label "empty" :params '(:r0) :captured nil))
          (def (list :closure ci :params '(:r0) :body (list (make-vm-ret :reg :r0))))
          (threshold (cl-cc/optimize::opt-adaptive-inline-threshold def)))
-    (assert-true (>= threshold 8))))
+    (expect (>= threshold 8) :to-be-truthy)))
 
-(deftest opt-adaptive-threshold-ml-bonus-unit
-  "Adaptive threshold gets an ML bonus when the ML score hook is enabled."
+(it-sequential "opt-adaptive-threshold-ml-bonus-unit"
   (let* ((ci (make-vm-closure :dst :r9 :label "cheap" :params '(:r0) :captured nil))
          (body (append (loop repeat 6 collect (make-vm-move :dst :r1 :src :r0))
                        (list (make-vm-ret :reg :r1))))
@@ -70,8 +61,8 @@
       (let ((without-ml (cl-cc/optimize::opt-adaptive-inline-threshold def)))
         (let ((cl-cc/optimize::*opt-enable-ml-inline-score* t)
               (cl-cc/optimize::*opt-inline-ml-model-version* "mlgo-v2"))
-          (assert-true (>= (cl-cc/optimize::opt-adaptive-inline-threshold def)
-                           without-ml)))))))
+          (expect (>= (cl-cc/optimize::opt-adaptive-inline-threshold def)
+                           without-ml) :to-be-truthy))))))
 
 ;;; ─── opt-inline-eligible-p ──────────────────────────────────────────────────
 
@@ -82,37 +73,32 @@
           :params params
           :body (append body-insts (list (make-vm-ret :reg (first params)))))))
 
-(deftest opt-inline-eligible-simple-function
-  "opt-inline-eligible-p returns T for a simple captured-var-free function."
+(it-sequential "opt-inline-eligible-simple-function"
   (let* ((def (%make-eligible-def "add1" '(:r0)
                  (list (make-vm-const :dst :r1 :value 1)))))
-    (assert-true (cl-cc/optimize::opt-inline-eligible-p def 50))))
+    (expect (cl-cc/optimize::opt-inline-eligible-p def 50) :to-be-truthy)))
 
-(deftest opt-inline-eligible-rejects-captured-vars
-  "opt-inline-eligible-p returns NIL when the closure has captured variables."
+(it-sequential "opt-inline-eligible-rejects-captured-vars"
   (let* ((ci  (make-vm-closure :dst :r9 :label "cap"
                                 :params '(:r0)
                                 :captured '((:r5 . 42))))
          (def (list :closure ci :params '(:r0)
                     :body (list (make-vm-ret :reg :r0)))))
-    (assert-null (cl-cc/optimize::opt-inline-eligible-p def 50))))
+    (expect (cl-cc/optimize::opt-inline-eligible-p def 50) :to-be-null)))
 
-(deftest opt-inline-eligible-rejects-over-threshold
-  "opt-inline-eligible-p returns NIL when body cost exceeds THRESHOLD."
+(it-sequential "opt-inline-eligible-rejects-over-threshold"
   (let* ((big-body (loop repeat 20
                          collect (make-vm-move :dst :r1 :src :r0)))
          (def (%make-eligible-def "big" '(:r0) big-body)))
     ;; threshold=0 → any non-empty body exceeds it
-    (assert-null (cl-cc/optimize::opt-inline-eligible-p def 0))))
+    (expect (cl-cc/optimize::opt-inline-eligible-p def 0) :to-be-null)))
 
 ;;; ─── opt-pass-global-dce ────────────────────────────────────────────────────
 
-(deftest opt-pass-global-dce-empty-program
-  "opt-pass-global-dce on an empty instruction list returns nil."
-  (assert-null (cl-cc/optimize::opt-pass-global-dce nil)))
+(it-sequential "opt-pass-global-dce-empty-program"
+  (expect (cl-cc/optimize::opt-pass-global-dce nil) :to-be-null))
 
-(deftest opt-pass-global-dce-preserves-reachable-function
-  "opt-pass-global-dce keeps a function that is called from top-level code."
+(it-sequential "opt-pass-global-dce-preserves-reachable-function"
   (let* (;; Function "fn" takes :r1 as param (non-nil so it gets collected)
          (cl   (make-vm-closure :dst :r0 :label "fn" :params '(:r1) :captured nil))
          (lbl  (make-vm-label :name "fn"))
@@ -123,10 +109,9 @@
          (insts (list cl lbl body ret call))
          (result (cl-cc/optimize::opt-pass-global-dce insts)))
     ;; All instructions should be preserved since "fn" is reachable
-    (assert-= (length insts) (length result))))
+    (expect (= (length insts) (length result)) :to-be-truthy)))
 
-(deftest opt-pass-global-dce-removes-dead-function
-  "opt-pass-global-dce removes a function that is never called."
+(it-sequential "opt-pass-global-dce-removes-dead-function"
   (let* (;; Dead function: must have non-nil params so opt-collect-function-defs
          ;; picks it up. Without params, it's invisible to the DCE analysis.
          (dead-cl  (make-vm-closure :dst :r9 :label "dead"
@@ -139,17 +124,15 @@
          (insts (list dead-cl dead-lbl dead-body dead-ret top-const))
          (result (cl-cc/optimize::opt-pass-global-dce insts)))
     ;; Only top-const should survive — 4 dead-function instructions removed
-    (assert-= 1 (length result))
-    (assert-true (cl-cc:vm-const-p (first result)))))
+    (expect (= 1 (length result)) :to-be-truthy)
+    (expect (cl-cc:vm-const-p (first result)) :to-be-truthy)))
 
 ;;; ─── opt-pass-inline ────────────────────────────────────────────────────────
 
-(deftest opt-pass-inline-empty-program
-  "opt-pass-inline on nil returns nil."
-  (assert-null (cl-cc/optimize::opt-pass-inline nil)))
+(it-sequential "opt-pass-inline-empty-program"
+  (expect (cl-cc/optimize::opt-pass-inline nil) :to-be-null))
 
-(deftest opt-pass-inline-inlines-eligible-call
-  "opt-pass-inline replaces a vm-call of a small function with inlined moves."
+(it-sequential "opt-pass-inline-inlines-eligible-call"
   (let* (;; Define a trivial function: (lambda (:r1) (const :r2 42) (ret :r1))
          (cl   (make-vm-closure :dst :r0 :label "const42" :params '(:r1) :captured nil))
          (lbl  (make-vm-label :name "const42"))
@@ -160,13 +143,11 @@
          (insts (list cl lbl body ret call))
          (result (cl-cc/optimize::opt-pass-inline insts :threshold 50)))
     ;; vm-call should be gone; result should contain vm-move for arg passing
-    (assert-null (find-if #'cl-cc:vm-call-p result))
+    (expect (find-if #'cl-cc:vm-call-p result) :to-be-null)
     ;; A vm-move or vm-const should appear for argument/return
-    (assert-true (some (lambda (i) (or (cl-cc:vm-move-p i) (cl-cc:vm-const-p i))) result))))
+    (expect (some (lambda (i) (or (cl-cc:vm-move-p i) (cl-cc:vm-const-p i))) result) :to-be-truthy)))
 
-(deftest opt-pass-inline-preserves-non-eligible-call
-  "opt-pass-inline keeps vm-call for a function with captured variables (never eligible)."
-  ;; A closure with captured vars fails opt-inline-eligible-p regardless of threshold
+(it-sequential "opt-pass-inline-preserves-non-eligible-call"
   (let* ((cl   (make-vm-closure :dst :r0 :label "fn" :params '(:r1)
                                  :captured '((:r5 . 42))))
          (lbl  (make-vm-label :name "fn"))
@@ -176,10 +157,9 @@
          (insts (list cl lbl body ret call))
          (result (cl-cc/optimize::opt-pass-inline insts :threshold 50)))
     ;; Captured vars → not eligible → vm-call must remain in output
-    (assert-true (find-if #'cl-cc:vm-call-p result))))
+    (expect (find-if #'cl-cc:vm-call-p result) :to-be-truthy)))
 
-(deftest opt-pass-inline-propagates-constant-argument-into-inlined-body
-  "Known constant call arguments are materialized at inlined parameter bindings."
+(it-sequential "opt-pass-inline-propagates-constant-argument-into-inlined-body"
   (let* ((cl   (make-vm-closure :dst :r0 :label "id" :params '(:r1) :captured nil))
          (lbl  (make-vm-label :name "id"))
          (ret  (make-vm-ret :reg :r1))
@@ -187,10 +167,9 @@
          (call (make-vm-call :dst :r6 :func :r0 :args (list :r5)))
          (insts (list cl lbl ret argc call))
          (result (cl-cc/optimize::opt-pass-inline insts :threshold 50)))
-    (assert-null (find-if #'cl-cc:vm-call-p result))
-    (assert-true
-     (>= (count-if (lambda (i)
+    (expect (find-if #'cl-cc:vm-call-p result) :to-be-null)
+    (expect (>= (count-if (lambda (i)
                      (and (cl-cc:vm-const-p i)
                           (eql (cl-cc:vm-const-value i) 0)))
                    result)
-         2))))
+         2) :to-be-truthy)))

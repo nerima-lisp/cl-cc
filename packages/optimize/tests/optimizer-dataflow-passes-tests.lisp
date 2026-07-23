@@ -1,10 +1,8 @@
 ;;;; optimizer-dataflow-passes-tests.lisp — global-DCE, pipeline, LICM, PRE
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
-(deftest global-dce-removes-unreachable-registered-function
-  "opt-pass-global-dce removes a registered function when nothing at top level reaches it."
+(it-sequential "global-dce-removes-unreachable-registered-function"
   (let* ((closure (make-vm-closure :dst :r0 :label "dead" :params '(:r1)
                                    :captured nil :optional-params nil :rest-param nil :key-params nil))
          (register (cl-cc:make-vm-register-function :name 'dead :src :r0))
@@ -12,14 +10,13 @@
          (body (make-vm-const :dst :r2 :value 7))
          (ret (make-vm-ret :reg :r2))
          (out (cl-cc/optimize::opt-pass-global-dce (list closure register label body ret))))
-    (assert-false (member closure out))
-    (assert-false (member register out))
-    (assert-false (member label out))
-    (assert-false (member body out))
-    (assert-false (member ret out))))
+    (expect (member closure out) :to-be-falsy)
+    (expect (member register out) :to-be-falsy)
+    (expect (member label out) :to-be-falsy)
+    (expect (member body out) :to-be-falsy)
+    (expect (member ret out) :to-be-falsy)))
 
-(deftest global-dce-preserves-top-level-called-chain
-  "opt-pass-global-dce keeps functions reachable from top-level known calls."
+(it-sequential "global-dce-preserves-top-level-called-chain"
   (let* ((f-closure (make-vm-closure :dst :r0 :label "f" :params '(:r1)
                                      :captured nil :optional-params nil :rest-param nil :key-params nil))
          (f-register (cl-cc:make-vm-register-function :name 'f :src :r0))
@@ -40,14 +37,13 @@
                (list f-closure f-register f-label f-ref f-call f-ret
                      g-closure g-label g-body g-ret
                      top-ref top-arg top-call top-ret))))
-    (assert-true (member f-closure out))
-    (assert-true (member f-label out))
-    (assert-true (member g-closure out))
-    (assert-true (member g-label out))
-    (assert-true (member top-call out))))
+    (expect (member f-closure out) :to-be-truthy)
+    (expect (member f-label out) :to-be-truthy)
+    (expect (member g-closure out) :to-be-truthy)
+    (expect (member g-label out) :to-be-truthy)
+    (expect (member top-call out) :to-be-truthy)))
 
-(deftest global-dce-removes-unreachable-func-ref-definition
-  "FR-338: whole-program DCE removes unreachable func-ref-defined functions too."
+(it-sequential "global-dce-removes-unreachable-func-ref-definition"
   (let* ((ref (make-vm-func-ref :dst :r0 :label "dead-ref" :params '(:r1)))
          (register (cl-cc:make-vm-register-function :name 'dead-ref :src :r0))
          (label (make-vm-label :name "dead-ref"))
@@ -56,86 +52,85 @@
          (top (make-vm-const :dst :r3 :value :ok))
          (out (cl-cc/optimize::opt-pass-global-dce
                (list ref register label body ret top))))
-    (assert-false (member ref out))
-    (assert-false (member register out))
-    (assert-false (member label out))
-    (assert-false (member body out))
-    (assert-false (member ret out))
-    (assert-true (member top out))))
+    (expect (member ref out) :to-be-falsy)
+    (expect (member register out) :to-be-falsy)
+    (expect (member label out) :to-be-falsy)
+    (expect (member body out) :to-be-falsy)
+    (expect (member ret out) :to-be-falsy)
+    (expect (member top out) :to-be-truthy)))
 
-(deftest-each known-callee-labels-track-const-func-ref-and-move
-  "Known-callee helper resolves labels through closure/const/move chains."
-  :cases (("direct-closure" :r0)
-          ("const-value"    :r2)
-          ("moved-copy"     :r3))
-  (reg)
-  (let* ((closure (make-vm-closure :dst :r0 :label "f" :params '(:r1)
+(it-sequential "known-callee-labels-track-const-func-ref-and-move direct-closure"
+  (destructuring-bind (reg) (list :r0)
+    (let* ((closure (make-vm-closure :dst :r0 :label "f" :params '(:r1)
                                    :captured nil :optional-params nil :rest-param nil :key-params nil))
          (regfun  (make-vm-register-function :name 'f :src :r0))
          (const   (make-vm-const :dst :r2 :value 'f))
          (move    (make-vm-move :dst :r3 :src :r2))
          (known   (cl-cc/optimize:opt-known-callee-labels (list closure regfun const move))))
-    (assert-string= "f" (gethash reg known))))
+    (expect (gethash reg known) :to-equal "f"))))
 
-(deftest-each optimizer-pass-pipeline-forms
-  "optimize-instructions folds (+ 1 2) to nothing for both keyword-list and string pipeline forms."
-  :cases (("keyword-list" '(:fold :dce))
-          ("string"       "fold,dce"))
-  (pipeline)
-  (let* ((instrs (list (make-vm-const :dst :r0 :value 1)
+(it-sequential "known-callee-labels-track-const-func-ref-and-move const-value"
+  (destructuring-bind (reg) (list :r2)
+    (let* ((closure (make-vm-closure :dst :r0 :label "f" :params '(:r1)
+                                   :captured nil :optional-params nil :rest-param nil :key-params nil))
+         (regfun  (make-vm-register-function :name 'f :src :r0))
+         (const   (make-vm-const :dst :r2 :value 'f))
+         (move    (make-vm-move :dst :r3 :src :r2))
+         (known   (cl-cc/optimize:opt-known-callee-labels (list closure regfun const move))))
+    (expect (gethash reg known) :to-equal "f"))))
+
+(it-sequential "known-callee-labels-track-const-func-ref-and-move moved-copy"
+  (destructuring-bind (reg) (list :r3)
+    (let* ((closure (make-vm-closure :dst :r0 :label "f" :params '(:r1)
+                                   :captured nil :optional-params nil :rest-param nil :key-params nil))
+         (regfun  (make-vm-register-function :name 'f :src :r0))
+         (const   (make-vm-const :dst :r2 :value 'f))
+         (move    (make-vm-move :dst :r3 :src :r2))
+         (known   (cl-cc/optimize:opt-known-callee-labels (list closure regfun const move))))
+    (expect (gethash reg known) :to-equal "f"))))
+
+(it-sequential "optimizer-pass-pipeline-forms keyword-list"
+  (destructuring-bind (pipeline) (list '(:fold :dce))
+    (let* ((instrs (list (make-vm-const :dst :r0 :value 1)
                        (make-vm-const :dst :r1 :value 2)
                        (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)))
          (out (cl-cc/optimize:optimize-instructions instrs :pass-pipeline pipeline)))
-    (assert-equal 0 (length out))))
+    (expect (length out) :to-equal 0))))
 
-(deftest optimizer-ir-verify-valid
-  "opt-verify-instructions passes on a simple valid linear program."
+(it-sequential "optimizer-pass-pipeline-forms string"
+  (destructuring-bind (pipeline) (list "fold,dce")
+    (let* ((instrs (list (make-vm-const :dst :r0 :value 1)
+                       (make-vm-const :dst :r1 :value 2)
+                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)))
+         (out (cl-cc/optimize:optimize-instructions instrs :pass-pipeline pipeline)))
+    (expect (length out) :to-equal 0))))
+
+(it-sequential "optimizer-ir-verify-valid"
   (let ((instrs (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret :reg :r2))))
-    (assert-true (cl-cc/optimize:opt-verify-instructions instrs :pass-name "test"))))
+    (expect (cl-cc/optimize:opt-verify-instructions instrs :pass-name "test") :to-be-truthy)))
 
-(deftest-each optimizer-ir-verify-rejects-invalid
-  "opt-verify-instructions raises an error for invalid IR programs."
-  :cases (("duplicate-label"
-           (list (make-vm-label :name "L0")
+(it-sequential "optimizer-ir-verify-rejects-invalid duplicate-label"
+  (destructuring-bind (instrs) (list (list (make-vm-label :name "L0")
                  (make-vm-label :name "L0")))
-          ("missing-label-target"
-           (list (make-vm-jump :label "MISSING")))
-          ("use-before-def"
-           (list (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))))
-  (instrs)
-  (assert-true
-   (handler-case (progn (cl-cc/optimize:opt-verify-instructions instrs :pass-name "test") nil)
-     (error () t))))
+    (expect (handler-case (progn (cl-cc/optimize:opt-verify-instructions instrs :pass-name "test") nil)
+     (error () t)) :to-be-truthy)))
 
-(deftest-each optimizer-pass-pipeline-output-modes
-  "optimize-instructions diagnostic output modes: timings, stats, JSON trace, and remarks."
-  :cases (("timings"
-           (list (make-vm-const :dst :r0 :value 1))
-           (list :print-pass-timings t :timing-stream nil)
-           '("OPT-PASS-FOLD"))
-          ("stats"
-           (list (make-vm-const :dst :r0 :value 1))
-           (list :print-pass-stats t :stats-stream nil)
-           '("OPT-PASS-FOLD" "BEFORE=" "AFTER="))
-          ("json-trace"
-           (list (make-vm-const :dst :r0 :value 1))
-           (list :trace-json-stream nil)
-           '("\"traceEvents\"" "OPT-PASS-FOLD" "\"dur\""))
-          ("remarks-changed"
-           (list (make-vm-const :dst :r0 :value 1)
-                 (make-vm-const :dst :r1 :value 2)
-                 (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1))
-           (list :print-opt-remarks t :opt-remarks-mode :changed :opt-remarks-stream nil)
-           '("OPT-PASS-FOLD" "CHANGED"))
-          ("remarks-missed"
-           (list (make-vm-const :dst :r0 :value 1))
-           (list :print-opt-remarks t :opt-remarks-mode :missed :opt-remarks-stream nil)
-           '("OPT-PASS-FOLD" "MISSED")))
-  (instrs extra-opts expected-strings)
-  (let* ((stream (make-string-output-stream))
+(it-sequential "optimizer-ir-verify-rejects-invalid missing-label-target"
+  (destructuring-bind (instrs) (list (list (make-vm-jump :label "MISSING")))
+    (expect (handler-case (progn (cl-cc/optimize:opt-verify-instructions instrs :pass-name "test") nil)
+     (error () t)) :to-be-truthy)))
+
+(it-sequential "optimizer-ir-verify-rejects-invalid use-before-def"
+  (destructuring-bind (instrs) (list (list (make-vm-add :dst :r0 :lhs :r1 :rhs :r2)))
+    (expect (handler-case (progn (cl-cc/optimize:opt-verify-instructions instrs :pass-name "test") nil)
+     (error () t)) :to-be-truthy)))
+
+(it-sequential "optimizer-pass-pipeline-output-modes timings"
+  (destructuring-bind (instrs extra-opts expected-strings) (list (list (make-vm-const :dst :r0 :value 1)) (list :print-pass-timings t :timing-stream nil) '("OPT-PASS-FOLD"))
+    (let* ((stream (make-string-output-stream))
          (patched-opts (loop for (k v) on extra-opts by #'cddr
                              nconc (if (null v) (list k stream) (list k v)))))
     (apply #'cl-cc/optimize:optimize-instructions instrs
@@ -143,10 +138,59 @@
            patched-opts)
     (let ((text (string-upcase (get-output-stream-string stream))))
       (dolist (s expected-strings)
-        (assert-true (search (string-upcase s) text))))))
+        (expect (search (string-upcase s) text) :to-be-truthy))))))
 
-(deftest licm-does-not-hoist-loop-defined-value
-  "opt-pass-licm keeps a pure instruction inside the loop when it reads a loop-defined register."
+(it-sequential "optimizer-pass-pipeline-output-modes stats"
+  (destructuring-bind (instrs extra-opts expected-strings) (list (list (make-vm-const :dst :r0 :value 1)) (list :print-pass-stats t :stats-stream nil) '("OPT-PASS-FOLD" "BEFORE=" "AFTER="))
+    (let* ((stream (make-string-output-stream))
+         (patched-opts (loop for (k v) on extra-opts by #'cddr
+                             nconc (if (null v) (list k stream) (list k v)))))
+    (apply #'cl-cc/optimize:optimize-instructions instrs
+           :pass-pipeline '(:fold)
+           patched-opts)
+    (let ((text (string-upcase (get-output-stream-string stream))))
+      (dolist (s expected-strings)
+        (expect (search (string-upcase s) text) :to-be-truthy))))))
+
+(it-sequential "optimizer-pass-pipeline-output-modes json-trace"
+  (destructuring-bind (instrs extra-opts expected-strings) (list (list (make-vm-const :dst :r0 :value 1)) (list :trace-json-stream nil) '("\"traceEvents\"" "OPT-PASS-FOLD" "\"dur\""))
+    (let* ((stream (make-string-output-stream))
+         (patched-opts (loop for (k v) on extra-opts by #'cddr
+                             nconc (if (null v) (list k stream) (list k v)))))
+    (apply #'cl-cc/optimize:optimize-instructions instrs
+           :pass-pipeline '(:fold)
+           patched-opts)
+    (let ((text (string-upcase (get-output-stream-string stream))))
+      (dolist (s expected-strings)
+        (expect (search (string-upcase s) text) :to-be-truthy))))))
+
+(it-sequential "optimizer-pass-pipeline-output-modes remarks-changed"
+  (destructuring-bind (instrs extra-opts expected-strings) (list (list (make-vm-const :dst :r0 :value 1)
+                 (make-vm-const :dst :r1 :value 2)
+                 (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)) (list :print-opt-remarks t :opt-remarks-mode :changed :opt-remarks-stream nil) '("OPT-PASS-FOLD" "CHANGED"))
+    (let* ((stream (make-string-output-stream))
+         (patched-opts (loop for (k v) on extra-opts by #'cddr
+                             nconc (if (null v) (list k stream) (list k v)))))
+    (apply #'cl-cc/optimize:optimize-instructions instrs
+           :pass-pipeline '(:fold)
+           patched-opts)
+    (let ((text (string-upcase (get-output-stream-string stream))))
+      (dolist (s expected-strings)
+        (expect (search (string-upcase s) text) :to-be-truthy))))))
+
+(it-sequential "optimizer-pass-pipeline-output-modes remarks-missed"
+  (destructuring-bind (instrs extra-opts expected-strings) (list (list (make-vm-const :dst :r0 :value 1)) (list :print-opt-remarks t :opt-remarks-mode :missed :opt-remarks-stream nil) '("OPT-PASS-FOLD" "MISSED"))
+    (let* ((stream (make-string-output-stream))
+         (patched-opts (loop for (k v) on extra-opts by #'cddr
+                             nconc (if (null v) (list k stream) (list k v)))))
+    (apply #'cl-cc/optimize:optimize-instructions instrs
+           :pass-pipeline '(:fold)
+           patched-opts)
+    (let ((text (string-upcase (get-output-stream-string stream))))
+      (dolist (s expected-strings)
+        (expect (search (string-upcase s) text) :to-be-truthy))))))
+
+(it-sequential "licm-does-not-hoist-loop-defined-value"
   (let* ((start (make-vm-label :name "start"))
          (jmp1  (make-vm-jump :label "loop"))
          (loop  (make-vm-label :name "loop"))
@@ -155,12 +199,11 @@
          (back  (make-vm-jump :label "loop"))
          (ret   (make-vm-ret :reg :r2))
          (out   (cl-cc/optimize::opt-pass-licm (list start jmp1 loop c1 a1 back ret))))
-    (assert-true (member a1 out))
-    (assert-true (> (position a1 out :test #'eq)
-                    (position loop out :test #'eq)))))
+    (expect (member a1 out) :to-be-truthy)
+    (expect (> (position a1 out :test #'eq)
+                    (position loop out :test #'eq)) :to-be-truthy)))
 
-(deftest pre-hoists-partially-redundant-expression
-  "opt-pass-pre removes a partially redundant join-point expression."
+(it-sequential "pre-hoists-partially-redundant-expression"
   (let* ((entry (make-vm-label :name "entry"))
          (c0    (make-vm-const :dst :r0 :value 1))
          (c2    (make-vm-const :dst :r2 :value 2))
@@ -175,11 +218,11 @@
          (a2    (make-vm-add :dst :r5 :lhs :r0 :rhs :r2))
          (ret   (make-vm-ret :reg :r5))
          (out   (cl-cc/optimize::opt-pass-pre (list entry c0 c2 br p1 a1 j1 p2 x j2 join a2 ret))))
-    (assert-equal 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out))
-    (assert-true (some (lambda (i)
+    (expect (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out) :to-equal 1)
+    (expect (some (lambda (i)
                          (and (typep i 'cl-cc/vm::vm-move)
                                (or (and (eq :r3 (cl-cc/vm::vm-dst i))
                                         (eq :r5 (cl-cc/vm::vm-src i)))
                                    (and (eq :r5 (cl-cc/vm::vm-dst i))
                                         (eq :r3 (cl-cc/vm::vm-src i))))))
-                       out))))
+                       out) :to-be-truthy)))

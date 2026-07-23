@@ -6,7 +6,6 @@
 ;;;;   optimize-with-egraph.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defmacro assert-licm-boolean-case (expected then-form else-form)
   `(if ,expected
@@ -15,110 +14,157 @@
 
 ;;; ─── opt-inst-loop-invariant-p ───────────────────────────────────────────
 
-(deftest-each licm-invariant-p-cases
-  "opt-inst-loop-invariant-p: pure const is invariant; loop-defined read reg makes it variant; impure instruction is never invariant."
-  :cases (("pure-const"   (make-vm-const :dst :r0 :value 42)         nil   t)
-          ("dst-in-loop"  (make-vm-add   :dst :r1 :lhs :r0 :rhs :r0) :r0   nil)
-          ("impure"       (make-vm-halt  :reg :r0)                    nil   nil))
-  (inst def-reg expected)
-  (let ((loop-def-regs (make-hash-table :test #'eq))
+(it-sequential "licm-invariant-p-cases pure-const"
+  (destructuring-bind (inst def-reg expected) (list (make-vm-const :dst :r0 :value 42) nil t)
+    (let ((loop-def-regs (make-hash-table :test #'eq))
         (loop-members  (make-hash-table :test #'eq))
         (def-sites     (make-hash-table :test #'eq)))
     (when def-reg
       (setf (gethash def-reg loop-def-regs) t))
     (assert-licm-boolean-case expected
-      (assert-true  (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites))
-      (assert-false (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites)))))
+      (expect (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites) :to-be-truthy)
+      (expect (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites) :to-be-falsy)))))
+
+(it-sequential "licm-invariant-p-cases dst-in-loop"
+  (destructuring-bind (inst def-reg expected) (list (make-vm-add   :dst :r1 :lhs :r0 :rhs :r0) :r0 nil)
+    (let ((loop-def-regs (make-hash-table :test #'eq))
+        (loop-members  (make-hash-table :test #'eq))
+        (def-sites     (make-hash-table :test #'eq)))
+    (when def-reg
+      (setf (gethash def-reg loop-def-regs) t))
+    (assert-licm-boolean-case expected
+      (expect (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites) :to-be-truthy)
+      (expect (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites) :to-be-falsy)))))
+
+(it-sequential "licm-invariant-p-cases impure"
+  (destructuring-bind (inst def-reg expected) (list (make-vm-halt  :reg :r0) nil nil)
+    (let ((loop-def-regs (make-hash-table :test #'eq))
+        (loop-members  (make-hash-table :test #'eq))
+        (def-sites     (make-hash-table :test #'eq)))
+    (when def-reg
+      (setf (gethash def-reg loop-def-regs) t))
+    (assert-licm-boolean-case expected
+      (expect (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites) :to-be-truthy)
+      (expect (cl-cc/optimize::opt-inst-loop-invariant-p inst loop-def-regs loop-members def-sites) :to-be-falsy)))))
 
 ;;; ─── %opt-pre-expression-key ─────────────────────────────────────────────
 
-(deftest-each pre-expression-key-cases
-  "%opt-pre-expression-key: (:const v) for vm-const; typed key for binary; nil for impure."
-  :cases (("const"   (make-vm-const :dst :r0 :value 7) :const   '(:const 7))
-          ("binary"  (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1) :binary nil)
-          ("impure"  (make-vm-halt  :reg :r0)                    :null   nil))
-  (inst shape expected)
-  (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+(it-sequential "pre-expression-key-cases const"
+  (destructuring-bind (inst shape expected) (list (make-vm-const :dst :r0 :value 7) :const '(:const 7))
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
     (ecase shape
-      (:const  (assert-equal expected key))
-      (:binary (assert-true (consp key)) (assert-eq 'cl-cc/vm::vm-add (car key)))
-      (:null   (assert-null key)))))
+      (:const  (expect key :to-equal expected))
+      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
+      (:null   (expect key :to-be-null))))))
 
-(deftest pre-expression-key-commutative
-  "%opt-pre-expression-key produces the same key regardless of lhs/rhs order (vm-add is commutative)."
+(it-sequential "pre-expression-key-cases binary"
+  (destructuring-bind (inst shape expected) (list (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1) :binary nil)
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+    (ecase shape
+      (:const  (expect key :to-equal expected))
+      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
+      (:null   (expect key :to-be-null))))))
+
+(it-sequential "pre-expression-key-cases impure"
+  (destructuring-bind (inst shape expected) (list (make-vm-halt  :reg :r0) :null nil)
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+    (ecase shape
+      (:const  (expect key :to-equal expected))
+      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
+      (:null   (expect key :to-be-null))))))
+
+(it-sequential "pre-expression-key-commutative"
   (let ((key-ab (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
         (key-ba (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r1 :rhs :r0))))
-    (assert-equal key-ab key-ba)))
+    (expect key-ba :to-equal key-ab)))
 
 ;;; ─── %opt-pre-splice-before-terminator ───────────────────────────────────
 
-(deftest-each pre-splice-inserts-before-terminator
-  "%opt-pre-splice-before-terminator places an extra instruction just before vm-jump and vm-ret terminators."
-  :cases (("before-jump"  (list (make-vm-const :dst :r0 :value 1) (make-vm-jump :label "end"))  'cl-cc/vm::vm-jump)
-          ("before-ret"   (list (make-vm-move  :dst :r0 :src :r1) (make-vm-ret  :reg  :r0))     'cl-cc/vm::vm-ret))
-  (insts term-type)
-  (let* ((extra  (make-vm-const :dst :r9 :value 0))
+(it-sequential "pre-splice-inserts-before-terminator before-jump"
+  (destructuring-bind (insts term-type) (list (list (make-vm-const :dst :r0 :value 1) (make-vm-jump :label "end")) 'cl-cc/vm::vm-jump)
+    (let* ((extra  (make-vm-const :dst :r9 :value 0))
          (result (cl-cc/optimize::%opt-pre-splice-before-terminator insts (list extra))))
-    (assert-= 3 (length result))
-    (assert-true (typep (second result) 'cl-cc/vm::vm-const))
-    (assert-true (typep (third  result) term-type))))
+    (expect (= 3 (length result)) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep (third  result) term-type) :to-be-truthy))))
 
-(deftest pre-splice-appends-when-no-terminator
-  "%opt-pre-splice-before-terminator appends at end when no terminator is present."
+(it-sequential "pre-splice-inserts-before-terminator before-ret"
+  (destructuring-bind (insts term-type) (list (list (make-vm-move  :dst :r0 :src :r1) (make-vm-ret  :reg  :r0)) 'cl-cc/vm::vm-ret)
+    (let* ((extra  (make-vm-const :dst :r9 :value 0))
+         (result (cl-cc/optimize::%opt-pre-splice-before-terminator insts (list extra))))
+    (expect (= 3 (length result)) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep (third  result) term-type) :to-be-truthy))))
+
+(it-sequential "pre-splice-appends-when-no-terminator"
   (let* ((const (make-vm-const :dst :r0 :value 5))
          (extra (make-vm-const :dst :r1 :value 6))
          (result (cl-cc/optimize::%opt-pre-splice-before-terminator
                   (list const)
                   (list extra))))
-    (assert-= 2 (length result))
-    (assert-true (typep (second result) 'cl-cc/vm::vm-const))))
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm::vm-const) :to-be-truthy)))
 
 ;;; ─── %opt-pre-env-evict-dst ──────────────────────────────────────────────
 
-(deftest-each licm-pre-env-evict-dst-cases
-  "%opt-pre-env-evict-dst removes all entries whose value equals DST."
-  :cases (("evicts-matching"  :r0 '((:a . :r0) (:b . :r1)) '((:b . :r1)))
-          ("noop-no-match"    :r9 '((:a . :r0) (:b . :r1)) '((:a . :r0) (:b . :r1)))
-          ("evicts-all"       :r0 '((:a . :r0) (:b . :r0)) nil))
-  (dst initial-alist expected-alist)
-  (let ((env (make-hash-table :test #'equal)))
+(it-sequential "licm-pre-env-evict-dst-cases evicts-matching"
+  (destructuring-bind (dst initial-alist expected-alist) (list :r0 '((:a . :r0) (:b . :r1)) '((:b . :r1)))
+    (let ((env (make-hash-table :test #'equal)))
     (dolist (pair initial-alist)
       (setf (gethash (car pair) env) (cdr pair)))
     (cl-cc/optimize::%opt-pre-env-evict-dst env dst)
     (let ((result (loop for k being the hash-keys of env using (hash-value v) collect (cons k v))))
-      (assert-= (length expected-alist) (length result))
+      (expect (= (length expected-alist) (length result)) :to-be-truthy)
       (dolist (pair expected-alist)
-        (assert-equal (cdr pair) (gethash (car pair) env))))))
+        (expect (gethash (car pair) env) :to-equal (cdr pair)))))))
+
+(it-sequential "licm-pre-env-evict-dst-cases noop-no-match"
+  (destructuring-bind (dst initial-alist expected-alist) (list :r9 '((:a . :r0) (:b . :r1)) '((:a . :r0) (:b . :r1)))
+    (let ((env (make-hash-table :test #'equal)))
+    (dolist (pair initial-alist)
+      (setf (gethash (car pair) env) (cdr pair)))
+    (cl-cc/optimize::%opt-pre-env-evict-dst env dst)
+    (let ((result (loop for k being the hash-keys of env using (hash-value v) collect (cons k v))))
+      (expect (= (length expected-alist) (length result)) :to-be-truthy)
+      (dolist (pair expected-alist)
+        (expect (gethash (car pair) env) :to-equal (cdr pair)))))))
+
+(it-sequential "licm-pre-env-evict-dst-cases evicts-all"
+  (destructuring-bind (dst initial-alist expected-alist) (list :r0 '((:a . :r0) (:b . :r0)) nil)
+    (let ((env (make-hash-table :test #'equal)))
+    (dolist (pair initial-alist)
+      (setf (gethash (car pair) env) (cdr pair)))
+    (cl-cc/optimize::%opt-pre-env-evict-dst env dst)
+    (let ((result (loop for k being the hash-keys of env using (hash-value v) collect (cons k v))))
+      (expect (= (length expected-alist) (length result)) :to-be-truthy)
+      (dolist (pair expected-alist)
+        (expect (gethash (car pair) env) :to-equal (cdr pair)))))))
 
 ;;; ─── opt-pass-licm (trivial paths) ───────────────────────────────────────
 
-(deftest licm-pass-returns-nil-for-empty-input
-  "opt-pass-licm returns nil immediately for an empty instruction list."
-  (assert-null (cl-cc/optimize::opt-pass-licm nil)))
+(it-sequential "licm-pass-returns-nil-for-empty-input"
+  (expect (cl-cc/optimize::opt-pass-licm nil) :to-be-null))
 
-(deftest licm-pass-returns-straight-line-code-unchanged
-  "opt-pass-licm returns code of the same length when no loops are detected."
+(it-sequential "licm-pass-returns-straight-line-code-unchanged"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret   :reg :r2)))
          (result (cl-cc/optimize::opt-pass-licm insts)))
-    (assert-= (length insts) (length result))))
+    (expect (= (length insts) (length result)) :to-be-truthy)))
 
 ;;; ─── %opt-pre-reconstruct-inst ──────────────────────────────────────────
 
-(deftest pre-reconstruct-inst-round-trips-vm-const
-  "%opt-pre-reconstruct-inst round-trips a vm-const, preserving its value."
+(it-sequential "pre-reconstruct-inst-round-trips-vm-const"
   (let* ((inst   (make-vm-const :dst :r0 :value 42))
          (result (cl-cc/optimize::%opt-pre-reconstruct-inst inst)))
-    (assert-true (typep result 'cl-cc/vm::vm-const))
-    (assert-equal 42 (cl-cc/vm::vm-value result))))
+    (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (cl-cc/vm::vm-value result) :to-equal 42)))
 
-(deftest pre-reconstruct-inst-passthrough-for-unrecognized
-  "%opt-pre-reconstruct-inst returns the original instruction when it cannot round-trip it."
+(it-sequential "pre-reconstruct-inst-passthrough-for-unrecognized"
   (let* ((inst   (make-vm-halt :reg :r0))
          (result (cl-cc/optimize::%opt-pre-reconstruct-inst inst)))
-    (assert-true (typep result 'cl-cc/vm::vm-halt))))
+    (expect (typep result 'cl-cc/vm::vm-halt) :to-be-truthy)))
 
 ;;; ─── %opt-pre-available-in-any-p ────────────────────────────────────────
 
@@ -130,40 +176,47 @@
     (when in-env2-p (setf (gethash key e2) :r0))
     (list (cons :p1 e1) (cons :p2 e2))))
 
-(deftest-each pre-available-in-any-p-cases
-  "%opt-pre-available-in-any-p: T when key is in any predecessor env; NIL when absent from all."
-  :cases (("in-first"   t   nil  t)
-          ("in-second"  nil t    t)
-          ("in-neither" nil nil  nil))
-  (in1 in2 expected)
-  (let ((preds (%pre-envs-with-key '(:const 1) in1 in2)))
+(it-sequential "pre-available-in-any-p-cases in-first"
+  (destructuring-bind (in1 in2 expected) (list t nil t)
+    (let ((preds (%pre-envs-with-key '(:const 1) in1 in2)))
     (assert-licm-boolean-case expected
-      (assert-true  (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds))
-      (assert-false (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds)))))
+      (expect (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds) :to-be-falsy)))))
+
+(it-sequential "pre-available-in-any-p-cases in-second"
+  (destructuring-bind (in1 in2 expected) (list nil t t)
+    (let ((preds (%pre-envs-with-key '(:const 1) in1 in2)))
+    (assert-licm-boolean-case expected
+      (expect (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds) :to-be-falsy)))))
+
+(it-sequential "pre-available-in-any-p-cases in-neither"
+  (destructuring-bind (in1 in2 expected) (list nil nil nil)
+    (let ((preds (%pre-envs-with-key '(:const 1) in1 in2)))
+    (assert-licm-boolean-case expected
+      (expect (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-pre-available-in-any-p '(:const 1) preds) :to-be-falsy)))))
 
 ;;; ─── %licm-collect-def-sites ────────────────────────────────────────────
 
-(deftest licm-collect-def-sites-maps-defined-registers
-  "%licm-collect-def-sites maps each defined register to the block(s) that define it."
+(it-sequential "licm-collect-def-sites-maps-defined-registers"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-ret   :reg :r0)))
          (cfg   (cl-cc/optimize:cfg-build insts))
          (sites (cl-cc/optimize::%licm-collect-def-sites cfg)))
-    (assert-true (gethash :r0 sites))
-    (assert-true (gethash :r1 sites))
-    (assert-null (gethash :r9 sites))))
+    (expect (gethash :r0 sites) :to-be-truthy)
+    (expect (gethash :r1 sites) :to-be-truthy)
+    (expect (gethash :r9 sites) :to-be-null)))
 
-(deftest licm-collect-def-sites-empty-cfg-returns-empty-table
-  "%licm-collect-def-sites returns an empty hash table for an empty CFG."
+(it-sequential "licm-collect-def-sites-empty-cfg-returns-empty-table"
   (let* ((cfg   (cl-cc/optimize:cfg-build nil))
          (sites (cl-cc/optimize::%licm-collect-def-sites cfg)))
-    (assert-= 0 (hash-table-count sites))))
+    (expect (= 0 (hash-table-count sites)) :to-be-truthy)))
 
 ;;; ─── %licm-loop-def-regs ────────────────────────────────────────────────
 
-(deftest licm-loop-def-regs-collects-from-members
-  "%licm-loop-def-regs returns all registers defined in member blocks."
+(it-sequential "licm-loop-def-regs-collects-from-members"
   (let* ((b (make-instance 'cl-cc/optimize:basic-block))
          (members (make-hash-table :test #'eq)))
     (setf (cl-cc/optimize:bb-instructions b)
@@ -171,14 +224,13 @@
                 (make-vm-add   :dst :r6 :lhs :r5 :rhs :r5)))
     (setf (gethash b members) t)
     (let ((regs (cl-cc/optimize::%licm-loop-def-regs members)))
-      (assert-true (gethash :r5 regs))
-      (assert-true (gethash :r6 regs))
-      (assert-null (gethash :r0 regs)))))
+      (expect (gethash :r5 regs) :to-be-truthy)
+      (expect (gethash :r6 regs) :to-be-truthy)
+      (expect (gethash :r0 regs) :to-be-null))))
 
 ;;; ─── %licm-find-loop-headers (smoke test via opt-pass-licm) ────────────
 
-(deftest licm-find-loop-headers-detects-self-loop
-  "%licm-find-loop-headers identifies the header of a simple counted loop."
+(it-sequential "licm-find-loop-headers-detects-self-loop"
   (let* ((start (make-vm-label :name "start"))
          (seed  (make-vm-const :dst :r0 :value 0))
          (jmp1  (make-vm-jump  :label "loop"))
@@ -196,30 +248,49 @@
     (multiple-value-bind (headers _)
         (cl-cc/optimize::%licm-find-loop-headers cfg)
       (declare (ignore _))
-      (assert-true (consp headers)))))
+      (expect (consp headers) :to-be-truthy))))
 
 ;;; ─── %opt-rewrite-block-terminator (shared helper via licm) ─────────────
 
-(deftest-each opt-rewrite-block-terminator-cases
-  "%opt-rewrite-block-terminator rewrites matching jump label; leaves non-matching unchanged."
-  :cases (("jump-match"      (make-vm-jump      :label "old") "old" "new" 'cl-cc/vm::vm-jump)
-          ("jump-zero-match" (make-vm-jump-zero :reg :r0 :label "old") "old" "new" 'cl-cc/vm::vm-jump-zero)
-          ("no-match"        (make-vm-jump      :label "other") "old" "new" nil))
-  (term-inst old new expected-type)
-  (let ((b (make-instance 'cl-cc/optimize:basic-block)))
+(it-sequential "opt-rewrite-block-terminator-cases jump-match"
+  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump      :label "old") "old" "new" 'cl-cc/vm::vm-jump)
+    (let ((b (make-instance 'cl-cc/optimize:basic-block)))
     (setf (cl-cc/optimize:bb-instructions b) (list term-inst))
     (cl-cc/optimize::%opt-rewrite-block-terminator b old new)
     (let ((result (car (cl-cc/optimize:bb-instructions b))))
       (if expected-type
           (progn
-          (assert-true (typep result expected-type))
-          (assert-equal new (cl-cc/vm::vm-label-name result)))
-          (assert-false (equal new (cl-cc/vm::vm-label-name result)))))))
+          (expect (typep result expected-type) :to-be-truthy)
+          (expect (cl-cc/vm::vm-label-name result) :to-equal new))
+          (expect (equal new (cl-cc/vm::vm-label-name result)) :to-be-falsy))))))
+
+(it-sequential "opt-rewrite-block-terminator-cases jump-zero-match"
+  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump-zero :reg :r0 :label "old") "old" "new" 'cl-cc/vm::vm-jump-zero)
+    (let ((b (make-instance 'cl-cc/optimize:basic-block)))
+    (setf (cl-cc/optimize:bb-instructions b) (list term-inst))
+    (cl-cc/optimize::%opt-rewrite-block-terminator b old new)
+    (let ((result (car (cl-cc/optimize:bb-instructions b))))
+      (if expected-type
+          (progn
+          (expect (typep result expected-type) :to-be-truthy)
+          (expect (cl-cc/vm::vm-label-name result) :to-equal new))
+          (expect (equal new (cl-cc/vm::vm-label-name result)) :to-be-falsy))))))
+
+(it-sequential "opt-rewrite-block-terminator-cases no-match"
+  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump      :label "other") "old" "new" nil)
+    (let ((b (make-instance 'cl-cc/optimize:basic-block)))
+    (setf (cl-cc/optimize:bb-instructions b) (list term-inst))
+    (cl-cc/optimize::%opt-rewrite-block-terminator b old new)
+    (let ((result (car (cl-cc/optimize:bb-instructions b))))
+      (if expected-type
+          (progn
+          (expect (typep result expected-type) :to-be-truthy)
+          (expect (cl-cc/vm::vm-label-name result) :to-equal new))
+          (expect (equal new (cl-cc/vm::vm-label-name result)) :to-be-falsy))))))
 
 ;;; ─── %licm-redirect-successor ────────────────────────────────────────────
 
-(deftest licm-redirect-successor-updates-edges
-  "%licm-redirect-successor swaps old→new in block's successors and updates predecessors."
+(it-sequential "licm-redirect-successor-updates-edges"
   (let ((block (make-instance 'cl-cc/optimize:basic-block))
         (old   (make-instance 'cl-cc/optimize:basic-block))
         (new   (make-instance 'cl-cc/optimize:basic-block)))
@@ -227,15 +298,14 @@
           (cl-cc/optimize:bb-predecessors old)   (list block)
           (cl-cc/optimize:bb-predecessors new)   nil)
     (cl-cc/optimize::%licm-redirect-successor block old new)
-    (assert-true  (member new (cl-cc/optimize:bb-successors   block) :test #'eq))
-    (assert-false (member old (cl-cc/optimize:bb-successors   block) :test #'eq))
-    (assert-false (member block (cl-cc/optimize:bb-predecessors old)  :test #'eq))
-    (assert-true  (member block (cl-cc/optimize:bb-predecessors new)  :test #'eq))))
+    (expect (member new (cl-cc/optimize:bb-successors   block) :test #'eq) :to-be-truthy)
+    (expect (member old (cl-cc/optimize:bb-successors   block) :test #'eq) :to-be-falsy)
+    (expect (member block (cl-cc/optimize:bb-predecessors old)  :test #'eq) :to-be-falsy)
+    (expect (member block (cl-cc/optimize:bb-predecessors new)  :test #'eq) :to-be-truthy)))
 
 ;;; ─── %licm-collect-members ──────────────────────────────────────────────
 
-(deftest licm-collect-members-returns-loop-blocks
-  "%licm-collect-members returns a hash-table containing all blocks in the natural loop."
+(it-sequential "licm-collect-members-returns-loop-blocks"
   (let* ((header (make-instance 'cl-cc/optimize:basic-block))
          (tail   (make-instance 'cl-cc/optimize:basic-block)))
     (setf (cl-cc/optimize:bb-predecessors header) (list tail)
@@ -243,14 +313,13 @@
           (cl-cc/optimize:bb-predecessors tail)   (list header)
           (cl-cc/optimize:bb-successors   tail)   (list header))
     (let ((members (cl-cc/optimize::%licm-collect-members header (list tail))))
-      (assert-true  (hash-table-p members))
-      (assert-true  (gethash header members))
-      (assert-true  (gethash tail   members)))))
+      (expect (hash-table-p members) :to-be-truthy)
+      (expect (gethash header members) :to-be-truthy)
+      (expect (gethash tail   members) :to-be-truthy))))
 
 ;;; ─── %licm-collect-invariants ────────────────────────────────────────────
 
-(deftest licm-collect-invariants-finds-pure-const
-  "%licm-collect-invariants returns pure instructions not reading loop-defined registers."
+(it-sequential "licm-collect-invariants-finds-pure-const"
   (let* ((b        (make-instance 'cl-cc/optimize:basic-block))
          (members  (make-hash-table :test #'eq))
          (def-sites (make-hash-table :test #'eq))
@@ -259,10 +328,9 @@
     (setf (gethash b members) t)
     (setf (gethash :r0 def-sites) (list b))
     (let ((invs (cl-cc/optimize::%licm-collect-invariants members def-sites)))
-      (assert-true (member c42 invs :test #'eq)))))
+      (expect (member c42 invs :test #'eq) :to-be-truthy))))
 
-(deftest licm-does-not-hoist-slot-read-across-aliased-slot-write
-  "LICM keeps a loop slot read in place when an aliased slot write is in the loop."
+(it-sequential "licm-does-not-hoist-slot-read-across-aliased-slot-write"
   (let* ((start (make-vm-label :name "start"))
          (obj   (make-vm-cons :dst :obj :car-src :r0 :cdr-src :r1))
          (jmp   (make-vm-jump :label "loop"))
@@ -272,12 +340,11 @@
          (back  (make-vm-jump :label "loop"))
          (ret   (make-vm-ret :reg :v))
          (out   (cl-cc/optimize::opt-pass-licm (list start obj jmp loop read write back ret))))
-    (assert-true (member read out :test #'eq))
-    (assert-true (> (position read out :test #'eq)
-                    (position loop out :test #'eq)))))
+    (expect (member read out :test #'eq) :to-be-truthy)
+    (expect (> (position read out :test #'eq)
+                    (position loop out :test #'eq)) :to-be-truthy)))
 
-(deftest licm-hoists-slot-read-across-tbaa-disjoint-slot-write
-  "LICM uses TBAA facts to hoist a slot read across a disjoint-kind slot write."
+(it-sequential "licm-hoists-slot-read-across-tbaa-disjoint-slot-write"
   (let* ((start (make-vm-label :name "start"))
          (size  (make-vm-const :dst :n :value 4))
          (obj   (make-vm-cons :dst :obj :car-src :r0 :cdr-src :r1))
@@ -291,12 +358,11 @@
          (back  (make-vm-jump :label "loop"))
          (ret   (make-vm-ret :reg :v))
          (out   (cl-cc/optimize::opt-pass-licm (list start size obj arr jmp loop read write back ret))))
-    (assert-true (member read out :test #'eq))
-    (assert-true (< (position read out :test #'eq)
-                    (position loop out :test #'eq)))))
+    (expect (member read out :test #'eq) :to-be-truthy)
+    (expect (< (position read out :test #'eq)
+                    (position loop out :test #'eq)) :to-be-truthy)))
 
-(deftest licm-unknown-call-invalidates-slot-read-hoist
-  "Unknown calls in the loop conservatively invalidate alias facts for load hoisting."
+(it-sequential "licm-unknown-call-invalidates-slot-read-hoist"
   (let* ((start (make-vm-label :name "start"))
          (obj   (make-vm-cons :dst :obj :car-src :r0 :cdr-src :r1))
          (jmp   (make-vm-jump :label "loop"))
@@ -306,39 +372,36 @@
          (back  (make-vm-jump :label "loop"))
          (ret   (make-vm-ret :reg :v))
          (out   (cl-cc/optimize::opt-pass-licm (list start obj jmp loop read call back ret))))
-    (assert-true (member read out :test #'eq))
-    (assert-true (> (position read out :test #'eq)
-                    (position loop out :test #'eq)))))
+    (expect (member read out :test #'eq) :to-be-truthy)
+    (expect (> (position read out :test #'eq)
+                    (position loop out :test #'eq)) :to-be-truthy)))
 
 ;;; ─── %opt-pre-block-out-env ──────────────────────────────────────────────
 
-(deftest pre-block-out-env-maps-key-to-defining-register
-  "%opt-pre-block-out-env maps the expression key (:const 42) to its destination register :r0."
+(it-sequential "pre-block-out-env-maps-key-to-defining-register"
   (let* ((b   (make-instance 'cl-cc/optimize:basic-block))
          (c42 (make-vm-const :dst :r0 :value 42)))
     (setf (cl-cc/optimize:bb-instructions b) (list c42))
     (let ((env (cl-cc/optimize::%opt-pre-block-out-env b)))
-      (assert-true  (hash-table-p env))
-      (assert-equal :r0 (gethash '(:const 42) env)))))
+      (expect (hash-table-p env) :to-be-truthy)
+      (expect (gethash '(:const 42) env) :to-equal :r0))))
 
-(deftest pre-block-out-env-removes-stale-entries-on-overwrite
-  "%opt-pre-block-out-env evicts the first definition when :r0 is redefined; only (:const 2) survives."
+(it-sequential "pre-block-out-env-removes-stale-entries-on-overwrite"
   (let* ((b  (make-instance 'cl-cc/optimize:basic-block))
          (c1 (make-vm-const :dst :r0 :value 1))
          (c2 (make-vm-const :dst :r0 :value 2)))
     (setf (cl-cc/optimize:bb-instructions b) (list c1 c2))
     (let ((env (cl-cc/optimize::%opt-pre-block-out-env b)))
-      (assert-null  (gethash '(:const 1) env))
-      (assert-equal :r0 (gethash '(:const 2) env)))))
+      (expect (gethash '(:const 1) env) :to-be-null)
+      (expect (gethash '(:const 2) env) :to-equal :r0))))
 
 ;;; ─── %opt-pre-join-elim ──────────────────────────────────────────────────
 
-(deftest pre-join-elim-no-change-on-straight-line
-  "%opt-pre-join-elim returns NIL (no changes) for straight-line code without join points."
+(it-sequential "pre-join-elim-no-change-on-straight-line"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-ret   :reg :r0)))
          (cfg (cl-cc/optimize:cfg-build insts)))
-    (assert-false (cl-cc/optimize::%opt-pre-join-elim cfg))))
+    (expect (cl-cc/optimize::%opt-pre-join-elim cfg) :to-be-falsy)))
 
 ;;; ─── %opt-pre-emit-compensating ────────────────────────────────────────
 
@@ -353,43 +416,38 @@
     (when prior-src (setf (gethash :k env) prior-src))
     (values pair inst table pred)))
 
-(deftest pre-emit-compensating-fresh-key
-  "%opt-pre-emit-compensating emits a copy of INST when key has no prior src."
+(it-sequential "pre-emit-compensating-fresh-key"
   (multiple-value-bind (pair inst table pred) (%make-pre-compensate-state)
     (cl-cc/optimize::%opt-pre-emit-compensating pair :k :r0 inst table)
-    (assert-= 1 (length (gethash pred table)))
-    (assert-eq :r0 (gethash :k (cdr pair)))))
+    (expect (= 1 (length (gethash pred table))) :to-be-truthy)
+    (expect (gethash :k (cdr pair)) :to-be :r0)))
 
-(deftest pre-emit-compensating-different-src
-  "%opt-pre-emit-compensating emits a vm-move from prior-src to dst when key has a different src."
+(it-sequential "pre-emit-compensating-different-src"
   (multiple-value-bind (pair inst table pred) (%make-pre-compensate-state :r1)
     (cl-cc/optimize::%opt-pre-emit-compensating pair :k :r0 inst table)
     (let ((emitted (first (gethash pred table))))
-      (assert-true (cl-cc/vm::vm-move-p emitted))
-      (assert-eq :r0 (cl-cc/vm::vm-move-dst emitted))
-      (assert-eq :r1 (cl-cc/vm::vm-move-src emitted)))))
+      (expect (cl-cc/vm::vm-move-p emitted) :to-be-truthy)
+      (expect (cl-cc/vm::vm-move-dst emitted) :to-be :r0)
+      (expect (cl-cc/vm::vm-move-src emitted) :to-be :r1))))
 
-(deftest pre-emit-compensating-same-src-noop
-  "%opt-pre-emit-compensating does NOT insert when src already equals dst."
+(it-sequential "pre-emit-compensating-same-src-noop"
   (multiple-value-bind (pair inst table pred) (%make-pre-compensate-state :r0)
     (cl-cc/optimize::%opt-pre-emit-compensating pair :k :r0 inst table)
-    (assert-null (gethash pred table))))
+    (expect (gethash pred table) :to-be-null)))
 
 ;;; ─── opt-pass-pre ────────────────────────────────────────────────────────
 
-(deftest pre-pass-returns-instruction-list
-  "opt-pass-pre returns an instruction list for straight-line code (no loops, no PRE opportunities)."
+(it-sequential "pre-pass-returns-instruction-list"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret   :reg :r2)))
          (result (cl-cc/optimize::opt-pass-pre insts)))
-    (assert-true (listp result))
-    (assert-true (> (length result) 0))))
+    (expect (listp result) :to-be-truthy)
+    (expect (> (length result) 0) :to-be-truthy)))
 
 ;;; ─── optimize-with-egraph ────────────────────────────────────────────────
 
-(deftest egraph-pass-returns-list-for-empty-input
-  "optimize-with-egraph on empty instruction list returns a list (possibly empty)."
+(it-sequential "egraph-pass-returns-list-for-empty-input"
   (let ((result (cl-cc/optimize:optimize-with-egraph nil)))
-    (assert-true (listp result))))
+    (expect (listp result) :to-be-truthy)))

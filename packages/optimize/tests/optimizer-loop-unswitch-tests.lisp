@@ -1,7 +1,6 @@
 ;;;; Unit tests for FR-602 loop unswitching.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defun %fr602-unswitch-loop (&key (condition-side-effect-p nil))
   "Build a counted loop containing an invariant if/else in its body."
@@ -26,26 +25,23 @@
                 (make-vm-label :name "exit")
                 (make-vm-ret :reg :i))))
 
-(deftest loop-unswitch-fr602-hoists-invariant-condition
-  "FR-602: invariant body branch is hoisted and two specialized loops are emitted."
+(it-sequential "loop-unswitch-fr602-hoists-invariant-condition"
   (let* ((out (cl-cc/optimize::opt-pass-loop-unswitch (%fr602-unswitch-loop))))
-    (assert-true (%test-label-position out "loop_unsw_true"))
-    (assert-true (%test-label-position out "loop_unsw_false"))
-    (assert-true (%test-label-position out "exit"))
-    (assert-false (%test-label-position out "loop"))
-    (assert-true (some (lambda (inst)
+    (expect (%test-label-position out "loop_unsw_true") :to-be-truthy)
+    (expect (%test-label-position out "loop_unsw_false") :to-be-truthy)
+    (expect (%test-label-position out "exit") :to-be-truthy)
+    (expect (%test-label-position out "loop") :to-be-falsy)
+    (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm::vm-jump-zero)
                               (eq (cl-cc/vm::vm-reg inst) :flag)
                               (equal (cl-cc/vm::vm-label-name inst) "loop_unsw_false")))
-                       out))
-    (assert-false (some (lambda (inst)
+                       out) :to-be-truthy)
+    (expect (some (lambda (inst)
                           (and (typep inst 'cl-cc/vm::vm-jump-zero)
                                (equal (cl-cc/vm::vm-label-name inst) "else")))
-                        out))))
+                        out) :to-be-falsy)))
 
-(deftest loop-unswitch-fr602-skips-side-effecting-condition
-  "FR-602: side-effecting loop-local condition computations are not unswitched."
+(it-sequential "loop-unswitch-fr602-skips-side-effecting-condition"
   (let* ((insts (%fr602-unswitch-loop :condition-side-effect-p t))
          (out (cl-cc/optimize::opt-pass-loop-unswitch insts)))
-    (assert-equal (mapcar #'cl-cc/vm::instruction->sexp insts)
-                  (mapcar #'cl-cc/vm::instruction->sexp out))))
+    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))

@@ -1,10 +1,8 @@
 ;;;; Unit tests for FR-686 dead loop elimination.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
-(deftest dead-loop-fr686-removes-pure-unused-loop
-  "FR-686: pure loop with unused loop-defined values is removed."
+(it-sequential "dead-loop-fr686-removes-pure-unused-loop"
   (let* ((insts (list (make-vm-const :dst :limit :value 10)
                       (make-vm-label :name "loop")
                       (make-vm-lt :dst :cond :lhs :i :rhs :limit)
@@ -14,21 +12,20 @@
                       (make-vm-label :name "exit")
                       (make-vm-ret :reg :result)))
          (out (cl-cc/optimize::opt-pass-dead-loop-elimination insts)))
-    (assert-false (some (lambda (inst)
+    (expect (some (lambda (inst)
                           (and (typep inst 'cl-cc/vm::vm-label)
                                (equal (cl-cc/vm::vm-name inst) "loop")))
-                        out))
-    (assert-false (some (lambda (inst)
+                        out) :to-be-falsy)
+    (expect (some (lambda (inst)
                           (and (typep inst 'cl-cc/vm::vm-add)
                                (eq (cl-cc/vm::vm-dst inst) :tmp)))
-                        out))
-    (assert-true (some (lambda (inst)
+                        out) :to-be-falsy)
+    (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm::vm-label)
                               (equal (cl-cc/vm::vm-name inst) "exit")))
-                       out))))
+                       out) :to-be-truthy)))
 
-(deftest dead-loop-fr686-preserves-volatile-loop
-  "FR-686: loops containing a volatile marker are preserved."
+(it-sequential "dead-loop-fr686-preserves-volatile-loop"
   (let* ((insts (list (make-vm-label :name "loop")
                       (make-vm-lt :dst :cond :lhs :i :rhs :limit)
                       (make-vm-jump-zero :reg :cond :label "exit")
@@ -38,5 +35,4 @@
                       (make-vm-label :name "exit")
                       (make-vm-ret :reg :result)))
          (out (cl-cc/optimize::opt-pass-dead-loop-elimination insts)))
-    (assert-equal (mapcar #'cl-cc/vm::instruction->sexp insts)
-                  (mapcar #'cl-cc/vm::instruction->sexp out))))
+    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))

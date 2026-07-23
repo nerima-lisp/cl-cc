@@ -188,24 +188,48 @@ Accepted STATUS keywords: :implemented, :partial, :planned, :unknown."
                            "packages/optimize/src/optimizer-speculative-peval.lisp"
                            "packages/optimize/src/optimizer-speculative-passes.lisp")))))))
 
+(defun %opt-roadmap-cl-weave-test-name-registered-p (anchor)
+  "Return T when ANCHOR names a cl-weave-registered test.
+Since the deftest→it-sequential migration, tests register in cl-weave's suite
+tree rather than cl-cc/test's *KNOWN-TEST-NAMES*. it-sequential names are the
+lowercased anchor symbol name (deftest-each cases are \"base label\"), so match
+the anchor either exactly or as a \"anchor \" prefix."
+  (let ((root-fn (find-symbol "ROOT-SUITE" :cl-weave))
+        (suite-p-fn (find-symbol "SUITE-P" :cl-weave))
+        (children-fn (find-symbol "SUITE-CHILDREN" :cl-weave))
+        (name-fn (find-symbol "TEST-CASE-NAME" :cl-weave)))
+    (when (and root-fn suite-p-fn children-fn name-fn)
+      (let ((target (string-downcase (symbol-name anchor)))
+            (root (ignore-errors (funcall root-fn))))
+        (when root
+          (labels ((walk (node)
+                     (if (funcall suite-p-fn node)
+                         (some #'walk (funcall children-fn node))
+                         (let ((name (funcall name-fn node)))
+                           (and (stringp name)
+                                (or (string-equal name target)
+                                    (let ((p (concatenate 'string target " ")))
+                                      (and (>= (length name) (length p))
+                                           (string-equal (subseq name 0 (length p)) p)))))))))
+            (walk root)))))))
+
 (defun %opt-roadmap-test-anchor-registered-p (anchor)
-  "Return T when ANCHOR names a loaded cl-cc/test test.
-Queries cl-cc/test's *KNOWN-TEST-NAMES* registry (DEFTEST NAME symbol ->
-description), which replaced the old *TEST-REGISTRY*/PERSIST-LOOKUP/
-PERSIST-EACH API this used to call."
-  (let ((test-package (find-package :cl-cc/test)))
-    (if test-package
-        (let ((test-symbol (find-symbol (symbol-name anchor) test-package))
-              (known-names-symbol (find-symbol "*KNOWN-TEST-NAMES*" test-package)))
-          (and known-names-symbol
-               (boundp known-names-symbol)
-               (let ((known-names (symbol-value known-names-symbol)))
-                 (or (and test-symbol
-                          (nth-value 1 (gethash test-symbol known-names)))
-                     (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " [")))
-                       (loop for name being the hash-keys of known-names
-                             thereis (search case-prefix (symbol-name name))))))))
-        nil)))
+  "Return T when ANCHOR names a loaded test, in either the cl-weave suite tree
+(it-sequential, post cl-weave migration) or cl-cc/test's legacy *KNOWN-TEST-NAMES*
+registry (DEFTEST NAME symbol -> description)."
+  (or (%opt-roadmap-cl-weave-test-name-registered-p anchor)
+      (let ((test-package (find-package :cl-cc/test)))
+        (when test-package
+          (let ((test-symbol (find-symbol (symbol-name anchor) test-package))
+                (known-names-symbol (find-symbol "*KNOWN-TEST-NAMES*" test-package)))
+            (and known-names-symbol
+                 (boundp known-names-symbol)
+                 (let ((known-names (symbol-value known-names-symbol)))
+                   (or (and test-symbol
+                            (nth-value 1 (gethash test-symbol known-names)))
+                       (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " [")))
+                         (loop for name being the hash-keys of known-names
+                               thereis (search case-prefix (symbol-name name))))))))))))
 
 (defun %opt-roadmap-api-entry-fbound-p (entry)
   "Return T when ENTRY names a checkable API evidence target.
