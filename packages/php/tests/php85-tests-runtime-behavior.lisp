@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (%php85-register-test 'php85-clone-with-lowers-to-helper-call
   "PHP 8.5 clone-with syntax lowers to the clone-with runtime helper."

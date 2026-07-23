@@ -3,7 +3,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Lexer helpers (local, not imported from cl-cc)
 
@@ -12,161 +11,160 @@
 
 ;;; ─── Lexer Tests ────────────────────────────────────────────────────────────
 
-(deftest php-lex-empty-source-produces-eof
-  "PHP lexer: source with only the opening tag produces a single :T-EOF token."
+(it-sequential "php-lex-empty-source-produces-eof"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php ")))
-    (assert-= 1 (length tokens))
-    (assert-eq :T-EOF (php-tok-type (first tokens)))))
+    (expect (= 1 (length tokens)) :to-be-truthy)
+    (expect (php-tok-type (first tokens)) :to-be :T-EOF)))
 
-(deftest php-lex-integer-literal
-  "PHP lexer: 42 produces a :T-INT token with value 42."
+(it-sequential "php-lex-integer-literal"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php 42;")))
-    (assert-eq :T-INT (php-tok-type (first tokens)))
-    (assert-= 42 (php-tok-value (first tokens)))))
+    (expect (php-tok-type (first tokens)) :to-be :T-INT)
+    (expect (= 42 (php-tok-value (first tokens))) :to-be-truthy)))
 
-(deftest php-lex-float-literal
-  "PHP lexer: 3.14 produces a :T-FLOAT token with the correct double-float value."
+(it-sequential "php-lex-float-literal"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php 3.14;")))
-    (assert-eq :T-FLOAT (php-tok-type (first tokens)))
-    (assert-true (< (abs (- 3.14 (php-tok-value (first tokens)))) 1e-6))))
+    (expect (php-tok-type (first tokens)) :to-be :T-FLOAT)
+    (expect (< (abs (- 3.14 (php-tok-value (first tokens)))) 1e-6) :to-be-truthy)))
 
-(deftest-each php-lex-string-literals
-  "Both single- and double-quoted strings lex as :T-STRING"
-  :cases (("double-quote" "<?php \"hello\";" "hello")
-          ("single-quote" "<?php 'world';"  "world"))
-  (source expected-val)
-  (let ((tok (first (cl-cc/php:tokenize-php-source source))))
-    (assert-eq :T-STRING (php-tok-type tok))
-    (assert-equal expected-val (php-tok-value tok))))
+(it-sequential "php-lex-string-literals double-quote"
+  (destructuring-bind (source expected-val) (list "<?php \"hello\";" "hello")
+    (let ((tok (first (cl-cc/php:tokenize-php-source source))))
+    (expect (php-tok-type tok) :to-be :T-STRING)
+    (expect (php-tok-value tok) :to-equal expected-val))))
 
-(deftest-each php-lex-braced-string-interpolation
-  "Braced interpolation forms lex as interpolated string segments."
-  :cases (("curly-variable" "<?php \"Hello {$name}\";" "$name")
-          ("dollar-curly" "<?php \"Hello ${name}\";" "$name"))
-  (source expected-var)
-  (let* ((tok (first (cl-cc/php:tokenize-php-source source)))
+(it-sequential "php-lex-string-literals single-quote"
+  (destructuring-bind (source expected-val) (list "<?php 'world';" "world")
+    (let ((tok (first (cl-cc/php:tokenize-php-source source))))
+    (expect (php-tok-type tok) :to-be :T-STRING)
+    (expect (php-tok-value tok) :to-equal expected-val))))
+
+(it-sequential "php-lex-braced-string-interpolation curly-variable"
+  (destructuring-bind (source expected-var) (list "<?php \"Hello {$name}\";" "$name")
+    (let* ((tok (first (cl-cc/php:tokenize-php-source source)))
          (value (php-tok-value tok)))
-    (assert-eq :T-STRING (php-tok-type tok))
-    (assert-eq :php-interpolated-string (first value))
-    (assert-equal expected-var (second (second (second value))))))
+    (expect (php-tok-type tok) :to-be :T-STRING)
+    (expect (first value) :to-be :php-interpolated-string)
+    (expect (second (second (second value))) :to-equal expected-var))))
 
-(deftest php-lex-variable-produces-t-var
-  "PHP lexer: $x produces a :T-VAR token with the raw variable name."
+(it-sequential "php-lex-braced-string-interpolation dollar-curly"
+  (destructuring-bind (source expected-var) (list "<?php \"Hello ${name}\";" "$name")
+    (let* ((tok (first (cl-cc/php:tokenize-php-source source)))
+         (value (php-tok-value tok)))
+    (expect (php-tok-type tok) :to-be :T-STRING)
+    (expect (first value) :to-be :php-interpolated-string)
+    (expect (second (second (second value))) :to-equal expected-var))))
+
+(it-sequential "php-lex-variable-produces-t-var"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php $x;")))
-    (assert-eq :T-VAR (php-tok-type (first tokens)))
-    (assert-equal "$x" (php-tok-value (first tokens)))))
+    (expect (php-tok-type (first tokens)) :to-be :T-VAR)
+    (expect (php-tok-value (first tokens)) :to-equal "$x")))
 
-(deftest php-lex-type-keyword-produces-t-type
-  "PHP lexer: 'int' type keyword produces a :T-TYPE token with value :int."
+(it-sequential "php-lex-type-keyword-produces-t-type"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php int")))
-    (assert-eq :T-TYPE (php-tok-type (first tokens)))
-    (assert-eq :int (php-tok-value (first tokens)))))
+    (expect (php-tok-type (first tokens)) :to-be :T-TYPE)
+    (expect (php-tok-value (first tokens)) :to-be :int)))
 
-(deftest-each php-lex-keywords
-  "PHP reserved words lex as :T-KEYWORD with the correct value"
-  :cases (("if"       "<?php if"       :if)
-          ("function" "<?php function" :function))
-  (source expected-kw)
-  (let ((tok (first (cl-cc/php:tokenize-php-source source))))
-    (assert-eq :T-KEYWORD (php-tok-type tok))
-    (assert-eq expected-kw (php-tok-value tok))))
+(it-sequential "php-lex-keywords if"
+  (destructuring-bind (source expected-kw) (list "<?php if" :if)
+    (let ((tok (first (cl-cc/php:tokenize-php-source source))))
+    (expect (php-tok-type tok) :to-be :T-KEYWORD)
+    (expect (php-tok-value tok) :to-be expected-kw))))
 
-(deftest-each php-lex-punctuation
-  "PHP punctuation tokens lex to the correct token type"
-  :cases (("arrow"         "<?php ->"  :T-ARROW)
-          ("nullsafe-arrow" "<?php ?->" :T-NULLSAFE-ARROW)
-          ("semicolon"     "<?php ;"   :T-SEMI))
-  (source expected-type)
-  (assert-eq expected-type (php-tok-type (first (cl-cc/php:tokenize-php-source source)))))
+(it-sequential "php-lex-keywords function"
+  (destructuring-bind (source expected-kw) (list "<?php function" :function)
+    (let ((tok (first (cl-cc/php:tokenize-php-source source))))
+    (expect (php-tok-type tok) :to-be :T-KEYWORD)
+    (expect (php-tok-value tok) :to-be expected-kw))))
 
-(deftest php-lex-line-comment-is-skipped
-  "PHP lexer: a // line comment is stripped; the next token is 42 as :T-INT."
+(it-sequential "php-lex-punctuation arrow"
+  (destructuring-bind (source expected-type) (list "<?php ->" :T-ARROW)
+    (expect (php-tok-type (first (cl-cc/php:tokenize-php-source source))) :to-be expected-type)))
+
+(it-sequential "php-lex-punctuation nullsafe-arrow"
+  (destructuring-bind (source expected-type) (list "<?php ?->" :T-NULLSAFE-ARROW)
+    (expect (php-tok-type (first (cl-cc/php:tokenize-php-source source))) :to-be expected-type)))
+
+(it-sequential "php-lex-punctuation semicolon"
+  (destructuring-bind (source expected-type) (list "<?php ;" :T-SEMI)
+    (expect (php-tok-type (first (cl-cc/php:tokenize-php-source source))) :to-be expected-type)))
+
+(it-sequential "php-lex-line-comment-is-skipped"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php // this is a comment
 42;")))
-    (assert-eq :T-INT (php-tok-type (first tokens)))
-    (assert-= 42 (php-tok-value (first tokens)))))
+    (expect (php-tok-type (first tokens)) :to-be :T-INT)
+    (expect (= 42 (php-tok-value (first tokens))) :to-be-truthy)))
 
-(deftest php-lex-arithmetic-operators-are-t-op
-  "PHP lexer: +, -, *, / all lex as :T-OP tokens."
+(it-sequential "php-lex-arithmetic-operators-are-t-op"
   (let ((tokens (cl-cc/php:tokenize-php-source "<?php + - * /")))
-    (assert-true (every (lambda (tok) (eq :T-OP (php-tok-type tok)))
-                        (butlast tokens)))))  ; exclude :T-EOF
+    (expect (every (lambda (tok) (eq :T-OP (php-tok-type tok)))
+                        (butlast tokens)) :to-be-truthy)))  ; exclude :T-EOF
 
-(deftest php-lex-php85-pipe-and-void-cast-tokens
-  "PHP 8.5 pipe and void-cast syntax preserves the token shapes parser support expects."
+(it-sequential "php-lex-php85-pipe-and-void-cast-tokens"
   (let ((pipe-tokens (cl-cc/php:tokenize-php-source "<?php $value |> trim(...);"))
         (void-tokens (cl-cc/php:tokenize-php-source "<?php (void) $value;")))
     (let ((pipe-token (find "|>" pipe-tokens :key #'php-tok-value :test #'equal)))
-      (assert-true pipe-token)
-      (assert-eq :T-OP (php-tok-type pipe-token)))
-    (assert-eq :T-LPAREN (php-tok-type (first void-tokens)))
-    (assert-eq :T-TYPE (php-tok-type (second void-tokens)))
-    (assert-eq :void (php-tok-value (second void-tokens)))
-    (assert-eq :T-RPAREN (php-tok-type (third void-tokens)))))
+      (expect pipe-token :to-be-truthy)
+      (expect (php-tok-type pipe-token) :to-be :T-OP))
+    (expect (php-tok-type (first void-tokens)) :to-be :T-LPAREN)
+    (expect (php-tok-type (second void-tokens)) :to-be :T-TYPE)
+    (expect (php-tok-value (second void-tokens)) :to-be :void)
+    (expect (php-tok-type (third void-tokens)) :to-be :T-RPAREN)))
 
-(deftest php-parser-expression-gap-operator-tokens
-  "Characterization: PHP gap operators must be preserved at lexer level for parser support."
+(it-sequential "php-parser-expression-gap-operator-tokens"
   (let ((tokens (cl-cc/php:tokenize-php-source
                  "<?php $a ?? $b; $c ? $d : $e; fn($x) => $x;")))
-    (assert-true (find "??" tokens :key #'php-tok-value :test #'equal))
-    (assert-true (find "?" tokens :key #'php-tok-value :test #'equal))
-    (assert-true (find "=>" tokens :key #'php-tok-value :test #'equal))
-    (assert-true (find :fn tokens :key #'php-tok-value :test #'eq))))
+    (expect (find "??" tokens :key #'php-tok-value :test #'equal) :to-be-truthy)
+    (expect (find "?" tokens :key #'php-tok-value :test #'equal) :to-be-truthy)
+    (expect (find "=>" tokens :key #'php-tok-value :test #'equal) :to-be-truthy)
+    (expect (find :fn tokens :key #'php-tok-value :test #'eq) :to-be-truthy)))
 
-(deftest php-parser-array-gap-lexer-tokens
-  "Characterization: short/associative/function-style array syntax tokens must all survive lexing."
+(it-sequential "php-parser-array-gap-lexer-tokens"
   (let ((tokens (cl-cc/php:tokenize-php-source
                  "<?php [1,2,3]; [\"a\"=>1,\"b\"=>2]; array(1,2,3);")))
-    (assert-true (find :T-LBRACKET tokens :key #'php-tok-type :test #'eq))
-    (assert-true (find "=>" tokens :key #'php-tok-value :test #'equal))
-    (assert-true (find :array tokens :key #'php-tok-value :test #'eq))))
+    (expect (find :T-LBRACKET tokens :key #'php-tok-type :test #'eq) :to-be-truthy)
+    (expect (find "=>" tokens :key #'php-tok-value :test #'equal) :to-be-truthy)
+    (expect (find :array tokens :key #'php-tok-value :test #'eq) :to-be-truthy)))
 
 ;;; ─── Parser Tests ───────────────────────────────────────────────────────────
 
-(deftest php-parse-single-forms
-  "Single-form PHP statements each produce the expected AST node type"
+(it-sequential "php-parse-single-forms"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php 42;"))))
-    (assert-true (ast-int-p ast))
-    (assert-= 42 (ast-int-value ast)))
+    (expect (ast-int-p ast) :to-be-truthy)
+    (expect (= 42 (ast-int-value ast)) :to-be-truthy))
   (let ((ast (first (cl-cc/php:parse-php-source "<?php echo 42;"))))
     ;; echo lowers to a PRINC call (no trailing newline) wrapping a %php-concat
     ;; call (PHP string conversion); the echoed int is the concat's first arg.
-    (assert-true (cl-cc:ast-call-p ast))
+    (expect (cl-cc:ast-call-p ast) :to-be-truthy)
     (let ((concat (first (cl-cc:ast-call-args ast))))
-      (assert-true (cl-cc:ast-call-p concat))
-      (assert-true (ast-int-p (first (cl-cc:ast-call-args concat))))))
+      (expect (cl-cc:ast-call-p concat) :to-be-truthy)
+      (expect (ast-int-p (first (cl-cc:ast-call-args concat))) :to-be-truthy)))
   (let ((ast (first (cl-cc/php:parse-php-source "<?php $x = 42;"))))
-    (assert-true (or (ast-let-p ast) (ast-setq-p ast))))
+    (expect (or (ast-let-p ast) (ast-setq-p ast)) :to-be-truthy))
   (let ((ast (first (cl-cc/php:parse-php-source "<?php if ($x) { echo 1; }"))))
-    (assert-true (ast-if-p ast))))
+    (expect (ast-if-p ast) :to-be-truthy)))
 
-(deftest php-parse-function-produces-ast-defun
-  "PHP parser: function declaration produces ast-defun with the upcased name."
+(it-sequential "php-parse-function-produces-ast-defun"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php function f($x) { return $x; }"))))
-    (assert-true (ast-defun-p ast))
-    (assert-string= "F" (symbol-name (ast-defun-name ast)))))
+    (expect (ast-defun-p ast) :to-be-truthy)
+    (expect (symbol-name (ast-defun-name ast)) :to-equal "F")))
 
-(deftest php-parse-class-produces-ast-defclass
-  "PHP parser: class declaration produces ast-defclass with the upcased name."
+(it-sequential "php-parse-class-produces-ast-defclass"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php class Foo {}"))))
-    (assert-true (ast-defclass-p ast))
-    (assert-string= "FOO" (symbol-name (ast-defclass-name ast)))))
+    (expect (ast-defclass-p ast) :to-be-truthy)
+    (expect (symbol-name (ast-defclass-name ast)) :to-equal "FOO")))
 
-(deftest php-parse-multiple-statements
-  "PHP parser: multiple echo statements each produce one AST node."
+(it-sequential "php-parse-multiple-statements"
   (let ((asts (cl-cc/php:parse-php-source "<?php echo 1; echo 2;")))
-    (assert-= 2 (length asts))))
+    (expect (= 2 (length asts)) :to-be-truthy)))
 
-(deftest php-parse-binary-op-produces-ast-binop-or-call
-  "PHP parser: binary $a + $b produces ast-binop or ast-call."
+(it-sequential "php-parse-binary-op-produces-ast-binop-or-call"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php $a + $b;"))))
-    (assert-true (or (ast-binop-p ast) (ast-call-p ast)))))
+    (expect (or (ast-binop-p ast) (ast-call-p ast)) :to-be-truthy)))
 
-(deftest php-parse-string-literal-produces-ast-quote
-  "PHP parser: string literal produces ast-quote with the string value."
+(it-sequential "php-parse-string-literal-produces-ast-quote"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php \"hello\";"))))
-    (assert-true (ast-quote-p ast))
-    (assert-equal "hello" (ast-quote-value ast))))
+    (expect (ast-quote-p ast) :to-be-truthy)
+    (expect (ast-quote-value ast) :to-equal "hello")))
 
 (eval-when (:load-toplevel :execute)
   (%run-registered-tests-from-source-file

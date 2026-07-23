@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (%php85-register-test 'php85-get-error-handler-reports-current-handler
   "get_error_handler() returns the active handler and null when none is installed."

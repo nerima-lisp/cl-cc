@@ -1,11 +1,6 @@
 (in-package :cl-cc/test)
 
-(defsuite cl-cc-php-e2e-suite
-  :description "PHP end-to-end VM execution tests"
-  :parent cl-cc-e2e-suite
-  :parallel nil)
 
-(in-suite cl-cc-php-e2e-suite)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %php-run-capture (source)

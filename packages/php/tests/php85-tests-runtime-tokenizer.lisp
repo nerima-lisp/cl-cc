@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (%php85-register-test 'php85-image-type-constants-match-current-values
   "PHP 8.5 IMAGETYPE_* constants match current extension values."

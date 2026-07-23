@@ -1,34 +1,29 @@
 ;;;; tests/unit/parse/php/grammar-tests.lisp — PHP grammar token-stream tests
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defun %php-ts (tokens)
   (cl-cc/php::make-php-token-stream :tokens tokens :source "" :diagnostics nil))
 
-(deftest php-grammar-token-stream-peek-advance
-  "Token-stream helpers expose the current token and advance correctly."
+(it-sequential "php-grammar-token-stream-peek-advance"
   (let* ((ts (%php-ts (list (list :type :T-IDENT :value "foo")
                             (list :type :T-EOF   :value nil)))))
-    (assert-eq :T-IDENT (cl-cc/php::php-ts-peek-type ts))
-    (assert-equal "foo" (cl-cc/php::php-ts-peek-value ts))
-    (assert-equal (list :type :T-IDENT :value "foo")
-                  (cl-cc/php::php-ts-advance ts))
-    (assert-eq :T-EOF (cl-cc/php::php-ts-peek-type ts))))
+    (expect (cl-cc/php::php-ts-peek-type ts) :to-be :T-IDENT)
+    (expect (cl-cc/php::php-ts-peek-value ts) :to-equal "foo")
+    (expect (cl-cc/php::php-ts-advance ts) :to-equal (list :type :T-IDENT :value "foo"))
+    (expect (cl-cc/php::php-ts-peek-type ts) :to-be :T-EOF)))
 
-(deftest php-grammar-token-stream-skip-semis
-  "Semicolon skipping consumes only semicolon tokens."
+(it-sequential "php-grammar-token-stream-skip-semis"
   (let* ((ts (%php-ts (list (list :type :T-SEMI :value ";")
                             (list :type :T-SEMI :value ";")
                             (list :type :T-IDENT :value "x")
                             (list :type :T-EOF :value nil)))))
     (cl-cc/php::php-ts-skip-semis ts)
-    (assert-eq :T-IDENT (cl-cc/php::php-ts-peek-type ts))
-    (assert-equal "x" (cl-cc/php::php-ts-peek-value ts))))
+    (expect (cl-cc/php::php-ts-peek-type ts) :to-be :T-IDENT)
+    (expect (cl-cc/php::php-ts-peek-value ts) :to-equal "x")))
 
-(deftest php-grammar-token-stream-at-end
-  "Token-stream end detection treats nil and EOF as finished."
-  (assert-true (cl-cc/php::php-ts-at-end-p (%php-ts nil)))
-  (assert-true (cl-cc/php::php-ts-at-end-p (%php-ts (list (list :type :T-EOF :value nil))))))
+(it-sequential "php-grammar-token-stream-at-end"
+  (expect (cl-cc/php::php-ts-at-end-p (%php-ts nil)) :to-be-truthy)
+  (expect (cl-cc/php::php-ts-at-end-p (%php-ts (list (list :type :T-EOF :value nil)))) :to-be-truthy))
 
 (eval-when (:load-toplevel :execute)
   (%run-registered-tests-from-source-file

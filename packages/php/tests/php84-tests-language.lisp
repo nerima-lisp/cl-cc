@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (%php85-register-test 'php84-named-args-to-positional-lowers-named
   "Named arg descriptors from %php-parse-named-args lower to plain positional AST exprs."

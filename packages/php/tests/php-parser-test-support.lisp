@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (defun %php-first (src)
   "Parse SRC and return the first top-level AST node."

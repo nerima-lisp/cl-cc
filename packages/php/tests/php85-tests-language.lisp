@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (%php85-register-test 'php85-pipe-operator-lowers-to-helper-call
   "The PHP 8.5 pipe operator lowers to the runtime pipe helper."

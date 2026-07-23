@@ -1,161 +1,199 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (defun %php-cst-parse-one (source)
   "Parse SOURCE into CST forms and diagnostics, returning both."
   (multiple-value-list (cl-cc/php:parse-php-source-to-cst source)))
 
-(deftest-each php-grammar-stmt-basic-dispatch
-  "The CST statement dispatcher parses representative keyword-led statements without diagnostics."
-  :cases (("echo" "<?php echo 1;")
-          ("return" "<?php return 1;")
-          ("if-else" "<?php if ($x) { echo 1; } else { echo 2; }")
-          ("while" "<?php while ($x) { echo 1; }")
-          ("foreach" "<?php foreach ($items as $item) { echo $item; }")
-          ("function" "<?php function greet($name) { return $name; }")
-          ("class" "<?php class Box extends Base { public function get($x) { return $x; } }")
-          ("try-catch" "<?php try { echo 1; } catch (Ex $e) { echo 2; }")
-          ("break" "<?php break;")
-          ("continue" "<?php continue;"))
-  (source)
-  (destructuring-bind (forms diagnostics)
+(it-sequential "php-grammar-stmt-basic-dispatch echo"
+  (destructuring-bind (source) (list "<?php echo 1;")
+    (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one source)
-    (assert-true (consp forms))
-    (assert-equal nil diagnostics)))
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
 
-(deftest php-grammar-stmt-expression-fallback
-  "Non-keyword statements fall back to expression parsing and still produce a CST node."
+(it-sequential "php-grammar-stmt-basic-dispatch return"
+  (destructuring-bind (source) (list "<?php return 1;")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch if-else"
+  (destructuring-bind (source) (list "<?php if ($x) { echo 1; } else { echo 2; }")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch while"
+  (destructuring-bind (source) (list "<?php while ($x) { echo 1; }")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch foreach"
+  (destructuring-bind (source) (list "<?php foreach ($items as $item) { echo $item; }")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch function"
+  (destructuring-bind (source) (list "<?php function greet($name) { return $name; }")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch class"
+  (destructuring-bind (source) (list "<?php class Box extends Base { public function get($x) { return $x; } }")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch try-catch"
+  (destructuring-bind (source) (list "<?php try { echo 1; } catch (Ex $e) { echo 2; }")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch break"
+  (destructuring-bind (source) (list "<?php break;")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-basic-dispatch continue"
+  (destructuring-bind (source) (list "<?php continue;")
+    (destructuring-bind (forms diagnostics)
+      (%php-cst-parse-one source)
+    (expect (consp forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil))))
+
+(it-sequential "php-grammar-stmt-expression-fallback"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php $x + 1;")
-    (assert-= 1 (length forms))
-    (assert-true (first forms))
-    (assert-equal nil diagnostics)))
+    (expect (= 1 (length forms)) :to-be-truthy)
+    (expect (first forms) :to-be-truthy)
+    (expect diagnostics :to-equal nil)))
 
 ;;; P1+P2: for and foreach parsers
-(deftest php-grammar-stmt-for-loop-has-five-children
-  "for loop CST node has kind :for with 5 children; the fifth is the :body node."
+(it-sequential "php-grammar-stmt-for-loop-has-five-children"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php for ($i = 0; $i < 10; $i = $i + 1) { echo $i; }")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
     (let ((node (first forms)))
-      (assert-eq :for (cl-cc:cst-node-kind node))
-      (assert-= 5 (length (cl-cc:cst-interior-children node)))
+      (expect (cl-cc:cst-node-kind node) :to-be :for)
+      (expect (= 5 (length (cl-cc:cst-interior-children node))) :to-be-truthy)
       (let ((body-node (fifth (cl-cc:cst-interior-children node))))
-        (assert-eq :body (cl-cc:cst-node-kind body-node))))))
+        (expect (cl-cc:cst-node-kind body-node) :to-be :body)))))
 
-(deftest php-grammar-stmt-foreach-key-value-has-four-children
-  "foreach $k => $v CST node has kind :foreach with 4 children."
+(it-sequential "php-grammar-stmt-foreach-key-value-has-four-children"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php foreach ($arr as $k => $v) { echo $k; }")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
     (let ((node (first forms)))
-      (assert-eq :foreach (cl-cc:cst-node-kind node))
-      (assert-= 4 (length (cl-cc:cst-interior-children node))))))
+      (expect (cl-cc:cst-node-kind node) :to-be :foreach)
+      (expect (= 4 (length (cl-cc:cst-interior-children node))) :to-be-truthy))))
 
 ;;; P3a+b: function return type and param defaults
-(deftest php-grammar-stmt-function-with-return-type
-  "function with : int return type annotation produces a :function-def CST node."
+(it-sequential "php-grammar-stmt-function-with-return-type"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php function add($a, $b): int { return $a + $b; }")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
-    (assert-eq :function-def (cl-cc:cst-node-kind (first forms)))))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind (first forms)) :to-be :function-def)))
 
-(deftest php-grammar-stmt-function-with-default-param
-  "function with default param value produces a :function-def CST node."
+(it-sequential "php-grammar-stmt-function-with-default-param"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php function greet($name = \"world\") { return $name; }")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
-    (assert-eq :function-def (cl-cc:cst-node-kind (first forms)))))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind (first forms)) :to-be :function-def)))
 
 ;;; P3c: class implements — single and multiple
-(deftest php-grammar-stmt-class-single-implements
-  "class with a single implements interface produces a :class-def CST node."
+(it-sequential "php-grammar-stmt-class-single-implements"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php class Box implements Iface { public function get($x) { return $x; } }")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
-    (assert-eq :class-def (cl-cc:cst-node-kind (first forms)))))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind (first forms)) :to-be :class-def)))
 
-(deftest php-grammar-stmt-class-multiple-implements
-  "class with multiple comma-separated interfaces produces a :class-def CST node."
+(it-sequential "php-grammar-stmt-class-multiple-implements"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php class Box implements IfaceA, IfaceB { public $x; }")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
-    (assert-eq :class-def (cl-cc:cst-node-kind (first forms)))))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind (first forms)) :to-be :class-def)))
 
 ;;; P4: structural assertions on simple statements
-(deftest php-grammar-stmt-echo-has-two-children
-  "echo 42; produces a :echo CST node with 2 children (keyword + expression)."
+(it-sequential "php-grammar-stmt-echo-has-two-children"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php echo 42;")
-    (assert-equal nil diagnostics)
-    (assert-= 1 (length forms))
+    (expect diagnostics :to-equal nil)
+    (expect (= 1 (length forms)) :to-be-truthy)
     (let ((node (first forms)))
-      (assert-eq :echo (cl-cc:cst-node-kind node))
-      (assert-= 2 (length (cl-cc:cst-interior-children node))))))
+      (expect (cl-cc:cst-node-kind node) :to-be :echo)
+      (expect (= 2 (length (cl-cc:cst-interior-children node))) :to-be-truthy))))
 
-(deftest php-grammar-stmt-return-with-value-has-two-children
-  "return 42; produces a :return CST node with 2 children (keyword + expression)."
+(it-sequential "php-grammar-stmt-return-with-value-has-two-children"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php return 42;")
-    (assert-equal nil diagnostics)
+    (expect diagnostics :to-equal nil)
     (let ((node (first forms)))
-      (assert-eq :return (cl-cc:cst-node-kind node))
-      (assert-= 2 (length (cl-cc:cst-interior-children node))))))
+      (expect (cl-cc:cst-node-kind node) :to-be :return)
+      (expect (= 2 (length (cl-cc:cst-interior-children node))) :to-be-truthy))))
 
-(deftest php-grammar-stmt-bare-return-has-one-child
-  "return; (without value) produces a :return CST node with 1 child."
+(it-sequential "php-grammar-stmt-bare-return-has-one-child"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php return;")
-    (assert-equal nil diagnostics)
+    (expect diagnostics :to-equal nil)
     (let ((node (first forms)))
-      (assert-eq :return (cl-cc:cst-node-kind node))
-      (assert-= 1 (length (cl-cc:cst-interior-children node))))))
+      (expect (cl-cc:cst-node-kind node) :to-be :return)
+      (expect (= 1 (length (cl-cc:cst-interior-children node))) :to-be-truthy))))
 
-(deftest php-grammar-stmt-if-only-has-then-no-else
-  "if-only CST node has :then interior child but no :else child."
+(it-sequential "php-grammar-stmt-if-only-has-then-no-else"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php if ($x) { echo 1; }")
-    (assert-equal nil diagnostics)
+    (expect diagnostics :to-equal nil)
     (let ((node (first forms)))
-      (assert-eq :if (cl-cc:cst-node-kind node))
+      (expect (cl-cc:cst-node-kind node) :to-be :if)
       (let ((kinds (mapcar #'cl-cc:cst-node-kind
                            (remove-if-not #'cl-cc:cst-interior-p
                                           (cl-cc:cst-interior-children node)))))
-        (assert-true (member :then kinds))
-        (assert-false (member :else kinds))))))
+        (expect (member :then kinds) :to-be-truthy)
+        (expect (member :else kinds) :to-be-falsy)))))
 
-(deftest php-grammar-stmt-if-else-has-both-then-and-else
-  "if-else CST node has both :then and :else interior children."
+(it-sequential "php-grammar-stmt-if-else-has-both-then-and-else"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php if ($x) { echo 1; } else { echo 2; }")
-    (assert-equal nil diagnostics)
+    (expect diagnostics :to-equal nil)
     (let ((node (first forms)))
-      (assert-eq :if (cl-cc:cst-node-kind node))
+      (expect (cl-cc:cst-node-kind node) :to-be :if)
       (let ((kinds (mapcar #'cl-cc:cst-node-kind
                            (remove-if-not #'cl-cc:cst-interior-p
                                           (cl-cc:cst-interior-children node)))))
-        (assert-true (member :then kinds))
-        (assert-true (member :else kinds))))))
+        (expect (member :then kinds) :to-be-truthy)
+        (expect (member :else kinds) :to-be-truthy)))))
 
-(deftest php-grammar-stmt-try-catch-structure
-  "try-catch has :try-body and at least one :catch child."
+(it-sequential "php-grammar-stmt-try-catch-structure"
   (destructuring-bind (forms diagnostics)
       (%php-cst-parse-one "<?php try { echo 1; } catch (Ex $e) { echo 2; }")
-    (assert-equal nil diagnostics)
+    (expect diagnostics :to-equal nil)
     (let ((node (first forms)))
-      (assert-eq :try-catch (cl-cc:cst-node-kind node))
+      (expect (cl-cc:cst-node-kind node) :to-be :try-catch)
       (let ((kinds (mapcar #'cl-cc:cst-node-kind
                            (remove-if-not #'cl-cc:cst-interior-p
                                           (cl-cc:cst-interior-children node)))))
-        (assert-true (member :try-body kinds))
-        (assert-true (member :catch kinds))))))
+        (expect (member :try-body kinds) :to-be-truthy)
+        (expect (member :catch kinds) :to-be-truthy)))))
 
 (eval-when (:load-toplevel :execute)
   (%run-registered-tests-from-source-file

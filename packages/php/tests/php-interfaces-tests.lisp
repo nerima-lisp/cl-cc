@@ -4,72 +4,62 @@
 ;;;; Exercises parser-interface.lisp: definition, single/multiple implements,
 ;;;; interface extends, interface constants, abstract method signatures.
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Interface Definition ────────────────────────────────────────────────────
 
-(deftest php-interface-definition-produces-ast-defclass
-  "interface I {} lowers to ast-defclass with :php-kind :interface."
+(it-sequential "php-interface-definition-produces-ast-defclass"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php interface Countable { }"))))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-eq :interface (cl-cc:ast-defclass-php-kind ast))))
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (cl-cc:ast-defclass-php-kind ast) :to-be :interface)))
 
-(deftest php-interface-name-is-upcased
-  "Interface name is stored as an upcased symbol consistent with class naming."
+(it-sequential "php-interface-name-is-upcased"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php interface JsonSerializable { }"))))
-    (assert-string= "JSONSERIALIZABLE"
-                    (symbol-name (cl-cc:ast-defclass-name ast)))))
+    (expect (symbol-name (cl-cc:ast-defclass-name ast)) :to-equal "JSONSERIALIZABLE")))
 
-(deftest php-interface-is-supported-by-check
-  "Interface AST nodes pass php-check-supported-forms without signalling an error."
+(it-sequential "php-interface-is-supported-by-check"
   (let ((ast (first (cl-cc/php:parse-php-source "<?php interface Loggable { }"))))
-    (assert-eq :interface (cl-cc:ast-defclass-php-kind ast))
-    (assert-true (cl-cc/php:php-check-supported-forms (list ast)))))
+    (expect (cl-cc:ast-defclass-php-kind ast) :to-be :interface)
+    (expect (cl-cc/php:php-check-supported-forms (list ast)) :to-be-truthy)))
 
 ;;; ─── Abstract Method Signatures ─────────────────────────────────────────────
 
-(deftest php-interface-abstract-method-is-registered
-  "An abstract method in an interface body is stored in *php-interface-registry*."
+(it-sequential "php-interface-abstract-method-is-registered"
   (let* ((ast (first (cl-cc/php:parse-php-source
                       "<?php interface HasIdMeth { public function getId(): int; }")))
          ;; Use the exact symbol produced by the parser for registry lookup.
          (iface-sym (cl-cc:ast-defclass-name ast))
          (record (gethash iface-sym cl-cc/php:*php-interface-registry*)))
-    (assert-true record)
-    (assert-true (plusp (length (getf record :methods))))))
+    (expect record :to-be-truthy)
+    (expect (plusp (length (getf record :methods))) :to-be-truthy)))
 
-(deftest php-interface-method-signature-captures-name
-  "The method signature plist stores the upcased method name symbol."
+(it-sequential "php-interface-method-signature-captures-name"
   (let* ((ast (first (cl-cc/php:parse-php-source
                       "<?php interface RenderableIface { public function render(): string; }")))
          (iface-sym (cl-cc:ast-defclass-name ast))
          (sigs (getf (gethash iface-sym cl-cc/php:*php-interface-registry*) :methods)))
-    (assert-true sigs)
-    (assert-true (some (lambda (s) (string= "RENDER" (symbol-name (getf s :name)))) sigs))))
+    (expect sigs :to-be-truthy)
+    (expect (some (lambda (s) (string= "RENDER" (symbol-name (getf s :name)))) sigs) :to-be-truthy)))
 
-(deftest php-interface-method-signature-captures-return-type
-  "The method signature plist preserves the declared return type string."
+(it-sequential "php-interface-method-signature-captures-return-type"
   (let* ((ast (first (cl-cc/php:parse-php-source
                       "<?php interface LabeledIface { public function label(): string; }")))
          (iface-sym (cl-cc:ast-defclass-name ast))
          (sigs (getf (gethash iface-sym cl-cc/php:*php-interface-registry*) :methods))
          (sig  (first sigs)))
-    (assert-true (stringp (getf sig :return-type)))))
+    (expect (stringp (getf sig :return-type)) :to-be-truthy)))
 
-(deftest php-interface-method-signature-captures-return-by-reference
-  "Interface method signatures preserve PHP's function &name() return marker."
+(it-sequential "php-interface-method-signature-captures-return-by-reference"
   (let* ((ast (first (cl-cc/php:parse-php-source
                       "<?php interface RefSourceIface { public function &current(): mixed; }")))
          (iface-sym (cl-cc:ast-defclass-name ast))
          (sigs (getf (gethash iface-sym cl-cc/php:*php-interface-registry*) :methods))
          (sig (first sigs)))
-    (assert-true sig)
-    (assert-string= "CURRENT" (symbol-name (getf sig :name)))
-    (assert-equal "mixed" (getf sig :return-type))
-    (assert-true (getf sig :returns-by-ref))))
+    (expect sig :to-be-truthy)
+    (expect (symbol-name (getf sig :name)) :to-equal "CURRENT")
+    (expect (getf sig :return-type) :to-equal "mixed")
+    (expect (getf sig :returns-by-ref) :to-be-truthy)))
 
-(deftest php-interface-method-signature-captures-parameter-metadata
-  "Interface method signatures preserve modern PHP parameter metadata."
+(it-sequential "php-interface-method-signature-captures-parameter-metadata"
   (let* ((ast (first (cl-cc/php:parse-php-source
                       "<?php interface SinkIface { #[Trace] public function write(#[Sensitive] string &$message, int $limit = 10, ...$rest): void; }")))
          (iface-sym (cl-cc:ast-defclass-name ast))
@@ -79,118 +69,107 @@
          (param-types (getf sig :param-types))
          (param-defaults (getf sig :param-defaults))
          (default-ast (cdr (assoc (second params) param-defaults :test #'eq))))
-    (assert-true sig)
-    (assert-equal '(:public) (getf sig :modifiers))
-    (assert-= 2 (length params))
-    (assert-equal '(0) (getf sig :by-ref-indices))
-    (assert-string= "message" (symbol-name (first params)))
-    (assert-string= "rest" (symbol-name (getf sig :variadic-param)))
-    (assert-equal "string" (cdr (assoc (first params) param-types :test #'eq)))
-    (assert-equal "int" (cdr (assoc (second params) param-types :test #'eq)))
-    (assert-true (cl-cc:ast-int-p default-ast))
-    (assert-= 10 (cl-cc:ast-int-value default-ast))
-    (assert-eq (first params) (first (first (getf sig :param-attributes))))
-    (assert-true (getf (rest (first (getf sig :param-attributes))) :php-attributes))
-    (assert-string= "Trace" (cl-cc/php:php-attribute-name (first (getf sig :attributes))))))
+    (expect sig :to-be-truthy)
+    (expect (getf sig :modifiers) :to-equal '(:public))
+    (expect (= 2 (length params)) :to-be-truthy)
+    (expect (getf sig :by-ref-indices) :to-equal '(0))
+    (expect (symbol-name (first params)) :to-equal "message")
+    (expect (symbol-name (getf sig :variadic-param)) :to-equal "rest")
+    (expect (cdr (assoc (first params) param-types :test #'eq)) :to-equal "string")
+    (expect (cdr (assoc (second params) param-types :test #'eq)) :to-equal "int")
+    (expect (cl-cc:ast-int-p default-ast) :to-be-truthy)
+    (expect (= 10 (cl-cc:ast-int-value default-ast)) :to-be-truthy)
+    (expect (first (first (getf sig :param-attributes))) :to-be (first params))
+    (expect (getf (rest (first (getf sig :param-attributes))) :php-attributes) :to-be-truthy)
+    (expect (cl-cc/php:php-attribute-name (first (getf sig :attributes))) :to-equal "Trace")))
 
-(deftest php-interface-empty-body-has-no-methods
-  "An interface with an empty body registers with an empty methods list."
+(it-sequential "php-interface-empty-body-has-no-methods"
   (let* ((ast (first (cl-cc/php:parse-php-source "<?php interface EmptyIfaceX { }")))
          (iface-sym (cl-cc:ast-defclass-name ast))
          (record (gethash iface-sym cl-cc/php:*php-interface-registry*)))
-    (assert-true record)
-    (assert-null (getf record :methods))))
+    (expect record :to-be-truthy)
+    (expect (getf record :methods) :to-be-null)))
 
 ;;; ─── Interface Constants ─────────────────────────────────────────────────────
 
-(deftest php-interface-constant-is-slot-def
-  "Interface constants are stored as :class allocation slot-defs with :php-class-constant."
+(it-sequential "php-interface-constant-is-slot-def"
   (let* ((ast   (first (cl-cc/php:parse-php-source
                         "<?php interface HasVersion { const VERSION = '1.0'; }")))
          (slots (cl-cc:ast-defclass-slots ast)))
-    (assert-eq :interface (cl-cc:ast-defclass-php-kind ast))
-    (assert-true (plusp (length slots)))
+    (expect (cl-cc:ast-defclass-php-kind ast) :to-be :interface)
+    (expect (plusp (length slots)) :to-be-truthy)
     (let ((const-slot (first slots)))
-      (assert-true (cl-cc:ast-slot-def-p const-slot))
-      (assert-eq :class (cl-cc:ast-slot-allocation const-slot))
-      (assert-true (getf (cl-cc:ast-imports const-slot) :php-class-constant)))))
+      (expect (cl-cc:ast-slot-def-p const-slot) :to-be-truthy)
+      (expect (cl-cc:ast-slot-allocation const-slot) :to-be :class)
+      (expect (getf (cl-cc:ast-imports const-slot) :php-class-constant) :to-be-truthy))))
 
-(deftest php-interface-constant-name-is-upcased
-  "Interface constant name is stored as an upcased symbol."
+(it-sequential "php-interface-constant-name-is-upcased"
   (let* ((ast   (first (cl-cc/php:parse-php-source
                         "<?php interface Colors { const RED = 'red'; }")))
          (slot  (first (cl-cc:ast-defclass-slots ast))))
-    (assert-string= "RED" (symbol-name (cl-cc:ast-slot-name slot)))))
+    (expect (symbol-name (cl-cc:ast-slot-name slot)) :to-equal "RED")))
 
-(deftest php-interface-typed-constant
-  "Interface typed constants preserve the type annotation on the slot-def."
+(it-sequential "php-interface-typed-constant"
   (let* ((ast   (first (cl-cc/php:parse-php-source
                         "<?php interface Spec { const int LIMIT = 100; }")))
          (slot  (first (cl-cc:ast-defclass-slots ast))))
-    (assert-true (stringp (cl-cc:ast-slot-type slot)))))
+    (expect (stringp (cl-cc:ast-slot-type slot)) :to-be-truthy)))
 
-(deftest php-interface-multiple-constants-in-one-declaration
-  "Interface const declarations may contain several constants sharing one optional type."
+(it-sequential "php-interface-multiple-constants-in-one-declaration"
   (let* ((ast   (first (cl-cc/php:parse-php-source
                         "<?php interface SpecMulti { const int MIN = 1, MAX = 10; }")))
          (slots (cl-cc:ast-defclass-slots ast))
          (record (gethash (cl-cc/php::php-ident-sym "SpecMulti")
                           cl-cc/php:*php-interface-registry*)))
-    (assert-= 2 (length slots))
-    (assert-equal '("MIN" "MAX")
-                  (mapcar (lambda (slot)
+    (expect (= 2 (length slots)) :to-be-truthy)
+    (expect (mapcar (lambda (slot)
                             (symbol-name (cl-cc:ast-slot-name slot)))
-                          slots))
-    (assert-equal '("int" "int") (mapcar #'cl-cc:ast-slot-type slots))
-    (assert-= 2 (length (getf record :constants)))))
+                          slots) :to-equal '("MIN" "MAX"))
+    (expect (mapcar #'cl-cc:ast-slot-type slots) :to-equal '("int" "int"))
+    (expect (= 2 (length (getf record :constants))) :to-be-truthy)))
 
 ;;; ─── Interface Extends ───────────────────────────────────────────────────────
 
-(deftest php-interface-extends-single-parent
-  "interface B extends A records A as a parent in the superclasses slot."
+(it-sequential "php-interface-extends-single-parent"
   (let* ((asts   (cl-cc/php:parse-php-source
                   "<?php interface A { } interface B extends A { }"))
          (iface-b (second asts))
          (supers  (cl-cc:ast-defclass-superclasses iface-b)))
-    (assert-eq :interface (cl-cc:ast-defclass-php-kind iface-b))
-    (assert-= 1 (length supers))
-    (assert-string= "A" (symbol-name (first supers)))))
+    (expect (cl-cc:ast-defclass-php-kind iface-b) :to-be :interface)
+    (expect (= 1 (length supers)) :to-be-truthy)
+    (expect (symbol-name (first supers)) :to-equal "A")))
 
-(deftest php-interface-extends-multiple-parents
-  "Interfaces may extend multiple parent interfaces (multiple inheritance)."
+(it-sequential "php-interface-extends-multiple-parents"
   (let* ((asts   (cl-cc/php:parse-php-source
                   "<?php interface A { } interface B { } interface C extends A, B { }"))
          (iface-c (third asts))
          (supers  (cl-cc:ast-defclass-superclasses iface-c)))
-    (assert-= 2 (length supers))
-    (assert-true (find "A" supers :key #'symbol-name :test #'string=))
-    (assert-true (find "B" supers :key #'symbol-name :test #'string=))))
+    (expect (= 2 (length supers)) :to-be-truthy)
+    (expect (find "A" supers :key #'symbol-name :test #'string=) :to-be-truthy)
+    (expect (find "B" supers :key #'symbol-name :test #'string=) :to-be-truthy)))
 
 ;;; ─── Class Implements ────────────────────────────────────────────────────────
 
-(deftest php-class-implements-single-interface
-  "class Foo implements Bar records BAR in the superclasses list."
+(it-sequential "php-class-implements-single-interface"
   (let* ((ast   (first (cl-cc/php:parse-php-source
                         "<?php class Foo implements Bar { }")))
          (supers (mapcar #'symbol-name (cl-cc:ast-defclass-superclasses ast))))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (member "BAR" supers :test #'string=))))
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (member "BAR" supers :test #'string=) :to-be-truthy)))
 
-(deftest php-class-implements-multiple-interfaces
-  "class Foo implements A, B records both A and B in superclasses in order."
+(it-sequential "php-class-implements-multiple-interfaces"
   (let* ((ast   (first (cl-cc/php:parse-php-source
                         "<?php class Foo implements IfaceA, IfaceB { }")))
          (names (mapcar #'symbol-name (cl-cc:ast-defclass-superclasses ast))))
-    (assert-equal '("IFACEA" "IFACEB") names)))
+    (expect names :to-equal '("IFACEA" "IFACEB"))))
 
-(deftest php-class-extends-and-implements
-  "class Foo extends Bar implements A, B records all in superclasses: Bar then A, B."
+(it-sequential "php-class-extends-and-implements"
   (let* ((ast    (first (cl-cc/php:parse-php-source
                          "<?php class Box extends Base implements Storable, Countable { }")))
          (supers (mapcar #'symbol-name (cl-cc:ast-defclass-superclasses ast))))
-    (assert-true (member "BASE"       supers :test #'string=))
-    (assert-true (member "STORABLE"   supers :test #'string=))
-    (assert-true (member "COUNTABLE"  supers :test #'string=))))
+    (expect (member "BASE"       supers :test #'string=) :to-be-truthy)
+    (expect (member "STORABLE"   supers :test #'string=) :to-be-truthy)
+    (expect (member "COUNTABLE"  supers :test #'string=) :to-be-truthy)))
 
 (eval-when (:load-toplevel :execute)
   (%run-registered-tests-from-source-file
