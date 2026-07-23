@@ -12,7 +12,7 @@ every test file)."
   :author "takeokunn"
   :license "MIT"
   :version "0.2.0"
-  :depends-on (:cl-cc :cl-cc-php :cl-weave)
+  :depends-on (:cl-cc :cl-weave)
   :pathname "src"
   :serial t
   :components

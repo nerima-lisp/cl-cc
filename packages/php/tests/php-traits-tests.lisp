@@ -1,6 +1,6 @@
 ;;;; packages/php/tests/php-traits-tests.lisp — PHP Trait tests
 ;;;;
-;;;; Coverage for trait declarations and class-use-trait via parse-php-source.
+;;;; Coverage for trait declarations and class-use-trait via cl-cc/php:parse-php-source.
 ;;;; Exercises parser-trait.lisp: trait bodies, use-trait statements,
 ;;;; conflict resolution (insteadof), method aliasing (as), visibility change.
 (in-package :cl-cc/test)

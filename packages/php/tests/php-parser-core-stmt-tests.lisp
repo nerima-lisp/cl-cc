@@ -178,7 +178,7 @@ After php-finish-let-bindings the 3 assignments nest into one top-level let chai
 ;;; ─── Multiple top-level statements ───────────────────────────────────────
 
 (deftest php-parser-multi-statement-source
-  "parse-php-source returns all top-level statements in order."
+  "cl-cc/php:parse-php-source returns all top-level statements in order."
   (let ((asts (cl-cc/php:parse-php-source "<?php echo 1; echo 2; echo 3;")))
     (assert-= 3 (length asts))
     (assert-true (every (lambda (a)

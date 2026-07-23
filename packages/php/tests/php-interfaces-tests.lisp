@@ -1,6 +1,6 @@
 ;;;; packages/php/tests/php-interfaces-tests.lisp — PHP Interface tests
 ;;;;
-;;;; Coverage for interface declarations via parse-php-source.
+;;;; Coverage for interface declarations via cl-cc/php:parse-php-source.
 ;;;; Exercises parser-interface.lisp: definition, single/multiple implements,
 ;;;; interface extends, interface constants, abstract method signatures.
 (in-package :cl-cc/test)

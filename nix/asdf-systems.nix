@@ -297,7 +297,6 @@ let
       src = "packages/testing-framework";
       deps = [
         "cl-cc"
-        "cl-cc-php"
       ];
       extraLispLibs = [ clWeave ];
     };
