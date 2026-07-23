@@ -8,64 +8,64 @@
 ;;; defined in codegen-tests.lisp (same suite, loaded before this file).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-codegen-unit-suite)
 
 ;;; ─── Section 1: GETHASH ─────────────────────────────────────────────────────
 
-(deftest-each codegen-phase2-gethash-cases
-  "gethash: 2-arg form has nil default slot; 3-arg form sets the default register."
-  :cases (("two-args"
-           (list (make-ast-quote :value :k) (make-ast-quote :value :ht))
-           nil)
-          ("three-args"
-           (list (make-ast-quote :value :k) (make-ast-quote :value :ht) (make-ast-int :value 0))
-           t))
-  (args default-set-p)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-phase2-gethash-cases two-args"
+  (destructuring-bind (args default-set-p) (list (list (make-ast-quote :value :k) (make-ast-quote :value :ht)) nil)
+    (let ((ctx (make-codegen-ctx)))
     (let ((reg (compile-ast (make-ast-call :func 'gethash :args args) ctx)))
       (let ((inst (codegen-find-inst ctx 'cl-cc:vm-gethash)))
-        (assert-true inst)
-        (assert-true (keywordp reg))
+        (expect inst :to-be-truthy)
+        (expect (keywordp reg) :to-be-truthy)
         (if default-set-p
-            (assert-true  (cl-cc::vm-gethash-default inst))
-            (assert-true  (null (cl-cc::vm-gethash-default inst))))))))
+            (expect (cl-cc::vm-gethash-default inst) :to-be-truthy)
+            (expect (null (cl-cc::vm-gethash-default inst)) :to-be-truthy)))))))
+
+(it-sequential "codegen-phase2-gethash-cases three-args"
+  (destructuring-bind (args default-set-p) (list (list (make-ast-quote :value :k) (make-ast-quote :value :ht) (make-ast-int :value 0)) t)
+    (let ((ctx (make-codegen-ctx)))
+    (let ((reg (compile-ast (make-ast-call :func 'gethash :args args) ctx)))
+      (let ((inst (codegen-find-inst ctx 'cl-cc:vm-gethash)))
+        (expect inst :to-be-truthy)
+        (expect (keywordp reg) :to-be-truthy)
+        (if default-set-p
+            (expect (cl-cc::vm-gethash-default inst) :to-be-truthy)
+            (expect (null (cl-cc::vm-gethash-default inst)) :to-be-truthy)))))))
 
 
 ;;; ─── Section 2: MAPHASH ─────────────────────────────────────────────────────
 
-(deftest codegen-phase2-maphash-compilation
-  "Compiling (maphash fn ht): emits vm-hash-table-keys, vm-call, and a nil-const for void return."
+(it-sequential "codegen-phase2-maphash-compilation"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'maphash
                                 :args (list (make-ast-quote :value 'my-fn)
                                             (make-ast-quote :value 'my-ht)))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-hash-table-keys))
-    (assert-true (codegen-find-inst ctx 'cl-cc:vm-call))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-hash-table-keys) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc:vm-call) :to-be-truthy)
     (let ((consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const))
                                   (codegen-instructions ctx))))
-      (assert-true (some (lambda (i) (null (cl-cc::vm-const-value i))) consts)))))
+      (expect (some (lambda (i) (null (cl-cc::vm-const-value i))) consts) :to-be-truthy))))
 
 ;;; ─── Section 3: MAKE-ARRAY ──────────────────────────────────────────────────
 
-(deftest codegen-phase2-make-array
-  "Compiling (make-array n): emits vm-make-array; no fill-pointer or adjustable; works with size zero."
+(it-sequential "codegen-phase2-make-array"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-array
                                 :args (list (make-ast-int :value 5)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))
-      (assert-true inst)
-      (assert-true (null (cl-cc::vm-make-array-fill-pointer inst)))
-      (assert-true (null (cl-cc::vm-make-array-adjustable inst)))))
+      (expect inst :to-be-truthy)
+      (expect (null (cl-cc::vm-make-array-fill-pointer inst)) :to-be-truthy)
+      (expect (null (cl-cc::vm-make-array-adjustable inst)) :to-be-truthy)))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-array
                                 :args (list (make-ast-int :value 0)))
                   ctx)
-     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))))
+     (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)))
 
-(deftest codegen-phase2-make-array-element-type
-  "Compiling (make-array n :element-type 'character) stores element-type in vm-make-array."
+(it-sequential "codegen-phase2-make-array-element-type"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-array
                                 :args (list (make-ast-int :value 3)
@@ -73,11 +73,10 @@
                                             (make-ast-quote :value 'character)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))
-      (assert-true inst)
-      (assert-eq 'character (cl-cc/vm::vm-element-type inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc/vm::vm-element-type inst) :to-be 'character))))
 
-(deftest codegen-phase2-make-array-dynamic-keywords-lower
-  "MAKE-ARRAY lowers dynamic keyword metadata into vm-make-array register slots."
+(it-sequential "codegen-phase2-make-array-dynamic-keywords-lower"
   (let ((ctx (make-ctx-with-vars 'init 'fp 'adj 'etype 'base)))
     (compile-ast (make-ast-call :func 'make-array
                                 :args (list (make-ast-int :value 5)
@@ -93,30 +92,30 @@
                                             (make-ast-var :name 'base)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))
-      (assert-true inst)
-      (assert-true (cl-cc/vm::vm-initial-element inst))
-      (assert-true (cl-cc/vm::vm-fill-pointer-reg inst))
-      (assert-true (cl-cc/vm::vm-adjustable-reg inst))
-      (assert-true (cl-cc/vm::vm-element-type-reg inst))
-      (assert-true (cl-cc/vm::vm-displaced-to-reg inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc/vm::vm-initial-element inst) :to-be-truthy)
+      (expect (cl-cc/vm::vm-fill-pointer-reg inst) :to-be-truthy)
+      (expect (cl-cc/vm::vm-adjustable-reg inst) :to-be-truthy)
+      (expect (cl-cc/vm::vm-element-type-reg inst) :to-be-truthy)
+      (expect (cl-cc/vm::vm-displaced-to-reg inst) :to-be-truthy))))
 
-(deftest-each codegen-phase2-make-array-unsupported-keywords-fall-through
-  "MAKE-ARRAY falls through only when the keyword shape cannot be safely lowered."
-  :cases (("unknown-keyword"
-           (list (make-ast-int :value 5)
+(it-sequential "codegen-phase2-make-array-unsupported-keywords-fall-through unknown-keyword"
+  (destructuring-bind (args) (list (list (make-ast-int :value 5)
                  (make-ast-var :name :unknown-option)
                  (make-ast-int :value 1)))
-          ("dynamic-initial-contents"
-           (list (make-ast-int :value 5)
-                 (make-ast-var :name :initial-contents)
-                 (make-ast-var :name 'contents))))
-  (args)
-  (let ((ctx (make-ctx-with-vars 'contents)))
+    (let ((ctx (make-ctx-with-vars 'contents)))
     (compile-ast (make-ast-call :func 'make-array :args args) ctx)
-    (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))))
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)) :to-be-truthy))))
 
-(deftest codegen-phase2-make-array-the-wrapped-initial-contents-lowers
-  "MAKE-ARRAY lowers ast-the-wrapped initial-contents and emits vm-aset for each element."
+(it-sequential "codegen-phase2-make-array-unsupported-keywords-fall-through dynamic-initial-contents"
+  (destructuring-bind (args) (list (list (make-ast-int :value 5)
+                 (make-ast-var :name :initial-contents)
+                 (make-ast-var :name 'contents)))
+    (let ((ctx (make-ctx-with-vars 'contents)))
+    (compile-ast (make-ast-call :func 'make-array :args args) ctx)
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)) :to-be-truthy))))
+
+(it-sequential "codegen-phase2-make-array-the-wrapped-initial-contents-lowers"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-array
                                 :args (list (make-ast-int :value 3)
@@ -125,49 +124,54 @@
                                              :type 'list
                                              :value (make-ast-quote :value '(1 2 3)))))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-= 3 (codegen-count-inst ctx 'cl-cc/vm::vm-aset))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
+    (expect (= 3 (codegen-count-inst ctx 'cl-cc/vm::vm-aset)) :to-be-truthy)))
 
 ;;; ─── Section 4: MAKE-ADJUSTABLE-VECTOR ─────────────────────────────────────
 
-(deftest codegen-phase2-make-adjustable-vector-compilation
-  "Compiling (make-adjustable-vector n): emits vm-make-array with fill-pointer t and adjustable t."
+(it-sequential "codegen-phase2-make-adjustable-vector-compilation"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-adjustable-vector
                                 :args (list (make-ast-int :value 8)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))
-      (assert-true inst)
-      (assert-true (cl-cc::vm-make-array-fill-pointer inst))
-      (assert-true (cl-cc::vm-make-array-adjustable inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-make-array-fill-pointer inst) :to-be-truthy)
+      (expect (cl-cc::vm-make-array-adjustable inst) :to-be-truthy))))
 
 ;;; ─── Section 5: TYPEP ───────────────────────────────────────────────────────
 
-(deftest codegen-phase2-typep-quoted-emits-vm-typep
-  "Compiling (typep x 'integer) emits vm-typep."
+(it-sequential "codegen-phase2-typep-quoted-emits-vm-typep"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'typep
                                 :args (list (make-ast-int :value 42)
                                             (make-ast-quote :value 'integer)))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-typep))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)))
 
-(deftest-each codegen-phase2-typep-type-name-stored
-  "Compiling (typep x 'TYPE) stores TYPE as the type-name in the vm-typep instruction."
-  :cases (("string" 'string)
-          ("list"   'list))
-  (type-sym)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-phase2-typep-type-name-stored string"
+  (destructuring-bind (type-sym) (list 'string)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'typep
                                 :args (list (make-ast-int :value 42)
                                             (make-ast-quote :value type-sym)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))
-      (assert-true inst)
-      (assert-eq type-sym (cl-cc::vm-typep-type-name inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-typep-type-name inst) :to-be type-sym)))))
 
-(deftest codegen-phase2-typep-the-wrapped-quoted-type-emits-vm-typep
-  "Compiling (typep x (the type-specifier 'TYPE)) still emits vm-typep."
+(it-sequential "codegen-phase2-typep-type-name-stored list"
+  (destructuring-bind (type-sym) (list 'list)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'typep
+                                :args (list (make-ast-int :value 42)
+                                            (make-ast-quote :value type-sym)))
+                 ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-typep-type-name inst) :to-be type-sym)))))
+
+(it-sequential "codegen-phase2-typep-the-wrapped-quoted-type-emits-vm-typep"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'typep
                                 :args (list (make-ast-int :value 42)
@@ -176,23 +180,21 @@
                                              :value (make-ast-quote :value 'string))))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))
-      (assert-true inst)
-      (assert-eq 'string (cl-cc::vm-typep-type-name inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-typep-type-name inst) :to-be 'string))))
 
-(deftest codegen-phase2-typep-unquoted-falls-through
-  "Compiling (typep x integer) with unquoted type does not emit vm-typep."
+(it-sequential "codegen-phase2-typep-unquoted-falls-through"
   (let ((ctx (make-codegen-ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'integer :R99)))
     (compile-ast (make-ast-call :func 'typep
                                 :args (list (make-ast-int :value 1)
                                             (make-ast-var :name 'integer)))
                  ctx)
-    (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))))
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-typep)) :to-be-truthy)))
 
 ;;; ─── Section 6: RT-SLOT-SET / MAKE-STRING / SET-FDEFINITION ───────────────
 
-(deftest codegen-phase2-rt-slot-set-the-wrapped-slot-name-lowers
-  "RT-SLOT-SET lowers ast-the-wrapped quoted slot names to vm-slot-write."
+(it-sequential "codegen-phase2-rt-slot-set-the-wrapped-slot-name-lowers"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'rt-slot-set
                                 :args (list (make-ast-int :value 0)
@@ -202,11 +204,10 @@
                                             (make-ast-int :value 99)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write)))
-      (assert-true inst)
-      (assert-eq 'slot-name (cl-cc::vm-slot-name-sym inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-slot-name-sym inst) :to-be 'slot-name))))
 
-(deftest codegen-phase2-make-string-the-wrapped-initial-element-lowers
-  "Compiling (make-string n :initial-element (the character #\\x)) still emits vm-make-string with a char slot."
+(it-sequential "codegen-phase2-make-string-the-wrapped-initial-element-lowers"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-string
                                 :args (list (make-ast-int :value 5)
@@ -216,11 +217,10 @@
                                              :value (make-ast-quote :value #\x))))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-string)))
-      (assert-true inst)
-      (assert-true (cl-cc::vm-make-string-char inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-make-string-char inst) :to-be-truthy))))
 
-(deftest codegen-phase2-set-fdefinition-the-wrapped-symbol-registers-function
-  "SET-FDEFINITION treats ast-the-wrapped quoted symbols as static function names."
+(it-sequential "codegen-phase2-set-fdefinition-the-wrapped-symbol-registers-function"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'set-fdefinition
                                 :args (list (make-ast-function :name 'helper)
@@ -229,57 +229,87 @@
                                              :value (make-ast-quote :value 'helper))))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-register-function)))
-      (assert-true inst)
-      (assert-eq 'helper (cl-cc::vm-func-name inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-func-name inst) :to-be 'helper))))
 
 ;;; ─── Section 6: FORMAT ──────────────────────────────────────────────────────
 
-(deftest-each codegen-phase2-format-dispatch
-  "format: nil-dest folds to vm-const; t-dest emits vm-princ; 1-arg falls through."
-  :cases (("nil-dest"
-           (list (make-ast-var :name nil) (make-ast-quote :value "hello"))
-           :nil-dest)
-          ("t-dest"
-           (list (make-ast-var :name t) (make-ast-quote :value "hello"))
-           :t-dest)
-          ("one-arg"
-           (list (make-ast-var :name nil))
-           :one-arg))
-  (args scenario)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-phase2-format-dispatch nil-dest"
+  (destructuring-bind (args scenario) (list (list (make-ast-var :name nil) (make-ast-quote :value "hello")) :nil-dest)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'format :args args) ctx)
     (ecase scenario
       (:nil-dest
        (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-         (assert-true inst)
-         (assert-equal "hello" (cl-cc::vm-const-value inst))
-         (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)))
-         (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-princ)))))
+         (expect inst :to-be-truthy)
+         (expect (cl-cc::vm-const-value inst) :to-equal "hello")
+         (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy)
+         (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-princ)) :to-be-truthy)))
       (:t-dest
-       (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-princ))
-       (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst))))
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-princ) :to-be-truthy)
+       (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy))
       (:one-arg
-       (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)))))))
+       (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy))))))
+
+(it-sequential "codegen-phase2-format-dispatch t-dest"
+  (destructuring-bind (args scenario) (list (list (make-ast-var :name t) (make-ast-quote :value "hello")) :t-dest)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'format :args args) ctx)
+    (ecase scenario
+      (:nil-dest
+       (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+         (expect inst :to-be-truthy)
+         (expect (cl-cc::vm-const-value inst) :to-equal "hello")
+         (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy)
+         (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-princ)) :to-be-truthy)))
+      (:t-dest
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-princ) :to-be-truthy)
+       (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy))
+      (:one-arg
+       (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy))))))
+
+(it-sequential "codegen-phase2-format-dispatch one-arg"
+  (destructuring-bind (args scenario) (list (list (make-ast-var :name nil)) :one-arg)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'format :args args) ctx)
+    (ecase scenario
+      (:nil-dest
+       (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+         (expect inst :to-be-truthy)
+         (expect (cl-cc::vm-const-value inst) :to-equal "hello")
+         (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy)
+         (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-princ)) :to-be-truthy)))
+      (:t-dest
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-princ) :to-be-truthy)
+       (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy))
+      (:one-arg
+       (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-format-inst)) :to-be-truthy))))))
 
 ;;; ─── Section 7: MAKE-HASH-TABLE ─────────────────────────────────────────────
 
-(deftest-each codegen-phase2-make-hash-table-cases
-  "make-hash-table: no-args has nil test slot; :test 'equal sets the test register."
-  :cases (("no-args"    '()  nil)
-          ("test-equal" (list (make-ast-var :name :test) (make-ast-quote :value 'equal)) t))
-  (args test-set-p)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-phase2-make-hash-table-cases no-args"
+  (destructuring-bind (args test-set-p) (list '() nil)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'make-hash-table :args args) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table)))
-      (assert-true inst)
+      (expect inst :to-be-truthy)
       (if test-set-p
-          (assert-true  (cl-cc::vm-make-hash-table-test inst))
-          (assert-true  (null (cl-cc::vm-make-hash-table-test inst)))))))
+          (expect (cl-cc::vm-make-hash-table-test inst) :to-be-truthy)
+          (expect (null (cl-cc::vm-make-hash-table-test inst)) :to-be-truthy))))))
+
+(it-sequential "codegen-phase2-make-hash-table-cases test-equal"
+  (destructuring-bind (args test-set-p) (list (list (make-ast-var :name :test) (make-ast-quote :value 'equal)) t)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func 'make-hash-table :args args) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table)))
+      (expect inst :to-be-truthy)
+      (if test-set-p
+          (expect (cl-cc::vm-make-hash-table-test inst) :to-be-truthy)
+          (expect (null (cl-cc::vm-make-hash-table-test inst)) :to-be-truthy))))))
 
 ;;; ─── Section 8: CONCATENATE ─────────────────────────────────────────────────
 
-(deftest codegen-phase2-concatenate-constant-strings-fold-to-vm-const
-  "Compiling (concatenate 'string foo bar) folds to a single vm-const."
+(it-sequential "codegen-phase2-concatenate-constant-strings-fold-to-vm-const"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'concatenate
                                 :args (list (make-ast-quote :value 'string)
@@ -287,12 +317,11 @@
                                             (make-ast-quote :value "bar")))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-      (assert-true inst)
-      (assert-equal "foobar" (cl-cc::vm-const-value inst))
-      (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate))))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal "foobar")
+      (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate)) :to-be-truthy))))
 
-(deftest codegen-phase2-concatenate-three-strings-emits-two-concats
-  "Compiling (concatenate 'string a b c) folds the chain with two vm-concatenate instructions."
+(it-sequential "codegen-phase2-concatenate-three-strings-emits-two-concats"
   (let ((ctx (make-ctx-with-vars 'a 'b 'c)))
     (compile-ast (make-ast-call :func 'concatenate
                                 :args (list (make-ast-quote :value 'string)
@@ -300,23 +329,24 @@
                                             (make-ast-var :name 'b)
                                             (make-ast-var :name 'c)))
                  ctx)
-    (assert-eql 2 (codegen-count-inst ctx 'cl-cc/vm::vm-concatenate))))
+    (expect (codegen-count-inst ctx 'cl-cc/vm::vm-concatenate) :to-be 2)))
 
-(deftest-each codegen-phase2-concatenate-non-string-falls-through
-  "Compiling (concatenate TYPE ...) with non-string or unquoted type does NOT emit vm-concatenate."
-  :cases (("non-string-type"
-           nil
-           (list (make-ast-quote :value 'list)
+(it-sequential "codegen-phase2-concatenate-non-string-falls-through non-string-type"
+  (destructuring-bind (extra-env args) (list nil (list (make-ast-quote :value 'list)
                  (make-ast-quote :value "a")
                  (make-ast-quote :value "b")))
-          ("unquoted-type"
-           (list (cons 'string :R99))
-           (list (make-ast-var :name 'string)
-                 (make-ast-quote :value "a")
-                 (make-ast-quote :value "b"))))
-  (extra-env args)
-  (let ((ctx (make-codegen-ctx)))
+    (let ((ctx (make-codegen-ctx)))
     (when extra-env
       (setf (cl-cc/compile:ctx-env ctx) extra-env))
     (compile-ast (make-ast-call :func 'concatenate :args args) ctx)
-    (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate)))))
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate)) :to-be-truthy))))
+
+(it-sequential "codegen-phase2-concatenate-non-string-falls-through unquoted-type"
+  (destructuring-bind (extra-env args) (list (list (cons 'string :R99)) (list (make-ast-var :name 'string)
+                 (make-ast-quote :value "a")
+                 (make-ast-quote :value "b")))
+    (let ((ctx (make-codegen-ctx)))
+    (when extra-env
+      (setf (cl-cc/compile:ctx-env ctx) extra-env))
+    (compile-ast (make-ast-call :func 'concatenate :args args) ctx)
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate)) :to-be-truthy))))

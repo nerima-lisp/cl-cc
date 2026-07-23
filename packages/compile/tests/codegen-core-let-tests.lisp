@@ -8,147 +8,146 @@
 ;;;;   %ast-let-sink-if-candidate.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── %ast-let-binding-ignored-p ───────────────────────────────────────────
 
-(deftest-each ast-let-binding-ignored-p
-  "%ast-let-binding-ignored-p: true only for ignore declarations on the same name."
-  :cases (("ignore"     t   'x '((ignore x)))
-          ("ignorable"  nil 'x '((ignorable x)))
-          ("wrong-name" nil 'x '((ignore y)))
-          ("empty"      nil 'x nil))
-  (expected name decls)
-  (assert-bool expected (cl-cc/compile::%ast-let-binding-ignored-p name decls)))
+(it-sequential "ast-let-binding-ignored-p ignore"
+  (destructuring-bind (expected name decls) (list t 'x '((ignore x)))
+    (assert-bool expected (cl-cc/compile::%ast-let-binding-ignored-p name decls))))
+
+(it-sequential "ast-let-binding-ignored-p ignorable"
+  (destructuring-bind (expected name decls) (list nil 'x '((ignorable x)))
+    (assert-bool expected (cl-cc/compile::%ast-let-binding-ignored-p name decls))))
+
+(it-sequential "ast-let-binding-ignored-p wrong-name"
+  (destructuring-bind (expected name decls) (list nil 'x '((ignore y)))
+    (assert-bool expected (cl-cc/compile::%ast-let-binding-ignored-p name decls))))
+
+(it-sequential "ast-let-binding-ignored-p empty"
+  (destructuring-bind (expected name decls) (list nil 'x nil)
+    (assert-bool expected (cl-cc/compile::%ast-let-binding-ignored-p name decls))))
 
 ;;; ─── %ast-cons-call-p ─────────────────────────────────────────────────────
 
-(deftest-each ast-cons-call-p
-  "%ast-cons-call-p: true for 2-arg cons calls; false for wrong arity, non-cons, or non-call."
-  :cases (("symbol-func"  (cl-cc/ast:make-ast-call :func 'cons
-                            :args (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2)))
-                          t)
-          ("var-func"     (cl-cc/ast:make-ast-call :func (cl-cc/ast:make-ast-var :name 'cons)
-                            :args (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2)))
-                          t)
-          ("wrong-arity"  (cl-cc/ast:make-ast-call :func 'cons
-                            :args (list (cl-cc/ast:make-ast-int :value 1)))
-                          nil)
-          ("non-cons"     (cl-cc/ast:make-ast-call :func 'list
-                            :args (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2)))
-                          nil)
-          ("non-call"     (cl-cc/ast:make-ast-int :value 5)
-                          nil))
-  (node expected)
-  (assert-bool expected (cl-cc/compile::%ast-cons-call-p node)))
+(it-sequential "ast-cons-call-p symbol-func"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'cons
+                            :args (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2))) t)
+    (assert-bool expected (cl-cc/compile::%ast-cons-call-p node))))
+
+(it-sequential "ast-cons-call-p var-func"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func (cl-cc/ast:make-ast-var :name 'cons)
+                            :args (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2))) t)
+    (assert-bool expected (cl-cc/compile::%ast-cons-call-p node))))
+
+(it-sequential "ast-cons-call-p wrong-arity"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'cons
+                            :args (list (cl-cc/ast:make-ast-int :value 1))) nil)
+    (assert-bool expected (cl-cc/compile::%ast-cons-call-p node))))
+
+(it-sequential "ast-cons-call-p non-cons"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'list
+                            :args (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2))) nil)
+    (assert-bool expected (cl-cc/compile::%ast-cons-call-p node))))
+
+(it-sequential "ast-cons-call-p non-call"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-int :value 5) nil)
+    (assert-bool expected (cl-cc/compile::%ast-cons-call-p node))))
 
 ;;; ─── %ast-make-array-call-p / %ast-make-array-int-call-p ─────────────────
 
-(deftest-each ast-make-array-call-p
-  "%ast-make-array-call-p: true for 1-arg make-array calls; false for wrong arity."
-  :cases (("symbol-func"  (cl-cc/ast:make-ast-call :func 'make-array
-                            :args (list (cl-cc/ast:make-ast-int :value 10)))
-                          t)
-          ("wrong-arity"  (cl-cc/ast:make-ast-call :func 'make-array
-                            :args (list (cl-cc/ast:make-ast-int :value 10)
-                                        (cl-cc/ast:make-ast-int :value 5)))
-                          nil))
-  (node expected)
-  (assert-bool expected (cl-cc/compile::%ast-make-array-call-p node)))
+(it-sequential "ast-make-array-call-p symbol-func"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'make-array
+                            :args (list (cl-cc/ast:make-ast-int :value 10))) t)
+    (assert-bool expected (cl-cc/compile::%ast-make-array-call-p node))))
 
-(deftest-each ast-make-array-int-call-p
-  "%ast-make-array-int-call-p: true when size is ast-int; false when size is a variable."
-  :cases (("literal-size"  (cl-cc/ast:make-ast-call :func 'make-array
-                             :args (list (cl-cc/ast:make-ast-int :value 5)))
-                           t)
-          ("var-size"      (cl-cc/ast:make-ast-call :func 'make-array
-                             :args (list (cl-cc/ast:make-ast-var :name 'n)))
-                           nil))
-  (node expected)
-  (assert-bool expected (cl-cc/compile::%ast-make-array-int-call-p node)))
+(it-sequential "ast-make-array-call-p wrong-arity"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'make-array
+                            :args (list (cl-cc/ast:make-ast-int :value 10)
+                                        (cl-cc/ast:make-ast-int :value 5))) nil)
+    (assert-bool expected (cl-cc/compile::%ast-make-array-call-p node))))
+
+(it-sequential "ast-make-array-int-call-p literal-size"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'make-array
+                             :args (list (cl-cc/ast:make-ast-int :value 5))) t)
+    (assert-bool expected (cl-cc/compile::%ast-make-array-int-call-p node))))
+
+(it-sequential "ast-make-array-int-call-p var-size"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-call :func 'make-array
+                             :args (list (cl-cc/ast:make-ast-var :name 'n))) nil)
+    (assert-bool expected (cl-cc/compile::%ast-make-array-int-call-p node))))
 
 ;;; ─── %binding-mentioned-in-body-p ─────────────────────────────────────────
 
-(deftest-each binding-mentioned-in-body-p
-  "%binding-mentioned-in-body-p: true when var referenced; false for empty body or different var."
-  :cases (("var-in-body"    (list (cl-cc/ast:make-ast-var :name 'x))  'x  t)
-          ("empty-body"     nil                                     'x  nil)
-          ("different-var"  (list (cl-cc/ast:make-ast-var :name 'y))  'x  nil))
-  (body name expected)
-  (assert-bool expected (cl-cc/compile::%binding-mentioned-in-body-p body name)))
+(it-sequential "binding-mentioned-in-body-p var-in-body"
+  (destructuring-bind (body name expected) (list (list (cl-cc/ast:make-ast-var :name 'x)) 'x t)
+    (assert-bool expected (cl-cc/compile::%binding-mentioned-in-body-p body name))))
+
+(it-sequential "binding-mentioned-in-body-p empty-body"
+  (destructuring-bind (body name expected) (list nil 'x nil)
+    (assert-bool expected (cl-cc/compile::%binding-mentioned-in-body-p body name))))
+
+(it-sequential "binding-mentioned-in-body-p different-var"
+  (destructuring-bind (body name expected) (list (list (cl-cc/ast:make-ast-var :name 'y)) 'x nil)
+    (assert-bool expected (cl-cc/compile::%binding-mentioned-in-body-p body name))))
 
 ;;; ─── %ast-lambda-bound-names ──────────────────────────────────────────────
 
-(deftest ast-lambda-bound-names-required-params
-  "%ast-lambda-bound-names includes required params."
+(it-sequential "ast-lambda-bound-names-required-params"
   (let ((node (cl-cc/ast:make-ast-lambda
                :params '(a b c)
                :body nil)))
-    (assert-equal '(a b c) (cl-cc/compile::%ast-lambda-bound-names node))))
+    (expect (cl-cc/compile::%ast-lambda-bound-names node) :to-equal '(a b c))))
 
-(deftest ast-lambda-bound-names-includes-rest-param
-  "%ast-lambda-bound-names includes the &rest parameter."
+(it-sequential "ast-lambda-bound-names-includes-rest-param"
   (let ((node (cl-cc/ast:make-ast-lambda
                :params '(x)
                :rest-param 'rest
                :body nil)))
     (let ((names (cl-cc/compile::%ast-lambda-bound-names node)))
-      (assert-true (member 'x names))
-      (assert-true (member 'rest names)))))
+      (expect (member 'x names) :to-be-truthy)
+      (expect (member 'rest names) :to-be-truthy))))
 
-(deftest ast-lambda-bound-names-includes-optional-params
-  "%ast-lambda-bound-names includes &optional parameter names."
+(it-sequential "ast-lambda-bound-names-includes-optional-params"
   (let ((node (cl-cc/ast:make-ast-lambda
                :params nil
                :optional-params (list (list 'a (cl-cc/ast:make-ast-int :value 0)))
                :body nil)))
-    (assert-true (member 'a (cl-cc/compile::%ast-lambda-bound-names node)))))
+    (expect (member 'a (cl-cc/compile::%ast-lambda-bound-names node)) :to-be-truthy)))
 
 ;;; ─── %ast-as-body-forms ───────────────────────────────────────────────────
 
-(deftest ast-as-body-forms-unwraps-progn
-  "%ast-as-body-forms returns the forms list from an ast-progn node."
+(it-sequential "ast-as-body-forms-unwraps-progn"
   (let* ((f1 (cl-cc/ast:make-ast-int :value 1))
          (f2 (cl-cc/ast:make-ast-int :value 2))
          (node (cl-cc/ast:make-ast-progn :forms (list f1 f2))))
-    (assert-equal (list f1 f2) (cl-cc/compile::%ast-as-body-forms node))))
+    (expect (cl-cc/compile::%ast-as-body-forms node) :to-equal (list f1 f2))))
 
-(deftest ast-as-body-forms-wraps-non-progn-in-list
-  "%ast-as-body-forms wraps a non-progn node in a singleton list."
+(it-sequential "ast-as-body-forms-wraps-non-progn-in-list"
   (let ((node (cl-cc/ast:make-ast-int :value 42)))
-    (assert-equal (list node) (cl-cc/compile::%ast-as-body-forms node))))
+    (expect (cl-cc/compile::%ast-as-body-forms node) :to-equal (list node))))
 
 ;;; ─── %ast-wrap-bindings ───────────────────────────────────────────────────
 
-(deftest ast-wrap-bindings-no-bindings-single-body-returns-form
-  "%ast-wrap-bindings with no bindings and one body form returns the form directly."
+(it-sequential "ast-wrap-bindings-no-bindings-single-body-returns-form"
   (let ((f (cl-cc/ast:make-ast-int :value 7)))
-    (assert-eq f (cl-cc/compile::%ast-wrap-bindings nil (list f)))))
+    (expect (cl-cc/compile::%ast-wrap-bindings nil (list f)) :to-be f)))
 
-(deftest ast-wrap-bindings-no-bindings-multi-body-returns-progn
-  "%ast-wrap-bindings with no bindings and multiple body forms returns ast-progn."
+(it-sequential "ast-wrap-bindings-no-bindings-multi-body-returns-progn"
   (let ((result (cl-cc/compile::%ast-wrap-bindings
                  nil
                  (list (cl-cc/ast:make-ast-int :value 1)
                        (cl-cc/ast:make-ast-int :value 2)))))
-    (assert-true (typep result 'cl-cc::ast-progn))))
+    (expect (typep result 'cl-cc::ast-progn) :to-be-truthy)))
 
-(deftest ast-wrap-bindings-with-bindings-returns-ast-let
-  "%ast-wrap-bindings with bindings returns an ast-let node."
+(it-sequential "ast-wrap-bindings-with-bindings-returns-ast-let"
   (let ((result (cl-cc/compile::%ast-wrap-bindings
                  (list (cons 'x (cl-cc/ast:make-ast-int :value 1)))
                  (list (cl-cc/ast:make-ast-var :name 'x)))))
-    (assert-true (typep result 'cl-cc::ast-let))))
+    (expect (typep result 'cl-cc::ast-let) :to-be-truthy)))
 
 ;;; ─── %ast-let-sink-if-candidate ───────────────────────────────────────────
 
-(deftest sink-if-candidate-detected-for-single-binding-single-if-body
-  "%ast-let-sink-if-candidate returns non-nil for a let binding a make-array
-expression used only in one branch of an IF body. The sink-if optimizer only
-targets allocating expressions (make-array, make-instance, cons); plain
-integer bindings aren't candidates."
-  ;; (let ((arr (make-array 3))) (if cond (aref arr 0) 0))
-  ;; arr is used only in then-branch → sink into then
+(it-sequential "sink-if-candidate-detected-for-single-binding-single-if-body"
   (let* ((node (cl-cc/ast:make-ast-let
                 :bindings (list (cons 'arr (cl-cc/ast:make-ast-call
                                             :func 'make-array
@@ -161,25 +160,40 @@ integer bindings aren't candidates."
                                                 (cl-cc/ast:make-ast-int :value 0)))
                              :else (cl-cc/ast:make-ast-int :value 0)))))
          (result (cl-cc/compile::%ast-let-sink-if-candidate node)))
-    (assert-true result)))
+    (expect result :to-be-truthy)))
 
-(deftest sink-if-candidate-nil-for-non-if-body
-  "%ast-let-sink-if-candidate returns nil when body is not an IF."
+(it-sequential "sink-if-candidate-nil-for-non-if-body"
   (let ((node (cl-cc/ast:make-ast-let
                :bindings (list (cons 'x (cl-cc/ast:make-ast-int :value 1)))
                :body (list (cl-cc/ast:make-ast-var :name 'x)))))
-    (assert-null (cl-cc/compile::%ast-let-sink-if-candidate node))))
+    (expect (cl-cc/compile::%ast-let-sink-if-candidate node) :to-be-null)))
 
 ;;; ─── %let-binding-special-p (from codegen-core-let-emit.lisp) ───────────────
 
-(deftest-each let-binding-special-p
-  "%let-binding-special-p: true only for registered *earmuff* globals; false otherwise."
-  :cases (("earmuff-global"      '*x*  '*x*  t)    ; registered *earmuff* → true
-          ("plain-symbol"        'x    'x    nil)   ; no earmuffs → false
-          ("earmuff-unregistered" '*x* nil   nil)   ; earmuffs but not registered → false
-          ("single-star"         '*    '*    nil))  ; * alone fails earmuff check → false
-  (sym register-sym expected)
-  (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
+(it-sequential "let-binding-special-p earmuff-global"
+  (destructuring-bind (sym register-sym expected) (list '*x* '*x* t)
+    (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     (when register-sym
       (setf (gethash register-sym (cl-cc/compile:ctx-global-variables ctx)) t))
-    (assert-bool expected (cl-cc/compile::%let-binding-special-p sym ctx))))
+    (assert-bool expected (cl-cc/compile::%let-binding-special-p sym ctx)))))
+
+(it-sequential "let-binding-special-p plain-symbol"
+  (destructuring-bind (sym register-sym expected) (list 'x 'x nil)
+    (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
+    (when register-sym
+      (setf (gethash register-sym (cl-cc/compile:ctx-global-variables ctx)) t))
+    (assert-bool expected (cl-cc/compile::%let-binding-special-p sym ctx)))))
+
+(it-sequential "let-binding-special-p earmuff-unregistered"
+  (destructuring-bind (sym register-sym expected) (list '*x* nil nil)
+    (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
+    (when register-sym
+      (setf (gethash register-sym (cl-cc/compile:ctx-global-variables ctx)) t))
+    (assert-bool expected (cl-cc/compile::%let-binding-special-p sym ctx)))))
+
+(it-sequential "let-binding-special-p single-star"
+  (destructuring-bind (sym register-sym expected) (list '* '* nil)
+    (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
+    (when register-sym
+      (setf (gethash register-sym (cl-cc/compile:ctx-global-variables ctx)) t))
+    (assert-bool expected (cl-cc/compile::%let-binding-special-p sym ctx)))))

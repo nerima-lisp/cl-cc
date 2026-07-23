@@ -9,7 +9,6 @@
 ;; Cons Cell Properties (VM uses native Lisp cons cells)
 ;; ----------------------------------------------------------------------------
 
-(in-suite cl-cc-pbt-suite)
 
 (defproperty cons-creates-pair
     (car-val (gen-integer :min -1000 :max 1000)

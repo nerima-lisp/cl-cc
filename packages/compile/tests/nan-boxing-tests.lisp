@@ -5,50 +5,43 @@
 ;;;;   boundary cases (48-bit payload mask), tag discrimination.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
-(deftest nan-box-fixnum-round-trips-zero
-  "nan-box-fixnum on 0 encodes the fixnum tag and a zero payload."
+(it-sequential "nan-box-fixnum-round-trips-zero"
   (multiple-value-bind (tag payload)
       (cl-cc/compile::nan-box-unbox (cl-cc/compile::nan-box-fixnum 0))
-    (assert-= cl-cc/compile::+nan-box-tag-fixnum+ tag)
-    (assert-= 0 payload)))
+    (expect (= cl-cc/compile::+nan-box-tag-fixnum+ tag) :to-be-truthy)
+    (expect (= 0 payload) :to-be-truthy)))
 
-(deftest nan-box-fixnum-round-trips-positive
-  "nan-box-fixnum on 42 recovers tag=fixnum and payload=42."
+(it-sequential "nan-box-fixnum-round-trips-positive"
   (multiple-value-bind (tag payload)
       (cl-cc/compile::nan-box-unbox (cl-cc/compile::nan-box-fixnum 42))
-    (assert-= cl-cc/compile::+nan-box-tag-fixnum+ tag)
-    (assert-= 42 payload)))
+    (expect (= cl-cc/compile::+nan-box-tag-fixnum+ tag) :to-be-truthy)
+    (expect (= 42 payload) :to-be-truthy)))
 
-(deftest nan-box-pointer-embeds-ptr-tag
-  "nan-box-pointer encodes the pointer tag and preserves the low 48-bit address."
+(it-sequential "nan-box-pointer-embeds-ptr-tag"
   (let ((ptr #x1234567890AB))
     (multiple-value-bind (tag payload)
         (cl-cc/compile::nan-box-unbox (cl-cc/compile::nan-box-pointer ptr))
-      (assert-= cl-cc/compile::+nan-box-tag-ptr+ tag)
-      (assert-= ptr payload))))
+      (expect (= cl-cc/compile::+nan-box-tag-ptr+ tag) :to-be-truthy)
+      (expect (= ptr payload) :to-be-truthy))))
 
-(deftest nan-box-float-preserves-ieee754-bits
-  "nan-box-float on 1.0d0 returns the IEEE 754 bit pattern for 1.0."
+(it-sequential "nan-box-float-preserves-ieee754-bits"
   (let ((boxed (cl-cc/compile::nan-box-float 1.0d0)))
-    (assert-= #x3FF0000000000000 boxed)))
+    (expect (= #x3FF0000000000000 boxed) :to-be-truthy)))
 
-(deftest nan-box-fixnum-payload-masked-to-48-bits
-  "nan-box-fixnum masks the payload to 48 bits, discarding higher bits."
+(it-sequential "nan-box-fixnum-payload-masked-to-48-bits"
   (let* ((big-val (+ #xFFFFFFFFFFFF 1))
          (boxed (cl-cc/compile::nan-box-fixnum big-val)))
     (multiple-value-bind (tag payload)
         (cl-cc/compile::nan-box-unbox boxed)
-      (assert-= cl-cc/compile::+nan-box-tag-fixnum+ tag)
-      (assert-= (logand big-val #xFFFFFFFFFFFF) payload))))
+      (expect (= cl-cc/compile::+nan-box-tag-fixnum+ tag) :to-be-truthy)
+      (expect (= (logand big-val #xFFFFFFFFFFFF) payload) :to-be-truthy))))
 
-(deftest nan-box-unbox-distinguishes-fixnum-from-pointer
-  "nan-box-unbox returns different tags for fixnum vs pointer encodings."
+(it-sequential "nan-box-unbox-distinguishes-fixnum-from-pointer"
   (multiple-value-bind (fixnum-tag ignore-f)
       (cl-cc/compile::nan-box-unbox (cl-cc/compile::nan-box-fixnum 1))
     (declare (ignore ignore-f))
     (multiple-value-bind (ptr-tag ignore-p)
         (cl-cc/compile::nan-box-unbox (cl-cc/compile::nan-box-pointer 1))
       (declare (ignore ignore-p))
-      (assert-false (= fixnum-tag ptr-tag)))))
+      (expect (= fixnum-tag ptr-tag) :to-be-falsy))))

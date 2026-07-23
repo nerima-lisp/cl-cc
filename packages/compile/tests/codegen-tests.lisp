@@ -6,16 +6,8 @@
 
 (in-package :cl-cc/test)
 
-(defsuite cl-cc-codegen-unit-suite
-  :description "Parallel codegen unit tests (pure ctx-scoped, no global mutation)"
-  :parent cl-cc-unit-suite)
 
-(defsuite cl-cc-codegen-unit-serial-suite
-  :description "Serial codegen tests requiring global function replacement"
-  :parent cl-cc-unit-suite
-  :parallel nil)
 
-(in-suite cl-cc-codegen-unit-suite)
 
 ;;; ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -51,88 +43,138 @@ stable, isolated context."
 
 ;;; ─── compile-ast: ast-int ───────────────────────────────────────────────
 
-(deftest codegen-integer-literal-returns-keyword-register
-  "compile-ast of an ast-int returns a keyword-named register."
+(it-sequential "codegen-integer-literal-returns-keyword-register"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-int :value 42) ctx)))
-    (assert-true (keywordp reg))))
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest codegen-local-var-returns-bound-register
-  "compile-ast of an ast-var with a bound name returns the associated register."
+(it-sequential "codegen-local-var-returns-bound-register"
   (let* ((ctx (make-codegen-ctx))
          (reg :R99))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x reg)))
     (let ((result (compile-ast (make-ast-var :name 'x) ctx)))
-      (assert-eq reg result))))
+      (expect result :to-be reg))))
 
-(deftest codegen-unbound-var-signals-error
-  "compile-ast of an ast-var for an unbound name signals an error."
+(it-sequential "codegen-unbound-var-signals-error"
   (let ((ctx (make-codegen-ctx)))
-    (assert-signals error
-      (compile-ast (make-ast-var :name 'nonexistent-var-xyz) ctx))))
+    (signals error (compile-ast (make-ast-var :name 'nonexistent-var-xyz) ctx))))
 
-(deftest-each codegen-int-emits-const-value
-  "Compiling an integer literal emits vm-const with the correct value."
-  :cases (("positive"  42)
-          ("zero"       0)
-          ("negative"  -1))
-  (n)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-int-emits-const-value positive"
+  (destructuring-bind (n) (list 42)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-int :value n) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-      (assert-true inst)
-      (assert-= n (cl-cc::vm-const-value inst)))))
+      (expect inst :to-be-truthy)
+      (expect (= n (cl-cc::vm-const-value inst)) :to-be-truthy)))))
+
+(it-sequential "codegen-int-emits-const-value zero"
+  (destructuring-bind (n) (list 0)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-int :value n) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (= n (cl-cc::vm-const-value inst)) :to-be-truthy)))))
+
+(it-sequential "codegen-int-emits-const-value negative"
+  (destructuring-bind (n) (list -1)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-int :value n) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (= n (cl-cc::vm-const-value inst)) :to-be-truthy)))))
 
 ;;; ─── compile-ast: ast-var ───────────────────────────────────────────────
 
-(deftest-each codegen-var-constant-emits-const
-  "Compiling T, NIL, or a keyword emits vm-const with that exact value."
-  :cases (("t"       t)
-          ("nil"     nil)
-          ("keyword" :foo))
-  (name)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-var-constant-emits-const t"
+  (destructuring-bind (name) (list t)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-var :name name) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-      (assert-true inst)
-      (assert-equal name (cl-cc::vm-const-value inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal name)))))
+
+(it-sequential "codegen-var-constant-emits-const nil"
+  (destructuring-bind (name) (list nil)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-var :name name) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal name)))))
+
+(it-sequential "codegen-var-constant-emits-const keyword"
+  (destructuring-bind (name) (list :foo)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-var :name name) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal name)))))
 
 
 ;;; ─── compile-ast: ast-quote ─────────────────────────────────────────────
 
-(deftest-each codegen-quote-forms-emit-const-value
-  "Compiling a quoted form emits vm-const with the exact value for all literal types."
-  :cases (("symbol"    'hello)
-          ("list"      '(1 2 3))
-          ("nil"       nil)
-          ("string"    "hello")
-          ("empty-str" "")
-          ("char"      #\a))
-  (datum)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-quote-forms-emit-const-value symbol"
+  (destructuring-bind (datum) (list 'hello)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-      (assert-true inst)
-      (assert-equal datum (cl-cc::vm-const-value inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
-(deftest codegen-string-literal-pool-deduplicates-string-equal-values
-  "Identical string literals share one pooled vm-const register within a compilation unit."
+(it-sequential "codegen-quote-forms-emit-const-value list"
+  (destructuring-bind (datum) (list '(1 2 3))
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-quote :value datum) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
+
+(it-sequential "codegen-quote-forms-emit-const-value nil"
+  (destructuring-bind (datum) (list nil)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-quote :value datum) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
+
+(it-sequential "codegen-quote-forms-emit-const-value string"
+  (destructuring-bind (datum) (list "hello")
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-quote :value datum) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
+
+(it-sequential "codegen-quote-forms-emit-const-value empty-str"
+  (destructuring-bind (datum) (list "")
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-quote :value datum) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
+
+(it-sequential "codegen-quote-forms-emit-const-value char"
+  (destructuring-bind (datum) (list #\a)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-quote :value datum) ctx)
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
+
+(it-sequential "codegen-string-literal-pool-deduplicates-string-equal-values"
   (let ((ctx (make-codegen-ctx))
         (first-literal (copy-seq "shared"))
         (second-literal (copy-seq "shared")))
     (let ((cl-cc/compile:*string-literal-pool* (make-hash-table :test #'equal)))
       (let ((first-reg (compile-ast (make-ast-quote :value first-literal) ctx))
             (second-reg (compile-ast (make-ast-quote :value second-literal) ctx)))
-        (assert-eq first-reg second-reg)
+        (expect second-reg :to-be first-reg)
         (let ((consts (remove-if-not (lambda (inst)
                                        (typep inst 'cl-cc/vm::vm-const))
                                      (codegen-instructions ctx))))
-          (assert-= 1 (length consts))
-          (assert-string= "shared" (cl-cc::vm-const-value (first consts))))))))
+          (expect (= 1 (length consts)) :to-be-truthy)
+          (expect (cl-cc::vm-const-value (first consts)) :to-equal "shared"))))))
 
-(deftest codegen-string-literal-pool-does-not-deduplicate-non-strings
-  "FR-137 pools strings only; other quoted constants keep direct vm-const emission.
-Note: identical non-string constants may coalesce to a single vm-const during compilation."
+(it-sequential "codegen-string-literal-pool-does-not-deduplicate-non-strings"
   (let ((ctx (make-codegen-ctx)))
     (let ((cl-cc/compile:*string-literal-pool* (make-hash-table :test #'equal)))
       (compile-ast (make-ast-quote :value 'same-symbol) ctx)
@@ -140,54 +182,87 @@ Note: identical non-string constants may coalesce to a single vm-const during co
       (let ((consts (remove-if-not (lambda (inst)
                                      (typep inst 'cl-cc/vm::vm-const))
                                    (codegen-instructions ctx))))
-        (assert-= 1 (length consts))))))
+        (expect (= 1 (length consts)) :to-be-truthy)))))
 
 ;;; ─── compile-ast: ast-binop ─────────────────────────────────────────────
 
-(deftest-each codegen-binop-emits-correct-instruction
-  "Each binary operator compiles to its corresponding VM instruction."
-  :cases (("add" '+ 'cl-cc/vm::vm-add)
-          ("sub" '- 'cl-cc/vm::vm-sub)
-          ("mul" '* 'cl-cc/vm::vm-mul)
-          ("lt"  '< 'cl-cc/vm::vm-lt)
-          ("gt"  '> 'cl-cc/vm::vm-gt)
-          ("eq"  '= 'cl-cc/vm::vm-num-eq))
-  (op inst-type)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-binop-emits-correct-instruction add"
+  (destructuring-bind (op inst-type) (list '+ 'cl-cc/vm::vm-add)
+    (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
                                   :rhs (make-ast-int :value 2))
                  ctx)
-    (assert-true (codegen-find-inst ctx inst-type))))
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
+
+(it-sequential "codegen-binop-emits-correct-instruction sub"
+  (destructuring-bind (op inst-type) (list '- 'cl-cc/vm::vm-sub)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-binop :op op
+                                  :lhs (make-ast-int :value 1)
+                                  :rhs (make-ast-int :value 2))
+                 ctx)
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
+
+(it-sequential "codegen-binop-emits-correct-instruction mul"
+  (destructuring-bind (op inst-type) (list '* 'cl-cc/vm::vm-mul)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-binop :op op
+                                  :lhs (make-ast-int :value 1)
+                                  :rhs (make-ast-int :value 2))
+                 ctx)
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
+
+(it-sequential "codegen-binop-emits-correct-instruction lt"
+  (destructuring-bind (op inst-type) (list '< 'cl-cc/vm::vm-lt)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-binop :op op
+                                  :lhs (make-ast-int :value 1)
+                                  :rhs (make-ast-int :value 2))
+                 ctx)
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
+
+(it-sequential "codegen-binop-emits-correct-instruction gt"
+  (destructuring-bind (op inst-type) (list '> 'cl-cc/vm::vm-gt)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-binop :op op
+                                  :lhs (make-ast-int :value 1)
+                                  :rhs (make-ast-int :value 2))
+                 ctx)
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
+
+(it-sequential "codegen-binop-emits-correct-instruction eq"
+  (destructuring-bind (op inst-type) (list '= 'cl-cc/vm::vm-num-eq)
+    (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-binop :op op
+                                  :lhs (make-ast-int :value 1)
+                                  :rhs (make-ast-int :value 2))
+                 ctx)
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
 
 ;;; ─── codegen helpers ─────────────────────────────────────────────────────
 
-(deftest codegen-make-register-returns-unique-keywords
-  "make-register returns unique keyword registers on each call."
+(it-sequential "codegen-make-register-returns-unique-keywords"
   (let* ((ctx (make-codegen-ctx))
          (r1 (cl-cc/compile:make-register ctx))
          (r2 (cl-cc/compile:make-register ctx)))
-    (assert-true (keywordp r1))
-    (assert-true (keywordp r2))
-    (assert-false (eq r1 r2))))
+    (expect (keywordp r1) :to-be-truthy)
+    (expect (keywordp r2) :to-be-truthy)
+    (expect (eq r1 r2) :to-be-falsy)))
 
-(deftest codegen-emit-appends-one-instruction
-  "emit appends exactly one instruction to the context's instruction list."
+(it-sequential "codegen-emit-appends-one-instruction"
   (let ((ctx (make-codegen-ctx)))
     (cl-cc/compile:emit ctx (cl-cc::make-vm-const :dst :R0 :value 42))
-    (assert-= 1 (length (codegen-instructions ctx)))))
+    (expect (= 1 (length (codegen-instructions ctx))) :to-be-truthy)))
 
-(deftest codegen-make-label-returns-unique-strings
-  "make-label returns distinct strings even for the same prefix."
+(it-sequential "codegen-make-label-returns-unique-strings"
   (let* ((ctx (make-codegen-ctx))
          (l1 (cl-cc/compile:make-label ctx "TEST"))
          (l2 (cl-cc/compile:make-label ctx "TEST")))
-    (assert-false (string= l1 l2))))
+    (expect (string= l1 l2) :to-be-falsy)))
 
-(in-suite cl-cc-codegen-unit-serial-suite)
 
-(deftest codegen-make-compile-opts-uses-global-speed-policy-by-default
-  "%make-compile-opts falls back to global declaim optimize speed when :speed is omitted."
+(it-sequential "codegen-make-compile-opts-uses-global-speed-policy-by-default"
   (let* ((old (gethash 'speed cl-cc/expand:*declaim-optimize-registry*))
          (_ignored old))
     (unwind-protect
@@ -195,13 +270,11 @@ Note: identical non-string constants may coalesce to a single vm-const during co
            (setf (gethash 'speed cl-cc/expand:*declaim-optimize-registry*) 3)
            (let* ((opts (cl-cc/compile::%make-compile-opts))
                   (speed (getf opts :speed)))
-             (assert-= 3 speed)))
+             (expect (= 3 speed) :to-be-truthy)))
       (setf (gethash 'speed cl-cc/expand:*declaim-optimize-registry*) old))))
 
-(in-suite cl-cc-codegen-unit-suite)
 
-(deftest codegen-maybe-bump-opts-speed-from-ast-defun-declaration
-  "%maybe-bump-opts-speed-from-ast picks up local defun optimize speed declaration."
+(it-sequential "codegen-maybe-bump-opts-speed-from-ast-defun-declaration"
   (let* ((opts (list :speed nil))
          (ast (cl-cc/ast:make-ast-defun
                :name 'f
@@ -213,10 +286,9 @@ Note: identical non-string constants may coalesce to a single vm-const during co
                :documentation nil
                :body (list (make-ast-var :name 'x)))))
     (cl-cc/compile::%maybe-bump-opts-speed-from-ast opts ast)
-    (assert-= 3 (getf opts :speed))))
+    (expect (= 3 (getf opts :speed)) :to-be-truthy)))
 
-(deftest codegen-maybe-bump-opts-speed-from-ast-does-not-lower-existing-speed
-  "%maybe-bump-opts-speed-from-ast keeps existing higher speed when local speed is lower."
+(it-sequential "codegen-maybe-bump-opts-speed-from-ast-does-not-lower-existing-speed"
   (let* ((opts (list :speed 3))
          (ast (cl-cc/ast:make-ast-defun
                :name 'f
@@ -228,27 +300,35 @@ Note: identical non-string constants may coalesce to a single vm-const during co
                :documentation nil
                :body (list (make-ast-var :name 'x)))))
     (cl-cc/compile::%maybe-bump-opts-speed-from-ast opts ast)
-    (assert-= 3 (getf opts :speed))))
+    (expect (= 3 (getf opts :speed)) :to-be-truthy)))
 
 ;;; ─── compile-ast: ast-call fast paths ────────────────────────────────────
 
-(deftest-each codegen-call-higher-order-fast-path
-  "funcall and apply each dispatch to their dedicated VM instructions, never vm-generic-call."
-  :cases (("funcall" 'funcall 'cl-cc/vm::vm-call)
-          ("apply"   'apply   'cl-cc/vm::vm-apply))
-  (fn-sym inst-type)
-  (let* ((ctx (make-codegen-ctx))
+(it-sequential "codegen-call-higher-order-fast-path funcall"
+  (destructuring-bind (fn-sym inst-type) (list 'funcall 'cl-cc/vm::vm-call)
+    (let* ((ctx (make-codegen-ctx))
          (fn-reg (cl-cc/compile:make-register ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'fn fn-reg)))
     (compile-ast (make-ast-call :func fn-sym
                                 :args (list (make-ast-var :name 'fn)
                                             (make-ast-int :value 1)))
                  ctx)
-    (assert-true (codegen-find-inst ctx inst-type))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call))))
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-null))))
 
-(deftest codegen-call-noescape-array-length-emits-const
-  "(array-length arr) on noescape array emits vm-const with the size, not vm-call."
+(it-sequential "codegen-call-higher-order-fast-path apply"
+  (destructuring-bind (fn-sym inst-type) (list 'apply 'cl-cc/vm::vm-apply)
+    (let* ((ctx (make-codegen-ctx))
+         (fn-reg (cl-cc/compile:make-register ctx)))
+    (setf (cl-cc/compile:ctx-env ctx) (list (cons 'fn fn-reg)))
+    (compile-ast (make-ast-call :func fn-sym
+                                :args (list (make-ast-var :name 'fn)
+                                            (make-ast-int :value 1)))
+                 ctx)
+    (expect (codegen-find-inst ctx inst-type) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-null))))
+
+(it-sequential "codegen-call-noescape-array-length-emits-const"
   (let* ((ctx (make-codegen-ctx))
          ;; Register a noescape array binding of size 3
          (arr-reg (cl-cc/compile:make-register ctx))
@@ -259,36 +339,38 @@ Note: identical non-string constants may coalesce to a single vm-const during co
                                 :args (list (make-ast-var :name 'arr)))
                  ctx)
     (let ((const-inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-      (assert-true const-inst)
-      (assert-= 3 (cl-cc::vm-const-value const-inst)))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-call))))
+      (expect const-inst :to-be-truthy)
+      (expect (= 3 (cl-cc::vm-const-value const-inst)) :to-be-truthy))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
 
-(deftest-each codegen-continuation-forms-emit-dedicated-instructions
-  "Continuation lowering emits the dedicated VM instruction for each form."
-  :cases (("call/cc" '(call/cc (lambda (k) (funcall k 42))) 'cl-cc/vm::vm-call/cc)
-          ("call-with-continuation-prompt"
-           '(call-with-continuation-prompt (lambda () 1) 'reset)
-           'cl-cc/vm::vm-call-with-prompt)
-          ("abort-to-prompt" '(abort-to-prompt 'reset 42) 'cl-cc/vm::vm-abort-to-prompt))
-  (expression expected-inst)
-  (let ((instructions (%compile-expression-vm-instructions expression)))
-    (assert-true (%vm-instruction-present-p instructions expected-inst))))
+(it-sequential "codegen-continuation-forms-emit-dedicated-instructions call/cc"
+  (destructuring-bind (expression expected-inst) (list '(call/cc (lambda (k) (funcall k 42))) 'cl-cc/vm::vm-call/cc)
+    (let ((instructions (%compile-expression-vm-instructions expression)))
+    (expect (%vm-instruction-present-p instructions expected-inst) :to-be-truthy))))
 
-(deftest codegen-block-return-from-keeps-direct-jump
-  "FR-801: BLOCK/RETURN-FROM remains an escape-only direct jump path."
+(it-sequential "codegen-continuation-forms-emit-dedicated-instructions call-with-continuation-prompt"
+  (destructuring-bind (expression expected-inst) (list '(call-with-continuation-prompt (lambda () 1) 'reset) 'cl-cc/vm::vm-call-with-prompt)
+    (let ((instructions (%compile-expression-vm-instructions expression)))
+    (expect (%vm-instruction-present-p instructions expected-inst) :to-be-truthy))))
+
+(it-sequential "codegen-continuation-forms-emit-dedicated-instructions abort-to-prompt"
+  (destructuring-bind (expression expected-inst) (list '(abort-to-prompt 'reset 42) 'cl-cc/vm::vm-abort-to-prompt)
+    (let ((instructions (%compile-expression-vm-instructions expression)))
+    (expect (%vm-instruction-present-p instructions expected-inst) :to-be-truthy))))
+
+(it-sequential "codegen-block-return-from-keeps-direct-jump"
   (let* ((ctx (make-codegen-ctx))
          (node (make-ast-block :name nil
                                :body (list (make-ast-return-from
                                             :name nil
                                             :value (make-ast-int :value 5))))))
     (compile-ast node ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-jump))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-call/cc))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call/cc) :to-be-null)))
 
 ;;; ─── optimize-ast / %loc macro ───────────────────────────────────────────
 
-(deftest optimize-ast-preserves-source-location
-  "optimize-ast carries source-file, source-line, and source-column through to the result."
+(it-sequential "optimize-ast-preserves-source-location"
   (let* ((src (make-ast-if :cond (make-ast-int :value 1 :source-line 5)
                             :then (make-ast-int :value 1)
                             :else (make-ast-int :value 0)
@@ -296,80 +378,90 @@ Note: identical non-string constants may coalesce to a single vm-const during co
                             :source-line 5
                             :source-column 2))
          (result (cl-cc/compile:optimize-ast src)))
-    (assert-equal "test.lisp" (cl-cc::ast-source-file result))
-    (assert-=     5           (cl-cc::ast-source-line result))
-    (assert-=     2           (cl-cc::ast-source-column result))))
+    (expect (cl-cc::ast-source-file result) :to-equal "test.lisp")
+    (expect (= 5 (cl-cc::ast-source-line result)) :to-be-truthy)
+    (expect (= 2 (cl-cc::ast-source-column result)) :to-be-truthy)))
 
-(deftest optimize-ast-recursively-folds-ast-progn
-  "optimize-ast constant-folds a binop inside an ast-progn."
+(it-sequential "optimize-ast-recursively-folds-ast-progn"
   (let* ((node (make-ast-progn :forms (list (make-ast-binop :op '+
                                                              :lhs (make-ast-int :value 2)
                                                              :rhs (make-ast-int :value 3)))))
          (result (cl-cc/compile:optimize-ast node)))
-    (assert-true (typep result 'cl-cc::ast-progn))
-    (assert-true (typep (first (cl-cc/ast:ast-progn-forms result)) 'cl-cc::ast-int))
-    (assert-= 5 (cl-cc/ast:ast-int-value (first (cl-cc/ast:ast-progn-forms result))))))
+    (expect (typep result 'cl-cc::ast-progn) :to-be-truthy)
+    (expect (typep (first (cl-cc/ast:ast-progn-forms result)) 'cl-cc::ast-int) :to-be-truthy)
+    (expect (= 5 (cl-cc/ast:ast-int-value (first (cl-cc/ast:ast-progn-forms result)))) :to-be-truthy)))
 
-(deftest optimize-ast-folds-defconstant-backed-binop
-  "optimize-ast rewrites defconstant-backed ast-var nodes so surrounding binops can fold."
+(it-sequential "optimize-ast-folds-defconstant-backed-binop"
   (cl-cc/expand::compiler-macroexpand-all '(defconstant +optimize-ast-inline-constant+ 41))
   (let* ((node (make-ast-binop :op '+
                                :lhs (make-ast-var :name '+optimize-ast-inline-constant+)
                                :rhs (make-ast-int :value 1)))
          (result (cl-cc/compile:optimize-ast node)))
-    (assert-true (typep result 'cl-cc::ast-int))
-    (assert-= 42 (cl-cc/ast:ast-int-value result))))
+    (expect (typep result 'cl-cc::ast-int) :to-be-truthy)
+    (expect (= 42 (cl-cc/ast:ast-int-value result)) :to-be-truthy)))
 
-(deftest-each optimize-ast-keeps-shadowed-defconstant-as-variable
-  "optimize-ast must not inline a defconstant when an inner lexical binding shadows the name."
-  :cases (("let-body"
-           (make-ast-let :bindings (list (cons 'optimize-shadowed-constant
+(it-sequential "optimize-ast-keeps-shadowed-defconstant-as-variable let-body"
+  (destructuring-bind (node body-reader) (list (make-ast-let :bindings (list (cons 'optimize-shadowed-constant
                                                (make-ast-int :value 2)))
                          :declarations nil
-                         :body (list (make-ast-var :name 'optimize-shadowed-constant)))
-           #'cl-cc/ast:ast-let-body)
-          ("lambda-key-param"
-           (make-ast-lambda :params nil
+                         :body (list (make-ast-var :name 'optimize-shadowed-constant))) #'cl-cc/ast:ast-let-body)
+    (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
+         (body-form (first (funcall body-reader result))))
+    (expect (typep body-form 'cl-cc::ast-var) :to-be-truthy)
+    (expect (cl-cc/ast:ast-var-name body-form) :to-be 'optimize-shadowed-constant))))
+
+(it-sequential "optimize-ast-keeps-shadowed-defconstant-as-variable lambda-key-param"
+  (destructuring-bind (node body-reader) (list (make-ast-lambda :params nil
                             :optional-params nil
                             :rest-param nil
                             :key-params (list (list 'optimize-shadowed-constant nil nil nil))
                             :declarations nil
-                            :body (list (make-ast-var :name 'optimize-shadowed-constant)))
-           #'cl-cc/ast:ast-lambda-body)
-          ("defun-optional-param"
-           (cl-cc/ast:make-ast-defun :name 'optimize-shadowed-constant-user
+                            :body (list (make-ast-var :name 'optimize-shadowed-constant))) #'cl-cc/ast:ast-lambda-body)
+    (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
+         (body-form (first (funcall body-reader result))))
+    (expect (typep body-form 'cl-cc::ast-var) :to-be-truthy)
+    (expect (cl-cc/ast:ast-var-name body-form) :to-be 'optimize-shadowed-constant))))
+
+(it-sequential "optimize-ast-keeps-shadowed-defconstant-as-variable defun-optional-param"
+  (destructuring-bind (node body-reader) (list (cl-cc/ast:make-ast-defun :name 'optimize-shadowed-constant-user
                                      :params nil
                                      :optional-params (list (list 'optimize-shadowed-constant nil nil))
                                      :rest-param nil
                                      :key-params nil
                                      :declarations nil
                                      :documentation nil
-                                     :body (list (make-ast-var :name 'optimize-shadowed-constant)))
-           #'cl-cc/ast:ast-defun-body))
-  (node body-reader)
-  (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99))
-  (let* ((result (cl-cc/compile:optimize-ast node))
+                                     :body (list (make-ast-var :name 'optimize-shadowed-constant))) #'cl-cc/ast:ast-defun-body)
+    (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
          (body-form (first (funcall body-reader result))))
-    (assert-true (typep body-form 'cl-cc::ast-var))
-    (assert-eq 'optimize-shadowed-constant (cl-cc/ast:ast-var-name body-form))))
+    (expect (typep body-form 'cl-cc::ast-var) :to-be-truthy)
+    (expect (cl-cc/ast:ast-var-name body-form) :to-be 'optimize-shadowed-constant))))
 
 ;;; ─── %let-binding-special-p ─────────────────────────────────────────────
 
-(deftest-each let-binding-special-p-dispatch
-  "%let-binding-special-p returns T only for earmuffed symbols registered as global."
-  :cases (("earmuffs-and-global"      '*x*            t    t)
-          ("earmuffs-no-registration" '*unregistered* nil  nil)
-          ("no-earmuffs-global"       'plain          t    nil))
-  (sym register-p expected)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "let-binding-special-p-dispatch earmuffs-and-global"
+  (destructuring-bind (sym register-p expected) (list '*x* t t)
+    (let ((ctx (make-codegen-ctx)))
     (when register-p
       (setf (gethash sym (cl-cc/compile:ctx-global-variables ctx)) t))
-    (assert-equal expected (cl-cc/compile::%let-binding-special-p sym ctx))))
+    (expect (cl-cc/compile::%let-binding-special-p sym ctx) :to-equal expected))))
+
+(it-sequential "let-binding-special-p-dispatch earmuffs-no-registration"
+  (destructuring-bind (sym register-p expected) (list '*unregistered* nil nil)
+    (let ((ctx (make-codegen-ctx)))
+    (when register-p
+      (setf (gethash sym (cl-cc/compile:ctx-global-variables ctx)) t))
+    (expect (cl-cc/compile::%let-binding-special-p sym ctx) :to-equal expected))))
+
+(it-sequential "let-binding-special-p-dispatch no-earmuffs-global"
+  (destructuring-bind (sym register-p expected) (list 'plain t nil)
+    (let ((ctx (make-codegen-ctx)))
+    (when register-p
+      (setf (gethash sym (cl-cc/compile:ctx-global-variables ctx)) t))
+    (expect (cl-cc/compile::%let-binding-special-p sym ctx) :to-equal expected))))
 
 ;;; ─── %let-noescape-closure ──────────────────────────────────────────────
 
-(deftest let-noescape-closure-unmutated-lambda-is-eligible
-  "%let-noescape-closure returns the lambda when the binding is not mutated."
+(it-sequential "let-noescape-closure-unmutated-lambda-is-eligible"
   (let* ((lam  (make-ast-lambda :params '(x)
                                 :optional-params nil
                                 :rest-param nil
@@ -378,10 +470,9 @@ Note: identical non-string constants may coalesce to a single vm-const during co
          (body (list (make-ast-call :func (make-ast-var :name 'f)
                                     :args (list (make-ast-int :value 1)))))
          (result (cl-cc/compile::%let-noescape-closure 'f lam nil nil nil body)))
-    (assert-eq lam result)))
+    (expect result :to-be lam)))
 
-(deftest let-noescape-closure-the-wrapped-lambda-is-eligible
-  "%let-noescape-closure unwraps ast-the before checking the lambda shape."
+(it-sequential "let-noescape-closure-the-wrapped-lambda-is-eligible"
   (let* ((lam (make-ast-lambda :params '(x)
                                :optional-params nil
                                :rest-param nil
@@ -391,34 +482,30 @@ Note: identical non-string constants may coalesce to a single vm-const during co
          (body (list (make-ast-call :func (make-ast-var :name 'f)
                                     :args (list (make-ast-int :value 1)))))
          (result (cl-cc/compile::%let-noescape-closure 'f wrapped nil nil nil body)))
-    (assert-eq lam result)))
+    (expect result :to-be lam)))
 
-(deftest let-noescape-closure-mutated-binding-returns-nil
-  "%let-noescape-closure returns NIL when the binding appears in the mutated set."
+(it-sequential "let-noescape-closure-mutated-binding-returns-nil"
   (let* ((lam (make-ast-lambda :params '(x)
                                :optional-params nil
                                :rest-param nil
                                :key-params nil
                                :body (list (make-ast-var :name 'x))))
          (body (list (make-ast-int :value 1))))
-    (assert-null (cl-cc/compile::%let-noescape-closure 'f lam nil '(f) nil body))))
+    (expect (cl-cc/compile::%let-noescape-closure 'f lam nil '(f) nil body) :to-be-null)))
 
 ;;; ─── %let-noescape-array-size ───────────────────────────────────────────
 
-(deftest let-noescape-array-size-non-make-array-returns-nil
-  "%let-noescape-array-size returns NIL when the expression is not a make-array call."
+(it-sequential "let-noescape-array-size-non-make-array-returns-nil"
   (let ((expr (make-ast-int :value 5)))
-    (assert-null (cl-cc/compile::%let-noescape-array-size 'arr expr nil nil nil nil))))
+    (expect (cl-cc/compile::%let-noescape-array-size 'arr expr nil nil nil nil) :to-be-null)))
 
-(deftest let-noescape-cons-p-non-cons-expr-returns-nil
-  "%let-noescape-cons-p returns NIL when the expression is not a cons call."
+(it-sequential "let-noescape-cons-p-non-cons-expr-returns-nil"
   (let ((expr (make-ast-int :value 5)))
-    (assert-null (cl-cc/compile::%let-noescape-cons-p 'c expr nil nil nil nil))))
+    (expect (cl-cc/compile::%let-noescape-cons-p 'c expr nil nil nil nil) :to-be-null)))
 
 ;;; ─── FR-864/892 MV buffer and load-time-value codegen ─────────────────────
 
-(deftest codegen-nth-value-emits-o1-buffer-read
-  "Constant nth-value lowers to clear/ensure/nth-value instead of list allocation."
+(it-sequential "codegen-nth-value-emits-o1-buffer-read"
   (let* ((ctx (make-codegen-ctx))
          (node (make-ast-call :func '%nth-value
                               :args (list (make-ast-int :value 1)
@@ -426,11 +513,10 @@ Note: identical non-string constants may coalesce to a single vm-const during co
                                            :forms (list (make-ast-int :value 10)
                                                         (make-ast-int :value 20)))))))
     (compile-ast node ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-nth-value))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-nth-value) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)))
 
-(deftest codegen-load-time-value-records-cell
-  "load-time-value records a cell and emits a constant-speed cell reference."
+(it-sequential "codegen-load-time-value-records-cell"
   (let ((ctx (make-codegen-ctx))
         (cl-cc/compile::*load-time-value-cells* nil)
         (cl-cc/compile::*next-load-time-value-cell-id* 0))
@@ -441,8 +527,7 @@ Note: identical non-string constants may coalesce to a single vm-const during co
                                             (make-ast-var :name nil)))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-load-time-value)))
-      (assert-true inst)
-      (assert-= 0 (cl-cc/vm::vm-load-time-value-cell-id inst))
-      (assert-equal '(+ 1 2)
-                    (cl-cc/vm::vm-load-time-value-cell-form
-                     (first cl-cc/compile::*load-time-value-cells*))))))
+      (expect inst :to-be-truthy)
+      (expect (= 0 (cl-cc/vm::vm-load-time-value-cell-id inst)) :to-be-truthy)
+      (expect (cl-cc/vm::vm-load-time-value-cell-form
+                     (first cl-cc/compile::*load-time-value-cells*)) :to-equal '(+ 1 2)))))

@@ -5,23 +5,16 @@
 ;; (`*repl-vm-state*`, label counters, current package, stdlib snapshots). Keep
 ;; them in a dedicated serial child suite so randomized mixed-mode execution does
 ;; not reintroduce order-dependent flakes.
-(defsuite cl-cc-pipeline-repl-serial-suite
-  :description "Serial pipeline REPL integration tests"
-  :parent cl-cc-integration-suite
-  :parallel nil)
 
-(in-suite cl-cc-pipeline-repl-serial-suite)
 
 ;;; ─── run-string-repl (persistent state) ─────────────────────────────────
 
-(deftest pipeline-repl-simple-eval
-  "run-string-repl evaluates a simple expression."
+(it-sequential "pipeline-repl-simple-eval"
   (with-reset-repl-state
     (let ((result (run-string-repl "42")))
-      (assert-= 42 result))))
+      (expect (= 42 result) :to-be-truthy))))
 
-(deftest pipeline-repl-elisp-language-argument
-  "run-string-repl forwards an explicit :elisp language setting through parsing and compilation."
+(it-sequential "pipeline-repl-elisp-language-argument"
   (let ((seen-parse-language nil)
         (seen-compile-language nil)
         (orig-parse (symbol-function 'cl-cc/parse:parse-source-for-language))
@@ -44,40 +37,40 @@
                    (lambda (&rest args)
                      (declare (ignore args))
                      123)))
-           (assert-= 123 (run-string-repl "ignored" :language :elisp))
-           (assert-eq :elisp seen-parse-language)
-           (assert-eq :elisp seen-compile-language))
+           (expect (= 123 (run-string-repl "ignored" :language :elisp)) :to-be-truthy)
+           (expect seen-parse-language :to-be :elisp)
+           (expect seen-compile-language :to-be :elisp))
       (sb-ext:without-package-locks
         (setf (symbol-function 'cl-cc/parse:parse-source-for-language) orig-parse
               (symbol-function 'cl-cc::compile-string) orig-compile
               (symbol-function 'cl-cc::%run-form-repl-impl) orig-run)))))
 
-(deftest-each pipeline-repl-persistence
-  "run-string-repl persists defun and defvar definitions across REPL calls."
-  :cases (("defun"   "(defun repl-test-double (x) (* x 2))"  "(repl-test-double 21)"  42)
-          ("defvar"  "(defvar *repl-test-val* 99)"             "*repl-test-val*"        99))
-  (setup check expected)
-  (with-reset-repl-state
+(it-sequential "pipeline-repl-persistence defun"
+  (destructuring-bind (setup check expected) (list "(defun repl-test-double (x) (* x 2))" "(repl-test-double 21)" 42)
+    (with-reset-repl-state
     (run-string-repl setup)
-    (assert-= expected (run-string-repl check))))
+    (expect (= expected (run-string-repl check)) :to-be-truthy))))
 
-(deftest pipeline-repl-defvar-without-init-persists-as-global
-  "A top-level DEFVAR without an init form is visible to later REPL SETF forms."
+(it-sequential "pipeline-repl-persistence defvar"
+  (destructuring-bind (setup check expected) (list "(defvar *repl-test-val* 99)" "*repl-test-val*" 99)
+    (with-reset-repl-state
+    (run-string-repl setup)
+    (expect (= expected (run-string-repl check)) :to-be-truthy))))
+
+(it-sequential "pipeline-repl-defvar-without-init-persists-as-global"
   (with-reset-repl-state
     (run-string-repl "(defvar *repl-no-init*)")
     (run-string-repl "(setf *repl-no-init* 3)")
-    (assert-= 3 (run-string-repl "*repl-no-init*"))))
+    (expect (= 3 (run-string-repl "*repl-no-init*")) :to-be-truthy)))
 
-(deftest pipeline-run-form-repl-defvar-without-init-persists-as-global
-  "run-form-repl records DEFVAR without init in the persistent global registry."
+(it-sequential "pipeline-run-form-repl-defvar-without-init-persists-as-global"
   (with-reset-repl-state
     (let ((form (first (cl-cc/parse:parse-all-forms "(defvar *run-form-no-init*)"))))
       (cl-cc::run-form-repl form)
       (run-string-repl "(setf *run-form-no-init* 7)")
-      (assert-= 7 (run-string-repl "*run-form-no-init*")))))
+      (expect (= 7 (run-string-repl "*run-form-no-init*")) :to-be-truthy))))
 
-(deftest pipeline-run-form-repl-registers-top-level-defmacro
-  "run-form-repl handles a top-level defmacro by registering an expander immediately." 
+(it-sequential "pipeline-run-form-repl-registers-top-level-defmacro"
   (let* ((*package* (find-package :cl-cc/compile))
          (macro-name (intern "PIPELINE-REPL-TEMP-DEFMACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
@@ -85,16 +78,14 @@
          (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
     (unwind-protect
          (progn
-           (assert-eq macro-name (cl-cc::run-form-repl form))
+           (expect (cl-cc::run-form-repl form) :to-be macro-name)
             (let ((expander (gethash macro-name table)))
-               (assert-true expander)
-               (assert-equal '(progn (print 1))
-                            (cl-cc/expand::invoke-registered-expander
-                             expander '(pipeline-repl-temp-defmacro (print 1)) nil))))
+               (expect expander :to-be-truthy)
+               (expect (cl-cc/expand::invoke-registered-expander
+                             expander '(pipeline-repl-temp-defmacro (print 1)) nil) :to-equal '(progn (print 1)))))
       (remhash macro-name table))))
 
-(deftest pipeline-run-form-repl-registers-destructuring-defmacro
-  "run-form-repl supports top-level defmacro lambda lists with nested destructuring." 
+(it-sequential "pipeline-run-form-repl-registers-destructuring-defmacro"
   (let* ((*package* (find-package :cl-cc/compile))
          (macro-name (intern "PIPELINE-REPL-TEMP-DESTRUCTURING-DEFMACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
@@ -102,25 +93,22 @@
          (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
     (unwind-protect
          (progn
-           (assert-eq macro-name (cl-cc::run-form-repl form))
+           (expect (cl-cc::run-form-repl form) :to-be macro-name)
              (let ((expander (gethash macro-name table)))
-               (assert-true expander)
-                (assert-equal '(list 'foo 'bar '(baz quux))
-                            (cl-cc/expand::invoke-registered-expander
+               (expect expander :to-be-truthy)
+                (expect (cl-cc/expand::invoke-registered-expander
                              expander
                              '(pipeline-repl-temp-destructuring-defmacro foo (bar) baz quux)
-                             nil))))
+                             nil) :to-equal '(list 'foo 'bar '(baz quux)))))
       (remhash macro-name table))))
 
-(deftest pipeline-repl-defun-not-host-only
-  "Plain DEFUN is not treated as a host-only form by the REPL host-load policy."
+(it-sequential "pipeline-repl-defun-not-host-only"
   (multiple-value-bind (result handled-p)
       (cl-cc::%handle-host-only-top-level-form '(defun demo (x) x))
-    (assert-false handled-p)
-    (assert-null result)))
+    (expect handled-p :to-be-falsy)
+    (expect result :to-be-null)))
 
-(deftest pipeline-run-form-repl-normalizes-register-macro-lambda-body
-  "run-form-repl normalizes top-level register-macro lambda bodies before storing the expander descriptor." 
+(it-sequential "pipeline-run-form-repl-normalizes-register-macro-lambda-body"
   (let* ((*package* (find-package :cl-cc/compile))
          (macro-name (intern "PIPELINE-REPL-TEMP-REGISTER-MACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
@@ -128,16 +116,14 @@
          (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
     (unwind-protect
          (progn
-           (assert-eq macro-name (cl-cc::run-form-repl form))
+           (expect (cl-cc::run-form-repl form) :to-be macro-name)
              (let ((expander (gethash macro-name table)))
-               (assert-true expander)
-                (assert-equal '(progn 42)
-                            (cl-cc/expand::invoke-registered-expander
-                             expander '(pipeline-repl-temp-register-macro 42) nil))))
+               (expect expander :to-be-truthy)
+                (expect (cl-cc/expand::invoke-registered-expander
+                             expander '(pipeline-repl-temp-register-macro 42) nil) :to-equal '(progn 42))))
       (remhash macro-name table))))
 
-(deftest pipeline-run-form-repl-register-macro-without-host-compile
-  "Top-level REGISTER-MACRO lambda registration works without host compile."
+(it-sequential "pipeline-run-form-repl-register-macro-without-host-compile"
   (let* ((*package* (find-package :cl-cc/compile))
          (macro-name (intern "PIPELINE-REPL-NO-COMPILE-REGISTER-MACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
@@ -151,164 +137,152 @@
                     (lambda (&rest args)
                       (declare (ignore args))
                       (error "host compile should not be called"))))
-             (assert-eq macro-name (cl-cc::run-form-repl form))
+             (expect (cl-cc::run-form-repl form) :to-be macro-name)
              (let ((expander (gethash macro-name table)))
-               (assert-true expander)
-               (assert-equal 42
-                             (cl-cc/expand::invoke-registered-expander
-                              expander '(pipeline-repl-no-compile-register-macro 42) nil))))
+               (expect expander :to-be-truthy)
+               (expect (cl-cc/expand::invoke-registered-expander
+                              expander '(pipeline-repl-no-compile-register-macro 42) nil) :to-equal 42)))
        (sb-ext:without-package-locks
          (setf (symbol-function 'compile) orig))
        (remhash macro-name table))))
 
-(deftest pipeline-run-form-repl-rejects-non-lambda-register-macro
-  "run-form-repl rejects top-level REGISTER-MACRO forms whose expander is not a lambda." 
+(it-sequential "pipeline-run-form-repl-rejects-non-lambda-register-macro"
   (let* ((*package* (find-package :cl-cc/compile))
          (form (first (cl-cc/parse:parse-all-forms
                        "(register-macro 'pipeline-repl-bad-register-macro 42)"))))
-    (assert-signals error (cl-cc::run-form-repl form))))
+    (signals error (cl-cc::run-form-repl form))))
 
-(deftest pipeline-run-string-uses-vm-compile-path-for-safe-single-form
-  "run-string executes safe single-form Lisp inputs through the normal VM compile path." 
-  (assert-eql 3 (cl-cc:run-string "(+ 1 2)")))
+(it-sequential "pipeline-run-string-uses-vm-compile-path-for-safe-single-form"
+  (expect (cl-cc:run-string "(+ 1 2)") :to-be 3))
 
-(deftest pipeline-run-string-still-handles-definition-forms
-  "run-string still handles definition-like top-level forms through the normal VM path." 
-  (assert-true (cl-cc:run-string "(defun pipeline-cps-fast-path-def () 42)")))
+(it-sequential "pipeline-run-string-still-handles-definition-forms"
+  (expect (cl-cc:run-string "(defun pipeline-cps-fast-path-def () 42)") :to-be-truthy))
 
 ;;; ─── reset-repl-state ──────────────────────────────────────────────────
 
-(deftest pipeline-reset-clears-state
-  "reset-repl-state clears all persistent REPL variables."
+(it-sequential "pipeline-reset-clears-state"
   (with-reset-repl-state
     (run-string-repl "42")
-    (assert-true (not (null cl-cc::*repl-vm-state*)))
+    (expect (not (null cl-cc::*repl-vm-state*)) :to-be-truthy)
     (reset-repl-state)
-    (assert-null cl-cc::*repl-vm-state*)
-    (assert-null cl-cc::*repl-pool-instructions*)
-    (assert-null cl-cc::*repl-pool-labels*)))
+    (expect cl-cc::*repl-vm-state* :to-be-null)
+    (expect cl-cc::*repl-pool-instructions* :to-be-null)
+    (expect cl-cc::*repl-pool-labels* :to-be-null)))
 
 ;;; ─── compile-string-with-stdlib ─────────────────────────────────────────
 
-(deftest pipeline-compile-with-stdlib
-  "compile-string-with-stdlib includes stdlib definitions."
+(it-sequential "pipeline-compile-with-stdlib"
   (let ((result (cl-cc::compile-string-with-stdlib "(+ 1 2)" :target :vm)))
-    (assert-true (typep result 'cl-cc/compile:compilation-result))))
+    (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)))
 
 ;;; ─── run-string with :stdlib ────────────────────────────────────────────
 
-(deftest-each pipeline-run-string-stdlib-forms
-  "run-string with :stdlib enables stdlib functions."
-  :cases (("mapcar-inc"  '(2 3 4)
-            "(mapcar (lambda (x) (+ x 1)) '(1 2 3))")
-          ("reduce-sum"  10
-            "(reduce (lambda (a b) (+ a b)) '(1 2 3 4) 0 t)"))
-  (expected expr)
-  (assert-equal expected (run-string expr :stdlib t)))
+(it-sequential "pipeline-run-string-stdlib-forms mapcar-inc"
+  (destructuring-bind (expected expr) (list '(2 3 4) "(mapcar (lambda (x) (+ x 1)) '(1 2 3))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-stdlib-forms reduce-sum"
+  (destructuring-bind (expected expr) (list 10 "(reduce (lambda (a b) (+ a b)) '(1 2 3 4) 0 t)")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
 
 ;;; ─── %whitespace-symbol-p ───────────────────────────────────────────────
 
-(deftest-each pipeline-whitespace-symbol-p
-  "%whitespace-symbol-p identifies symbols whose name is all whitespace."
-  :cases (("plain-symbol"      nil 'hello)
-          ("nil"               nil nil)
-          ("keyword"           nil :foo)
-          ("number"            nil 42)
-          ("empty-string"      nil ""))
-  (expected form)
-  (assert-equal expected (cl-cc::%whitespace-symbol-p form)))
+(it-sequential "pipeline-whitespace-symbol-p plain-symbol"
+  (destructuring-bind (expected form) (list nil 'hello)
+    (expect (cl-cc::%whitespace-symbol-p form) :to-equal expected)))
 
-(deftest pipeline-whitespace-symbol-p-space-sym
-  "%whitespace-symbol-p returns T for a symbol named with only spaces."
-  ;; Intern a whitespace-only symbol to test the predicate directly.
+(it-sequential "pipeline-whitespace-symbol-p nil"
+  (destructuring-bind (expected form) (list nil nil)
+    (expect (cl-cc::%whitespace-symbol-p form) :to-equal expected)))
+
+(it-sequential "pipeline-whitespace-symbol-p keyword"
+  (destructuring-bind (expected form) (list nil :foo)
+    (expect (cl-cc::%whitespace-symbol-p form) :to-equal expected)))
+
+(it-sequential "pipeline-whitespace-symbol-p number"
+  (destructuring-bind (expected form) (list nil 42)
+    (expect (cl-cc::%whitespace-symbol-p form) :to-equal expected)))
+
+(it-sequential "pipeline-whitespace-symbol-p empty-string"
+  (destructuring-bind (expected form) (list nil "")
+    (expect (cl-cc::%whitespace-symbol-p form) :to-equal expected)))
+
+(it-sequential "pipeline-whitespace-symbol-p-space-sym"
   (let ((ws-sym (intern " " (find-package :cl-cc))))
-    (assert-true (cl-cc::%whitespace-symbol-p ws-sym))))
+    (expect (cl-cc::%whitespace-symbol-p ws-sym) :to-be-truthy)))
 
 ;;; ─── %ensure-repl-state ─────────────────────────────────────────────────
 
-(deftest pipeline-ensure-repl-state-initializes
-  "%ensure-repl-state lazily initializes all REPL state variables."
+(it-sequential "pipeline-ensure-repl-state-initializes"
   (with-reset-repl-state
     ;; All state vars should be nil after reset
-    (assert-null cl-cc::*repl-vm-state*)
-    (assert-null cl-cc::*repl-pool-instructions*)
+    (expect cl-cc::*repl-vm-state* :to-be-null)
+    (expect cl-cc::*repl-pool-instructions* :to-be-null)
     ;; Trigger lazy init
     (cl-cc::%ensure-repl-state)
     ;; All should now be initialized
-    (assert-true (not (null cl-cc::*repl-vm-state*)))
-    (assert-true (not (null cl-cc::*repl-pool-instructions*)))
-    (assert-true (not (null cl-cc::*repl-pool-labels*)))
-    (assert-true (not (null cl-cc::*repl-global-vars-persistent*)))))
+    (expect (not (null cl-cc::*repl-vm-state*)) :to-be-truthy)
+    (expect (not (null cl-cc::*repl-pool-instructions*)) :to-be-truthy)
+    (expect (not (null cl-cc::*repl-pool-labels*)) :to-be-truthy)
+    (expect (not (null cl-cc::*repl-global-vars-persistent*)) :to-be-truthy)))
 
-(deftest pipeline-ensure-repl-state-idempotent
-  "%ensure-repl-state is idempotent — second call does not reset existing state."
+(it-sequential "pipeline-ensure-repl-state-idempotent"
   (with-reset-repl-state
     (cl-cc::%ensure-repl-state)
     (let ((first-state cl-cc::*repl-vm-state*))
       (cl-cc::%ensure-repl-state)
-      (assert-eq first-state cl-cc::*repl-vm-state*))))
+      (expect cl-cc::*repl-vm-state* :to-be first-state))))
 
 ;;; ─── FR-312: REPL history and completion ────────────────────────────────
 
-(deftest pipeline-repl-history-records-forms
-  "FR-312: REPL history records non-empty commands in insertion order."
-  :tags '(:fr-312)
+(it-sequential "pipeline-repl-history-records-forms"
   (with-reset-repl-state
     (cl-cc::%repl-record-history "  (+ 1 2)  ")
     (cl-cc::%repl-record-history "")
     (cl-cc::%repl-record-history "(list 1 2)")
-    (assert-equal '("(+ 1 2)" "(list 1 2)")
-                  (cl-cc:repl-history))))
+    (expect (cl-cc:repl-history) :to-equal '("(+ 1 2)" "(list 1 2)"))))
 
-(deftest pipeline-repl-history-arrow-navigation
-  "FR-312: cooked-terminal arrow escape lines navigate REPL history."
-  :tags '(:fr-312)
+(it-sequential "pipeline-repl-history-arrow-navigation"
   (with-reset-repl-state
     (cl-cc::%repl-record-history "(+ 1 2)")
     (cl-cc::%repl-record-history "(+ 3 4)")
     (multiple-value-bind (line candidates edited-p)
         (cl-cc:repl-edit-input-line (format nil "~C[A" #\Escape))
-      (assert-equal "(+ 3 4)" line)
-      (assert-null candidates)
-      (assert-true edited-p))
+      (expect line :to-equal "(+ 3 4)")
+      (expect candidates :to-be-null)
+      (expect edited-p :to-be-truthy))
     (multiple-value-bind (line candidates edited-p)
         (cl-cc:repl-edit-input-line (format nil "~C[A" #\Escape))
-      (assert-equal "(+ 1 2)" line)
-      (assert-null candidates)
-      (assert-true edited-p))
+      (expect line :to-equal "(+ 1 2)")
+      (expect candidates :to-be-null)
+      (expect edited-p :to-be-truthy))
     (multiple-value-bind (line candidates edited-p)
         (cl-cc:repl-edit-input-line (format nil "~C[B" #\Escape))
-      (assert-equal "(+ 3 4)" line)
-      (assert-null candidates)
-      (assert-true edited-p))))
+      (expect line :to-equal "(+ 3 4)")
+      (expect candidates :to-be-null)
+      (expect edited-p :to-be-truthy))))
 
-(deftest pipeline-repl-completion-includes-package-symbols
-  "FR-312: completion candidates include package-visible symbols."
-  :tags '(:fr-312)
+(it-sequential "pipeline-repl-completion-includes-package-symbols"
   (with-reset-repl-state
     (let ((*package* (find-package :cl-cc/test)))
       (intern "FR312-UNIQUE-PACKAGE-CANDIDATE" *package*)
-      (assert-true (member "FR312-UNIQUE-PACKAGE-CANDIDATE"
+      (expect (member "FR312-UNIQUE-PACKAGE-CANDIDATE"
                            (cl-cc:repl-completion-candidates "FR312-UNIQUE-PACKAGE")
-                           :test #'string=)))))
+                           :test #'string=) :to-be-truthy))))
 
-(deftest pipeline-repl-completion-includes-function-registry
-  "FR-312: completion candidates include function names defined in the REPL VM state."
-  :tags '(:fr-312)
+(it-sequential "pipeline-repl-completion-includes-function-registry"
   (with-reset-repl-state
     (run-string-repl "(defun fr312-repl-complete-fn (x) x)")
-    (assert-true (member "FR312-REPL-COMPLETE-FN"
+    (expect (member "FR312-REPL-COMPLETE-FN"
                          (cl-cc:repl-completion-candidates "FR312-REPL-COMPLETE")
-                         :test #'string=))))
+                         :test #'string=) :to-be-truthy)))
 
-(deftest pipeline-repl-tab-completes-single-candidate
-  "FR-312: TAB completion replaces a unique token candidate."
-  :tags '(:fr-312)
+(it-sequential "pipeline-repl-tab-completes-single-candidate"
   (with-reset-repl-state
     (let ((*package* (find-package :cl-cc/test)))
       (intern "FR312-TAB-ONLY-CANDIDATE" *package*)
       (multiple-value-bind (line candidates edited-p)
           (cl-cc:repl-edit-input-line (concatenate 'string "FR312-TAB-ONLY" (string #\Tab)))
-        (assert-equal "FR312-TAB-ONLY-CANDIDATE" line)
-        (assert-equal '("FR312-TAB-ONLY-CANDIDATE") candidates)
-        (assert-true edited-p)))))
+        (expect line :to-equal "FR312-TAB-ONLY-CANDIDATE")
+        (expect candidates :to-equal '("FR312-TAB-ONLY-CANDIDATE"))
+        (expect edited-p :to-be-truthy)))))

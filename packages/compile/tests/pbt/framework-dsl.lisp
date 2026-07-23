@@ -157,13 +157,9 @@
 
 ;;; Test Suite Definition
 
-(defsuite cl-cc-pbt-suite
-  :description "Property-Based Testing suite for CL-CC"
-  :parent cl-cc-integration-suite)
 
 ;;; Example Properties
 
-(in-suite cl-cc-pbt-suite)
 
 (defproperty integer-addition-commutativity
     (a (gen-integer :min -1000 :max 1000)

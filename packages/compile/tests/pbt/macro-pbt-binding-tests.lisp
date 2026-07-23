@@ -1,7 +1,6 @@
 ;;;; tests/pbt/macro-pbt-binding-tests.lisp — PBT for LET*/PROG1/PROG2/SETF/PSETQ/MVB/MVS/MVL/DEFUN
 (in-package :cl-cc/pbt)
 
-(in-suite macro-pbt-suite)
 
 (defproperty let-star-empty-is-progn-binding-pbt
     (body (gen-list-of (gen-body-form) :min-length 1 :max-length 3))
@@ -216,20 +215,17 @@
            (eq (car lambda-form) 'lambda)
            (equal (second lambda-form) params)))))
 
-(deftest defun-c-enforces-contracts-binding-pbt
-  "DEFUN/C expands with explicit pre/post contract checks."
+(it-sequential "defun-c-enforces-contracts-binding-pbt"
   (let ((expanded-1
           (cl-cc:our-macroexpand-1
            '(defun/c add1-positive-pbtb (x)
               :requires (> x 0)
               :ensures (= result (+ x 1))
               (+ x 1)))))
-    (assert-eq 'defun (car expanded-1))
-    (assert-eq 'add1-positive-pbtb (cadr expanded-1))
-    (assert-equal '(x) (caddr expanded-1))
-    (assert-true
-     (some (lambda (form) (and (consp form) (eq (car form) 'unless)))
-           (cdddr expanded-1)))
-    (assert-true
-     (some (lambda (form) (and (consp form) (eq (car form) 'let)))
-           (cdddr expanded-1)))))
+    (expect (car expanded-1) :to-be 'defun)
+    (expect (cadr expanded-1) :to-be 'add1-positive-pbtb)
+    (expect (caddr expanded-1) :to-equal '(x))
+    (expect (some (lambda (form) (and (consp form) (eq (car form) 'unless)))
+           (cdddr expanded-1)) :to-be-truthy)
+    (expect (some (lambda (form) (and (consp form) (eq (car form) 'let)))
+           (cdddr expanded-1)) :to-be-truthy)))

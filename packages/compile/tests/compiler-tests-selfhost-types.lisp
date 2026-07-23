@@ -1,178 +1,219 @@
 ;;;; compiler-tests-selfhost-types.lisp — Parametric types, defparameter, equal, numeric, warn, format tests
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; Parametric Types (type-constructor)
 
-(deftest-each parametric-type-parse-single-arg
-  "parse-type-specifier produces a type-constructor with one arg of the expected type."
-  :cases (("list-fixnum"   '(list fixnum)   'list   cl-cc/type:type-int)
-          ("option-string" '(Option string)  'Option cl-cc/type:type-string))
-  (spec expected-name expected-arg-type)
-  (let ((ty (cl-cc/type:parse-type-specifier spec)))
-    (assert-type cl-cc/type:type-constructor ty)
-    (assert-eq expected-name (cl-cc/type:type-constructor-name ty))
-    (assert-= 1 (length (cl-cc/type:type-constructor-args ty)))
-    (assert-true (cl-cc/type:type-equal-p (first (cl-cc/type:type-constructor-args ty))
-                                          expected-arg-type))))
+(it-sequential "parametric-type-parse-single-arg list-fixnum"
+  (destructuring-bind (spec expected-name expected-arg-type) (list '(list fixnum) 'list cl-cc/type:type-int)
+    (let ((ty (cl-cc/type:parse-type-specifier spec)))
+    (expect (typep ty 'cl-cc/type:type-constructor) :to-be-truthy)
+    (expect (cl-cc/type:type-constructor-name ty) :to-be expected-name)
+    (expect (= 1 (length (cl-cc/type:type-constructor-args ty))) :to-be-truthy)
+    (expect (cl-cc/type:type-equal-p (first (cl-cc/type:type-constructor-args ty))
+                                          expected-arg-type) :to-be-truthy))))
 
-(deftest parametric-type-parse-pair
-  "Parsing (Pair fixnum string) yields a type-constructor with 2 args"
+(it-sequential "parametric-type-parse-single-arg option-string"
+  (destructuring-bind (spec expected-name expected-arg-type) (list '(Option string) 'Option cl-cc/type:type-string)
+    (let ((ty (cl-cc/type:parse-type-specifier spec)))
+    (expect (typep ty 'cl-cc/type:type-constructor) :to-be-truthy)
+    (expect (cl-cc/type:type-constructor-name ty) :to-be expected-name)
+    (expect (= 1 (length (cl-cc/type:type-constructor-args ty))) :to-be-truthy)
+    (expect (cl-cc/type:type-equal-p (first (cl-cc/type:type-constructor-args ty))
+                                          expected-arg-type) :to-be-truthy))))
+
+(it-sequential "parametric-type-parse-pair"
   (let ((ty (cl-cc/type:parse-type-specifier '(Pair fixnum string))))
-    (assert-type cl-cc/type:type-constructor ty)
-    (assert-eq 'Pair (cl-cc/type:type-constructor-name ty))
-    (assert-= 2 (length (cl-cc/type:type-constructor-args ty)))
-    (assert-true (cl-cc/type:type-equal-p (first (cl-cc/type:type-constructor-args ty))
-                                  cl-cc/type:type-int))
-    (assert-true (cl-cc/type:type-equal-p (second (cl-cc/type:type-constructor-args ty))
-                                  cl-cc/type:type-string))))
+    (expect (typep ty 'cl-cc/type:type-constructor) :to-be-truthy)
+    (expect (cl-cc/type:type-constructor-name ty) :to-be 'Pair)
+    (expect (= 2 (length (cl-cc/type:type-constructor-args ty))) :to-be-truthy)
+    (expect (cl-cc/type:type-equal-p (first (cl-cc/type:type-constructor-args ty))
+                                  cl-cc/type:type-int) :to-be-truthy)
+    (expect (cl-cc/type:type-equal-p (second (cl-cc/type:type-constructor-args ty))
+                                  cl-cc/type:type-string) :to-be-truthy)))
 
-(deftest parametric-type-unify-same
-  "Unifying (List fixnum) with (List fixnum) succeeds with no new bindings"
+(it-sequential "parametric-type-unify-same"
   (let ((t1 (cl-cc/type:parse-type-specifier '(list fixnum)))
         (t2 (cl-cc/type:parse-type-specifier '(list fixnum))))
     (multiple-value-bind (subst ok) (cl-cc/type:type-unify t1 t2)
-      (assert-true ok)
+      (expect ok :to-be-truthy)
       ;; No bindings needed — subst may be empty struct or nil
-      (assert-true (or (null subst)
+      (expect (or (null subst)
                        (zerop (hash-table-count
-                                (cl-cc/type:substitution-bindings subst))))))))
+                                (cl-cc/type:substitution-bindings subst)))) :to-be-truthy))))
 
-(deftest parametric-type-unify-with-var
-  "Unifying (List ?a) with (List fixnum) binds ?a to fixnum"
+(it-sequential "parametric-type-unify-with-var"
   (let* ((tv (cl-cc/type:fresh-type-var 'a))
          (t1 (cl-cc/type:make-type-constructor 'list (list tv)))
          (t2 (cl-cc/type:parse-type-specifier '(list fixnum))))
     (multiple-value-bind (subst ok) (cl-cc/type:type-unify t1 t2)
-      (assert-true ok)
-      (assert-false (null subst))
+      (expect ok :to-be-truthy)
+      (expect (null subst) :to-be-falsy)
       (let ((resolved (cl-cc/type:zonk tv subst)))
-        (assert-true (cl-cc/type:type-equal-p resolved cl-cc/type:type-int))))))
+        (expect (cl-cc/type:type-equal-p resolved cl-cc/type:type-int) :to-be-truthy)))))
 
-(deftest parametric-type-unify-different-constructors
-  "Unifying (List fixnum) with (Option fixnum) fails"
+(it-sequential "parametric-type-unify-different-constructors"
   (let ((t1 (cl-cc/type:parse-type-specifier '(list fixnum)))
         (t2 (cl-cc/type:parse-type-specifier '(Option fixnum))))
     (multiple-value-bind (subst ok) (cl-cc/type:type-unify t1 t2)
       (declare (ignore subst))
-      (assert-false ok))))
+      (expect ok :to-be-falsy))))
 
-(deftest-each parametric-type-utilities
-  "Type-constructor utility operations: unparse, to-string, equal-p, free-vars."
-  :cases (("unparse-roundtrip"
-           (lambda ()
+(it-sequential "parametric-type-utilities unparse-roundtrip"
+  (destructuring-bind (check) (list (lambda ()
              (let* ((ty   (cl-cc/type:parse-type-specifier '(Pair fixnum string)))
                     (spec (cl-cc/type:unparse-type ty)))
-               (assert-equal 'Pair (first spec))
-               (assert-=     3     (length spec)))))
-          ("to-string"
-           (lambda ()
+               (expect (first spec) :to-equal 'Pair)
+               (expect (= 3 (length spec)) :to-be-truthy))))
+    (funcall check)))
+
+(it-sequential "parametric-type-utilities to-string"
+  (destructuring-bind (check) (list (lambda ()
              (let ((ty (cl-cc/type:parse-type-specifier '(list fixnum))))
-               (assert-string= "(LIST FIXNUM)" (cl-cc/type:type-to-string ty)))))
-          ("equal-p"
-           (lambda ()
+               (expect (cl-cc/type:type-to-string ty) :to-equal "(LIST FIXNUM)"))))
+    (funcall check)))
+
+(it-sequential "parametric-type-utilities equal-p"
+  (destructuring-bind (check) (list (lambda ()
              (let ((t1 (cl-cc/type:parse-type-specifier '(list fixnum)))
                    (t2 (cl-cc/type:parse-type-specifier '(list fixnum)))
                    (t3 (cl-cc/type:parse-type-specifier '(list string))))
-               (assert-true  (cl-cc/type:type-equal-p t1 t2))
-               (assert-false (cl-cc/type:type-equal-p t1 t3)))))
-          ("free-vars"
-           (lambda ()
+               (expect (cl-cc/type:type-equal-p t1 t2) :to-be-truthy)
+               (expect (cl-cc/type:type-equal-p t1 t3) :to-be-falsy))))
+    (funcall check)))
+
+(it-sequential "parametric-type-utilities free-vars"
+  (destructuring-bind (check) (list (lambda ()
              (let* ((tv (cl-cc/type:fresh-type-var 'x))
                     (ty (cl-cc/type:make-type-constructor 'list (list tv))))
-               (assert-= 1 (length (cl-cc/type:type-free-vars ty)))))))
-  (check)
-  (funcall check))
+               (expect (= 1 (length (cl-cc/type:type-free-vars ty))) :to-be-truthy))))
+    (funcall check)))
 
-(deftest parametric-type-nested
-  "Nested parametric types: (List (Option fixnum))"
+(it-sequential "parametric-type-nested"
   (let ((ty (cl-cc/type:parse-type-specifier '(list (Option fixnum)))))
-    (assert-type cl-cc/type:type-constructor ty)
-    (assert-eq 'list (cl-cc/type:type-constructor-name ty))
+    (expect (typep ty 'cl-cc/type:type-constructor) :to-be-truthy)
+    (expect (cl-cc/type:type-constructor-name ty) :to-be 'list)
     (let ((inner (first (cl-cc/type:type-constructor-args ty))))
-      (assert-type cl-cc/type:type-constructor inner)
-      (assert-eq 'Option (cl-cc/type:type-constructor-name inner)))))
+      (expect (typep inner 'cl-cc/type:type-constructor) :to-be-truthy)
+      (expect (cl-cc/type:type-constructor-name inner) :to-be 'Option))))
 
-(deftest parametric-type-in-typed-defun
-  "Typed defun with parametric return type compiles"
+(it-sequential "parametric-type-in-typed-defun"
   (let ((result (run-string "(progn
     (deftype int-list (list fixnum))
     (defun make-nums () (list 1 2 3))
     (length (make-nums)))")))
-    (assert-= 3 result)))
+    (expect (= 3 result) :to-be-truthy)))
 
 ;;; Defparameter Tests
 
-(deftest-each defparameter-persistence
-  "defparameter defines and persists dynamic variables across various usage patterns."
-  :cases (("basic"         42 "(progn (defparameter *val* 42) *val*)")
-          ("with-function" 10 "(progn (defparameter *base* 10) (defun get-base () *base*) (get-base))")
-          ("setq-mutation"  5 "(progn (defparameter *x* 0) (setq *x* 5) *x*)"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "defparameter-persistence basic"
+  (destructuring-bind (expected form) (list 42 "(progn (defparameter *val* 42) *val*)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "defparameter-persistence with-function"
+  (destructuring-bind (expected form) (list 10 "(progn (defparameter *base* 10) (defun get-base () *base*) (get-base))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "defparameter-persistence setq-mutation"
+  (destructuring-bind (expected form) (list 5 "(progn (defparameter *x* 0) (setq *x* 5) *x*)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; String= and Equal Tests
 
-(deftest-each compile-equal-truthy
-  "equal and string= return truthy for matching values."
-  :cases (("string=-match"  "(string= \"hello\" \"hello\")")
-          ("equal-numbers"  "(equal 42 42)")
-          ("equal-strings"  "(equal \"abc\" \"abc\")")
-          ("equal-lists"    "(equal '(1 2 3) (list 1 2 3))"))
-  (form)
-  (assert-true (run-string form)))
+(it-sequential "compile-equal-truthy string=-match"
+  (destructuring-bind (form) (list "(string= \"hello\" \"hello\")")
+    (expect (run-string form) :to-be-truthy)))
 
-(deftest-each compile-equal-false
-  "equal and string= return NIL (falsy) for non-matching values."
-  :cases (("string=-diff" "(string= \"hello\" \"world\")")
-          ("equal-diff"   "(equal 1 2)"))
-  (form)
-  (assert-true (null (run-string form))))
+(it-sequential "compile-equal-truthy equal-numbers"
+  (destructuring-bind (form) (list "(equal 42 42)")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "compile-equal-truthy equal-strings"
+  (destructuring-bind (form) (list "(equal \"abc\" \"abc\")")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "compile-equal-truthy equal-lists"
+  (destructuring-bind (form) (list "(equal '(1 2 3) (list 1 2 3))")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "compile-equal-false string=-diff"
+  (destructuring-bind (form) (list "(string= \"hello\" \"world\")")
+    (expect (null (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-equal-false equal-diff"
+  (destructuring-bind (form) (list "(equal 1 2)")
+    (expect (null (run-string form)) :to-be-truthy)))
 
 ;;; Numeric Builtins Tests (max, min, mod, zerop, plusp, minusp)
 
-(deftest-each numeric-arithmetic
-  "max/min/mod/abs return the expected numeric value."
-  :cases (("max"       5 "(max 3 5)")
-          ("min"       3 "(min 3 5)")
-          ("mod-basic" 1 "(mod 7 3)")
-          ("mod-even"  0 "(mod 6 3)")
-          ("abs"       5 "(abs -5)"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "numeric-arithmetic max"
+  (destructuring-bind (expected form) (list 5 "(max 3 5)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
-(deftest-each numeric-predicates-truthy
-  "Numeric predicates return truthy for matching values."
-  :cases (("zerop-zero"  "(zerop 0)")
-          ("plusp-pos"   "(plusp 5)")
-          ("minusp-neg"  "(minusp -3)")
-          ("evenp-even"  "(evenp 4)")
-          ("oddp-odd"    "(oddp 3)"))
-  (form)
-  (assert-true (run-string form)))
+(it-sequential "numeric-arithmetic min"
+  (destructuring-bind (expected form) (list 3 "(min 3 5)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
-(deftest-each numeric-predicates-false
-  "Numeric predicates return NIL for non-matching values."
-  :cases (("zerop-nonzero" "(zerop 5)")
-          ("plusp-neg"     "(plusp -3)")
-          ("minusp-pos"    "(minusp 5)"))
-  (form)
-  (assert-false (run-string form)))
+(it-sequential "numeric-arithmetic mod-basic"
+  (destructuring-bind (expected form) (list 1 "(mod 7 3)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "numeric-arithmetic mod-even"
+  (destructuring-bind (expected form) (list 0 "(mod 6 3)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "numeric-arithmetic abs"
+  (destructuring-bind (expected form) (list 5 "(abs -5)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "numeric-predicates-truthy zerop-zero"
+  (destructuring-bind (form) (list "(zerop 0)")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "numeric-predicates-truthy plusp-pos"
+  (destructuring-bind (form) (list "(plusp 5)")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "numeric-predicates-truthy minusp-neg"
+  (destructuring-bind (form) (list "(minusp -3)")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "numeric-predicates-truthy evenp-even"
+  (destructuring-bind (form) (list "(evenp 4)")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "numeric-predicates-truthy oddp-odd"
+  (destructuring-bind (form) (list "(oddp 3)")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "numeric-predicates-false zerop-nonzero"
+  (destructuring-bind (form) (list "(zerop 5)")
+    (expect (run-string form) :to-be-falsy)))
+
+(it-sequential "numeric-predicates-false plusp-neg"
+  (destructuring-bind (form) (list "(plusp -3)")
+    (expect (run-string form) :to-be-falsy)))
+
+(it-sequential "numeric-predicates-false minusp-pos"
+  (destructuring-bind (form) (list "(minusp 5)")
+    (expect (run-string form) :to-be-falsy)))
 
 ;;; Warn Compilation Tests
 
-(deftest compile-warn
-  "warn compiles without crashing and execution continues past it."
-  (assert-true (null (run-string "(warn \"test warning\")")))
-  (assert-= 42 (run-string "(progn (warn \"warning\") 42)")))
+(it-sequential "compile-warn"
+  (expect (null (run-string "(warn \"test warning\")")) :to-be-truthy)
+  (expect (= 42 (run-string "(progn (warn \"warning\") 42)")) :to-be-truthy))
 
 ;;; Format Compilation Tests
 
-(deftest-each compile-format-nil
-  "format nil with various directives returns the correctly formatted string."
-  :cases (("simple" "hello"       "(format nil \"~A\" \"hello\")")
-          ("number" "42"          "(format nil \"~D\" 42)")
-          ("concat" "hello world" "(format nil \"~A ~A\" \"hello\" \"world\")"))
-  (expected form)
-  (assert-string= expected (run-string form)))
+(it-sequential "compile-format-nil simple"
+  (destructuring-bind (expected form) (list "hello" "(format nil \"~A\" \"hello\")")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-format-nil number"
+  (destructuring-bind (expected form) (list "42" "(format nil \"~D\" 42)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-format-nil concat"
+  (destructuring-bind (expected form) (list "hello world" "(format nil \"~A ~A\" \"hello\" \"world\")")
+    (expect (run-string form) :to-equal expected)))

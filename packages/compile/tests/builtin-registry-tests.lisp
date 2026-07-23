@@ -1,52 +1,166 @@
 ;;;; tests/unit/compile/builtin-registry-tests.lisp — Builtin Registry tests
 (in-package :cl-cc/test)
-(in-suite cl-cc-coverage-unstable-unit-suite)
 
 ;;; ─── Registry Lookup Tests ─────────────────────────────────────────────────
 
-(deftest-each builtin-registry-lookup
-  "Registry contains entries for representative builtins from each convention."
-  :cases (("car-unary"          "CAR"              :unary)
-          ("cdr-unary"          "CDR"              :unary)
-          ("not-unary"          "NOT"              :unary)
-          ("bswap-unary"        "BSWAP"            :unary)
-          ("length-unary"       "LENGTH"           :unary)
-          ("mod-binary"         "MOD"              :binary)
-          ("ash-binary"         "ASH"              :binary)
-          ("expt-binary"        "EXPT"             :binary)
-          ("string=-str-cmp"    "STRING="          :string-cmp)
-          ("char=-char-cmp"     "CHAR="            :char-cmp)
-          ("ht-count-table"     "HASH-TABLE-COUNT" :table-query)
-          ("read-byte-handle"   "READ-BYTE"        :handle-input)
-          ("princ-side-eff"     "PRINC"            :side-effect)
-          ("terpri-void"        "TERPRI"           :void-side-eff)
-          ("gensym-nullary"     "GENSYM"           :nullary)
-          ("string-trim-trim"   "STRING-TRIM"      :string-trim)
-          ("close-handle-eff"   "CLOSE"            :handle-effect))
-  (name-str expected-conv)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq expected-conv (cl-cc/compile::be-convention entry))))
+(it-sequential "builtin-registry-lookup car-unary"
+  (destructuring-bind (name-str expected-conv) (list "CAR" :unary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
 
-(deftest-each builtin-registry-constructor-symbols
-  "Registry entries have correct constructor symbols."
-  :cases (("car"   "CAR"   'cl-cc::make-vm-car)
-          ("bswap" "BSWAP" 'cl-cc::make-vm-bswap)
-          ("mod"   "MOD"   'cl-cc::make-vm-mod)
-          ("princ" "PRINC" 'cl-cc::make-vm-princ)
-          ("float" "FLOAT" 'cl-cc::make-vm-float-inst)
-          ("float-precision" "FLOAT-PRECISION" 'cl-cc::make-vm-float-precision)
-          ("float-radix" "FLOAT-RADIX" 'cl-cc::make-vm-float-radix)
-          ("float-sign" "FLOAT-SIGN" 'cl-cc::make-vm-float-sign)
-          ("float-digits" "FLOAT-DIGITS" 'cl-cc::make-vm-float-digits)
-          ("decode-float" "DECODE-FLOAT" 'cl-cc::make-vm-decode-float)
-          ("integer-decode-float" "INTEGER-DECODE-FLOAT" 'cl-cc::make-vm-integer-decode-float))
-  (name-str expected-ctor)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-eq expected-ctor (cl-cc/compile::be-ctor entry))))
+(it-sequential "builtin-registry-lookup cdr-unary"
+  (destructuring-bind (name-str expected-conv) (list "CDR" :unary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
 
-(deftest builtin-registry-constructors-are-fbound
-  "Every registered builtin constructor symbol resolves to a callable function."
+(it-sequential "builtin-registry-lookup not-unary"
+  (destructuring-bind (name-str expected-conv) (list "NOT" :unary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup bswap-unary"
+  (destructuring-bind (name-str expected-conv) (list "BSWAP" :unary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup length-unary"
+  (destructuring-bind (name-str expected-conv) (list "LENGTH" :unary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup mod-binary"
+  (destructuring-bind (name-str expected-conv) (list "MOD" :binary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup ash-binary"
+  (destructuring-bind (name-str expected-conv) (list "ASH" :binary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup expt-binary"
+  (destructuring-bind (name-str expected-conv) (list "EXPT" :binary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup string=-str-cmp"
+  (destructuring-bind (name-str expected-conv) (list "STRING=" :string-cmp)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup char=-char-cmp"
+  (destructuring-bind (name-str expected-conv) (list "CHAR=" :char-cmp)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup ht-count-table"
+  (destructuring-bind (name-str expected-conv) (list "HASH-TABLE-COUNT" :table-query)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup read-byte-handle"
+  (destructuring-bind (name-str expected-conv) (list "READ-BYTE" :handle-input)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup princ-side-eff"
+  (destructuring-bind (name-str expected-conv) (list "PRINC" :side-effect)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup terpri-void"
+  (destructuring-bind (name-str expected-conv) (list "TERPRI" :void-side-eff)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup gensym-nullary"
+  (destructuring-bind (name-str expected-conv) (list "GENSYM" :nullary)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup string-trim-trim"
+  (destructuring-bind (name-str expected-conv) (list "STRING-TRIM" :string-trim)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-lookup close-handle-eff"
+  (destructuring-bind (name-str expected-conv) (list "CLOSE" :handle-effect)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be expected-conv))))
+
+(it-sequential "builtin-registry-constructor-symbols car"
+  (destructuring-bind (name-str expected-ctor) (list "CAR" 'cl-cc::make-vm-car)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols bswap"
+  (destructuring-bind (name-str expected-ctor) (list "BSWAP" 'cl-cc::make-vm-bswap)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols mod"
+  (destructuring-bind (name-str expected-ctor) (list "MOD" 'cl-cc::make-vm-mod)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols princ"
+  (destructuring-bind (name-str expected-ctor) (list "PRINC" 'cl-cc::make-vm-princ)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols float"
+  (destructuring-bind (name-str expected-ctor) (list "FLOAT" 'cl-cc::make-vm-float-inst)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols float-precision"
+  (destructuring-bind (name-str expected-ctor) (list "FLOAT-PRECISION" 'cl-cc::make-vm-float-precision)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols float-radix"
+  (destructuring-bind (name-str expected-ctor) (list "FLOAT-RADIX" 'cl-cc::make-vm-float-radix)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols float-sign"
+  (destructuring-bind (name-str expected-ctor) (list "FLOAT-SIGN" 'cl-cc::make-vm-float-sign)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols float-digits"
+  (destructuring-bind (name-str expected-ctor) (list "FLOAT-DIGITS" 'cl-cc::make-vm-float-digits)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols decode-float"
+  (destructuring-bind (name-str expected-ctor) (list "DECODE-FLOAT" 'cl-cc::make-vm-decode-float)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructor-symbols integer-decode-float"
+  (destructuring-bind (name-str expected-ctor) (list "INTEGER-DECODE-FLOAT" 'cl-cc::make-vm-integer-decode-float)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "builtin-registry-constructors-are-fbound"
   (let (missing)
     (maphash (lambda (_key entry)
                (declare (ignore _key))
@@ -54,40 +168,40 @@
                  (unless (fboundp ctor)
                    (push ctor missing))))
              cl-cc/compile::*builtin-registry*)
-    (assert-null (nreverse missing))))
+    (expect (nreverse missing) :to-be-null)))
 
-(deftest-each builtin-registry-missing-returns-nil
-  "Looking up a non-builtin name returns NIL."
-  :cases (("not-a-builtin" "NOT-A-BUILTIN")
-          ("defun"         "DEFUN")
-          ("let"           "LET"))
-  (name-str)
-  (assert-true (null (gethash name-str cl-cc/compile::*builtin-registry*))))
+(it-sequential "builtin-registry-missing-returns-nil not-a-builtin"
+  (destructuring-bind (name-str) (list "NOT-A-BUILTIN")
+    (expect (null (gethash name-str cl-cc/compile::*builtin-registry*)) :to-be-truthy)))
 
-(deftest builtin-registry-binary-needs-2-args
-  "Binary convention entries have :binary convention."
+(it-sequential "builtin-registry-missing-returns-nil defun"
+  (destructuring-bind (name-str) (list "DEFUN")
+    (expect (null (gethash name-str cl-cc/compile::*builtin-registry*)) :to-be-truthy)))
+
+(it-sequential "builtin-registry-missing-returns-nil let"
+  (destructuring-bind (name-str) (list "LET")
+    (expect (null (gethash name-str cl-cc/compile::*builtin-registry*)) :to-be-truthy)))
+
+(it-sequential "builtin-registry-binary-needs-2-args"
   (let ((entry (gethash "MOD" cl-cc/compile::*builtin-registry*)))
-    (assert-eq :binary (cl-cc/compile::be-convention entry))))
+    (expect (cl-cc/compile::be-convention entry) :to-be :binary)))
 
-(deftest builtin-registry-bit-array-uses-ansi-ior-name
-  "Bit-array OR is registered under ANSI BIT-IOR, not the removed BIT-OR alias."
+(it-sequential "builtin-registry-bit-array-uses-ansi-ior-name"
   (let ((entry (gethash "BIT-IOR" cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq 'cl-cc::make-vm-bit-or (cl-cc/compile::be-ctor entry))
-    (assert-null (gethash "BIT-OR" cl-cc/compile::*builtin-registry*))))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-ctor entry) :to-be 'cl-cc::make-vm-bit-or)
+    (expect (gethash "BIT-OR" cl-cc/compile::*builtin-registry*) :to-be-null)))
 
-(deftest builtin-registry-known-function-properties
-  "FR-183: builtin registry entries expose known function properties for optimizer consumers."
+(it-sequential "builtin-registry-known-function-properties"
   (let ((char-entry (gethash "CHAR=" cl-cc/compile::*builtin-registry*))
         (princ-entry (gethash "PRINC" cl-cc/compile::*builtin-registry*)))
-    (assert-true (member :pure (cl-cc/compile::be-properties char-entry)))
-    (assert-true (member :foldable (cl-cc/compile::be-properties char-entry)))
-    (assert-true (member :io (cl-cc/compile::be-properties princ-entry)))))
+    (expect (member :pure (cl-cc/compile::be-properties char-entry)) :to-be-truthy)
+    (expect (member :foldable (cl-cc/compile::be-properties char-entry)) :to-be-truthy)
+    (expect (member :io (cl-cc/compile::be-properties princ-entry)) :to-be-truthy)))
 
 ;;; ─── Prolog Fact Tests ─────────────────────────────────────────────────────
 
-(deftest builtin-prolog-facts-registered
-  "Prolog facts are registered for each builtin convention."
+(it-sequential "builtin-prolog-facts-registered"
   (let ((unary-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
                                              '(cl-cc/compile::builtin-unary ?sym ?ctor)))
         (binary-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
@@ -96,67 +210,136 @@
                                                    '(cl-cc/compile::builtin-string-cmp ?sym ?ctor)))
         (nullary-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
                                                '(cl-cc/compile::builtin-nullary ?sym ?ctor))))
-    (assert-true (> (length unary-rules) 50))
-    (assert-true (> (length binary-rules) 15))
-    (assert-true (> (length string-cmp-rules) 10))
-    (assert-true (> (length nullary-rules) 3))))
+    (expect (> (length unary-rules) 50) :to-be-truthy)
+    (expect (> (length binary-rules) 15) :to-be-truthy)
+    (expect (> (length string-cmp-rules) 10) :to-be-truthy)
+    (expect (> (length nullary-rules) 3) :to-be-truthy)))
 
-(deftest builtin-prolog-fact-structure
-  "Prolog facts have correct (predicate cl-sym vm-ctor) structure."
+(it-sequential "builtin-prolog-fact-structure"
   (let ((car-solution (cl-prolog:query-prolog-first
                        cl-cc/compile::*builtin-rulebase*
                        '(cl-cc/compile::builtin-unary car ?ctor))))
-    (assert-true car-solution)
-    (assert-eq 'cl-cc/vm:make-vm-car (cl-prolog:solution-binding '?ctor car-solution))))
+    (expect car-solution :to-be-truthy)
+    (expect (cl-prolog:solution-binding '?ctor car-solution) :to-be 'cl-cc/vm:make-vm-car)))
 
 ;;; ─── Emitter Dispatch Tests ────────────────────────────────────────────────
 
-(deftest-each builtin-emitter-table-coverage
-  "Every convention has an emitter in the dispatch table."
-  :cases (("unary"          :unary)
-          ("binary"         :binary)
-          ("binary-custom"  :binary-custom)
-          ("string-cmp"     :string-cmp)
-          ("char-cmp"       :char-cmp)
-          ("table-query"    :table-query)
-          ("handle-input"   :handle-input)
-          ("side-effect"    :side-effect)
-          ("void-side-eff"  :void-side-eff)
-          ("nullary"        :nullary)
-          ("string-trim"    :string-trim)
-          ("handle-effect"  :handle-effect)
-          ("zero-compare"   :zero-compare)
-          ("stream-input-opt"  :stream-input-opt)
-          ("stream-void-opt"   :stream-void-opt)
-          ("stream-write-val"  :stream-write-val)
-          ;; 2026 conventions
-          ("unary-custom"           :unary-custom)
-          ("unary-custom-void"      :unary-custom-void)
-          ("binary-move-first"      :binary-move-first)
-          ("binary-void"            :binary-void)
-          ("binary-synth-zero"      :binary-synth-zero)
-          ("unary-opt-nil"          :unary-opt-nil)
-          ("binary-opt-one"         :binary-opt-one)
-          ("binary-opt-nil-slot"    :binary-opt-nil-slot)
-          ("ternary-custom"         :ternary-custom)
-          ("ternary-opt-nil-custom" :ternary-opt-nil-custom))
-  (conv)
-  (assert-true (gethash conv cl-cc/compile::*builtin-emitter-table*)))
+(it-sequential "builtin-emitter-table-coverage unary"
+  (destructuring-bind (conv) (list :unary)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary"
+  (destructuring-bind (conv) (list :binary)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary-custom"
+  (destructuring-bind (conv) (list :binary-custom)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage string-cmp"
+  (destructuring-bind (conv) (list :string-cmp)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage char-cmp"
+  (destructuring-bind (conv) (list :char-cmp)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage table-query"
+  (destructuring-bind (conv) (list :table-query)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage handle-input"
+  (destructuring-bind (conv) (list :handle-input)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage side-effect"
+  (destructuring-bind (conv) (list :side-effect)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage void-side-eff"
+  (destructuring-bind (conv) (list :void-side-eff)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage nullary"
+  (destructuring-bind (conv) (list :nullary)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage string-trim"
+  (destructuring-bind (conv) (list :string-trim)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage handle-effect"
+  (destructuring-bind (conv) (list :handle-effect)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage zero-compare"
+  (destructuring-bind (conv) (list :zero-compare)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage stream-input-opt"
+  (destructuring-bind (conv) (list :stream-input-opt)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage stream-void-opt"
+  (destructuring-bind (conv) (list :stream-void-opt)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage stream-write-val"
+  (destructuring-bind (conv) (list :stream-write-val)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage unary-custom"
+  (destructuring-bind (conv) (list :unary-custom)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage unary-custom-void"
+  (destructuring-bind (conv) (list :unary-custom-void)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary-move-first"
+  (destructuring-bind (conv) (list :binary-move-first)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary-void"
+  (destructuring-bind (conv) (list :binary-void)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary-synth-zero"
+  (destructuring-bind (conv) (list :binary-synth-zero)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage unary-opt-nil"
+  (destructuring-bind (conv) (list :unary-opt-nil)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary-opt-one"
+  (destructuring-bind (conv) (list :binary-opt-one)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage binary-opt-nil-slot"
+  (destructuring-bind (conv) (list :binary-opt-nil-slot)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage ternary-custom"
+  (destructuring-bind (conv) (list :ternary-custom)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
+
+(it-sequential "builtin-emitter-table-coverage ternary-opt-nil-custom"
+  (destructuring-bind (conv) (list :ternary-opt-nil-custom)
+    (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy)))
 
 ;;; ─── Binary-Custom Convention Tests ─────────────────────────────────────────
 
-(deftest binary-custom-entry-count
-  "There are exactly 18 binary-custom entries in the registry."
+(it-sequential "binary-custom-entry-count"
   (let ((count 0))
     (maphash (lambda (_key entry)
                (declare (ignore _key))
                (when (eq (cl-cc/compile::be-convention entry) :binary-custom)
                  (incf count)))
              cl-cc/compile::*builtin-registry*)
-    (assert-equal 18 count)))
+    (expect count :to-equal 18)))
 
-(deftest binary-custom-entry-validation
-  "Every binary-custom entry has a 2-element slots list with keyword slot names."
+(it-sequential "binary-custom-entry-validation"
   (let ((slots-ok t)
         (keywords-ok t))
     (maphash (lambda (_key entry)
@@ -169,109 +352,177 @@
                               (keywordp (second (cl-cc/compile::be-slots entry))))
                    (setf keywords-ok nil))))
              cl-cc/compile::*builtin-registry*)
-    (assert-true slots-ok)
-    (assert-true keywords-ok)))
+    (expect slots-ok :to-be-truthy)
+    (expect keywords-ok :to-be-truthy)))
 
-(deftest-each binary-custom-entry-details
-  "CONS and NTH binary-custom slots are registered with the correct convention and slot names."
-  :cases (("cons" "CONS" '(:car-src :cdr-src))
-          ("nth"  "NTH"  '(:index :list)))
-  (name-str expected-slots)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-equal :binary-custom (cl-cc/compile::be-convention entry))
-    (assert-equal expected-slots (cl-cc/compile::be-slots entry))))
+(it-sequential "binary-custom-entry-details cons"
+  (destructuring-bind (name-str expected-slots) (list "CONS" '(:car-src :cdr-src))
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-equal :binary-custom)
+    (expect (cl-cc/compile::be-slots entry) :to-equal expected-slots))))
+
+(it-sequential "binary-custom-entry-details nth"
+  (destructuring-bind (name-str expected-slots) (list "NTH" '(:index :list))
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-equal :binary-custom)
+    (expect (cl-cc/compile::be-slots entry) :to-equal expected-slots))))
 
 ;;; ─── Zero-Compare Convention Tests ────────────────────────────────────────
 
-(deftest-each zero-compare-registry-entries
-  "Zero-compare entries are correctly registered."
-  :cases (("zerop"  "ZEROP"  'cl-cc::make-vm-num-eq)
-          ("plusp"   "PLUSP"  'cl-cc::make-vm-gt)
-          ("minusp"  "MINUSP" 'cl-cc::make-vm-lt))
-  (name-str expected-ctor)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq :zero-compare (cl-cc/compile::be-convention entry))
-    (assert-eq expected-ctor (cl-cc/compile::be-ctor entry))))
+(it-sequential "zero-compare-registry-entries zerop"
+  (destructuring-bind (name-str expected-ctor) (list "ZEROP" 'cl-cc::make-vm-num-eq)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :zero-compare)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "zero-compare-registry-entries plusp"
+  (destructuring-bind (name-str expected-ctor) (list "PLUSP" 'cl-cc::make-vm-gt)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :zero-compare)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
+
+(it-sequential "zero-compare-registry-entries minusp"
+  (destructuring-bind (name-str expected-ctor) (list "MINUSP" 'cl-cc::make-vm-lt)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :zero-compare)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor))))
 
 ;;; ─── Stream I/O Convention Tests ──────────────────────────────────────────
 
-(deftest-each stream-input-opt-registry-entries
-  "Stream-input-opt entries have correct convention and default handle."
-  :cases (("read-char"  "READ-CHAR"  'cl-cc::make-vm-read-char  0)
-          ("read-line"  "READ-LINE"  'cl-cc::make-vm-read-line  0))
-  (name-str expected-ctor default-handle)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq :stream-input-opt (cl-cc/compile::be-convention entry))
-    (assert-eq expected-ctor (cl-cc/compile::be-ctor entry))
-    (assert-equal (list default-handle) (cl-cc/compile::be-slots entry))))
+(it-sequential "stream-input-opt-registry-entries read-char"
+  (destructuring-bind (name-str expected-ctor default-handle) (list "READ-CHAR" 'cl-cc::make-vm-read-char 0)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-input-opt)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list default-handle)))))
 
-(deftest-each stream-void-opt-registry-entries
-  "Stream-void-opt entries have correct convention and default handle."
-  :cases (("force-output"  "FORCE-OUTPUT"  'cl-cc::make-vm-force-output  1)
-          ("finish-output" "FINISH-OUTPUT" 'cl-cc::make-vm-finish-output 1)
-          ("clear-input"   "CLEAR-INPUT"   'cl-cc::make-vm-clear-input   0))
-  (name-str expected-ctor default-handle)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq :stream-void-opt (cl-cc/compile::be-convention entry))
-    (assert-eq expected-ctor (cl-cc/compile::be-ctor entry))
-    (assert-equal (list default-handle) (cl-cc/compile::be-slots entry))))
+(it-sequential "stream-input-opt-registry-entries read-line"
+  (destructuring-bind (name-str expected-ctor default-handle) (list "READ-LINE" 'cl-cc::make-vm-read-line 0)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-input-opt)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list default-handle)))))
 
-(deftest-each stream-write-val-registry-entries
-  "Stream-write-val entries have correct convention, value slot, and default handle."
-  :cases (("write-char" "WRITE-CHAR" 'cl-cc::make-vm-write-char :char     1)
-          ("write-byte" "WRITE-BYTE" 'cl-cc::make-vm-write-byte :byte-val 1)
-          ("write-line" "WRITE-LINE" 'cl-cc::make-vm-write-line :str      1))
-  (name-str expected-ctor val-slot default-handle)
-  (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq :stream-write-val (cl-cc/compile::be-convention entry))
-    (assert-eq expected-ctor (cl-cc/compile::be-ctor entry))
-    (assert-equal (list val-slot default-handle) (cl-cc/compile::be-slots entry))))
+(it-sequential "stream-void-opt-registry-entries force-output"
+  (destructuring-bind (name-str expected-ctor default-handle) (list "FORCE-OUTPUT" 'cl-cc::make-vm-force-output 1)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-void-opt)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list default-handle)))))
+
+(it-sequential "stream-void-opt-registry-entries finish-output"
+  (destructuring-bind (name-str expected-ctor default-handle) (list "FINISH-OUTPUT" 'cl-cc::make-vm-finish-output 1)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-void-opt)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list default-handle)))))
+
+(it-sequential "stream-void-opt-registry-entries clear-input"
+  (destructuring-bind (name-str expected-ctor default-handle) (list "CLEAR-INPUT" 'cl-cc::make-vm-clear-input 0)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-void-opt)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list default-handle)))))
+
+(it-sequential "stream-write-val-registry-entries write-char"
+  (destructuring-bind (name-str expected-ctor val-slot default-handle) (list "WRITE-CHAR" 'cl-cc::make-vm-write-char :char 1)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-write-val)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list val-slot default-handle)))))
+
+(it-sequential "stream-write-val-registry-entries write-byte"
+  (destructuring-bind (name-str expected-ctor val-slot default-handle) (list "WRITE-BYTE" 'cl-cc::make-vm-write-byte :byte-val 1)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-write-val)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list val-slot default-handle)))))
+
+(it-sequential "stream-write-val-registry-entries write-line"
+  (destructuring-bind (name-str expected-ctor val-slot default-handle) (list "WRITE-LINE" 'cl-cc::make-vm-write-line :str 1)
+    (let ((entry (gethash name-str cl-cc/compile::*builtin-registry*)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-write-val)
+    (expect (cl-cc/compile::be-ctor entry) :to-be expected-ctor)
+    (expect (cl-cc/compile::be-slots entry) :to-equal (list val-slot default-handle)))))
 
 ;;; ─── Integration: Stream I/O Compilation ──────────────────────────────────
 
-(deftest stream-io-operation-behavior
-  "Stream I/O: read-char resolves via registry; write-char returns value; force-output and clear-input return nil."
+(it-sequential "stream-io-operation-behavior"
   (let ((entry (gethash "READ-CHAR" cl-cc/compile::*builtin-registry*)))
-    (assert-true entry)
-    (assert-eq :stream-input-opt (cl-cc/compile::be-convention entry)))
+    (expect entry :to-be-truthy)
+    (expect (cl-cc/compile::be-convention entry) :to-be :stream-input-opt))
   (let ((*standard-output* (make-broadcast-stream)))
-    (assert-equal #\A (cl-cc:run-string "(write-char #\\A)"))
-    (assert-null (cl-cc:run-string "(force-output)"))
-    (assert-null (cl-cc:run-string "(clear-input)"))))
+    (expect (cl-cc:run-string "(write-char #\\A)") :to-equal #\A)
+    (expect (cl-cc:run-string "(force-output)") :to-be-null)
+    (expect (cl-cc:run-string "(clear-input)") :to-be-null)))
 
 ;;; ─── *convention-arity* completeness ─────────────────────────────────────────
 
-(deftest convention-arity-all-conventions-in-emitter-table
-  "Every convention in *convention-arity* has an emitter registered."
+(it-sequential "convention-arity-all-conventions-in-emitter-table"
   (dolist (entry cl-cc/compile::*convention-arity*)
     (let ((conv (car entry)))
-      (assert-true (gethash conv cl-cc/compile::*builtin-emitter-table*)))))
+      (expect (gethash conv cl-cc/compile::*builtin-emitter-table*) :to-be-truthy))))
 
-(deftest-each convention-arity-arg-bounds
-  "Selected conventions have the expected (min . max) arg counts."
-  :cases (("unary"          :unary          1 1)
-          ("binary"         :binary         2 2)
-          ("unary-opt-nil"  :unary-opt-nil  0 1)
-          ("binary-opt-one" :binary-opt-one 1 2)
-          ("nullary"        :nullary        0 0)
-          ("ternary-custom" :ternary-custom 3 3))
-  (conv expected-min expected-max)
-  (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
-    (assert-true (not (null bounds)))
-    (assert-= expected-min (car bounds))
-    (assert-= expected-max (cdr bounds))))
+(it-sequential "convention-arity-arg-bounds unary"
+  (destructuring-bind (conv expected-min expected-max) (list :unary 1 1)
+    (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
+    (expect (not (null bounds)) :to-be-truthy)
+    (expect (= expected-min (car bounds)) :to-be-truthy)
+    (expect (= expected-max (cdr bounds)) :to-be-truthy))))
+
+(it-sequential "convention-arity-arg-bounds binary"
+  (destructuring-bind (conv expected-min expected-max) (list :binary 2 2)
+    (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
+    (expect (not (null bounds)) :to-be-truthy)
+    (expect (= expected-min (car bounds)) :to-be-truthy)
+    (expect (= expected-max (cdr bounds)) :to-be-truthy))))
+
+(it-sequential "convention-arity-arg-bounds unary-opt-nil"
+  (destructuring-bind (conv expected-min expected-max) (list :unary-opt-nil 0 1)
+    (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
+    (expect (not (null bounds)) :to-be-truthy)
+    (expect (= expected-min (car bounds)) :to-be-truthy)
+    (expect (= expected-max (cdr bounds)) :to-be-truthy))))
+
+(it-sequential "convention-arity-arg-bounds binary-opt-one"
+  (destructuring-bind (conv expected-min expected-max) (list :binary-opt-one 1 2)
+    (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
+    (expect (not (null bounds)) :to-be-truthy)
+    (expect (= expected-min (car bounds)) :to-be-truthy)
+    (expect (= expected-max (cdr bounds)) :to-be-truthy))))
+
+(it-sequential "convention-arity-arg-bounds nullary"
+  (destructuring-bind (conv expected-min expected-max) (list :nullary 0 0)
+    (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
+    (expect (not (null bounds)) :to-be-truthy)
+    (expect (= expected-min (car bounds)) :to-be-truthy)
+    (expect (= expected-max (cdr bounds)) :to-be-truthy))))
+
+(it-sequential "convention-arity-arg-bounds ternary-custom"
+  (destructuring-bind (conv expected-min expected-max) (list :ternary-custom 3 3)
+    (let ((bounds (cdr (assoc conv cl-cc/compile::*convention-arity* :test #'eq))))
+    (expect (not (null bounds)) :to-be-truthy)
+    (expect (= expected-min (car bounds)) :to-be-truthy)
+    (expect (= expected-max (cdr bounds)) :to-be-truthy))))
 
 ;;; ─── emit-registered-builtin arity validation ─────────────────────────────────
 
-(deftest emit-registered-builtin-returns-nil-for-wrong-arity
-  "emit-registered-builtin returns nil when arg count is outside convention bounds."
+(it-sequential "emit-registered-builtin-returns-nil-for-wrong-arity"
   (let* ((entry (gethash "CAR" cl-cc/compile::*builtin-registry*))  ; :unary, needs exactly 1 arg
          (ctx   (make-codegen-ctx))
          (reg   (cl-cc/compile:make-register ctx)))
     ;; Pass 0 args for a :unary convention (min=1, max=1) → should return nil
-    (assert-null (cl-cc/compile::emit-registered-builtin entry nil reg ctx))))
+    (expect (cl-cc/compile::emit-registered-builtin entry nil reg ctx) :to-be-null)))

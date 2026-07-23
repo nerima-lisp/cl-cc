@@ -10,7 +10,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 (defun %compiled-assembly (code target)
   (compilation-result-assembly (compile-string code :target target)))
@@ -18,14 +17,14 @@
 (defun %assert-assembly-stringp (code)
   (let ((x86 (%compiled-assembly code :x86_64))
         (arm (%compiled-assembly code :aarch64)))
-    (assert-true (stringp x86))
-    (assert-true (stringp arm))))
+    (expect (stringp x86) :to-be-truthy)
+    (expect (stringp arm) :to-be-truthy)))
 
 (defun %assert-assembly-contains (code substring)
   (let ((x86 (string-downcase (%compiled-assembly code :x86_64)))
         (arm (string-downcase (%compiled-assembly code :aarch64))))
-    (assert-true (search substring x86))
-    (assert-true (search substring arm))))
+    (expect (search substring x86) :to-be-truthy)
+    (expect (search substring arm) :to-be-truthy)))
 
 (defun %assert-assembly-or-not-yet-supported (code)
   (flet ((compile-or-tag (target)
@@ -34,8 +33,8 @@
              (error () :not-yet-supported))))
     (let ((x86 (compile-or-tag :x86_64))
           (arm (compile-or-tag :aarch64)))
-      (assert-true (or (eq x86 :not-yet-supported) (stringp x86)))
-      (assert-true (or (eq arm :not-yet-supported) (stringp arm))))))
+      (expect (or (eq x86 :not-yet-supported) (stringp x86)) :to-be-truthy)
+      (expect (or (eq arm :not-yet-supported) (stringp arm)) :to-be-truthy))))
 
 ;;; Basic Compiler Tests
 
@@ -56,90 +55,97 @@
           ("progn-simple"     3  "(progn 1 2 3)")
           ("progn-with-let"   3  "(progn (let ((x 2)) x) (let ((y 3)) y))")))
 
-(deftest vm-exec-progn-empty
-  "Empty progn returns NIL."
-  (assert-null (run-string "(progn)")))
+(it-sequential "vm-exec-progn-empty"
+  (expect (run-string "(progn)") :to-be-null))
 
 ;;; Print Tests
 
-(deftest-each vm-exec-print-outputs
-  "print writes its argument(s) to *standard-output*."
-  :cases (("single-value" '("42")        "(print 42)")
-          ("sequence"     '("1" "2" "3") "(progn (print 1) (print 2) (print 3))"))
-  (expected-substrings form)
-  (let ((output (with-output-to-string (*standard-output*)
+(it-sequential "vm-exec-print-outputs single-value"
+  (destructuring-bind (expected-substrings form) (list '("42") "(print 42)")
+    (let ((output (with-output-to-string (*standard-output*)
                   (run-string form))))
     (dolist (s expected-substrings)
-      (assert-true (search s output)))))
+      (expect (search s output) :to-be-truthy)))))
+
+(it-sequential "vm-exec-print-outputs sequence"
+  (destructuring-bind (expected-substrings form) (list '("1" "2" "3") "(progn (print 1) (print 2) (print 3))")
+    (let ((output (with-output-to-string (*standard-output*)
+                  (run-string form))))
+    (dolist (s expected-substrings)
+      (expect (search s output) :to-be-truthy)))))
 
 ;;; Function Compilation Tests
 
-(deftest-each compile-function-forms
-  "Lambda and labels forms compile to a valid vm-program."
-  :cases
-  (("simple-lambda"
-    "(lambda (x) x)")
-   ("multi-param-lambda"
-    "(lambda (x y) (+ x y))")
-   ("lambda-in-let"
-    "(let ((f (lambda (x) (+ x 1)))) (f 5))")
-   ("nested-lambda"
-    "(let ((make-adder (lambda (n) (lambda (x) (+ x n))))) (let ((add5 (make-adder 5))) (add5 10)))")
-   ("recursive-labels"
-    "(labels ((factorial (n) (if (<= n 1) 1 (* n (factorial (- n 1)))))) (factorial 5))")
-   ("hof-function-as-arg"
-    "(let ((apply-twice (lambda (f x) (f (f x))))) (apply-twice (lambda (x) (* x 2)) 3))")
-   ("hof-returning-function"
-    "(let ((make-mul (lambda (n) (lambda (x) (* x n))))) (let ((double (make-mul 2))) (double 21)))"))
-  (code)
-  (assert-true (compilation-result-program (compile-string code :target :vm))))
+(it-sequential "compile-function-forms simple-lambda"
+  (destructuring-bind (code) (list "(lambda (x) x)")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
+
+(it-sequential "compile-function-forms multi-param-lambda"
+  (destructuring-bind (code) (list "(lambda (x y) (+ x y))")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
+
+(it-sequential "compile-function-forms lambda-in-let"
+  (destructuring-bind (code) (list "(let ((f (lambda (x) (+ x 1)))) (f 5))")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
+
+(it-sequential "compile-function-forms nested-lambda"
+  (destructuring-bind (code) (list "(let ((make-adder (lambda (n) (lambda (x) (+ x n))))) (let ((add5 (make-adder 5))) (add5 10)))")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
+
+(it-sequential "compile-function-forms recursive-labels"
+  (destructuring-bind (code) (list "(labels ((factorial (n) (if (<= n 1) 1 (* n (factorial (- n 1)))))) (factorial 5))")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
+
+(it-sequential "compile-function-forms hof-function-as-arg"
+  (destructuring-bind (code) (list "(let ((apply-twice (lambda (f x) (f (f x))))) (apply-twice (lambda (x) (* x 2)) 3))")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
+
+(it-sequential "compile-function-forms hof-returning-function"
+  (destructuring-bind (code) (list "(let ((make-mul (lambda (n) (lambda (x) (* x n))))) (let ((double (make-mul 2))) (double 21)))")
+    (expect (compilation-result-program (compile-string code :target :vm)) :to-be-truthy)))
 
 ;;; Assembly Emission Tests
 
-(deftest asm-emission-binop-add
-  "Native backends emit non-empty assembly for a simple arithmetic form."
-  (assert-true (> (length (compilation-result-assembly
-                           (compile-string "(+ 1 2)" :target :x86_64))) 0))
-  (assert-true (> (length (compilation-result-assembly
-                           (compile-string "(+ 1 2)" :target :aarch64))) 0)))
+(it-sequential "asm-emission-binop-add"
+  (expect (> (length (compilation-result-assembly
+                           (compile-string "(+ 1 2)" :target :x86_64))) 0) :to-be-truthy)
+  (expect (> (length (compilation-result-assembly
+                           (compile-string "(+ 1 2)" :target :aarch64))) 0) :to-be-truthy))
 
-(deftest-each asm-emission-basic-forms
-  "Both backends generate non-empty string assembly for basic forms."
-  :cases (("if-form"  "(if 1 2 3)")
-          ("let-form" "(let ((x 1)) x)"))
-  (form)
-  (%assert-assembly-stringp form))
+(it-sequential "asm-emission-basic-forms if-form"
+  (destructuring-bind (form) (list "(if 1 2 3)")
+    (%assert-assembly-stringp form)))
 
-(deftest asm-emission-identity-lambda
-  "Identity lambda compiles successfully or is flagged as not-yet-supported."
+(it-sequential "asm-emission-basic-forms let-form"
+  (destructuring-bind (form) (list "(let ((x 1)) x)")
+    (%assert-assembly-stringp form)))
+
+(it-sequential "asm-emission-identity-lambda"
   (%assert-assembly-or-not-yet-supported "(lambda (x) x)"))
 
 ;;; Error Handling Tests
 
-(deftest compile-error-conditions
-  "Unbound variables, invalid if, and invalid binop all signal errors."
+(it-sequential "compile-error-conditions"
   (handler-case (run-string "x") (error () nil))
   (handler-case (compile-string "(if 1 2)") (error () nil))
   (handler-case (compile-string "(+ 1)") (error () nil)))
 
 ;;; Integration Tests
 
-(deftest integration-recursive-and-complex
-  "Factorial, fibonacci, and complex nested expressions evaluate correctly."
+(it-sequential "integration-recursive-and-complex"
   (let ((result (handler-case
                     (run-string "(labels ((fact (n) (if (<= n 1) 1 (* n (fact (- n 1)))))) (fact 5))")
                   (error () nil))))
-    (assert-true (or (null result) (= result 120))))
+    (expect (or (null result) (= result 120)) :to-be-truthy))
   (let ((result (handler-case
                     (run-string "(labels ((fib (n) (if (<= n 1) n (+ (fib (- n 1)) (fib (- n 2)))))) (fib 10))")
                   (error () nil))))
-    (assert-true (or (null result) (= result 55))))
-  (assert-= 25 (run-string "(let ((x 2) (y 3)) (let ((add (lambda (a b) (+ a b)))) (let ((mul (lambda (a b) (* a b)))) (mul (add x y) (add x y)))))")))
+    (expect (or (null result) (= result 55)) :to-be-truthy))
+  (expect (= 25 (run-string "(let ((x 2) (y 3)) (let ((add (lambda (a b) (+ a b)))) (let ((mul (lambda (a b) (* a b)))) (mul (add x y) (add x y)))))")) :to-be-truthy))
 
 ;;; Label and Jump Tests
 
-(deftest compile-labels-and-jumps
-  "Compiler generates valid labels and jump targets that reference existing labels."
+(it-sequential "compile-labels-and-jumps"
   (let* ((program (compilation-result-program (compile-string "(if 1 2 3)")))
          (label-names (loop for inst in (vm-program-instructions program)
                           when (typep inst 'vm-label)
@@ -148,23 +154,22 @@
                            when (or (typep inst 'vm-jump)
                                    (typep inst 'vm-jump-zero))
                            collect (vm-label-name inst))))
-    (assert-true (<= 0 (length label-names) 4))
-    (assert-true (every (lambda (target) (find target label-names :test #'string=)) jump-targets))))
+    (expect (<= 0 (length label-names) 4) :to-be-truthy)
+    (expect (every (lambda (target) (find target label-names :test #'string=)) jump-targets) :to-be-truthy)))
 
 ;;; Register Allocation Tests
 
-(deftest compile-register-allocation
-  "Compiler creates symbolic registers and sets a result register."
+(it-sequential "compile-register-allocation"
   (let* ((program (compilation-result-program (compile-string "(+ 1 2)")))
          (registers (loop for inst in (vm-program-instructions program)
                         append (list (when (slot-exists-p inst 'dst) (slot-value inst 'dst))
                                      (when (slot-exists-p inst 'lhs) (slot-value inst 'lhs))
                                      (when (slot-exists-p inst 'rhs) (slot-value inst 'rhs)))))
          (all-registers (remove-duplicates (remove nil registers))))
-    (assert-true (every #'symbolp all-registers)))
+    (expect (every #'symbolp all-registers) :to-be-truthy))
   (let* ((program (compilation-result-program (compile-string "42")))
          (result-reg (vm-program-result-register program)))
-    (assert-true (symbolp result-reg))))
+    (expect (symbolp result-reg) :to-be-truthy)))
 
 ;;; Complex Scoping Tests
 
@@ -173,23 +178,19 @@
   :cases (("deep-nesting" 10 "(let ((a 1)) (let ((b 2)) (let ((c 3)) (let ((d 4)) (+ a (+ b (+ c d)))))))")
           ("shadowing"     3 "(let ((x 1)) (let ((x 2)) (let ((x 3)) x)))")))
 
-(deftest compile-closure-captures-correct-value
-  "Test that closures capture the correct value from scope."
+(it-sequential "compile-closure-captures-correct-value"
   (let ((result (run-string "(let ((x 10)) (let ((get-x (lambda () x))) (let ((x 20)) (get-x))))")))
-    (assert-true (or (= result 10) (eq result 20)))))
+    (expect (or (= result 10) (eq result 20)) :to-be-truthy)))
 
 ;;; Optimization Tests
 
-(deftest compile-peephole-optimization
-  "Test that the peephole optimizer runs (if enabled)."
+(it-sequential "compile-peephole-optimization"
   (let* ((program (compilation-result-program (compile-string "(+ 1 2)")))
          (inst-count (length (vm-program-instructions program))))
-    (assert-true (> inst-count 0))))
+    (expect (> inst-count 0) :to-be-truthy)))
 
-(in-suite cl-cc-unit-suite)
 
-(deftest reflect-optimization-settings
-  "Optimization reflection should read the live SBCL policy without warning."
+(it-sequential "reflect-optimization-settings"
   (let ((warning-seen nil))
     (handler-bind ((warning
                      (lambda (condition)
@@ -203,23 +204,25 @@
              (policy-quality (find-symbol "POLICY-QUALITY" "SB-C"))
              (expected (loop for quality in '(speed safety debug compilation-speed space)
                              collect (cons quality (funcall policy-quality policy quality)))))
-        (assert-false warning-seen)
-        (assert-equal expected settings)
-        (assert-true (every (lambda (entry)
+        (expect warning-seen :to-be-falsy)
+        (expect settings :to-equal expected)
+        (expect (every (lambda (entry)
                               (and (symbolp (car entry))
                                    (integerp (cdr entry))))
-                            settings))))))
+                            settings) :to-be-truthy)))))
 
-(in-suite cl-cc-integration-suite)
 
 ;;; CPS Transformation Tests
 
-(deftest-each compile-cps-transform
-  "CPS transform field in compile result is nil or a proper list."
-  :cases (("arith" "(+ 1 2)") ("if" "(if 1 2 3)"))
-  (form)
-  (let* ((result (compile-string form)) (cps (compilation-result-cps result)))
-    (assert-true (or (null cps) (listp cps)))))
+(it-sequential "compile-cps-transform arith"
+  (destructuring-bind (form) (list "(+ 1 2)")
+    (let* ((result (compile-string form)) (cps (compilation-result-cps result)))
+    (expect (or (null cps) (listp cps)) :to-be-truthy))))
+
+(it-sequential "compile-cps-transform if"
+  (destructuring-bind (form) (list "(if 1 2 3)")
+    (let* ((result (compile-string form)) (cps (compilation-result-cps result)))
+    (expect (or (null cps) (listp cps)) :to-be-truthy))))
 
 ;;; ─── FR-008 Float Unboxing ─────────────────────────────────────────────────
 
@@ -231,14 +234,12 @@
           ("float-div" 2.5   "(/ 10.0 4.0)")
           ("float-nested" 7.0 "(+ (* 2.0 3.0) 1.0)")))
 
-(deftest float-unboxing-instruction-selection
-  "Float binop expressions compile to float-specific VM instructions."
+(it-sequential "float-unboxing-instruction-selection"
   (assert-compiles-to "(+ 1.0 2.0)" :contains 'vm-float-add)
   (assert-compiles-to "(- 5.0 3.0)" :contains 'vm-float-sub)
   (assert-compiles-to "(* 3.0 4.0)" :contains 'vm-float-mul)
   (assert-compiles-to "(/ 10.0 4.0)" :contains 'vm-float-div))
 
-(deftest float-unboxing-via-the
-  "Float arithmetic with explicit THE type annotation selects float ops."
+(it-sequential "float-unboxing-via-the"
   (assert-run= 3.0 "(the float (+ 1.0 2.0))")
   (assert-run= 12.0 "(the float (* 3.0 4.0))"))

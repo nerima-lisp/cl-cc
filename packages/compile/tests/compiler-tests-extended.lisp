@@ -1,30 +1,23 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; Self-Hosting Smoke Test: Mini-Optimizer with Labels + HOFs
 
-(deftest self-host-optimizer-pipeline
-  "Self-hosting smoke: CLOS AST + labels recursive optimizer + mapcar + defparameter"
-  (assert-= 30 (run-string *self-host-optimizer-pipeline-program* :stdlib t)))
+(it-sequential "self-host-optimizer-pipeline"
+  (expect (= 30 (run-string *self-host-optimizer-pipeline-program* :stdlib t)) :to-be-truthy))
 
 ;;; Self-Hosting Integration: Macro Expander + Type Checker
 
-(deftest self-host-macro-system-full
-  "Self-hosting: hash-table macro registry + recursive expansion + multiple macros"
-  (assert-string= "(if x (progn (if y (progn z) nil)) nil)"
-             (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
-               (string-downcase (format nil "~S" (run-string *self-host-macro-system-program* :stdlib t))))))
+(it-sequential "self-host-macro-system-full"
+  (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+               (string-downcase (format nil "~S" (run-string *self-host-macro-system-program* :stdlib t)))) :to-equal "(if x (progn (if y (progn z) nil)) nil)"))
 
-(deftest self-host-type-checker
-  "Self-hosting: simple HM-style type checker with CLOS type nodes"
-  (assert-string= "ok"
-                        (string-downcase
-                         (symbol-name (run-string *self-host-type-checker-program*)))))
+(it-sequential "self-host-type-checker"
+  (expect (string-downcase
+                         (symbol-name (run-string *self-host-type-checker-program*))) :to-equal "ok"))
 
-(deftest self-host-format-error-pipeline
-  "Self-hosting: format for string building + error signaling + handler-case"
-  (assert-string= "caught: bad-value" (run-string "(handler-case (let ((val 42)) (if (> val 100) val (error (format nil \"bad-value\")))) (error (e) (format nil \"caught: ~A\" e)))")))
+(it-sequential "self-host-format-error-pipeline"
+  (expect (run-string "(handler-case (let ((val 42)) (if (> val 100) val (error (format nil \"bad-value\")))) (error (e) (format nil \"caught: ~A\" e)))") :to-equal "caught: bad-value"))
 
 ;;; Prog/With-Slots/Nth-Value Macro Tests
 
@@ -51,51 +44,57 @@
           ("float-literal"      4.0    "(+ 1.5 2.5)"))
   :stdlib t)
 
-(deftest compile-find-package-builtin
-  "find-package compiles through the registry and returns a non-NIL package descriptor."
-  (assert-true (run-string "(find-package :cl-user)" :stdlib t)))
+(it-sequential "compile-find-package-builtin"
+  (expect (run-string "(find-package :cl-user)" :stdlib t) :to-be-truthy))
 
-(deftest compile-find-symbol-builtin
-  "find-symbol compiles through the registry and preserves symbol status as multiple values."
-  (assert-equal '("CAR" :external)
-                (run-string "(multiple-value-bind (sym status) (find-symbol \"CAR\" :cl) (list (symbol-name sym) status))" :stdlib t)))
+(it-sequential "compile-find-symbol-builtin"
+  (expect (run-string "(multiple-value-bind (sym status) (find-symbol \"CAR\" :cl) (list (symbol-name sym) status))" :stdlib t) :to-equal '("CAR" :external)))
 
-(deftest-each compile-float-inspection-builtins
-  "Unary float inspection builtins compile through the registry and return the host results."
-  :cases (("float-precision" "(float-precision 1.0)" (float-precision 1.0))
-          ("float-radix" "(float-radix 1.0)" (float-radix 1.0))
-          ("float-sign" "(float-sign -2.5)" (float-sign -2.5))
-          ("float-digits" "(float-digits 1.0)" (float-digits 1.0)))
-  (form expected)
-  (assert-equal expected (run-string form :stdlib t)))
+(it-sequential "compile-float-inspection-builtins float-precision"
+  (destructuring-bind (form expected) (list "(float-precision 1.0)" (float-precision 1.0))
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
-(deftest-each compile-float-decode-builtins
-  "Float decode builtins compile through the registry and preserve all multiple values."
-  :cases (("decode-float"
-           "(multiple-value-list (decode-float 1.0))"
-           (multiple-value-list (decode-float 1.0)))
-          ("integer-decode-float"
-           "(multiple-value-list (integer-decode-float 1.0))"
-           (multiple-value-list (integer-decode-float 1.0))))
-  (form expected)
-  (assert-equal expected (run-string form :stdlib t)))
+(it-sequential "compile-float-inspection-builtins float-radix"
+  (destructuring-bind (form expected) (list "(float-radix 1.0)" (float-radix 1.0))
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
-(deftest-each compile-string-not-equal
-  "string-not-equal returns truthy for different strings and falsy for case-insensitively equal strings."
-  :cases (("different"      "(string-not-equal \"abc\" \"def\")")
-          ("case-insensitive" "(if (string-not-equal \"abc\" \"ABC\") nil t)"))
-  (form)
-  (assert-true (run-string form :stdlib t)))
+(it-sequential "compile-float-inspection-builtins float-sign"
+  (destructuring-bind (form expected) (list "(float-sign -2.5)" (float-sign -2.5))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-float-inspection-builtins float-digits"
+  (destructuring-bind (form expected) (list "(float-digits 1.0)" (float-digits 1.0))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-float-decode-builtins decode-float"
+  (destructuring-bind (form expected) (list "(multiple-value-list (decode-float 1.0))" (multiple-value-list (decode-float 1.0)))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-float-decode-builtins integer-decode-float"
+  (destructuring-bind (form expected) (list "(multiple-value-list (integer-decode-float 1.0))" (multiple-value-list (integer-decode-float 1.0)))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-string-not-equal different"
+  (destructuring-bind (form) (list "(string-not-equal \"abc\" \"def\")")
+    (expect (run-string form :stdlib t) :to-be-truthy)))
+
+(it-sequential "compile-string-not-equal case-insensitive"
+  (destructuring-bind (form) (list "(if (string-not-equal \"abc\" \"ABC\") nil t)")
+    (expect (run-string form :stdlib t) :to-be-truthy)))
 
 ;;; ─── New stdlib tests (FR-495, FR-496, FR-540, FR-547, FR-582, FR-596, etc.) ──
 
-(deftest-each compile-list-tree-predicates
-  "tailp, copy-alist, and tree-equal all return truthy results."
-  :cases (("tailp"      "(let* ((x '(1 2 3 4)) (tail (cddr x))) (tailp tail x))")
-          ("copy-alist" "(let ((al '((a . 1) (b . 2)))) (equal al (copy-alist al)))")
-          ("tree-equal" "(tree-equal '(1 (2 3)) '(1 (2 3)))"))
-  (form)
-  (assert-true (run-string form)))
+(it-sequential "compile-list-tree-predicates tailp"
+  (destructuring-bind (form) (list "(let* ((x '(1 2 3 4)) (tail (cddr x))) (tailp tail x))")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "compile-list-tree-predicates copy-alist"
+  (destructuring-bind (form) (list "(let ((al '((a . 1) (b . 2)))) (equal al (copy-alist al)))")
+    (expect (run-string form) :to-be-truthy)))
+
+(it-sequential "compile-list-tree-predicates tree-equal"
+  (destructuring-bind (form) (list "(tree-equal '(1 (2 3)) '(1 (2 3)))")
+    (expect (run-string form) :to-be-truthy)))
 
 (deftest-compile compile-list-tree-mutators
   "ldiff, get-properties, nunion, nsubst, and nstring-upcase return expected values."
@@ -113,17 +112,20 @@
           ("in-bounds-invalid" nil "(array-in-bounds-p (make-array 5) 7)"))
   )
 
-(deftest-each compile-equalp
-  "equalp compares lists and strings case-insensitively."
-  :cases (("lists-equal"   "(equalp '(1 2) '(1 2))"      t)
-          ("string-case"   "(equalp \"hello\" \"HELLO\")"  t)
-          ("lists-unequal" "(equalp '(1 2) '(1 3))"       nil))
-  (form expected-truthy)
-  (assert-equal expected-truthy (not (null (run-string form)))))
+(it-sequential "compile-equalp lists-equal"
+  (destructuring-bind (form expected-truthy) (list "(equalp '(1 2) '(1 2))" t)
+    (expect (not (null (run-string form))) :to-equal expected-truthy)))
 
-(deftest compile-lisp-implementation-type
-  "lisp-implementation-type returns cl-cc."
-  (assert-equal "cl-cc" (run-string "(lisp-implementation-type)")))
+(it-sequential "compile-equalp string-case"
+  (destructuring-bind (form expected-truthy) (list "(equalp \"hello\" \"HELLO\")" t)
+    (expect (not (null (run-string form))) :to-equal expected-truthy)))
+
+(it-sequential "compile-equalp lists-unequal"
+  (destructuring-bind (form expected-truthy) (list "(equalp '(1 2) '(1 3))" nil)
+    (expect (not (null (run-string form))) :to-equal expected-truthy)))
+
+(it-sequential "compile-lisp-implementation-type"
+  (expect (run-string "(lisp-implementation-type)") :to-equal "cl-cc"))
 
 (deftest-compile compile-last-butlast-count
   "last/butlast with count return the correct sublist."
@@ -147,24 +149,23 @@
           ("displaced-to"         9 "(let ((base (vector 1 2 3))) (let ((a (make-array 2 :displaced-to base))) (setf (aref a 1) 9) (aref base 1)))"))
   )
 
-(deftest compile-write-to-string-keywords
-  "write-to-string with keyword args; setf on GET updates a symbol property."
-  (assert-equal "42" (run-string "(write-to-string 42 :base 10)"))
-  (assert-equal '(42 (:answer 42)) (run-string "(let ((sym 'hello)) (setf (get sym :answer) 42) (list (get sym :answer) (symbol-plist sym)))")))
+(it-sequential "compile-write-to-string-keywords"
+  (expect (run-string "(write-to-string 42 :base 10)") :to-equal "42")
+  (expect (run-string "(let ((sym 'hello)) (setf (get sym :answer) 42) (list (get sym :answer) (symbol-plist sym)))") :to-equal '(42 (:answer 42))))
 
 ;;; ─── FR-635: bit-nor / bit-nand / bit-eqv ────────────────────────────────────
 
-(deftest-each compile-bit-vector-ops
-  "bit-nor and bit-eqv produce bit-vector results."
-  :cases (("nor" "(bit-nor #*1010 #*1100)")
-          ("eqv" "(bit-eqv #*1010 #*0101)"))
-  (form)
-  (assert-true (vectorp (run-string form))))
+(it-sequential "compile-bit-vector-ops nor"
+  (destructuring-bind (form) (list "(bit-nor #*1010 #*1100)")
+    (expect (vectorp (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-bit-vector-ops eqv"
+  (destructuring-bind (form) (list "(bit-eqv #*1010 #*0101)")
+    (expect (vectorp (run-string form)) :to-be-truthy)))
 
 ;;; ─── FR-497: with-hash-table-iterator ────────────────────────────────────────
 
-(deftest compile-with-hash-table-iterator
-  "with-hash-table-iterator iterates all keys."
+(it-sequential "compile-with-hash-table-iterator"
   (let ((r (run-string "(let ((h (make-hash-table)) (count 0))
   (setf (gethash :a h) 1 (gethash :b h) 2)
   (with-hash-table-iterator (next h)
@@ -172,7 +173,7 @@
             (unless more (return count))
             (incf count)
             (declare (ignore k v))))))")))
-    (assert-= 2 r)))
+    (expect (= 2 r) :to-be-truthy)))
 
 ;;; ─── FR-617/FR-608: stream read forms ────────────────────────────────────────
 
@@ -262,8 +263,7 @@
            "(namestring (translate-pathname #P\"/tmp/src/foo.lisp\" #P\"/tmp/src/*.lisp\" #P\"/tmp/out/*.fasl\"))"))
   )
 
-(deftest compile-pathname-file-host-bridges
-  "File-oriented pathname bridges compile and operate on real filesystem paths."
+(it-sequential "compile-pathname-file-host-bridges"
   (let* ((root (uiop:ensure-directory-pathname
                 (merge-pathnames (format nil "cl-cc-path-bridge-~A/" (get-universal-time))
                                  (uiop:temporary-directory))))
@@ -275,66 +275,63 @@
     (unwind-protect
          (progn
            (run-string (format nil "(ensure-directories-exist ~S)" (namestring nested-file)))
-           (assert-true (probe-file nested-dir))
+           (expect (probe-file nested-dir) :to-be-truthy)
            (with-open-file (out source-file :direction :output :if-exists :supersede :if-does-not-exist :create)
              (write-string "bridge" out))
-           (assert-true (run-string (format nil "(probe-file ~S)" (namestring source-file))))
-           (assert-= (length (directory pattern))
-                     (run-string (format nil "(length (directory ~S))" pattern)))
-           (assert-equal (namestring (truename source-file))
-                         (run-string (format nil "(namestring (truename ~S))" (namestring source-file))))
+           (expect (run-string (format nil "(probe-file ~S)" (namestring source-file))) :to-be-truthy)
+           (expect (= (length (directory pattern)) (run-string (format nil "(length (directory ~S))" pattern))) :to-be-truthy)
+           (expect (run-string (format nil "(namestring (truename ~S))" (namestring source-file))) :to-equal (namestring (truename source-file)))
            (let ((write-date (run-string (format nil "(file-write-date ~S)" (namestring source-file)))))
-             (assert-true (integerp write-date)))
+             (expect (integerp write-date) :to-be-truthy))
            (let ((author (run-string (format nil "(file-author ~S)" (namestring source-file)))))
-             (assert-true (or (null author) (stringp author))))
+             (expect (or (null author) (stringp author)) :to-be-truthy))
            (run-string (format nil "(rename-file ~S ~S)"
                                (namestring source-file)
                                (namestring renamed-file)))
-           (assert-false (probe-file source-file))
-           (assert-true (probe-file renamed-file))
+           (expect (probe-file source-file) :to-be-falsy)
+           (expect (probe-file renamed-file) :to-be-truthy)
            (run-string (format nil "(delete-file ~S)" (namestring renamed-file)))
-           (assert-false (probe-file renamed-file)))
+           (expect (probe-file renamed-file) :to-be-falsy))
       (ignore-errors (delete-file renamed-file))
       (ignore-errors (delete-file source-file)))))
 
 ;;; ─── FR-572: #nA multi-dimensional array literal ─────────────────────────────
 
-(deftest compile-hash-na-arrays
-  "#2A creates a 2D array; #1A creates a 1D array (same as #(...))."
+(it-sequential "compile-hash-na-arrays"
   (let ((r (run-string "#2A((1 2 3) (4 5 6))")))
-    (assert-true (arrayp r))
-    (assert-= 2 (array-rank r))
-    (assert-= 2 (array-dimension r 0))
-    (assert-= 3 (array-dimension r 1))
-    (assert-= 1 (aref r 0 0))
-    (assert-= 6 (aref r 1 2)))
+    (expect (arrayp r) :to-be-truthy)
+    (expect (= 2 (array-rank r)) :to-be-truthy)
+    (expect (= 2 (array-dimension r 0)) :to-be-truthy)
+    (expect (= 3 (array-dimension r 1)) :to-be-truthy)
+    (expect (= 1 (aref r 0 0)) :to-be-truthy)
+    (expect (= 6 (aref r 1 2)) :to-be-truthy))
   (let ((r (run-string "#1A(10 20 30)")))
-    (assert-true (vectorp r))
-    (assert-= 3 (length r))
-    (assert-= 20 (aref r 1))))
+    (expect (vectorp r) :to-be-truthy)
+    (expect (= 3 (length r)) :to-be-truthy)
+    (expect (= 20 (aref r 1)) :to-be-truthy)))
 
 ;;; ─── FR-612: read-char / read-line / read with eof args ──────────────────────
 
-(deftest-each compile-stream-read-eof-args
-  "read-char and read-line with explicit eof args compile; result is nil-like or an eof marker."
-  :cases (("read-char"  "(with-input-from-string (s \"\") (read-char s nil :end-of-stream))")
-          ("read-line"  "(with-input-from-string (s \"\") (read-line s nil nil))"))
-  (form)
-  (let ((r (run-string form)))
-    (assert-true (or (null r) (equal r "") (eq r :eof) (eq r :end-of-stream)))))
+(it-sequential "compile-stream-read-eof-args read-char"
+  (destructuring-bind (form) (list "(with-input-from-string (s \"\") (read-char s nil :end-of-stream))")
+    (let ((r (run-string form)))
+    (expect (or (null r) (equal r "") (eq r :eof) (eq r :end-of-stream)) :to-be-truthy))))
 
-(deftest compile-read-char-stream-arg
-  "read-char with explicit stream reads a character."
+(it-sequential "compile-stream-read-eof-args read-line"
+  (destructuring-bind (form) (list "(with-input-from-string (s \"\") (read-line s nil nil))")
+    (let ((r (run-string form)))
+    (expect (or (null r) (equal r "") (eq r :eof) (eq r :end-of-stream)) :to-be-truthy))))
+
+(it-sequential "compile-read-char-stream-arg"
   (let ((r (run-string
               "(with-input-from-string (s \"A\")
                  (read-char s))")))
-    (assert-equal #\A r)))
+    (expect r :to-equal #\A)))
 
-(deftest compile-close-abort
-  "close with :abort t compiles and returns t."
+(it-sequential "compile-close-abort"
   (let ((r (run-string
               "(let ((s (make-string-output-stream)))
                  (close s :abort t))")))
-    (assert-true r)))
+    (expect r :to-be-truthy)))
 
 ;;; Extended stdlib/keyword integration tests are in compiler-tests-extended-stdlib.lisp.

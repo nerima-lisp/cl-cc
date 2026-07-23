@@ -46,7 +46,6 @@
 
 ;;; Example Properties Using New Generators
 
-(in-suite cl-cc-pbt-suite)
 
 ;; Type Expression Properties
 

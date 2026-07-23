@@ -2,7 +2,6 @@
 
 (in-package :cl-cc/pbt)
 
-(in-suite macro-pbt-suite)
 
 ;;; Property: WHEN Macro Expansion
 

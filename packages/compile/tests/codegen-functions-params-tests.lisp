@@ -8,117 +8,170 @@
 ;;;; compilation context is needed.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── extract-constant-value ──────────────────────────────────────────────
 
-(deftest-each extract-constant-value-constants
-  "extract-constant-value returns the constant and T for compile-time literals."
-  :cases (("int-42"       (cl-cc/ast:make-ast-int   :value 42)    42  t)
-          ("int-0"        (cl-cc/ast:make-ast-int   :value 0)      0  t)
-          ("int-neg"      (cl-cc/ast:make-ast-int   :value -7)    -7  t)
-          ("quote-symbol" (cl-cc/ast:make-ast-quote :value 'hello) 'hello t)
-          ("quote-list"   (cl-cc/ast:make-ast-quote :value '(1 2)) '(1 2) t)
-          ("var-t"        (cl-cc/ast:make-ast-var   :name 't)      t  t)
-          ("var-nil"      (cl-cc/ast:make-ast-var   :name 'nil)    nil t))
-  (ast expected-val expected-const)
-  (multiple-value-bind (val is-const)
+(it-sequential "extract-constant-value-constants int-42"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-int   :value 42) 42 t)
+    (multiple-value-bind (val is-const)
       (cl-cc/compile::extract-constant-value ast)
-    (assert-equal expected-val val)
-    (assert-equal expected-const is-const)))
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
 
-(deftest-each extract-constant-value-non-constants
-  "extract-constant-value returns (nil nil) for non-constant AST nodes."
-  :cases (("var-x"    (cl-cc/ast:make-ast-var  :name 'x))
-          ("call"     (cl-cc/ast:make-ast-call  :func 'f :args nil))
-          ("binop"    (cl-cc/ast:make-ast-binop :op '+ :lhs (cl-cc/ast:make-ast-int :value 1)
-                                                         :rhs (cl-cc/ast:make-ast-int :value 2)))
-          ("lambda"   (cl-cc/ast:make-ast-lambda :params '(x) :body nil)))
-  (ast)
-  (multiple-value-bind (val is-const)
+(it-sequential "extract-constant-value-constants int-0"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-int   :value 0) 0 t)
+    (multiple-value-bind (val is-const)
       (cl-cc/compile::extract-constant-value ast)
-    (assert-null val)
-    (assert-false is-const)))
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
+
+(it-sequential "extract-constant-value-constants int-neg"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-int   :value -7) -7 t)
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
+
+(it-sequential "extract-constant-value-constants quote-symbol"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-quote :value 'hello) 'hello t)
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
+
+(it-sequential "extract-constant-value-constants quote-list"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-quote :value '(1 2)) '(1 2) t)
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
+
+(it-sequential "extract-constant-value-constants var-t"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-var   :name 't) t t)
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
+
+(it-sequential "extract-constant-value-constants var-nil"
+  (destructuring-bind (ast expected-val expected-const) (list (cl-cc/ast:make-ast-var   :name 'nil) nil t)
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-equal expected-val)
+    (expect is-const :to-equal expected-const))))
+
+(it-sequential "extract-constant-value-non-constants var-x"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-var  :name 'x))
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-be-null)
+    (expect is-const :to-be-falsy))))
+
+(it-sequential "extract-constant-value-non-constants call"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-call  :func 'f :args nil))
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-be-null)
+    (expect is-const :to-be-falsy))))
+
+(it-sequential "extract-constant-value-non-constants binop"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-binop :op '+ :lhs (cl-cc/ast:make-ast-int :value 1)
+                                                         :rhs (cl-cc/ast:make-ast-int :value 2)))
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-be-null)
+    (expect is-const :to-be-falsy))))
+
+(it-sequential "extract-constant-value-non-constants lambda"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-lambda :params '(x) :body nil))
+    (multiple-value-bind (val is-const)
+      (cl-cc/compile::extract-constant-value ast)
+    (expect val :to-be-null)
+    (expect is-const :to-be-falsy))))
 
 ;;; ─── dynamic-extent-declared-p ───────────────────────────────────────────
 
-(deftest-each dynamic-extent-declared-p-truthy
-  "dynamic-extent-declared-p returns T when name appears in (dynamic-extent ...)."
-  :cases (("single"   '((dynamic-extent rest))          'rest)
-          ("multi"    '((dynamic-extent a b rest))       'rest)
-          ("first"    '((dynamic-extent args))           'args)
-          ("mixed-decls" '((ignore x) (dynamic-extent r) (type integer n)) 'r))
-  (declarations name)
-  (assert-true (cl-cc/compile::dynamic-extent-declared-p declarations name)))
+(it-sequential "dynamic-extent-declared-p-truthy single"
+  (destructuring-bind (declarations name) (list '((dynamic-extent rest)) 'rest)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-truthy)))
 
-(deftest-each dynamic-extent-declared-p-falsy
-  "dynamic-extent-declared-p returns NIL when name is absent or declarations empty."
-  :cases (("empty"        '()                            'rest)
-          ("other-decl"   '((ignore rest))               'rest)
-          ("wrong-name"   '((dynamic-extent other))      'rest)
-          ("nil-decls"    nil                            'args))
-  (declarations name)
-  (assert-false (cl-cc/compile::dynamic-extent-declared-p declarations name)))
+(it-sequential "dynamic-extent-declared-p-truthy multi"
+  (destructuring-bind (declarations name) (list '((dynamic-extent a b rest)) 'rest)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-truthy)))
+
+(it-sequential "dynamic-extent-declared-p-truthy first"
+  (destructuring-bind (declarations name) (list '((dynamic-extent args)) 'args)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-truthy)))
+
+(it-sequential "dynamic-extent-declared-p-truthy mixed-decls"
+  (destructuring-bind (declarations name) (list '((ignore x) (dynamic-extent r) (type integer n)) 'r)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-truthy)))
+
+(it-sequential "dynamic-extent-declared-p-falsy empty"
+  (destructuring-bind (declarations name) (list '() 'rest)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-falsy)))
+
+(it-sequential "dynamic-extent-declared-p-falsy other-decl"
+  (destructuring-bind (declarations name) (list '((ignore rest)) 'rest)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-falsy)))
+
+(it-sequential "dynamic-extent-declared-p-falsy wrong-name"
+  (destructuring-bind (declarations name) (list '((dynamic-extent other)) 'rest)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-falsy)))
+
+(it-sequential "dynamic-extent-declared-p-falsy nil-decls"
+  (destructuring-bind (declarations name) (list nil 'args)
+    (expect (cl-cc/compile::dynamic-extent-declared-p declarations name) :to-be-falsy)))
 
 ;;; ─── rest-param-stack-alloc-p ────────────────────────────────────────────
 
-(deftest rest-param-stack-alloc-p-non-list-body
-  "rest-param-stack-alloc-p returns NIL for non-list body (conservative)."
-  (assert-false (cl-cc/compile::rest-param-stack-alloc-p nil 'rest))
-  (assert-false (cl-cc/compile::rest-param-stack-alloc-p 'x  'rest)))
+(it-sequential "rest-param-stack-alloc-p-non-list-body"
+  (expect (cl-cc/compile::rest-param-stack-alloc-p nil 'rest) :to-be-falsy)
+  (expect (cl-cc/compile::rest-param-stack-alloc-p 'x  'rest) :to-be-falsy))
 
-(deftest rest-param-stack-alloc-p-safe-consumers
-  "rest-param-stack-alloc-p returns T when rest is only used by safe consumers."
+(it-sequential "rest-param-stack-alloc-p-safe-consumers"
   (let ((body-forms (list `(car rest))))
-    (assert-true (cl-cc/compile::rest-param-stack-alloc-p body-forms 'rest))))
+    (expect (cl-cc/compile::rest-param-stack-alloc-p body-forms 'rest) :to-be-truthy)))
 
 ;;; ─── build-all-param-bindings ────────────────────────────────────────────
 
-(deftest build-all-param-bindings-required-only
-  "build-all-param-bindings with only required params returns correct alist."
+(it-sequential "build-all-param-bindings-required-only"
   (let ((result (cl-cc/compile::build-all-param-bindings
                  '(a b c) '(:r0 :r1 :r2) nil nil nil)))
-    (assert-equal '((a . :r0) (b . :r1) (c . :r2)) result)))
+    (expect result :to-equal '((a . :r0) (b . :r1) (c . :r2)))))
 
-(deftest build-all-param-bindings-with-optional
-  "build-all-param-bindings appends optional bindings after required."
+(it-sequential "build-all-param-bindings-with-optional"
   (let ((result (cl-cc/compile::build-all-param-bindings
                  '(x) '(:r0)
                  '((opt . :r1))
                  nil nil)))
-    (assert-equal '((x . :r0) (opt . :r1)) result)))
+    (expect result :to-equal '((x . :r0) (opt . :r1)))))
 
-(deftest build-all-param-bindings-with-rest
-  "build-all-param-bindings includes rest binding after required and optional."
+(it-sequential "build-all-param-bindings-with-rest"
   (let ((result (cl-cc/compile::build-all-param-bindings
                  '(x) '(:r0) nil '(rest . :r2) nil)))
-    (assert-equal '((x . :r0) (rest . :r2)) result)))
+    (expect result :to-equal '((x . :r0) (rest . :r2)))))
 
-(deftest build-all-param-bindings-with-key
-  "build-all-param-bindings appends key bindings last."
+(it-sequential "build-all-param-bindings-with-key"
   (let ((result (cl-cc/compile::build-all-param-bindings
                  '(a) '(:r0) nil nil '((kw . :r3)))))
-    (assert-equal '((a . :r0) (kw . :r3)) result)))
+    (expect result :to-equal '((a . :r0) (kw . :r3)))))
 
-(deftest-each build-all-param-bindings-combined
-  "build-all-param-bindings ordering: required → optional → rest → key."
-  :cases (("all-present"
-           '(a) '(:r0) '((b . :r1)) '(c . :r2) '((d . :r3))
-           '((a . :r0) (b . :r1) (c . :r2) (d . :r3)))
-          ("empty"
-           nil nil nil nil nil
-           nil))
-  (params param-regs opt-bindings rest-binding key-bindings expected)
-  (assert-equal expected
-                (cl-cc/compile::build-all-param-bindings
-                 params param-regs opt-bindings rest-binding key-bindings)))
+(it-sequential "build-all-param-bindings-combined all-present"
+  (destructuring-bind (params param-regs opt-bindings rest-binding key-bindings expected) (list '(a) '(:r0) '((b . :r1)) '(c . :r2) '((d . :r3)) '((a . :r0) (b . :r1) (c . :r2) (d . :r3)))
+    (expect (cl-cc/compile::build-all-param-bindings
+                 params param-regs opt-bindings rest-binding key-bindings) :to-equal expected)))
 
-(deftest build-all-param-bindings-preserves-order
-  "build-all-param-bindings preserves left-to-right parameter order."
+(it-sequential "build-all-param-bindings-combined empty"
+  (destructuring-bind (params param-regs opt-bindings rest-binding key-bindings expected) (list nil nil nil nil nil nil)
+    (expect (cl-cc/compile::build-all-param-bindings
+                 params param-regs opt-bindings rest-binding key-bindings) :to-equal expected)))
+
+(it-sequential "build-all-param-bindings-preserves-order"
   (let* ((params '(x y z))
          (regs   '(:ra :rb :rc))
          (result (cl-cc/compile::build-all-param-bindings params regs nil nil nil)))
-    (assert-equal 'x (car (first result)))
-    (assert-equal :ra (cdr (first result)))
-    (assert-equal 'y (car (second result)))
-    (assert-equal 'z (car (third result)))))
+    (expect (car (first result)) :to-equal 'x)
+    (expect (cdr (first result)) :to-equal :ra)
+    (expect (car (second result)) :to-equal 'y)
+    (expect (car (third result)) :to-equal 'z)))

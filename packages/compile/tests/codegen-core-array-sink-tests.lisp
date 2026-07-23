@@ -1,10 +1,8 @@
 ;;;; tests/unit/compile/codegen-core-array-sink-tests.lisp — Codegen array non-escape/sink tests
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-codegen-unit-suite)
 
-(deftest codegen-let-noescape-array-variable-aset-bypasses-vm-aset
-  "A non-escaping fixed-size local array can update variable indices via bounded dispatch."
+(it-sequential "codegen-let-noescape-array-variable-aset-bypasses-vm-aset"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -20,15 +18,14 @@
                                            :args (list (make-ast-var :name 'arr)
                                                        (make-ast-var :name 'i)))))
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aset))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-num-eq))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aset) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-num-eq) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero) :to-be-truthy)))
 
-(deftest codegen-let-noescape-typed-array-the-wrapper-still-sinks
-  "Typed (the (simple-array ...)) make-array bindings still use noescape array sink path."
+(it-sequential "codegen-let-noescape-typed-array-the-wrapper-still-sinks"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -46,13 +43,12 @@
                                                        (make-ast-int :value 1))))
                 :declarations nil)
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aset))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aset) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)))
 
-(deftest codegen-let-noescape-array-make-array-function-wrapper-still-sinks
-  "An ast-the-wrapped make-array function designator still takes the noescape array sink path."
+(it-sequential "codegen-let-noescape-array-make-array-function-wrapper-still-sinks"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -70,13 +66,12 @@
                                                        (make-ast-int :value 0))))
                 :declarations nil)
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aset))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aset) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)))
 
-(deftest codegen-let-noescape-typed-array-character-default-init
-  "Typed character noescape arrays initialize slot registers with #\\Nul by default."
+(it-sequential "codegen-let-noescape-typed-array-character-default-init"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast
      (make-ast-let
@@ -90,15 +85,13 @@
                                              (make-ast-int :value 0))))
       :declarations nil)
      ctx)
-    (assert-true
-     (some (lambda (inst)
+    (expect (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-const)
                   (characterp (cl-cc/vm::vm-value inst))
                   (char= #\Nul (cl-cc/vm::vm-value inst))))
-           (codegen-instructions ctx)))))
+           (codegen-instructions ctx)) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-element-type-keyword-still-sinks
-  "(make-array n :element-type 'character) still takes the noescape sink path in let binding."
+(it-sequential "codegen-let-noescape-array-element-type-keyword-still-sinks"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -112,18 +105,16 @@
                                                        (make-ast-int :value 0))))
                 :declarations nil)
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true
-     (some (lambda (inst)
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-const)
                   (characterp (cl-cc/vm::vm-value inst))
                   (char= #\Nul (cl-cc/vm::vm-value inst))))
-           (codegen-instructions ctx)))))
+           (codegen-instructions ctx)) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-element-type-keyword-through-ast-the-still-sinks
-  "Transparent ast-the wrappers around the element-type quote still take the noescape sink path."
+(it-sequential "codegen-let-noescape-array-element-type-keyword-through-ast-the-still-sinks"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -139,18 +130,16 @@
                                                        (make-ast-int :value 0))))
                 :declarations nil)
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true
-     (some (lambda (inst)
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-const)
                   (characterp (cl-cc/vm::vm-value inst))
                   (char= #\Nul (cl-cc/vm::vm-value inst))))
-           (codegen-instructions ctx)))))
+           (codegen-instructions ctx)) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-element-type-keyword-node-through-ast-the-still-sinks
-  "Transparent ast-the wrappers around the :element-type keyword node still take the noescape sink path."
+(it-sequential "codegen-let-noescape-array-element-type-keyword-node-through-ast-the-still-sinks"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -166,18 +155,16 @@
                                                        (make-ast-int :value 0))))
                 :declarations nil)
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true
-     (some (lambda (inst)
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-const)
                   (characterp (cl-cc/vm::vm-value inst))
                   (char= #\Nul (cl-cc/vm::vm-value inst))))
-           (codegen-instructions ctx)))))
+           (codegen-instructions ctx)) :to-be-truthy)))
 
-(deftest codegen-let-branch-local-array-use-elides-allocation
-  "A fixed-size local array used only in one branch is elided entirely on the optimized path."
+(it-sequential "codegen-let-branch-local-array-use-elides-allocation"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -199,15 +186,14 @@
                                  when (and (typep inst 'cl-cc/vm::vm-const)
                                            (eql (cl-cc/vm::vm-value inst) 0))
                                  collect idx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true jump-pos)
-    (assert-true const0-positions)
-    (assert-true (every (lambda (idx) (> idx jump-pos)) const0-positions))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect jump-pos :to-be-truthy)
+    (expect const0-positions :to-be-truthy)
+    (expect (every (lambda (idx) (> idx jump-pos)) const0-positions) :to-be-truthy)))
 
-(deftest codegen-let-branch-array-escape-preserves-allocation
-  "If a branch returns the array itself, the heap-backed make-array path is preserved."
+(it-sequential "codegen-let-branch-array-escape-preserves-allocation"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -222,11 +208,10 @@
                                                   :args (list (make-ast-var :name 'arr)
                                                               (make-ast-var :name 'i))))))
                 ctx)))
-    (assert-true (keywordp reg))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)))
 
-(deftest codegen-let-branch-shadowed-array-binding-still-sinks-outer-use
-  "A shadowed inner array binding must not block sinking the outer array into its only real branch."
+(it-sequential "codegen-let-branch-shadowed-array-binding-still-sinks-outer-use"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -249,56 +234,60 @@
                ctx))
          (insts (codegen-instructions ctx))
          (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts)))
-    (assert-true (keywordp reg))
-    (assert-true jump-pos)
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect jump-pos :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)))
 
-(deftest-each codegen-single-inst-emission
-  "Each AST form emits the expected VM instruction type."
-  :cases (("setq-emits-move"  :setq  'cl-cc/vm::vm-move)
-          ("print-emits-print" :print 'cl-cc/vm::vm-print))
-  (scenario expected-inst)
-  (let ((ctx (make-codegen-ctx)))
+(it-sequential "codegen-single-inst-emission setq-emits-move"
+  (destructuring-bind (scenario expected-inst) (list :setq 'cl-cc/vm::vm-move)
+    (let ((ctx (make-codegen-ctx)))
     (ecase scenario
       (:setq
        (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x :R0)))
        (compile-ast (make-ast-setq :var 'x :value (make-ast-int :value 99)) ctx))
       (:print
        (compile-ast (make-ast-print :expr (make-ast-int :value 42)) ctx)))
-    (assert-true (codegen-find-inst ctx expected-inst))))
+    (expect (codegen-find-inst ctx expected-inst) :to-be-truthy))))
 
-(deftest codegen-the-compiles-inner
-  "Compiling (the integer ...) emits the inner assertion path."
+(it-sequential "codegen-single-inst-emission print-emits-print"
+  (destructuring-bind (scenario expected-inst) (list :print 'cl-cc/vm::vm-print)
+    (let ((ctx (make-codegen-ctx)))
+    (ecase scenario
+      (:setq
+       (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x :R0)))
+       (compile-ast (make-ast-setq :var 'x :value (make-ast-int :value 99)) ctx))
+      (:print
+       (compile-ast (make-ast-print :expr (make-ast-int :value 42)) ctx)))
+    (expect (codegen-find-inst ctx expected-inst) :to-be-truthy))))
+
+(it-sequential "codegen-the-compiles-inner"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc:make-ast-the :type 'integer
                                  :value (make-ast-int :value 42))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-typep))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-signal-error))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-signal-error) :to-be-truthy)))
 
-(deftest codegen-hole-signals-typed-hole-message
-  "Compiling '_' signals an ast-compilation-error mentioning typed holes."
+(it-sequential "codegen-hole-signals-typed-hole-message"
   (let ((ctx (make-codegen-ctx)))
     (handler-case
         (progn
           (compile-ast (cl-cc/parse::lower-sexp-to-ast '_) ctx)
-          (assert-true nil))
+          (expect nil :to-be-truthy))
       (cl-cc:ast-compilation-error (e)
-        (assert-true (search "Typed hole" (format nil "~A" e)))))))
+        (expect (search "Typed hole" (format nil "~A" e)) :to-be-truthy)))))
 
-(deftest codegen-if-narrows-branch-type-env
-  "Type guards narrow the then branch so proven vars skip redundant assertions."
+(it-sequential "codegen-if-narrows-branch-type-env"
   (let* ((ctx (make-codegen-ctx))
          (ast (cl-cc/parse::lower-sexp-to-ast
                 '(if (numberp x) (the fixnum x) 0))))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x :R0)))
     (compile-ast ast ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-typep))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-signal-error))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-signal-error) :to-be-null)))
 
-(deftest codegen-if-case-of-case-collapses-redundant-inner-branch
-  "Nested ifs with the same condition only emit one branch test."
+(it-sequential "codegen-if-case-of-case-collapses-redundant-inner-branch"
   (let* ((ctx (make-codegen-ctx))
          (ast (cl-cc/parse::lower-sexp-to-ast
                '(if (numberp x)
@@ -306,6 +295,6 @@
                     3))))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x :R0)))
     (compile-ast ast ctx)
-    (assert-= 1 (count-if (lambda (inst)
+    (expect (= 1 (count-if (lambda (inst)
                             (typep inst 'cl-cc/vm::vm-jump-zero))
-                          (codegen-instructions ctx)))))
+                          (codegen-instructions ctx))) :to-be-truthy)))

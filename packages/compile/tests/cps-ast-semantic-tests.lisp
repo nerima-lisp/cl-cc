@@ -2,64 +2,85 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cps-ast-suite)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; AST CPS — semantic (evaluable forms)
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cps-ast-binop
-  "cps-transform-ast: binary arithmetic operations evaluate correctly"
-  :cases (("add"      '+ 3  4  7)
-          ("sub"      '- 9  4  5)
-          ("mul"      '* 3  4 12))
-  (op lhs rhs expected)
-  (let ((ast (cl-cc:make-ast-binop :op op
+(it-sequential "cps-ast-binop add"
+  (destructuring-bind (op lhs rhs expected) (list '+ 3 4 7)
+    (let ((ast (cl-cc:make-ast-binop :op op
                                    :lhs (cl-cc:make-ast-int :value lhs)
                                    :rhs (cl-cc:make-ast-int :value rhs))))
-    (assert-= expected (run-cps-ast ast))))
+    (expect (= expected (run-cps-ast ast)) :to-be-truthy))))
 
-(deftest-each cps-ast-if-branch
-  "cps-transform-ast: if selects the correct branch based on condition truthiness"
-  :cases (("truthy-takes-then" 1  10 20 10)
-          ("nil-takes-else"    nil 10 20 20))
-  (cond-val then-val else-val expected)
-  (let ((ast (cl-cc:make-ast-if :cond (cl-cc:make-ast-int :value cond-val)
+(it-sequential "cps-ast-binop sub"
+  (destructuring-bind (op lhs rhs expected) (list '- 9 4 5)
+    (let ((ast (cl-cc:make-ast-binop :op op
+                                   :lhs (cl-cc:make-ast-int :value lhs)
+                                   :rhs (cl-cc:make-ast-int :value rhs))))
+    (expect (= expected (run-cps-ast ast)) :to-be-truthy))))
+
+(it-sequential "cps-ast-binop mul"
+  (destructuring-bind (op lhs rhs expected) (list '* 3 4 12)
+    (let ((ast (cl-cc:make-ast-binop :op op
+                                   :lhs (cl-cc:make-ast-int :value lhs)
+                                   :rhs (cl-cc:make-ast-int :value rhs))))
+    (expect (= expected (run-cps-ast ast)) :to-be-truthy))))
+
+(it-sequential "cps-ast-if-branch truthy-takes-then"
+  (destructuring-bind (cond-val then-val else-val expected) (list 1 10 20 10)
+    (let ((ast (cl-cc:make-ast-if :cond (cl-cc:make-ast-int :value cond-val)
                                 :then (cl-cc:make-ast-int :value then-val)
                                 :else (cl-cc:make-ast-int :value else-val))))
-    (assert-= expected (run-cps-ast ast))))
+    (expect (= expected (run-cps-ast ast)) :to-be-truthy))))
 
-(deftest-each cps-evaluable-forms
-  "cps-transform-ast: each evaluable AST node type evaluates to its expected value via run-cps-ast."
-  :cases (("integer"      (cl-cc:make-ast-int :value 42)
-                          42)
-          ("progn"        (cl-cc:make-ast-progn
+(it-sequential "cps-ast-if-branch nil-takes-else"
+  (destructuring-bind (cond-val then-val else-val expected) (list nil 10 20 20)
+    (let ((ast (cl-cc:make-ast-if :cond (cl-cc:make-ast-int :value cond-val)
+                                :then (cl-cc:make-ast-int :value then-val)
+                                :else (cl-cc:make-ast-int :value else-val))))
+    (expect (= expected (run-cps-ast ast)) :to-be-truthy))))
+
+(it-sequential "cps-evaluable-forms integer"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-int :value 42) 42)
+    (expect (run-cps-ast ast) :to-equal expected)))
+
+(it-sequential "cps-evaluable-forms progn"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-progn
                            :forms (list (cl-cc:make-ast-int :value 1)
                                         (cl-cc:make-ast-int :value 2)
-                                        (cl-cc:make-ast-int :value 99)))
-                          99)
-          ("let"          (cl-cc:make-ast-let
+                                        (cl-cc:make-ast-int :value 99))) 99)
+    (expect (run-cps-ast ast) :to-equal expected)))
+
+(it-sequential "cps-evaluable-forms let"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-let
                            :bindings (list (cons 'x (cl-cc:make-ast-int :value 3))
                                            (cons 'y (cl-cc:make-ast-int :value 4)))
                            :body (list (cl-cc:make-ast-binop
                                         :op '+
                                         :lhs (cl-cc:make-ast-var :name 'x)
-                                        :rhs (cl-cc:make-ast-var :name 'y))))
-                          7)
-          ("print"        (cl-cc:make-ast-print :expr (cl-cc:make-ast-int :value 42))
-                          42)
-          ("quote-symbol" (cl-cc:make-ast-quote :value 'hello)
-                          'hello)
-          ("quote-list"   (cl-cc:make-ast-quote :value '(1 2 3))
-                          '(1 2 3))
-          ("the"          (cl-cc:make-ast-the :type 'integer
-                                              :value (cl-cc:make-ast-int :value 7))
-                          7))
-  (ast expected)
-  (assert-equal expected (run-cps-ast ast)))
+                                        :rhs (cl-cc:make-ast-var :name 'y)))) 7)
+    (expect (run-cps-ast ast) :to-equal expected)))
 
-(deftest cps-ast-setq-returns-value
-  "cps-transform-ast: setq evaluates the value and passes it to continuation"
+(it-sequential "cps-evaluable-forms print"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-print :expr (cl-cc:make-ast-int :value 42)) 42)
+    (expect (run-cps-ast ast) :to-equal expected)))
+
+(it-sequential "cps-evaluable-forms quote-symbol"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-quote :value 'hello) 'hello)
+    (expect (run-cps-ast ast) :to-equal expected)))
+
+(it-sequential "cps-evaluable-forms quote-list"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-quote :value '(1 2 3)) '(1 2 3))
+    (expect (run-cps-ast ast) :to-equal expected)))
+
+(it-sequential "cps-evaluable-forms the"
+  (destructuring-bind (ast expected) (list (cl-cc:make-ast-the :type 'integer
+                                              :value (cl-cc:make-ast-int :value 7)) 7)
+    (expect (run-cps-ast ast) :to-equal expected)))
+
+(it-sequential "cps-ast-setq-returns-value"
   (let ((setq-ast (cl-cc:make-ast-setq
                    :var 'cl-cc-test-setq-var
                    :value (cl-cc:make-ast-int :value 55))))
@@ -68,8 +89,8 @@
       (declare (special cl-cc-test-setq-var))
       (handler-bind ((warning #'muffle-warning))
         (let ((result (run-cps-ast setq-ast)))
-          (assert-= 55 result)
-          (assert-= 55 cl-cc-test-setq-var))))))
+          (expect (= 55 result) :to-be-truthy)
+          (expect (= 55 cl-cc-test-setq-var) :to-be-truthy))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; AST CPS — structural ("is it a CPS lambda?")
@@ -77,58 +98,63 @@
 ;;; because they involve non-local control (block, go, throw) or closures.
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cps-ast-structural-shape
-  "cps-transform-ast*: every node type produces a (lambda (k) ...) form"
-  :cases
-  (("lambda"
-    (cl-cc:make-ast-lambda
+(it-sequential "cps-ast-structural-shape lambda"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-lambda
      :params '(x)
      :body (list (cl-cc:make-ast-int :value 1))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("block"
-    (cl-cc:make-ast-block
+(it-sequential "cps-ast-structural-shape block"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-block
      :name 'b
      :body (list (cl-cc:make-ast-int :value 1))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("return-from"
-    (cl-cc:make-ast-return-from
+(it-sequential "cps-ast-structural-shape return-from"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-return-from
      :name 'b
      :value (cl-cc:make-ast-int :value 1)))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("tagbody"
-    (cl-cc:make-ast-tagbody
+(it-sequential "cps-ast-structural-shape tagbody"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-tagbody
      :tags (list (cons 'tag1 (list (cl-cc:make-ast-int :value 1))))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("go"
-    (cl-cc:make-ast-go :tag 'tag1))
+(it-sequential "cps-ast-structural-shape go"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-go :tag 'tag1))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("catch"
-    (cl-cc:make-ast-catch
+(it-sequential "cps-ast-structural-shape catch"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-catch
      :tag  (cl-cc:make-ast-var :name 'my-tag)
      :body (list (cl-cc:make-ast-int :value 42))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("throw"
-    (cl-cc:make-ast-throw
+(it-sequential "cps-ast-structural-shape throw"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-throw
      :tag   (cl-cc:make-ast-var :name 'my-tag)
      :value (cl-cc:make-ast-int :value 42)))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("unwind-protect"
-    (cl-cc:make-ast-unwind-protect
+(it-sequential "cps-ast-structural-shape unwind-protect"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-unwind-protect
      :protected (cl-cc:make-ast-int :value 42)
      :cleanup   (list (cl-cc:make-ast-int :value 0))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("flet"
-    (cl-cc:make-ast-flet
+(it-sequential "cps-ast-structural-shape flet"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-flet
      :bindings (list (list 'double '(x)
                            (cl-cc:make-ast-binop
                             :op '*
                             :lhs (cl-cc:make-ast-int :value 2)
                             :rhs (cl-cc:make-ast-var :name 'x))))
      :body (list (cl-cc:make-ast-int :value 1))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
-   ("labels"
-    (cl-cc:make-ast-labels
+(it-sequential "cps-ast-structural-shape labels"
+  (destructuring-bind (ast) (list (cl-cc:make-ast-labels
      :bindings (list (list 'id '(x) (cl-cc:make-ast-var :name 'x)))
-     :body (list (cl-cc:make-ast-int :value 1)))))
-  (ast)
-  (assert-true (is-cps-lambda (cl-cc:cps-transform-ast* ast))))
+     :body (list (cl-cc:make-ast-int :value 1))))
+    (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))

@@ -57,7 +57,6 @@
                        (funcall #',check (cps-transform ,expr)))))
                 specs)))
 
-(in-suite cl-cc-pbt-suite)
 
 (define-cps-shape-properties
   (cps-constant-introduces-continuation

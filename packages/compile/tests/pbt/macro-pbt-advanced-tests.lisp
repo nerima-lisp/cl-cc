@@ -1,7 +1,6 @@
 ;;;; tests/pbt/macro-pbt-advanced-tests.lisp — Advanced PBT: Nested/Idempotency/Hygiene/Validity
 (in-package :cl-cc/pbt)
 
-(in-suite macro-pbt-suite)
 ;;; Property: Nested Macro Expansion
 
 (defproperty nested-when-in-let-star-advanced-pbt
@@ -47,32 +46,29 @@
 
 ;;; Property: Macro Expansion Idempotency
 
-(deftest macroexpand-idempotent-when
-  "Fully expanding representative WHEN forms twice gives the same result."
+(it-sequential "macroexpand-idempotent-when"
   (dolist (form '((when t body)
                   (when flag body1 body2)
                   (when (= x 0) (print 1))))
     (let* ((exp1 (cl-cc:our-macroexpand form))
            (exp2 (cl-cc:our-macroexpand exp1)))
-      (assert-equal exp1 exp2))))
+      (expect exp2 :to-equal exp1))))
 
-(deftest macroexpand-idempotent-unless
-  "Fully expanding representative UNLESS forms twice gives the same result."
+(it-sequential "macroexpand-idempotent-unless"
   (dolist (form '((unless t body)
                   (unless flag body1 body2)
                   (unless (= x 0) (print 1))))
     (let* ((exp1 (cl-cc:our-macroexpand form))
            (exp2 (cl-cc:our-macroexpand exp1)))
-      (assert-equal exp1 exp2))))
+      (expect exp2 :to-equal exp1))))
 
-(deftest macroexpand-idempotent-and
-  "Fully expanding representative AND forms twice gives the same result."
+(it-sequential "macroexpand-idempotent-and"
   (dolist (form '((and a b)
                   (and a b c)
                   (and (= x 0) flag (print 1))))
     (let* ((exp1 (cl-cc:our-macroexpand form))
            (exp2 (cl-cc:our-macroexpand exp1)))
-      (assert-equal exp1 exp2))))
+      (expect exp2 :to-equal exp1))))
 
 (defproperty macroexpand-idempotent-or
     (args (gen-list-of (gen-body-form) :min-length 2 :max-length 4))

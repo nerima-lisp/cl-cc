@@ -1,101 +1,111 @@
 ;;;; clos-dispatch-tests.lisp — CLOS :default-initargs, :allocation :class, EQL specializers, and method qualifiers
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; ── :default-initargs ──────────────────────────────────────────────────────
 
-(deftest clos-parse-default-initargs
-  "defclass with :default-initargs parses into AST."
+(it-sequential "clos-parse-default-initargs"
   (let ((ast (lower-sexp-to-ast '(defclass point ()
                                     ((x :initarg :x :initform 0))
                                     (:default-initargs :x 42)))))
-    (assert-type ast-defclass ast)
+    (expect (typep ast 'ast-defclass) :to-be-truthy)
     (let ((di (cl-cc/ast:ast-defclass-default-initargs ast)))
-      (assert-= 1 (length di))
-      (assert-eq :x (car (first di))))))
+      (expect (= 1 (length di)) :to-be-truthy)
+      (expect (car (first di)) :to-be :x))))
 
-(deftest-each clos-default-initargs-runtime
-  ":default-initargs provides defaults; explicit initargs override them."
-  :cases (("default-applies"    42 "(progn (defclass da-point () ((x :initarg :x :initform 0)) (:default-initargs :x 42)) (slot-value (make-instance 'da-point) 'x))")
-          ("explicit-overrides" 99 "(progn (defclass da-point2 () ((x :initarg :x :initform 0)) (:default-initargs :x 42)) (slot-value (make-instance 'da-point2 :x 99) 'x))"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "clos-default-initargs-runtime default-applies"
+  (destructuring-bind (expected form) (list 42 "(progn (defclass da-point () ((x :initarg :x :initform 0)) (:default-initargs :x 42)) (slot-value (make-instance 'da-point) 'x))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-default-initargs-runtime explicit-overrides"
+  (destructuring-bind (expected form) (list 99 "(progn (defclass da-point2 () ((x :initarg :x :initform 0)) (:default-initargs :x 42)) (slot-value (make-instance 'da-point2 :x 99) 'x))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; ── :allocation :class Tests ────────────────────────────────────────────────
 
-(deftest-each clos-allocation-class
-  "defclass :allocation :class slots are shared; :instance slots are independent."
-  :cases
-  (("class-slot-shared-read"     42
-    "(defclass counter ()
+(it-sequential "clos-allocation-class class-slot-shared-read"
+  (destructuring-bind (expected form) (list 42 "(defclass counter ()
        ((count :initarg :count :allocation :class)))
      (let ((c1 (make-instance 'counter :count 42))
            (c2 (make-instance 'counter)))
        (slot-value c2 'count))")
-   ("class-slot-mutation-reads"  99
-    "(defclass shared-box ()
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-allocation-class class-slot-mutation-reads"
+  (destructuring-bind (expected form) (list 99 "(defclass shared-box ()
        ((val :initarg :val :allocation :class)))
      (let ((a (make-instance 'shared-box :val 10))
            (b (make-instance 'shared-box)))
        (setf (slot-value a 'val) 99)
        (slot-value b 'val))")
-   ("mixed-shared-from-second"  100
-    "(defclass mixed ()
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-allocation-class mixed-shared-from-second"
+  (destructuring-bind (expected form) (list 100 "(defclass mixed ()
        ((shared :initarg :shared :allocation :class)
         (own    :initarg :own)))
      (let ((a (make-instance 'mixed :shared 100 :own 1))
            (b (make-instance 'mixed :own 2)))
        (slot-value b 'shared))")
-   ("mixed-instance-independent"  1
-    "(defclass mixed2 ()
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-allocation-class mixed-instance-independent"
+  (destructuring-bind (expected form) (list 1 "(defclass mixed2 ()
        ((shared :initarg :shared :allocation :class)
         (own    :initarg :own)))
      (let ((a (make-instance 'mixed2 :shared 100 :own 1))
            (b (make-instance 'mixed2 :own 2)))
-       (slot-value a 'own))"))
-  (expected form)
-  (assert-= expected (run-string form)))
+       (slot-value a 'own))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; ── EQL Specializer Tests ──────────────────────────────────────────────────
 
-(deftest-each clos-eql-specializer
-  "EQL specializers dispatch on specific values, fall back to class, and match symbols."
-  :cases (("penny"        1   "(defgeneric coin-value (c))
+(it-sequential "clos-eql-specializer penny"
+  (destructuring-bind (expected form) (list 1 "(defgeneric coin-value (c))
                                (defmethod coin-value ((c (eql :penny))) 1)
                                (defmethod coin-value ((c (eql :nickel))) 5)
                                (coin-value :penny)")
-          ("nickel"       5   "(defgeneric coin-val2 (c))
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-eql-specializer nickel"
+  (destructuring-bind (expected form) (list 5 "(defgeneric coin-val2 (c))
                                (defmethod coin-val2 ((c (eql :penny))) 1)
                                (defmethod coin-val2 ((c (eql :nickel))) 5)
                                (coin-val2 :nickel)")
-          ("eql-match"    42  "(defgeneric describe-it (x))
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-eql-specializer eql-match"
+  (destructuring-bind (expected form) (list 42 "(defgeneric describe-it (x))
                                (defmethod describe-it ((x (eql 42))) 42)
                                (defmethod describe-it ((x integer)) 0)
                                (describe-it 42)")
-          ("class-fallbk" 0   "(defgeneric describe-it2 (x))
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-eql-specializer class-fallbk"
+  (destructuring-bind (expected form) (list 0 "(defgeneric describe-it2 (x))
                                (defmethod describe-it2 ((x (eql 42))) 42)
                                (defmethod describe-it2 ((x integer)) 0)
                                (describe-it2 99)")
-          ("sym-match"    100 "(defgeneric sym-val (s))
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-eql-specializer sym-match"
+  (destructuring-bind (expected form) (list 100 "(defgeneric sym-val (s))
                                (defmethod sym-val ((s (eql 'foo))) 100)
                                (defmethod sym-val ((s symbol)) 0)
                                (sym-val 'foo)")
-          ("sym-fallbk"   0   "(defgeneric sym-val2 (s))
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "clos-eql-specializer sym-fallbk"
+  (destructuring-bind (expected form) (list 0 "(defgeneric sym-val2 (s))
                                (defmethod sym-val2 ((s (eql 'foo))) 100)
                                (defmethod sym-val2 ((s symbol)) 0)
-                               (sym-val2 'bar)"))
-  (expected form)
-  (assert-= expected (run-string form)))
+                               (sym-val2 'bar)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; ── Method Qualifier Tests (:before/:after/:around) ──────────────────────
 
-(deftest-each clos-defmethod-qualifier-run
-  "Method qualifier execution: :before/:around/:around+before+after run in the correct order."
-  :timeout 15
-  :cases (("before"
-           "before:primary"
-           "(defvar *bq-log* \"\")
+(it-sequential "clos-defmethod-qualifier-run before"
+  (destructuring-bind (expected form) (list "before:primary" "(defvar *bq-log* \"\")
             (defgeneric greet-q (x))
             (defmethod greet-q ((x integer))
               (setf *bq-log* (concatenate 'string *bq-log* \"primary\"))
@@ -103,9 +113,10 @@
             (defmethod greet-q :before ((x integer))
               (setf *bq-log* (concatenate 'string *bq-log* \"before:\")))
             (greet-q 1)")
-          ("before-and-after"
-           "B:P:A"
-           "(defvar *ba-log* \"\")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "clos-defmethod-qualifier-run before-and-after"
+  (destructuring-bind (expected form) (list "B:P:A" "(defvar *ba-log* \"\")
             (defgeneric ba-test (x))
             (defmethod ba-test ((x integer))
               (setf *ba-log* (concatenate 'string *ba-log* \"P\"))
@@ -116,18 +127,20 @@
               (setf *ba-log* (concatenate 'string *ba-log* \":A\")))
             (ba-test 1)
             *ba-log*")
-          ("around"
-           "WRAPPED:42"
-           "(defgeneric around-test (x))
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "clos-defmethod-qualifier-run around"
+  (destructuring-bind (expected form) (list "WRAPPED:42" "(defgeneric around-test (x))
             (defmethod around-test ((x integer))
               42)
             (defmethod around-test :around ((x integer))
               (let ((result (call-next-method)))
                 (concatenate 'string \"WRAPPED:\" (write-to-string result))))
             (around-test 1)")
-          ("around-with-before-after"
-           "B:P:A"
-           "(defvar *aba-log* \"\")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "clos-defmethod-qualifier-run around-with-before-after"
+  (destructuring-bind (expected form) (list "B:P:A" "(defvar *aba-log* \"\")
             (defgeneric aba-test (x))
             (defmethod aba-test ((x integer))
               (setf *aba-log* (concatenate 'string *aba-log* \"P\"))
@@ -139,25 +152,19 @@
             (defmethod aba-test :around ((x integer))
               (call-next-method)
               *aba-log*)
-            (aba-test 1)"))
-  (expected form)
-  (assert-equal expected (run-string form)))
+            (aba-test 1)")
+    (expect (run-string form) :to-equal expected)))
 
-(deftest clos-defmethod-after-qualifier
-  "defmethod :after runs after the primary method; primary value is returned."
-  :timeout 15
-  (assert-= 42
-    (run-string
+(it-sequential "clos-defmethod-after-qualifier"
+  (expect (= 42 (run-string
      "(defgeneric aft-test (x))
       (defmethod aft-test ((x integer))
         42)
        (defmethod aft-test :after ((x integer))
          99)
-       (aft-test 1)")))
+       (aft-test 1)")) :to-be-truthy))
 
-(deftest clos-custom-method-combination-multi-dispatch
-  "Custom method-combination dispatch respects multi-argument specializers in specificity order."
-  :timeout 15
+(it-sequential "clos-custom-method-combination-multi-dispatch"
   (let ((result (run-string
                  "(defgeneric combo-test (x y) (:method-combination list))
        (defmethod combo-test list ((x integer) (y integer)) 'ii)
@@ -165,28 +172,25 @@
        (defmethod combo-test list ((x t) (y integer)) 'ti)
        (defmethod combo-test list ((x t) (y t)) 'tt)
        (combo-test 1 2)")))
-    (assert-equal '("II" "IT" "TI" "TT")
-                  (mapcar (lambda (s) (string-upcase (symbol-name s))) result))))
+    (expect (mapcar (lambda (s) (string-upcase (symbol-name s))) result) :to-equal '("II" "IT" "TI" "TT"))))
 
-(deftest-each clos-defmethod-qualifier-parse
-  "defmethod with :before and :around qualifiers parse correctly."
-  :cases (("before" '(defmethod foo :before ((x integer)) (print x)) :before)
-          ("around" '(defmethod foo :around ((x integer)) (print x)) :around))
-  (form expected-qualifier)
-  (let ((ast (lower-sexp-to-ast form)))
-    (assert-type ast-defmethod ast)
-    (assert-eq expected-qualifier (cl-cc/ast:ast-defmethod-qualifier ast))))
+(it-sequential "clos-defmethod-qualifier-parse before"
+  (destructuring-bind (form expected-qualifier) (list '(defmethod foo :before ((x integer)) (print x)) :before)
+    (let ((ast (lower-sexp-to-ast form)))
+    (expect (typep ast 'ast-defmethod) :to-be-truthy)
+    (expect (cl-cc/ast:ast-defmethod-qualifier ast) :to-be expected-qualifier))))
 
-(deftest clos-defmethod-around-without-cnm
-  "defmethod :around without call-next-method returns around's value.
-ANSI 7.6.6.2: when an :around method returns without calling call-next-method,
-that value is the result of the generic function call; primary, :before, and
-:after methods are not run."
-  (assert-equal "AROUND-ONLY"
-    (run-string
+(it-sequential "clos-defmethod-qualifier-parse around"
+  (destructuring-bind (form expected-qualifier) (list '(defmethod foo :around ((x integer)) (print x)) :around)
+    (let ((ast (lower-sexp-to-ast form)))
+    (expect (typep ast 'ast-defmethod) :to-be-truthy)
+    (expect (cl-cc/ast:ast-defmethod-qualifier ast) :to-be expected-qualifier))))
+
+(it-sequential "clos-defmethod-around-without-cnm"
+  (expect (run-string
      "(defgeneric around-only-test (x))
       (defmethod around-only-test ((x integer))
         \"PRIMARY\")
       (defmethod around-only-test :around ((x integer))
         \"AROUND-ONLY\")
-      (around-only-test 1)")))
+      (around-only-test 1)") :to-equal "AROUND-ONLY"))

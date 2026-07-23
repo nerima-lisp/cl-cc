@@ -6,146 +6,142 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; AST Parsing Tests
 
-(deftest clos-parse-defclass
-  "lower-sexp-to-ast parses defclass: name, nil superclasses, and slot metadata."
+(it-sequential "clos-parse-defclass"
   (let ((ast (lower-sexp-to-ast '(defclass point ()
                                     ((x :initarg :x :reader point-x)
                                      (y :initarg :y :reader point-y))))))
-    (assert-type ast-defclass ast)
-    (assert-eq 'point (ast-defclass-name ast))
-    (assert-null (ast-defclass-superclasses ast))
-    (assert-= 2 (length (ast-defclass-slots ast)))
+    (expect (typep ast 'ast-defclass) :to-be-truthy)
+    (expect (ast-defclass-name ast) :to-be 'point)
+    (expect (ast-defclass-superclasses ast) :to-be-null)
+    (expect (= 2 (length (ast-defclass-slots ast))) :to-be-truthy)
     (let ((x-slot (first (ast-defclass-slots ast))))
-      (assert-eq 'x (ast-slot-name x-slot))
-      (assert-eq :x (ast-slot-initarg x-slot))
-      (assert-eq 'point-x (ast-slot-reader x-slot)))))
+      (expect (ast-slot-name x-slot) :to-be 'x)
+      (expect (ast-slot-initarg x-slot) :to-be :x)
+      (expect (ast-slot-reader x-slot) :to-be 'point-x))))
 
-(deftest clos-parse-defclass-with-superclass
-  "lower-sexp-to-ast parses defclass: superclass list is preserved."
+(it-sequential "clos-parse-defclass-with-superclass"
   (let ((ast (lower-sexp-to-ast '(defclass colored-point (point)
                                     ((color :initarg :color))))))
-    (assert-type ast-defclass ast)
-    (assert-eq 'colored-point (ast-defclass-name ast))
-    (assert-equal '(point) (ast-defclass-superclasses ast))))
+    (expect (typep ast 'ast-defclass) :to-be-truthy)
+    (expect (ast-defclass-name ast) :to-be 'colored-point)
+    (expect (ast-defclass-superclasses ast) :to-equal '(point))))
 
-(deftest clos-parse-defgeneric
-  "lower-sexp-to-ast parses defgeneric: name and parameter list."
+(it-sequential "clos-parse-defgeneric"
   (let ((ast (lower-sexp-to-ast '(defgeneric area (shape)))))
-    (assert-type ast-defgeneric ast)
-    (assert-eq 'area (ast-defgeneric-name ast))
-    (assert-equal '(shape) (ast-defgeneric-params ast))))
+    (expect (typep ast 'ast-defgeneric) :to-be-truthy)
+    (expect (ast-defgeneric-name ast) :to-be 'area)
+    (expect (ast-defgeneric-params ast) :to-equal '(shape))))
 
-(deftest clos-parse-defmethod
-  "lower-sexp-to-ast parses defmethod: name, params, body, and specializers."
+(it-sequential "clos-parse-defmethod"
   (let ((ast (lower-sexp-to-ast '(defmethod area ((s circle))
                                    (* 3 (slot-value s 'radius))))))
-    (assert-type ast-defmethod ast)
-    (assert-eq 'area (ast-defmethod-name ast))
-    (assert-equal '(s) (ast-defmethod-params ast))
-    (assert-= 1 (length (ast-defmethod-body ast)))
+    (expect (typep ast 'ast-defmethod) :to-be-truthy)
+    (expect (ast-defmethod-name ast) :to-be 'area)
+    (expect (ast-defmethod-params ast) :to-equal '(s))
+    (expect (= 1 (length (ast-defmethod-body ast))) :to-be-truthy)
     (let ((specs (ast-defmethod-specializers ast)))
-      (assert-= 1 (length specs))
-      (assert-equal '(s . circle) (first specs)))))
+      (expect (= 1 (length specs)) :to-be-truthy)
+      (expect (first specs) :to-equal '(s . circle)))))
 
-(deftest clos-parse-make-instance
-  "lower-sexp-to-ast parses make-instance: class and initarg pairs."
+(it-sequential "clos-parse-make-instance"
   (let ((ast (lower-sexp-to-ast '(make-instance 'point :x 10 :y 20))))
-    (assert-type ast-make-instance ast)
-    (assert-type ast-quote (ast-make-instance-class ast))
-    (assert-= 2 (length (ast-make-instance-initargs ast)))
-    (assert-eq :x (car (first (ast-make-instance-initargs ast))))
-    (assert-eq :y (car (second (ast-make-instance-initargs ast))))))
+    (expect (typep ast 'ast-make-instance) :to-be-truthy)
+    (expect (typep (ast-make-instance-class ast) 'ast-quote) :to-be-truthy)
+    (expect (= 2 (length (ast-make-instance-initargs ast))) :to-be-truthy)
+    (expect (car (first (ast-make-instance-initargs ast))) :to-be :x)
+    (expect (car (second (ast-make-instance-initargs ast))) :to-be :y)))
 
-(deftest clos-parse-slot-value
-  "lower-sexp-to-ast parses slot-value: object and slot name."
+(it-sequential "clos-parse-slot-value"
   (let ((ast (lower-sexp-to-ast '(slot-value obj 'x))))
-    (assert-type ast-slot-value ast)
-    (assert-eq 'x (ast-slot-value-slot ast))
-    (assert-type ast-var (ast-slot-value-object ast))))
+    (expect (typep ast 'ast-slot-value) :to-be-truthy)
+    (expect (ast-slot-value-slot ast) :to-be 'x)
+    (expect (typep (ast-slot-value-object ast) 'ast-var) :to-be-truthy)))
 
 ;;; defgeneric options tests
 
-(deftest-each clos-defgeneric-with-options
-  "defgeneric with :documentation, :argument-precedence-order, and :generic-function-class all parse to ast-defgeneric."
-  :cases (("documentation"    'area    '(shape)
-           '(defgeneric area (shape) (:documentation "Compute area")))
-          ("precedence+class" 'combine nil
-           '(defgeneric combine (a b)
-              (:argument-precedence-order b a)
-              (:generic-function-class standard-generic-function))))
-  (expected-name expected-params form)
-  (let ((ast (lower-sexp-to-ast form)))
-    (assert-type ast-defgeneric ast)
-    (assert-eq expected-name (ast-defgeneric-name ast))
+(it-sequential "clos-defgeneric-with-options documentation"
+  (destructuring-bind (expected-name expected-params form) (list 'area '(shape) '(defgeneric area (shape) (:documentation "Compute area")))
+    (let ((ast (lower-sexp-to-ast form)))
+    (expect (typep ast 'ast-defgeneric) :to-be-truthy)
+    (expect (ast-defgeneric-name ast) :to-be expected-name)
     (when expected-params
-      (assert-equal expected-params (ast-defgeneric-params ast)))))
+      (expect (ast-defgeneric-params ast) :to-equal expected-params)))))
 
-(deftest-each clos-defgeneric-inline-method-parse
-  "defgeneric with (:method ...) expands to ast-progn of defgeneric + defmethod(s)."
-  :cases (("single-method"
-           '(defgeneric area (shape)
-              (:method ((s circle)) (* 3 (slot-value s 'radius))))
-           2
-           'area)
-          ("multiple-methods"
-           '(defgeneric describe-it (x)
+(it-sequential "clos-defgeneric-with-options precedence+class"
+  (destructuring-bind (expected-name expected-params form) (list 'combine nil '(defgeneric combine (a b)
+              (:argument-precedence-order b a)
+              (:generic-function-class standard-generic-function)))
+    (let ((ast (lower-sexp-to-ast form)))
+    (expect (typep ast 'ast-defgeneric) :to-be-truthy)
+    (expect (ast-defgeneric-name ast) :to-be expected-name)
+    (when expected-params
+      (expect (ast-defgeneric-params ast) :to-equal expected-params)))))
+
+(it-sequential "clos-defgeneric-inline-method-parse single-method"
+  (destructuring-bind (form expected-form-count expected-method-name) (list '(defgeneric area (shape)
+              (:method ((s circle)) (* 3 (slot-value s 'radius)))) 2 'area)
+    (let ((ast (lower-sexp-to-ast form)))
+    (expect (typep ast 'ast-progn) :to-be-truthy)
+    (let ((forms (ast-progn-forms ast)))
+      (expect (= expected-form-count (length forms)) :to-be-truthy)
+      (expect (typep (first forms) 'ast-defgeneric) :to-be-truthy)
+      (dolist (f (cdr forms))
+        (expect (typep f 'ast-defmethod) :to-be-truthy))
+      (expect (ast-defmethod-name (second forms)) :to-be expected-method-name)))))
+
+(it-sequential "clos-defgeneric-inline-method-parse multiple-methods"
+  (destructuring-bind (form expected-form-count expected-method-name) (list '(defgeneric describe-it (x)
               (:documentation "Describe an object")
               (:method ((x integer)) (format nil "int:~A" x))
-              (:method ((x string)) (format nil "str:~A" x)))
-           3
-           'describe-it))
-  (form expected-form-count expected-method-name)
-  (let ((ast (lower-sexp-to-ast form)))
-    (assert-type ast-progn ast)
+              (:method ((x string)) (format nil "str:~A" x))) 3 'describe-it)
+    (let ((ast (lower-sexp-to-ast form)))
+    (expect (typep ast 'ast-progn) :to-be-truthy)
     (let ((forms (ast-progn-forms ast)))
-      (assert-= expected-form-count (length forms))
-      (assert-type ast-defgeneric (first forms))
+      (expect (= expected-form-count (length forms)) :to-be-truthy)
+      (expect (typep (first forms) 'ast-defgeneric) :to-be-truthy)
       (dolist (f (cdr forms))
-        (assert-type ast-defmethod f))
-      (assert-eq expected-method-name (ast-defmethod-name (second forms))))))
+        (expect (typep f 'ast-defmethod) :to-be-truthy))
+      (expect (ast-defmethod-name (second forms)) :to-be expected-method-name)))))
 
-(deftest clos-defgeneric-inline-method-compile
-  "defgeneric with inline method compiles and runs correctly."
+(it-sequential "clos-defgeneric-inline-method-compile"
   (let ((result (run-string "
     (defgeneric greet (who)
       (:method ((who string))
         (concatenate 'string \"Hello \" who)))
     (greet \"World\")")))
-    (assert-equal "Hello World" result)))
+    (expect result :to-equal "Hello World")))
 
 ;;; AST Roundtrip Tests
 
-(deftest-each clos-ast-roundtrip-forms
-  "ast-to-sexp/lower-sexp-to-ast roundtrip preserves structure for core CLOS forms."
-  :cases (("defclass"
-           '(defclass point nil
+(it-sequential "clos-ast-roundtrip-forms defclass"
+  (destructuring-bind (form check) (list '(defclass point nil
               ((x :initarg :x :reader point-x)
-               (y :initarg :y :reader point-y)))
-           (lambda (result)
-             (assert-eq   'defclass (first result))
-             (assert-eq   'point    (second result))
-             (assert-null           (third result))
-             (assert-=    2         (length (fourth result)))))
-          ("defgeneric"
-           '(defgeneric compute (obj))
-           (lambda (result)
-             (assert-equal '(defgeneric compute (obj)) result)))
-          ("slot-value"
-           '(slot-value obj 'x)
-           (lambda (result)
-             (assert-eq    'slot-value (first result))
-             (assert-equal '(quote x)  (third result))))
-          ("setf-slot-value"
-           '(setf (slot-value obj (quote x)) 42)
-           (lambda (result)
-             (assert-eq   'setf       (first result))
-             (assert-eq   'slot-value (first (second result)))
-             (assert-equal '(quote x)  (third (second result))))))
-  (form check)
-  (funcall check (ast-to-sexp (lower-sexp-to-ast form))))
+               (y :initarg :y :reader point-y))) (lambda (result)
+             (expect (first result) :to-be 'defclass)
+             (expect (second result) :to-be 'point)
+             (expect (third result) :to-be-null)
+             (expect (= 2 (length (fourth result))) :to-be-truthy)))
+    (funcall check (ast-to-sexp (lower-sexp-to-ast form)))))
+
+(it-sequential "clos-ast-roundtrip-forms defgeneric"
+  (destructuring-bind (form check) (list '(defgeneric compute (obj)) (lambda (result)
+             (expect result :to-equal '(defgeneric compute (obj)))))
+    (funcall check (ast-to-sexp (lower-sexp-to-ast form)))))
+
+(it-sequential "clos-ast-roundtrip-forms slot-value"
+  (destructuring-bind (form check) (list '(slot-value obj 'x) (lambda (result)
+             (expect (first result) :to-be 'slot-value)
+             (expect (third result) :to-equal '(quote x))))
+    (funcall check (ast-to-sexp (lower-sexp-to-ast form)))))
+
+(it-sequential "clos-ast-roundtrip-forms setf-slot-value"
+  (destructuring-bind (form check) (list '(setf (slot-value obj (quote x)) 42) (lambda (result)
+             (expect (first result) :to-be 'setf)
+             (expect (first (second result)) :to-be 'slot-value)
+             (expect (third (second result)) :to-equal '(quote x))))
+    (funcall check (ast-to-sexp (lower-sexp-to-ast form)))))
 
 ;;; Compilation and Execution Tests

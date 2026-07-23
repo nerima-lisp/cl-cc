@@ -1,13 +1,8 @@
 ;;;; tests/unit/compile/codegen-core-tests.lisp — Codegen core tests
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-codegen-unit-suite)
 
-(deftest codegen-if-compilation
-  "Compiling a pure if-form emits a vm-jump-zero + labels sequence and returns
-a register. The codegen backend doesn't use vm-select for ordinary IF forms;
-it branches via jump-zero/jump/label. vm-select only appears in specialized
-sink/fold paths."
+(it-sequential "codegen-if-compilation"
   (let* ((ctx (make-codegen-ctx))
          (x-reg (cl-cc/compile:make-register ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x x-reg)))
@@ -15,12 +10,11 @@ sink/fold paths."
                                           :then (make-ast-int :value 1)
                                           :else (make-ast-int :value 2))
                              ctx)))
-      (assert-true (keywordp reg))
-      (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero))
-      (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-jump)))))
+      (expect (keywordp reg) :to-be-truthy)
+      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero) :to-be-truthy)
+      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump) :to-be-truthy))))
 
-(deftest codegen-progn-compilation
-  "Compiling a progn returns a register and emits instructions for sub-forms."
+(it-sequential "codegen-progn-compilation"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-progn
                               :forms (list (make-ast-int :value 1)
@@ -29,11 +23,10 @@ sink/fold paths."
                            ctx))
          (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const))
                                 (codegen-instructions ctx))))
-    (assert-true (keywordp reg))
-    (assert-= 3 (length consts))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (= 3 (length consts)) :to-be-truthy)))
 
-(deftest codegen-mvb-the-wrapped-function-keeps-register-mv-bind
-  "multiple-value-bind keeps the register mv-bind fast path when the callee is ast-the-wrapped."
+(it-sequential "codegen-mvb-the-wrapped-function-keeps-register-mv-bind"
   (let* ((ctx (make-codegen-ctx))
          (reg (progn
                 (setf (gethash 'floor (cl-cc/compile::ctx-global-function-mv-arities ctx)) 2)
@@ -47,45 +40,43 @@ sink/fold paths."
                                                         (make-ast-int :value 5)))
                               :body (list (make-ast-var :name 'a)))
                              ctx))))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest-each ast-constant-folding-before-codegen
-  "optimize-ast folds literal arithmetic and pure string-length calls to an integer node."
-  :cases (("arithmetic"    6 '(+ 1 2 3))
-          ("string-length" 5 '(string-length "hello")))
-  (expected form)
-  (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse::lower-sexp-to-ast form))))
-    (assert-true (cl-cc/ast:ast-int-p result))
-    (assert-= expected (cl-cc/ast:ast-int-value result))))
+(it-sequential "ast-constant-folding-before-codegen arithmetic"
+  (destructuring-bind (expected form) (list 6 '(+ 1 2 3))
+    (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse::lower-sexp-to-ast form))))
+    (expect (cl-cc/ast:ast-int-p result) :to-be-truthy)
+    (expect (= expected (cl-cc/ast:ast-int-value result)) :to-be-truthy))))
 
-(deftest ast-partial-eval-known-defun-call
-  "compile-toplevel-forms preserves non-empty AST output for a known top-level defun call."
+(it-sequential "ast-constant-folding-before-codegen string-length"
+  (destructuring-bind (expected form) (list 5 '(string-length "hello"))
+    (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse::lower-sexp-to-ast form))))
+    (expect (cl-cc/ast:ast-int-p result) :to-be-truthy)
+    (expect (= expected (cl-cc/ast:ast-int-value result)) :to-be-truthy))))
+
+(it-sequential "ast-partial-eval-known-defun-call"
   (let ((result (cl-cc/compile:compile-toplevel-forms
                  '((defun add1 (x) (+ x 1))
                    (add1 41))
                  :target :vm)))
     (let ((asts (cl-cc/compile:compilation-result-ast result)))
-      (assert-true (or (null asts) (listp asts))))))
+      (expect (or (null asts) (listp asts)) :to-be-truthy))))
 
-(deftest codegen-let-compilation
-  "Compiling a let returns a register and emits a move for the bound variable."
+(it-sequential "codegen-let-compilation"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                               :bindings (list (cons 'x (make-ast-int :value 42)))
                               :body (list (make-ast-var :name 'x)))
                             ctx)))
-    (assert-true (keywordp reg))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-const))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)))
 
-(deftest-each codegen-let-binding-declaration-controls-own-move
-  "Compiling let distinguishes ignore from ignorable when emitting the binding move."
-  :cases (("ignore"    '((ignore x))    0)
-          ("ignorable" '((ignorable x)) 1))
-  (declarations expected-moves)
-  (let* ((ctx (make-codegen-ctx))
+(it-sequential "codegen-let-binding-declaration-controls-own-move ignore"
+  (destructuring-bind (declarations expected-moves) (list '((ignore x)) 0)
+    (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'x (make-ast-int :value 42)))
                              :declarations declarations
@@ -93,11 +84,23 @@ sink/fold paths."
                            ctx))
          (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move))
                                (codegen-instructions ctx))))
-    (assert-true (keywordp reg))
-    (assert-= expected-moves (length moves))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (= expected-moves (length moves)) :to-be-truthy))))
 
-(deftest codegen-let-ignore-binding-enables-dce-of-unused-initializer
-  "DCE removes the pure initializer for an ignored let binding while preserving the body result."
+(it-sequential "codegen-let-binding-declaration-controls-own-move ignorable"
+  (destructuring-bind (declarations expected-moves) (list '((ignorable x)) 1)
+    (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast (make-ast-let
+                             :bindings (list (cons 'x (make-ast-int :value 42)))
+                             :declarations declarations
+                             :body (list (make-ast-int :value 0)))
+                           ctx))
+         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move))
+                               (codegen-instructions ctx))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (= expected-moves (length moves)) :to-be-truthy))))
+
+(it-sequential "codegen-let-ignore-binding-enables-dce-of-unused-initializer"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'x (make-ast-int :value 42)))
@@ -111,11 +114,10 @@ sink/fold paths."
                                (remove-if-not (lambda (i)
                                                 (typep i 'cl-cc/vm::vm-const))
                                               optimized))))
-    (assert-false (member 42 const-values :test #'eql))
-    (assert-true (member 0 const-values :test #'eql))))
+    (expect (member 42 const-values :test #'eql) :to-be-falsy)
+    (expect (member 0 const-values :test #'eql) :to-be-truthy)))
 
-(deftest codegen-let-noescape-cons-car-bypasses-vm-car
-  "A non-escaping let-bound cons lets car read the original component register."
+(it-sequential "codegen-let-noescape-cons-car-bypasses-vm-car"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'p (make-ast-call
@@ -129,13 +131,12 @@ sink/fold paths."
                               (codegen-instructions ctx)))
          (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move))
                                (codegen-instructions ctx))))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
-    (assert-= 0 (length cars))
-    (assert-true (> (length moves) 0))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
+    (expect (= 0 (length cars)) :to-be-truthy)
+    (expect (> (length moves) 0) :to-be-truthy)))
 
-(deftest codegen-let-noescape-cons-car-through-ast-the-bypasses-vm-car
-  "Transparent ast-the wrappers around cons still let car read the original component register."
+(it-sequential "codegen-let-noescape-cons-car-through-ast-the-bypasses-vm-car"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'p (make-ast-the
@@ -149,17 +150,14 @@ sink/fold paths."
                            ctx))
          (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-car))
                               (codegen-instructions ctx))))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-car))
-    (assert-= 0 (length cars))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-car) :to-be-null)
+    (expect (= 0 (length cars)) :to-be-truthy)))
 
-(deftest-each codegen-let-dynamic-extent-cons-declaration-controls-noescape
-  "A captured cons binding only takes the noescape path when declared dynamic-extent."
-  :cases (("no-declaration"        nil                  nil)
-          ("with-dynamic-extent" '((dynamic-extent p)) t))
-  (declarations noescape-p)
-  (let* ((ctx (make-codegen-ctx))
+(it-sequential "codegen-let-dynamic-extent-cons-declaration-controls-noescape no-declaration"
+  (destructuring-bind (declarations noescape-p) (list nil nil)
+    (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
                 :bindings (list (cons 'p (make-ast-call
@@ -177,18 +175,47 @@ sink/fold paths."
                              :body (list (make-ast-call :func (make-ast-var :name 'reader)
                                                          :args nil)))))
                 ctx)))
-    (assert-true (keywordp reg))
+    (expect (keywordp reg) :to-be-truthy)
     (if noescape-p
         (progn
-          (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
-          (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-cdr))
-          (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move)))
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
         (progn
-          (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
-          (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-cdr))))))
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-truthy))))))
 
-(deftest codegen-let-dynamic-extent-cons-unsafe-nested-consumer-falls-back
-  "dynamic-extent does not noescape-optimize cons when the binding is not the direct CAR/CDR operand."
+(it-sequential "codegen-let-dynamic-extent-cons-declaration-controls-noescape with-dynamic-extent"
+  (destructuring-bind (declarations noescape-p) (list '((dynamic-extent p)) t)
+    (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast
+               (make-ast-let
+                :bindings (list (cons 'p (make-ast-call
+                                         :func 'cons
+                                         :args (list (make-ast-int :value 1)
+                                                     (make-ast-int :value 2)))))
+                :declarations declarations
+                :body (list (make-ast-let
+                             :bindings (list (cons 'reader
+                                                    (make-ast-lambda
+                                                     :params '()
+                                                     :body (list (make-ast-call
+                                                                  :func 'cdr
+                                                                  :args (list (make-ast-var :name 'p)))))))
+                             :body (list (make-ast-call :func (make-ast-var :name 'reader)
+                                                         :args nil)))))
+                ctx)))
+    (expect (keywordp reg) :to-be-truthy)
+    (if noescape-p
+        (progn
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
+        (progn
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-truthy))))))
+
+(it-sequential "codegen-let-dynamic-extent-cons-unsafe-nested-consumer-falls-back"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -210,12 +237,11 @@ sink/fold paths."
                              :body (list (make-ast-call :func (make-ast-var :name 'reader)
                                                          :args nil)))))
                 ctx)))
-    (assert-true (keywordp reg))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-car))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-car) :to-be-truthy)))
 
-(deftest codegen-let-dynamic-extent-closure-the-wrapped-call-keeps-noescape
-  "A dynamic-extent closure binding still avoids heap closure allocation when the call designator is ast-the-wrapped."
+(it-sequential "codegen-let-dynamic-extent-closure-the-wrapped-call-keeps-noescape"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -230,11 +256,10 @@ sink/fold paths."
                                     :value (make-ast-var :name 'reader))
                              :args (list (make-ast-int :value 1)))))
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-closure))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null)))
 
-(deftest codegen-let-escaped-cons-car-falls-back-to-vm-car
-  "Captured cons bindings are not treated as non-escaping car/cdr shortcuts."
+(it-sequential "codegen-let-escaped-cons-car-falls-back-to-vm-car"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -247,14 +272,12 @@ sink/fold paths."
                ctx))
          (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-car))
                               (codegen-instructions ctx))))
-    (assert-true (keywordp reg))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-cons))
-    (assert-true (> (length cars) 0))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
+    (expect (> (length cars) 0) :to-be-truthy)))
 
-(deftest-each codegen-let-branch-local-cons-sinks-allocation
-  "Branch-local non-escaping cons delays component evaluation past the branch test (cons-pos > jump-pos)."
-  :cases (("simple-cond"
-           (make-ast-let
+(it-sequential "codegen-let-branch-local-cons-sinks-allocation simple-cond"
+  (destructuring-bind (ast) (list (make-ast-let
             :bindings (list (cons 'p (make-ast-call
                                      :func 'cons
                                      :args (list (make-ast-call :func 'cons
@@ -265,8 +288,18 @@ sink/fold paths."
                          :cond (make-ast-int :value 1)
                          :then (make-ast-call :func 'car :args (list (make-ast-var :name 'p)))
                          :else (make-ast-int :value 0)))))
-          ("multi-binding-cond"
-           (make-ast-let
+    (let* ((ctx   (make-codegen-ctx))
+         (reg   (compile-ast ast ctx))
+         (insts (codegen-instructions ctx))
+         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts))
+         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts)))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect jump-pos :to-be-truthy)
+    (expect cons-pos :to-be-truthy)
+    (expect (> cons-pos jump-pos) :to-be-truthy))))
+
+(it-sequential "codegen-let-branch-local-cons-sinks-allocation multi-binding-cond"
+  (destructuring-bind (ast) (list (make-ast-let
             :bindings (list (cons 'p (make-ast-call
                                      :func 'cons
                                      :args (list (make-ast-call :func 'cons
@@ -277,20 +310,18 @@ sink/fold paths."
             :body (list (make-ast-if
                          :cond (make-ast-var :name 'flag)
                          :then (make-ast-call :func 'car :args (list (make-ast-var :name 'p)))
-                         :else (make-ast-int :value 0))))))
-  (ast)
-  (let* ((ctx   (make-codegen-ctx))
+                         :else (make-ast-int :value 0)))))
+    (let* ((ctx   (make-codegen-ctx))
          (reg   (compile-ast ast ctx))
          (insts (codegen-instructions ctx))
          (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts))
          (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts)))
-    (assert-true (keywordp reg))
-    (assert-true jump-pos)
-    (assert-true cons-pos)
-    (assert-true (> cons-pos jump-pos))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect jump-pos :to-be-truthy)
+    (expect cons-pos :to-be-truthy)
+    (expect (> cons-pos jump-pos) :to-be-truthy))))
 
-(deftest codegen-let-noescape-array-aref-bypasses-vm-make-array-and-vm-aref
-  "A non-escaping fixed-size local array can serve constant-index aref from split registers."
+(it-sequential "codegen-let-noescape-array-aref-bypasses-vm-make-array-and-vm-aref"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'arr (make-ast-call
@@ -300,13 +331,12 @@ sink/fold paths."
                                                         :args (list (make-ast-var :name 'arr)
                                                                     (make-ast-int :value 1)))))
                            ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-length-bypasses-vm-make-array
-  "A non-escaping fixed-size local array returns array-length without heap-backed array ops."
+(it-sequential "codegen-let-noescape-array-length-bypasses-vm-make-array"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'arr (make-ast-call
@@ -315,12 +345,11 @@ sink/fold paths."
                              :body (list (make-ast-call :func 'array-length
                                                         :args (list (make-ast-var :name 'arr)))))
                            ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-const))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-length-through-ast-the-bypasses-vm-make-array
-  "Typed function-position wrappers still let array-length hit the noescape array path."
+(it-sequential "codegen-let-noescape-array-length-through-ast-the-bypasses-vm-make-array"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-let
                              :bindings (list (cons 'arr (make-ast-call
@@ -332,12 +361,11 @@ sink/fold paths."
                                                  :value (make-ast-var :name 'array-length))
                                           :args (list (make-ast-var :name 'arr)))))
                            ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-const))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-variable-aref-bypasses-vm-aref
-  "A non-escaping fixed-size local array can serve variable-index aref via bounded dispatch."
+(it-sequential "codegen-let-noescape-array-variable-aref-bypasses-vm-aref"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -349,14 +377,13 @@ sink/fold paths."
                                            :args (list (make-ast-var :name 'arr)
                                                        (make-ast-var :name 'i)))))
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-num-eq))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-num-eq) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero) :to-be-truthy)))
 
-(deftest codegen-let-escaped-array-aref-falls-back-to-vm-aref
-  "Captured array bindings keep the normal heap-backed make-array/aref path."
+(it-sequential "codegen-let-escaped-array-aref-falls-back-to-vm-aref"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -368,12 +395,11 @@ sink/fold paths."
                                            :args (list (make-ast-var :name 'arr)
                                                        (make-ast-int :value 0)))))
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy)))
 
-(deftest codegen-let-noescape-array-aset-bypasses-vm-make-array-and-vm-aset
-  "A non-escaping fixed-size local array can update constant indices without heap-backed array ops."
+(it-sequential "codegen-let-noescape-array-aset-bypasses-vm-make-array-and-vm-aset"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -388,18 +414,15 @@ sink/fold paths."
                                            :args (list (make-ast-var :name 'arr)
                                                        (make-ast-int :value 1)))))
                ctx)))
-    (assert-true (keywordp reg))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aset))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aset) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)))
 
-(deftest-each codegen-let-dynamic-extent-array-declaration-controls-noescape
-  "A captured fixed array binding only takes the noescape path when declared dynamic-extent."
-  :cases (("no-declaration"        nil                    nil)
-          ("with-dynamic-extent" '((dynamic-extent arr)) t))
-  (declarations noescape-p)
-  (let* ((ctx (make-codegen-ctx))
+(it-sequential "codegen-let-dynamic-extent-array-declaration-controls-noescape no-declaration"
+  (destructuring-bind (declarations noescape-p) (list nil nil)
+    (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
                 :bindings (list (cons 'arr (make-ast-call
@@ -417,18 +440,47 @@ sink/fold paths."
                              :body (list (make-ast-call :func (make-ast-var :name 'reader)
                                                          :args nil)))))
                 ctx)))
-    (assert-true (keywordp reg))
+    (expect (keywordp reg) :to-be-truthy)
     (if noescape-p
         (progn
-          (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-          (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-aref))
-          (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-move)))
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
         (progn
-          (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-          (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))))
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy))))))
 
-(deftest codegen-let-dynamic-extent-array-unsafe-operand-falls-back
-  "dynamic-extent does not noescape-optimize arrays when the binding is used outside the direct array operand position."
+(it-sequential "codegen-let-dynamic-extent-array-declaration-controls-noescape with-dynamic-extent"
+  (destructuring-bind (declarations noescape-p) (list '((dynamic-extent arr)) t)
+    (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast
+               (make-ast-let
+                :bindings (list (cons 'arr (make-ast-call
+                                           :func 'make-array
+                                           :args (list (make-ast-int :value 2)))))
+                :declarations declarations
+                :body (list (make-ast-let
+                             :bindings (list (cons 'reader
+                                                    (make-ast-lambda
+                                                     :params '()
+                                                     :body (list (make-ast-call
+                                                                  :func 'aref
+                                                                  :args (list (make-ast-var :name 'arr)
+                                                                              (make-ast-int :value 0)))))))
+                             :body (list (make-ast-call :func (make-ast-var :name 'reader)
+                                                         :args nil)))))
+                ctx)))
+    (expect (keywordp reg) :to-be-truthy)
+    (if noescape-p
+        (progn
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
+        (progn
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy))))))
+
+(it-sequential "codegen-let-dynamic-extent-array-unsafe-operand-falls-back"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast
                (make-ast-let
@@ -449,54 +501,48 @@ sink/fold paths."
                              :body (list (make-ast-call :func (make-ast-var :name 'reader)
                                                          :args nil)))))
                 ctx)))
-    (assert-true (keywordp reg))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-aref))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy)))
 
-(deftest codegen-result-vm-instructions-without-halt-strips-terminal-halt
-  "%result-vm-instructions-without-halt removes only the final vm-halt instruction."
+(it-sequential "codegen-result-vm-instructions-without-halt-strips-terminal-halt"
   (let* ((move (cl-cc:make-vm-move :dst :R1 :src :R0))
          (halt (cl-cc:make-vm-halt :reg :R1))
          (result (cl-cc/compile:make-compilation-result
                   :program (cl-cc:make-vm-program :instructions (list move halt) :result-register :R1)
                   :vm-instructions (list move halt))))
-    (assert-equal (list move)
-                  (cl-cc/compile::%result-vm-instructions-without-halt result))))
+    (expect (cl-cc/compile::%result-vm-instructions-without-halt result) :to-equal (list move))))
 
-(deftest compile-toplevel-forms-recovers-from-form-error
-  "FR-506: one bad top-level form is recorded and later forms still compile."
+(it-sequential "compile-toplevel-forms-recovers-from-form-error"
   (let* ((forms '((+ 1 1) (if 1) (+ 2 3)))
          (result (cl-cc/compile:compile-toplevel-forms forms :target :vm))
          (errors (cl-cc/compile:compilation-result-errors result))
          (asts (cl-cc/compile:compilation-result-ast result)))
-    (assert-true (typep result 'cl-cc/compile:compilation-result))
-    (assert-= 1 (length errors))
-    (assert-= 2 (length asts))
-    (assert-= 1 (getf (first errors) :form-index))
-    (assert-equal '(if 1) (getf (first errors) :form))
-    (assert-true (typep (getf (first errors) :condition) 'error))
-    (assert-true (stringp (getf (first errors) :message)))
-    (assert-true (cl-cc/compile:compilation-result-program result))
-    (assert-true (> (length (cl-cc/compile:compilation-result-vm-instructions result)) 0))))
+    (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)
+    (expect (= 1 (length errors)) :to-be-truthy)
+    (expect (= 2 (length asts)) :to-be-truthy)
+    (expect (= 1 (getf (first errors) :form-index)) :to-be-truthy)
+    (expect (getf (first errors) :form) :to-equal '(if 1))
+    (expect (typep (getf (first errors) :condition) 'error) :to-be-truthy)
+    (expect (stringp (getf (first errors) :message)) :to-be-truthy)
+    (expect (cl-cc/compile:compilation-result-program result) :to-be-truthy)
+    (expect (> (length (cl-cc/compile:compilation-result-vm-instructions result)) 0) :to-be-truthy)))
 
-(deftest compile-toplevel-forms-records-multiple-form-errors
-  "FR-506: multiple failed top-level forms are recorded in source order."
+(it-sequential "compile-toplevel-forms-records-multiple-form-errors"
   (let* ((forms '((if 1) (+ 10 20) (if 2) (+ 30 40)))
          (result (cl-cc/compile:compile-toplevel-forms forms :target :vm))
          (errors (cl-cc/compile:compilation-result-errors result)))
-    (assert-= 2 (length errors))
-    (assert-equal '(0 2) (mapcar (lambda (entry) (getf entry :form-index)) errors))
-    (assert-equal '((if 1) (if 2)) (mapcar (lambda (entry) (getf entry :form)) errors))
-    (assert-= 2 (length (cl-cc/compile:compilation-result-ast result)))))
+    (expect (= 2 (length errors)) :to-be-truthy)
+    (expect (mapcar (lambda (entry) (getf entry :form-index)) errors) :to-equal '(0 2))
+    (expect (mapcar (lambda (entry) (getf entry :form)) errors) :to-equal '((if 1) (if 2)))
+    (expect (= 2 (length (cl-cc/compile:compilation-result-ast result))) :to-be-truthy)))
 
-(deftest compile-toplevel-forms-all-good-forms-have-no-recovery-errors
-  "FR-506: successful top-level compilation keeps the errors slot empty."
+(it-sequential "compile-toplevel-forms-all-good-forms-have-no-recovery-errors"
   (let ((result (cl-cc/compile:compile-toplevel-forms '((+ 1 2) (+ 3 4)) :target :vm)))
-    (assert-null (cl-cc/compile:compilation-result-errors result))
-    (assert-= 2 (length (cl-cc/compile:compilation-result-ast result)))))
+    (expect (cl-cc/compile:compilation-result-errors result) :to-be-null)
+    (expect (= 2 (length (cl-cc/compile:compilation-result-ast result))) :to-be-truthy)))
 
-(deftest compile-toplevel-forms-skips-in-package-forms
-  "compile-toplevel-forms ignores leading in-package forms and compiles later forms normally."
+(it-sequential "compile-toplevel-forms-skips-in-package-forms"
   (let* ((forms-with-package '((in-package :cl-user) (+ 2 3)))
          (forms-without-package '((+ 2 3)))
          (result-with-package (cl-cc/compile:compile-toplevel-forms forms-with-package :target :vm))
@@ -505,14 +551,13 @@ sink/fold paths."
                                         (cl-cc/compile:compilation-result-vm-instructions result-with-package)))
          (vm-types-without-package (mapcar (lambda (inst) (class-name (class-of inst)))
                                            (cl-cc/compile:compilation-result-vm-instructions result-without-package))))
-    (assert-null (cl-cc/compile:compilation-result-errors result-with-package))
-    (assert-null (cl-cc/compile:compilation-result-errors result-without-package))
-    (assert-= 1 (length (cl-cc/compile:compilation-result-ast result-with-package)))
-    (assert-= 1 (length (cl-cc/compile:compilation-result-ast result-without-package)))
-    (assert-equal vm-types-without-package vm-types-with-package)))
+    (expect (cl-cc/compile:compilation-result-errors result-with-package) :to-be-null)
+    (expect (cl-cc/compile:compilation-result-errors result-without-package) :to-be-null)
+    (expect (= 1 (length (cl-cc/compile:compilation-result-ast result-with-package))) :to-be-truthy)
+    (expect (= 1 (length (cl-cc/compile:compilation-result-ast result-without-package))) :to-be-truthy)
+    (expect vm-types-with-package :to-equal vm-types-without-package)))
 
-(deftest compile-toplevel-forms-rolls-back-partial-if-emit-on-error
-  "FR-506: failed forms do not leave partially emitted jumps or labels behind."
+(it-sequential "compile-toplevel-forms-rolls-back-partial-if-emit-on-error"
   (let* ((forms '((if t 1 missing-var) (+ 2 3)))
           (result (cl-cc/compile:compile-toplevel-forms forms :target :vm))
           (instructions (cl-cc/compile:compilation-result-vm-instructions result))
@@ -520,18 +565,17 @@ sink/fold paths."
                                 (remove-if-not (lambda (inst)
                                                  (typep inst 'cl-cc/vm::vm-const))
                                                instructions))))
-    (assert-= 1 (length (cl-cc/compile:compilation-result-errors result)))
-    (assert-= 1 (length (cl-cc/compile:compilation-result-ast result)))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) instructions))
-    (assert-false (member 1 const-values :test #'eql))
-    (assert-true (member 5 const-values :test #'eql))))
+    (expect (= 1 (length (cl-cc/compile:compilation-result-errors result))) :to-be-truthy)
+    (expect (= 1 (length (cl-cc/compile:compilation-result-ast result))) :to-be-truthy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) instructions) :to-be-falsy)
+    (expect (member 1 const-values :test #'eql) :to-be-falsy)
+    (expect (member 5 const-values :test #'eql) :to-be-truthy)))
 
-(deftest compile-toplevel-forms-rolls-back-partial-defvar-emit-on-error
-  "FR-506: failed defvar initializers do not leave global setup fragments behind."
+(it-sequential "compile-toplevel-forms-rolls-back-partial-defvar-emit-on-error"
   (let* ((forms '((defvar *fr506-partial* (if t 1 missing-var)) (+ 4 5)))
          (result (cl-cc/compile:compile-toplevel-forms forms :target :vm))
          (instructions (cl-cc/compile:compilation-result-vm-instructions result)))
-    (assert-= 1 (length (cl-cc/compile:compilation-result-errors result)))
-    (assert-= 1 (length (cl-cc/compile:compilation-result-ast result)))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm::vm-boundp)) instructions))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm::vm-set-global)) instructions))))
+    (expect (= 1 (length (cl-cc/compile:compilation-result-errors result))) :to-be-truthy)
+    (expect (= 1 (length (cl-cc/compile:compilation-result-ast result))) :to-be-truthy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-boundp)) instructions) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-set-global)) instructions) :to-be-falsy)))

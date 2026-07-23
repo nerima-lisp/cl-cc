@@ -246,20 +246,15 @@ Syntax:
     :stdlib t/nil)
 
 When :STDLIB is T, uses (run-string form :stdlib t) instead of assert-run=."
+  (declare (ignore docstring))
+  ;; cl-weave native: one it-sequential per case. assert-run= /
+  ;; assert-evaluates-to already signal cl-weave assertion failures.
   (let ((expansions
           (loop for (label expected form) in cases
-                for source-id = (pathname-name
-                                 (or *compile-file-pathname*
-                                     *load-pathname*
-                                     *default-pathname-defaults*))
-                for test-name = (intern
-                                 (format nil "~A/~A [~A]"
-                                         (string-upcase source-id)
-                                         (symbol-name name)
-                                         label))
                 collect
-                  `(deftest ,test-name
-                     ,docstring
+                  `(it-sequential ,(format nil "~A ~A"
+                                           (string-downcase (symbol-name name))
+                                           label)
                     ,(if stdlib
                          `(assert-evaluates-to ,form ,expected :stdlib t)
                          `(assert-run= ,expected ,form))))))

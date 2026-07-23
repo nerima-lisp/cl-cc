@@ -4,7 +4,6 @@
 
 (in-package :cl-cc/pbt)
 
-(in-suite cl-cc-pbt-suite)
 
 ;; ----------------------------------------------------------------------------
 ;; VM Instruction Roundtrip Properties

@@ -7,265 +7,368 @@
 ;;;;   %compile-time-append-env, %compile-time-eval-call.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── %evaluate-ast ────────────────────────────────────────────────────────
 
-(deftest evaluate-ast-constants
-  "%evaluate-ast evaluates ast-int and ast-quote to their values."
+(it-sequential "evaluate-ast-constants"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast (cl-cc/ast:make-ast-int :value 17) 10)
-      (assert-true ok)
-      (assert-= 17 value))
+      (expect ok :to-be-truthy)
+      (expect (= 17 value) :to-be-truthy))
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast (cl-cc/ast:make-ast-quote :value 'hello) 10)
-      (assert-true ok)
-      (assert-eq 'hello value))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be 'hello))))
 
-(deftest evaluate-ast-var-found-in-env
-  "%evaluate-ast resolves a bound variable from the compile-time env."
+(it-sequential "evaluate-ast-var-found-in-env"
   (multiple-value-bind (value ok)
       (let ((cl-cc/compile::*compile-time-value-env* '((n . 42)))
             (cl-cc/compile::*compile-time-function-env* nil))
         (cl-cc/compile::%evaluate-ast (cl-cc/ast:make-ast-var :name 'n) 10))
-    (assert-true ok)
-    (assert-= 42 value)))
+    (expect ok :to-be-truthy)
+    (expect (= 42 value) :to-be-truthy)))
 
-(deftest evaluate-ast-unbound-variable-returns-nil-nil
-  "%evaluate-ast returns (values nil nil) for an unbound variable."
+(it-sequential "evaluate-ast-unbound-variable-returns-nil-nil"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast (cl-cc/ast:make-ast-var :name 'x) 10)
-      (assert-null value)
-      (assert-null ok))))
+      (expect value :to-be-null)
+      (expect ok :to-be-null))))
 
-(deftest evaluate-ast-exhausted-depth-returns-nil-nil
-  "%evaluate-ast returns (values nil nil) when the depth counter is negative."
+(it-sequential "evaluate-ast-exhausted-depth-returns-nil-nil"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast (cl-cc/ast:make-ast-int :value 5) -1)
-      (assert-null value)
-      (assert-null ok))))
+      (expect value :to-be-null)
+      (expect ok :to-be-null))))
 
-(deftest evaluate-ast-arithmetic-binop
-  "%evaluate-ast evaluates a constant arithmetic binop to an integer."
+(it-sequential "evaluate-ast-arithmetic-binop"
   (multiple-value-bind (value ok)
       (%with-clean-ct-env
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-binop :op '+ :lhs (cl-cc/ast:make-ast-int :value 3)
                                     :rhs (cl-cc/ast:make-ast-int :value 4))
          10))
-    (assert-true ok)
-    (assert-= 7 value)))
+    (expect ok :to-be-truthy)
+    (expect (= 7 value) :to-be-truthy)))
 
 ;;; ─── %evaluate-ast-sequence ───────────────────────────────────────────────
 
-(deftest evaluate-ast-sequence-empty-returns-nil-true
-  "%evaluate-ast-sequence on an empty list returns (values nil t)."
+(it-sequential "evaluate-ast-sequence-empty-returns-nil-true"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast-sequence nil nil nil 10)
-      (assert-true ok)
-      (assert-null value))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be-null))))
 
-(deftest evaluate-ast-sequence-two-constants-returns-last
-  "%evaluate-ast-sequence of two constants returns the last value."
+(it-sequential "evaluate-ast-sequence-two-constants-returns-last"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast-sequence
          (list (cl-cc/ast:make-ast-int :value 1) (cl-cc/ast:make-ast-int :value 2))
          nil nil 10)
-      (assert-true ok)
-      (assert-= 2 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 2 value) :to-be-truthy))))
 
-(deftest evaluate-ast-sequence-unknown-var-returns-nil-nil
-  "%evaluate-ast-sequence returns (values nil nil) when a sequence element cannot be evaluated."
+(it-sequential "evaluate-ast-sequence-unknown-var-returns-nil-nil"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast-sequence
          (list (cl-cc/ast:make-ast-var :name 'unk-xyz))
          nil nil 10)
-      (assert-null ok)
-      (assert-null value))))
+      (expect ok :to-be-null)
+      (expect value :to-be-null))))
 
 ;;; ─── %evaluate-ast (extended) ─────────────────────────────────────────────
 
-(deftest-each evaluate-ast-ast-if-cases
-  "%evaluate-ast ast-if: truthy condition picks then-branch; falsy picks else-branch."
-  :cases (("truthy" (cl-cc/ast:make-ast-int   :value 1)   42)
-          ("falsy"  (cl-cc/ast:make-ast-quote :value nil)  0))
-  (cond-node expected)
-  (multiple-value-bind (value ok)
+(it-sequential "evaluate-ast-ast-if-cases truthy"
+  (destructuring-bind (cond-node expected) (list (cl-cc/ast:make-ast-int   :value 1) 42)
+    (multiple-value-bind (value ok)
       (%with-clean-ct-env
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-if :cond cond-node
                                  :then (cl-cc/ast:make-ast-int :value 42)
                                  :else (cl-cc/ast:make-ast-int :value 0))
          10))
-    (assert-true ok)
-    (assert-= expected value)))
+    (expect ok :to-be-truthy)
+    (expect (= expected value) :to-be-truthy))))
 
-(deftest evaluate-ast-progn-two-forms-returns-last-value
-  "%evaluate-ast ast-progn with two constant forms returns the last value."
+(it-sequential "evaluate-ast-ast-if-cases falsy"
+  (destructuring-bind (cond-node expected) (list (cl-cc/ast:make-ast-quote :value nil) 0)
+    (multiple-value-bind (value ok)
+      (%with-clean-ct-env
+        (cl-cc/compile::%evaluate-ast
+         (cl-cc/ast:make-ast-if :cond cond-node
+                                 :then (cl-cc/ast:make-ast-int :value 42)
+                                 :else (cl-cc/ast:make-ast-int :value 0))
+         10))
+    (expect ok :to-be-truthy)
+    (expect (= expected value) :to-be-truthy))))
+
+(it-sequential "evaluate-ast-progn-two-forms-returns-last-value"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-progn :forms (list (cl-cc/ast:make-ast-int :value 1)
                                                   (cl-cc/ast:make-ast-int :value 2)))
          10)
-      (assert-true ok)
-      (assert-= 2 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 2 value) :to-be-truthy))))
 
-(deftest evaluate-ast-progn-with-unknown-var-returns-nil-nil
-  "%evaluate-ast ast-progn returns (values nil nil) when an inner form cannot be evaluated."
+(it-sequential "evaluate-ast-progn-with-unknown-var-returns-nil-nil"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-progn :forms (list (cl-cc/ast:make-ast-var :name 'unk-xyz)))
          10)
-      (assert-null ok)
-      (assert-null value))))
+      (expect ok :to-be-null)
+      (expect value :to-be-null))))
 
-(deftest evaluate-ast-let-binding-returns-bound-value
-  "%evaluate-ast ast-let: binding x=5 and returning x yields value=5."
+(it-sequential "evaluate-ast-let-binding-returns-bound-value"
   (multiple-value-bind (value ok)
       (%with-clean-ct-env
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-let :bindings (list (cons 'x (cl-cc/ast:make-ast-int :value 5)))
                                   :body (list (cl-cc/ast:make-ast-var :name 'x)))
          10))
-    (assert-true ok)
-    (assert-= 5 value)))
+    (expect ok :to-be-truthy)
+    (expect (= 5 value) :to-be-truthy)))
 
-(deftest evaluate-ast-the-passes-through-to-inner-value
-  "%evaluate-ast ast-the: passes through to inner value."
+(it-sequential "evaluate-ast-the-passes-through-to-inner-value"
   (multiple-value-bind (value ok)
       (%with-clean-ct-env
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-the :type 'fixnum :value (cl-cc/ast:make-ast-int :value 99))
          10))
-    (assert-true ok)
-    (assert-= 99 value)))
+    (expect ok :to-be-truthy)
+    (expect (= 99 value) :to-be-truthy)))
 
-(deftest evaluate-ast-unknown-node-returns-nil
-  "%evaluate-ast returns (values nil nil) for nodes whose op cannot be evaluated."
+(it-sequential "evaluate-ast-unknown-node-returns-nil"
   (multiple-value-bind (value ok)
       (%with-clean-ct-env
         (cl-cc/compile::%evaluate-ast
          (cl-cc/ast:make-ast-binop :op 'unknown-op :lhs (cl-cc/ast:make-ast-var :name 'x)
                                     :rhs (cl-cc/ast:make-ast-var :name 'y))
          10))
-    (assert-null ok)
-    (assert-null value)))
+    (expect ok :to-be-null)
+    (expect value :to-be-null)))
 
 ;;; ─── *compile-time-multi-arg-fns* / *compile-time-unary-pred-fns* ───────────
 
-(deftest compile-time-multi-arg-fns-contains-all-expected
-  "*compile-time-multi-arg-fns* has all N-ary arithmetic and comparison ops."
+(it-sequential "compile-time-multi-arg-fns-contains-all-expected"
   (dolist (sym '(+ - * = < <= > >=))
-    (assert-true (member sym cl-cc/compile::*compile-time-multi-arg-fns* :test #'eq))))
+    (expect (member sym cl-cc/compile::*compile-time-multi-arg-fns* :test #'eq) :to-be-truthy)))
 
-(deftest compile-time-unary-pred-fns-contains-all-expected
-  "*compile-time-unary-pred-fns* has all supported unary predicates."
+(it-sequential "compile-time-unary-pred-fns-contains-all-expected"
   (dolist (sym '(not zerop plusp minusp oddp evenp numberp integerp consp null symbolp stringp functionp))
-    (assert-true (member sym cl-cc/compile::*compile-time-unary-pred-fns* :test #'eq))))
+    (expect (member sym cl-cc/compile::*compile-time-unary-pred-fns* :test #'eq) :to-be-truthy)))
 
 ;;; ─── %compile-time-eval-known-call ───────────────────────────────────────────
 
-(deftest-each compile-time-eval-known-call-multi-arg-fns
-  "%compile-time-eval-known-call evaluates all registered N-ary arithmetic/comparison fns."
-  :cases (("add"  '+  '(3 4)   7)
-          ("sub"  '-  '(10 3)  7)
-          ("mul"  '*  '(4 5)   20)
-          ("eq"   '=  '(7 7)   t)
-          ("lt"   '<  '(3 5)   t)
-          ("lte"  '<= '(5 5)   t)
-          ("gt"   '>  '(9 3)   t)
-          ("gte"  '>= '(4 4)   t))
-  (name args expected)
-  (multiple-value-bind (result ok)
+(it-sequential "compile-time-eval-known-call-multi-arg-fns add"
+  (destructuring-bind (name args expected) (list '+ '(3 4) 7)
+    (multiple-value-bind (result ok)
       (cl-cc/compile::%compile-time-eval-known-call name args)
-    (assert-true ok)
-    (assert-equal expected result)))
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
 
-(deftest-each compile-time-eval-known-call-unary-preds
-  "%compile-time-eval-known-call evaluates all registered unary predicates."
-  :cases (("not-nil"    'not      '(nil)   t)
-          ("not-t"      'not      '(t)     nil)
-          ("zerop"      'zerop    '(0)     t)
-          ("plusp"      'plusp    '(5)     t)
-          ("minusp"     'minusp   '(-3)    t)
-          ("oddp"       'oddp     '(3)     t)
-          ("evenp"      'evenp    '(4)     t)
-          ("numberp"    'numberp  '(42)    t)
-          ("integerp"   'integerp '(1)     t)
-          ("consp"      'consp    '((a))   t)
-          ("null-nil"   'null     '(nil)   t)
-          ("symbolp"    'symbolp  '(foo)   t)
-          ("stringp"    'stringp  '("hi")  t))
-  (name args expected)
-  (multiple-value-bind (result ok)
+(it-sequential "compile-time-eval-known-call-multi-arg-fns sub"
+  (destructuring-bind (name args expected) (list '- '(10 3) 7)
+    (multiple-value-bind (result ok)
       (cl-cc/compile::%compile-time-eval-known-call name args)
-    (assert-true ok)
-    (assert-equal expected result)))
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
 
-(deftest compile-time-eval-known-call-division-integer
-  "%compile-time-eval-known-call / with exact integer division returns the quotient."
+(it-sequential "compile-time-eval-known-call-multi-arg-fns mul"
+  (destructuring-bind (name args expected) (list '* '(4 5) 20)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-multi-arg-fns eq"
+  (destructuring-bind (name args expected) (list '= '(7 7) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-multi-arg-fns lt"
+  (destructuring-bind (name args expected) (list '< '(3 5) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-multi-arg-fns lte"
+  (destructuring-bind (name args expected) (list '<= '(5 5) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-multi-arg-fns gt"
+  (destructuring-bind (name args expected) (list '> '(9 3) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-multi-arg-fns gte"
+  (destructuring-bind (name args expected) (list '>= '(4 4) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds not-nil"
+  (destructuring-bind (name args expected) (list 'not '(nil) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds not-t"
+  (destructuring-bind (name args expected) (list 'not '(t) nil)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds zerop"
+  (destructuring-bind (name args expected) (list 'zerop '(0) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds plusp"
+  (destructuring-bind (name args expected) (list 'plusp '(5) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds minusp"
+  (destructuring-bind (name args expected) (list 'minusp '(-3) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds oddp"
+  (destructuring-bind (name args expected) (list 'oddp '(3) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds evenp"
+  (destructuring-bind (name args expected) (list 'evenp '(4) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds numberp"
+  (destructuring-bind (name args expected) (list 'numberp '(42) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds integerp"
+  (destructuring-bind (name args expected) (list 'integerp '(1) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds consp"
+  (destructuring-bind (name args expected) (list 'consp '((a)) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds null-nil"
+  (destructuring-bind (name args expected) (list 'null '(nil) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds symbolp"
+  (destructuring-bind (name args expected) (list 'symbolp '(foo) t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-unary-preds stringp"
+  (destructuring-bind (name args expected) (list 'stringp '("hi") t)
+    (multiple-value-bind (result ok)
+      (cl-cc/compile::%compile-time-eval-known-call name args)
+    (expect ok :to-be-truthy)
+    (expect result :to-equal expected))))
+
+(it-sequential "compile-time-eval-known-call-division-integer"
   (multiple-value-bind (result ok)
       (cl-cc/compile::%compile-time-eval-known-call '/ '(12 4))
-    (assert-true ok)
-    (assert-= 3 result)))
+    (expect ok :to-be-truthy)
+    (expect (= 3 result) :to-be-truthy)))
 
-(deftest compile-time-eval-known-call-division-ratio
-  "%compile-time-eval-known-call / returns the ratio for non-exact division (no integerp guard)."
+(it-sequential "compile-time-eval-known-call-division-ratio"
   (multiple-value-bind (result ok)
       (cl-cc/compile::%compile-time-eval-known-call '/ '(7 2))
-    (assert-true ok)
-    (assert-equal 7/2 result)))
+    (expect ok :to-be-truthy)
+    (expect result :to-equal 7/2)))
 
-(deftest compile-time-eval-known-call-division-by-zero
-  "%compile-time-eval-known-call / returns nil for division by zero."
+(it-sequential "compile-time-eval-known-call-division-by-zero"
   (multiple-value-bind (result ok)
       (cl-cc/compile::%compile-time-eval-known-call '/ '(5 0))
-    (assert-null ok)
-    (assert-null result)))
+    (expect ok :to-be-null)
+    (expect result :to-be-null)))
 
-(deftest compile-time-eval-known-call-unknown-returns-nil-nil
-  "%compile-time-eval-known-call returns (values nil nil) for unrecognized names."
+(it-sequential "compile-time-eval-known-call-unknown-returns-nil-nil"
   (multiple-value-bind (result ok)
       (cl-cc/compile::%compile-time-eval-known-call 'totally-unknown-fn '(1))
-    (assert-null result)
-    (assert-null ok)))
+    (expect result :to-be-null)
+    (expect ok :to-be-null)))
 
 ;;; ─── %compile-time-pair-bindings ─────────────────────────────────────────────
 
-(deftest-each compile-time-pair-bindings-cases
-  "%compile-time-pair-bindings pairs params and args into an alist."
-  :cases (("empty"   nil       nil       nil)
-          ("single"  '(x)      '(1)      '((x . 1)))
-          ("multi"   '(x y z)  '(1 2 3)  '((x . 1) (y . 2) (z . 3)))
-          ("fewer"   '(x y)    '(1)      '((x . 1))))
-  (params args expected)
-  (assert-equal expected (cl-cc/compile::%compile-time-pair-bindings params args)))
+(it-sequential "compile-time-pair-bindings-cases empty"
+  (destructuring-bind (params args expected) (list nil nil nil)
+    (expect (cl-cc/compile::%compile-time-pair-bindings params args) :to-equal expected)))
+
+(it-sequential "compile-time-pair-bindings-cases single"
+  (destructuring-bind (params args expected) (list '(x) '(1) '((x . 1)))
+    (expect (cl-cc/compile::%compile-time-pair-bindings params args) :to-equal expected)))
+
+(it-sequential "compile-time-pair-bindings-cases multi"
+  (destructuring-bind (params args expected) (list '(x y z) '(1 2 3) '((x . 1) (y . 2) (z . 3)))
+    (expect (cl-cc/compile::%compile-time-pair-bindings params args) :to-equal expected)))
+
+(it-sequential "compile-time-pair-bindings-cases fewer"
+  (destructuring-bind (params args expected) (list '(x y) '(1) '((x . 1)))
+    (expect (cl-cc/compile::%compile-time-pair-bindings params args) :to-equal expected)))
 
 ;;; ─── %compile-time-append-env ────────────────────────────────────────────────
 
-(deftest compile-time-append-env-prepends-bindings
-  "%compile-time-append-env prepends new bindings in front of the existing env."
+(it-sequential "compile-time-append-env-prepends-bindings"
   (let ((result (cl-cc/compile::%compile-time-append-env
                  '((a . 1) (b . 2)) '((c . 3)))))
-    (assert-equal '((a . 1) (b . 2) (c . 3)) result)))
+    (expect result :to-equal '((a . 1) (b . 2) (c . 3)))))
 
-(deftest compile-time-append-env-empty-bindings-returns-env
-  "%compile-time-append-env with empty bindings returns the original env."
+(it-sequential "compile-time-append-env-empty-bindings-returns-env"
   (let ((env '((x . 99))))
-    (assert-equal env (cl-cc/compile::%compile-time-append-env nil env))))
+    (expect (cl-cc/compile::%compile-time-append-env nil env) :to-equal env)))
 
 ;;; ─── %evaluate-ast block/return-from ────────────────────────────────────────
 
-(deftest evaluate-ast-block-normal-exit
-  "%evaluate-ast ast-block returns the last form value on normal exit."
+(it-sequential "evaluate-ast-block-normal-exit"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast
@@ -273,11 +376,10 @@
           :name 'done
           :body (list (cl-cc/ast:make-ast-int :value 42)))
          10)
-      (assert-true ok)
-      (assert-= 42 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 42 value) :to-be-truthy))))
 
-(deftest evaluate-ast-return-from-exits-block
-  "%evaluate-ast ast-return-from unwinds to the named block."
+(it-sequential "evaluate-ast-return-from-exits-block"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%evaluate-ast
@@ -289,76 +391,68 @@
                   :value (cl-cc/ast:make-ast-int :value 7))
                  (cl-cc/ast:make-ast-int :value 99)))
          10)
-      (assert-true ok)
-      (assert-= 7 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 7 value) :to-be-truthy))))
 
 ;;; ─── %compile-time-eval-call ──────────────────────────────────────────────
 
-(deftest compile-time-eval-call-string-length-folds
-  "%compile-time-eval-call evaluates STRING-LENGTH of a literal string at compile time."
+(it-sequential "compile-time-eval-call-string-length-folds"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-var :name 'string-length) (list "hello") 10)
-      (assert-true ok)
-      (assert-= 5 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 5 value) :to-be-truthy))))
 
-(deftest compile-time-eval-call-intern-folds-explicit-package
-  "%compile-time-eval-call resolves INTERN when name and package are literal constants."
+(it-sequential "compile-time-eval-call-intern-folds-explicit-package"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-var :name 'intern) (list "CAR" :cl) 10)
-      (assert-true ok)
-      (assert-eq 'cl:car value))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be 'cl:car))))
 
-(deftest compile-time-eval-call-intern-folds-string-package
-  "%compile-time-eval-call accepts string package designators for INTERN folding."
+(it-sequential "compile-time-eval-call-intern-folds-string-package"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-var :name 'intern) (list "CDR" "CL") 10)
-      (assert-true ok)
-      (assert-eq 'cl:cdr value))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be 'cl:cdr))))
 
-(deftest compile-time-eval-call-intern-rejects-implicit-package
-  "%compile-time-eval-call does not fold one-argument INTERN because *PACKAGE* is dynamic."
+(it-sequential "compile-time-eval-call-intern-rejects-implicit-package"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-var :name 'intern) (list "CAR") 10)
-      (assert-null ok)
-      (assert-null value))))
+      (expect ok :to-be-null)
+      (expect value :to-be-null))))
 
-(deftest compile-time-eval-call-builtin-not-folds
-  "%compile-time-eval-call evaluates the built-in NOT function at compile time."
+(it-sequential "compile-time-eval-call-builtin-not-folds"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-var :name 'not) (list nil) 10)
-      (assert-true ok)
-      (assert-true value))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be-truthy))))
 
-(deftest compile-time-eval-call-ast-function-folds
-  "%compile-time-eval-call also accepts AST-FUNCTION designators."
+(it-sequential "compile-time-eval-call-ast-function-folds"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-function :name 'not) (list nil) 10)
-      (assert-true ok)
-      (assert-true value))))
+      (expect ok :to-be-truthy)
+      (expect value :to-be-truthy))))
 
-(deftest compile-time-eval-call-quoted-function-designator-folds
-  "%compile-time-eval-call also accepts quoted function designators."
+(it-sequential "compile-time-eval-call-quoted-function-designator-folds"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
          (cl-cc/ast:make-ast-quote :value '+) (list 1 2 3) 10)
-      (assert-true ok)
-      (assert-= 6 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 6 value) :to-be-truthy))))
 
-(deftest compile-time-eval-call-lambda-application-folds
-  "%compile-time-eval-call evaluates an inline lambda application at compile time."
+(it-sequential "compile-time-eval-call-lambda-application-folds"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
@@ -366,11 +460,10 @@
                                      :body (list (cl-cc/ast:make-ast-var :name 'x))
                                      :optional-params nil :rest-param nil :key-params nil)
          (list 7) 10)
-      (assert-true ok)
-      (assert-= 7 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 7 value) :to-be-truthy))))
 
-(deftest compile-time-eval-call-ast-the-wrapped-lambda-application-folds
-  "%compile-time-eval-call unwraps AST-THE before evaluating an inline lambda application."
+(it-sequential "compile-time-eval-call-ast-the-wrapped-lambda-application-folds"
   (%with-clean-ct-env
     (multiple-value-bind (value ok)
         (cl-cc/compile::%compile-time-eval-call
@@ -380,12 +473,11 @@
                                             :body (list (cl-cc/ast:make-ast-var :name 'x))
                                             :optional-params nil :rest-param nil :key-params nil))
          (list 7) 10)
-      (assert-true ok)
-      (assert-= 7 value))))
+      (expect ok :to-be-truthy)
+      (expect (= 7 value) :to-be-truthy))))
 
-(deftest compile-time-eval-call-unknown-function-returns-nil
-  "%compile-time-eval-call returns NIL for an unknown function symbol."
+(it-sequential "compile-time-eval-call-unknown-function-returns-nil"
   (%with-clean-ct-env
-    (assert-null (cl-cc/compile::%compile-time-eval-call
+    (expect (cl-cc/compile::%compile-time-eval-call
                   (cl-cc/ast:make-ast-var :name 'completely-unknown-fn-xyz)
-                  (list 1) 10))))
+                  (list 1) 10) :to-be-null)))

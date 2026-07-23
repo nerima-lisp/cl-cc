@@ -7,7 +7,6 @@
 
 (in-package :cl-cc/pbt)
 
-(in-suite cl-cc-pbt-suite)
 
 ;; ----------------------------------------------------------------------------
 ;; Unification Properties

@@ -6,38 +6,33 @@
 ;;;;   type-check-ast (integer literal type, unknown variable signals error).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-codegen-unit-suite)
 
 ;;; ─── target-instance ─────────────────────────────────────────────────────────
 
-(deftest-each target-instance-returns-correct-class
-  "target-instance maps each target keyword to its backend class."
-  :cases (("x86-64"  :x86_64  'cl-cc/codegen::x86-64-target)
-          ("aarch64" :aarch64 'cl-cc/codegen::aarch64-target))
-  (target expected-class)
-  (assert-true (typep (cl-cc/compile:target-instance target) expected-class)))
+(it-sequential "target-instance-returns-correct-class x86-64"
+  (destructuring-bind (target expected-class) (list :x86_64 'cl-cc/codegen::x86-64-target)
+    (expect (typep (cl-cc/compile:target-instance target) expected-class) :to-be-truthy)))
 
-(deftest target-instance-vm-returns-nil
-  "target-instance :vm returns nil (no native backend for VM)."
-  (assert-null (cl-cc/compile:target-instance :vm)))
+(it-sequential "target-instance-returns-correct-class aarch64"
+  (destructuring-bind (target expected-class) (list :aarch64 'cl-cc/codegen::aarch64-target)
+    (expect (typep (cl-cc/compile:target-instance target) expected-class) :to-be-truthy)))
 
-(deftest target-instance-invalid-target-signals-error
-  "target-instance signals an error for an unrecognised target keyword."
-  (assert-signals error
-    (cl-cc/compile:target-instance :invalid-target)))
+(it-sequential "target-instance-vm-returns-nil"
+  (expect (cl-cc/compile:target-instance :vm) :to-be-null))
+
+(it-sequential "target-instance-invalid-target-signals-error"
+  (signals error (cl-cc/compile:target-instance :invalid-target)))
 
 ;;; ─── %compile-body-with-tail ─────────────────────────────────────────────────
 
-(deftest compile-body-with-tail-single-form-returns-register
-  "%compile-body-with-tail on a single form returns the register it compiled."
+(it-sequential "compile-body-with-tail-single-form-returns-register"
   (let* ((ctx (make-codegen-ctx))
          (reg (cl-cc/compile::%compile-body-with-tail
                 (list (make-ast-int :value 7))
                 nil ctx)))
-    (assert-true (keywordp reg))))
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest compile-body-with-tail-multi-form-returns-last-register
-  "%compile-body-with-tail returns the register of the last compiled form."
+(it-sequential "compile-body-with-tail-multi-form-returns-last-register"
   (let* ((ctx (make-codegen-ctx))
          (reg (cl-cc/compile::%compile-body-with-tail
                 (list (make-ast-int :value 1)
@@ -45,24 +40,18 @@
                       (make-ast-int :value 3))
                 nil ctx)))
     ;; All three forms are compiled; the register of form 3 is returned.
-    (assert-true (keywordp reg))
+    (expect (keywordp reg) :to-be-truthy)
     ;; Three vm-const instructions should have been emitted
-    (assert-true (>= (count-if (lambda (i) (typep i 'cl-cc/vm::vm-const))
+    (expect (>= (count-if (lambda (i) (typep i 'cl-cc/vm::vm-const))
                                (codegen-instructions ctx))
-                     3))))
+                     3) :to-be-truthy)))
 
-(deftest compile-body-with-tail-empty-body-returns-nil
-  "%compile-body-with-tail on an empty body returns nil."
+(it-sequential "compile-body-with-tail-empty-body-returns-nil"
   (let* ((ctx (make-codegen-ctx))
          (result (cl-cc/compile::%compile-body-with-tail '() nil ctx)))
-    (assert-null result)))
+    (expect result :to-be-null)))
 
-(deftest compile-body-with-tail-sets-tail-for-last-form
-  "%compile-body-with-tail sets ctx-tail-position=TAIL only for the last form."
-  ;; After compilation, the tail-position left in ctx is the value set for the
-  ;; last form (which then gets overwritten by compile-ast for that form).
-  ;; We verify indirectly: if we pass TAIL=t and the body has exactly one form,
-  ;; ctx-tail-position is set to T for that form.
+(it-sequential "compile-body-with-tail-sets-tail-for-last-form"
   (let* ((ctx (make-codegen-ctx))
          (tail-values nil))
     ;; Instrument by wrapping compile-ast: not straightforward, so
@@ -71,7 +60,7 @@
                  (list (make-ast-int :value 42))
                  t ctx)))
       (declare (ignore tail-values))
-      (assert-true (keywordp reg)))))
+      (expect (keywordp reg) :to-be-truthy))))
 
 ;;; ─── labels tail-SCC contification ─────────────────────────────────────────
 
@@ -98,24 +87,21 @@
                                                    :rhs (make-ast-int :value 1)))))))
    :body (list body-form)))
 
-(deftest codegen-labels-mutual-tail-scc-emits-jumps-not-closures
-  "Tail-only non-escaping mutual labels are contified into local vm-jump targets."
+(it-sequential "codegen-labels-mutual-tail-scc-emits-jumps-not-closures"
   (let ((ctx (make-codegen-ctx)))
     (setf (cl-cc/compile:ctx-tail-position ctx) t)
     (compile-ast
      (%mutual-tail-labels-fixture
       (make-ast-call :func 'evenp-local :args (list (make-ast-int :value 4))))
      ctx)
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-closure))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call))
-    (assert-true
-     (some (lambda (inst)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-null)
+    (expect (some (lambda (inst)
                  (and (typep inst 'cl-cc/vm::vm-jump)
                       (search "labels_tail_fn" (cl-cc/vm::vm-label-name inst))))
-           (codegen-instructions ctx)))))
+           (codegen-instructions ctx)) :to-be-truthy)))
 
-(deftest codegen-labels-the-wrapped-local-call-keeps-tail-scc
-  "labels tail-SCC detection treats ast-the-wrapped local call designators transparently."
+(it-sequential "codegen-labels-the-wrapped-local-call-keeps-tail-scc"
   (let ((ctx (make-codegen-ctx)))
     (setf (cl-cc/compile:ctx-tail-position ctx) t)
     (compile-ast
@@ -126,16 +112,14 @@
               :value 'evenp-local)
        :args (list (make-ast-int :value 4))))
      ctx)
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-closure))
-    (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call))
-    (assert-true
-     (some (lambda (inst)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-null)
+    (expect (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-jump)
                   (search "labels_tail_fn" (cl-cc/vm::vm-label-name inst))))
-           (codegen-instructions ctx)))))
+           (codegen-instructions ctx)) :to-be-truthy)))
 
-(deftest codegen-labels-non-tail-mutual-call-keeps-boxed-closures
-  "A non-tail call to a labels SCC falls back to boxed closures."
+(it-sequential "codegen-labels-non-tail-mutual-call-keeps-boxed-closures"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast
      (%mutual-tail-labels-fixture
@@ -143,10 +127,9 @@
                       :lhs (make-ast-call :func 'evenp-local :args (list (make-ast-int :value 4)))
                       :rhs (make-ast-int :value 1)))
      ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-closure))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy)))
 
-(deftest codegen-labels-restores-compiler-state-after-compilation
-  "compile-ast on labels restores ctx-env and *labels-boxed-fns* after emission."
+(it-sequential "codegen-labels-restores-compiler-state-after-compilation"
   (let* ((ctx (make-codegen-ctx))
          (original-env (list (cons 'sentinel-env (cl-cc/compile:make-register ctx))))
          (original-labels-boxed-fns '((sentinel-boxed-fn . sentinel-entry))))
@@ -157,11 +140,10 @@
       :bindings (list (list 'local-id '(x) (make-ast-var :name 'x)))
       :body (list (make-ast-call :func 'local-id :args (list (make-ast-int :value 1)))))
      ctx)
-    (assert-equal original-env (cl-cc/compile:ctx-env ctx))
-    (assert-equal original-labels-boxed-fns cl-cc/compile:*labels-boxed-fns*)))
+    (expect (cl-cc/compile:ctx-env ctx) :to-equal original-env)
+    (expect cl-cc/compile:*labels-boxed-fns* :to-equal original-labels-boxed-fns)))
 
-(deftest codegen-labels-restores-compiler-state-for-tail-scc-path
-  "Tail-SCC labels compilation restores ctx-env, *labels-boxed-fns*, and *local-tail-jump-fns*."
+(it-sequential "codegen-labels-restores-compiler-state-for-tail-scc-path"
   (let* ((ctx (make-codegen-ctx))
          (original-env (list (cons 'sentinel-env (cl-cc/compile:make-register ctx))))
          (original-labels-boxed-fns '((sentinel-boxed-fn . sentinel-entry)))
@@ -174,44 +156,39 @@
      (%mutual-tail-labels-fixture
       (make-ast-call :func 'evenp-local :args (list (make-ast-int :value 4))))
      ctx)
-    (assert-equal original-env (cl-cc/compile:ctx-env ctx))
-    (assert-equal original-labels-boxed-fns cl-cc/compile:*labels-boxed-fns*)
-    (assert-equal original-local-tail-jump-fns cl-cc/compile:*local-tail-jump-fns*)))
+    (expect (cl-cc/compile:ctx-env ctx) :to-equal original-env)
+    (expect cl-cc/compile:*labels-boxed-fns* :to-equal original-labels-boxed-fns)
+    (expect cl-cc/compile:*local-tail-jump-fns* :to-equal original-local-tail-jump-fns)))
 
 ;;; ─── emit-assembly ───────────────────────────────────────────────────────────
 
-(deftest emit-assembly-vm-target-returns-empty-string
-  ":vm target bypasses code generation and returns the empty string."
+(it-sequential "emit-assembly-vm-target-returns-empty-string"
   (let ((program (cl-cc:make-vm-program :instructions nil :result-register :R0)))
-    (assert-string= "" (cl-cc/compile:emit-assembly program :target :vm))))
+    (expect (cl-cc/compile:emit-assembly program :target :vm) :to-equal "")))
 
-(deftest emit-assembly-x86-64-produces-bootstrap-header
-  "x86-64 assembly output begins with the CL-CC bootstrap header."
+(it-sequential "emit-assembly-x86-64-produces-bootstrap-header"
   (let* ((program (cl-cc:make-vm-program :instructions nil :result-register :R0))
          (asm     (cl-cc/compile:emit-assembly program :target :x86_64)))
-    (assert-true (stringp asm))
-    (assert-true (search "; CL-CC bootstrap assembly" asm))
-    (assert-true (search "clcc_entry:" asm))))
+    (expect (stringp asm) :to-be-truthy)
+    (expect (search "; CL-CC bootstrap assembly" asm) :to-be-truthy)
+    (expect (search "clcc_entry:" asm) :to-be-truthy)))
 
-(deftest emit-assembly-aarch64-produces-bootstrap-header
-  "aarch64 assembly output begins with the CL-CC bootstrap header."
+(it-sequential "emit-assembly-aarch64-produces-bootstrap-header"
   (let* ((program (cl-cc:make-vm-program :instructions nil :result-register :R0))
          (asm     (cl-cc/compile:emit-assembly program :target :aarch64)))
-    (assert-true (stringp asm))
-    (assert-true (search "; CL-CC bootstrap assembly" asm))
-    (assert-true (search "clcc_entry:" asm))))
+    (expect (stringp asm) :to-be-truthy)
+    (expect (search "; CL-CC bootstrap assembly" asm) :to-be-truthy)
+    (expect (search "clcc_entry:" asm) :to-be-truthy)))
 
 ;;; ─── type-check-ast ──────────────────────────────────────────────────────────
 
-(deftest type-check-ast-integer-literal-returns-integer-type
-  "type-check-ast on an integer literal returns a type related to integer."
+(it-sequential "type-check-ast-integer-literal-returns-integer-type"
   (let* ((ast  (make-ast-int :value 42))
          (type (cl-cc/compile:type-check-ast ast)))
     ;; The inferred type should be something (not nil)
-    (assert-true (not (null type)))))
+    (expect (not (null type)) :to-be-truthy)))
 
-(deftest type-check-ast-quoted-nil-returns-type
-  "type-check-ast on a quoted nil literal returns a type."
+(it-sequential "type-check-ast-quoted-nil-returns-type"
   (let* ((ast  (make-ast-quote :value nil))
          (type (cl-cc/compile:type-check-ast ast)))
-    (assert-true (not (null type)))))
+    (expect (not (null type)) :to-be-truthy)))
