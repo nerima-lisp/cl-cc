@@ -6,11 +6,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite vm-mop-remaining-features-suite
-  :description "TDD baseline tests for remaining VM MOP/SBCL compatibility features"
-  :parent cl-cc-unit-suite)
 
-(in-suite vm-mop-remaining-features-suite)
 
 (defmacro assert-mop-red-ok (source)
   "Run SOURCE in the CL-CC VM with stdlib support and expect :OK.
@@ -28,8 +24,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Effective slots ─────────────────────────────────────────────────────
 
-(deftest mop-effective-slots-compute-effective-slot-definition
-  "compute-effective-slot-definition returns an effective slot descriptor for a direct slot."
+(it-sequential "mop-effective-slots-compute-effective-slot-definition"
   (assert-mop-red-ok
    "(progn
       (defclass mop-eff-base () ((x :initarg :x :initform 10)))
@@ -38,8 +33,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
              (slot (compute-effective-slot-definition class 'x direct-slots)))
         (if (and slot (eq (slot-definition-name slot) 'x)) :ok :bad)))"))
 
-(deftest mop-effective-slots-class-slots-includes-inherited-slots
-  "class-slots returns effective slots including inherited slots."
+(it-sequential "mop-effective-slots-class-slots-includes-inherited-slots"
   (assert-mop-red-ok
    "(progn
       (defclass mop-eff-parent () ((a :initarg :a)))
@@ -48,8 +42,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
                            (class-slots (class-of (make-instance 'mop-eff-child))))))
         (if (and (member 'a names) (member 'b names)) :ok :bad)))"))
 
-(deftest mop-effective-slots-class-direct-slots-excludes-inherited-slots
-  "class-direct-slots returns only slots declared directly on the class."
+(it-sequential "mop-effective-slots-class-direct-slots-excludes-inherited-slots"
   (assert-mop-red-ok
    "(progn
       (defclass mop-direct-parent () ((a :initarg :a)))
@@ -58,8 +51,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
                            (class-direct-slots (class-of (make-instance 'mop-direct-child))))))
         (if (and (not (member 'a names)) (member 'b names)) :ok :bad)))"))
 
-(deftest mop-effective-slots-same-name-inherited-slot-merge
-  "Same-name inherited and direct slots merge into one effective slot."
+(it-sequential "mop-effective-slots-same-name-inherited-slot-merge"
   (assert-mop-red-ok
    "(progn
       (defclass mop-merge-parent () ((x :initarg :parent-x :initform :parent)))
@@ -72,8 +64,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Initargs/initforms ──────────────────────────────────────────────────
 
-(deftest mop-initargs-union-across-superclass-slots
-  "Inherited slot initargs are accepted by subclasses."
+(it-sequential "mop-initargs-union-across-superclass-slots"
   (assert-mop-red-ok
    "(progn
       (defclass mop-init-parent () ((x :initarg :x)))
@@ -84,8 +75,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
             :ok
             :bad)))"))
 
-(deftest mop-initforms-own-slot-precedence-over-inherited-slot
-  "A direct slot initform takes precedence when it overrides an inherited slot."
+(it-sequential "mop-initforms-own-slot-precedence-over-inherited-slot"
   (assert-mop-red-ok
    "(progn
       (defclass mop-own-init-parent () ((x :initform :parent)))
@@ -93,16 +83,14 @@ turn into clean test failures rather than blocking the parallel worker thread."
       (let ((obj (make-instance 'mop-own-init-child)))
         (if (eq (slot-value obj 'x) :child) :ok :bad)))"))
 
-(deftest mop-initforms-explicit-initarg-suppresses-initform
-  "An explicit initarg suppresses the slot initform."
+(it-sequential "mop-initforms-explicit-initarg-suppresses-initform"
   (assert-mop-red-ok
    "(progn
        (defclass mop-initarg-wins () ((x :initarg :x :initform :default)))
        (let ((obj (make-instance 'mop-initarg-wins :x :explicit)))
          (if (eq (slot-value obj 'x) :explicit) :ok :bad)))"))
 
-(deftest mop-initargs-inherited-overridden-slot-initarg-suppresses-initform
-  "Inherited initargs remain valid for an overridden slot and suppress inherited initforms."
+(it-sequential "mop-initargs-inherited-overridden-slot-initarg-suppresses-initform"
   (assert-mop-red-ok
    "(progn
        (defclass mop-inherited-initarg-a () ((x :initarg :a-x :initform 1)))
@@ -110,8 +98,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
        (let ((obj (make-instance 'mop-inherited-initarg-b :a-x 5)))
          (if (= (slot-value obj 'x) 5) :ok :bad)))"))
 
-(deftest mop-initforms-leftmost-superclass-priority
-  "When superclasses provide competing initforms for the same slot, the most-specific initform wins."
+(it-sequential "mop-initforms-leftmost-superclass-priority"
   (assert-mop-red-ok
    "(progn
        (defclass mop-initform-left () ((x :initform :left)))
@@ -122,8 +109,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Metaclass hooks ─────────────────────────────────────────────────────
 
-(deftest mop-metaclass-hooks-slot-access-protocol
-  "slot-value, setf slot-value, slot-boundp, and slot-makunbound route through metaclass hooks."
+(it-sequential "mop-metaclass-hooks-slot-access-protocol"
   (assert-mop-red-ok
    "(progn
       (defclass mop-hook-meta (standard-class) ())
@@ -153,8 +139,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
               :ok
               :bad))))"))
 
-(deftest mop-metaclass-hooks-allocate-instance
-  "make-instance routes allocation through allocate-instance for custom metaclasses."
+(it-sequential "mop-metaclass-hooks-allocate-instance"
   (assert-mop-red-ok
    "(progn
       (defclass mop-alloc-meta (standard-class) ())
@@ -167,8 +152,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
       (let ((obj (make-instance 'mop-alloc-target)))
         (if (eq (slot-value obj 'x) :allocated) :ok :bad)))"))
 
-(deftest mop-metaclass-hooks-initialize-instance-fallback
-  "initialize-instance falls back to the standard method when no custom method overrides it."
+(it-sequential "mop-metaclass-hooks-initialize-instance-fallback"
   (assert-mop-red-ok
    "(progn
       (defclass mop-init-fallback () ((x :initarg :x :initform :default)))
@@ -177,8 +161,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Dispatch memoization ────────────────────────────────────────────────
 
-(deftest mop-dispatch-memoization-multi-dispatch-cache-hit
-  "Repeated multi-dispatch calls return correct results (TDD RED: cache-stats not implemented)."
+(it-sequential "mop-dispatch-memoization-multi-dispatch-cache-hit"
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-md (a b))
@@ -187,8 +170,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
                (eq (mop-md 2 \"y\") :integer-string))
           :ok :bad))"))
 
-(deftest mop-dispatch-memoization-invalidates-after-register-method
-  "Adding a method after a cached fallback invalidates stale dispatch entries."
+(it-sequential "mop-dispatch-memoization-invalidates-after-register-method"
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-register-method (x))
@@ -197,8 +179,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
       (defmethod mop-register-method ((x integer)) :integer)
       (if (eq (mop-register-method 1) :integer) :ok :bad))"))
 
-(deftest mop-dispatch-memoization-eql-specializer-safety
-  "EQL specializers remain safe when a class dispatch entry is already cached."
+(it-sequential "mop-dispatch-memoization-eql-specializer-safety"
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-eql-safe (x))
@@ -210,8 +191,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
           :ok
           :bad))"))
 
-(deftest mop-dispatch-memoization-qualified-method-safety
-  "Qualified methods are included in cached effective method computation."
+(it-sequential "mop-dispatch-memoization-qualified-method-safety"
   (assert-mop-red-ok
    "(progn
       (defvar *mop-qualified-log* nil)
@@ -225,8 +205,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Shape/layout ────────────────────────────────────────────────────────
 
-(deftest mop-shape-layout-slot-definition-location-valid-indices
-  "slot-definition-location returns non-negative integer indices for instance slots."
+(it-sequential "mop-shape-layout-slot-definition-location-valid-indices"
   (assert-mop-red-ok
    "(progn
       (defclass mop-layout-index () ((a :initarg :a) (b :initarg :b)))
@@ -234,8 +213,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
                                (class-slots (class-of (make-instance 'mop-layout-index))))))
         (if (every (lambda (x) (and (integerp x) (>= x 0))) locations) :ok :bad)))"))
 
-(deftest mop-shape-layout-class-redefinition-shape-change
-  "Class redefinition migrates old instances to the new shape lazily and safely."
+(it-sequential "mop-shape-layout-class-redefinition-shape-change"
   (assert-mop-red-ok
    "(progn
       (defclass mop-shape-change () ((x :initarg :x)))
@@ -246,8 +224,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
           :ok
           :bad))"))
 
-(deftest mop-shape-layout-slot-indexes-consistent
-  "Slot locations are stable across instances of the same class and distinct per slot."
+(it-sequential "mop-shape-layout-slot-indexes-consistent"
   (assert-mop-red-ok
    "(progn
       (defclass mop-layout-stable () ((a :initarg :a) (b :initarg :b)))
@@ -264,8 +241,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Standard-instance abstraction ───────────────────────────────────────
 
-(deftest mop-standard-instance-slot-operations-through-abstraction
-  "slot-value, setf, boundp, and makunbound work through the standard-instance abstraction."
+(it-sequential "mop-standard-instance-slot-operations-through-abstraction"
   (assert-mop-red-ok
    "(progn
       (defclass mop-standard-instance () ((x :initarg :x)))
@@ -276,16 +252,14 @@ turn into clean test failures rather than blocking the parallel worker thread."
           (slot-makunbound obj 'x)
           (if (and read bound-before (not (slot-boundp obj 'x))) :ok :bad))))"))
 
-(deftest mop-standard-instance-no-direct-hash-table-assumptions
-  "standard-instance objects are not specified as raw hash tables."
+(it-sequential "mop-standard-instance-no-direct-hash-table-assumptions"
   (assert-mop-red-ok
    "(progn
       (defclass mop-not-raw-hash () ((x :initarg :x)))
       (let ((obj (make-instance 'mop-not-raw-hash :x 1)))
         (if (and (not (hash-table-p obj)) (= (slot-value obj 'x) 1)) :ok :bad)))"))
 
-(deftest mop-standard-instance-vector-backed-instance-equality
-  "Vector-backed instances preserve object identity across slot writes."
+(it-sequential "mop-standard-instance-vector-backed-instance-equality"
   (assert-mop-red-ok
    "(progn
       (defclass mop-vector-identity () ((x :initarg :x)))
@@ -296,8 +270,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Sealed classes ──────────────────────────────────────────────────────
 
-(deftest mop-sealed-classes-subclass-rejection
-  "Subclassing a sealed class signals an error."
+(it-sequential "mop-sealed-classes-subclass-rejection"
   (assert-mop-red-ok
    "(progn
       (define-sealed-type mop-sealed-root () ())
@@ -305,8 +278,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
           (progn (defclass mop-sealed-child (mop-sealed-root) ()) :bad)
         (error () :ok)))"))
 
-(deftest mop-sealed-classes-define-sealed-type-macro
-  "define-sealed-type creates a class and marks it sealed."
+(it-sequential "mop-sealed-classes-define-sealed-type-macro"
   (assert-mop-red-ok
    "(progn
       (define-sealed-type mop-sealed-leaf () ((x :initarg :x)))
@@ -316,8 +288,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
             :ok
             :bad)))"))
 
-(deftest mop-sealed-classes-safe-static-devirtualization
-  "Static devirtualization for sealed classes preserves generic function semantics."
+(it-sequential "mop-sealed-classes-safe-static-devirtualization"
   (assert-mop-red-ok
    "(progn
       (define-sealed-type mop-sealed-point () ((x :initarg :x)))
@@ -326,8 +297,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
       (let ((obj (make-instance 'mop-sealed-point :x 42)))
         (if (= (mop-sealed-value obj) 42) :ok :bad)))"))
 
-(deftest mop-sealed-classes-dynamic-fallback
-  "Dynamic dispatch remains available when the receiver class is not sealed."
+(it-sequential "mop-sealed-classes-dynamic-fallback"
   (assert-mop-red-ok
    "(progn
       (defclass mop-open-base () ())
@@ -339,18 +309,18 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Satiated generic functions ──────────────────────────────────────────
 
-(deftest mop-satiated-gfs-dispatch-after-satiation-same-method
-  "Dispatch after satiation returns the same applicable method result (TDD RED: satiate-generic-function not yet implemented)."
-  :timeout 5
+(it-sequential "mop-satiated-gfs-dispatch-after-satiation-same-method"
+  :timeout
+  5
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-satiated (x))
       (defmethod mop-satiated ((x integer)) :integer)
       (if (eq (mop-satiated 1) :integer) :ok :bad))"))
 
-(deftest mop-satiated-gfs-method-addition-after-satiation-behavior
-  "Method addition dispatch works correctly (TDD RED: satiate-generic-function not yet implemented)."
-  :timeout 5
+(it-sequential "mop-satiated-gfs-method-addition-after-satiation-behavior"
+  :timeout
+  5
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-satiated-add (x))
@@ -358,39 +328,35 @@ turn into clean test failures rather than blocking the parallel worker thread."
       (defmethod mop-satiated-add ((x integer)) :integer)
       (if (eq (mop-satiated-add 1) :integer) :ok :bad))"))
 
-(deftest mop-satiated-gfs-predicate
-  "satiating-gfs-p is callable in the VM (TDD RED: with-satiating-gfs not yet implemented)."
-  :timeout 5
+(it-sequential "mop-satiated-gfs-predicate"
+  :timeout
+  5
   (assert-mop-red-ok
    "(if (fboundp 'satiating-gfs-p) :ok :bad)"))
 
 ;;; ─── MOP functions directly accessible ──────────────────────────────────
 
-(deftest mop-compute-effective-slot-definition-accessible
-  "compute-effective-slot-definition is accessible in the VM."
+(it-sequential "mop-compute-effective-slot-definition-accessible"
   (assert-mop-red-ok
    "(progn
       (multiple-value-bind (sym status)
           (find-symbol \"COMPUTE-EFFECTIVE-SLOT-DEFINITION\" (find-package \"CL-CC\"))
         (if (and sym (eq status :external)) :ok :bad))))"))
 
-(deftest mop-class-slots-accessible
-  "class-slots is accessible in the VM."
+(it-sequential "mop-class-slots-accessible"
   (assert-mop-red-ok
    "(progn
       (multiple-value-bind (sym status)
           (find-symbol \"CLASS-SLOTS\" (find-package \"CL-CC\"))
         (if (and sym (eq status :external)) :ok :bad))))"))
 
-(deftest mop-satiating-gfs-p-accessible
-  "satiating-gfs-p is accessible directly in the VM without compat packages."
+(it-sequential "mop-satiating-gfs-p-accessible"
   (assert-mop-red-ok
    "(if (fboundp 'satiating-gfs-p) :ok :bad)"))
 
 ;;; ─── copy-instance ───────────────────────────────────────────────────────
 
-(deftest mop-copy-instance-distinct-object
-  "copy-instance returns a distinct object."
+(it-sequential "mop-copy-instance-distinct-object"
   (assert-mop-red-ok
    "(progn
       (defclass mop-copy-distinct () ((x :initarg :x)))
@@ -398,8 +364,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
              (copy (copy-instance obj)))
         (if (not (eq obj copy)) :ok :bad)))"))
 
-(deftest mop-copy-instance-same-class
-  "copy-instance preserves the class of the copied object."
+(it-sequential "mop-copy-instance-same-class"
   (assert-mop-red-ok
    "(progn
       (defclass mop-copy-class () ((x :initarg :x)))
@@ -407,8 +372,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
              (copy (copy-instance obj)))
         (if (eq (class-of obj) (class-of copy)) :ok :bad)))"))
 
-(deftest mop-copy-instance-shallow-slot-copy
-  "copy-instance performs a shallow copy of slot values."
+(it-sequential "mop-copy-instance-shallow-slot-copy"
   (assert-mop-red-ok
    "(progn
       (defclass mop-copy-shallow () ((items :initarg :items)))
@@ -417,8 +381,7 @@ turn into clean test failures rather than blocking the parallel worker thread."
              (copy (copy-instance obj)))
         (if (eq (slot-value copy 'items) items) :ok :bad)))"))
 
-(deftest mop-copy-instance-compatible-with-vector-layout
-  "copy-instance works with vector-backed standard-instance layout without hash-table assumptions."
+(it-sequential "mop-copy-instance-compatible-with-vector-layout"
   (assert-mop-red-ok
    "(progn
       (defclass mop-copy-vector () ((x :initarg :x) (y :initarg :y)))

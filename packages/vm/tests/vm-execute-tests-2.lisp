@@ -6,48 +6,42 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
-(deftest vm-execute-vm-values-stores-all
-  "vm-values stores first value in dst and all values in values-list."
+(it-sequential "vm-execute-vm-values-stores-all"
   (let ((s (make-test-vm)))
     (cl-cc:vm-reg-set s :R1 10)
     (cl-cc:vm-reg-set s :R2 20)
     (cl-cc:vm-reg-set s :R3 30)
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-values :dst :R0 :src-regs (list :R1 :R2 :R3)) s 0 (make-hash-table :test #'equal))
-    (assert-= 10 (cl-cc:vm-reg-get s :R0))
-    (assert-equal '(10 20 30) (cl-cc/vm::vm-values-list s))))
+    (expect (= 10 (cl-cc:vm-reg-get s :R0)) :to-be-truthy)
+    (expect (cl-cc/vm::vm-values-list s) :to-equal '(10 20 30))))
 
-(deftest vm-execute-mv-bind-distributes
-  "vm-mv-bind distributes values-list into individual destination registers."
+(it-sequential "vm-execute-mv-bind-distributes"
   (let ((s (make-test-vm)))
     (setf (cl-cc/vm::vm-values-list s) '(1 2 3))
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-mv-bind :dst-regs (list :R0 :R1 :R2)) s 0 (make-hash-table :test #'equal))
-    (assert-= 1 (cl-cc:vm-reg-get s :R0))
-    (assert-= 2 (cl-cc:vm-reg-get s :R1))
-    (assert-= 3 (cl-cc:vm-reg-get s :R2))))
+    (expect (= 1 (cl-cc:vm-reg-get s :R0)) :to-be-truthy)
+    (expect (= 2 (cl-cc:vm-reg-get s :R1)) :to-be-truthy)
+    (expect (= 3 (cl-cc:vm-reg-get s :R2)) :to-be-truthy)))
 
-(deftest vm-execute-values-to-list-copies
-  "vm-values-to-list copies the current values-list into the destination register."
+(it-sequential "vm-execute-values-to-list-copies"
   (let ((s (make-test-vm)))
     (setf (cl-cc/vm::vm-values-list s) '(7 8 9))
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-values-to-list :dst :R0) s 0 (make-hash-table :test #'equal))
-    (assert-equal '(7 8 9) (cl-cc:vm-reg-get s :R0))))
+    (expect (cl-cc:vm-reg-get s :R0) :to-equal '(7 8 9))))
 
-(deftest vm-execute-spread-values-roundtrip
-  "vm-spread-values loads first element into dst and full list into values-list."
+(it-sequential "vm-execute-spread-values-roundtrip"
   (let ((s (make-test-vm)))
     (cl-cc:vm-reg-set s :R1 '(100 200 300))
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-spread-values :dst :R0 :src :R1) s 0 (make-hash-table :test #'equal))
-    (assert-= 100 (cl-cc:vm-reg-get s :R0))
-    (assert-equal '(100 200 300) (cl-cc/vm::vm-values-list s))))
+    (expect (= 100 (cl-cc:vm-reg-get s :R0)) :to-be-truthy)
+    (expect (cl-cc/vm::vm-values-list s) :to-equal '(100 200 300))))
 
-(deftest vm-execute-vm-apply-spreads-final-list-on-host-function
-  "vm-apply splices the final list argument and applies host functions directly."
+(it-sequential "vm-execute-vm-apply-spreads-final-list-on-host-function"
   (let ((s (make-test-vm)))
     (cl-cc:vm-reg-set s :R1 #'+)
     (cl-cc:vm-reg-set s :R2 10)
@@ -58,12 +52,11 @@
          (cl-cc:make-vm-apply :dst :R0 :func :R1 :args '(:R2 :R3 :R4))
          s 5 (make-hash-table :test #'equal))
       (declare (ignore result))
-      (assert-= 6 next-pc)
-      (assert-false halted)
-      (assert-= 100 (cl-cc:vm-reg-get s :R0)))))
+      (expect (= 6 next-pc) :to-be-truthy)
+      (expect halted :to-be-falsy)
+      (expect (= 100 (cl-cc:vm-reg-get s :R0)) :to-be-truthy))))
 
-(deftest vm-execute-vm-apply-spreads-php-array-final-list
-  "vm-apply accepts a PHP array hash table as the final spread argument."
+(it-sequential "vm-execute-vm-apply-spreads-php-array-final-list"
   (let* ((s (make-test-vm))
          (array (make-hash-table :test #'equal))
          (order-key (let ((package (find-package :cl-cc/php)))
@@ -72,7 +65,7 @@
                             (find-symbol "+PHP-ARRAY-ORDER-KEY+" package)
                           (declare (ignore status))
                           (when symbol (symbol-value symbol)))))))
-    (assert-true order-key)
+    (expect order-key :to-be-truthy)
     (setf (gethash order-key array) '(a b c))
     (setf (gethash 'a array) 10
           (gethash 'b array) 20
@@ -86,51 +79,46 @@
          (cl-cc:make-vm-apply :dst :R0 :func :R1 :args '(:R2 :R3 :R4))
          s 9 (make-hash-table :test #'equal))
       (declare (ignore result))
-      (assert-= 10 next-pc)
-      (assert-false halted)
-      (assert-= 63 (cl-cc:vm-reg-get s :R0)))))
+      (expect (= 10 next-pc) :to-be-truthy)
+      (expect halted :to-be-falsy)
+      (expect (= 63 (cl-cc:vm-reg-get s :R0)) :to-be-truthy))))
 
-(deftest vm-execute-vm-values-buffer-management
-  "vm-clear-values resets values-list; vm-ensure-values initialises it from src when nil."
+(it-sequential "vm-execute-vm-values-buffer-management"
   (let ((s (make-test-vm)))
     (setf (cl-cc/vm::vm-values-list s) '(1 2 3))
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-clear-values) s 0 (make-hash-table :test #'equal))
-    (assert-null (cl-cc/vm::vm-values-list s)))
+    (expect (cl-cc/vm::vm-values-list s) :to-be-null))
   (let ((s (make-test-vm)))
     (cl-cc:vm-reg-set s :R0 55)
     (setf (cl-cc/vm::vm-values-list s) nil)
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-ensure-values :src :R0) s 0 (make-hash-table :test #'equal))
-    (assert-equal '(55) (cl-cc/vm::vm-values-list s))))
+    (expect (cl-cc/vm::vm-values-list s) :to-equal '(55))))
 
-(deftest vm-execute-set-global-stores-value
-  "vm-set-global writes the source register value into the global vars table."
+(it-sequential "vm-execute-set-global-stores-value"
   (let ((s (make-test-vm)))
     (cl-cc:vm-reg-set s :R0 42)
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-set-global :name 'myvar :src :R0) s 0 (make-hash-table :test #'equal))
-    (assert-= 42 (gethash 'myvar (cl-cc/vm::vm-global-vars s)))))
+    (expect (= 42 (gethash 'myvar (cl-cc/vm::vm-global-vars s))) :to-be-truthy)))
 
-(deftest vm-execute-get-global-loads-value
-  "vm-get-global reads from the global vars table into the destination register."
+(it-sequential "vm-execute-get-global-loads-value"
   (let ((s (make-test-vm)))
     (setf (gethash 'myvar2 (cl-cc/vm::vm-global-vars s)) 99)
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-get-global :dst :R0 :name 'myvar2) s 0 (make-hash-table :test #'equal))
-    (assert-= 99 (cl-cc:vm-reg-get s :R0))))
+    (expect (= 99 (cl-cc:vm-reg-get s :R0)) :to-be-truthy)))
 
-(deftest vm-execute-print-writes-to-stream
-  "vm-print writes the register value followed by a newline to the output stream."
+(it-sequential "vm-execute-print-writes-to-stream"
   (let* ((str (make-string-output-stream))
          (s   (make-instance 'cl-cc/vm::vm-io-state :output-stream str)))
     (cl-cc:vm-reg-set s :R0 42)
     (cl-cc/vm::execute-instruction
      (cl-cc:make-vm-print :reg :R0) s 0 (make-hash-table :test #'equal))
-    (assert-string= (format nil "42~%") (get-output-stream-string str))))
+    (expect (get-output-stream-string str) :to-equal (format nil "42~%"))))
 
-(deftest vm-execute-register-function-stores-in-registry
-  "vm-register-function stores a vm-closure-object in the function registry."
+(it-sequential "vm-execute-register-function-stores-in-registry"
   (let ((s (make-test-vm)))
     (let ((closure (make-instance 'cl-cc/vm::vm-closure-object
                                   :entry-label "myfn"
@@ -140,12 +128,10 @@
       (cl-cc:vm-reg-set s :R0 closure)
        (cl-cc/vm::execute-instruction
         (cl-cc:make-vm-register-function :name 'myfn :src :R0) s 0 (make-hash-table :test #'equal))
-      (assert-true (not (null (gethash 'myfn (cl-cc/vm::vm-function-registry s)))))
-      (assert-equal '(:known-function . myfn)
-                    (cl-cc/vm::vm-closure-dispatch-tag closure)))))
+      (expect (not (null (gethash 'myfn (cl-cc/vm::vm-function-registry s)))) :to-be-truthy)
+      (expect (cl-cc/vm::vm-closure-dispatch-tag closure) :to-equal '(:known-function . myfn)))))
 
-(deftest vm-defunctionalized-dispatch-resolves-known-function-tag
-  "%vm-defunctionalized-dispatch resolves tagged known functions through registry."
+(it-sequential "vm-defunctionalized-dispatch-resolves-known-function-tag"
   (let ((s (make-test-vm)))
     (let* ((registered (make-instance 'cl-cc/vm::vm-closure-object
                                       :entry-label "fn-registered"
@@ -159,10 +145,9 @@
                                        :captured-vals #()
                                        :dispatch-tag '(:known-function . myfn))))
       (setf (gethash 'myfn (cl-cc/vm::vm-function-registry s)) registered)
-      (assert-eq registered (cl-cc/vm::%vm-defunctionalized-dispatch s placeholder)))))
+      (expect (cl-cc/vm::%vm-defunctionalized-dispatch s placeholder) :to-be registered))))
 
-(deftest vm-execute-make-closure-stores-vector-captures
-  "vm-make-closure stores captured values in a vector and vm-closure-ref-idx reads by index."
+(it-sequential "vm-execute-make-closure-stores-vector-captures"
   (let ((s (make-test-vm)))
     (cl-cc:vm-reg-set s :R1 10)
     (cl-cc:vm-reg-set s :R2 20)
@@ -171,16 +156,15 @@
      s 0 (%labels))
     (let* ((addr (cl-cc:vm-reg-get s :R0))
            (closure (cl-cc:vm-heap-get s addr)))
-      (assert-true (vectorp (cl-cc/vm::vm-closure-captured-vals closure)))
-      (assert-= 2 (length (cl-cc/vm::vm-closure-captured-vals closure)))
+      (expect (vectorp (cl-cc/vm::vm-closure-captured-vals closure)) :to-be-truthy)
+      (expect (= 2 (length (cl-cc/vm::vm-closure-captured-vals closure))) :to-be-truthy)
       (cl-cc:vm-reg-set s :R3 addr)
       (cl-cc:execute-instruction
        (cl-cc:make-vm-closure-ref-idx :dst :R4 :closure :R3 :index 1)
        s 0 (%labels))
-      (assert-= 20 (cl-cc:vm-reg-get s :R4)))))
+      (expect (= 20 (cl-cc:vm-reg-get s :R4)) :to-be-truthy))))
 
-(deftest vm-execute-vm-closure-propagates-dispatch-tag
-  "vm-closure instruction forwards dispatch-tag into vm-closure-object." 
+(it-sequential "vm-execute-vm-closure-propagates-dispatch-tag"
   (let ((s (make-test-vm)))
     (cl-cc:execute-instruction
      (cl-cc:make-vm-closure :dst :R0
@@ -195,5 +179,4 @@
                             :captured nil)
      s 0 (%labels))
     (let ((closure (cl-cc:vm-reg-get s :R0)))
-      (assert-equal '(:known-function . tagged)
-                    (cl-cc/vm::vm-closure-dispatch-tag closure)))))
+      (expect (cl-cc/vm::vm-closure-dispatch-tag closure) :to-equal '(:known-function . tagged)))))

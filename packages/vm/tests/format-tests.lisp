@@ -2,11 +2,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite format-suite
-  :description "VM formatted output and reader operation tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite format-suite)
 
 ;;; ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -24,110 +20,118 @@
 
 ;;; ─── write-to-string / princ-to-string ────────────────────────────────────
 
-(deftest-each fmt-write-to-string
-  "vm-write-to-string converts values to their printed representation."
-  :cases (("number" 42   "42")
-          ("symbol" :test ":TEST")
-          ("string" "hi" "\"hi\""))
-  (value expected)
-  (let ((s (fmt-vm)))
+(it-sequential "fmt-write-to-string number"
+  (destructuring-bind (value expected) (list 42 "42")
+    (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 value)
     (fmt-exec (cl-cc:make-vm-write-to-string-inst :dst :R0 :src :R1) s)
-    (assert-equal expected (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
 
-(deftest-each fmt-princ-to-string
-  "vm-princ-to-string returns unescaped printed representations."
-  :cases (("number" 42 "42")
-          ("string" "hi" "hi"))
-  (value expected)
-  (let ((s (fmt-vm)))
+(it-sequential "fmt-write-to-string symbol"
+  (destructuring-bind (value expected) (list :test ":TEST")
+    (let ((s (fmt-vm)))
+    (cl-cc/vm::vm-reg-set s :R1 value)
+    (fmt-exec (cl-cc:make-vm-write-to-string-inst :dst :R0 :src :R1) s)
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
+
+(it-sequential "fmt-write-to-string string"
+  (destructuring-bind (value expected) (list "hi" "\"hi\"")
+    (let ((s (fmt-vm)))
+    (cl-cc/vm::vm-reg-set s :R1 value)
+    (fmt-exec (cl-cc:make-vm-write-to-string-inst :dst :R0 :src :R1) s)
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
+
+(it-sequential "fmt-princ-to-string number"
+  (destructuring-bind (value expected) (list 42 "42")
+    (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 value)
     (fmt-exec (cl-cc:make-vm-princ-to-string-inst :dst :R0 :src :R1) s)
-    (assert-equal expected (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
+
+(it-sequential "fmt-princ-to-string string"
+  (destructuring-bind (value expected) (list "hi" "hi")
+    (let ((s (fmt-vm)))
+    (cl-cc/vm::vm-reg-set s :R1 value)
+    (fmt-exec (cl-cc:make-vm-princ-to-string-inst :dst :R0 :src :R1) s)
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
 
 ;;; ─── princ / prin1 / print / terpri / fresh-line ─────────────────────────
 
-(deftest-each fmt-princ-values
-  "vm-princ prints values without escaping."
-  :cases (("number" 42 "42")
-          ("string" "hello" "hello"))
-  (value expected)
-  (let ((s (fmt-vm)))
+(it-sequential "fmt-princ-values number"
+  (destructuring-bind (value expected) (list 42 "42")
+    (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 value)
     (fmt-exec (cl-cc:make-vm-princ :src :R1) s)
-    (assert-equal expected (fmt-capture s))))
+    (expect (fmt-capture s) :to-equal expected))))
 
-(deftest fmt-prin1-prints-strings-with-quotes
-  "vm-prin1 prints string values with surrounding double-quote characters."
+(it-sequential "fmt-princ-values string"
+  (destructuring-bind (value expected) (list "hello" "hello")
+    (let ((s (fmt-vm)))
+    (cl-cc/vm::vm-reg-set s :R1 value)
+    (fmt-exec (cl-cc:make-vm-princ :src :R1) s)
+    (expect (fmt-capture s) :to-equal expected))))
+
+(it-sequential "fmt-prin1-prints-strings-with-quotes"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "hello")
     (fmt-exec (cl-cc:make-vm-prin1 :src :R1) s)
-    (assert-equal "\"hello\"" (fmt-capture s))))
+    (expect (fmt-capture s) :to-equal "\"hello\"")))
 
-(deftest fmt-print-inst-emits-object-representation
-  "vm-print-inst emits the printed representation of an object to the output stream."
+(it-sequential "fmt-print-inst-emits-object-representation"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 42)
     (fmt-exec (cl-cc:make-vm-print-inst :src :R1) s)
-    (assert-true (search "42" (fmt-capture s)))))
+    (expect (search "42" (fmt-capture s)) :to-be-truthy)))
 
-(deftest fmt-terpri-outputs-newline
-  "vm-terpri emits a newline character to the output stream."
+(it-sequential "fmt-terpri-outputs-newline"
   (let ((s (fmt-vm)))
     (fmt-exec (cl-cc:make-vm-terpri-inst) s)
-    (assert-equal (string #\Newline) (fmt-capture s))))
+    (expect (fmt-capture s) :to-equal (string #\Newline))))
 
-(deftest fmt-fresh-line-outputs-newline-after-prior-output
-  "vm-fresh-line emits a newline character after existing output on the stream."
+(it-sequential "fmt-fresh-line-outputs-newline-after-prior-output"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "x")
     (fmt-exec (cl-cc:make-vm-princ :src :R1) s)
     (fmt-exec (cl-cc:make-vm-fresh-line-inst) s)
-    (assert-equal (concatenate 'string "x" (string #\Newline))
-                  (fmt-capture s))))
+    (expect (fmt-capture s) :to-equal (concatenate 'string "x" (string #\Newline)))))
 
 ;;; ─── format ───────────────────────────────────────────────────────────────
 
-(deftest fmt-format-no-args-passes-string-through
-  "vm-format-inst with no arg-regs stores the format string unchanged."
+(it-sequential "fmt-format-no-args-passes-string-through"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "hello world")
     (fmt-exec (cl-cc:make-vm-format-inst :dst :R0 :fmt :R1 :arg-regs nil) s)
-    (assert-equal "hello world" (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal "hello world")))
 
-(deftest fmt-format-tilde-a-interpolates-args
-  "vm-format-inst with ~A directives interpolates the argument registers."
+(it-sequential "fmt-format-tilde-a-interpolates-args"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "~A is ~A")
     (cl-cc/vm::vm-reg-set s :R2 "answer")
     (cl-cc/vm::vm-reg-set s :R3 42)
     (fmt-exec (cl-cc:make-vm-format-inst :dst :R0 :fmt :R1 :arg-regs '(:R2 :R3)) s)
-    (assert-equal "answer is 42" (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal "answer is 42")))
 
-(deftest fmt-format-tilde-d-formats-integer
-  "vm-format-inst with ~D directive formats an integer argument."
+(it-sequential "fmt-format-tilde-d-formats-integer"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "count: ~D")
     (cl-cc/vm::vm-reg-set s :R2 99)
     (fmt-exec (cl-cc:make-vm-format-inst :dst :R0 :fmt :R1 :arg-regs '(:R2)) s)
-    (assert-equal "count: 99" (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal "count: 99")))
 
 ;;; ─── String Output Stream ────────────────────────────────────────────────
 
-(deftest fmt-string-output-stream-single-write-roundtrips
-  "A single write to a string output stream is recovered intact by get-output-stream-string."
+(it-sequential "fmt-string-output-stream-single-write-roundtrips"
   (let ((s (fmt-vm)))
     (fmt-exec (cl-cc:make-vm-make-string-output-stream-inst :dst :R0) s)
     (let ((stream (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (streamp stream))
+      (expect (streamp stream) :to-be-truthy)
       (cl-cc/vm::vm-reg-set s :R1 stream)
       (cl-cc/vm::vm-reg-set s :R2 "hello")
       (fmt-exec (cl-cc:make-vm-stream-write-string-inst :stream-reg :R1 :src :R2) s)
       (fmt-exec (cl-cc:make-vm-get-output-stream-string-inst :dst :R3 :src :R1) s)
-      (assert-equal "hello" (cl-cc/vm::vm-reg-get s :R3)))))
+      (expect (cl-cc/vm::vm-reg-get s :R3) :to-equal "hello"))))
 
-(deftest fmt-string-output-stream-multiple-writes-accumulate
-  "Multiple writes to a string output stream concatenate in the buffer."
+(it-sequential "fmt-string-output-stream-multiple-writes-accumulate"
   (let ((s (fmt-vm)))
     (fmt-exec (cl-cc:make-vm-make-string-output-stream-inst :dst :R0) s)
     (let ((stream (cl-cc/vm::vm-reg-get s :R0)))
@@ -137,126 +141,127 @@
       (cl-cc/vm::vm-reg-set s :R2 " world")
       (fmt-exec (cl-cc:make-vm-stream-write-string-inst :stream-reg :R1 :src :R2) s)
       (fmt-exec (cl-cc:make-vm-get-output-stream-string-inst :dst :R3 :src :R1) s)
-      (assert-equal "hello world" (cl-cc/vm::vm-reg-get s :R3)))))
+      (expect (cl-cc/vm::vm-reg-get s :R3) :to-equal "hello world"))))
 
 ;;; ─── Reader Instructions (use cl-cc's own lexer/parser) ──────────────────
 
-(deftest fmt-read-from-string-number-sets-values-list
-  "vm-read-from-string parses a number and stores the position in the values list."
+(it-sequential "fmt-read-from-string-number-sets-values-list"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "42")
     (fmt-exec (cl-cc:make-vm-read-from-string-inst :dst :R0 :src :R1) s)
-    (assert-equal 42 (cl-cc/vm::vm-reg-get s :R0))
-    (assert-equal '(42 2) (cl-cc/vm::vm-values-list s))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal 42)
+    (expect (cl-cc/vm::vm-values-list s) :to-equal '(42 2))))
 
-(deftest fmt-read-from-string-symbol-is-uppercased
-  "vm-read-from-string interns the symbol name in uppercase."
+(it-sequential "fmt-read-from-string-symbol-is-uppercased"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "hello")
     (fmt-exec (cl-cc:make-vm-read-from-string-inst :dst :R0 :src :R1) s)
-    (assert-equal "HELLO" (symbol-name (cl-cc/vm::vm-reg-get s :R0)))))
+    (expect (symbol-name (cl-cc/vm::vm-reg-get s :R0)) :to-equal "HELLO")))
 
-(deftest fmt-read-from-string-list-produces-list-value
-  "vm-read-from-string parses a parenthesized list into a proper list."
+(it-sequential "fmt-read-from-string-list-produces-list-value"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "(1 2 3)")
     (fmt-exec (cl-cc:make-vm-read-from-string-inst :dst :R0 :src :R1) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (listp result))
-      (assert-equal 3 (length result)))))
+      (expect (listp result) :to-be-truthy)
+      (expect (length result) :to-equal 3))))
 
-(deftest fmt-read-from-string-empty-string-yields-nil
-  "vm-read-from-string on an empty string stores nil with position 0 in the values list."
+(it-sequential "fmt-read-from-string-empty-string-yields-nil"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "")
     (fmt-exec (cl-cc:make-vm-read-from-string-inst :dst :R0 :src :R1) s)
-    (assert-equal nil (cl-cc/vm::vm-reg-get s :R0))
-    (assert-equal '(nil 0) (cl-cc/vm::vm-values-list s))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal nil)
+    (expect (cl-cc/vm::vm-values-list s) :to-equal '(nil 0))))
 
-(deftest fmt-read-sexp-from-stream
-  "vm-read-sexp reads the first form from a CL input stream."
+(it-sequential "fmt-read-sexp-from-stream"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 (make-string-input-stream "(1 2 3)"))
     (fmt-exec (cl-cc:make-vm-read-sexp-inst :dst :R0 :src :R1) s)
-    (assert-equal '(1 2 3) (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal '(1 2 3))))
 
 ;;; ─── Wave 2: ~_ directive test (partial ANSI, conditional newline) ────────
 
-(deftest fmt-directive-tilde-underscore
-  "VM recognizes ~_ directive and renders it (partial ANSI implementation)."
+(it-sequential "fmt-directive-tilde-underscore"
   (let ((s (fmt-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "a~_b")
     (fmt-exec (cl-cc:make-vm-format-inst :dst :R0 :fmt :R1 :arg-regs nil) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (search "a" result))
-      (assert-true (search "b" result)))))
+      (expect (search "a" result) :to-be-truthy)
+      (expect (search "b" result) :to-be-truthy))))
 
 ;;; ─── ~F / ~E / ~$ floating-point directive parameters ──────────────────────
 
-(deftest-each fmt-float-directive-params
-  "The ~F/~E/~$ directives honor their width/decimals/scale parameters.
-Regression: %vm-format-float ignored PARAMS entirely, so ~,2f printed full
-precision (3.14159) instead of 3.14. With params present the directive is
-reconstructed and delegated to the host FORMAT for full ANSI semantics."
-  :cases (("f-2-decimals"   "~,2f"  3.14159  "3.14")
-          ("f-1-rounds"     "~,1f"  2.67     "2.7")
-          ("f-width-pad"    "~6,2f" 3.14159  "  3.14")
-          ("f-integer-arg"  "~,2f"  3        "3.00")
-          ("f-negative"     "~,2f"  -3.14159 "-3.14")
-          ("f-no-params"    "~f"    3.14159  "3.14159")
-          ("dollar-default" "~$"    3.14159  "3.14")
-          ("dollar-intdig"  "~,3$"  3.14159  "003.14"))
-  (control arg expected)
-  (assert-equal expected (cl-cc/vm::%vm-format-render-to-string control (list arg))))
+(it-sequential "fmt-float-directive-params f-2-decimals"
+  (destructuring-bind (control arg expected) (list "~,2f" 3.14159 "3.14")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
 
-(deftest fmt-float-params-in-context
-  "Float directive parameters work alongside surrounding text and multiple args."
-  (assert-equal "1.50 and 2.56"
-                (cl-cc/vm::%vm-format-render-to-string "~,2f and ~,2f" (list 1.5 2.555))))
+(it-sequential "fmt-float-directive-params f-1-rounds"
+  (destructuring-bind (control arg expected) (list "~,1f" 2.67 "2.7")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-directive-params f-width-pad"
+  (destructuring-bind (control arg expected) (list "~6,2f" 3.14159 "  3.14")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-directive-params f-integer-arg"
+  (destructuring-bind (control arg expected) (list "~,2f" 3 "3.00")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-directive-params f-negative"
+  (destructuring-bind (control arg expected) (list "~,2f" -3.14159 "-3.14")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-directive-params f-no-params"
+  (destructuring-bind (control arg expected) (list "~f" 3.14159 "3.14159")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-directive-params dollar-default"
+  (destructuring-bind (control arg expected) (list "~$" 3.14159 "3.14")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-directive-params dollar-intdig"
+  (destructuring-bind (control arg expected) (list "~,3$" 3.14159 "003.14")
+    (expect (cl-cc/vm::%vm-format-render-to-string control (list arg)) :to-equal expected)))
+
+(it-sequential "fmt-float-params-in-context"
+  (expect (cl-cc/vm::%vm-format-render-to-string "~,2f and ~,2f" (list 1.5 2.555)) :to-equal "1.50 and 2.56"))
 
 ;;; ─── ~( ~) case conversion (ANSI) ─────────────────────────────────────────
 
-(deftest fmt-case-conversion-directive
-  "~(...~) renders its body and applies ANSI case conversion modifiers."
+(it-sequential "fmt-case-conversion-directive"
   (flet ((f (control &rest args)
            (cl-cc/vm::%vm-format-render-to-string control args)))
-    (assert-equal "hello world" (f "~(~A~)" "HELLO WORLD"))
-    (assert-equal "Hello World" (f "~:(~A~)" "hello world"))
-    (assert-equal "Hello world" (f "~@(~A~)" "hello world"))
-    (assert-equal "HELLO WORLD" (f "~:@(~A~)" "hello world"))
-    (assert-equal "item 1: alpha" (f "~(ITEM ~D: ~A~)" 1 "ALPHA"))))
+    (expect (f "~(~A~)" "HELLO WORLD") :to-equal "hello world")
+    (expect (f "~:(~A~)" "hello world") :to-equal "Hello World")
+    (expect (f "~@(~A~)" "hello world") :to-equal "Hello world")
+    (expect (f "~:@(~A~)" "hello world") :to-equal "HELLO WORLD")
+    (expect (f "~(ITEM ~D: ~A~)" 1 "ALPHA") :to-equal "item 1: alpha")))
 
 ;;; ─── ~T tabulation after rendered directives ──────────────────────────────
 
-(deftest fmt-tab-column-after-rendered-directives
-  "~T uses the current output column after directives rendered by helper paths."
+(it-sequential "fmt-tab-column-after-rendered-directives"
   (flet ((f (control &rest args)
            (cl-cc/vm::%vm-format-render-to-string control args)))
-    (assert-equal "12  !" (f "~D~4T!" 12))
-    (assert-equal "A   !" (f "~C~4T!" #\A))
-    (assert-equal "1.5   !" (f "~F~6T!" 1.5))
-    (assert-equal "forty-two   !" (f "~R~12T!" 42))
-    (assert-equal "    x   !" (f "~5<~A~>~8T!" "x"))))
+    (expect (f "~D~4T!" 12) :to-equal "12  !")
+    (expect (f "~C~4T!" #\A) :to-equal "A   !")
+    (expect (f "~F~6T!" 1.5) :to-equal "1.5   !")
+    (expect (f "~R~12T!" 42) :to-equal "forty-two   !")
+    (expect (f "~5<~A~>~8T!" "x") :to-equal "    x   !")))
 
 ;;; ─── ~{ ~} iteration with ~^ separator (ANSI) ──────────────────────────────
 
-(deftest fmt-iteration-caret-separator
-  "~{...~} iterates a list; ~^ inside it terminates when the list is exhausted,
-which is what makes ~{~a~^, ~} the canonical comma-join. Regression: plain ~^
-always terminated (the (null params) clause), and a per-item caret hack dropped
-the last element — ~{~a~^, ~} over (1 2 3) produced \"12\" instead of \"1, 2, 3\"."
+(it-sequential "fmt-iteration-caret-separator"
   (flet ((f (control arg) (cl-cc/vm::%vm-format-render-to-string control (list arg))))
-    (assert-equal "1, 2, 3"   (f "~{~a~^, ~}"  '(1 2 3)))
-    (assert-equal "9"         (f "~{~a~^, ~}"  '(9)))
-    (assert-equal ""          (f "~{~a~^, ~}"  '()))
-    (assert-equal "1 2 3 "    (f "~{~a ~}"     '(1 2 3)))
-    (assert-equal "1=2 3=4 "  (f "~{~a=~a ~}"  '(1 2 3 4)))
-    (assert-equal "[a, b, c]" (f "[~{~a~^, ~}]" '("a" "b" "c")))
-    (assert-equal "1 2 "      (f "~2{~a ~}"    '(1 2 3 4)))
+    (expect (f "~{~a~^, ~}"  '(1 2 3)) :to-equal "1, 2, 3")
+    (expect (f "~{~a~^, ~}"  '(9)) :to-equal "9")
+    (expect (f "~{~a~^, ~}"  '()) :to-equal "")
+    (expect (f "~{~a ~}"     '(1 2 3)) :to-equal "1 2 3 ")
+    (expect (f "~{~a=~a ~}"  '(1 2 3 4)) :to-equal "1=2 3=4 ")
+    (expect (f "[~{~a~^, ~}]" '("a" "b" "c")) :to-equal "[a, b, c]")
+    (expect (f "~2{~a ~}"    '(1 2 3 4)) :to-equal "1 2 ")
     ;; ~:{ ~} iterates a list of sublists
-    (assert-equal "(1 2)(3 4)" (f "~:{(~a ~a)~}" '((1 2) (3 4))))))
+    (expect (f "~:{(~a ~a)~}" '((1 2) (3 4))) :to-equal "(1 2)(3 4)")))
 
-(deftest fmt-caret-top-level
-  "~^ at top level (not in ~{~}) terminates only when no args remain."
-  (assert-equal "12" (cl-cc/vm::%vm-format-render-to-string "~a~^~a" (list 1 2)))
-  (assert-equal "1"  (cl-cc/vm::%vm-format-render-to-string "~a~^~a" (list 1))))
+(it-sequential "fmt-caret-top-level"
+  (expect (cl-cc/vm::%vm-format-render-to-string "~a~^~a" (list 1 2)) :to-equal "12")
+  (expect (cl-cc/vm::%vm-format-render-to-string "~a~^~a" (list 1)) :to-equal "1"))

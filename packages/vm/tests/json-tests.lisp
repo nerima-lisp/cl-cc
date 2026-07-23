@@ -2,34 +2,27 @@
 
 (in-package :cl-cc/test)
 
-(defsuite json-suite
-  :description "JSON reader/writer unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite json-suite)
 
-(deftest json-parse-object-array-null
-  "json:parse reads objects, arrays, booleans, numbers, strings, and null."
+(it-sequential "json-parse-object-array-null"
   (let ((json:*json-null* :null))
     (let ((obj (json:parse "{\"a\":1,\"b\":[true,false,null,\"x\"]}")))
-      (assert-= 1 (gethash "a" obj))
-      (assert-equal '(t nil :null "x") (coerce (gethash "b" obj) 'list)))))
+      (expect (= 1 (gethash "a" obj)) :to-be-truthy)
+      (expect (coerce (gethash "b" obj) 'list) :to-equal '(t nil :null "x")))))
 
-(deftest json-stringify-roundtrip
-  "json:stringify emits parseable JSON for hash-table objects."
+(it-sequential "json-stringify-roundtrip"
   (let ((table (make-hash-table :test #'equal)))
     (setf (gethash "name" table) "cl-cc"
           (gethash "ok" table) t
           (gethash "items" table) #(1 2 3))
     (let ((parsed (json:parse (json:stringify table))))
-      (assert-equal "cl-cc" (gethash "name" parsed))
-      (assert-true (gethash "ok" parsed))
-      (assert-equal '(1 2 3) (coerce (gethash "items" parsed) 'list)))))
+      (expect (gethash "name" parsed) :to-equal "cl-cc")
+      (expect (gethash "ok" parsed) :to-be-truthy)
+      (expect (coerce (gethash "items" parsed) 'list) :to-equal '(1 2 3)))))
 
-(deftest json-streaming-parse-and-stringify
-  "json:parse-stream and json:stringify-stream work on arbitrary streams."
+(it-sequential "json-streaming-parse-and-stringify"
   (with-input-from-string (in " [1, 2, 3] ")
-    (assert-equal '(1 2 3) (coerce (json:parse-stream in) 'list)))
+    (expect (coerce (json:parse-stream in) 'list) :to-equal '(1 2 3)))
   (let ((out (make-string-output-stream)))
     (json:stringify-stream '("a" "b") out)
-    (assert-equal "[\"a\",\"b\"]" (get-output-stream-string out))))
+    (expect (get-output-stream-string out) :to-equal "[\"a\",\"b\"]")))

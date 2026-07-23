@@ -5,42 +5,44 @@
 
 (in-package :cl-cc/test)
 
-(defsuite hash-suite
-  :description "VM hash table operations unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite hash-suite)
 
 ;;; ─── resolve-hash-test ────────────────────────────────────────────────────
 
-(deftest-each resolve-hash-test-cases
-  "resolve-hash-test maps symbols to canonical test designators."
-  :cases (("eq"     'eq     'eq)
-          ("eql"    'eql    'eql)
-          ("equal"  'equal  'equal)
-          ("equalp" 'equalp 'equalp)
-          ("nil-defaults-eql" nil 'eql))
-  (test-sym expected-designator)
-  (assert-equal expected-designator (cl-cc/vm::resolve-hash-test test-sym)))
+(it-sequential "resolve-hash-test-cases eq"
+  (destructuring-bind (test-sym expected-designator) (list 'eq 'eq)
+    (expect (cl-cc/vm::resolve-hash-test test-sym) :to-equal expected-designator)))
 
-(deftest resolve-hash-test-unknown-errors
-  "resolve-hash-test signals error for unknown test."
-  (assert-true
-   (handler-case
+(it-sequential "resolve-hash-test-cases eql"
+  (destructuring-bind (test-sym expected-designator) (list 'eql 'eql)
+    (expect (cl-cc/vm::resolve-hash-test test-sym) :to-equal expected-designator)))
+
+(it-sequential "resolve-hash-test-cases equal"
+  (destructuring-bind (test-sym expected-designator) (list 'equal 'equal)
+    (expect (cl-cc/vm::resolve-hash-test test-sym) :to-equal expected-designator)))
+
+(it-sequential "resolve-hash-test-cases equalp"
+  (destructuring-bind (test-sym expected-designator) (list 'equalp 'equalp)
+    (expect (cl-cc/vm::resolve-hash-test test-sym) :to-equal expected-designator)))
+
+(it-sequential "resolve-hash-test-cases nil-defaults-eql"
+  (destructuring-bind (test-sym expected-designator) (list nil 'eql)
+    (expect (cl-cc/vm::resolve-hash-test test-sym) :to-equal expected-designator)))
+
+(it-sequential "resolve-hash-test-unknown-errors"
+  (expect (handler-case
        (progn (cl-cc/vm::resolve-hash-test 'bogus) nil)
-     (error () t))))
+     (error () t)) :to-be-truthy))
 
 ;;; ─── Hash Table Create ────────────────────────────────────────────────────
 
-(deftest make-hash-table-default-test
-  "vm-make-hash-table with no test creates an EQL hash table."
+(it-sequential "make-hash-table-default-test"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (let ((obj (cl-cc/vm::vm-reg-get state :R0)))
-      (assert-true (typep obj 'cl-cc/vm::vm-hash-table-object)))))
+      (expect (typep obj 'cl-cc/vm::vm-hash-table-object) :to-be-truthy))))
 
-(deftest make-hash-table-size-and-rehash-options
-  "vm-make-hash-table passes size and rehash control options to the backing table."
+(it-sequential "make-hash-table-size-and-rehash-options"
   (let ((state (make-test-vm)))
     (cl-cc/vm::vm-reg-set state :SIZE 32)
     (cl-cc/vm::vm-reg-set state :REHASH-SIZE 2)
@@ -53,14 +55,13 @@
     (vm-exec (cl-cc:make-vm-hash-table-size :dst :R1 :table :R0) state)
     (vm-exec (cl-cc:make-vm-hash-table-rehash-size :dst :R2 :table :R0) state)
     (vm-exec (cl-cc:make-vm-hash-table-rehash-threshold :dst :R3 :table :R0) state)
-    (assert-true (>= (cl-cc/vm::vm-reg-get state :R1) 32))
-    (assert-equal 2 (cl-cc/vm::vm-reg-get state :R2))
-    (assert-= 0.75 (cl-cc/vm::vm-reg-get state :R3))))
+    (expect (>= (cl-cc/vm::vm-reg-get state :R1) 32) :to-be-truthy)
+    (expect (cl-cc/vm::vm-reg-get state :R2) :to-equal 2)
+    (expect (= 0.75 (cl-cc/vm::vm-reg-get state :R3)) :to-be-truthy)))
 
 ;;; ─── Hash Table Set/Get Round-Trip ────────────────────────────────────────
 
-(deftest sethash-gethash-roundtrip
-  "Setting and getting a hash table entry round-trips."
+(it-sequential "sethash-gethash-roundtrip"
   (let ((state (make-test-vm)))
     ;; Create table in :R0
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
@@ -71,37 +72,57 @@
     (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
     ;; gethash :R3 :R1 :R0
     (vm-exec (cl-cc:make-vm-gethash :dst :R3 :key :R1 :table :R0) state)
-    (assert-equal 99 (cl-cc/vm::vm-reg-get state :R3))))
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal 99)))
 
-(deftest gethash-missing-key
-  "Getting a missing key returns nil."
+(it-sequential "gethash-missing-key"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (cl-cc/vm::vm-reg-set state :R1 'nonexistent)
     (vm-exec (cl-cc:make-vm-gethash :dst :R3 :key :R1 :table :R0) state)
-    (assert-equal nil (cl-cc/vm::vm-reg-get state :R3))))
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal nil)))
 
-(deftest-each specialized-gethash-roundtrip
-  "Specialized gethash instructions preserve generic gethash value/found semantics."
-  :cases (("eq" #'cl-cc:make-vm-gethash-eq 'eq 'key)
-          ("eql" #'cl-cc:make-vm-gethash-eql 'eql 42)
-          ("equal" #'cl-cc:make-vm-gethash-equal 'equal "key"))
-  (ctor test-sym key)
-  (let ((state (make-test-vm)))
+(it-sequential "specialized-gethash-roundtrip eq"
+  (destructuring-bind (ctor test-sym key) (list #'cl-cc:make-vm-gethash-eq 'eq 'key)
+    (let ((state (make-test-vm)))
     (cl-cc/vm::vm-reg-set state :TEST test-sym)
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test :TEST) state)
     (cl-cc/vm::vm-reg-set state :R1 key)
     (cl-cc/vm::vm-reg-set state :R2 99)
     (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
     (vm-exec (funcall ctor :dst :R3 :found-dst :R4 :key :R1 :table :R0) state)
-    (assert-equal 99 (cl-cc/vm::vm-reg-get state :R3))
-    (assert-equal 1 (cl-cc/vm::vm-reg-get state :R4))
-    (assert-equal (list 99 1) (cl-cc/vm::vm-values-list state))))
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal 99)
+    (expect (cl-cc/vm::vm-reg-get state :R4) :to-equal 1)
+    (expect (cl-cc/vm::vm-values-list state) :to-equal (list 99 1)))))
+
+(it-sequential "specialized-gethash-roundtrip eql"
+  (destructuring-bind (ctor test-sym key) (list #'cl-cc:make-vm-gethash-eql 'eql 42)
+    (let ((state (make-test-vm)))
+    (cl-cc/vm::vm-reg-set state :TEST test-sym)
+    (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test :TEST) state)
+    (cl-cc/vm::vm-reg-set state :R1 key)
+    (cl-cc/vm::vm-reg-set state :R2 99)
+    (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
+    (vm-exec (funcall ctor :dst :R3 :found-dst :R4 :key :R1 :table :R0) state)
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal 99)
+    (expect (cl-cc/vm::vm-reg-get state :R4) :to-equal 1)
+    (expect (cl-cc/vm::vm-values-list state) :to-equal (list 99 1)))))
+
+(it-sequential "specialized-gethash-roundtrip equal"
+  (destructuring-bind (ctor test-sym key) (list #'cl-cc:make-vm-gethash-equal 'equal "key")
+    (let ((state (make-test-vm)))
+    (cl-cc/vm::vm-reg-set state :TEST test-sym)
+    (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test :TEST) state)
+    (cl-cc/vm::vm-reg-set state :R1 key)
+    (cl-cc/vm::vm-reg-set state :R2 99)
+    (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
+    (vm-exec (funcall ctor :dst :R3 :found-dst :R4 :key :R1 :table :R0) state)
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal 99)
+    (expect (cl-cc/vm::vm-reg-get state :R4) :to-equal 1)
+    (expect (cl-cc/vm::vm-values-list state) :to-equal (list 99 1)))))
 
 ;;; ─── Hash Table Remove ────────────────────────────────────────────────────
 
-(deftest remhash-removes-entry
-  "vm-remhash removes an existing entry."
+(it-sequential "remhash-removes-entry"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (cl-cc/vm::vm-reg-set state :R1 'key)
@@ -109,16 +130,15 @@
     (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
     (vm-exec (cl-cc:make-vm-remhash :key :R1 :table :R0) state)
     (vm-exec (cl-cc:make-vm-gethash :dst :R3 :key :R1 :table :R0) state)
-    (assert-equal nil (cl-cc/vm::vm-reg-get state :R3))))
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal nil)))
 
 ;;; ─── Hash Table Count ─────────────────────────────────────────────────────
 
-(deftest hash-table-count-behavior
-  "Hash table count is 0 when empty and reflects number of entries after inserts."
+(it-sequential "hash-table-count-behavior"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (vm-exec (cl-cc:make-vm-hash-table-count :dst :R1 :table :R0) state)
-    (assert-equal 0 (cl-cc/vm::vm-reg-get state :R1)))
+    (expect (cl-cc/vm::vm-reg-get state :R1) :to-equal 0))
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (cl-cc/vm::vm-reg-set state :R1 'a)
@@ -128,12 +148,11 @@
     (cl-cc/vm::vm-reg-set state :R2 2)
     (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
     (vm-exec (cl-cc:make-vm-hash-table-count :dst :R3 :table :R0) state)
-    (assert-equal 2 (cl-cc/vm::vm-reg-get state :R3))))
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal 2)))
 
 ;;; ─── Hash Table Clear ─────────────────────────────────────────────────────
 
-(deftest clrhash-empties-table
-  "vm-clrhash removes all entries."
+(it-sequential "clrhash-empties-table"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (cl-cc/vm::vm-reg-set state :R1 'key)
@@ -141,26 +160,31 @@
     (vm-exec (cl-cc:make-vm-sethash :key :R1 :value :R2 :table :R0) state)
     (vm-exec (cl-cc:make-vm-clrhash :table :R0) state)
     (vm-exec (cl-cc:make-vm-hash-table-count :dst :R3 :table :R0) state)
-    (assert-equal 0 (cl-cc/vm::vm-reg-get state :R3))))
+    (expect (cl-cc/vm::vm-reg-get state :R3) :to-equal 0)))
 
 ;;; ─── Hash Table Predicate ─────────────────────────────────────────────────
 
-(deftest-each hash-table-p
-  "vm-hash-table-p returns 1 for hash table objects, 0 for non-hash-tables."
-  :cases (("true"  t)
-          ("false" nil))
-  (is-ht)
-  (let ((state (make-test-vm)))
+(it-sequential "hash-table-p true"
+  (destructuring-bind (is-ht) (list t)
+    (let ((state (make-test-vm)))
     (if is-ht
         (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
         (cl-cc/vm::vm-reg-set state :R0 42))
     (vm-exec (cl-cc:make-vm-hash-table-p :dst :R1 :src :R0) state)
-    (assert-equal (if is-ht 1 0) (cl-cc/vm::vm-reg-get state :R1))))
+    (expect (cl-cc/vm::vm-reg-get state :R1) :to-equal (if is-ht 1 0)))))
+
+(it-sequential "hash-table-p false"
+  (destructuring-bind (is-ht) (list nil)
+    (let ((state (make-test-vm)))
+    (if is-ht
+        (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
+        (cl-cc/vm::vm-reg-set state :R0 42))
+    (vm-exec (cl-cc:make-vm-hash-table-p :dst :R1 :src :R0) state)
+    (expect (cl-cc/vm::vm-reg-get state :R1) :to-equal (if is-ht 1 0)))))
 
 ;;; ─── Hash Table Keys / Values ─────────────────────────────────────────────
 
-(deftest hash-table-keys-and-values
-  "vm-hash-table-keys and vm-hash-table-values each return a 2-element list with correct members."
+(it-sequential "hash-table-keys-and-values"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (cl-cc/vm::vm-reg-set state :R1 'x) (cl-cc/vm::vm-reg-set state :R2 10)
@@ -170,27 +194,25 @@
     ;; keys
     (vm-exec (cl-cc:make-vm-hash-table-keys :dst :R3 :table :R0) state)
     (let ((keys (cl-cc/vm::vm-reg-get state :R3)))
-      (assert-equal 2 (length keys))
-      (assert-true (member 'x keys))
-      (assert-true (member 'y keys)))
+      (expect (length keys) :to-equal 2)
+      (expect (member 'x keys) :to-be-truthy)
+      (expect (member 'y keys) :to-be-truthy))
     ;; values
     (vm-exec (cl-cc:make-vm-hash-table-values :dst :R4 :table :R0) state)
     (let ((vals (cl-cc/vm::vm-reg-get state :R4)))
-      (assert-equal 2 (length vals))
-      (assert-true (member 10 vals))
-      (assert-true (member 20 vals)))))
+      (expect (length vals) :to-equal 2)
+      (expect (member 10 vals) :to-be-truthy)
+      (expect (member 20 vals) :to-be-truthy))))
 
 ;;; ─── Hash Table Test ──────────────────────────────────────────────────────
 
-(deftest hash-table-test-returns-symbol
-  "vm-hash-table-test returns test function symbol."
+(it-sequential "hash-table-test-returns-symbol"
   (let ((state (make-test-vm)))
     (vm-exec (cl-cc:make-vm-make-hash-table :dst :R0 :test nil) state)
     (vm-exec (cl-cc:make-vm-hash-table-test :dst :R1 :table :R0) state)
-    (assert-equal 'eql (cl-cc/vm::vm-reg-get state :R1))))
+    (expect (cl-cc/vm::vm-reg-get state :R1) :to-equal 'eql)))
 
-(deftest hash-lock-elision-wrapper-falls-back-after-abort
-  "vm-hash-with-lock-fallback increments abort count and retries under fallback path."
+(it-sequential "hash-lock-elision-wrapper-falls-back-after-abort"
   (let* ((table (make-hash-table :test 'eql))
          (obj (make-instance 'cl-cc/vm::vm-hash-table-object
                              :table table
@@ -207,12 +229,11 @@
        (when (= attempts 1)
          (error "simulated-htm-abort"))
        (setf (gethash 'k table) 99)))
-    (assert-= 2 attempts)
-    (assert-= 1 (cl-cc/vm::vm-hash-table-htm-abort-count obj))
-    (assert-equal 99 (gethash 'k table))))
+    (expect (= 2 attempts) :to-be-truthy)
+    (expect (= 1 (cl-cc/vm::vm-hash-table-htm-abort-count obj)) :to-be-truthy)
+    (expect (gethash 'k table) :to-equal 99)))
 
-(deftest hash-lock-elision-disabled-after-abort-threshold
-  "HTM lock elision is disabled once abort count reaches threshold for a table."
+(it-sequential "hash-lock-elision-disabled-after-abort-threshold"
   (let* ((table (make-hash-table :test 'eql))
          (obj (make-instance 'cl-cc/vm::vm-hash-table-object
                              :table table
@@ -223,4 +244,4 @@
          (cl-cc/vm::*vm-hash-low-contention-p* t)
          (cl-cc/vm::*vm-hash-htm-abort-threshold* 2))
     (setf (cl-cc/vm::vm-hash-table-htm-abort-count obj) 2)
-    (assert-false (cl-cc/vm::vm-hash-htm-eligible-p obj))))
+    (expect (cl-cc/vm::vm-hash-htm-eligible-p obj) :to-be-falsy)))

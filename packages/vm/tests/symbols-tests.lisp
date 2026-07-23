@@ -1,7 +1,6 @@
 ;;;; tests/unit/vm/symbols-tests.lisp — VM Symbol Instruction Tests
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Symbol Operations ───────────────────────────────────────────────────
 
@@ -13,66 +12,64 @@
   "Execute a single instruction against STATE."
   (cl-cc/vm::execute-instruction inst state 0 (make-hash-table :test #'equal)))
 
-(deftest sym-symbol-name
-  "vm-symbol-name returns symbol's name string."
+(it-sequential "sym-symbol-name"
   (let ((s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 'hello)
     (str-exec (cl-cc:make-vm-symbol-name :dst :R0 :src :R1) s)
-    (assert-equal "HELLO" (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal "HELLO")))
 
-(deftest sym-make-symbol
-  "vm-make-symbol creates uninterned symbol from string."
+(it-sequential "sym-make-symbol"
   (let ((s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "FOO")
     (str-exec (cl-cc:make-vm-make-symbol :dst :R0 :src :R1) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (symbolp result))
-      (assert-equal "FOO" (symbol-name result)))))
+      (expect (symbolp result) :to-be-truthy)
+      (expect (symbol-name result) :to-equal "FOO"))))
 
-(deftest sym-intern-symbol
-  "vm-intern-symbol interns string as symbol."
+(it-sequential "sym-intern-symbol"
   (let ((s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "INTERN-TEST-SYM-12345")
     (str-exec (cl-cc:make-vm-intern-symbol :dst :R0 :src :R1 :pkg nil) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (symbolp result))
-      (assert-equal "INTERN-TEST-SYM-12345" (symbol-name result)))))
+      (expect (symbolp result) :to-be-truthy)
+      (expect (symbol-name result) :to-equal "INTERN-TEST-SYM-12345"))))
 
-(deftest sym-find-package
-  "vm-find-package resolves a package designator through the runtime/host package layer."
+(it-sequential "sym-find-package"
   (let ((s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 :cl-user)
     (str-exec (cl-cc:make-vm-find-package :dst :R0 :src :R1) s)
-    (assert-true (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-be-truthy)))
 
-(deftest sym-find-symbol
-  "vm-find-symbol returns the symbol and status as multiple values."
+(it-sequential "sym-find-symbol"
   (let ((s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "CAR")
     (cl-cc/vm::vm-reg-set s :R2 :cl)
     (str-exec (cl-cc:make-vm-find-symbol :dst :R0 :src :R1 :pkg :R2) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (symbolp result))
-      (assert-equal "CAR" (symbol-name result))
-      (assert-equal :external (second (cl-cc/vm::vm-values-list s))))))
+      (expect (symbolp result) :to-be-truthy)
+      (expect (symbol-name result) :to-equal "CAR")
+      (expect (second (cl-cc/vm::vm-values-list s)) :to-equal :external))))
 
-(deftest sym-gensym
-  "vm-gensym-inst creates unique uninterned symbol."
+(it-sequential "sym-gensym"
   (let ((s (str-vm)))
     (str-exec (cl-cc:make-vm-gensym-inst :dst :R0) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (symbolp result))
-      (assert-equal nil (symbol-package result)))))
+      (expect (symbolp result) :to-be-truthy)
+      (expect (symbol-package result) :to-equal nil))))
 
-(deftest-each sym-keywordp
-  "vm-keywordp returns 1 for keywords, 0 for other symbols."
-  :cases (("keyword" :test  1)
-          ("symbol"  'hello 0))
-  (value expected)
-  (let ((s (str-vm)))
+(it-sequential "sym-keywordp keyword"
+  (destructuring-bind (value expected) (list :test 1)
+    (let ((s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 value)
     (str-exec (cl-cc:make-vm-keywordp :dst :R0 :src :R1) s)
-    (assert-equal expected (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
+
+(it-sequential "sym-keywordp symbol"
+  (destructuring-bind (value expected) (list 'hello 0)
+    (let ((s (str-vm)))
+    (cl-cc/vm::vm-reg-set s :R1 value)
+    (str-exec (cl-cc:make-vm-keywordp :dst :R0 :src :R1) s)
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-equal expected))))
 
 ;;; ─── Package-Local Nicknames (FR-275) ─────────────────────────────────────
 
@@ -105,30 +102,26 @@
         (str-delete-package-if-exists user-name)
         (str-delete-package-if-exists target-name)))))
 
-(deftest sym-defpackage-local-nicknames-expands
-  "defpackage accepts :local-nicknames and installs the requested local nickname."
+(it-sequential "sym-defpackage-local-nicknames-expands"
   (sb-thread:with-mutex (*str-package-lock*)
     (str-delete-package-if-exists :fr275-defpackage-local-user)
     (str-delete-package-if-exists :fr275-defpackage-local-target)
     (unwind-protect
          (progn
-           (assert-true
-            (macroexpand-1
+           (expect (macroexpand-1
              '(defpackage #:fr275-defpackage-local-user
                 (:use #:cl)
-                (:local-nicknames (#:ln #:fr275-defpackage-local-target)))))
+                (:local-nicknames (#:ln #:fr275-defpackage-local-target)))) :to-be-truthy)
            (eval '(defpackage #:fr275-defpackage-local-target (:use #:cl)))
            (eval '(defpackage #:fr275-defpackage-local-user
                    (:use #:cl)
                    (:local-nicknames (#:ln #:fr275-defpackage-local-target))))
            (let ((*package* (find-package :fr275-defpackage-local-user)))
-             (assert-eq (find-package :fr275-defpackage-local-target)
-                        (find-package :ln))))
+             (expect (find-package :ln) :to-be (find-package :fr275-defpackage-local-target))))
       (str-delete-package-if-exists :fr275-defpackage-local-user)
       (str-delete-package-if-exists :fr275-defpackage-local-target))))
 
-(deftest sym-vm-add-package-local-nickname
-  "vm-add-package-local-nickname creates a package-local nickname mapping."
+(it-sequential "sym-vm-add-package-local-nickname"
   (str-with-local-nickname-packages
    "FR275-VM-ADD-TARGET"
    "FR275-VM-ADD-USER"
@@ -140,10 +133,9 @@
        (cl-cc/vm::vm-reg-set s :R3 user)
        (str-exec (funcall ctor :dst :R0 :pkg :R3 :nick :R1 :target :R2) s)
        (let ((*package* user))
-         (assert-eq target (find-package "LN")))))))
+         (expect (find-package "LN") :to-be target))))))
 
-(deftest sym-vm-remove-package-local-nickname
-  "vm-remove-package-local-nickname removes a package-local nickname mapping."
+(it-sequential "sym-vm-remove-package-local-nickname"
   (str-with-local-nickname-packages
    "FR275-VM-REMOVE-TARGET"
    "FR275-VM-REMOVE-USER"
@@ -157,10 +149,9 @@
        (str-exec (funcall add-ctor :dst :R0 :pkg :R3 :nick :R1 :target :R2) s)
        (str-exec (funcall remove-ctor :dst :R0 :pkg :R3 :nick :R1 :target nil) s)
        (let ((*package* user))
-         (assert-null (find-package "LN")))))))
+         (expect (find-package "LN") :to-be-null))))))
 
-(deftest sym-vm-find-package-uses-local-nickname
-  "vm-find-package resolves package-local nicknames relative to the VM current package."
+(it-sequential "sym-vm-find-package-uses-local-nickname"
   (str-with-local-nickname-packages
    "FR275-VM-RESOLVE-TARGET"
    "FR275-VM-RESOLVE-USER"
@@ -174,55 +165,50 @@
        (setf (gethash '*package* (cl-cc/vm::vm-global-vars s)) user)
        (let ((*package* user))
          (str-exec (cl-cc:make-vm-find-package :dst :R0 :src :R1) s))
-        (assert-eq target (cl-cc/vm::vm-reg-get s :R0))))))
+        (expect (cl-cc/vm::vm-reg-get s :R0) :to-be target)))))
 
 ;;; ─── FR-895: Symbol Table Compaction ─────────────────────────────────────────
 
-(deftest sym-symbol-table-freeze-thaw
-  "freeze-symbol-table and thaw-symbol-table work correctly."
+(it-sequential "sym-symbol-table-freeze-thaw"
   (let ((test-sym (gensym "FR895-TEST-")))
     (setf (cl-cc/vm::lookup-symbol (symbol-name test-sym)) test-sym)
-    (assert-eq test-sym (cl-cc/vm::lookup-symbol (symbol-name test-sym)))
+    (expect (cl-cc/vm::lookup-symbol (symbol-name test-sym)) :to-be test-sym)
     ;; Freeze — table becomes read-only
     (cl-cc/vm::freeze-symbol-table)
-    (assert-true cl-cc/vm::*symbol-table-frozen*)
-    (assert-true (vectorp cl-cc/vm::*symbol-table-compact*))
-    (assert-eq test-sym (cl-cc/vm::lookup-symbol (symbol-name test-sym)))
+    (expect cl-cc/vm::*symbol-table-frozen* :to-be-truthy)
+    (expect (vectorp cl-cc/vm::*symbol-table-compact*) :to-be-truthy)
+    (expect (cl-cc/vm::lookup-symbol (symbol-name test-sym)) :to-be test-sym)
     ;; Frozen — adding new symbol should error
     (let ((new-sym (gensym "FR895-FROZEN-")))
-      (assert-signals error
-        (setf (cl-cc/vm::lookup-symbol (symbol-name new-sym)) new-sym)))
+      (signals error (setf (cl-cc/vm::lookup-symbol (symbol-name new-sym)) new-sym)))
     ;; Thaw — back to dynamic
     (cl-cc/vm::thaw-symbol-table)
-    (assert-null cl-cc/vm::*symbol-table-frozen*)
-    (assert-null cl-cc/vm::*symbol-table-compact*)
+    (expect cl-cc/vm::*symbol-table-frozen* :to-be-null)
+    (expect cl-cc/vm::*symbol-table-compact* :to-be-null)
     (let ((new-sym (gensym "FR895-THAWED-")))
       (setf (cl-cc/vm::lookup-symbol (symbol-name new-sym)) new-sym)
-      (assert-eq new-sym (cl-cc/vm::lookup-symbol (symbol-name new-sym))))))
+      (expect (cl-cc/vm::lookup-symbol (symbol-name new-sym)) :to-be new-sym))))
 
-(deftest sym-symbol-index
-  "symbol-index returns a sequential integer for each symbol."
+(it-sequential "sym-symbol-index"
   (let ((a (gensym "FR895-IDX-A-"))
         (b (gensym "FR895-IDX-B-"))
         (c (gensym "FR895-IDX-C-")))
     (let ((ia (cl-cc/vm::symbol-index a))
           (ib (cl-cc/vm::symbol-index b))
           (ic (cl-cc/vm::symbol-index c)))
-      (assert-true (integerp ia))
-      (assert-true (integerp ib))
-      (assert-true (integerp ic))
+      (expect (integerp ia) :to-be-truthy)
+      (expect (integerp ib) :to-be-truthy)
+      (expect (integerp ic) :to-be-truthy)
       ;; Each gets a unique index
-      (assert-false (= ia ib))
-      (assert-false (= ib ic))
+      (expect (= ia ib) :to-be-falsy)
+      (expect (= ib ic) :to-be-falsy)
       ;; Same symbol returns same index
-      (assert-equal ia (cl-cc/vm::symbol-index a)))))
+      (expect (cl-cc/vm::symbol-index a) :to-equal ia))))
 
-(deftest sym-register-weak-symbol
-  "register-weak-symbol registers a symbol in the weak table."
+(it-sequential "sym-register-weak-symbol"
   (let ((test-sym (gensym "FR895-WEAK-")))
     (cl-cc/vm::register-weak-symbol test-sym)
-    (assert-eq test-sym
-               (gethash (symbol-name test-sym) cl-cc/vm::*symbol-table-weak*))))
+    (expect (gethash (symbol-name test-sym) cl-cc/vm::*symbol-table-weak*) :to-be test-sym)))
 
 ;;; ─── FR-896: Package Lock / Sealed ──────────────────────────────────────────
 
@@ -233,91 +219,80 @@
       (cl-cc/vm::unlock-package pkg)
       (delete-package pkg))))
 
-(deftest sym-lock-package
-  "lock-package prevents intern/lock-package-locked-p reflects state."
+(it-sequential "sym-lock-package"
   (sb-thread:with-mutex (*str-package-lock*)
     (%str-delete-package-if-exists :fr896-lock-test-a)
     (unwind-protect
          (let ((pkg (make-package :fr896-lock-test-a :use nil)))
-           (assert-null (cl-cc/vm::package-locked-p pkg))
+           (expect (cl-cc/vm::package-locked-p pkg) :to-be-null)
            (cl-cc/vm::lock-package pkg)
-           (assert-true (cl-cc/vm::package-locked-p pkg))
+           (expect (cl-cc/vm::package-locked-p pkg) :to-be-truthy)
            (cl-cc/vm::unlock-package pkg)
-           (assert-null (cl-cc/vm::package-locked-p pkg)))
+           (expect (cl-cc/vm::package-locked-p pkg) :to-be-null))
       (%str-delete-package-if-exists :fr896-lock-test-a))))
 
-(deftest sym-package-locked-error-on-intern
-  "Interning a symbol into a locked package signals package-locked-error."
+(it-sequential "sym-package-locked-error-on-intern"
   (sb-thread:with-mutex (*str-package-lock*)
     (%str-delete-package-if-exists :fr896-lock-test-b)
     (unwind-protect
          (let ((pkg (make-package :fr896-lock-test-b :use nil)))
            (cl-cc/vm::lock-package pkg)
-           (assert-signals cl-cc/vm::package-locked-error
-             (intern "LOCKED-SYMBOL" pkg))
+           (signals cl-cc/vm::package-locked-error (intern "LOCKED-SYMBOL" pkg))
            ;; Package should remain locked
-           (assert-true (cl-cc/vm::package-locked-p pkg)))
+           (expect (cl-cc/vm::package-locked-p pkg) :to-be-truthy))
       (%str-delete-package-if-exists :fr896-lock-test-b))))
 
-(deftest sym-with-unlocked-packages
-  "with-unlocked-packages temporarily unlocks packages."
+(it-sequential "sym-with-unlocked-packages"
   (sb-thread:with-mutex (*str-package-lock*)
     (%str-delete-package-if-exists :fr896-lock-test-c)
     (unwind-protect
          (let ((pkg (make-package :fr896-lock-test-c :use nil)))
            (cl-cc/vm::lock-package pkg)
            ;; Without unlock, intern should error
-           (assert-signals cl-cc/vm::package-locked-error
-             (intern "SHOULD-FAIL" pkg))
+           (signals cl-cc/vm::package-locked-error (intern "SHOULD-FAIL" pkg))
            ;; With unlock, intern should succeed
            (let ((result
                    (cl-cc/vm::with-unlocked-packages (:fr896-lock-test-c)
                      (intern "SHOULD-SUCCEED" pkg))))
-             (assert-true (symbolp result))
-             (assert-equal "SHOULD-SUCCEED" (symbol-name result)))
+             (expect (symbolp result) :to-be-truthy)
+             (expect (symbol-name result) :to-equal "SHOULD-SUCCEED"))
            ;; After unlock block, package should be re-locked
-           (assert-true (cl-cc/vm::package-locked-p pkg))
-           (assert-signals cl-cc/vm::package-locked-error
-             (intern "SHOULD-FAIL-AGAIN" pkg)))
+           (expect (cl-cc/vm::package-locked-p pkg) :to-be-truthy)
+           (signals cl-cc/vm::package-locked-error (intern "SHOULD-FAIL-AGAIN" pkg)))
       (%str-delete-package-if-exists :fr896-lock-test-c))))
 
-(deftest sym-default-locked-packages
-  "*locked-packages* includes :cl by default."
-  (assert-true (find-package :cl))
-  (assert-true (cl-cc/vm::package-locked-p (find-package :cl))))
+(it-sequential "sym-default-locked-packages"
+  (expect (find-package :cl) :to-be-truthy)
+  (expect (cl-cc/vm::package-locked-p (find-package :cl)) :to-be-truthy))
 
-(deftest sym-check-package-lock-signals
-  "check-package-lock signals package-locked-error for locked packages."
+(it-sequential "sym-check-package-lock-signals"
   (sb-thread:with-mutex (*str-package-lock*)
     (%str-delete-package-if-exists :fr896-lock-test-d)
     (unwind-protect
          (let ((pkg (make-package :fr896-lock-test-d :use nil)))
            (cl-cc/vm::lock-package pkg)
-           (assert-signals cl-cc/vm::package-locked-error
-             (cl-cc/vm::check-package-lock pkg :intern))
+           (signals cl-cc/vm::package-locked-error (cl-cc/vm::check-package-lock pkg :intern))
             (cl-cc/vm::unlock-package pkg)
             ;; Unlocked should not signal
-            (assert-true (null (cl-cc/vm::check-package-lock pkg :intern))))
+            (expect (null (cl-cc/vm::check-package-lock pkg :intern)) :to-be-truthy))
        (%str-delete-package-if-exists :fr896-lock-test-d))))
 
 ;;; ─── Self-Host Mode (FR-626) ──────────────────────────────────────────────
 
-(deftest sym-self-host-intern-works-with-runtime-registry
-  "In self-host mode with runtime registry available, vm-intern-symbol succeeds."
+(it-sequential "sym-self-host-intern-works-with-runtime-registry"
   (let ((cl-cc/vm::*vm-self-host-mode* t)
         (s (str-vm)))
     (cl-cc/vm::vm-reg-set s :R1 "SELF-HOST-INTERN-SYM")
     (str-exec (cl-cc:make-vm-intern-symbol :dst :R0 :src :R1 :pkg nil) s)
     (let ((result (cl-cc/vm::vm-reg-get s :R0)))
-      (assert-true (symbolp result))
-      (assert-equal "SELF-HOST-INTERN-SYM" (symbol-name result)))))
+      (expect (symbolp result) :to-be-truthy)
+      (expect (symbol-name result) :to-equal "SELF-HOST-INTERN-SYM"))))
 
-(deftest sym-self-host-find-package-works-with-runtime-registry
-  "In self-host mode, vm-find-package finds a runtime-registered package."
+(it-sequential "sym-self-host-find-package-works-with-runtime-registry"
   (let ((cl-cc/vm::*vm-self-host-mode* t)
         (s (str-vm)))
     ;; Register a package in the runtime registry
     (cl-cc/runtime:rt-make-package :self-host-test-pkg)
     (cl-cc/vm::vm-reg-set s :R1 :self-host-test-pkg)
     (str-exec (cl-cc:make-vm-find-package :dst :R0 :src :R1) s)
-    (assert-true (cl-cc/vm::vm-reg-get s :R0))))
+    (expect (cl-cc/vm::vm-reg-get s :R0) :to-be-truthy)))

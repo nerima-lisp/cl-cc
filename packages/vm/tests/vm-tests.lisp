@@ -2,150 +2,141 @@
 
 (in-package :cl-cc/test)
 
-(defsuite vm-suite
-  :description "VM core helper tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite vm-suite)
 
 ;; SKIP (Nix sandbox): *features* initialization differs in sandbox
-(deftest vm-heap-address-normalization
-  "vm-heap-address normalizes integers, wrapped addresses, and nil."
+(it-sequential "vm-heap-address-normalization"
   (let ((wrapped (cl-cc/vm::make-vm-heap-address :value 7)))
-    (assert-= 9 (cl-cc/vm::vm-heap-address 9))
-    (assert-= 7 (cl-cc/vm::vm-heap-address wrapped))
-    (assert-null (cl-cc/vm::vm-heap-address nil))))
+    (expect (= 9 (cl-cc/vm::vm-heap-address 9)) :to-be-truthy)
+    (expect (= 7 (cl-cc/vm::vm-heap-address wrapped)) :to-be-truthy)
+    (expect (cl-cc/vm::vm-heap-address nil) :to-be-null)))
 
-(deftest vm-build-list-stack-allocates-values
-  "vm-build-list reuses the provided rest tail when stack allocation is enabled."
+(it-sequential "vm-build-list-stack-allocates-values"
   (let* ((values (list 1 2 3))
           (result (cl-cc/vm::vm-build-list nil values :stack-allocate-p t)))
-    (assert-equal values result)
-    (assert-eq values result)))
+    (expect result :to-equal values)
+    (expect result :to-be values)))
 
-(deftest-each vm-arg-slot-name-helper
-  "vm-arg-slot-name maps integer indices to their :ARGn keyword."
-  :cases (("zero"  0 :ARG0)
-          ("one"   1 :ARG1)
-          ("seven" 7 :ARG7))
-  (index expected)
-  (assert-eq expected (cl-cc/vm::vm-arg-slot-name index)))
+(it-sequential "vm-arg-slot-name-helper zero"
+  (destructuring-bind (index expected) (list 0 :ARG0)
+    (expect (cl-cc/vm::vm-arg-slot-name index) :to-be expected)))
 
-(deftest vm-bind-arg-slots-binds-leading-args
-  "vm-bind-arg-slots stores the first 8 arguments into reserved slots."
+(it-sequential "vm-arg-slot-name-helper one"
+  (destructuring-bind (index expected) (list 1 :ARG1)
+    (expect (cl-cc/vm::vm-arg-slot-name index) :to-be expected)))
+
+(it-sequential "vm-arg-slot-name-helper seven"
+  (destructuring-bind (index expected) (list 7 :ARG7)
+    (expect (cl-cc/vm::vm-arg-slot-name index) :to-be expected)))
+
+(it-sequential "vm-bind-arg-slots-binds-leading-args"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (let ((slots (cl-cc/vm::vm-bind-arg-slots state '(10 20 30 40 50 60 70 80 90))))
-      (assert-equal '(:ARG0 :ARG1 :ARG2 :ARG3 :ARG4 :ARG5 :ARG6 :ARG7) slots)
-      (assert-= 10 (cl-cc:vm-reg-get state :ARG0))
-      (assert-= 80 (cl-cc:vm-reg-get state :ARG7)))))
+      (expect slots :to-equal '(:ARG0 :ARG1 :ARG2 :ARG3 :ARG4 :ARG5 :ARG6 :ARG7))
+      (expect (= 10 (cl-cc:vm-reg-get state :ARG0)) :to-be-truthy)
+      (expect (= 80 (cl-cc:vm-reg-get state :ARG7)) :to-be-truthy))))
 
-(deftest vm-bind-closure-args-populates-arg-slots
-  "vm-bind-closure-args also mirrors call arguments into reserved ARG slots."
-    (let ((state (make-instance 'cl-cc/vm::vm-io-state))
+(it-sequential "vm-bind-closure-args-populates-arg-slots"
+  (let ((state (make-instance 'cl-cc/vm::vm-io-state))
         (closure (make-instance 'cl-cc/vm::vm-closure-object
                                 :entry-label "f"
                                 :params '(:R10 :R11)
                                 :captured-regs #()
                                 :captured-vals #())))
     (cl-cc/vm::vm-bind-closure-args closure state '(1 2 3))
-    (assert-= 1 (cl-cc:vm-reg-get state :ARG0))
-    (assert-= 2 (cl-cc:vm-reg-get state :ARG1))
-    (assert-= 3 (cl-cc:vm-reg-get state :ARG2))
-    (assert-= 1 (cl-cc:vm-reg-get state :R10))
-    (assert-= 2 (cl-cc:vm-reg-get state :R11))))
+    (expect (= 1 (cl-cc:vm-reg-get state :ARG0)) :to-be-truthy)
+    (expect (= 2 (cl-cc:vm-reg-get state :ARG1)) :to-be-truthy)
+    (expect (= 3 (cl-cc:vm-reg-get state :ARG2)) :to-be-truthy)
+    (expect (= 1 (cl-cc:vm-reg-get state :R10)) :to-be-truthy)
+    (expect (= 2 (cl-cc:vm-reg-get state :R11)) :to-be-truthy)))
 
-(deftest vm-host-bridge-registration
-  "vm-register-host-bridge marks a symbol as host-callable in the bridge table."
+(it-sequential "vm-host-bridge-registration"
   (let ((sym (gensym "VM-BRIDGE-")))
     (unwind-protect
         (progn
-          (assert-null (gethash sym cl-cc/vm::*vm-host-bridge-functions*))
+          (expect (gethash sym cl-cc/vm::*vm-host-bridge-functions*) :to-be-null)
           (cl-cc/vm::vm-register-host-bridge sym (lambda () :ok))
-          (assert-true (gethash sym cl-cc/vm::*vm-host-bridge-functions*)))
+          (expect (gethash sym cl-cc/vm::*vm-host-bridge-functions*) :to-be-truthy))
       (remhash sym cl-cc/vm::*vm-host-bridge-functions*))))
 
 ;;; ─── vm runtime objects and heap helpers ────────────────────────────────────
 
-(deftest vm-closure-object
-  "vm-closure-object: entry-label/params/captured-regs/vals stored; typep passes."
-  ;; basic slots
+(it-sequential "vm-closure-object"
   (let ((c (make-instance 'cl-cc/vm::vm-closure-object
                            :entry-label "my-fn"
                            :params (list :r1 :r2)
                            :captured-regs #()
                            :captured-vals #())))
-    (assert-string= "my-fn" (cl-cc/vm::vm-closure-entry-label c))
-    (assert-equal (list :r1 :r2) (cl-cc/vm::vm-closure-params c))
-    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-regs c)))
-    (assert-= 0 (length (cl-cc/vm::vm-closure-captured-regs c)))
-    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-vals c)))
-    (assert-= 0 (length (cl-cc/vm::vm-closure-captured-vals c)))
-    (assert-true (typep c 'cl-cc/vm::vm-closure-object)))
-  ;; captured variables
+    (expect (cl-cc/vm::vm-closure-entry-label c) :to-equal "my-fn")
+    (expect (cl-cc/vm::vm-closure-params c) :to-equal (list :r1 :r2))
+    (expect (vectorp (cl-cc/vm::vm-closure-captured-regs c)) :to-be-truthy)
+    (expect (= 0 (length (cl-cc/vm::vm-closure-captured-regs c))) :to-be-truthy)
+    (expect (vectorp (cl-cc/vm::vm-closure-captured-vals c)) :to-be-truthy)
+    (expect (= 0 (length (cl-cc/vm::vm-closure-captured-vals c))) :to-be-truthy)
+    (expect (typep c 'cl-cc/vm::vm-closure-object) :to-be-truthy))
   (let ((c (make-instance 'cl-cc/vm::vm-closure-object
                            :entry-label "adder"
                            :params (list :r1)
                            :captured-regs (vector :r0)
                            :captured-vals (vector 10))))
-    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-regs c)))
-    (assert-= 1 (length (cl-cc/vm::vm-closure-captured-regs c)))
-    (assert-equal :r0 (aref (cl-cc/vm::vm-closure-captured-regs c) 0))
-    (assert-true (vectorp (cl-cc/vm::vm-closure-captured-vals c)))
-    (assert-= 1 (length (cl-cc/vm::vm-closure-captured-vals c)))
-    (assert-equal 10 (aref (cl-cc/vm::vm-closure-captured-vals c) 0))))
+    (expect (vectorp (cl-cc/vm::vm-closure-captured-regs c)) :to-be-truthy)
+    (expect (= 1 (length (cl-cc/vm::vm-closure-captured-regs c))) :to-be-truthy)
+    (expect (aref (cl-cc/vm::vm-closure-captured-regs c) 0) :to-equal :r0)
+    (expect (vectorp (cl-cc/vm::vm-closure-captured-vals c)) :to-be-truthy)
+    (expect (= 1 (length (cl-cc/vm::vm-closure-captured-vals c))) :to-be-truthy)
+    (expect (aref (cl-cc/vm::vm-closure-captured-vals c) 0) :to-equal 10)))
 
-(deftest vm-cons-cell
-  "vm-cons-cell: stores car/cdr, car is setf-able, subtype of vm-heap-object."
+(it-sequential "vm-cons-cell"
   (let ((cell (make-instance 'cl-cc/vm::vm-cons-cell :car 1 :cdr 2)))
-    (assert-= 1 (cl-cc/vm::vm-cons-cell-car cell))
-    (assert-= 2 (cl-cc/vm::vm-cons-cell-cdr cell))
+    (expect (= 1 (cl-cc/vm::vm-cons-cell-car cell)) :to-be-truthy)
+    (expect (= 2 (cl-cc/vm::vm-cons-cell-cdr cell)) :to-be-truthy)
     (setf (cl-cc/vm::vm-cons-cell-car cell) 99)
-    (assert-= 99 (cl-cc/vm::vm-cons-cell-car cell))
-    (assert-true (typep cell 'cl-cc/vm::vm-heap-object))))
+    (expect (= 99 (cl-cc/vm::vm-cons-cell-car cell)) :to-be-truthy)
+    (expect (typep cell 'cl-cc/vm::vm-heap-object) :to-be-truthy)))
 
-(deftest vm-heap-address-struct
-  "make-vm-heap-address creates a struct with correct value; predicate recognizes it."
+(it-sequential "vm-heap-address-struct"
   (let ((ha (cl-cc/vm::make-vm-heap-address :value 42)))
-    (assert-= 42 (cl-cc/vm::vm-heap-address-value ha))
-    (assert-true (cl-cc/vm::vm-heap-address-p ha))))
+    (expect (= 42 (cl-cc/vm::vm-heap-address-value ha)) :to-be-truthy)
+    (expect (cl-cc/vm::vm-heap-address-p ha) :to-be-truthy)))
 
-(deftest rt-plist-put
-  "rt-plist-put: add new key, replace existing, preserve others, non-destructive."
-  (assert-equal 42 (getf (cl-cc/bootstrap::rt-plist-put nil :foo 42) :foo))
+(it-sequential "rt-plist-put"
+  (expect (getf (cl-cc/bootstrap::rt-plist-put nil :foo 42) :foo) :to-equal 42)
   (let ((result (cl-cc/bootstrap::rt-plist-put '(:foo 1 :bar 2) :foo 99)))
-    (assert-equal 99 (getf result :foo))
-    (assert-equal 2  (getf result :bar)))
+    (expect (getf result :foo) :to-equal 99)
+    (expect (getf result :bar) :to-equal 2))
   (let ((result (cl-cc/bootstrap::rt-plist-put '(:a 1 :b 2 :c 3) :b 20)))
-    (assert-equal 1  (getf result :a))
-    (assert-equal 20 (getf result :b))
-    (assert-equal 3  (getf result :c)))
+    (expect (getf result :a) :to-equal 1)
+    (expect (getf result :b) :to-equal 20)
+    (expect (getf result :c) :to-equal 3))
   (let ((orig '(:x 10)))
     (cl-cc/bootstrap::rt-plist-put orig :x 99)
-    (assert-equal 10 (getf orig :x))))
+    (expect (getf orig :x) :to-equal 10)))
 
-(deftest vm-heap-alloc-operations
-  "vm-heap-alloc returns a positive integer; get roundtrips; set overwrites; addresses are unique."
+(it-sequential "vm-heap-alloc-operations"
   (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
     (let ((addr (cl-cc/vm::vm-heap-alloc s :some-object)))
-      (assert-true (integerp addr))
-      (assert-true (> addr 0))))
+      (expect (integerp addr) :to-be-truthy)
+      (expect (> addr 0) :to-be-truthy)))
   (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
     (let ((addr (cl-cc/vm::vm-heap-alloc s "original")))
       (cl-cc/vm::vm-heap-set s addr "replaced")
-      (assert-string= "replaced" (cl-cc/vm::vm-heap-get s addr))))
+      (expect (cl-cc/vm::vm-heap-get s addr) :to-equal "replaced")))
   (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
     (let ((a1 (cl-cc/vm::vm-heap-alloc s 1))
           (a2 (cl-cc/vm::vm-heap-alloc s 2))
           (a3 (cl-cc/vm::vm-heap-alloc s 3)))
-      (assert-true (/= a1 a2))
-      (assert-true (/= a2 a3))
-      (assert-true (/= a1 a3)))))
+      (expect (/= a1 a2) :to-be-truthy)
+      (expect (/= a2 a3) :to-be-truthy)
+      (expect (/= a1 a3) :to-be-truthy))))
 
-(deftest-each vm-heap-alloc-roundtrip
-  "vm-heap-alloc followed by vm-heap-get retrieves the original object for any value type."
-  :cases (("string" "test-payload")
-          ("list"   '(a b c)))
-  (value)
-  (let* ((s    (make-instance 'cl-cc/vm::vm-io-state))
+(it-sequential "vm-heap-alloc-roundtrip string"
+  (destructuring-bind (value) (list "test-payload")
+    (let* ((s    (make-instance 'cl-cc/vm::vm-io-state))
          (addr (cl-cc/vm::vm-heap-alloc s value)))
-    (assert-equal value (cl-cc/vm::vm-heap-get s addr))))
+    (expect (cl-cc/vm::vm-heap-get s addr) :to-equal value))))
+
+(it-sequential "vm-heap-alloc-roundtrip list"
+  (destructuring-bind (value) (list '(a b c))
+    (let* ((s    (make-instance 'cl-cc/vm::vm-io-state))
+         (addr (cl-cc/vm::vm-heap-alloc s value)))
+    (expect (cl-cc/vm::vm-heap-get s addr) :to-equal value))))

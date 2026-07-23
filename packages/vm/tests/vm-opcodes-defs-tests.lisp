@@ -10,7 +10,6 @@
 ;;;;   run-vm-with-opcode-bigrams — bigram profiling variant of run-vm
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -20,108 +19,93 @@
 
 ;;; ─── make-vm-state ──────────────────────────────────────────────────────────
 
-(deftest vm-opcodes-defs-make-vm-state-returns-vm-io-state
-  "make-vm-state returns an instance of vm-io-state."
+(it-sequential "vm-opcodes-defs-make-vm-state-returns-vm-io-state"
   (let ((s (cl-cc/vm::make-vm-state)))
-    (assert-true (typep s 'cl-cc/vm::vm-io-state))))
+    (expect (typep s 'cl-cc/vm::vm-io-state) :to-be-truthy)))
 
-(deftest vm-opcodes-defs-make-vm-state-defaults-to-standard-output
-  "make-vm-state defaults the output stream to *standard-output*."
+(it-sequential "vm-opcodes-defs-make-vm-state-defaults-to-standard-output"
   (let ((s (cl-cc/vm::make-vm-state)))
-    (assert-eq *standard-output* (cl-cc/vm::vm-standard-output s))))
+    (expect (cl-cc/vm::vm-standard-output s) :to-be *standard-output*)))
 
-(deftest vm-opcodes-defs-make-vm-state-accepts-custom-output-stream
-  "make-vm-state :output-stream stores the supplied stream."
+(it-sequential "vm-opcodes-defs-make-vm-state-accepts-custom-output-stream"
   (let* ((str (make-string-output-stream))
          (s   (cl-cc/vm::make-vm-state :output-stream str)))
-    (assert-eq str (cl-cc/vm::vm-standard-output s))))
+    (expect (cl-cc/vm::vm-standard-output s) :to-be str)))
 
 ;;; ─── vm-state-registers / vm-output-stream / vm-global-vars (generics) ─────
 
-(deftest vm-opcodes-defs-vm-state-registers-returns-hash-table
-  "vm-state-registers returns a hash table for the public VM state."
+(it-sequential "vm-opcodes-defs-vm-state-registers-returns-hash-table"
   (let* ((s    (cl-cc/vm::make-vm-state))
          (regs (cl-cc/vm::vm-state-registers s)))
-    (assert-true (hash-table-p regs))))
+    (expect (hash-table-p regs) :to-be-truthy)))
 
-(deftest vm-opcodes-defs-vm-standard-output-reflects-custom-stream
-  "vm-standard-output returns the stream passed to make-vm-state :output-stream."
+(it-sequential "vm-opcodes-defs-vm-standard-output-reflects-custom-stream"
   (let* ((str (make-string-output-stream))
          (s   (cl-cc/vm::make-vm-state :output-stream str)))
-    (assert-eq str (cl-cc/vm::vm-standard-output s))))
+    (expect (cl-cc/vm::vm-standard-output s) :to-be str)))
 
-(deftest vm-opcodes-defs-vm-global-vars-returns-hash-table
-  "vm-global-vars returns a hash table for the public VM state."
+(it-sequential "vm-opcodes-defs-vm-global-vars-returns-hash-table"
   (let ((s (cl-cc/vm::make-vm-state)))
-    (assert-true (hash-table-p (cl-cc/vm::vm-global-vars s)))))
+    (expect (hash-table-p (cl-cc/vm::vm-global-vars s)) :to-be-truthy)))
 
 ;;; ─── vm-reg-get / vm-reg-set on public VM state ─────────────────────────────
 
-(deftest vm-opcodes-defs-reg-get-fresh-register-nil
-  "vm-reg-get returns 0 for any fresh register in a new public vm-io-state (hash-table based)."
+(it-sequential "vm-opcodes-defs-reg-get-fresh-register-nil"
   (let ((s (cl-cc/vm::make-vm-state)))
-    (assert-= 0 (cl-cc/vm::vm-reg-get s 0))
-    (assert-= 0 (cl-cc/vm::vm-reg-get s 127))
-    (assert-= 0 (cl-cc/vm::vm-reg-get s 255))))
+    (expect (= 0 (cl-cc/vm::vm-reg-get s 0)) :to-be-truthy)
+    (expect (= 0 (cl-cc/vm::vm-reg-get s 127)) :to-be-truthy)
+    (expect (= 0 (cl-cc/vm::vm-reg-get s 255)) :to-be-truthy)))
 
-(deftest vm-opcodes-defs-reg-set-returns-stored-value
-  "vm-reg-set returns the value it stored and makes it visible to vm-reg-get."
+(it-sequential "vm-opcodes-defs-reg-set-returns-stored-value"
   (let ((s (cl-cc/vm::make-vm-state)))
     (let ((ret (cl-cc/vm::vm-reg-set s 0 42)))
-      (assert-= 42 ret)
-      (assert-= 42 (cl-cc/vm::vm-reg-get s 0)))))
+      (expect (= 42 ret) :to-be-truthy)
+      (expect (= 42 (cl-cc/vm::vm-reg-get s 0)) :to-be-truthy))))
 
-(deftest vm-opcodes-defs-reg-set-overwrite-takes-last
-  "vm-reg-set overwrites the previous value; only the last write is visible."
+(it-sequential "vm-opcodes-defs-reg-set-overwrite-takes-last"
   (let ((s (cl-cc/vm::make-vm-state)))
     (cl-cc/vm::vm-reg-set s 3 :first)
     (cl-cc/vm::vm-reg-set s 3 :second)
-    (assert-eq :second (cl-cc/vm::vm-reg-get s 3))))
+    (expect (cl-cc/vm::vm-reg-get s 3) :to-be :second)))
 
-(deftest vm-opcodes-defs-reg-set-adjacent-registers-independent
-  "vm-reg-set to adjacent registers are independent; each holds its own value."
+(it-sequential "vm-opcodes-defs-reg-set-adjacent-registers-independent"
   (let ((s (cl-cc/vm::make-vm-state)))
     (cl-cc/vm::vm-reg-set s 10 'alpha)
     (cl-cc/vm::vm-reg-set s 11 'beta)
-    (assert-eq 'alpha (cl-cc/vm::vm-reg-get s 10))
-    (assert-eq 'beta  (cl-cc/vm::vm-reg-get s 11))))
+    (expect (cl-cc/vm::vm-reg-get s 10) :to-be 'alpha)
+    (expect (cl-cc/vm::vm-reg-get s 11) :to-be 'beta)))
 
-(deftest vm-opcodes-defs-reg-roundtrip-all-slots
-  "vm-reg-set/get round-trip is consistent for many representative register slots."
+(it-sequential "vm-opcodes-defs-reg-roundtrip-all-slots"
   (let ((s (cl-cc/vm::make-vm-state)))
     (dotimes (i 64)
       (cl-cc/vm::vm-reg-set s i i))
     (dotimes (i 64)
-      (assert-= i (cl-cc/vm::vm-reg-get s i)))))
+      (expect (= i (cl-cc/vm::vm-reg-get s i)) :to-be-truthy))))
 
 ;;; ─── vm2 low-level constructor remains available explicitly ────────────────
 
-(deftest vm-opcodes-defs-make-vm2-state-returns-vm2-state
-  "make-vm2-state returns an object satisfying vm2-state-p."
+(it-sequential "vm-opcodes-defs-make-vm2-state-returns-vm2-state"
   (let ((s (cl-cc:make-vm2-state)))
-    (assert-true (cl-cc:vm2-state-p s))))
+    (expect (cl-cc:vm2-state-p s) :to-be-truthy)))
 
-(deftest vm-opcodes-defs-make-vm2-state-accepts-custom-output-stream
-  "make-vm2-state :output-stream stores the supplied stream in vm2-state-output-stream."
+(it-sequential "vm-opcodes-defs-make-vm2-state-accepts-custom-output-stream"
   (let* ((str (make-string-output-stream))
          (s   (cl-cc:make-vm2-state :output-stream str)))
-    (assert-eq str (cl-cc:vm2-state-output-stream s))))
+    (expect (cl-cc:vm2-state-output-stream s) :to-be str)))
 
 ;;; ─── run-vm-with-opcode-bigrams ─────────────────────────────────────────────
 
-(deftest vm-opcodes-defs-run-vm-bigrams-returns-halted-value
-  "run-vm-with-opcode-bigrams primary return value is the halted register value."
+(it-sequential "vm-opcodes-defs-run-vm-bigrams-returns-halted-value"
   (let* ((code (make-bytecode2 cl-cc:+op2-const+ 0 99 nil
                                 cl-cc:+op2-halt2+ 0 nil nil))
          (s    (cl-cc:make-vm2-state)))
-    (assert-= 99 (cl-cc/vm::run-vm-with-opcode-bigrams code s))))
+    (expect (= 99 (cl-cc/vm::run-vm-with-opcode-bigrams code s)) :to-be-truthy)))
 
-(deftest vm-opcodes-defs-run-vm-bigrams-second-value-is-hash-table
-  "run-vm-with-opcode-bigrams second return value is a bigram count hash table."
+(it-sequential "vm-opcodes-defs-run-vm-bigrams-second-value-is-hash-table"
   (let* ((code (make-bytecode2 cl-cc:+op2-const+ 0 1 nil
                                 cl-cc:+op2-halt2+ 0 nil nil))
          (s    (cl-cc:make-vm2-state)))
     (multiple-value-bind (result counts)
         (cl-cc/vm::run-vm-with-opcode-bigrams code s)
       (declare (ignore result))
-      (assert-true (hash-table-p counts)))))
+      (expect (hash-table-p counts) :to-be-truthy))))

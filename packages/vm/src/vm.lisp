@@ -757,7 +757,7 @@ Also engages SBCL's native package lock so that CL:INTERN signals an error."
 OPERATION is :INTERN, :EXPORT, :IMPORT, or :SHADOW (for error messages)."
   (declare (ignore operation))
   (when (vm-package-locked-p package)
-    (error 'package-locked-error :package package)))
+    (error 'package-locked-error :package package :references nil)))
 
 (defmacro with-unlocked-packages ((&rest packages) &body body)
   "Execute BODY with PACKAGES temporarily unlocked.

@@ -6,148 +6,321 @@
 
 (in-package :cl-cc/test)
 
-(defsuite runtime-stdlib-2-vm-suite
-  :description "Runtime-stdlib-2 VM feature verification tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite runtime-stdlib-2-vm-suite)
 
-(deftest runtime-stdlib-2-vm-system-loads
-  "The VM system is loadable with runtime-stdlib-2 features."
-  :timeout 5
-  (assert-true (asdf:find-system :cl-cc-vm nil)))
+(it-sequential "runtime-stdlib-2-vm-system-loads"
+  :timeout
+  5
+  (expect (asdf:find-system :cl-cc-vm nil) :to-be-truthy))
 
 ;;; ─── Multi-symbol FR groups (cannot collapse to single-entry rows) ─────────
 
-(deftest fr-787-string-builder-exists
-  "FR-787: String builder functions are defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/vm::make-string-builder))
-  (assert-true (fboundp 'cl-cc/vm::string-builder-append!))
-  (assert-true (fboundp 'cl-cc/vm::string-builder-finish)))
+(it-sequential "fr-787-string-builder-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/vm::make-string-builder) :to-be-truthy)
+  (expect (fboundp 'cl-cc/vm::string-builder-append!) :to-be-truthy)
+  (expect (fboundp 'cl-cc/vm::string-builder-finish) :to-be-truthy))
 
-(deftest fr-788-rope-exists
-  "FR-788: Rope functions are defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/vm::rope))
-  (assert-true (fboundp 'cl-cc/vm::rope-concat))
-  (assert-true (fboundp 'cl-cc/vm::rope-split))
-  (assert-true (fboundp 'cl-cc/vm::rope-to-string)))
+(it-sequential "fr-788-rope-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/vm::rope) :to-be-truthy)
+  (expect (fboundp 'cl-cc/vm::rope-concat) :to-be-truthy)
+  (expect (fboundp 'cl-cc/vm::rope-split) :to-be-truthy)
+  (expect (fboundp 'cl-cc/vm::rope-to-string) :to-be-truthy))
 
-(deftest fr-791-logging-exists
-  "FR-791: Structured logging functions are defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/runtime::log-error))
-  (assert-true (fboundp 'cl-cc/runtime::log-warn))
-  (assert-true (fboundp 'cl-cc/runtime::log-info)))
+(it-sequential "fr-791-logging-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/runtime::log-error) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::log-warn) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::log-info) :to-be-truthy))
 
-(deftest fr-792-metrics-exists
-  "FR-792: Runtime metrics API is defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/runtime::rt-make-counter))
-  (assert-true (fboundp 'cl-cc/runtime::rt-counter-increment!))
-  (assert-true (fboundp 'cl-cc/runtime::rt-make-histogram)))
+(it-sequential "fr-792-metrics-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/runtime::rt-make-counter) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::rt-counter-increment!) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::rt-make-histogram) :to-be-truthy))
 
-(deftest fr-793-perf-counters-exists
-  "FR-793: Hardware performance counter API is defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/runtime::rt-perf-init))
-  (assert-true (fboundp 'cl-cc/runtime::rt-with-perf-counters)))
+(it-sequential "fr-793-perf-counters-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/runtime::rt-perf-init) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::rt-with-perf-counters) :to-be-truthy))
 
-(deftest fr-804-syntax-rules-exists
-  "FR-804: syntax-rules hygienic macros are defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/expand::define-syntax))
-  (assert-true (fboundp 'cl-cc/expand::with-gensyms)))
+(it-sequential "fr-804-syntax-rules-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/expand::define-syntax) :to-be-truthy)
+  (expect (fboundp 'cl-cc/expand::with-gensyms) :to-be-truthy))
 
-(deftest fr-812-c-embedding-exists
-  "FR-812: C Embedding API is defined."
-  :timeout 5
-  (assert-true (fboundp 'cl-cc/runtime::cl-cc-init))
-  (assert-true (fboundp 'cl-cc/runtime::cl-cc-eval))
-  (assert-true (fboundp 'cl-cc/runtime::cl-cc-call)))
+(it-sequential "fr-812-c-embedding-exists"
+  :timeout
+  5
+  (expect (fboundp 'cl-cc/runtime::cl-cc-init) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::cl-cc-eval) :to-be-truthy)
+  (expect (fboundp 'cl-cc/runtime::cl-cc-call) :to-be-truthy))
 
 ;;; ─── Package existence ───────────────────────────────────────────────────────
 
-(deftest-each fr-package-exists
-  "FR feature packages are loadable."
-  :cases (("fr-796-lsp"     :cl-cc/tools/lsp)
-          ("fr-797-dap"     :cl-cc/tools/dap)
-          ("fr-908-expand"  :cl-cc/expand))
-  (pkg)
-  (assert-true (find-package pkg)))
+(it-sequential "fr-package-exists fr-796-lsp"
+  (destructuring-bind (pkg) (list :cl-cc/tools/lsp)
+    (expect (find-package pkg) :to-be-truthy)))
+
+(it-sequential "fr-package-exists fr-797-dap"
+  (destructuring-bind (pkg) (list :cl-cc/tools/dap)
+    (expect (find-package pkg) :to-be-truthy)))
+
+(it-sequential "fr-package-exists fr-908-expand"
+  (destructuring-bind (pkg) (list :cl-cc/expand)
+    (expect (find-package pkg) :to-be-truthy)))
 
 ;;; ─── Single-function fboundp checks ─────────────────────────────────────────
 
-(deftest-each fr-function-exists
-  "Each FR feature exports exactly the named function."
-  :cases (("fr-800-callcc"          'cl-cc/vm::call-with-current-continuation)
-          ("fr-801-escape"           'cl-cc/vm::vm-call/cc)
-          ("fr-805-once-only"        'cl-cc/expand::once-only)
-          ("fr-808-shebang"          'cl-cc/cli::parse-cli-args)
-          ("fr-809-argv"             'cl-cc/cli::cl-cc-argv)
-          ("fr-813-multi-vm"         'cl-cc/vm::make-vm-instance)
-          ("fr-816-arena"            'cl-cc/runtime::make-arena)
-          ("fr-817-object-pool"      'cl-cc/runtime::make-object-pool)
-          ("fr-821-copy-structure"   'cl-cc/vm::copy-structure)
-          ("fr-824-transients"       'cl-cc/vm::transient)
-          ("fr-828-stack-canary"     'cl-cc/vm::vm-stack-canary-check)
-          ("fr-829-overflow"         'cl-cc/vm::vm-check-fixnum-overflow)
-          ("fr-830-taint"            'cl-cc/vm::taint-mark)
-          ("fr-835-adaptive-runtime" 'cl-cc/vm::runtime-tuning-report)
-          ("fr-838-sequence-proto"   'cl-cc/vm::sequence-protocol-p)
-          ("fr-839-iterator"         'cl-cc/expand::make-iterator)
-          ("fr-842-kahan"            'cl-cc/vm::kahan-sum)
-          ("fr-843-float-traps"      'cl-cc/vm::with-float-traps-masked)
-          ("fr-844-extended-prec"    'cl-cc/vm::dd+)
-          ("fr-847-mutex"            'cl-cc/vm::make-mutex)
-          ("fr-848-rwlock"           'cl-cc/vm::make-rwlock)
-          ("fr-851-socket"           'cl-cc/vm::make-tcp-socket)
-          ("fr-852-dns"              'cl-cc/vm::dns-resolve)
-          ("fr-853-tls"              'cl-cc/vm::make-tls-context)
-          ("fr-856-delay"            'cl-cc/expand::delay)
-          ("fr-857-memoize"          'cl-cc/expand::memoize)
-          ("fr-865-mv-apply"         'cl-cc/vm::vm-nth-value)
-          ("fr-868-file-position"    'cl-cc/vm::vm-file-position)
-          ("fr-869-mmap"             'cl-cc/runtime::mmap-file)
-          ("fr-872-cow-string"       'cl-cc/vm::vm-string-copy)
-          ("fr-873-cow-array"        'cl-cc/vm::copy-on-write-array-p)
-          ("fr-876-segmented-stack"  'cl-cc/runtime::grow-stack-segment)
-          ("fr-877-copying-stack"    'cl-cc/runtime::relocate-stack-pointers)
-          ("fr-880-custom-hash"      'cl-cc/vm::define-hash-table-test)
-          ("fr-881-rehash"           'cl-cc/vm::hash-table-rehash-size)
-          ("fr-884-floor"            'cl-cc/vm::vm-floor)
-          ("fr-885-ffloor"           'cl-cc/vm::vm-ffloor)
-          ("fr-888-allocate-fast"    'cl-cc/vm::allocate-instance-vector)
-          ("fr-889-initargs-cache"   'cl-cc/vm::class-slot-vector-index)
-          ("fr-892-load-time-value"  'cl-cc/vm::vm-load-time-value)
-          ("fr-895-symbol-table"     'cl-cc/vm::freeze-symbol-table)
-          ("fr-896-package-lock"     'cl-cc/vm::lock-package)
-          ("fr-902-pgo"              'cl-cc/vm::save-pgo-data)
-          ("fr-905-tco-unwind"       'cl-cc/vm::vm-check-dynamic-extent)
-          ("fr-911-riscv"            'cl-cc/emit::riscv64-emit-function)
-          ("fr-914-delimited-cont"   'cl-cc/vm::call-with-continuation-prompt)
-          ("fr-917-reproducible"     'cl-cc/cli::cl-cc-deterministic-build-p)
-          ("fr-923-io-buffering"     'cl-cc/vm::make-buffered-stream)
-          ("fr-924-special-streams"  'cl-cc/vm::make-string-input-stream)
-          ("fr-927-pathname"         'cl-cc/vm::wild-pathname-p)
-          ("fr-930-mop"              'cl-cc/vm::class-slots)
-          ("fr-931-camuc"            'cl-cc/vm::compute-applicable-methods-using-classes))
-  (sym)
-  (assert-true (fboundp sym)))
+(it-sequential "fr-function-exists fr-800-callcc"
+  (destructuring-bind (sym) (list 'cl-cc/vm::call-with-current-continuation)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-801-escape"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-call/cc)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-805-once-only"
+  (destructuring-bind (sym) (list 'cl-cc/expand::once-only)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-808-shebang"
+  (destructuring-bind (sym) (list 'cl-cc/cli::parse-cli-args)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-809-argv"
+  (destructuring-bind (sym) (list 'cl-cc/cli::cl-cc-argv)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-813-multi-vm"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-vm-instance)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-816-arena"
+  (destructuring-bind (sym) (list 'cl-cc/runtime::make-arena)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-817-object-pool"
+  (destructuring-bind (sym) (list 'cl-cc/runtime::make-object-pool)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-821-copy-structure"
+  (destructuring-bind (sym) (list 'cl-cc/vm::copy-structure)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-824-transients"
+  (destructuring-bind (sym) (list 'cl-cc/vm::transient)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-828-stack-canary"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-stack-canary-check)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-829-overflow"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-check-fixnum-overflow)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-830-taint"
+  (destructuring-bind (sym) (list 'cl-cc/vm::taint-mark)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-835-adaptive-runtime"
+  (destructuring-bind (sym) (list 'cl-cc/vm::runtime-tuning-report)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-838-sequence-proto"
+  (destructuring-bind (sym) (list 'cl-cc/vm::sequence-protocol-p)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-839-iterator"
+  (destructuring-bind (sym) (list 'cl-cc/expand::make-iterator)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-842-kahan"
+  (destructuring-bind (sym) (list 'cl-cc/vm::kahan-sum)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-843-float-traps"
+  (destructuring-bind (sym) (list 'cl-cc/vm::with-float-traps-masked)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-844-extended-prec"
+  (destructuring-bind (sym) (list 'cl-cc/vm::dd+)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-847-mutex"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-mutex)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-848-rwlock"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-rwlock)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-851-socket"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-tcp-socket)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-852-dns"
+  (destructuring-bind (sym) (list 'cl-cc/vm::dns-resolve)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-853-tls"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-tls-context)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-856-delay"
+  (destructuring-bind (sym) (list 'cl-cc/expand::delay)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-857-memoize"
+  (destructuring-bind (sym) (list 'cl-cc/expand::memoize)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-865-mv-apply"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-nth-value)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-868-file-position"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-file-position)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-869-mmap"
+  (destructuring-bind (sym) (list 'cl-cc/runtime::mmap-file)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-872-cow-string"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-string-copy)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-873-cow-array"
+  (destructuring-bind (sym) (list 'cl-cc/vm::copy-on-write-array-p)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-876-segmented-stack"
+  (destructuring-bind (sym) (list 'cl-cc/runtime::grow-stack-segment)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-877-copying-stack"
+  (destructuring-bind (sym) (list 'cl-cc/runtime::relocate-stack-pointers)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-880-custom-hash"
+  (destructuring-bind (sym) (list 'cl-cc/vm::define-hash-table-test)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-881-rehash"
+  (destructuring-bind (sym) (list 'cl-cc/vm::hash-table-rehash-size)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-884-floor"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-floor)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-885-ffloor"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-ffloor)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-888-allocate-fast"
+  (destructuring-bind (sym) (list 'cl-cc/vm::allocate-instance-vector)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-889-initargs-cache"
+  (destructuring-bind (sym) (list 'cl-cc/vm::class-slot-vector-index)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-892-load-time-value"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-load-time-value)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-895-symbol-table"
+  (destructuring-bind (sym) (list 'cl-cc/vm::freeze-symbol-table)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-896-package-lock"
+  (destructuring-bind (sym) (list 'cl-cc/vm::lock-package)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-902-pgo"
+  (destructuring-bind (sym) (list 'cl-cc/vm::save-pgo-data)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-905-tco-unwind"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-check-dynamic-extent)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-911-riscv"
+  (destructuring-bind (sym) (list 'cl-cc/emit::riscv64-emit-function)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-914-delimited-cont"
+  (destructuring-bind (sym) (list 'cl-cc/vm::call-with-continuation-prompt)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-917-reproducible"
+  (destructuring-bind (sym) (list 'cl-cc/cli::cl-cc-deterministic-build-p)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-923-io-buffering"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-buffered-stream)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-924-special-streams"
+  (destructuring-bind (sym) (list 'cl-cc/vm::make-string-input-stream)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-927-pathname"
+  (destructuring-bind (sym) (list 'cl-cc/vm::wild-pathname-p)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-930-mop"
+  (destructuring-bind (sym) (list 'cl-cc/vm::class-slots)
+    (expect (fboundp sym) :to-be-truthy)))
+
+(it-sequential "fr-function-exists fr-931-camuc"
+  (destructuring-bind (sym) (list 'cl-cc/vm::compute-applicable-methods-using-classes)
+    (expect (fboundp sym) :to-be-truthy)))
 
 ;;; ─── Single-variable boundp checks ──────────────────────────────────────────
 
-(deftest-each fr-variable-exists
-  "Each FR feature binds the named special variable."
-  :cases (("fr-820-print-circle"      'cl-cc/vm::*print-circle*)
-          ("fr-827-bounds-check"      'cl-cc/vm::*safety-level*)
-          ("fr-833-gc-tuning"         'cl-cc/runtime::*gc-nursery-size*)
-          ("fr-834-jit-thresholds"    'cl-cc/vm::*jit-tier1-threshold*)
-          ("fr-860-numeric-contagion" 'cl-cc/vm::*numeric-contagion-table*)
-          ("fr-861-inline-dispatch"   'cl-cc/vm::*arith-dispatch-table*)
-          ("fr-864-mv-frame"          'cl-cc/vm::+maximum-multiple-values+)
-          ("fr-899-fasl-demand"       'cl-cc/vm::*fasl-toc-enabled*)
-          ("fr-920-forward-ref"       'cl-cc/compile::*forward-reference-patch-table*))
-  (sym)
-  (assert-true (boundp sym)))
+(it-sequential "fr-variable-exists fr-820-print-circle"
+  (destructuring-bind (sym) (list 'cl-cc/vm::*print-circle*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-827-bounds-check"
+  (destructuring-bind (sym) (list 'cl-cc/vm::*safety-level*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-833-gc-tuning"
+  (destructuring-bind (sym) (list 'cl-cc/runtime::*gc-nursery-size*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-834-jit-thresholds"
+  (destructuring-bind (sym) (list 'cl-cc/vm::*jit-tier1-threshold*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-860-numeric-contagion"
+  (destructuring-bind (sym) (list 'cl-cc/vm::*numeric-contagion-table*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-861-inline-dispatch"
+  (destructuring-bind (sym) (list 'cl-cc/vm::*arith-dispatch-table*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-864-mv-frame"
+  (destructuring-bind (sym) (list 'cl-cc/vm::+maximum-multiple-values+)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-899-fasl-demand"
+  (destructuring-bind (sym) (list 'cl-cc/vm::*fasl-toc-enabled*)
+    (expect (boundp sym) :to-be-truthy)))
+
+(it-sequential "fr-variable-exists fr-920-forward-ref"
+  (destructuring-bind (sym) (list 'cl-cc/compile::*forward-reference-patch-table*)
+    (expect (boundp sym) :to-be-truthy)))
