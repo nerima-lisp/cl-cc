@@ -97,15 +97,15 @@
 
 (defmacro define-fr-loaded-test (name fr-doc &rest symbols)
   "Existence test: assert every SYMBOL in the list is fboundp."
-  `(deftest ,name
-     ,fr-doc
+  (declare (ignore fr-doc))
+  `(it-sequential ,(string-downcase (string name))
      ,@(mapcar (lambda (sym) `(expect (fboundp ',sym) :to-be-truthy)) symbols)))
 
 (defmacro define-fr-existence-test (name fr-doc &rest checks)
   "Existence test supporting mixed check types.
 Each check is (:f sym) fboundp / (:b sym) boundp / (:s pkg sym) find-symbol."
-  `(deftest ,name
-     ,fr-doc
+  (declare (ignore fr-doc))
+  `(it-sequential ,(string-downcase (string name))
      ,@(mapcar (lambda (check)
                  (ecase (car check)
                    (:f `(expect (fboundp  ',(second check)) :to-be-truthy))

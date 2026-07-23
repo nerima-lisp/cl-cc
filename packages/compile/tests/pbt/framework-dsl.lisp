@@ -42,7 +42,7 @@
         (iteration-var (gensym "I"))
         (failure-var (gensym "FAILURE"))
         (args-var (gensym "ARGS")))
-    `(deftest ,name
+    `(it-sequential ,(string-downcase (string name))
        (let ((,test-count-var *test-count*)
              (,failure-var nil)
              (,args-var nil))
