@@ -5,11 +5,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite formatter-suite
-  :description "FR-320 formatter unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite formatter-suite)
 
 ;;; ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -27,94 +23,83 @@ lines, to allow whitespace-insensitive comparison of formatted output."
 
 ;;; ─── format-string: basic atom forms ─────────────────────────────────────
 
-(deftest formatter-formats-integer-atom
-  "FR-320: format-string round-trips a bare integer literal unchanged."
+(it-sequential "formatter-formats-integer-atom"
   (let ((result (cl-cc/formatter:format-string "42")))
-    (assert-true (search "42" result))))
+    (expect (search "42" result) :to-be-truthy)))
 
-(deftest formatter-formats-string-atom
-  "FR-320: format-string round-trips a string literal (with escaped quotes)."
+(it-sequential "formatter-formats-string-atom"
   (let ((result (cl-cc/formatter:format-string "\"hello\"")))
-    (assert-true (search "hello" result))))
+    (expect (search "hello" result) :to-be-truthy)))
 
-(deftest formatter-formats-symbol-atom
-  "FR-320: format-string preserves a bare symbol name."
+(it-sequential "formatter-formats-symbol-atom"
   (let ((result (cl-cc/formatter:format-string "foo")))
-    (assert-true (search "FOO" result))))
+    (expect (search "FOO" result) :to-be-truthy)))
 
 ;;; ─── format-string: empty / nil input ────────────────────────────────────
 
-(deftest formatter-empty-string-returns-empty
-  "FR-320: format-string on the empty string produces an empty string."
+(it-sequential "formatter-empty-string-returns-empty"
   (let ((result (cl-cc/formatter:format-string "")))
-    (assert-equal "" result)))
+    (expect result :to-equal "")))
 
-(deftest formatter-nil-list-formats-as-unit
-  "FR-320: format-string on the empty list literal '()' emits '()'."
+(it-sequential "formatter-nil-list-formats-as-unit"
   (let ((result (cl-cc/formatter:format-string "()")))
-    (assert-true (search "()" result))))
+    (expect (search "()" result) :to-be-truthy)))
 
 ;;; ─── format-string: simple call form ─────────────────────────────────────
 
-(deftest formatter-simple-call-on-one-line
-  "FR-320: a short call form is printed on a single line (< 60-char rule)."
+(it-sequential "formatter-simple-call-on-one-line"
   (let ((result (cl-cc/formatter:format-string "(+ 1 2)")))
     ;; The head and arguments should appear together
-    (assert-true (search "+" result))
-    (assert-true (search "1" result))
-    (assert-true (search "2" result))))
+    (expect (search "+" result) :to-be-truthy)
+    (expect (search "1" result) :to-be-truthy)
+    (expect (search "2" result) :to-be-truthy)))
 
 ;;; ─── format-string: special-form indentation ──────────────────────────────
 
-(deftest formatter-defun-indents-body
-  "FR-320: a DEFUN form emits the function name on its own indented line."
+(it-sequential "formatter-defun-indents-body"
   (let* ((source "(defun square (x) (* x x))")
          (result (cl-cc/formatter:format-string source)))
     ;; Head and name must both appear
-    (assert-true (search "DEFUN" result))
-    (assert-true (search "SQUARE" result))
+    (expect (search "DEFUN" result) :to-be-truthy)
+    (expect (search "SQUARE" result) :to-be-truthy)
     ;; Body expression must be present
-    (assert-true (search "*" result))))
+    (expect (search "*" result) :to-be-truthy)))
 
-(deftest formatter-let-indents-bindings-and-body
-  "FR-320: a LET form emits its binding list and body on indented lines."
+(it-sequential "formatter-let-indents-bindings-and-body"
   (let* ((source "(let ((x 1)) x)")
          (result (cl-cc/formatter:format-string source)))
-    (assert-true (search "LET" result))
-    (assert-true (search "X" result))
-    (assert-true (search "1" result))))
+    (expect (search "LET" result) :to-be-truthy)
+    (expect (search "X" result) :to-be-truthy)
+    (expect (search "1" result) :to-be-truthy)))
 
 ;;; ─── format-string: cond / case dispatch ──────────────────────────────────
 
-(deftest formatter-cond-indents-clauses
-  "FR-320: a COND form emits each clause on its own indented line."
+(it-sequential "formatter-cond-indents-clauses"
   (let* ((source "(cond ((= x 1) :one) (t :other))")
          (result (cl-cc/formatter:format-string source)))
-    (assert-true (search "COND" result))
-    (assert-true (search ":ONE" result))
-    (assert-true (search ":OTHER" result))))
+    (expect (search "COND" result) :to-be-truthy)
+    (expect (search ":ONE" result) :to-be-truthy)
+    (expect (search ":OTHER" result) :to-be-truthy)))
 
 ;;; ─── format-string: multiple top-level forms ─────────────────────────────
 
-(deftest formatter-multiple-top-level-forms
-  "FR-320: format-string reads and emits all top-level forms in order."
+(it-sequential "formatter-multiple-top-level-forms"
   (let* ((source "(defvar *x* 0) (defvar *y* 1)")
          (result (cl-cc/formatter:format-string source)))
-    (assert-true (search "*X*" result))
-    (assert-true (search "*Y*" result))
+    (expect (search "*X*" result) :to-be-truthy)
+    (expect (search "*Y*" result) :to-be-truthy)
     ;; Each form should end up before the other in document order
-    (assert-true (< (search "*X*" result) (search "*Y*" result)))))
+    (expect (< (search "*X*" result) (search "*Y*" result)) :to-be-truthy)))
 
 ;;; ─── format-string: indent-size keyword ─────────────────────────────────
 
-(deftest formatter-indent-size-parameter-is-respected
-  "FR-320: :indent-size 4 uses 4-space indentation instead of the default 2."
+(it-sequential "formatter-indent-size-parameter-is-respected"
   (let* ((source "(defun f (x) x)")
          (result-2 (cl-cc/formatter:format-string source :indent-size 2))
          (result-4 (cl-cc/formatter:format-string source :indent-size 4)))
     ;; Both must contain the function name
-    (assert-true (search "F" result-2))
-    (assert-true (search "F" result-4))
+    (expect (search "F" result-2) :to-be-truthy)
+    (expect (search "F" result-4) :to-be-truthy)
     ;; The 4-space version must be at least as long as the 2-space version
     ;; (more leading spaces means more characters overall)
-    (assert-true (>= (length result-4) (length result-2)))))
+    (expect (>= (length result-4) (length result-2)) :to-be-truthy)))

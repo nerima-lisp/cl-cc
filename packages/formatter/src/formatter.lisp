@@ -59,8 +59,8 @@
                   (dolist (arg (cdr form))
                     (format stream "~%")
                     (%format-form stream arg (+ depth *indent-size*)))
-                  (format stream ")"))))))
-        (t (format stream "~S" form)))))
+                  (format stream ")"))))))))
+        (t (format stream "~S" form))))
 
 (defun format-string (source-string &key (indent-size 2))
   "FR-320: Format SOURCE-STRING as Lisp code and return the formatted string.
@@ -68,10 +68,11 @@ INDENT-SIZE controls spaces per nesting level."
   (let ((*indent-size* indent-size)
         (forms nil)
         (output (make-string-output-stream)))
-    ;; Read all top-level forms
+    ;; Read all top-level forms. Use a distinct EOF sentinel so a form that reads
+    ;; as NIL (e.g. the source "()") is not mistaken for end-of-input.
     (with-input-from-string (in source-string)
-      (loop for form = (read in nil nil)
-            while form
+      (loop for form = (read in nil '#1=#:eof)
+            until (eq form '#1#)
             do (push form forms)))
     ;; Pretty-print each form
     (dolist (form (nreverse forms))
