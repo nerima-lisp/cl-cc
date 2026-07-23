@@ -9,30 +9,23 @@
 ;;;; Depends on: js-e2e-core-tests.lisp (%js-run-capture, deftest-js-run).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-e2e-serial-suite)
 
 ;;; ─── ES2022: Private class fields ────────────────────────────────────────────
 
-(deftest js-e2e-private-class-fields
-  "Private class fields (#name) are stored in the instance's __private__ slot
-and are inaccessible from outside the class.  ES2022 syntax, inherited by ES2026."
-  (assert-string= "42"
-    (%js-run-capture
+(it-sequential "js-e2e-private-class-fields"
+  (expect (%js-run-capture
      "class C{#x; constructor(v){this.#x=v;} get(){return this.#x;}}
-console.log(new C(42).get());"))
-  (assert-string= "0"
-    (%js-run-capture
+console.log(new C(42).get());") :to-equal "42")
+  (expect (%js-run-capture
      "class C{#count=0; inc(){this.#count++;} val(){return this.#count;}}
-const c=new C(); console.log(c.val());"))
-  (assert-string= "10"
-    (%js-run-capture
+const c=new C(); console.log(c.val());") :to-equal "0")
+  (expect (%js-run-capture
      "class C{#v; constructor(v){this.#v=v;} double(){return this.#v*2;}}
-console.log(new C(5).double());"))
-  (assert-string= "7"
-    (%js-run-capture
+console.log(new C(5).double());") :to-equal "10")
+  (expect (%js-run-capture
      "class P{#n; constructor(n){this.#n=n;} get(){return this.#n;}}
 class C extends P{constructor(n){super(n);} doubled(){return this.get()*2;}}
-console.log(new C(7).get());")))
+console.log(new C(7).get());") :to-equal "7"))
 
 ;;; ─── Promise chaining ────────────────────────────────────────────────────────
 

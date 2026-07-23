@@ -7,262 +7,249 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Internal key filter ─────────────────────────────────────────────────────
 
-(deftest-each js-rt-internal-key-p
-  "%js-internal-key-p correctly classifies double-underscore and accessor keys."
-  :cases (("dunder-proto"  "__proto__"   t)
-          ("dunder-class"  "__class__"   t)
-          ("get-prefix"    "__get_foo"   t)
-          ("set-prefix"    "__set_foo"   t)
-          ("plain-key"     "name"        nil)
-          ("empty"         ""            nil))
-  (k expected)
-  (assert-equal expected (cl-cc/javascript::%js-internal-key-p k)))
+(it-sequential "js-rt-internal-key-p dunder-proto"
+  (destructuring-bind (k expected) (list "__proto__" t)
+    (expect (cl-cc/javascript::%js-internal-key-p k) :to-equal expected)))
+
+(it-sequential "js-rt-internal-key-p dunder-class"
+  (destructuring-bind (k expected) (list "__class__" t)
+    (expect (cl-cc/javascript::%js-internal-key-p k) :to-equal expected)))
+
+(it-sequential "js-rt-internal-key-p get-prefix"
+  (destructuring-bind (k expected) (list "__get_foo" t)
+    (expect (cl-cc/javascript::%js-internal-key-p k) :to-equal expected)))
+
+(it-sequential "js-rt-internal-key-p set-prefix"
+  (destructuring-bind (k expected) (list "__set_foo" t)
+    (expect (cl-cc/javascript::%js-internal-key-p k) :to-equal expected)))
+
+(it-sequential "js-rt-internal-key-p plain-key"
+  (destructuring-bind (k expected) (list "name" nil)
+    (expect (cl-cc/javascript::%js-internal-key-p k) :to-equal expected)))
+
+(it-sequential "js-rt-internal-key-p empty"
+  (destructuring-bind (k expected) (list "" nil)
+    (expect (cl-cc/javascript::%js-internal-key-p k) :to-equal expected)))
 
 ;;; ─── Object.keys / values / entries ─────────────────────────────────────────
 
-(deftest js-rt-object-keys-excludes-internals
-  "Object.keys skips __proto__/__class__ and returns only enumerable string keys."
+(it-sequential "js-rt-object-keys-excludes-internals"
   (let* ((obj (cl-cc/javascript::%js-make-object "a" 1 "b" 2)))
     (setf (gethash "__proto__" obj) cl-cc/javascript::+js-null+)
     (let ((keys (sort (coerce (cl-cc/javascript::%js-object-keys obj) 'list) #'string<)))
-      (assert-equal '("a" "b") keys))))
+      (expect keys :to-equal '("a" "b")))))
 
-(deftest js-rt-object-keys-includes-accessor-property-name
-  "Object.keys exposes accessor properties by public name, not internal slots."
+(it-sequential "js-rt-object-keys-includes-accessor-property-name"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (getter (lambda () 42))
          (desc (cl-cc/javascript::%js-make-object "get" getter)))
     (cl-cc/javascript::%js-object-define-property obj "answer" desc)
     (let ((keys (coerce (cl-cc/javascript::%js-object-keys obj) 'list)))
-      (assert-equal '("answer") keys))))
+      (expect keys :to-equal '("answer")))))
 
-(deftest js-rt-object-values
-  "Object.values returns the enumerable values in insertion order."
+(it-sequential "js-rt-object-values"
   (let* ((obj    (cl-cc/javascript::%js-make-object "x" 10 "y" 20))
          (values (sort (coerce (cl-cc/javascript::%js-object-values obj) 'list) #'<)))
-    (assert-equal '(10 20) values)))
+    (expect values :to-equal '(10 20))))
 
-(deftest js-rt-object-values-reads-accessor
-  "Object.values reads accessor properties through %js-get-prop."
+(it-sequential "js-rt-object-values-reads-accessor"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (getter (lambda () 123))
          (desc (cl-cc/javascript::%js-make-object "get" getter)))
     (cl-cc/javascript::%js-object-define-property obj "answer" desc)
     (let ((values (coerce (cl-cc/javascript::%js-object-values obj) 'list)))
-      (assert-equal '(123) values))))
+      (expect values :to-equal '(123)))))
 
-(deftest js-rt-object-entries
-  "Object.entries returns [key, value] pairs as two-element arrays."
+(it-sequential "js-rt-object-entries"
   (let* ((obj     (cl-cc/javascript::%js-make-object "k" 99))
          (entries (cl-cc/javascript::%js-object-entries obj)))
-    (assert-= 1 (length entries))
+    (expect (= 1 (length entries)) :to-be-truthy)
     (let ((pair (aref entries 0)))
-      (assert-string= "k"  (aref pair 0))
-      (assert-=       99   (aref pair 1)))))
+      (expect (aref pair 0) :to-equal "k")
+      (expect (= 99 (aref pair 1)) :to-be-truthy))))
 
-(deftest js-rt-object-own-keys-includes-accessor-property-name
-  "Reflect.ownKeys/Object.getOwnPropertyNames backend exposes accessor names."
+(it-sequential "js-rt-object-own-keys-includes-accessor-property-name"
   (let* ((obj (cl-cc/javascript::%js-make-object "data" 1))
          (getter (lambda () 7))
          (desc (cl-cc/javascript::%js-make-object "get" getter)))
     (cl-cc/javascript::%js-object-define-property obj "computed" desc)
     (let ((keys (sort (coerce (cl-cc/javascript::%js-object-own-keys obj) 'list) #'string<)))
-      (assert-equal '("computed" "data") keys)
-      (assert-false (member "__get_computed" keys :test #'string=)))))
+      (expect keys :to-equal '("computed" "data"))
+      (expect (member "__get_computed" keys :test #'string=) :to-be-falsy))))
 
-(deftest js-rt-object-symbol-own-property-keys
-  "Symbol-keyed own properties are hidden from string enumerators and exposed by symbol APIs."
+(it-sequential "js-rt-object-symbol-own-property-keys"
   (let* ((obj (cl-cc/javascript::%js-make-object "name" "visible"))
          (sym (cl-cc/javascript::%js-make-symbol "secret")))
     (cl-cc/javascript::%js-set-prop obj sym 99)
-    (assert-= 99 (cl-cc/javascript::%js-get-prop obj sym))
-    (assert-equal '("name")
-                  (coerce (cl-cc/javascript::%js-object-keys obj) 'list))
-    (assert-equal '("name")
-                  (coerce (cl-cc/javascript::%js-object-get-own-property-names obj) 'list))
+    (expect (= 99 (cl-cc/javascript::%js-get-prop obj sym)) :to-be-truthy)
+    (expect (coerce (cl-cc/javascript::%js-object-keys obj) 'list) :to-equal '("name"))
+    (expect (coerce (cl-cc/javascript::%js-object-get-own-property-names obj) 'list) :to-equal '("name"))
     (let ((symbols (coerce (cl-cc/javascript::%js-object-get-own-property-symbols obj) 'list))
           (own-keys (coerce (cl-cc/javascript::%js-object-own-keys obj) 'list)))
-      (assert-equal 1 (length symbols))
-      (assert-eq sym (first symbols))
-      (assert-true (member "name" own-keys :test #'equal))
-      (assert-true (member sym own-keys :test #'eq)))))
+      (expect (length symbols) :to-equal 1)
+      (expect (first symbols) :to-be sym)
+      (expect (member "name" own-keys :test #'equal) :to-be-truthy)
+      (expect (member sym own-keys :test #'eq) :to-be-truthy))))
 
 ;;; ─── Object.assign ───────────────────────────────────────────────────────────
 
-(deftest js-rt-object-assign-merges
-  "Object.assign copies own enumerable properties of sources into target."
+(it-sequential "js-rt-object-assign-merges"
   (let* ((target (cl-cc/javascript::%js-make-object "a" 1))
          (src1   (cl-cc/javascript::%js-make-object "b" 2))
          (src2   (cl-cc/javascript::%js-make-object "c" 3))
          (result (cl-cc/javascript::%js-object-assign target src1 src2)))
-    (assert-eq target result)
-    (assert-= 1 (gethash "a" target))
-    (assert-= 2 (gethash "b" target))
-    (assert-= 3 (gethash "c" target))))
+    (expect result :to-be target)
+    (expect (= 1 (gethash "a" target)) :to-be-truthy)
+    (expect (= 2 (gethash "b" target)) :to-be-truthy)
+    (expect (= 3 (gethash "c" target)) :to-be-truthy)))
 
-(deftest js-rt-object-assign-skips-internal-slots
-  "Object.assign copies public own keys without leaking prototype internals."
+(it-sequential "js-rt-object-assign-skips-internal-slots"
   (let* ((proto (cl-cc/javascript::%js-make-object "inherited" 9))
          (src (cl-cc/javascript::%js-object-create proto))
          (target (cl-cc/javascript::%js-make-object)))
     (cl-cc/javascript::%js-set-prop src "a" 10)
     (cl-cc/javascript::%js-object-assign target src)
-    (assert-= 10 (cl-cc/javascript::%js-get-prop target "a"))
-    (assert-eq cl-cc/javascript::+js-null+
-               (cl-cc/javascript::%js-object-get-prototype-of target))
-    (assert-false (nth-value 1 (gethash "__proto__" target)))))
+    (expect (= 10 (cl-cc/javascript::%js-get-prop target "a")) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-object-get-prototype-of target) :to-be cl-cc/javascript::+js-null+)
+    (expect (nth-value 1 (gethash "__proto__" target)) :to-be-falsy)))
 
-(deftest js-rt-object-assign-copies-symbol-properties
-  "Object.assign copies enumerable own Symbol properties."
+(it-sequential "js-rt-object-assign-copies-symbol-properties"
   (let* ((sym (cl-cc/javascript::%js-make-symbol "copy"))
          (src (cl-cc/javascript::%js-make-object "name" "source"))
          (target (cl-cc/javascript::%js-make-object)))
     (cl-cc/javascript::%js-set-prop src sym 77)
     (cl-cc/javascript::%js-object-assign target src)
-    (assert-string= "source" (cl-cc/javascript::%js-get-prop target "name"))
-    (assert-= 77 (cl-cc/javascript::%js-get-prop target sym))
+    (expect (cl-cc/javascript::%js-get-prop target "name") :to-equal "source")
+    (expect (= 77 (cl-cc/javascript::%js-get-prop target sym)) :to-be-truthy)
     (let ((symbols (coerce (cl-cc/javascript::%js-object-get-own-property-symbols target)
                            'list)))
-      (assert-equal 1 (length symbols))
-      (assert-eq sym (first symbols)))))
+      (expect (length symbols) :to-equal 1)
+      (expect (first symbols) :to-be sym))))
 
-(deftest js-rt-object-spread-set-returns-obj
-  "%js-object-spread-set sets a key and returns the object."
+(it-sequential "js-rt-object-spread-set-returns-obj"
   (let ((obj (cl-cc/javascript::%js-make-object "a" 1)))
     (let ((ret (cl-cc/javascript::%js-object-spread-set obj "b" 42)))
-      (assert-eq obj ret)
-      (assert-= 42 (gethash "b" obj)))))
+      (expect ret :to-be obj)
+      (expect (= 42 (gethash "b" obj)) :to-be-truthy))))
 
 ;;; ─── Object.create / prototype ops ──────────────────────────────────────────
 
-(deftest js-rt-object-create-with-proto
-  "Object.create links __proto__ to the provided prototype."
+(it-sequential "js-rt-object-create-with-proto"
   (let* ((proto (cl-cc/javascript::%js-make-object "method" t))
          (obj   (cl-cc/javascript::%js-object-create proto)))
-    (assert-eq proto (cl-cc/javascript::%js-object-get-prototype-of obj))))
+    (expect (cl-cc/javascript::%js-object-get-prototype-of obj) :to-be proto)))
 
-(deftest js-rt-object-create-null-proto
-  "Object.create(null) produces an object with no prototype."
+(it-sequential "js-rt-object-create-null-proto"
   (let ((obj (cl-cc/javascript::%js-object-create cl-cc/javascript::+js-null+)))
-    (assert-eq cl-cc/javascript::+js-null+
-               (cl-cc/javascript::%js-object-get-prototype-of obj))))
+    (expect (cl-cc/javascript::%js-object-get-prototype-of obj) :to-be cl-cc/javascript::+js-null+)))
 
-(deftest js-rt-object-set-prototype-of
-  "setPrototypeOf replaces the __proto__ entry."
+(it-sequential "js-rt-object-set-prototype-of"
   (let* ((obj    (cl-cc/javascript::%js-make-object "x" 1))
          (proto2 (cl-cc/javascript::%js-make-object "tag" "v2")))
     (cl-cc/javascript::%js-object-set-prototype-of obj proto2)
-    (assert-eq proto2 (cl-cc/javascript::%js-object-get-prototype-of obj))))
+    (expect (cl-cc/javascript::%js-object-get-prototype-of obj) :to-be proto2)))
 
-(deftest js-rt-object-extensibility-seal-freeze
-  "Object extensibility helpers affect prototype, writes, and deletes."
+(it-sequential "js-rt-object-extensibility-seal-freeze"
   (let* ((proto (cl-cc/javascript::%js-make-object "p" 1))
          (obj   (cl-cc/javascript::%js-object-create proto)))
-    (assert-true (cl-cc/javascript::%js-object-extensible-p obj))
-    (assert-eq proto (cl-cc/javascript::%js-object-get-prototype-of obj))
-    (assert-= 1 (cl-cc/javascript::%js-get-prop obj "p"))
+    (expect (cl-cc/javascript::%js-object-extensible-p obj) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-object-get-prototype-of obj) :to-be proto)
+    (expect (= 1 (cl-cc/javascript::%js-get-prop obj "p")) :to-be-truthy)
     (cl-cc/javascript::%js-object-prevent-extensions obj)
-    (assert-false (cl-cc/javascript::%js-object-extensible-p obj))
+    (expect (cl-cc/javascript::%js-object-extensible-p obj) :to-be-falsy)
     (cl-cc/javascript::%js-set-prop obj "new-key" 2)
-    (assert-false (nth-value 1 (gethash "new-key" obj)))
+    (expect (nth-value 1 (gethash "new-key" obj)) :to-be-falsy)
     (let ((next-proto (cl-cc/javascript::%js-make-object "q" 2)))
-      (assert-false (cl-cc/javascript::%js-reflect-set-prototype-of obj next-proto))
-      (assert-eq proto (cl-cc/javascript::%js-object-get-prototype-of obj)))))
+      (expect (cl-cc/javascript::%js-reflect-set-prototype-of obj next-proto) :to-be-falsy)
+      (expect (cl-cc/javascript::%js-object-get-prototype-of obj) :to-be proto))))
 
-(deftest js-rt-object-seal-and-freeze-mutations
-  "Sealed objects keep properties from deletion; frozen objects reject writes."
+(it-sequential "js-rt-object-seal-and-freeze-mutations"
   (let ((sealed (cl-cc/javascript::%js-make-object "a" 1)))
-    (assert-eq sealed (cl-cc/javascript::%js-object-seal sealed))
-    (assert-true (cl-cc/javascript::%js-object-sealed-p sealed))
-    (assert-false (cl-cc/javascript::%js-delete sealed "a"))
-    (assert-= 1 (gethash "a" sealed)))
+    (expect (cl-cc/javascript::%js-object-seal sealed) :to-be sealed)
+    (expect (cl-cc/javascript::%js-object-sealed-p sealed) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-delete sealed "a") :to-be-falsy)
+    (expect (= 1 (gethash "a" sealed)) :to-be-truthy))
   (let ((frozen (cl-cc/javascript::%js-make-object "x" 10)))
-    (assert-eq frozen (cl-cc/javascript::%js-object-freeze frozen))
-    (assert-true (cl-cc/javascript::%js-object-frozen-p frozen))
+    (expect (cl-cc/javascript::%js-object-freeze frozen) :to-be frozen)
+    (expect (cl-cc/javascript::%js-object-frozen-p frozen) :to-be-truthy)
     (cl-cc/javascript::%js-set-prop frozen "x" 99)
-    (assert-= 10 (gethash "x" frozen))
-    (assert-false (cl-cc/javascript::%js-delete frozen "x"))
-    (assert-= 10 (gethash "x" frozen))))
+    (expect (= 10 (gethash "x" frozen)) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-delete frozen "x") :to-be-falsy)
+    (expect (= 10 (gethash "x" frozen)) :to-be-truthy)))
 
 ;;; ─── Object.hasOwn ───────────────────────────────────────────────────────────
 
-(deftest-each js-rt-object-has-own
-  "Object.hasOwn returns t for own keys and nil for absent ones."
-  :cases (("present" "a" t)
-          ("absent"  "z" nil))
-  (key expected)
-  (let ((obj (cl-cc/javascript::%js-make-object "a" 1)))
-    (assert-equal expected (cl-cc/javascript::%js-object-has-own obj key))))
+(it-sequential "js-rt-object-has-own present"
+  (destructuring-bind (key expected) (list "a" t)
+    (let ((obj (cl-cc/javascript::%js-make-object "a" 1)))
+    (expect (cl-cc/javascript::%js-object-has-own obj key) :to-equal expected))))
 
-(deftest js-rt-object-has-own-symbol-key
-  "Object.hasOwn recognizes own Symbol properties."
+(it-sequential "js-rt-object-has-own absent"
+  (destructuring-bind (key expected) (list "z" nil)
+    (let ((obj (cl-cc/javascript::%js-make-object "a" 1)))
+    (expect (cl-cc/javascript::%js-object-has-own obj key) :to-equal expected))))
+
+(it-sequential "js-rt-object-has-own-symbol-key"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (sym (cl-cc/javascript::%js-make-symbol "owned")))
     (cl-cc/javascript::%js-set-prop obj sym 42)
-    (assert-true (cl-cc/javascript::%js-object-has-own obj sym))
-    (assert-false (cl-cc/javascript::%js-object-has-own
+    (expect (cl-cc/javascript::%js-object-has-own obj sym) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-object-has-own
                    obj
-                   (cl-cc/javascript::%js-make-symbol "owned")))))
+                   (cl-cc/javascript::%js-make-symbol "owned")) :to-be-falsy)))
 
-(deftest js-rt-object-has-own-accessor-property
-  "Object.hasOwn recognizes accessor properties as own properties."
+(it-sequential "js-rt-object-has-own-accessor-property"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (getter (lambda () 42))
          (desc (cl-cc/javascript::%js-make-object "get" getter)))
     (cl-cc/javascript::%js-object-define-property obj "answer" desc)
-    (assert-true (cl-cc/javascript::%js-object-has-own obj "answer"))))
+    (expect (cl-cc/javascript::%js-object-has-own obj "answer") :to-be-truthy)))
 
 ;;; ─── Object.fromEntries ──────────────────────────────────────────────────────
 
-(deftest js-rt-object-from-entries
-  "Object.fromEntries builds an object from an array of [key,val] pairs."
+(it-sequential "js-rt-object-from-entries"
   (let* ((pairs (cl-cc/javascript::%js-make-array (%jr-arr "x" 10)
                                                    (%jr-arr "y" 20)))
          (obj   (cl-cc/javascript::%js-object-from-entries pairs)))
-    (assert-= 10 (gethash "x" obj))
-    (assert-= 20 (gethash "y" obj))))
+    (expect (= 10 (gethash "x" obj)) :to-be-truthy)
+    (expect (= 20 (gethash "y" obj)) :to-be-truthy)))
 
-(deftest js-rt-object-from-entries-preserves-symbol-keys
-  "Object.fromEntries preserves Symbol keys instead of stringifying them."
+(it-sequential "js-rt-object-from-entries-preserves-symbol-keys"
   (let* ((sym (cl-cc/javascript::%js-make-symbol "entry"))
          (pairs (cl-cc/javascript::%js-make-array (%jr-arr sym 88)))
          (obj (cl-cc/javascript::%js-object-from-entries pairs)))
-    (assert-= 88 (cl-cc/javascript::%js-get-prop obj sym))
+    (expect (= 88 (cl-cc/javascript::%js-get-prop obj sym)) :to-be-truthy)
     (let ((symbols (coerce (cl-cc/javascript::%js-object-get-own-property-symbols obj)
                            'list)))
-      (assert-equal 1 (length symbols))
-      (assert-eq sym (first symbols)))))
+      (expect (length symbols) :to-equal 1)
+      (expect (first symbols) :to-be sym))))
 
 ;;; ─── Object.withoutKeys ──────────────────────────────────────────────────────
 
-(deftest js-rt-object-without-keys
-  "%js-object-without-keys returns a copy excluding the specified keys."
+(it-sequential "js-rt-object-without-keys"
   (let* ((obj  (cl-cc/javascript::%js-make-object "a" 1 "b" 2 "c" 3))
          (excl (%jr-arr "b"))
          (copy (cl-cc/javascript::%js-object-without-keys obj excl)))
-    (assert-false (eq obj copy))
-    (assert-= 1 (gethash "a" copy))
-    (assert-false (nth-value 1 (gethash "b" copy)))
-    (assert-= 3 (gethash "c" copy))))
+    (expect (eq obj copy) :to-be-falsy)
+    (expect (= 1 (gethash "a" copy)) :to-be-truthy)
+    (expect (nth-value 1 (gethash "b" copy)) :to-be-falsy)
+    (expect (= 3 (gethash "c" copy)) :to-be-truthy)))
 
 ;;; ─── Object.groupBy ──────────────────────────────────────────────────────────
 
-(deftest js-rt-object-group-by
-  "%js-object-group-by partitions an iterable by key-fn result."
+(it-sequential "js-rt-object-group-by"
   (let* ((items  (%jr-arr 1 2 3 4))
          (key-fn (lambda (x index)
                    (declare (ignore index))
                    (if (evenp x) "even" "odd")))
          (grouped (cl-cc/javascript::%js-object-group-by items key-fn)))
-    (assert-= 2 (length (gethash "even" grouped)))
-    (assert-= 2 (length (gethash "odd"  grouped)))))
+    (expect (= 2 (length (gethash "even" grouped))) :to-be-truthy)
+    (expect (= 2 (length (gethash "odd"  grouped))) :to-be-truthy)))
 
-(deftest js-rt-object-group-by-passes-index
-  "%js-object-group-by passes the zero-based element index to key-fn."
+(it-sequential "js-rt-object-group-by-passes-index"
   (let* ((seen '())
          (items (%jr-arr "a" "b" "c"))
          (grouped (cl-cc/javascript::%js-object-group-by
@@ -270,245 +257,284 @@
                    (lambda (item index)
                      (push (list item index) seen)
                      (if (evenp index) "even-index" "odd-index")))))
-    (assert-equal '(("c" 2) ("b" 1) ("a" 0)) seen)
-    (assert-equal '("a" "c") (%jr-list (gethash "even-index" grouped)))
-    (assert-equal '("b") (%jr-list (gethash "odd-index" grouped)))))
+    (expect seen :to-equal '(("c" 2) ("b" 1) ("a" 0)))
+    (expect (%jr-list (gethash "even-index" grouped)) :to-equal '("a" "c"))
+    (expect (%jr-list (gethash "odd-index" grouped)) :to-equal '("b"))))
 
-(deftest js-rt-object-group-by-null-prototype
-  "%js-object-group-by returns a null-prototype object."
+(it-sequential "js-rt-object-group-by-null-prototype"
   (let* ((items (%jr-arr 1))
          (grouped (cl-cc/javascript::%js-object-group-by
                    items
                    (lambda (item index)
                      (declare (ignore item index))
                      "all"))))
-    (assert-eq cl-cc/javascript::+js-null+
-               (cl-cc/javascript::%js-object-get-prototype-of grouped))
-    (assert-false (member "__proto__"
+    (expect (cl-cc/javascript::%js-object-get-prototype-of grouped) :to-be cl-cc/javascript::+js-null+)
+    (expect (member "__proto__"
                           (coerce (cl-cc/javascript::%js-object-keys grouped) 'list)
-                          :test #'string=))))
+                          :test #'string=) :to-be-falsy)))
 
 ;;; ─── Destructuring helpers ───────────────────────────────────────────────────
 
-(deftest js-rt-destructure-array-rest
-  "%js-destructure-array in :rest mode collects tail elements."
+(it-sequential "js-rt-destructure-array-rest"
   (let* ((arr  (%jr-arr 10 20 30 40))
          (rest (cl-cc/javascript::%js-destructure-array arr 1 :rest)))
-    (assert-= 3 (length rest))
-    (assert-= 20 (aref rest 0))
-    (assert-= 40 (aref rest 2))))
+    (expect (= 3 (length rest)) :to-be-truthy)
+    (expect (= 20 (aref rest 0)) :to-be-truthy)
+    (expect (= 40 (aref rest 2)) :to-be-truthy)))
 
-(deftest js-rt-destructure-array-value-mode
-  "%js-destructure-array in value mode returns each element or its default."
+(it-sequential "js-rt-destructure-array-value-mode"
   (let* ((arr (cl-cc/javascript::%js-make-array 10))
          (result (cl-cc/javascript::%js-destructure-array arr 0 99 1 42)))
-    (assert-= 10 (first result))
-    (assert-= 42 (second result))))
+    (expect (= 10 (first result)) :to-be-truthy)
+    (expect (= 42 (second result)) :to-be-truthy)))
 
-(deftest js-rt-destructure-object-rest
-  "%js-destructure-object in :rest mode omits excluded keys."
+(it-sequential "js-rt-destructure-object-rest"
   (let* ((obj    (cl-cc/javascript::%js-make-object "a" 1 "b" 2 "c" 3))
          (others (cl-cc/javascript::%js-destructure-object obj :rest "a")))
-    (assert-false (nth-value 1 (gethash "a" others)))
-    (assert-= 2 (gethash "b" others))
-    (assert-= 3 (gethash "c" others))))
+    (expect (nth-value 1 (gethash "a" others)) :to-be-falsy)
+    (expect (= 2 (gethash "b" others)) :to-be-truthy)
+    (expect (= 3 (gethash "c" others)) :to-be-truthy)))
 
-(deftest js-rt-destructure-object-value-mode
-  "%js-destructure-object in value mode extracts keys with defaults."
+(it-sequential "js-rt-destructure-object-value-mode"
   (let* ((obj    (cl-cc/javascript::%js-make-object "x" 7))
          (result (cl-cc/javascript::%js-destructure-object obj "x" 0 "y" 99)))
-    (assert-= 7  (first result))
-    (assert-= 99 (second result))))
+    (expect (= 7 (first result)) :to-be-truthy)
+    (expect (= 99 (second result)) :to-be-truthy)))
 
 ;;; ─── 32-bit integer coercion ─────────────────────────────────────────────────
 
-(deftest-each js-rt-to-int32
-  "%js-to-int32 truncates and masks to 32-bit unsigned."
-  :cases (("small"    5    5)
-          ("float"    3.7d0 3)
-          ("over-32"  #x100000001  1))
-  (x expected)
-  (assert-= expected (cl-cc/javascript::%js-to-int32 x)))
+(it-sequential "js-rt-to-int32 small"
+  (destructuring-bind (x expected) (list 5 5)
+    (expect (= expected (cl-cc/javascript::%js-to-int32 x)) :to-be-truthy)))
 
-(deftest-each js-rt-sign-extend32
-  "%js-sign-extend32 turns the high-bit set pattern into a negative integer."
-  :cases (("positive"   5            5)
-          ("max-int32"  #x7FFFFFFF   2147483647)
-          ("min-int32"  #x80000000  -2147483648))
-  (n expected)
-  (assert-= expected (cl-cc/javascript::%js-sign-extend32 n)))
+(it-sequential "js-rt-to-int32 float"
+  (destructuring-bind (x expected) (list 3.7d0 3)
+    (expect (= expected (cl-cc/javascript::%js-to-int32 x)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-int32 over-32"
+  (destructuring-bind (x expected) (list #x100000001 1)
+    (expect (= expected (cl-cc/javascript::%js-to-int32 x)) :to-be-truthy)))
+
+(it-sequential "js-rt-sign-extend32 positive"
+  (destructuring-bind (n expected) (list 5 5)
+    (expect (= expected (cl-cc/javascript::%js-sign-extend32 n)) :to-be-truthy)))
+
+(it-sequential "js-rt-sign-extend32 max-int32"
+  (destructuring-bind (n expected) (list #x7FFFFFFF 2147483647)
+    (expect (= expected (cl-cc/javascript::%js-sign-extend32 n)) :to-be-truthy)))
+
+(it-sequential "js-rt-sign-extend32 min-int32"
+  (destructuring-bind (n expected) (list #x80000000 -2147483648)
+    (expect (= expected (cl-cc/javascript::%js-sign-extend32 n)) :to-be-truthy)))
 
 ;;; ─── Bitwise operators ───────────────────────────────────────────────────────
 
-(deftest-each js-rt-bitwise-binops
-  "Bitwise AND/OR/XOR produce correct 32-bit signed results."
-  :cases (("and"  #'cl-cc/javascript::%js-bitwise-and  #b1010  #b1100  #b1000)
-          ("or"   #'cl-cc/javascript::%js-bitwise-or   #b1010  #b1100  #b1110)
-          ("xor"  #'cl-cc/javascript::%js-bitwise-xor  #b1010  #b1100  #b0110))
-  (fn a b expected)
-  (assert-= expected (funcall fn a b)))
+(it-sequential "js-rt-bitwise-binops and"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-bitwise-and #b1010 #b1100 #b1000)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest js-rt-bitwise-not
-  "%js-bitwise-not inverts all 32 bits and sign-extends."
-  (assert-= -1 (cl-cc/javascript::%js-bitwise-not 0))
-  (assert-= -6 (cl-cc/javascript::%js-bitwise-not 5)))
+(it-sequential "js-rt-bitwise-binops or"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-bitwise-or #b1010 #b1100 #b1110)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-binops xor"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-bitwise-xor #b1010 #b1100 #b0110)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-not"
+  (expect (= -1 (cl-cc/javascript::%js-bitwise-not 0)) :to-be-truthy)
+  (expect (= -6 (cl-cc/javascript::%js-bitwise-not 5)) :to-be-truthy))
 
 ;;; ─── Shift operators ─────────────────────────────────────────────────────────
 
-(deftest-each js-rt-shift-ops
-  "Shift left/right/unsigned-right produce correct results."
-  :cases (("shl"   #'cl-cc/javascript::%js-shift-left          1  4   16)
-          ("shr"   #'cl-cc/javascript::%js-shift-right        -8  1   -4)
-          ("ushr"  #'cl-cc/javascript::%js-unsigned-shift-right -1  28  15))
-  (fn a b expected)
-  (assert-= expected (funcall fn a b)))
+(it-sequential "js-rt-shift-ops shl"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-left 1 4 16)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops shr"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-right -8 1 -4)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops ushr"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-unsigned-shift-right -1 28 15)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
 ;;; ─── Unary / increment ops ───────────────────────────────────────────────────
 
-(deftest js-rt-unary-plus
-  "%js-unary-plus coerces its argument to a number."
-  (assert-= 42   (cl-cc/javascript::%js-unary-plus "42"))
-  (assert-= 0    (cl-cc/javascript::%js-unary-plus nil)))
+(it-sequential "js-rt-unary-plus"
+  (expect (= 42 (cl-cc/javascript::%js-unary-plus "42")) :to-be-truthy)
+  (expect (= 0 (cl-cc/javascript::%js-unary-plus nil)) :to-be-truthy))
 
-(deftest-each js-rt-inc-dec-ops
-  "Prefix inc/dec add 1; postfix ops return the original value."
-  :cases (("prefix-inc"  #'cl-cc/javascript::%js-prefix-inc  5   6)
-          ("prefix-dec"  #'cl-cc/javascript::%js-prefix-dec  5   4)
-          ("postfix-inc" #'cl-cc/javascript::%js-postfix-inc 5   5)
-          ("postfix-dec" #'cl-cc/javascript::%js-postfix-dec 5   5))
-  (fn val expected)
-  (assert-= expected (funcall fn val)))
+(it-sequential "js-rt-inc-dec-ops prefix-inc"
+  (destructuring-bind (fn val expected) (list #'cl-cc/javascript::%js-prefix-inc 5 6)
+    (expect (= expected (funcall fn val)) :to-be-truthy)))
+
+(it-sequential "js-rt-inc-dec-ops prefix-dec"
+  (destructuring-bind (fn val expected) (list #'cl-cc/javascript::%js-prefix-dec 5 4)
+    (expect (= expected (funcall fn val)) :to-be-truthy)))
+
+(it-sequential "js-rt-inc-dec-ops postfix-inc"
+  (destructuring-bind (fn val expected) (list #'cl-cc/javascript::%js-postfix-inc 5 5)
+    (expect (= expected (funcall fn val)) :to-be-truthy)))
+
+(it-sequential "js-rt-inc-dec-ops postfix-dec"
+  (destructuring-bind (fn val expected) (list #'cl-cc/javascript::%js-postfix-dec 5 5)
+    (expect (= expected (funcall fn val)) :to-be-truthy)))
 
 ;;; ─── BigInt extras ───────────────────────────────────────────────────────────
 
-(deftest-each js-rt-bigint-constructor
-  "%js-bigint coerces integers, floats, and strings to BigInt structs."
-  :cases (("integer" 42       42)
-          ("float"   3.9d0    3)
-          ("string"  "100"  100))
-  (x expected)
-  (let ((bi (cl-cc/javascript::%js-bigint x)))
-    (assert-true (cl-cc/javascript::js-bigint-p bi))
-    (assert-= expected (cl-cc/javascript::js-bigint-value bi))))
+(it-sequential "js-rt-bigint-constructor integer"
+  (destructuring-bind (x expected) (list 42 42)
+    (let ((bi (cl-cc/javascript::%js-bigint x)))
+    (expect (cl-cc/javascript::js-bigint-p bi) :to-be-truthy)
+    (expect (= expected (cl-cc/javascript::js-bigint-value bi)) :to-be-truthy))))
 
-(deftest-each js-rt-bigint-to-string-radix
-  "%js-bigint-to-string renders BigInt value in the requested base."
-  :cases (("decimal" 255 10  "255")
-          ("hex"     255 16  "ff")
-          ("binary"    5  2  "101"))
-  (n radix expected)
-  (let ((bi (cl-cc/javascript::%make-js-bigint n)))
-    (assert-string= expected (cl-cc/javascript::%js-bigint-to-string bi radix))))
+(it-sequential "js-rt-bigint-constructor float"
+  (destructuring-bind (x expected) (list 3.9d0 3)
+    (let ((bi (cl-cc/javascript::%js-bigint x)))
+    (expect (cl-cc/javascript::js-bigint-p bi) :to-be-truthy)
+    (expect (= expected (cl-cc/javascript::js-bigint-value bi)) :to-be-truthy))))
 
-(deftest-each js-rt-bigint-div-mod
-  "BigInt div and mod perform integer division and remainder."
-  :cases (("div"  #'cl-cc/javascript::%js-bigint-div  10  3   3)
-          ("mod"  #'cl-cc/javascript::%js-bigint-mod  10  3   1))
-  (fn a b expected)
-  (let ((result (funcall fn a b)))
-    (assert-= expected (cl-cc/javascript::js-bigint-value result))))
+(it-sequential "js-rt-bigint-constructor string"
+  (destructuring-bind (x expected) (list "100" 100)
+    (let ((bi (cl-cc/javascript::%js-bigint x)))
+    (expect (cl-cc/javascript::js-bigint-p bi) :to-be-truthy)
+    (expect (= expected (cl-cc/javascript::js-bigint-value bi)) :to-be-truthy))))
 
-(deftest-each js-rt-bigint-compare
-  "%js-bigint-compare returns -1/0/1 like cmp."
-  :cases (("lt"  3  5  -1)
-          ("eq"  5  5   0)
-          ("gt"  7  5   1))
-  (a b expected)
-  (assert-= expected (cl-cc/javascript::%js-bigint-compare a b)))
+(it-sequential "js-rt-bigint-to-string-radix decimal"
+  (destructuring-bind (n radix expected) (list 255 10 "255")
+    (let ((bi (cl-cc/javascript::%make-js-bigint n)))
+    (expect (cl-cc/javascript::%js-bigint-to-string bi radix) :to-equal expected))))
 
-(deftest-each js-rt-bigint-shift
-  "BigInt lshift and rshift use ash semantics."
-  :cases (("lshift" #'cl-cc/javascript::%js-bigint-lshift  1  3    8)
-          ("rshift" #'cl-cc/javascript::%js-bigint-rshift  8  2    2))
-  (fn a n expected)
-  (let ((result (funcall fn a n)))
-    (assert-= expected (cl-cc/javascript::js-bigint-value result))))
+(it-sequential "js-rt-bigint-to-string-radix hex"
+  (destructuring-bind (n radix expected) (list 255 16 "ff")
+    (let ((bi (cl-cc/javascript::%make-js-bigint n)))
+    (expect (cl-cc/javascript::%js-bigint-to-string bi radix) :to-equal expected))))
 
-(deftest js-rt-bigint-negate
-  "%js-bigint-negate changes the sign of the BigInt value."
-  (assert-= -42 (cl-cc/javascript::js-bigint-value
-                 (cl-cc/javascript::%js-bigint-negate 42)))
-  (assert-= 7   (cl-cc/javascript::js-bigint-value
-                 (cl-cc/javascript::%js-bigint-negate -7))))
+(it-sequential "js-rt-bigint-to-string-radix binary"
+  (destructuring-bind (n radix expected) (list 5 2 "101")
+    (let ((bi (cl-cc/javascript::%make-js-bigint n)))
+    (expect (cl-cc/javascript::%js-bigint-to-string bi radix) :to-equal expected))))
+
+(it-sequential "js-rt-bigint-div-mod div"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-bigint-div 10 3 3)
+    (let ((result (funcall fn a b)))
+    (expect (= expected (cl-cc/javascript::js-bigint-value result)) :to-be-truthy))))
+
+(it-sequential "js-rt-bigint-div-mod mod"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-bigint-mod 10 3 1)
+    (let ((result (funcall fn a b)))
+    (expect (= expected (cl-cc/javascript::js-bigint-value result)) :to-be-truthy))))
+
+(it-sequential "js-rt-bigint-compare lt"
+  (destructuring-bind (a b expected) (list 3 5 -1)
+    (expect (= expected (cl-cc/javascript::%js-bigint-compare a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bigint-compare eq"
+  (destructuring-bind (a b expected) (list 5 5 0)
+    (expect (= expected (cl-cc/javascript::%js-bigint-compare a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bigint-compare gt"
+  (destructuring-bind (a b expected) (list 7 5 1)
+    (expect (= expected (cl-cc/javascript::%js-bigint-compare a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bigint-shift lshift"
+  (destructuring-bind (fn a n expected) (list #'cl-cc/javascript::%js-bigint-lshift 1 3 8)
+    (let ((result (funcall fn a n)))
+    (expect (= expected (cl-cc/javascript::js-bigint-value result)) :to-be-truthy))))
+
+(it-sequential "js-rt-bigint-shift rshift"
+  (destructuring-bind (fn a n expected) (list #'cl-cc/javascript::%js-bigint-rshift 8 2 2)
+    (let ((result (funcall fn a n)))
+    (expect (= expected (cl-cc/javascript::js-bigint-value result)) :to-be-truthy))))
+
+(it-sequential "js-rt-bigint-negate"
+  (expect (= -42 (cl-cc/javascript::js-bigint-value
+                 (cl-cc/javascript::%js-bigint-negate 42))) :to-be-truthy)
+  (expect (= 7 (cl-cc/javascript::js-bigint-value
+                 (cl-cc/javascript::%js-bigint-negate -7))) :to-be-truthy))
 
 ;;; ─── URI encoding ────────────────────────────────────────────────────────────
 
-(deftest js-rt-encode-uri-component
-  "%js-encode-uri-component percent-encodes non-unreserved chars."
-  (assert-string= "hello%20world"
-                  (cl-cc/javascript::%js-encode-uri-component "hello world"))
-  (assert-string= "abc"
-                  (cl-cc/javascript::%js-encode-uri-component "abc")))
+(it-sequential "js-rt-encode-uri-component"
+  (expect (cl-cc/javascript::%js-encode-uri-component "hello world") :to-equal "hello%20world")
+  (expect (cl-cc/javascript::%js-encode-uri-component "abc") :to-equal "abc"))
 
-(deftest js-rt-decode-uri-component
-  "%js-decode-uri-component reverses percent-encoding."
-  (assert-string= "hello world"
-                  (cl-cc/javascript::%js-decode-uri-component "hello%20world")))
+(it-sequential "js-rt-decode-uri-component"
+  (expect (cl-cc/javascript::%js-decode-uri-component "hello%20world") :to-equal "hello world"))
 
 ;;; ─── Accessor / misc stubs ───────────────────────────────────────────────────
 
-(deftest js-rt-accessor-descriptor
-  "%js-accessor produces a descriptor HT with __accessor__, kind, and fn fields."
+(it-sequential "js-rt-accessor-descriptor"
   (let* ((fn   (lambda () 42))
          (desc (cl-cc/javascript::%js-accessor "get" fn)))
-    (assert-true  (gethash "__accessor__" desc))
-    (assert-string= "get" (gethash "kind" desc))
-    (assert-eq fn (gethash "fn" desc))))
+    (expect (gethash "__accessor__" desc) :to-be-truthy)
+    (expect (gethash "kind" desc) :to-equal "get")
+    (expect (gethash "fn" desc) :to-be fn)))
 
-(deftest js-rt-new-target-returns-undefined
-  "%js-new-target returns +js-undefined+ outside a constructor."
-  (assert-eq cl-cc/javascript::+js-undefined+
-             (cl-cc/javascript::%js-new-target)))
+(it-sequential "js-rt-new-target-returns-undefined"
+  (expect (cl-cc/javascript::%js-new-target) :to-be cl-cc/javascript::+js-undefined+))
 
-(deftest js-rt-using-register-identity
-  "%js-using-register returns its argument unchanged."
+(it-sequential "js-rt-using-register-identity"
   (let ((r (list 1 2)))
-    (assert-eq r (cl-cc/javascript::%js-using-register r))))
+    (expect (cl-cc/javascript::%js-using-register r) :to-be r)))
 
 ;;; ─── runtime-property.lisp: accessor-descriptor-p, put-entry, optional ops ──
 
-(deftest-each js-rt-accessor-descriptor-p
-  "%js-accessor-descriptor-p distinguishes accessor HTs from plain values."
-  :cases (("get-accessor" (cl-cc/javascript::%js-accessor "get" (lambda () 1)) t)
-          ("set-accessor" (cl-cc/javascript::%js-accessor "set" (lambda (v) v))  t)
-          ("plain-ht"     (cl-cc/javascript::%js-make-object "x" 1)             nil)
-          ("string"       "not-an-accessor"                                      nil))
-  (val expected)
-  (assert-equal expected (cl-cc/javascript::%js-accessor-descriptor-p val)))
+(it-sequential "js-rt-accessor-descriptor-p get-accessor"
+  (destructuring-bind (val expected) (list (cl-cc/javascript::%js-accessor "get" (lambda () 1)) t)
+    (expect (cl-cc/javascript::%js-accessor-descriptor-p val) :to-equal expected)))
 
-(deftest js-rt-object-put-entry-accessor-routing
-  "%js-object-put-entry routes getter descriptor to __get_KEY slot."
+(it-sequential "js-rt-accessor-descriptor-p set-accessor"
+  (destructuring-bind (val expected) (list (cl-cc/javascript::%js-accessor "set" (lambda (v) v)) t)
+    (expect (cl-cc/javascript::%js-accessor-descriptor-p val) :to-equal expected)))
+
+(it-sequential "js-rt-accessor-descriptor-p plain-ht"
+  (destructuring-bind (val expected) (list (cl-cc/javascript::%js-make-object "x" 1) nil)
+    (expect (cl-cc/javascript::%js-accessor-descriptor-p val) :to-equal expected)))
+
+(it-sequential "js-rt-accessor-descriptor-p string"
+  (destructuring-bind (val expected) (list "not-an-accessor" nil)
+    (expect (cl-cc/javascript::%js-accessor-descriptor-p val) :to-equal expected)))
+
+(it-sequential "js-rt-object-put-entry-accessor-routing"
   (let* ((ht  (cl-cc/javascript::%js-make-ht))
          (fn  (lambda () 42))
          (desc (cl-cc/javascript::%js-accessor "get" fn)))
     (cl-cc/javascript::%js-object-put-entry ht "foo" desc)
-    (assert-eq fn (gethash "__get_foo" ht))
-    (assert-false (nth-value 1 (gethash "foo" ht)))))
+    (expect (gethash "__get_foo" ht) :to-be fn)
+    (expect (nth-value 1 (gethash "foo" ht)) :to-be-falsy)))
 
-(deftest-each js-rt-optional-call
-  "%js-optional-call invokes the function or returns +js-undefined+ for null/undefined."
-  :cases (("real-fn"     (lambda () 99)                   99)
-          ("undefined"   cl-cc/javascript::+js-undefined+ :undef)
-          ("null"        cl-cc/javascript::+js-null+       :undef))
-  (func expected)
-  (let ((result (cl-cc/javascript::%js-optional-call func)))
+(it-sequential "js-rt-optional-call real-fn"
+  (destructuring-bind (func expected) (list (lambda () 99) 99)
+    (let ((result (cl-cc/javascript::%js-optional-call func)))
     (if (eq expected :undef)
-        (assert-eq cl-cc/javascript::+js-undefined+ result)
-        (assert-= expected result))))
+        (expect result :to-be cl-cc/javascript::+js-undefined+)
+        (expect (= expected result) :to-be-truthy)))))
 
-(deftest js-rt-optional-method-call-present
-  "%js-optional-method-call calls the method when obj is not null/undefined."
+(it-sequential "js-rt-optional-call undefined"
+  (destructuring-bind (func expected) (list cl-cc/javascript::+js-undefined+ :undef)
+    (let ((result (cl-cc/javascript::%js-optional-call func)))
+    (if (eq expected :undef)
+        (expect result :to-be cl-cc/javascript::+js-undefined+)
+        (expect (= expected result) :to-be-truthy)))))
+
+(it-sequential "js-rt-optional-call null"
+  (destructuring-bind (func expected) (list cl-cc/javascript::+js-null+ :undef)
+    (let ((result (cl-cc/javascript::%js-optional-call func)))
+    (if (eq expected :undef)
+        (expect result :to-be cl-cc/javascript::+js-undefined+)
+        (expect (= expected result) :to-be-truthy)))))
+
+(it-sequential "js-rt-optional-method-call-present"
   (let* ((obj    (cl-cc/javascript::%js-make-object "double" (lambda (n) (* 2 n))))
          (result (cl-cc/javascript::%js-optional-method-call obj "double" 5)))
-    (assert-= 10 result)))
+    (expect (= 10 result) :to-be-truthy)))
 
-(deftest js-rt-optional-method-call-null
-  "%js-optional-method-call returns +js-undefined+ when obj is null."
-  (assert-eq cl-cc/javascript::+js-undefined+
-             (cl-cc/javascript::%js-optional-method-call cl-cc/javascript::+js-null+ "double" 5)))
+(it-sequential "js-rt-optional-method-call-null"
+  (expect (cl-cc/javascript::%js-optional-method-call cl-cc/javascript::+js-null+ "double" 5) :to-be cl-cc/javascript::+js-undefined+))
 
-(deftest js-rt-add-string-coercion
-  "%js-add coerces to string when either operand is a string, otherwise numeric add."
-  (assert-string= "42"    (cl-cc/javascript::%js-add 4 "2"))
-  (assert-string= "ab"    (cl-cc/javascript::%js-add "a" "b"))
-  (assert-=       6.0d0   (cl-cc/javascript::%js-add 4 2)))
+(it-sequential "js-rt-add-string-coercion"
+  (expect (cl-cc/javascript::%js-add 4 "2") :to-equal "42")
+  (expect (cl-cc/javascript::%js-add "a" "b") :to-equal "ab")
+  (expect (= 6.0d0 (cl-cc/javascript::%js-add 4 2)) :to-be-truthy))

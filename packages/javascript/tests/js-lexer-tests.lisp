@@ -3,10 +3,6 @@
 ;;;; Token format: (:type :T-XXX :value val)
 
 (in-package :cl-cc/test)
-(defsuite cl-cc-javascript-suite
-  :description "JavaScript frontend tests"
-  :parent cl-cc-unit-suite)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,277 +32,443 @@
 
 ;;; ─── Numeric literals ─────────────────────────────────────────────────────────
 
-(deftest-each lex-integer-literal
-  "Integer literals in decimal, hex, octal, binary, and with numeric separators
-   all lex to :T-NUMBER with the expected integer value."
-  :cases (("decimal-42"    "42"        42)
-          ("decimal-0"     "0"         0)
-          ("decimal-255"   "255"       255)
-          ("hex-0xff"      "0xFF"      255)
-          ("octal-0o777"   "0o777"     511)
-          ("binary-0b1010" "0b1010"    10)
-          ("separator"     "1_000_000" 1000000))
-  (src expected)
-  (assert-eq :T-NUMBER (%js-first-type src))
-  (assert-= expected (%js-first-value src)))
+(it-sequential "lex-integer-literal decimal-42"
+  (destructuring-bind (src expected) (list "42" 42)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
 
-(deftest lex-float-pi
-  "3.14 lexes to :T-NUMBER with a double-float value close to pi."
-  (assert-eq :T-NUMBER (%js-first-type "3.14"))
-  (assert-true (typep (%js-first-value "3.14") 'double-float))
-  (assert-true (< (abs (- 3.14d0 (%js-first-value "3.14"))) 1.0d-10)))
+(it-sequential "lex-integer-literal decimal-0"
+  (destructuring-bind (src expected) (list "0" 0)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
 
-(deftest lex-float-scientific
-  "1.5e-3 lexes to :T-NUMBER within 1e-15 of the expected double value."
-  (assert-eq :T-NUMBER (%js-first-type "1.5e-3"))
-  (assert-true (< (abs (- 1.5d-3 (%js-first-value "1.5e-3"))) 1.0d-15)))
+(it-sequential "lex-integer-literal decimal-255"
+  (destructuring-bind (src expected) (list "255" 255)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
 
-(deftest lex-bigint-literal
-  "42n lexes to :T-BIGINT with integer value 42."
-  (assert-eq :T-BIGINT (%js-first-type "42n"))
-  (assert-= 42 (%js-first-value "42n")))
+(it-sequential "lex-integer-literal hex-0xff"
+  (destructuring-bind (src expected) (list "0xFF" 255)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
+
+(it-sequential "lex-integer-literal octal-0o777"
+  (destructuring-bind (src expected) (list "0o777" 511)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
+
+(it-sequential "lex-integer-literal binary-0b1010"
+  (destructuring-bind (src expected) (list "0b1010" 10)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
+
+(it-sequential "lex-integer-literal separator"
+  (destructuring-bind (src expected) (list "1_000_000" 1000000)
+    (expect (%js-first-type src) :to-be :T-NUMBER) (expect (= expected (%js-first-value src)) :to-be-truthy)))
+
+(it-sequential "lex-float-pi"
+  (expect (%js-first-type "3.14") :to-be :T-NUMBER)
+  (expect (typep (%js-first-value "3.14") 'double-float) :to-be-truthy)
+  (expect (< (abs (- 3.14d0 (%js-first-value "3.14"))) 1.0d-10) :to-be-truthy))
+
+(it-sequential "lex-float-scientific"
+  (expect (%js-first-type "1.5e-3") :to-be :T-NUMBER)
+  (expect (< (abs (- 1.5d-3 (%js-first-value "1.5e-3"))) 1.0d-15) :to-be-truthy))
+
+(it-sequential "lex-bigint-literal"
+  (expect (%js-first-type "42n") :to-be :T-BIGINT)
+  (expect (= 42 (%js-first-value "42n")) :to-be-truthy))
 
 ;;; ─── String literals ──────────────────────────────────────────────────────────
 
-(deftest-each lex-string-literal
-  "Single and double quoted string literals lex to :T-STRING."
-  :cases (("single" "'hello'" "hello")
-          ("double" "\"world\"" "world"))
-  (src expected)
-  (assert-eq :T-STRING (%js-first-type src))
-  (assert-string= expected (%js-first-value src)))
+(it-sequential "lex-string-literal single"
+  (destructuring-bind (src expected) (list "'hello'" "hello")
+    (expect (%js-first-type src) :to-be :T-STRING) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-string-literal double"
+  (destructuring-bind (src expected) (list "\"world\"" "world")
+    (expect (%js-first-type src) :to-be :T-STRING) (expect (%js-first-value src) :to-equal expected)))
 
 ;;; ─── Keyword tokens ───────────────────────────────────────────────────────────
 
-(deftest-each lex-keyword
-  "JavaScript keywords each lex to their canonical token type."
-  :cases (("if"        "if"        :T-IF)
-          ("for"       "for"       :T-FOR)
-          ("class"     "class"     :T-CLASS)
-          ("async"     "async"     :T-ASYNC)
-          ("await"     "await"     :T-AWAIT)
-          ("using"     "using"     :T-USING)
-          ("true"      "true"      :T-TRUE)
-          ("false"     "false"     :T-FALSE)
-          ("null"      "null"      :T-NULL)
-          ("undefined" "undefined" :T-UNDEFINED))
-  (src expected-type)
-  (assert-eq expected-type (%js-first-type src)))
+(it-sequential "lex-keyword if"
+  (destructuring-bind (src expected-type) (list "if" :T-IF)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword for"
+  (destructuring-bind (src expected-type) (list "for" :T-FOR)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword class"
+  (destructuring-bind (src expected-type) (list "class" :T-CLASS)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword async"
+  (destructuring-bind (src expected-type) (list "async" :T-ASYNC)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword await"
+  (destructuring-bind (src expected-type) (list "await" :T-AWAIT)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword using"
+  (destructuring-bind (src expected-type) (list "using" :T-USING)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword true"
+  (destructuring-bind (src expected-type) (list "true" :T-TRUE)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword false"
+  (destructuring-bind (src expected-type) (list "false" :T-FALSE)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword null"
+  (destructuring-bind (src expected-type) (list "null" :T-NULL)
+    (expect (%js-first-type src) :to-be expected-type)))
+
+(it-sequential "lex-keyword undefined"
+  (destructuring-bind (src expected-type) (list "undefined" :T-UNDEFINED)
+    (expect (%js-first-type src) :to-be expected-type)))
 
 ;;; ─── Identifiers ──────────────────────────────────────────────────────────────
 
-(deftest-each lex-identifier
-  "Valid JS identifiers lex to :T-IDENT with their source text as the value."
-  :cases (("simple"     "foo"       "foo")
-          ("underscore" "_bar"      "_bar")
-          ("dollar"     "$baz"      "$baz")
-          ("camel"      "camelCase" "camelCase"))
-  (src expected)
-  (assert-eq :T-IDENT (%js-first-type src))
-  (assert-string= expected (%js-first-value src)))
+(it-sequential "lex-identifier simple"
+  (destructuring-bind (src expected) (list "foo" "foo")
+    (expect (%js-first-type src) :to-be :T-IDENT) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-identifier underscore"
+  (destructuring-bind (src expected) (list "_bar" "_bar")
+    (expect (%js-first-type src) :to-be :T-IDENT) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-identifier dollar"
+  (destructuring-bind (src expected) (list "$baz" "$baz")
+    (expect (%js-first-type src) :to-be :T-IDENT) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-identifier camel"
+  (destructuring-bind (src expected) (list "camelCase" "camelCase")
+    (expect (%js-first-type src) :to-be :T-IDENT) (expect (%js-first-value src) :to-equal expected)))
 
 ;;; ─── Private identifiers ──────────────────────────────────────────────────────
 
-(deftest-each lex-private-identifier
-  "Private identifiers (#name) lex to :T-PRIVATE-IDENT; the # is stripped from value."
-  :cases (("field"  "#field"         "field")
-          ("method" "#privateMethod" "privateMethod"))
-  (src expected)
-  (assert-eq :T-PRIVATE-IDENT (%js-first-type src))
-  (assert-string= expected (%js-first-value src)))
+(it-sequential "lex-private-identifier field"
+  (destructuring-bind (src expected) (list "#field" "field")
+    (expect (%js-first-type src) :to-be :T-PRIVATE-IDENT) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-private-identifier method"
+  (destructuring-bind (src expected) (list "#privateMethod" "privateMethod")
+    (expect (%js-first-type src) :to-be :T-PRIVATE-IDENT) (expect (%js-first-value src) :to-equal expected)))
 
 ;;; ─── Decorator ────────────────────────────────────────────────────────────────
 
-(deftest lex-decorator-at
-  "@decorator opens with :T-AT followed by :T-IDENT."
+(it-sequential "lex-decorator-at"
   (let ((types (%js-lex-types "@decorator")))
-    (assert-eq :T-AT    (first  types))
-    (assert-eq :T-IDENT (second types))))
+    (expect (first  types) :to-be :T-AT)
+    (expect (second types) :to-be :T-IDENT)))
 
 ;;; ─── Multi-character operators ────────────────────────────────────────────────
 
-(deftest-each lex-operator
-  "Multi-character operators lex to :T-OP with their literal text as value."
-  :cases (("strict-eq"      "==="  "===")
-          ("strict-neq"     "!=="  "!==")
-          ("nullish"        "??"   "??")
-          ("optional-chain" "?."   "?.")
-          ("logic-and-asgn" "&&="  "&&=")
-          ("logic-or-asgn"  "||="  "||=")
-          ("nullish-asgn"   "??="  "??=")
-          ("exp-asgn"       "**="  "**="))
-  (src expected)
-  (assert-eq :T-OP (%js-first-type src))
-  (assert-string= expected (%js-first-value src)))
+(it-sequential "lex-operator strict-eq"
+  (destructuring-bind (src expected) (list "===" "===")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator strict-neq"
+  (destructuring-bind (src expected) (list "!==" "!==")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator nullish"
+  (destructuring-bind (src expected) (list "??" "??")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator optional-chain"
+  (destructuring-bind (src expected) (list "?." "?.")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator logic-and-asgn"
+  (destructuring-bind (src expected) (list "&&=" "&&=")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator logic-or-asgn"
+  (destructuring-bind (src expected) (list "||=" "||=")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator nullish-asgn"
+  (destructuring-bind (src expected) (list "??=" "??=")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
+
+(it-sequential "lex-operator exp-asgn"
+  (destructuring-bind (src expected) (list "**=" "**=")
+    (expect (%js-first-type src) :to-be :T-OP) (expect (%js-first-value src) :to-equal expected)))
 
 ;;; ─── Special punctuation ──────────────────────────────────────────────────────
 
-(deftest lex-ellipsis
-  "... lexes to :T-ELLIPSIS."
-  (assert-eq :T-ELLIPSIS (%js-first-type "..."))
-  (assert-string= "..." (%js-first-value "...")))
+(it-sequential "lex-ellipsis"
+  (expect (%js-first-type "...") :to-be :T-ELLIPSIS)
+  (expect (%js-first-value "...") :to-equal "..."))
 
-(deftest lex-arrow
-  "=> lexes to :T-ARROW."
-  (assert-eq :T-ARROW (%js-first-type "=>"))
-  (assert-string= "=>" (%js-first-value "=>")))
+(it-sequential "lex-arrow"
+  (expect (%js-first-type "=>") :to-be :T-ARROW)
+  (expect (%js-first-value "=>") :to-equal "=>"))
 
 ;;; ─── Comments ─────────────────────────────────────────────────────────────────
 
-(deftest lex-line-comment-skipped
-  "// line comment produces only :T-EOF."
+(it-sequential "lex-line-comment-skipped"
   (let ((types (%js-lex-types "// this is a comment")))
-    (assert-= 1 (length types))
-    (assert-eq :T-EOF (first types))))
+    (expect (= 1 (length types)) :to-be-truthy)
+    (expect (first types) :to-be :T-EOF)))
 
-(deftest lex-line-comment-newline-consumed
-  "// line comment consumes the terminating newline before the next token."
+(it-sequential "lex-line-comment-newline-consumed"
   (let ((tokens (%js-lex (format nil "// comment~%foo"))))
-    (assert-eq :T-IDENT (getf (first tokens) :type))
-    (assert-string= "foo" (getf (first tokens) :value))))
+    (expect (getf (first tokens) :type) :to-be :T-IDENT)
+    (expect (getf (first tokens) :value) :to-equal "foo")))
 
-(deftest lex-block-comment-skipped
-  "/* block comment */ is skipped; the identifier after it is the first real token."
+(it-sequential "lex-block-comment-skipped"
   (let ((tokens (%js-lex "/* skip me */ foo")))
-    (assert-eq :T-IDENT (getf (first tokens) :type))
-    (assert-string= "foo" (getf (first tokens) :value))))
+    (expect (getf (first tokens) :type) :to-be :T-IDENT)
+    (expect (getf (first tokens) :value) :to-equal "foo")))
 
-(deftest lex-block-comment-unterminated
-  "An unterminated block comment signals an error."
-  (assert-signals error
-    (%js-lex "/* unterminated")))
+(it-sequential "lex-block-comment-unterminated"
+  (let ((%%signaled1 nil)) (handler-case (progn (%js-lex "/* unterminated")) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy)))
 
-(deftest lex-hashbang-skipped-at-start
-  "#! hashbang at the beginning is skipped as a line comment."
+(it-sequential "lex-hashbang-skipped-at-start"
   (let ((tokens (%js-lex (format nil "#!/usr/bin/env js~%foo"))))
-    (assert-eq :T-IDENT (getf (first tokens) :type))
-    (assert-string= "foo" (getf (first tokens) :value))))
+    (expect (getf (first tokens) :type) :to-be :T-IDENT)
+    (expect (getf (first tokens) :value) :to-equal "foo")))
 
-(deftest-each lex-string-escape-branches
-  "String escape handling covers unicode, hex, standard escapes, and normal characters."
-  :cases (("standard" "\\n\\r\\t\\\\\\'\\\"\\0z'"
-           (coerce (list #\Newline #\Return #\Tab #\\ #\' #\" #\Null #\z) 'string))
-          ("unicode-short" "\\u0041'" "A")
-          ("unicode-braced" "\\u{263A}'" (string (code-char #x263A)))
-          ("hex" "\\x41'" "A")
-          ("normal" "abc'" "abc"))
-  (src expected)
-  (multiple-value-bind (value new-pos)
+(it-sequential "lex-string-escape-branches standard"
+  (destructuring-bind (src expected) (list "\\n\\r\\t\\\\\\'\\\"\\0z'" (coerce (list #\Newline #\Return #\Tab #\\ #\' #\" #\Null #\z) 'string))
+    (multiple-value-bind (value new-pos)
       (cl-cc/javascript::lex-js-string src 0 #\')
-    (assert-string= expected value)
-    (assert-= (length src) new-pos)))
+    (expect value :to-equal expected)
+    (expect (= (length src) new-pos) :to-be-truthy))))
 
-(deftest-each lex-string-error-branches
-  "String lexing rejects trailing escapes, newline-containing strings, and unterminated strings."
-  :cases (("trailing-backslash" "\\")
-          ("newline" (format nil "line1~%line2'"))
-          ("unterminated" "abc"))
-  (src)
-  (assert-signals error
-    (cl-cc/javascript::lex-js-string src 0 #\')))
+(it-sequential "lex-string-escape-branches unicode-short"
+  (destructuring-bind (src expected) (list "\\u0041'" "A")
+    (multiple-value-bind (value new-pos)
+      (cl-cc/javascript::lex-js-string src 0 #\')
+    (expect value :to-equal expected)
+    (expect (= (length src) new-pos) :to-be-truthy))))
+
+(it-sequential "lex-string-escape-branches unicode-braced"
+  (destructuring-bind (src expected) (list "\\u{263A}'" (string (code-char #x263A)))
+    (multiple-value-bind (value new-pos)
+      (cl-cc/javascript::lex-js-string src 0 #\')
+    (expect value :to-equal expected)
+    (expect (= (length src) new-pos) :to-be-truthy))))
+
+(it-sequential "lex-string-escape-branches hex"
+  (destructuring-bind (src expected) (list "\\x41'" "A")
+    (multiple-value-bind (value new-pos)
+      (cl-cc/javascript::lex-js-string src 0 #\')
+    (expect value :to-equal expected)
+    (expect (= (length src) new-pos) :to-be-truthy))))
+
+(it-sequential "lex-string-escape-branches normal"
+  (destructuring-bind (src expected) (list "abc'" "abc")
+    (multiple-value-bind (value new-pos)
+      (cl-cc/javascript::lex-js-string src 0 #\')
+    (expect value :to-equal expected)
+    (expect (= (length src) new-pos) :to-be-truthy))))
+
+(it-sequential "lex-string-error-branches trailing-backslash"
+  (destructuring-bind (src) (list "\\")
+    (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/javascript::lex-js-string src 0 #\')) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy))))
+
+(it-sequential "lex-string-error-branches newline"
+  (destructuring-bind (src) (list (format nil "line1~%line2'"))
+    (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/javascript::lex-js-string src 0 #\')) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy))))
+
+(it-sequential "lex-string-error-branches unterminated"
+  (destructuring-bind (src) (list "abc")
+    (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/javascript::lex-js-string src 0 #\')) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy))))
 
 ;;; ─── Multi-token sequence ─────────────────────────────────────────────────────
 
-(deftest lex-const-statement-sequence
-  "\"const x = 42 + y;\" yields the full expected token-type sequence."
-  (assert-equal '(:T-CONST :T-IDENT :T-OP :T-NUMBER :T-OP :T-IDENT :T-SEMI :T-EOF)
-                (%js-lex-types "const x = 42 + y;")))
+(it-sequential "lex-const-statement-sequence"
+  (expect (%js-lex-types "const x = 42 + y;") :to-equal '(:T-CONST :T-IDENT :T-OP :T-NUMBER :T-OP :T-IDENT :T-SEMI :T-EOF)))
 
 ;;; ─── Regex literals ───────────────────────────────────────────────────────────
 
-(deftest-each lex-regex-pattern
-  "Regex literals lex to :T-REGEX; value is (list :regex pattern flags)."
-  :cases (("with-flags"   "/ab+c/gi"  "ab+c"  "gi")
-          ("no-flags"     "/hello/"   "hello" "")
-          ("char-class"   "/[a-z]+/"  "[a-z]+" "")
-          ("all-flags"    "/x/dgimsuy" "x"    "dgimsuy"))
-  (src expected-pattern expected-flags)
-  (let* ((tok (first (%js-lex src)))
+(it-sequential "lex-regex-pattern with-flags"
+  (destructuring-bind (src expected-pattern expected-flags) (list "/ab+c/gi" "ab+c" "gi")
+    (let* ((tok (first (%js-lex src)))
          (val (getf tok :value)))
-    (assert-eq :T-REGEX (getf tok :type))
-    (assert-string= expected-pattern (second val))
-    (assert-string= expected-flags   (third  val))))
+    (expect (getf tok :type) :to-be :T-REGEX)
+    (expect (second val) :to-equal expected-pattern)
+    (expect (third  val) :to-equal expected-flags))))
 
-(deftest lex-division-not-regex
-  "After an identifier, / is :T-OP (division), not :T-REGEX."
+(it-sequential "lex-regex-pattern no-flags"
+  (destructuring-bind (src expected-pattern expected-flags) (list "/hello/" "hello" "")
+    (let* ((tok (first (%js-lex src)))
+         (val (getf tok :value)))
+    (expect (getf tok :type) :to-be :T-REGEX)
+    (expect (second val) :to-equal expected-pattern)
+    (expect (third  val) :to-equal expected-flags))))
+
+(it-sequential "lex-regex-pattern char-class"
+  (destructuring-bind (src expected-pattern expected-flags) (list "/[a-z]+/" "[a-z]+" "")
+    (let* ((tok (first (%js-lex src)))
+         (val (getf tok :value)))
+    (expect (getf tok :type) :to-be :T-REGEX)
+    (expect (second val) :to-equal expected-pattern)
+    (expect (third  val) :to-equal expected-flags))))
+
+(it-sequential "lex-regex-pattern all-flags"
+  (destructuring-bind (src expected-pattern expected-flags) (list "/x/dgimsuy" "x" "dgimsuy")
+    (let* ((tok (first (%js-lex src)))
+         (val (getf tok :value)))
+    (expect (getf tok :type) :to-be :T-REGEX)
+    (expect (second val) :to-equal expected-pattern)
+    (expect (third  val) :to-equal expected-flags))))
+
+(it-sequential "lex-division-not-regex"
   (let ((types (%js-lex-types "a / b")))
-    (assert-true  (member :T-OP    types))
-    (assert-false (member :T-REGEX types))))
+    (expect (member :T-OP    types) :to-be-truthy)
+    (expect (member :T-REGEX types) :to-be-falsy)))
 
 ;;; ─── Template literals ───────────────────────────────────────────────────────
 
-(deftest lex-template-simple
-  "A plain template literal lexes to :T-TEMPLATE-PARTS with a single cooked part."
+(it-sequential "lex-template-simple"
   (let* ((tok (first (%js-lex "`hello`")))
          (parts (getf tok :value)))
-    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
-    (assert-equal '("hello") parts)))
+    (expect (getf tok :type) :to-be :T-TEMPLATE-PARTS)
+    (expect parts :to-equal '("hello"))))
 
-(deftest lex-template-escaped-cook
-  "Template escape sequences are cooked before being stored in the template part."
+(it-sequential "lex-template-escaped-cook"
   (let* ((tok (first (%js-lex "`a\\n\\r\\t\\\\\\`\\$\\0z`")))
          (parts (getf tok :value))
          (expected (coerce (list #\a #\Newline #\Return #\Tab #\\ #\` #\$ #\Null #\z)
                            'string)))
-    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
-    (assert-equal (list expected) parts)))
+    (expect (getf tok :type) :to-be :T-TEMPLATE-PARTS)
+    (expect parts :to-equal (list expected))))
 
-(deftest lex-template-interpolated
-  "An interpolated template preserves literal text and an inner token list."
+(it-sequential "lex-template-interpolated"
   (let* ((tok (first (%js-lex "`hi ${name + 1}!`")))
          (parts (getf tok :value))
          (expr-part (second parts))
          (inner (second expr-part))
          (inner-types (mapcar (lambda (tk) (getf tk :type))
                               inner)))
-    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
-    (assert-string= "hi " (first parts))
-    (assert-true (and (consp expr-part)
-                      (eq (first expr-part) :template-expr)))
-    (assert-string= "!" (third parts))
-    (assert-equal '(:T-IDENT :T-OP :T-NUMBER) inner-types)))
+    (expect (getf tok :type) :to-be :T-TEMPLATE-PARTS)
+    (expect (first parts) :to-equal "hi ")
+    (expect (and (consp expr-part)
+                      (eq (first expr-part) :template-expr)) :to-be-truthy)
+    (expect (third parts) :to-equal "!")
+    (expect inner-types :to-equal '(:T-IDENT :T-OP :T-NUMBER))))
 
-(deftest lex-template-nested-interpolation
-  "Template interpolation scanning skips strings and nested template literals."
+(it-sequential "lex-template-nested-interpolation"
   (let* ((tok (first (%js-lex "`a ${\"{\" + `inner ${x}` + \"}\"} b`")))
          (parts (getf tok :value))
          (inner (second (second parts)))
          (inner-types (mapcar (lambda (tk) (getf tk :type)) inner)))
-    (assert-eq :T-TEMPLATE-PARTS (getf tok :type))
-    (assert-equal "a " (first parts))
-    (assert-equal " b" (third parts))
-    (assert-true (member :T-TEMPLATE-PARTS inner-types))))
+    (expect (getf tok :type) :to-be :T-TEMPLATE-PARTS)
+    (expect (first parts) :to-equal "a ")
+    (expect (third parts) :to-equal " b")
+    (expect (member :T-TEMPLATE-PARTS inner-types) :to-be-truthy)))
 
-(deftest-each lex-template-escape-processor
-  "Internal template escape handling covers cooked, fallback, and error branches."
-  :cases (("newline" "n" 0 #\Newline 1)
-          ("return" "r" 0 #\Return 1)
-          ("tab" "t" 0 #\Tab 1)
-          ("backslash" "\\" 0 #\\ 1)
-          ("backtick" "`" 0 #\` 1)
-          ("dollar" "$" 0 #\$ 1)
-          ("null" "0" 0 #\Null 1)
-          ("unicode-short" "u0041" 0 #\A 5)
-          ("unicode-braced" "u{1F600}" 0 (code-char #x1F600) 8)
-          ("hex" "x41" 0 #\A 3)
-          ("fallback" "a" 0 #\a 1))
-  (src pos expected-char expected-pos)
-  (multiple-value-bind (ch new-pos)
+(it-sequential "lex-template-escape-processor newline"
+  (destructuring-bind (src pos expected-char expected-pos) (list "n" 0 #\Newline 1)
+    (multiple-value-bind (ch new-pos)
       (cl-cc/javascript::js-lex-template-escape src pos)
-    (assert-eq expected-char ch)
-    (assert-= expected-pos new-pos)))
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
 
-(deftest-each lex-template-escape-errors
-  "Malformed template escapes signal errors."
-  :cases (("trailing-backslash" "")
-          ("incomplete-unicode" "u")
-          ("empty-braced-unicode" "u{}")
-          ("unterminated-braced-unicode" "u{1F4")
-          ("missing-brace" "u{1F4x")
-          ("out-of-range" "u{110000}")
-          ("short-hex" "x4")
-          ("bad-unicode-digit" "u12x4")
-          ("bad-hex-digit" "xg1"))
-  (src)
-  (assert-signals error
-    (cl-cc/javascript::js-lex-template-escape src 0)))
+(it-sequential "lex-template-escape-processor return"
+  (destructuring-bind (src pos expected-char expected-pos) (list "r" 0 #\Return 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor tab"
+  (destructuring-bind (src pos expected-char expected-pos) (list "t" 0 #\Tab 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor backslash"
+  (destructuring-bind (src pos expected-char expected-pos) (list "\\" 0 #\\ 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor backtick"
+  (destructuring-bind (src pos expected-char expected-pos) (list "`" 0 #\` 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor dollar"
+  (destructuring-bind (src pos expected-char expected-pos) (list "$" 0 #\$ 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor null"
+  (destructuring-bind (src pos expected-char expected-pos) (list "0" 0 #\Null 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor unicode-short"
+  (destructuring-bind (src pos expected-char expected-pos) (list "u0041" 0 #\A 5)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor unicode-braced"
+  (destructuring-bind (src pos expected-char expected-pos) (list "u{1F600}" 0 (code-char #x1F600) 8)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor hex"
+  (destructuring-bind (src pos expected-char expected-pos) (list "x41" 0 #\A 3)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-processor fallback"
+  (destructuring-bind (src pos expected-char expected-pos) (list "a" 0 #\a 1)
+    (multiple-value-bind (ch new-pos)
+      (cl-cc/javascript::js-lex-template-escape src pos)
+    (expect ch :to-be expected-char)
+    (expect (= expected-pos new-pos) :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors trailing-backslash"
+  (destructuring-bind (src) (list "")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors incomplete-unicode"
+  (destructuring-bind (src) (list "u")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors empty-braced-unicode"
+  (destructuring-bind (src) (list "u{}")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors unterminated-braced-unicode"
+  (destructuring-bind (src) (list "u{1F4")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors missing-brace"
+  (destructuring-bind (src) (list "u{1F4x")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors out-of-range"
+  (destructuring-bind (src) (list "u{110000}")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors short-hex"
+  (destructuring-bind (src) (list "x4")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors bad-unicode-digit"
+  (destructuring-bind (src) (list "u12x4")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))
+
+(it-sequential "lex-template-escape-errors bad-hex-digit"
+  (destructuring-bind (src) (list "xg1")
+    (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/javascript::js-lex-template-escape src 0)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy))))

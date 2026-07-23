@@ -7,134 +7,115 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Array core ──────────────────────────────────────────────────────────────
 
-(deftest js-rt-array-make-and-index
-  "make-array stores elements at integer indices."
+(it-sequential "js-rt-array-make-and-index"
   (let ((a (%jr-arr 10 20 30)))
-    (assert-= 3  (length a))
-    (assert-= 10 (aref a 0))
-    (assert-= 30 (aref a 2))))
+    (expect (= 3 (length a)) :to-be-truthy)
+    (expect (= 10 (aref a 0)) :to-be-truthy)
+    (expect (= 30 (aref a 2)) :to-be-truthy)))
 
-(deftest js-rt-array-push-pop
-  "push appends (returning new length); pop removes and returns the last element."
+(it-sequential "js-rt-array-push-pop"
   (let ((a (%jr-arr 1 2)))
-    (assert-= 3 (cl-cc/javascript::%js-array-push a 3))
-    (assert-= 3 (aref a 2))
-    (assert-= 3 (cl-cc/javascript::%js-array-pop a))
-    (assert-= 2 (length a))))
+    (expect (= 3 (cl-cc/javascript::%js-array-push a 3)) :to-be-truthy)
+    (expect (= 3 (aref a 2)) :to-be-truthy)
+    (expect (= 3 (cl-cc/javascript::%js-array-pop a)) :to-be-truthy)
+    (expect (= 2 (length a)) :to-be-truthy)))
 
-(deftest js-rt-array-pop-empty-is-undefined
-  "pop on an empty array returns undefined."
-  (assert-eq cl-cc/javascript::+js-undefined+
-             (cl-cc/javascript::%js-array-pop (%jr-arr))))
+(it-sequential "js-rt-array-pop-empty-is-undefined"
+  (expect (cl-cc/javascript::%js-array-pop (%jr-arr)) :to-be cl-cc/javascript::+js-undefined+))
 
-(deftest js-rt-array-map-filter
-  "map and filter produce correctly transformed and filtered arrays."
+(it-sequential "js-rt-array-map-filter"
   (let ((doubled (cl-cc/javascript::%js-array-map
                   (%jr-arr 1 2 3)
                   (lambda (x &rest _) (declare (ignore _)) (* x 2))))
         (evens   (cl-cc/javascript::%js-array-filter
                   (%jr-arr 1 2 3 4)
                   (lambda (x &rest _) (declare (ignore _)) (evenp x)))))
-    (assert-equal '(2 4 6) (%jr-list doubled))
-    (assert-equal '(2 4)   (%jr-list evens))))
+    (expect (%jr-list doubled) :to-equal '(2 4 6))
+    (expect (%jr-list evens) :to-equal '(2 4))))
 
-(deftest js-rt-array-reduce
-  "reduce folds over the array with an initial accumulator."
-  (assert-= 10
-            (cl-cc/javascript::%js-array-reduce
+(it-sequential "js-rt-array-reduce"
+  (expect (= 10 (cl-cc/javascript::%js-array-reduce
              (%jr-arr 1 2 3 4)
              (lambda (acc x &rest _) (declare (ignore _)) (+ acc x))
-             0)))
+             0)) :to-be-truthy))
 
-(deftest-each js-rt-array-includes
-  "includes returns t when the element is present, nil otherwise."
-  :cases (("found"   2 t)
-          ("missing" 9 nil))
-  (needle expected)
-  (assert-equal expected
-                (cl-cc/javascript::%js-array-includes (%jr-arr 1 2 3) needle)))
+(it-sequential "js-rt-array-includes found"
+  (destructuring-bind (needle expected) (list 2 t)
+    (expect (cl-cc/javascript::%js-array-includes (%jr-arr 1 2 3) needle) :to-equal expected)))
 
-(deftest js-rt-array-includes-same-value-zero
-  "includes uses SameValueZero: NaN matches NaN, and +0/-0 match."
+(it-sequential "js-rt-array-includes missing"
+  (destructuring-bind (needle expected) (list 9 nil)
+    (expect (cl-cc/javascript::%js-array-includes (%jr-arr 1 2 3) needle) :to-equal expected)))
+
+(it-sequential "js-rt-array-includes-same-value-zero"
   (let ((nan-a cl-cc/javascript::*js-nan-float*)
         (nan-b cl-cc/javascript::+js-nan+))
-    (assert-true (cl-cc/javascript::%js-array-includes (%jr-arr nan-a) nan-b))
-    (assert-true (cl-cc/javascript::%js-array-includes (%jr-arr -0.0d0) 0.0d0))))
+    (expect (cl-cc/javascript::%js-array-includes (%jr-arr nan-a) nan-b) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-array-includes (%jr-arr -0.0d0) 0.0d0) :to-be-truthy)))
 
-(deftest-each js-rt-array-index-of
-  "indexOf returns the first index of the element, or -1 when absent."
-  :cases (("found"   6  1)
-          ("missing" 9 -1))
-  (needle expected)
-  (assert-= expected
-            (cl-cc/javascript::%js-array-index-of (%jr-arr 5 6 7) needle)))
+(it-sequential "js-rt-array-index-of found"
+  (destructuring-bind (needle expected) (list 6 1)
+    (expect (= expected (cl-cc/javascript::%js-array-index-of (%jr-arr 5 6 7) needle)) :to-be-truthy)))
 
-(deftest js-rt-array-index-of-does-not-match-nan
-  "indexOf/lastIndexOf use strict equality, so NaN is not found."
+(it-sequential "js-rt-array-index-of missing"
+  (destructuring-bind (needle expected) (list 9 -1)
+    (expect (= expected (cl-cc/javascript::%js-array-index-of (%jr-arr 5 6 7) needle)) :to-be-truthy)))
+
+(it-sequential "js-rt-array-index-of-does-not-match-nan"
   (let ((nan-a cl-cc/javascript::*js-nan-float*)
         (nan-b cl-cc/javascript::+js-nan+))
-    (assert-= -1 (cl-cc/javascript::%js-array-index-of (%jr-arr nan-a) nan-b))
-    (assert-= -1 (cl-cc/javascript::%js-array-last-index-of (%jr-arr nan-a) nan-b))))
+    (expect (= -1 (cl-cc/javascript::%js-array-index-of (%jr-arr nan-a) nan-b)) :to-be-truthy)
+    (expect (= -1 (cl-cc/javascript::%js-array-last-index-of (%jr-arr nan-a) nan-b)) :to-be-truthy)))
 
-(deftest js-rt-array-join
-  "join concatenates with the given separator (default comma)."
-  (assert-string= "1,2,3" (cl-cc/javascript::%js-array-join (%jr-arr 1 2 3)))
-  (assert-string= "1-2-3" (cl-cc/javascript::%js-array-join (%jr-arr 1 2 3) "-")))
+(it-sequential "js-rt-array-join"
+  (expect (cl-cc/javascript::%js-array-join (%jr-arr 1 2 3)) :to-equal "1,2,3")
+  (expect (cl-cc/javascript::%js-array-join (%jr-arr 1 2 3) "-") :to-equal "1-2-3"))
 
-(deftest js-rt-array-shift-unshift
-  "shift removes from front; unshift prepends."
+(it-sequential "js-rt-array-shift-unshift"
   (let ((a (%jr-arr 1 2 3)))
-    (assert-= 1   (cl-cc/javascript::%js-array-shift a))
-    (assert-equal '(2 3) (%jr-list a))
-    (assert-= 4  (cl-cc/javascript::%js-array-unshift a 0 1))
-    (assert-equal '(0 1 2 3) (%jr-list a))))
+    (expect (= 1 (cl-cc/javascript::%js-array-shift a)) :to-be-truthy)
+    (expect (%jr-list a) :to-equal '(2 3))
+    (expect (= 4 (cl-cc/javascript::%js-array-unshift a 0 1)) :to-be-truthy)
+    (expect (%jr-list a) :to-equal '(0 1 2 3))))
 
-(deftest js-rt-array-some-every
-  "some short-circuits on first match; every short-circuits on first mismatch."
+(it-sequential "js-rt-array-some-every"
   (let ((pred (lambda (x &rest _) (declare (ignore _)) (evenp x))))
-    (assert-true  (cl-cc/javascript::%js-array-some  (%jr-arr 1 2 3) pred))
-    (assert-false (cl-cc/javascript::%js-array-some  (%jr-arr 1 3 5) pred))
-    (assert-true  (cl-cc/javascript::%js-array-every (%jr-arr 2 4 6) pred))
-    (assert-false (cl-cc/javascript::%js-array-every (%jr-arr 2 3 4) pred))))
+    (expect (cl-cc/javascript::%js-array-some  (%jr-arr 1 2 3) pred) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-array-some  (%jr-arr 1 3 5) pred) :to-be-falsy)
+    (expect (cl-cc/javascript::%js-array-every (%jr-arr 2 4 6) pred) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-array-every (%jr-arr 2 3 4) pred) :to-be-falsy)))
 
-(deftest js-rt-array-find-and-find-index
-  "find returns the element; findIndex returns its position."
+(it-sequential "js-rt-array-find-and-find-index"
   (let ((arr (%jr-arr 1 4 9 16)))
-    (assert-= 4   (cl-cc/javascript::%js-array-find
-                   arr (lambda (x &rest _) (declare (ignore _)) (> x 3))))
-    (assert-= 1   (cl-cc/javascript::%js-array-find-index
-                   arr (lambda (x &rest _) (declare (ignore _)) (> x 3))))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-array-find
-                arr (lambda (x &rest _) (declare (ignore _)) (> x 100))))))
+    (expect (= 4 (cl-cc/javascript::%js-array-find
+                   arr (lambda (x &rest _) (declare (ignore _)) (> x 3)))) :to-be-truthy)
+    (expect (= 1 (cl-cc/javascript::%js-array-find-index
+                   arr (lambda (x &rest _) (declare (ignore _)) (> x 3)))) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-array-find
+                arr (lambda (x &rest _) (declare (ignore _)) (> x 100))) :to-be cl-cc/javascript::+js-undefined+)))
 
-(deftest js-rt-array-slice
-  "slice extracts a sub-array without modifying the original."
+(it-sequential "js-rt-array-slice"
   (let* ((a   (%jr-arr 10 20 30 40))
          (s1  (cl-cc/javascript::%js-array-slice a 1 3))
          (s2  (cl-cc/javascript::%js-array-slice a 2)))
-    (assert-equal '(20 30) (%jr-list s1))
-    (assert-equal '(30 40) (%jr-list s2))
-    (assert-= 4 (length a))))    ; original untouched
+    (expect (%jr-list s1) :to-equal '(20 30))
+    (expect (%jr-list s2) :to-equal '(30 40))
+    (expect (= 4 (length a)) :to-be-truthy)))    ; original untouched
 
-(deftest js-rt-array-slice-coerces-relative-indices
-  "slice coerces string and fractional relative indices."
+(it-sequential "js-rt-array-slice-coerces-relative-indices"
   (let* ((a (%jr-arr 10 20 30 40))
          (r (cl-cc/javascript::%js-array-slice a "-3" -1.2d0)))
-    (assert-equal '(20 30) (%jr-list r))))
+    (expect (%jr-list r) :to-equal '(20 30))))
 
-(deftest js-rt-array-splice-delete-insert
-  "splice removes and optionally inserts elements."
+(it-sequential "js-rt-array-splice-delete-insert"
   (let ((a (%jr-arr 1 2 3 4 5)))
     (cl-cc/javascript::%js-array-splice a 1 2 9 9)
-    (assert-equal '(1 9 9 4 5) (%jr-list a))))
+    (expect (%jr-list a) :to-equal '(1 9 9 4 5))))
 
-(deftest js-rt-array-splice-coerces-indices
-  "splice coerces start/deleteCount and treats omitted deleteCount as delete-to-end."
+(it-sequential "js-rt-array-splice-coerces-indices"
   (let* ((coerced (%jr-arr 1 2 3 4))
          (omitted (%jr-arr 1 2 3 4))
          (undefined-count (%jr-arr 1 2 3 4))
@@ -142,219 +123,254 @@
          (removed-tail (cl-cc/javascript::%js-array-splice omitted "2"))
          (removed-none (cl-cc/javascript::%js-array-splice
                         undefined-count 1 cl-cc/javascript::+js-undefined+ 9)))
-    (assert-equal '(2) (%jr-list removed))
-    (assert-equal '(1 9 3 4) (%jr-list coerced))
-    (assert-equal '(3 4) (%jr-list removed-tail))
-    (assert-equal '(1 2) (%jr-list omitted))
-    (assert-equal '() (%jr-list removed-none))
-    (assert-equal '(1 9 2 3 4) (%jr-list undefined-count))))
+    (expect (%jr-list removed) :to-equal '(2))
+    (expect (%jr-list coerced) :to-equal '(1 9 3 4))
+    (expect (%jr-list removed-tail) :to-equal '(3 4))
+    (expect (%jr-list omitted) :to-equal '(1 2))
+    (expect (%jr-list removed-none) :to-equal '())
+    (expect (%jr-list undefined-count) :to-equal '(1 9 2 3 4))))
 
-(deftest js-rt-array-concat
-  "concat merges arrays without modifying the originals."
+(it-sequential "js-rt-array-concat"
   (let* ((a (%jr-arr 1 2))
          (b (%jr-arr 3 4))
          (r (cl-cc/javascript::%js-array-concat a b (%jr-arr 5))))
-    (assert-equal '(1 2 3 4 5) (%jr-list r))
-    (assert-= 2 (length a))))   ; originals untouched
+    (expect (%jr-list r) :to-equal '(1 2 3 4 5))
+    (expect (= 2 (length a)) :to-be-truthy)))   ; originals untouched
 
-(deftest js-rt-array-reverse
-  "reverse mutates and returns the reversed array."
+(it-sequential "js-rt-array-reverse"
   (let ((a (%jr-arr 1 2 3)))
     (let ((r (cl-cc/javascript::%js-array-reverse a)))
-      (assert-equal '(3 2 1) (%jr-list r))
-      (assert-eq a r))))         ; same object
+      (expect (%jr-list r) :to-equal '(3 2 1))
+      (expect r :to-be a))))         ; same object
 
-(deftest js-rt-array-sort-default
-  "sort with no comparator uses lexicographic order: \"10\" < \"2\" < \"9\"."
+(it-sequential "js-rt-array-sort-default"
   (let* ((a (%jr-arr 9 10 2))
          (r (cl-cc/javascript::%js-array-sort a)))
-    (assert-equal '(10 2 9) (%jr-list r))   ; lexicographic
-    (assert-eq a r)))
+    (expect (%jr-list r) :to-equal '(10 2 9))   ; lexicographic
+    (expect r :to-be a)))
 
-(deftest js-rt-array-sort-numeric
-  "sort with numeric comparator sorts numerically."
+(it-sequential "js-rt-array-sort-numeric"
   (let* ((a (%jr-arr 10 2 30))
          (r (cl-cc/javascript::%js-array-sort
              a (lambda (x y &rest _) (declare (ignore _)) (- x y)))))
-    (assert-equal '(2 10 30) (%jr-list r))))
+    (expect (%jr-list r) :to-equal '(2 10 30))))
 
-(deftest js-rt-array-flat
-  "flat flattens one level by default; depth controls levels."
+(it-sequential "js-rt-array-flat"
   (let* ((nested (%jr-arr 1 (%jr-arr 2 3) (%jr-arr 4 (%jr-arr 5)))))
-    (assert-equal '(1 2 3 4 5)       (%jr-list (cl-cc/javascript::%js-array-flat nested 2)))
+    (expect (%jr-list (cl-cc/javascript::%js-array-flat nested 2)) :to-equal '(1 2 3 4 5))
     (let ((shallow (%jr-arr 1 (%jr-arr 2 3) (%jr-arr 4 (%jr-arr 5)))))
       ;; depth 1: [1, 2, 3, 4, [5]] — inner [5] stays nested
-      (assert-= 5 (length (%jr-list (cl-cc/javascript::%js-array-flat shallow 1)))))))
+      (expect (= 5 (length (%jr-list (cl-cc/javascript::%js-array-flat shallow 1)))) :to-be-truthy))))
 
-(deftest js-rt-array-last-index-of
-  "lastIndexOf returns rightmost index of element, -1 if absent."
+(it-sequential "js-rt-array-last-index-of"
   (let ((a (%jr-arr 1 2 3 2 1)))
-    (assert-= 3 (cl-cc/javascript::%js-array-last-index-of a 2))
-    (assert-= -1 (cl-cc/javascript::%js-array-last-index-of a 9))))
+    (expect (= 3 (cl-cc/javascript::%js-array-last-index-of a 2)) :to-be-truthy)
+    (expect (= -1 (cl-cc/javascript::%js-array-last-index-of a 9)) :to-be-truthy)))
 
-(deftest js-rt-array-search-from-coerces-indices
-  "includes/indexOf/lastIndexOf coerce relative fromIndex values."
+(it-sequential "js-rt-array-search-from-coerces-indices"
   (let ((a (%jr-arr 1 2 3 2 1)))
-    (assert-true (cl-cc/javascript::%js-array-includes a 2 "-4"))
-    (assert-= 3 (cl-cc/javascript::%js-array-index-of a 2 2.8d0))
-    (assert-= 1 (cl-cc/javascript::%js-array-last-index-of a 2 -3.2d0))))
+    (expect (cl-cc/javascript::%js-array-includes a 2 "-4") :to-be-truthy)
+    (expect (= 3 (cl-cc/javascript::%js-array-index-of a 2 2.8d0)) :to-be-truthy)
+    (expect (= 1 (cl-cc/javascript::%js-array-last-index-of a 2 -3.2d0)) :to-be-truthy)))
 
-(deftest js-rt-array-last-index-of-from-before-start
-  "lastIndexOf returns -1 when fromIndex resolves before the array."
+(it-sequential "js-rt-array-last-index-of-from-before-start"
   (let ((a (%jr-arr 1 2 1)))
-    (assert-= -1 (cl-cc/javascript::%js-array-last-index-of a 1 -99))
-    (assert-= 0 (cl-cc/javascript::%js-array-last-index-of
-                 a 1 cl-cc/javascript::+js-undefined+))))
+    (expect (= -1 (cl-cc/javascript::%js-array-last-index-of a 1 -99)) :to-be-truthy)
+    (expect (= 0 (cl-cc/javascript::%js-array-last-index-of
+                 a 1 cl-cc/javascript::+js-undefined+)) :to-be-truthy)))
 
-(deftest js-rt-array-fill
-  "fill fills a range of the array with a value."
+(it-sequential "js-rt-array-fill"
   (let* ((a (%jr-arr 1 2 3 4 5))
          (r (cl-cc/javascript::%js-array-fill a 0 1 3)))
-    (assert-equal '(1 0 0 4 5) (%jr-list r))
-    (assert-eq a r)))           ; mutated in place
+    (expect (%jr-list r) :to-equal '(1 0 0 4 5))
+    (expect r :to-be a)))           ; mutated in place
 
-(deftest js-rt-array-fill-coerces-relative-indices
-  "fill coerces string and fractional relative indices."
+(it-sequential "js-rt-array-fill-coerces-relative-indices"
   (let ((a (%jr-arr 1 2 3 4)))
     (cl-cc/javascript::%js-array-fill a "x" "-3" 3.8d0)
-    (assert-equal '(1 "x" "x" 4) (%jr-list a))))
+    (expect (%jr-list a) :to-equal '(1 "x" "x" 4))))
 
-(deftest js-rt-array-reduce-right
-  "reduceRight folds from right to left."
+(it-sequential "js-rt-array-reduce-right"
   (let ((result (cl-cc/javascript::%js-array-reduce-right
                  (%jr-arr 1 2 3 4)
                  (lambda (acc x &rest _) (declare (ignore _)) (cons x acc))
                  nil)))
-    (assert-equal '(1 2 3 4) result)))
+    (expect result :to-equal '(1 2 3 4))))
 
 ;;; ─── ES2023 non-mutating array methods ──────────────────────────────────────
 
-(deftest js-rt-array-to-reversed
-  "toReversed returns a new reversed array without mutating the original."
+(it-sequential "js-rt-array-to-reversed"
   (let* ((orig (%jr-arr 1 2 3))
          (rev  (cl-cc/javascript::%js-array-to-reversed orig)))
-    (assert-equal '(3 2 1) (%jr-list rev))
-    (assert-equal '(1 2 3) (%jr-list orig))))
+    (expect (%jr-list rev) :to-equal '(3 2 1))
+    (expect (%jr-list orig) :to-equal '(1 2 3))))
 
-(deftest js-rt-array-to-sorted
-  "toSorted returns a sorted copy without mutating the original."
+(it-sequential "js-rt-array-to-sorted"
   (let* ((orig (%jr-arr 3 1 2))
          (srt  (cl-cc/javascript::%js-array-to-sorted orig)))
-    (assert-equal '(1 2 3) (%jr-list srt))
-    (assert-equal '(3 1 2) (%jr-list orig))))
+    (expect (%jr-list srt) :to-equal '(1 2 3))
+    (expect (%jr-list orig) :to-equal '(3 1 2))))
 
-(deftest-each js-rt-array-with
-  "with(index, value) returns a copy with one element replaced."
-  :cases (("mid-index"  1   99  '(10 99 30))
-          ("neg-index" -1   99  '(10 20 99))
-          ("string-index" "1" 99 '(10 99 30))
-          ("fractional-negative-index" -1.8d0 99 '(10 20 99)))
-  (idx val expected)
-  (assert-equal expected (%jr-list (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx val))))
+(it-sequential "js-rt-array-with mid-index"
+  (destructuring-bind (idx val expected) (list 1 99 '(10 99 30))
+    (expect (%jr-list (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx val)) :to-equal expected)))
 
-(deftest-each js-rt-array-with-out-of-bounds
-  "with(index, value) throws RangeError when index is outside array bounds."
-  :cases (("too-large" 3)
-          ("too-negative" -4))
-  (idx)
-  (handler-case
+(it-sequential "js-rt-array-with neg-index"
+  (destructuring-bind (idx val expected) (list -1 99 '(10 20 99))
+    (expect (%jr-list (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx val)) :to-equal expected)))
+
+(it-sequential "js-rt-array-with string-index"
+  (destructuring-bind (idx val expected) (list "1" 99 '(10 99 30))
+    (expect (%jr-list (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx val)) :to-equal expected)))
+
+(it-sequential "js-rt-array-with fractional-negative-index"
+  (destructuring-bind (idx val expected) (list -1.8d0 99 '(10 20 99))
+    (expect (%jr-list (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx val)) :to-equal expected)))
+
+(it-sequential "js-rt-array-with-out-of-bounds too-large"
+  (destructuring-bind (idx) (list 3)
+    (handler-case
       (progn
         (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx 99)
-        (assert-false t))
+        (expect t :to-be-falsy))
     (cl-cc/javascript:js-exception (c)
       (let ((err (cl-cc/javascript:js-exception-value c)))
-        (assert-string= "RangeError" (gethash "name" err))))))
+        (expect (gethash "name" err) :to-equal "RangeError"))))))
 
-(deftest-each js-rt-array-at
-  "at() supports both positive and negative indices."
-  :cases (("positive"  1   20)
-          ("negative" -1   30)
-          ("string-index" "1" 20)
-          ("fractional-negative-index" -1.8d0 30)
-          ("oob"       9   :js-undefined))
-  (idx expected)
-  (let ((a (%jr-arr 10 20 30))
+(it-sequential "js-rt-array-with-out-of-bounds too-negative"
+  (destructuring-bind (idx) (list -4)
+    (handler-case
+      (progn
+        (cl-cc/javascript::%js-array-with (%jr-arr 10 20 30) idx 99)
+        (expect t :to-be-falsy))
+    (cl-cc/javascript:js-exception (c)
+      (let ((err (cl-cc/javascript:js-exception-value c)))
+        (expect (gethash "name" err) :to-equal "RangeError"))))))
+
+(it-sequential "js-rt-array-at positive"
+  (destructuring-bind (idx expected) (list 1 20)
+    (let ((a (%jr-arr 10 20 30))
         (undef cl-cc/javascript::+js-undefined+))
     (let ((got (cl-cc/javascript::%js-array-at a idx)))
       (if (eq expected :js-undefined)
-          (assert-eq undef got)
-          (assert-= expected got)))))
+          (expect got :to-be undef)
+          (expect (= expected got) :to-be-truthy))))))
 
-(deftest js-rt-array-find-last
-  "findLast returns the last element matching the predicate."
+(it-sequential "js-rt-array-at negative"
+  (destructuring-bind (idx expected) (list -1 30)
+    (let ((a (%jr-arr 10 20 30))
+        (undef cl-cc/javascript::+js-undefined+))
+    (let ((got (cl-cc/javascript::%js-array-at a idx)))
+      (if (eq expected :js-undefined)
+          (expect got :to-be undef)
+          (expect (= expected got) :to-be-truthy))))))
+
+(it-sequential "js-rt-array-at string-index"
+  (destructuring-bind (idx expected) (list "1" 20)
+    (let ((a (%jr-arr 10 20 30))
+        (undef cl-cc/javascript::+js-undefined+))
+    (let ((got (cl-cc/javascript::%js-array-at a idx)))
+      (if (eq expected :js-undefined)
+          (expect got :to-be undef)
+          (expect (= expected got) :to-be-truthy))))))
+
+(it-sequential "js-rt-array-at fractional-negative-index"
+  (destructuring-bind (idx expected) (list -1.8d0 30)
+    (let ((a (%jr-arr 10 20 30))
+        (undef cl-cc/javascript::+js-undefined+))
+    (let ((got (cl-cc/javascript::%js-array-at a idx)))
+      (if (eq expected :js-undefined)
+          (expect got :to-be undef)
+          (expect (= expected got) :to-be-truthy))))))
+
+(it-sequential "js-rt-array-at oob"
+  (destructuring-bind (idx expected) (list 9 :js-undefined)
+    (let ((a (%jr-arr 10 20 30))
+        (undef cl-cc/javascript::+js-undefined+))
+    (let ((got (cl-cc/javascript::%js-array-at a idx)))
+      (if (eq expected :js-undefined)
+          (expect got :to-be undef)
+          (expect (= expected got) :to-be-truthy))))))
+
+(it-sequential "js-rt-array-find-last"
   (let ((result (cl-cc/javascript::%js-array-find-last
                  (%jr-arr 1 2 3 4)
                  (lambda (x &rest _) (declare (ignore _)) (evenp x)))))
-    (assert-= 4 result)))
+    (expect (= 4 result) :to-be-truthy)))
 
-(deftest js-rt-array-find-last-index
-  "findLastIndex returns the index of the last matching element."
+(it-sequential "js-rt-array-find-last-index"
   (let ((result (cl-cc/javascript::%js-array-find-last-index
                  (%jr-arr 1 2 3 4)
                  (lambda (x &rest _) (declare (ignore _)) (evenp x)))))
-    (assert-= 3 result)))
+    (expect (= 3 result) :to-be-truthy)))
 
-(deftest js-rt-array-to-spliced
-  "toSpliced returns a modified copy without mutating the original."
+(it-sequential "js-rt-array-to-spliced"
   (let* ((orig (%jr-arr 1 2 3 4))
          (result (cl-cc/javascript::%js-array-to-spliced orig 1 2 9 9)))
-    (assert-equal '(1 9 9 4) (%jr-list result))
-    (assert-equal '(1 2 3 4) (%jr-list orig))))
+    (expect (%jr-list result) :to-equal '(1 9 9 4))
+    (expect (%jr-list orig) :to-equal '(1 2 3 4))))
 
-(deftest js-rt-array-to-spliced-coerces-indices
-  "toSpliced coerces start/deleteCount and handles omitted deleteCount."
+(it-sequential "js-rt-array-to-spliced-coerces-indices"
   (let* ((orig (%jr-arr 1 2 3 4))
          (coerced (cl-cc/javascript::%js-array-to-spliced orig "1" "2" 9))
          (omitted (cl-cc/javascript::%js-array-to-spliced orig "2")))
-    (assert-equal '(1 9 4) (%jr-list coerced))
-    (assert-equal '(1 2) (%jr-list omitted))
-    (assert-equal '(1 2 3 4) (%jr-list orig))))
+    (expect (%jr-list coerced) :to-equal '(1 9 4))
+    (expect (%jr-list omitted) :to-equal '(1 2))
+    (expect (%jr-list orig) :to-equal '(1 2 3 4))))
 
-(deftest js-rt-array-of
-  "Array.of creates an array from positional arguments."
-  (assert-equal '(5 6 7) (%jr-list (cl-cc/javascript::%js-array-of 5 6 7))))
+(it-sequential "js-rt-array-of"
+  (expect (%jr-list (cl-cc/javascript::%js-array-of 5 6 7)) :to-equal '(5 6 7)))
 
 ;;; ─── TypedArray basic operations ─────────────────────────────────────────────
 
-(deftest js-rt-typed-array-make-get-set
-  "make-typed-array, ta-get, ta-set round-trip correctly."
+(it-sequential "js-rt-typed-array-make-get-set"
   (let ((ta (cl-cc/javascript::%js-make-typed-array "Int32Array" 3)))
     (cl-cc/javascript::%js-ta-set ta 0 10)
     (cl-cc/javascript::%js-ta-set ta 2 99)
-    (assert-= 10 (cl-cc/javascript::%js-ta-get ta 0))
-    (assert-= 0  (cl-cc/javascript::%js-ta-get ta 1))
-    (assert-= 99 (cl-cc/javascript::%js-ta-get ta 2))))
+    (expect (= 10 (cl-cc/javascript::%js-ta-get ta 0)) :to-be-truthy)
+    (expect (= 0 (cl-cc/javascript::%js-ta-get ta 1)) :to-be-truthy)
+    (expect (= 99 (cl-cc/javascript::%js-ta-get ta 2)) :to-be-truthy)))
 
-(deftest js-rt-typed-array-length
-  "ta-length struct accessor returns the number of elements."
+(it-sequential "js-rt-typed-array-length"
   (let ((ta (cl-cc/javascript::%js-make-typed-array "Float64Array" 4)))
-    (assert-= 4 (cl-cc/javascript::js-ta-length ta))))
+    (expect (= 4 (cl-cc/javascript::js-ta-length ta)) :to-be-truthy)))
 
-(deftest-each js-rt-typed-array-types
-  "Various TypedArray types are constructed with the correct length."
-  :cases (("Int8Array"    "Int8Array"    3 3)
-          ("Uint8Array"   "Uint8Array"   5 5)
-          ("Int32Array"   "Int32Array"   2 2)
-          ("Float16Array" "Float16Array" 4 4)
-          ("Float64Array" "Float64Array" 1 1))
-  (type-name length expected-length)
-  (let ((ta (cl-cc/javascript::%js-make-typed-array type-name length)))
-    (assert-= expected-length (cl-cc/javascript::js-ta-length ta))))
+(it-sequential "js-rt-typed-array-types Int8Array"
+  (destructuring-bind (type-name length expected-length) (list "Int8Array" 3 3)
+    (let ((ta (cl-cc/javascript::%js-make-typed-array type-name length)))
+    (expect (= expected-length (cl-cc/javascript::js-ta-length ta)) :to-be-truthy))))
 
-(deftest js-rt-method-resolution-array
-  "Calling a method through get-prop on an array invokes the correct helper."
+(it-sequential "js-rt-typed-array-types Uint8Array"
+  (destructuring-bind (type-name length expected-length) (list "Uint8Array" 5 5)
+    (let ((ta (cl-cc/javascript::%js-make-typed-array type-name length)))
+    (expect (= expected-length (cl-cc/javascript::js-ta-length ta)) :to-be-truthy))))
+
+(it-sequential "js-rt-typed-array-types Int32Array"
+  (destructuring-bind (type-name length expected-length) (list "Int32Array" 2 2)
+    (let ((ta (cl-cc/javascript::%js-make-typed-array type-name length)))
+    (expect (= expected-length (cl-cc/javascript::js-ta-length ta)) :to-be-truthy))))
+
+(it-sequential "js-rt-typed-array-types Float16Array"
+  (destructuring-bind (type-name length expected-length) (list "Float16Array" 4 4)
+    (let ((ta (cl-cc/javascript::%js-make-typed-array type-name length)))
+    (expect (= expected-length (cl-cc/javascript::js-ta-length ta)) :to-be-truthy))))
+
+(it-sequential "js-rt-typed-array-types Float64Array"
+  (destructuring-bind (type-name length expected-length) (list "Float64Array" 1 1)
+    (let ((ta (cl-cc/javascript::%js-make-typed-array type-name length)))
+    (expect (= expected-length (cl-cc/javascript::js-ta-length ta)) :to-be-truthy))))
+
+(it-sequential "js-rt-method-resolution-array"
   (let* ((arr (%jr-arr 10 20 30))
          (join-fn (cl-cc/javascript::%js-get-prop arr "join")))
-    (assert-true (functionp join-fn))
-    (assert-string= "10,20,30" (funcall join-fn ","))))
+    (expect (functionp join-fn) :to-be-truthy)
+    (expect (funcall join-fn ",") :to-equal "10,20,30")))
 
-(deftest js-rt-method-resolution-length
-  "Accessing .length on an array returns the numeric length."
+(it-sequential "js-rt-method-resolution-length"
   (let* ((arr (%jr-arr 1 2 3)))
-    (assert-= 3 (cl-cc/javascript::%js-get-prop arr "length"))))
+    (expect (= 3 (cl-cc/javascript::%js-get-prop arr "length")) :to-be-truthy)))
 
-(deftest js-rt-array-values-via-get-prop
-  "Array values() method resolves to an iterator over the elements."
+(it-sequential "js-rt-array-values-via-get-prop"
   (let* ((arr   (%jr-arr 10 20))
          (fn    (cl-cc/javascript::%js-get-prop arr "values"))
          (iter  (funcall fn))
@@ -362,31 +378,28 @@
          (r1    (funcall next))
          (r2    (funcall next))
          (done  (funcall next)))
-    (assert-= 10 (gethash "value" r1))
-    (assert-= 20 (gethash "value" r2))
-    (assert-true  (gethash "done"  done))))
+    (expect (= 10 (gethash "value" r1)) :to-be-truthy)
+    (expect (= 20 (gethash "value" r2)) :to-be-truthy)
+    (expect (gethash "done"  done) :to-be-truthy)))
 
-(deftest js-rt-array-@@iterator-via-get-prop
-  "Array @@iterator() returns an independent iterator (iterable-iterator protocol)."
+(it-sequential "js-rt-array-@@iterator-via-get-prop"
   (let* ((arr   (%jr-arr 5 6))
          (fn    (cl-cc/javascript::%js-get-prop arr "@@iterator"))
          (iter  (funcall fn))
          (next  (gethash "next" iter)))
-    (assert-true  (functionp next))
-    (assert-= 5  (gethash "value" (funcall next)))
-    (assert-= 6  (gethash "value" (funcall next)))))
+    (expect (functionp next) :to-be-truthy)
+    (expect (= 5 (gethash "value" (funcall next))) :to-be-truthy)
+    (expect (= 6 (gethash "value" (funcall next))) :to-be-truthy)))
 
 ;;; ─── Uncovered array methods ─────────────────────────────────────────────────
 
-(deftest js-rt-array-flat-map
-  "flatMap maps then flattens one level."
+(it-sequential "js-rt-array-flat-map"
   (let* ((arr    (%jr-arr 1 2 3))
          (result (cl-cc/javascript::%js-array-flat-map
                   arr (lambda (x &rest _) (declare (ignore _)) (%jr-arr x (* x 10))))))
-    (assert-equal '(1 10 2 20 3 30) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(1 10 2 20 3 30))))
 
-(deftest js-rt-array-entries
-  "entries returns an iterator yielding [[0,v0],[1,v1],...] pairs."
+(it-sequential "js-rt-array-entries"
   (let* ((arr     (%jr-arr "a" "b"))
          (entries (cl-cc/javascript::%js-array-entries arr))
          (next    (gethash "next" entries)))
@@ -395,95 +408,82 @@
            (r1 (funcall next))
            (e1 (gethash "value" r1))
            (r2 (funcall next)))
-      (assert-false (gethash "done" r0))
-      (assert-= 0 (aref e0 0))
-      (assert-string= "a" (aref e0 1))
-      (assert-false (gethash "done" r1))
-      (assert-= 1 (aref e1 0))
-      (assert-string= "b" (aref e1 1))
-      (assert-true (gethash "done" r2)))))
+      (expect (gethash "done" r0) :to-be-falsy)
+      (expect (= 0 (aref e0 0)) :to-be-truthy)
+      (expect (aref e0 1) :to-equal "a")
+      (expect (gethash "done" r1) :to-be-falsy)
+      (expect (= 1 (aref e1 0)) :to-be-truthy)
+      (expect (aref e1 1) :to-equal "b")
+      (expect (gethash "done" r2) :to-be-truthy))))
 
-(deftest js-rt-array-keys
-  "keys returns an iterator yielding indices [0, 1, 2, ...]."
+(it-sequential "js-rt-array-keys"
   (let* ((arr  (%jr-arr "x" "y" "z"))
          (ks   (cl-cc/javascript::%js-array-keys arr))
          (acc  nil))
     (cl-cc/javascript::%js-for-of ks (lambda (k) (push k acc)))
-    (assert-equal '(0 1 2) (nreverse acc))))
+    (expect (nreverse acc) :to-equal '(0 1 2))))
 
-(deftest js-rt-array-copy-within
-  "copyWithin copies a section to another position in-place."
+(it-sequential "js-rt-array-copy-within"
   (let ((arr (%jr-arr 1 2 3 4 5)))
     (cl-cc/javascript::%js-array-copy-within arr 0 3 5)
-    (assert-= 4 (aref arr 0))
-    (assert-= 5 (aref arr 1))
-    (assert-= 3 (aref arr 2))))
+    (expect (= 4 (aref arr 0)) :to-be-truthy)
+    (expect (= 5 (aref arr 1)) :to-be-truthy)
+    (expect (= 3 (aref arr 2)) :to-be-truthy)))
 
-(deftest js-rt-array-copy-within-coerces-relative-indices
-  "copyWithin coerces string and fractional relative indices."
+(it-sequential "js-rt-array-copy-within-coerces-relative-indices"
   (let ((arr (%jr-arr 1 2 3 4)))
     (cl-cc/javascript::%js-array-copy-within arr "-2" "0" 2.9d0)
-    (assert-equal '(1 2 1 2) (%jr-list arr))))
+    (expect (%jr-list arr) :to-equal '(1 2 1 2))))
 
 ;;; ─── Coverage: forEach / isArray / Array.from ────────────────────────────────
 
-(deftest js-rt-array-for-each
-  "forEach calls FN for each element with (element, index, arr) and returns undefined."
+(it-sequential "js-rt-array-for-each"
   (let ((collected nil))
     (cl-cc/javascript::%js-array-for-each
      (%jr-arr 10 20 30)
      (lambda (x i &rest _) (declare (ignore _)) (push (list i x) collected)))
-    (assert-equal '((2 30) (1 20) (0 10)) collected)
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-array-for-each (%jr-arr 1) (constantly nil)))))
+    (expect collected :to-equal '((2 30) (1 20) (0 10)))
+    (expect (cl-cc/javascript::%js-array-for-each (%jr-arr 1) (constantly nil)) :to-be cl-cc/javascript::+js-undefined+)))
 
-(deftest js-rt-array-is-array
-  "isArray returns t for JS arrays and nil for everything else."
-  (assert-true  (cl-cc/javascript::%js-array-is-array (%jr-arr 1 2)))
-  (assert-false (cl-cc/javascript::%js-array-is-array "not-an-array"))
-  (assert-false (cl-cc/javascript::%js-array-is-array 42))
-  (assert-false (cl-cc/javascript::%js-array-is-array cl-cc/javascript::+js-undefined+)))
+(it-sequential "js-rt-array-is-array"
+  (expect (cl-cc/javascript::%js-array-is-array (%jr-arr 1 2)) :to-be-truthy)
+  (expect (cl-cc/javascript::%js-array-is-array "not-an-array") :to-be-falsy)
+  (expect (cl-cc/javascript::%js-array-is-array 42) :to-be-falsy)
+  (expect (cl-cc/javascript::%js-array-is-array cl-cc/javascript::+js-undefined+) :to-be-falsy))
 
-(deftest js-rt-array-from-plain
-  "Array.from converts an iterable to a fresh array."
+(it-sequential "js-rt-array-from-plain"
   (let ((result (cl-cc/javascript::%js-array-from (%jr-arr 1 2 3))))
-    (assert-equal '(1 2 3) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(1 2 3))))
 
-(deftest js-rt-array-from-undefined-map-fn
-  "Array.from treats an undefined mapFn as omitted."
+(it-sequential "js-rt-array-from-undefined-map-fn"
   (let ((result (cl-cc/javascript::%js-array-from
                  (%jr-arr 1 2 3)
                  cl-cc/javascript::+js-undefined+)))
-    (assert-equal '(1 2 3) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(1 2 3))))
 
-(deftest js-rt-array-from-with-map
-  "Array.from with a mapFn applies the function to each element."
+(it-sequential "js-rt-array-from-with-map"
   (let ((result (cl-cc/javascript::%js-array-from
                  (%jr-arr 1 2 3)
                  (lambda (x &rest _) (declare (ignore _)) (* x 10)))))
-    (assert-equal '(10 20 30) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(10 20 30))))
 
-(deftest js-rt-array-from-map-fn-receives-index
-  "Array.from mapFn receives the element and index."
+(it-sequential "js-rt-array-from-map-fn-receives-index"
   (let ((result (cl-cc/javascript::%js-array-from
                  (%jr-arr 10 20 30)
                  (lambda (x i) (+ x i)))))
-    (assert-equal '(10 21 32) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(10 21 32))))
 
-(deftest js-rt-array-from-array-like
-  "Array.from converts array-like objects when no iterator is present."
+(it-sequential "js-rt-array-from-array-like"
   (let* ((source (cl-cc/javascript::%js-make-object "0" "a" "1" "b" "length" 2))
          (result (cl-cc/javascript::%js-array-from source)))
-    (assert-equal '("a" "b") (%jr-list result))))
+    (expect (%jr-list result) :to-equal '("a" "b"))))
 
-(deftest js-rt-array-from-array-like-missing-index
-  "Array.from preserves missing array-like entries as undefined."
+(it-sequential "js-rt-array-from-array-like-missing-index"
   (let* ((source (cl-cc/javascript::%js-make-object "0" "a" "length" 2))
          (result (cl-cc/javascript::%js-array-from source)))
-    (assert-equal (list "a" cl-cc/javascript::+js-undefined+) (%jr-list result))))
+    (expect (%jr-list result) :to-equal (list "a" cl-cc/javascript::+js-undefined+))))
 
-(deftest js-rt-array-from-map-fn-this-arg
-  "Array.from calls mapFn with the provided thisArg."
+(it-sequential "js-rt-array-from-map-fn-this-arg"
   (let* ((this (cl-cc/javascript::%js-make-object "scale" 10))
          (result (cl-cc/javascript::%js-array-from
                   (%jr-arr 1 2)
@@ -491,19 +491,17 @@
                     (+ (* x (cl-cc/javascript::%js-get-prop cl-cc/javascript::%js-this "scale"))
                        i))
                   this)))
-    (assert-equal '(10 21) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(10 21))))
 
-(deftest js-rt-array-from-async-awaits-elements
-  "Array.fromAsync awaits each input element and resolves with a fresh array."
+(it-sequential "js-rt-array-from-async-awaits-elements"
   (let* ((input  (%jr-arr (cl-cc/javascript::%js-promise-resolve 1)
                           (cl-cc/javascript::%js-promise-resolve 2)
                           3))
          (result (cl-cc/javascript::%js-await
                   (cl-cc/javascript::%js-array-from-async input))))
-    (assert-equal '(1 2 3) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(1 2 3))))
 
-(deftest js-rt-array-from-async-awaits-map-results
-  "Array.fromAsync awaits mapFn results and passes the element index."
+(it-sequential "js-rt-array-from-async-awaits-map-results"
   (let* ((input  (%jr-arr (cl-cc/javascript::%js-promise-resolve 10)
                           (cl-cc/javascript::%js-promise-resolve 20)))
          (result (cl-cc/javascript::%js-await
@@ -511,10 +509,9 @@
                    input
                    (lambda (x i &rest _) (declare (ignore _))
                      (cl-cc/javascript::%js-promise-resolve (+ x i)))))))
-    (assert-equal '(10 21) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(10 21))))
 
-(deftest js-rt-array-from-async-array-like
-  "Array.fromAsync accepts array-like objects and awaits their values."
+(it-sequential "js-rt-array-from-async-array-like"
   (let* ((source (cl-cc/javascript::%js-make-object
                   "0" (cl-cc/javascript::%js-promise-resolve 3)
                   "1" 4
@@ -524,26 +521,24 @@
                    source
                    (lambda (x i)
                      (cl-cc/javascript::%js-promise-resolve (+ x i)))))))
-    (assert-equal '(3 5) (%jr-list result))))
+    (expect (%jr-list result) :to-equal '(3 5))))
 
 ;;; ─── Coverage: ES2024 group / groupToMap ─────────────────────────────────────
 
-(deftest js-rt-array-group
-  "group(keyFn) partitions elements into a hash-table by key."
+(it-sequential "js-rt-array-group"
   (let* ((arr    (%jr-arr 1 2 3 4))
          (result (cl-cc/javascript::%js-array-group
                   arr (lambda (x &rest _) (declare (ignore _))
                         (if (evenp x) "even" "odd")))))
-    (assert-true  (hash-table-p result))
-    (assert-equal '(1 3) (%jr-list (gethash "odd"  result)))
-    (assert-equal '(2 4) (%jr-list (gethash "even" result)))))
+    (expect (hash-table-p result) :to-be-truthy)
+    (expect (%jr-list (gethash "odd"  result)) :to-equal '(1 3))
+    (expect (%jr-list (gethash "even" result)) :to-equal '(2 4))))
 
-(deftest js-rt-array-group-to-map
-  "groupToMap(keyFn) partitions into a JS Map keyed by the raw (non-stringified) key."
+(it-sequential "js-rt-array-group-to-map"
   (let* ((arr    (%jr-arr 1 2 3 4))
          (result (cl-cc/javascript::%js-array-group-to-map
                   arr (lambda (x &rest _) (declare (ignore _))
                         (if (evenp x) "even" "odd")))))
-    (assert-true  (cl-cc/javascript::%js-map-p result))
-    (assert-equal '(1 3) (%jr-list (cl-cc/javascript::%js-map-get result "odd")))
-    (assert-equal '(2 4) (%jr-list (cl-cc/javascript::%js-map-get result "even")))))
+    (expect (cl-cc/javascript::%js-map-p result) :to-be-truthy)
+    (expect (%jr-list (cl-cc/javascript::%js-map-get result "odd")) :to-equal '(1 3))
+    (expect (%jr-list (cl-cc/javascript::%js-map-get result "even")) :to-equal '(2 4))))

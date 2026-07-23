@@ -82,16 +82,43 @@ def split_args(inner):
             while i < n and inner[i] != '\n':
                 i += 1
             continue
-        # reader-macro prefixes attach to the following datum as one token
-        if c in "'`" or (c == ',' ) or (c == '#' and i+1 < n and inner[i+1] in "'"):
+        # '#' dispatch reader macros: #(...) vector, #\x char, #'fn, #.form,
+        # #xNN/#bNN/#:sym/#+feature ... — keep the whole datum as one token.
+        if c == '#':
             pre = i
-            if c == '#':
-                i += 2
-            elif c == ',' and i+1 < n and inner[i+1] == '@':
+            i += 1  # past '#'
+            if i < n and inner[i] == '(':          # #(...) vector
+                _, j = read_form(inner, i); toks.append(inner[pre:j]); i = j; continue
+            if i < n and inner[i] == '\\':         # #\x or #\Newline
+                i += 1
+                j = i + 1 if i < n else i
+                while j < n and (inner[j].isalnum() or inner[j] == '-'):
+                    j += 1
+                toks.append(inner[pre:j]); i = j; continue
+            if i < n and inner[i] in "'.+-":       # #'fn #.form #+feat #-feat
+                i += 1
+                while i < n and inner[i] in ' \t\n':
+                    i += 1
+                if i < n and inner[i] == '(':
+                    _, j = read_form(inner, i); toks.append(inner[pre:j]); i = j
+                else:
+                    j = i
+                    while j < n and inner[j] not in ' \t\n()";':
+                        j += 1
+                    toks.append(inner[pre:j]); i = j
+                continue
+            # #xNN #bNN #oNN #:sym #C(...) etc — read as atom (up to delimiter)
+            j = i
+            while j < n and inner[j] not in ' \t\n()";':
+                j += 1
+            toks.append(inner[pre:j]); i = j; continue
+        # quote/quasiquote/unquote prefixes attach to the following datum
+        if c in "'`" or c == ',':
+            pre = i
+            if c == ',' and i+1 < n and inner[i+1] == '@':
                 i += 2
             else:
                 i += 1
-            # now read the following datum
             while i < n and inner[i] in ' \t\n':
                 i += 1
             if i < n and inner[i] == '(':
@@ -185,7 +212,10 @@ def rewrite_head(head, toks):
         return f"(expect {T(a[0])} :to-be-null)"
     if head in ('assert-eq', 'assert-eql') and len(a) >= 2:
         return f"(expect {T(a[1])} :to-be {T(a[0])})"
-    if head in ('assert-=', 'assert-equal', 'assert-string=') and len(a) >= 2:
+    if head == 'assert-=' and len(a) >= 2:
+        # numeric = crosses types (6 vs 6.0d0); :to-equal is type-strict equal.
+        return f"(expect (= {T(a[0])} {T(a[1])}) :to-be-truthy)"
+    if head in ('assert-equal', 'assert-string=') and len(a) >= 2:
         return f"(expect {T(a[1])} :to-equal {T(a[0])})"
     if head == 'assert-equalp' and len(a) >= 2:
         return f"(expect {T(a[1])} :to-equalp {T(a[0])})"

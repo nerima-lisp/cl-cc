@@ -7,7 +7,6 @@
 ;;;; Depends on: js-e2e-core-tests.lisp (%js-run-capture, deftest-js-run).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-e2e-serial-suite)
 
 ;;; ─── Optional chaining + nullish coalescing ──────────────────────────────────
 
@@ -90,37 +89,87 @@
 
 ;;; ─── Relational operators ────────────────────────────────────────────────────
 
-(deftest-each js-e2e-relational-operators
-  "< > <= >= follow JS Abstract Relational Comparison (string-lex, NaN→false, coerce)."
-  :cases (("gt-true"      "console.log(5 > 0);"                               "true")
-          ("lt-false"     "console.log(2 < 1);"                               "false")
-          ("gte-eq"       "console.log(3 >= 3);"                              "true")
-          ("lte-false"    "console.log(4 <= 2);"                              "false")
-          ("str-lex"      "console.log(\"apple\" < \"banana\");"              "true")
-          ("nan-gt"       "console.log(NaN > 0);"                             "false")
-          ("coerce"       "console.log(\"5\" > 3);"                           "true")
-          ("ternary"      "console.log(5 > 3 ? \"y\" : \"n\");"              "y")
-          ("for-loop-sum" "let s=0; for(let i=0;i<4;i++){s+=i;} console.log(s);" "6"))
-  (src expected)
-  (assert-string= expected (%js-run-capture src)))
+(it-sequential "js-e2e-relational-operators gt-true"
+  (destructuring-bind (src expected) (list "console.log(5 > 0);" "true")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators lt-false"
+  (destructuring-bind (src expected) (list "console.log(2 < 1);" "false")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators gte-eq"
+  (destructuring-bind (src expected) (list "console.log(3 >= 3);" "true")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators lte-false"
+  (destructuring-bind (src expected) (list "console.log(4 <= 2);" "false")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators str-lex"
+  (destructuring-bind (src expected) (list "console.log(\"apple\" < \"banana\");" "true")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators nan-gt"
+  (destructuring-bind (src expected) (list "console.log(NaN > 0);" "false")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators coerce"
+  (destructuring-bind (src expected) (list "console.log(\"5\" > 3);" "true")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators ternary"
+  (destructuring-bind (src expected) (list "console.log(5 > 3 ? \"y\" : \"n\");" "y")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-relational-operators for-loop-sum"
+  (destructuring-bind (src expected) (list "let s=0; for(let i=0;i<4;i++){s+=i;} console.log(s);" "6")
+    (expect (%js-run-capture src) :to-equal expected)))
 
 ;;; ─── Logical &&/|| ──────────────────────────────────────────────────────────
 
-(deftest-each js-e2e-logical-and-or
-  "&& and || short-circuit and yield operand values, not coerced booleans."
-  :cases (("and-false"  "console.log(true && false);"                                    "false")
-          ("and-true"   "console.log(true && true);"                                     "true")
-          ("and-val"    "console.log(1 && 2);"                                            "2")
-          ("and-zero"   "console.log(0 && 2);"                                            "0")
-          ("or-right"   "console.log(0 || 5);"                                            "5")
-          ("or-left"    "console.log(3 || 5);"                                            "3")
-          ("and-str"    "console.log(\"a\" && \"b\");"                                   "b")
-          ("and-chain"  "console.log(1 && 2 && 3);"                                      "3")
-          ("or-default" "function f(a){return a || \"def\";} console.log(f());"         "def")
-          ("or-given"   "function f(a){return a || \"def\";} console.log(f(\"hi\"));"   "hi")
-          ("short-circ" "let c=0; function s(){c++;return true;} false && s(); console.log(c);" "0"))
-  (src expected)
-  (assert-string= expected (%js-run-capture src)))
+(it-sequential "js-e2e-logical-and-or and-false"
+  (destructuring-bind (src expected) (list "console.log(true && false);" "false")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or and-true"
+  (destructuring-bind (src expected) (list "console.log(true && true);" "true")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or and-val"
+  (destructuring-bind (src expected) (list "console.log(1 && 2);" "2")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or and-zero"
+  (destructuring-bind (src expected) (list "console.log(0 && 2);" "0")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or or-right"
+  (destructuring-bind (src expected) (list "console.log(0 || 5);" "5")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or or-left"
+  (destructuring-bind (src expected) (list "console.log(3 || 5);" "3")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or and-str"
+  (destructuring-bind (src expected) (list "console.log(\"a\" && \"b\");" "b")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or and-chain"
+  (destructuring-bind (src expected) (list "console.log(1 && 2 && 3);" "3")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or or-default"
+  (destructuring-bind (src expected) (list "function f(a){return a || \"def\";} console.log(f());" "def")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or or-given"
+  (destructuring-bind (src expected) (list "function f(a){return a || \"def\";} console.log(f(\"hi\"));" "hi")
+    (expect (%js-run-capture src) :to-equal expected)))
+
+(it-sequential "js-e2e-logical-and-or short-circ"
+  (destructuring-bind (src expected) (list "let c=0; function s(){c++;return true;} false && s(); console.log(c);" "0")
+    (expect (%js-run-capture src) :to-equal expected)))
 
 ;;; ─── null / undefined literals ───────────────────────────────────────────────
 

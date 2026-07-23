@@ -9,7 +9,6 @@
 ;;;;         modifiers, class declarations with fields/methods/static/private.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Shared helpers (available to all js-parser-* files via serial load) ─────
 
@@ -29,153 +28,138 @@
 
 ;;; ─── Variable / const / let declarations ─────────────────────────────────────
 
-(deftest js-parser-const-decl
-  "const x = 42; parses to ast-let with one numeric binding."
+(it-sequential "js-parser-const-decl"
   (let ((ast (%js-first "const x = 42;")))
-    (assert-true (cl-cc:ast-let-p ast))
-    (assert-= 1 (length (cl-cc:ast-let-bindings ast)))
-    (assert-true (cl-cc:ast-int-p (cdr (first (cl-cc:ast-let-bindings ast)))))))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy)
+    (expect (= 1 (length (cl-cc:ast-let-bindings ast))) :to-be-truthy)
+    (expect (cl-cc:ast-int-p (cdr (first (cl-cc:ast-let-bindings ast)))) :to-be-truthy)))
 
-(deftest js-parser-let-decl
-  "let y = 'hello'; parses to ast-let with a string binding."
+(it-sequential "js-parser-let-decl"
   (let ((ast (%js-first "let y = 'hello';")))
-    (assert-true (cl-cc:ast-let-p ast))
-    (assert-true (cl-cc:ast-quote-p (cdr (first (cl-cc:ast-let-bindings ast)))))))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy)
+    (expect (cl-cc:ast-quote-p (cdr (first (cl-cc:ast-let-bindings ast)))) :to-be-truthy)))
 
-(deftest js-parser-var-decl
-  "var z; parses to ast-let with a nil binding."
+(it-sequential "js-parser-var-decl"
   (let ((ast (%js-first "var z;")))
-    (assert-true (cl-cc:ast-let-p ast))))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy)))
 
-(deftest js-parser-const-multi-decl
-  "const a = 1, b = 2; parses to sequential nested single-binding lets (ast-let
-binds in parallel, so JS's sequential `let' is modelled as a nested chain)."
+(it-sequential "js-parser-const-multi-decl"
   (let ((ast (%js-first "const a = 1, b = 2;")))
-    (assert-true (cl-cc:ast-let-p ast))
-    (assert-= 1 (length (cl-cc:ast-let-bindings ast)))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy)
+    (expect (= 1 (length (cl-cc:ast-let-bindings ast))) :to-be-truthy)
     (let ((inner (first (cl-cc:ast-let-body ast))))
-      (assert-true (cl-cc:ast-let-p inner))
-      (assert-= 1 (length (cl-cc:ast-let-bindings inner))))))
+      (expect (cl-cc:ast-let-p inner) :to-be-truthy)
+      (expect (= 1 (length (cl-cc:ast-let-bindings inner))) :to-be-truthy))))
 
 ;;; ─── Arrow functions ──────────────────────────────────────────────────────────
 
-(deftest js-parser-arrow-function-simple
-  "const f = (x) => x + 1; yields a let binding whose value is a lambda."
+(it-sequential "js-parser-arrow-function-simple"
   (let* ((ast (%js-first "const f = (x) => x + 1;"))
          (val (cdr (first (cl-cc:ast-let-bindings ast)))))
-    (assert-true (cl-cc:ast-let-p ast))
-    (assert-true (cl-cc:ast-lambda-p val))
-    (assert-= 1 (length (cl-cc:ast-lambda-params val)))))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy)
+    (expect (cl-cc:ast-lambda-p val) :to-be-truthy)
+    (expect (= 1 (length (cl-cc:ast-lambda-params val))) :to-be-truthy)))
 
-(deftest js-parser-arrow-function-block-body
-  "const double = (x) => { return x * 2; }; lambda body wraps a (block nil ...)
-that contains the return. The block is required so JS `return' (which lowers to
-return-from nil) exits the arrow — a bare lambda establishes no block named nil."
+(it-sequential "js-parser-arrow-function-block-body"
   (let* ((ast (%js-first "const double = (x) => { return x * 2; };"))
          (val (cdr (first (cl-cc:ast-let-bindings ast))))
          (body (cl-cc:ast-lambda-body val)))
-    (assert-true (cl-cc:ast-lambda-p val))
-    (assert-true (cl-cc:ast-block-p (first body)))
-    (assert-true (some #'cl-cc:ast-return-from-p
-                       (cl-cc:ast-block-body (first body))))))
+    (expect (cl-cc:ast-lambda-p val) :to-be-truthy)
+    (expect (cl-cc:ast-block-p (first body)) :to-be-truthy)
+    (expect (some #'cl-cc:ast-return-from-p
+                       (cl-cc:ast-block-body (first body))) :to-be-truthy)))
 
 ;;; ─── Async / generator function modifiers ────────────────────────────────────
 
-(deftest-each js-parser-function-modifiers
-  "Async and generator declarations mark the ast-defun appropriately."
-  :cases (("async"     "async function fetch() {}"  :js-async)
-          ("generator" "function* gen() {}"          :js-generator))
-  (src decl)
-  (let ((ast (%js-first src)))
-    (assert-true (cl-cc:ast-defun-p ast))
-    (assert-true (member decl (cl-cc:ast-defun-declarations ast)))))
+(it-sequential "js-parser-function-modifiers async"
+  (destructuring-bind (src decl) (list "async function fetch() {}" :js-async)
+    (let ((ast (%js-first src)))
+    (expect (cl-cc:ast-defun-p ast) :to-be-truthy)
+    (expect (member decl (cl-cc:ast-defun-declarations ast)) :to-be-truthy))))
+
+(it-sequential "js-parser-function-modifiers generator"
+  (destructuring-bind (src decl) (list "function* gen() {}" :js-generator)
+    (let ((ast (%js-first src)))
+    (expect (cl-cc:ast-defun-p ast) :to-be-truthy)
+    (expect (member decl (cl-cc:ast-defun-declarations ast)) :to-be-truthy))))
 
 ;;; ─── Class declarations ───────────────────────────────────────────────────────
 
-(deftest js-parser-class-decl-simple
-  "class Dog {} produces ast-defclass."
+(it-sequential "js-parser-class-decl-simple"
   (let ((ast (%js-first "class Dog {}")))
-    (assert-true (cl-cc:ast-defclass-p ast))
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
     ;; case-preserved: JS `Dog' interns as |Dog|, not DOG
-    (assert-string= "Dog" (symbol-name (cl-cc:ast-defclass-name ast)))))
+    (expect (symbol-name (cl-cc:ast-defclass-name ast)) :to-equal "Dog")))
 
-(deftest js-parser-class-with-extends
-  "class Cat extends Animal {} records superclass."
+(it-sequential "js-parser-class-with-extends"
   (let ((ast (%js-first "class Cat extends Animal {}")))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (some (lambda (s) (string= "Animal" (symbol-name s)))
-              (cl-cc:ast-defclass-superclasses ast)))))
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (some (lambda (s) (string= "Animal" (symbol-name s)))
+              (cl-cc:ast-defclass-superclasses ast)) :to-be-truthy)))
 
-(deftest js-parser-class-with-constructor
-  "class Pt { constructor(x,y){} } produces at least 1 slot (the constructor)."
+(it-sequential "js-parser-class-with-constructor"
   (let ((ast (%js-first "class Pt { constructor(x, y) { this.x = x; this.y = y; } }")))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (>= (length (cl-cc:ast-defclass-slots ast)) 1))))
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (>= (length (cl-cc:ast-defclass-slots ast)) 1) :to-be-truthy)))
 
-(deftest js-parser-class-with-method
-  "class C { greet() { return 1; } } slot for method is present."
+(it-sequential "js-parser-class-with-method"
   (let* ((ast (%js-first "class C { greet() { return 1; } }"))
          (slots (cl-cc:ast-defclass-slots ast)))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (>= (length slots) 1))))
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (>= (length slots) 1) :to-be-truthy)))
 
-(deftest js-parser-class-with-static-method
-  "class C { static create() {} } method slot carries :js-static t metadata."
+(it-sequential "js-parser-class-with-static-method"
   (let* ((ast (%js-first "class C { static create() {} }"))
          (slots (cl-cc:ast-defclass-slots ast)))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (some (lambda (slot)
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (some (lambda (slot)
                           (getf (cl-cc:ast-imports slot) :js-static))
-                        slots))))
+                        slots) :to-be-truthy)))
 
-(deftest js-parser-class-with-private-field
-  "class C { #count = 0; } private field produces a :T-PRIVATE-IDENT-named slot."
+(it-sequential "js-parser-class-with-private-field"
   (let* ((ast (%js-first "class C { #count = 0; }"))
          (slots (cl-cc:ast-defclass-slots ast)))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (some (lambda (slot)
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (some (lambda (slot)
                 (let ((name (symbol-name (cl-cc:ast-slot-name slot))))
                   (or (search "COUNT" name) (search "PRIV" name))))
-              slots))))
+              slots) :to-be-truthy)))
 
-(deftest js-parser-class-field-arrow-initializer
-  "class C { g = () => {}; } — a class field whose initialiser is an arrow
-function parses to ONE class declaration. Regression: the field-initialiser
-token scan was brace-blind and stopped at the arrow body's '}', truncating the
-initialiser and mis-reading that '}' as the end of the class body."
+(it-sequential "js-parser-class-field-arrow-initializer"
   (let ((asts (%js-parse "class C { g = () => {}; }")))
-    (assert-= 1 (length asts))
-    (assert-true (cl-cc:ast-defclass-p (first asts)))))
+    (expect (= 1 (length asts)) :to-be-truthy)
+    (expect (cl-cc:ast-defclass-p (first asts)) :to-be-truthy)))
 
-(deftest js-parser-class-field-private-arrow-and-method
-  "class C { #m() {} #g = () => {}; } — a private method followed by a private
-field with an arrow initialiser parses to a single class with >= 2 slots."
+(it-sequential "js-parser-class-field-private-arrow-and-method"
   (let* ((asts (%js-parse "class C { #m() {} #g = () => {}; }"))
          (ast (first asts)))
-    (assert-= 1 (length asts))
-    (assert-true (cl-cc:ast-defclass-p ast))
-    (assert-true (>= (length (cl-cc:ast-defclass-slots ast)) 2))))
+    (expect (= 1 (length asts)) :to-be-truthy)
+    (expect (cl-cc:ast-defclass-p ast) :to-be-truthy)
+    (expect (>= (length (cl-cc:ast-defclass-slots ast)) 2) :to-be-truthy)))
 
-(deftest js-parser-class-field-object-literal-initializer
-  "class C { x = {a: 1}; } — an object-literal field initialiser (also brace-
-containing) parses to one class declaration."
+(it-sequential "js-parser-class-field-object-literal-initializer"
   (let ((asts (%js-parse "class C { x = {a: 1, b: 2}; }")))
-    (assert-= 1 (length asts))
-    (assert-true (cl-cc:ast-defclass-p (first asts)))))
+    (expect (= 1 (length asts)) :to-be-truthy)
+    (expect (cl-cc:ast-defclass-p (first asts)) :to-be-truthy)))
 
-(deftest-each js-parser-tagged-template
-  "Tagged templates (plain and interpolated) produce ONE ast-call."
-  :cases (("plain"        "tag`hi`;")
-          ("interpolated" "tag`hi ${name}`;"))
-  (src)
-  (let ((asts (%js-parse src)))
-    (assert-= 1 (length asts))
-    (assert-true (cl-cc:ast-call-p (first asts)))))
+(it-sequential "js-parser-tagged-template plain"
+  (destructuring-bind (src) (list "tag`hi`;")
+    (let ((asts (%js-parse src)))
+    (expect (= 1 (length asts)) :to-be-truthy)
+    (expect (cl-cc:ast-call-p (first asts)) :to-be-truthy))))
 
-(deftest-each js-parser-class-expression
-  "Class expressions produce an ast-let binding."
-  :cases (("plain"   "const C = class { m() { return 1; } };")
-          ("extends" "const C = class extends Base { constructor() { super(); } };"))
-  (src)
-  (let ((ast (%js-first src)))
-    (assert-true (cl-cc:ast-let-p ast))))
+(it-sequential "js-parser-tagged-template interpolated"
+  (destructuring-bind (src) (list "tag`hi ${name}`;")
+    (let ((asts (%js-parse src)))
+    (expect (= 1 (length asts)) :to-be-truthy)
+    (expect (cl-cc:ast-call-p (first asts)) :to-be-truthy))))
+
+(it-sequential "js-parser-class-expression plain"
+  (destructuring-bind (src) (list "const C = class { m() { return 1; } };")
+    (let ((ast (%js-first src)))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy))))
+
+(it-sequential "js-parser-class-expression extends"
+  (destructuring-bind (src) (list "const C = class extends Base { constructor() { super(); } };")
+    (let ((ast (%js-first src)))
+    (expect (cl-cc:ast-let-p ast) :to-be-truthy))))

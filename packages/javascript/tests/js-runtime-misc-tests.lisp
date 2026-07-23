@@ -11,7 +11,6 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Local test helpers ──────────────────────────────────────────────────────
 
@@ -22,25 +21,22 @@
 
 ;;; ─── Module exports ─────────────────────────────────────────────────────────
 
-(deftest js-rt-export-default-registers-module-value
-  "export default stores the evaluated value on the module namespace."
+(it-sequential "js-rt-export-default-registers-module-value"
   (let ((cl-cc/javascript::*js-module-exports* (cl-cc/javascript::%js-make-object)))
     (let* ((result (cl-cc/javascript::%js-export :default 42))
            (exports (cl-cc/javascript::%js-current-module-exports)))
-      (assert-= 42 result)
-      (assert-= 42 (cl-cc/javascript::%js-get-prop exports "default")))))
+      (expect (= 42 result) :to-be-truthy)
+      (expect (= 42 (cl-cc/javascript::%js-get-prop exports "default")) :to-be-truthy))))
 
-(deftest js-rt-export-declaration-registers-named-value
-  "export declarations use parser-provided names to populate the namespace."
+(it-sequential "js-rt-export-declaration-registers-named-value"
   (let ((cl-cc/javascript::*js-module-exports* (cl-cc/javascript::%js-make-object)))
     (let* ((fn (lambda () 7))
            (result (cl-cc/javascript::%js-export :declaration fn nil '("add")))
            (exports (cl-cc/javascript::%js-current-module-exports)))
-      (assert-eq fn result)
-      (assert-eq fn (gethash "add" exports)))))
+      (expect result :to-be fn)
+      (expect (gethash "add" exports) :to-be fn))))
 
-(deftest js-rt-export-reexport-records-source-metadata
-  "export ... from records unresolved re-export metadata for the module loader."
+(it-sequential "js-rt-export-reexport-records-source-metadata"
   (let ((cl-cc/javascript::*js-module-exports* (cl-cc/javascript::%js-make-object)))
     (cl-cc/javascript::%js-export
      :re-export
@@ -51,32 +47,29 @@
            (entry (aref reexports 0))
            (specs (cl-cc/javascript::%js-get-prop entry "value"))
            (spec (aref specs 0)))
-      (assert-= 1 (length reexports))
-      (assert-string= "named" (cl-cc/javascript::%js-get-prop entry "kind"))
-      (assert-string= "./dep.js" (cl-cc/javascript::%js-get-prop entry "from"))
-      (assert-string= "foo" (cl-cc/javascript::%js-get-prop spec "local"))
-      (assert-string= "bar" (cl-cc/javascript::%js-get-prop spec "exported")))))
+      (expect (= 1 (length reexports)) :to-be-truthy)
+      (expect (cl-cc/javascript::%js-get-prop entry "kind") :to-equal "named")
+      (expect (cl-cc/javascript::%js-get-prop entry "from") :to-equal "./dep.js")
+      (expect (cl-cc/javascript::%js-get-prop spec "local") :to-equal "foo")
+      (expect (cl-cc/javascript::%js-get-prop spec "exported") :to-equal "bar"))))
 
 ;;; ─── Promise.race ────────────────────────────────────────────────────────────
 
-(deftest js-rt-promise-race-returns-first
-  "Promise.race returns the first element of the promise array unchanged."
+(it-sequential "js-rt-promise-race-returns-first"
   (let* ((p1  (cl-cc/javascript::%js-promise-resolve 1))
          (p2  (cl-cc/javascript::%js-promise-resolve 2))
          (arr (%jr-arr p1 p2))
          (winner (cl-cc/javascript::%js-promise-race arr)))
-    (assert-eq p1 winner)))
+    (expect winner :to-be p1)))
 
-(deftest js-rt-promise-race-empty-pending
-  "Promise.race with empty array returns an unsettled promise."
+(it-sequential "js-rt-promise-race-empty-pending"
   (let ((result (cl-cc/javascript::%js-promise-race (%jr-arr))))
-    (assert-true (cl-cc/javascript::js-promise-p result))
-    (assert-false (cl-cc/javascript::js-promise-settled-p result))))
+    (expect (cl-cc/javascript::js-promise-p result) :to-be-truthy)
+    (expect (cl-cc/javascript::js-promise-settled-p result) :to-be-falsy)))
 
 ;;; ─── Promise.allSettled ──────────────────────────────────────────────────────
 
-(deftest js-rt-promise-all-settled-mixed
-  "Promise.allSettled returns status objects for both fulfilled and rejected."
+(it-sequential "js-rt-promise-all-settled-mixed"
   (let* ((p1  (cl-cc/javascript::%js-promise-resolve "ok"))
          (p2  (cl-cc/javascript::%js-promise-reject  "err"))
          (arr (%jr-arr p1 p2))
@@ -84,122 +77,149 @@
                    (cl-cc/javascript::%js-promise-all-settled arr)))
          (r1  (aref settled 0))
          (r2  (aref settled 1)))
-    (assert-string= "fulfilled" (gethash "status" r1))
-    (assert-string= "ok"        (gethash "value"  r1))
-    (assert-string= "rejected"  (gethash "status" r2))
-    (assert-string= "err"       (gethash "reason" r2))))
+    (expect (gethash "status" r1) :to-equal "fulfilled")
+    (expect (gethash "value"  r1) :to-equal "ok")
+    (expect (gethash "status" r2) :to-equal "rejected")
+    (expect (gethash "reason" r2) :to-equal "err")))
 
 ;;; ─── Promise.finally ─────────────────────────────────────────────────────────
 
-(deftest js-rt-promise-finally-calls-cleanup
-  "Promise.finally invokes on-finally and returns the original promise."
+(it-sequential "js-rt-promise-finally-calls-cleanup"
   (let* ((called (list nil))
          (p      (cl-cc/javascript::%js-promise-resolve 42))
          (result (cl-cc/javascript::%js-promise-finally
                   p (lambda () (setf (car called) t)))))
-    (assert-true (car called))
-    (assert-eq p result)))
+    (expect (car called) :to-be-truthy)
+    (expect result :to-be p)))
 
 ;;; ─── Promise.withResolvers ───────────────────────────────────────────────────
 
-(deftest js-rt-promise-with-resolvers
-  "Promise.withResolvers returns an object with promise, resolve, reject."
+(it-sequential "js-rt-promise-with-resolvers"
   (let* ((obj     (cl-cc/javascript::%js-promise-with-resolvers))
          (promise  (gethash "promise" obj))
          (resolve  (gethash "resolve" obj)))
-    (assert-true (cl-cc/javascript::js-promise-p promise))
-    (assert-true (functionp resolve))
+    (expect (cl-cc/javascript::js-promise-p promise) :to-be-truthy)
+    (expect (functionp resolve) :to-be-truthy)
     (funcall resolve 99)
-    (assert-= 99 (cl-cc/javascript::%js-await promise))))
+    (expect (= 99 (cl-cc/javascript::%js-await promise)) :to-be-truthy)))
 
 ;;; ─── Promise.try ─────────────────────────────────────────────────────────────
 
-(deftest js-rt-promise-try-success
-  "Promise.try wraps a synchronous result in a fulfilled promise."
+(it-sequential "js-rt-promise-try-success"
   (let* ((result (cl-cc/javascript::%js-promise-try (lambda () 7))))
-    (assert-= 7 (cl-cc/javascript::%js-await result))))
+    (expect (= 7 (cl-cc/javascript::%js-await result)) :to-be-truthy)))
 
 ;;; ─── Global isNaN / isFinite (with coercion) ─────────────────────────────────
 
-(deftest-each js-rt-global-is-nan
-  "Global isNaN coerces its argument before checking (unlike Number.isNaN)."
-  :cases (("number-nan"  cl-cc/javascript::*js-nan-float*  t)
-          ("string-nan"  "NaN"                              t)
-          ("string-num"  "42"                               nil)
-          ("integer"     5                                  nil))
-  (val expected)
-  (assert-equal expected (cl-cc/javascript::%js-is-nan val)))
+(it-sequential "js-rt-global-is-nan number-nan"
+  (destructuring-bind (val expected) (list cl-cc/javascript::*js-nan-float* t)
+    (expect (cl-cc/javascript::%js-is-nan val) :to-equal expected)))
 
-(deftest-each js-rt-global-is-finite
-  "Global isFinite coerces its argument (unlike Number.isFinite)."
-  :cases (("integer"   42      t)
-          ("string-n"  "3.14"  t)
-          ("nan"       cl-cc/javascript::*js-nan-float*  nil)
-          ("inf"       cl-cc/javascript::*js-inf-float*  nil))
-  (val expected)
-  (assert-equal expected (cl-cc/javascript::%js-is-finite val)))
+(it-sequential "js-rt-global-is-nan string-nan"
+  (destructuring-bind (val expected) (list "NaN" t)
+    (expect (cl-cc/javascript::%js-is-nan val) :to-equal expected)))
+
+(it-sequential "js-rt-global-is-nan string-num"
+  (destructuring-bind (val expected) (list "42" nil)
+    (expect (cl-cc/javascript::%js-is-nan val) :to-equal expected)))
+
+(it-sequential "js-rt-global-is-nan integer"
+  (destructuring-bind (val expected) (list 5 nil)
+    (expect (cl-cc/javascript::%js-is-nan val) :to-equal expected)))
+
+(it-sequential "js-rt-global-is-finite integer"
+  (destructuring-bind (val expected) (list 42 t)
+    (expect (cl-cc/javascript::%js-is-finite val) :to-equal expected)))
+
+(it-sequential "js-rt-global-is-finite string-n"
+  (destructuring-bind (val expected) (list "3.14" t)
+    (expect (cl-cc/javascript::%js-is-finite val) :to-equal expected)))
+
+(it-sequential "js-rt-global-is-finite nan"
+  (destructuring-bind (val expected) (list cl-cc/javascript::*js-nan-float* nil)
+    (expect (cl-cc/javascript::%js-is-finite val) :to-equal expected)))
+
+(it-sequential "js-rt-global-is-finite inf"
+  (destructuring-bind (val expected) (list cl-cc/javascript::*js-inf-float* nil)
+    (expect (cl-cc/javascript::%js-is-finite val) :to-equal expected)))
 
 ;;; ─── structuredClone ─────────────────────────────────────────────────────────
 
-(deftest js-rt-structured-clone
-  "%js-structured-clone deep-clones an object (delegates to %js-deep-clone)."
+(it-sequential "js-rt-structured-clone"
   (let* ((orig  (cl-cc/javascript::%js-make-object "x" 10))
          (clone (cl-cc/javascript::%js-structured-clone orig)))
-    (assert-false (eq orig clone))
-    (assert-= 10 (gethash "x" clone))))
+    (expect (eq orig clone) :to-be-falsy)
+    (expect (= 10 (gethash "x" clone)) :to-be-truthy)))
 
 ;;; ─── queueMicrotask / browser timers ─────────────────────────────────────────
 
-(deftest js-rt-queue-microtask-runs-fn
-  "%js-queue-microtask runs its callback synchronously and returns +js-undefined+."
+(it-sequential "js-rt-queue-microtask-runs-fn"
   (let ((called (list nil)))
     (let ((ret (cl-cc/javascript::%js-queue-microtask
                 (lambda () (setf (car called) t)))))
-      (assert-true (car called))
-      (assert-eq cl-cc/javascript::+js-undefined+ ret))))
+      (expect (car called) :to-be-truthy)
+      (expect ret :to-be cl-cc/javascript::+js-undefined+))))
 
-(deftest-each js-rt-browser-timer-stubs-absent
-  "Browser timer stubs are not exposed as builtins."
-  :cases (("setTimeout" "setTimeout")
-          ("setInterval" "setInterval")
-          ("clearTimeout" "clearTimeout")
-          ("clearInterval" "clearInterval"))
-  (name)
-  (assert-false (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)))
-  (assert-false (find name cl-cc/javascript::*js-prelude-global-specs*
+(it-sequential "js-rt-browser-timer-stubs-absent setTimeout"
+  (destructuring-bind (name) (list "setTimeout")
+    (expect (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)) :to-be-falsy) (expect (find name cl-cc/javascript::*js-prelude-global-specs*
                       :key #'second
-                      :test #'string=))
-  (assert-false (nth-value 1
+                      :test #'string=) :to-be-falsy) (expect (nth-value 1
                             (gethash (cl-cc/javascript::js-ident-sym name)
-                                     cl-cc/javascript::*js-coercion-call-helpers*))))
+                                     cl-cc/javascript::*js-coercion-call-helpers*)) :to-be-falsy)))
+
+(it-sequential "js-rt-browser-timer-stubs-absent setInterval"
+  (destructuring-bind (name) (list "setInterval")
+    (expect (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)) :to-be-falsy) (expect (find name cl-cc/javascript::*js-prelude-global-specs*
+                      :key #'second
+                      :test #'string=) :to-be-falsy) (expect (nth-value 1
+                            (gethash (cl-cc/javascript::js-ident-sym name)
+                                     cl-cc/javascript::*js-coercion-call-helpers*)) :to-be-falsy)))
+
+(it-sequential "js-rt-browser-timer-stubs-absent clearTimeout"
+  (destructuring-bind (name) (list "clearTimeout")
+    (expect (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)) :to-be-falsy) (expect (find name cl-cc/javascript::*js-prelude-global-specs*
+                      :key #'second
+                      :test #'string=) :to-be-falsy) (expect (nth-value 1
+                            (gethash (cl-cc/javascript::js-ident-sym name)
+                                     cl-cc/javascript::*js-coercion-call-helpers*)) :to-be-falsy)))
+
+(it-sequential "js-rt-browser-timer-stubs-absent clearInterval"
+  (destructuring-bind (name) (list "clearInterval")
+    (expect (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)) :to-be-falsy) (expect (find name cl-cc/javascript::*js-prelude-global-specs*
+                      :key #'second
+                      :test #'string=) :to-be-falsy) (expect (nth-value 1
+                            (gethash (cl-cc/javascript::js-ident-sym name)
+                                     cl-cc/javascript::*js-coercion-call-helpers*)) :to-be-falsy)))
 
 ;;; ─── Dynamic code stubs ─────────────────────────────────────────────────────
 
-(deftest-each js-rt-dynamic-code-stubs-absent
-  "Dynamic code execution stubs are not exposed as builtins."
-  :cases (("eval" "eval")
-          ("Function" "Function"))
-  (name)
-  (assert-false (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)))
-  (assert-false (find name cl-cc/javascript::*js-prelude-global-specs*
+(it-sequential "js-rt-dynamic-code-stubs-absent eval"
+  (destructuring-bind (name) (list "eval")
+    (expect (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)) :to-be-falsy) (expect (find name cl-cc/javascript::*js-prelude-global-specs*
                       :key #'second
-                      :test #'string=))
-  (assert-false (nth-value 1
+                      :test #'string=) :to-be-falsy) (expect (nth-value 1
                             (gethash (cl-cc/javascript::js-ident-sym name)
-                                     cl-cc/javascript::*js-coercion-call-helpers*))))
+                                     cl-cc/javascript::*js-coercion-call-helpers*)) :to-be-falsy)))
+
+(it-sequential "js-rt-dynamic-code-stubs-absent Function"
+  (destructuring-bind (name) (list "Function")
+    (expect (nth-value 1 (gethash name cl-cc/javascript::*js-builtin-map*)) :to-be-falsy) (expect (find name cl-cc/javascript::*js-prelude-global-specs*
+                      :key #'second
+                      :test #'string=) :to-be-falsy) (expect (nth-value 1
+                            (gethash (cl-cc/javascript::js-ident-sym name)
+                                     cl-cc/javascript::*js-coercion-call-helpers*)) :to-be-falsy)))
 
 ;;; ─── Iterator.from ───────────────────────────────────────────────────────────
 
-(deftest js-rt-iterator-from-array
-  "%js-iterator-from-iterable wraps an array in a generator iterator."
+(it-sequential "js-rt-iterator-from-array"
   (let* ((arr  (%jr-arr 1 2 3))
          (iter (cl-cc/javascript::%js-iterator-from-iterable arr))
          (acc  nil))
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
-    (assert-equal '(3 2 1) acc)))
+    (expect acc :to-equal '(3 2 1))))
 
-(deftest js-rt-iterator-from-set
-  "%js-iterator-from-iterable normalizes Set values to an iterator object."
+(it-sequential "js-rt-iterator-from-set"
   (let* ((set (cl-cc/javascript::%js-make-set))
          (_   (cl-cc/javascript::%js-set-add set 3))
          (_   (cl-cc/javascript::%js-set-add set 4))
@@ -207,10 +227,9 @@
          (acc nil))
     (declare (ignore _))
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
-    (assert-equal '(4 3) acc)))
+    (expect acc :to-equal '(4 3))))
 
-(deftest js-rt-iterator-from-map
-  "%js-iterator-from-iterable normalizes Map values to an entries iterator."
+(it-sequential "js-rt-iterator-from-map"
   (let* ((map (cl-cc/javascript::%js-make-map))
          (_1  (cl-cc/javascript::%js-map-set map "a" 1))
          (_2  (cl-cc/javascript::%js-map-set map "b" 2))
@@ -220,10 +239,9 @@
     (cl-cc/javascript::%js-for-of iter
                                   (lambda (entry)
                                     (push (%jr-list entry) acc)))
-    (assert-equal '(("b" 2) ("a" 1)) acc)))
+    (expect acc :to-equal '(("b" 2) ("a" 1)))))
 
-(deftest js-rt-iterator-from-plain-next
-  "%js-iterator-from-iterable accepts plain iterator objects with next()."
+(it-sequential "js-rt-iterator-from-plain-next"
   (let* ((step 0)
          (iterable
            (cl-cc/javascript::%js-make-object
@@ -237,10 +255,9 @@
          (iter (cl-cc/javascript::%js-iterator-from-iterable iterable))
          (acc nil))
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
-    (assert-equal '("second" "first") acc)))
+    (expect acc :to-equal '("second" "first"))))
 
-(deftest js-rt-iterator-from-@@iterator
-  "%js-iterator-from-iterable calls @@iterator when present on a plain object."
+(it-sequential "js-rt-iterator-from-@@iterator"
   (let* ((iterable
            (cl-cc/javascript::%js-make-object
             "@@iterator" (lambda ()
@@ -248,58 +265,52 @@
          (iter (cl-cc/javascript::%js-iterator-from-iterable iterable))
          (acc nil))
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
-    (assert-equal '(9 8) acc)))
+    (expect acc :to-equal '(9 8))))
 
-(deftest js-rt-iterator-from-string
-  "%js-iterator-from-iterable wraps strings as iterators over one-char strings."
+(it-sequential "js-rt-iterator-from-string"
   (let* ((iter (cl-cc/javascript::%js-iterator-from-iterable "ab"))
          (acc nil))
     (cl-cc/javascript::%js-for-of iter (lambda (v) (push v acc)))
-    (assert-equal '("b" "a") acc)))
+    (expect acc :to-equal '("b" "a"))))
 
-(deftest js-rt-iterator-from-non-iterable
-  "%js-iterator-from-iterable returns an already-done iterator for non-iterables."
+(it-sequential "js-rt-iterator-from-non-iterable"
   (let ((iter (cl-cc/javascript::%js-iterator-from-iterable
                (cl-cc/javascript::%js-make-object))))
     (multiple-value-bind (value done) (cl-cc/javascript::%js-iter-next iter)
-      (assert-eq cl-cc/javascript::+js-undefined+ value)
-      (assert-true done))))
+      (expect value :to-be cl-cc/javascript::+js-undefined+)
+      (expect done :to-be-truthy))))
 
 ;;; ─── Map.groupBy ─────────────────────────────────────────────────────────────
 
-(deftest js-rt-map-group-by
-  "%js-map-group-by groups elements into a Map by key-fn result."
+(it-sequential "js-rt-map-group-by"
   (let* ((items  (%jr-arr 1 2 3 4))
          (result (cl-cc/javascript::%js-map-group-by
                   items (lambda (x) (if (evenp x) "even" "odd"))))
          (evens  (cl-cc/javascript::%js-map-get result "even"))
          (odds   (cl-cc/javascript::%js-map-get result "odd")))
-    (assert-= 2 (length evens))
-    (assert-= 2 (length odds))))
+    (expect (= 2 (length evens)) :to-be-truthy)
+    (expect (= 2 (length odds)) :to-be-truthy)))
 
 ;;; ─── Set-from-iterable ───────────────────────────────────────────────────────
 
-(deftest js-rt-make-set-from-iterable
-  "%js-make-set-from-iterable seeds a new Set from an array."
+(it-sequential "js-rt-make-set-from-iterable"
   (let* ((arr (cl-cc/javascript::%js-make-array 1 2 3 2))
          (s   (cl-cc/javascript::%js-make-set-from-iterable arr)))
-    (assert-true  (cl-cc/javascript::%js-set-has s 1))
-    (assert-true  (cl-cc/javascript::%js-set-has s 3))
-    (assert-false (cl-cc/javascript::%js-set-has s 9))))
+    (expect (cl-cc/javascript::%js-set-has s 1) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-set-has s 3) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-set-has s 9) :to-be-falsy)))
 
 ;;; ─── Proxy ───────────────────────────────────────────────────────────────────
 
-(deftest js-rt-make-proxy-object
-  "%js-make-proxy-object stores target/handler and marks a Proxy wrapper."
+(it-sequential "js-rt-make-proxy-object"
   (let* ((target  (cl-cc/javascript::%js-make-object "x" 1))
          (handler (cl-cc/javascript::%js-make-object))
          (proxy   (cl-cc/javascript::%js-make-proxy-object target handler)))
-    (assert-eq target  (gethash "__proxy-target__"  proxy))
-    (assert-eq handler (gethash "__proxy-handler__" proxy))
-    (assert-true (cl-cc/javascript::%js-proxy-object-p proxy))))
+    (expect (gethash "__proxy-target__"  proxy) :to-be target)
+    (expect (gethash "__proxy-handler__" proxy) :to-be handler)
+    (expect (cl-cc/javascript::%js-proxy-object-p proxy) :to-be-truthy)))
 
-(deftest js-rt-proxy-property-traps
-  "Proxy get/set/has/deleteProperty traps route ordinary property operations."
+(it-sequential "js-rt-proxy-property-traps"
   (let* ((target (cl-cc/javascript::%js-make-object "x" 1))
          (deleted nil)
          (handler
@@ -321,33 +332,31 @@
                                 (remhash key target)
                                 t)))
          (proxy (cl-cc/javascript::%js-make-proxy-object target handler)))
-    (assert-string= "trap-x-1" (cl-cc/javascript::%js-get-prop proxy "x"))
-    (assert-= 7 (cl-cc/javascript::%js-set-prop proxy "y" 7))
-    (assert-= 7 (gethash "y" target))
-    (assert-true (cl-cc/javascript::%js-in "visible" proxy))
-    (assert-false (cl-cc/javascript::%js-in "x" proxy))
-    (assert-true (cl-cc/javascript::%js-delete proxy "x"))
-    (assert-string= "x" deleted)
-    (assert-false (nth-value 1 (gethash "x" target)))))
+    (expect (cl-cc/javascript::%js-get-prop proxy "x") :to-equal "trap-x-1")
+    (expect (= 7 (cl-cc/javascript::%js-set-prop proxy "y" 7)) :to-be-truthy)
+    (expect (= 7 (gethash "y" target)) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-in "visible" proxy) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-in "x" proxy) :to-be-falsy)
+    (expect (cl-cc/javascript::%js-delete proxy "x") :to-be-truthy)
+    (expect deleted :to-equal "x")
+    (expect (nth-value 1 (gethash "x" target)) :to-be-falsy)))
 
-(deftest js-rt-proxy-falls-back-without-traps
-  "Proxy operations fall back to the target when a trap is absent."
+(it-sequential "js-rt-proxy-falls-back-without-traps"
   (let* ((target (cl-cc/javascript::%js-make-object "x" 1))
          (proxy (cl-cc/javascript::%js-make-proxy-object
                  target (cl-cc/javascript::%js-make-object))))
     (multiple-value-bind (value trapped)
         (cl-cc/javascript::%js-proxy-call-trap proxy "get" target "x" proxy)
-      (assert-eq cl-cc/javascript::+js-undefined+ value)
-      (assert-false trapped))
-    (assert-= 1 (cl-cc/javascript::%js-get-prop proxy "x"))
-    (assert-= 2 (cl-cc/javascript::%js-set-prop proxy "y" 2))
-    (assert-= 2 (gethash "y" target))
-    (assert-true (cl-cc/javascript::%js-in "x" proxy))
-    (assert-true (cl-cc/javascript::%js-delete proxy "x"))
-    (assert-false (nth-value 1 (gethash "x" target)))))
+      (expect value :to-be cl-cc/javascript::+js-undefined+)
+      (expect trapped :to-be-falsy))
+    (expect (= 1 (cl-cc/javascript::%js-get-prop proxy "x")) :to-be-truthy)
+    (expect (= 2 (cl-cc/javascript::%js-set-prop proxy "y" 2)) :to-be-truthy)
+    (expect (= 2 (gethash "y" target)) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-in "x" proxy) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-delete proxy "x") :to-be-truthy)
+    (expect (nth-value 1 (gethash "x" target)) :to-be-falsy)))
 
-(deftest js-rt-proxy-reflect-and-object-traps
-  "Proxy traps route Reflect and Object descriptor/enumeration helpers."
+(it-sequential "js-rt-proxy-reflect-and-object-traps"
   (let* ((target (cl-cc/javascript::%js-make-object "a" 1))
          (handler
            (cl-cc/javascript::%js-make-object
@@ -373,72 +382,66 @@
                (setf (gethash key target) (gethash "value" descriptor))
                t)))
          (proxy (cl-cc/javascript::%js-make-proxy-object target handler)))
-    (assert-= 20 (cl-cc/javascript::%js-reflect-get proxy "b"))
-    (assert-true (cl-cc/javascript::%js-reflect-set proxy "z" 99))
-    (assert-= 99 (gethash "z" target))
-    (assert-true
-      (cl-cc/javascript::%js-reflect-define-property
-        proxy "d" (cl-cc/javascript::%js-make-object "value" 44)))
-    (assert-= 44 (gethash "d" target))
+    (expect (= 20 (cl-cc/javascript::%js-reflect-get proxy "b")) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-reflect-set proxy "z" 99) :to-be-truthy)
+    (expect (= 99 (gethash "z" target)) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-reflect-define-property
+        proxy "d" (cl-cc/javascript::%js-make-object "value" 44)) :to-be-truthy)
+    (expect (= 44 (gethash "d" target)) :to-be-truthy)
     (let ((keys (cl-cc/javascript::%js-object-keys proxy)))
-      (assert-= 2 (length keys))
-      (assert-string= "b" (aref keys 0))
-      (assert-string= "c" (aref keys 1)))
+      (expect (= 2 (length keys)) :to-be-truthy)
+      (expect (aref keys 0) :to-equal "b")
+      (expect (aref keys 1) :to-equal "c"))
     (let ((desc (cl-cc/javascript::%js-object-get-own-property-descriptor proxy "b")))
-      (assert-string= "b" (gethash "value" desc)))
+      (expect (gethash "value" desc) :to-equal "b"))
     (let ((desc (cl-cc/javascript::%js-object-get-own-property-descriptor proxy "c")))
-      (assert-string= "c" (gethash "value" desc)))))
+      (expect (gethash "value" desc) :to-equal "c"))))
 
 ;;; ─── Math.sumPrecise (ES2026) ────────────────────────────────────────────────
 
-(deftest js-rt-math-sum-precise
-  "%js-math-sum-precise sums a numeric iterable to double-float."
+(it-sequential "js-rt-math-sum-precise"
   (let ((result (cl-cc/javascript::%js-math-sum-precise (%jr-arr 1 2 3 4))))
-    (assert-= 10.0d0 result)))
+    (expect (= 10.0d0 result) :to-be-truthy)))
 
 ;;; ─── Error.isError (ES2026) ──────────────────────────────────────────────────
 
-(deftest js-rt-error-is-error
-  "%js-error-is-error returns truthy for Error-like objects, nil for non-errors."
+(it-sequential "js-rt-error-is-error"
   (let ((with-message (cl-cc/javascript::%js-make-error-instance
                        cl-cc/javascript::*js-error-class* "oops"))
         (plain-obj    (cl-cc/javascript::%js-make-object "x" 1)))
-    (assert-true  (cl-cc/javascript::%js-error-is-error with-message))
-    (assert-false (cl-cc/javascript::%js-error-is-error plain-obj))
-    (assert-false (cl-cc/javascript::%js-error-is-error "error"))))
+    (expect (cl-cc/javascript::%js-error-is-error with-message) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-error-is-error plain-obj) :to-be-falsy)
+    (expect (cl-cc/javascript::%js-error-is-error "error") :to-be-falsy)))
 
 ;;; ─── AggregateError ──────────────────────────────────────────────────────────
 
-(deftest js-rt-make-aggregate-error
-  "%js-make-aggregate-error returns a real AggregateError instance."
+(it-sequential "js-rt-make-aggregate-error"
   (let* ((errors (%jr-arr "e1" "e2"))
          (cause  (cl-cc/javascript::%js-make-object "code" "root"))
          (opts   (cl-cc/javascript::%js-make-object "cause" cause))
          (agg    (cl-cc/javascript::%js-make-aggregate-error errors "multiple" opts)))
-    (assert-string= "AggregateError" (gethash "name"    agg))
-    (assert-string= "multiple"       (gethash "message" agg))
-    (assert-string= "AggregateError: multiple" (gethash "stack" agg))
-    (assert-eq errors                (gethash "errors"  agg))
-    (assert-eq cause                 (gethash "cause"   agg))
-    (assert-true (cl-cc/javascript::%js-instanceof
-                  agg cl-cc/javascript::*js-aggregate-error-class*))
-    (assert-true (cl-cc/javascript::%js-instanceof
-                  agg cl-cc/javascript::*js-error-class*))))
+    (expect (gethash "name"    agg) :to-equal "AggregateError")
+    (expect (gethash "message" agg) :to-equal "multiple")
+    (expect (gethash "stack" agg) :to-equal "AggregateError: multiple")
+    (expect (gethash "errors"  agg) :to-be errors)
+    (expect (gethash "cause"   agg) :to-be cause)
+    (expect (cl-cc/javascript::%js-instanceof
+                  agg cl-cc/javascript::*js-aggregate-error-class*) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-instanceof
+                  agg cl-cc/javascript::*js-error-class*) :to-be-truthy)))
 
 ;;; ─── AbortController ─────────────────────────────────────────────────────────
 
-(deftest js-rt-abort-controller
-  "%js-make-abort-controller produces a signal/abort pair."
+(it-sequential "js-rt-abort-controller"
   (let* ((ctrl   (cl-cc/javascript::%js-make-abort-controller))
          (sig    (gethash "signal" ctrl))
          (abort  (gethash "abort"  ctrl)))
-    (assert-false (gethash "aborted" sig))
+    (expect (gethash "aborted" sig) :to-be-falsy)
     (funcall abort "reason")
-    (assert-true  (gethash "aborted" sig))
-    (assert-string= "reason" (gethash "reason" sig))))
+    (expect (gethash "aborted" sig) :to-be-truthy)
+    (expect (gethash "reason" sig) :to-equal "reason")))
 
-(deftest js-rt-abort-controller-dispatches-once
-  "AbortController.abort aborts once and synchronously dispatches abort listeners."
+(it-sequential "js-rt-abort-controller-dispatches-once"
   (let* ((ctrl   (cl-cc/javascript::%js-make-abort-controller))
          (sig    (gethash "signal" ctrl))
          (abort  (gethash "abort" ctrl))
@@ -447,22 +450,21 @@
     (setf (gethash "onabort" sig)
           (lambda (event)
             (incf onabort-calls)
-            (assert-string= "abort" (gethash "type" event))
-            (assert-eq sig (gethash "target" event))))
+            (expect (gethash "type" event) :to-equal "abort")
+            (expect (gethash "target" event) :to-be sig)))
     (funcall (gethash "addEventListener" sig)
              "abort"
              (lambda (event)
                (incf listener-calls)
-               (assert-string= "abort" (gethash "type" event))
-               (assert-eq sig (gethash "currentTarget" event))))
+               (expect (gethash "type" event) :to-equal "abort")
+               (expect (gethash "currentTarget" event) :to-be sig)))
     (funcall abort "first")
     (funcall abort "second")
-    (assert-= 1 onabort-calls)
-    (assert-= 1 listener-calls)
-    (assert-string= "first" (gethash "reason" sig))))
+    (expect (= 1 onabort-calls) :to-be-truthy)
+    (expect (= 1 listener-calls) :to-be-truthy)
+    (expect (gethash "reason" sig) :to-equal "first")))
 
-(deftest js-rt-abort-signal-remove-event-listener
-  "AbortSignal.removeEventListener prevents a removed abort listener from firing."
+(it-sequential "js-rt-abort-signal-remove-event-listener"
   (let* ((ctrl  (cl-cc/javascript::%js-make-abort-controller))
          (sig   (gethash "signal" ctrl))
          (calls 0)
@@ -470,41 +472,38 @@
     (funcall (gethash "addEventListener" sig) "abort" listener)
     (funcall (gethash "removeEventListener" sig) "abort" listener)
     (funcall (gethash "abort" ctrl) "done")
-    (assert-= 0 calls)))
+    (expect (= 0 calls) :to-be-truthy)))
 
-(deftest js-rt-abort-signal-throw-if-aborted
-  "AbortSignal.throwIfAborted throws the stored reason."
+(it-sequential "js-rt-abort-signal-throw-if-aborted"
   (let ((sig (cl-cc/javascript::%js-abort-signal-aborted "boom")))
-    (assert-true (gethash "aborted" sig))
-    (assert-string= "boom" (gethash "reason" sig))
+    (expect (gethash "aborted" sig) :to-be-truthy)
+    (expect (gethash "reason" sig) :to-equal "boom")
     (handler-case
         (progn
           (funcall (gethash "throwIfAborted" sig))
           (%fail-test "throwIfAborted did not signal js-exception"))
       (cl-cc/javascript:js-exception (c)
-        (assert-string= "boom" (cl-cc/javascript:js-exception-value c))))))
+        (expect (cl-cc/javascript:js-exception-value c) :to-equal "boom")))))
 
-(deftest js-rt-abort-signal-static-helpers
-  "AbortSignal static helpers create aborted signals and compose input signals."
+(it-sequential "js-rt-abort-signal-static-helpers"
   (let* ((ctor    (cl-cc/javascript::%js-make-abort-signal-constructor))
          (aborted (funcall (gethash "abort" ctor) "done"))
          (timeout (funcall (gethash "timeout" ctor) 5))
          (reason  (gethash "reason" timeout))
          (source  (gethash "signal" (cl-cc/javascript::%js-make-abort-controller)))
          (combo   (funcall (gethash "any" ctor) (%jr-arr source))))
-    (assert-true (gethash "aborted" aborted))
-    (assert-string= "done" (gethash "reason" aborted))
-    (assert-true (gethash "aborted" timeout))
-    (assert-string= "TimeoutError" (gethash "name" reason))
-    (assert-false (gethash "aborted" combo))
+    (expect (gethash "aborted" aborted) :to-be-truthy)
+    (expect (gethash "reason" aborted) :to-equal "done")
+    (expect (gethash "aborted" timeout) :to-be-truthy)
+    (expect (gethash "name" reason) :to-equal "TimeoutError")
+    (expect (gethash "aborted" combo) :to-be-falsy)
     (cl-cc/javascript::%js-abort-signal-abort source "input")
-    (assert-true (gethash "aborted" combo))
-    (assert-string= "input" (gethash "reason" combo))))
+    (expect (gethash "aborted" combo) :to-be-truthy)
+    (expect (gethash "reason" combo) :to-equal "input")))
 
 ;;; ─── URL ─────────────────────────────────────────────────────────────────────
 
-(deftest js-rt-make-url-parses-components
-  "%js-make-url parses common absolute URL components."
+(it-sequential "js-rt-make-url-parses-components"
   (let ((url (cl-cc/javascript::%js-make-url
               "https://example.com:8443/path/to?q=1#frag")))
     (%jr-assert-string-props
@@ -518,11 +517,9 @@
        ("pathname" "/path/to")
        ("search" "?q=1")
        ("hash" "#frag")))
-    (assert-string= "https://example.com:8443/path/to?q=1#frag"
-                    (funcall (gethash "toString" url)))))
+    (expect (funcall (gethash "toString" url)) :to-equal "https://example.com:8443/path/to?q=1#frag")))
 
-(deftest js-rt-make-url-resolves-base-relative-path
-  "%js-make-url resolves a relative path against a base URL string."
+(it-sequential "js-rt-make-url-resolves-base-relative-path"
   (let ((url (cl-cc/javascript::%js-make-url
               "child?x=1"
               "https://example.com/a/b/index.html")))
@@ -532,8 +529,7 @@
        ("pathname" "/a/b/child")
        ("search" "?x=1")))))
 
-(deftest js-rt-make-url-normalizes-relative-dot-segments
-  "%js-make-url normalizes dot segments when resolving against a base URL."
+(it-sequential "js-rt-make-url-normalizes-relative-dot-segments"
   (let ((url (cl-cc/javascript::%js-make-url
               "../c/./d/?x=1"
               "https://example.com/a/b/index.html")))
@@ -543,8 +539,7 @@
        ("pathname" "/a/c/d/")
        ("search" "?x=1")))))
 
-(deftest js-rt-make-url-resolves-query-and-hash-only-relative
-  "%js-make-url keeps the base path for query-only and hash-only relative URLs."
+(it-sequential "js-rt-make-url-resolves-query-and-hash-only-relative"
   (let ((query-url (cl-cc/javascript::%js-make-url
                     "?q=2"
                     "https://example.com/a/b/index.html?old=1#frag"))
@@ -565,131 +560,116 @@
 
 ;;; ─── TypedArray constructor factory ─────────────────────────────────────────
 
-(deftest js-rt-typed-array-ctor-factory
-  "%js-make-typed-array-ctor returns a lambda that creates a TypedArray."
+(it-sequential "js-rt-typed-array-ctor-factory"
   (let* ((ctor (cl-cc/javascript::%js-make-typed-array-ctor "Int32Array"))
          (ta   (funcall ctor 3)))
-    (assert-true (cl-cc/javascript::js-typed-array-p ta))
-    (assert-= 3 (cl-cc/javascript::js-ta-length ta))))
+    (expect (cl-cc/javascript::js-typed-array-p ta) :to-be-truthy)
+    (expect (= 3 (cl-cc/javascript::js-ta-length ta)) :to-be-truthy)))
 
 ;;; ─── Object.defineProperties ─────────────────────────────────────────────────
 
-(deftest js-rt-object-define-properties
-  "%js-object-define-properties sets multiple keys from a descriptor map."
+(it-sequential "js-rt-object-define-properties"
   (let* ((obj   (cl-cc/javascript::%js-make-object))
          (descs (cl-cc/javascript::%js-make-object
                  "a" (cl-cc/javascript::%js-make-object "value" 1)
                  "b" (cl-cc/javascript::%js-make-object "value" 2))))
     (cl-cc/javascript::%js-object-define-properties obj descs)
-    (assert-= 1 (gethash "a" obj))
-    (assert-= 2 (gethash "b" obj))))
+    (expect (= 1 (gethash "a" obj)) :to-be-truthy)
+    (expect (= 2 (gethash "b" obj)) :to-be-truthy)))
 
-(deftest js-rt-object-define-properties-ignores-non-objects
-  "%js-object-define-properties ignores non-object props and non-object descriptors."
+(it-sequential "js-rt-object-define-properties-ignores-non-objects"
   (let* ((obj (cl-cc/javascript::%js-make-object "keep" 1))
          (mixed (cl-cc/javascript::%js-make-object
                  "ok" (cl-cc/javascript::%js-make-object "value" 2)
                  "skip" 9)))
     (cl-cc/javascript::%js-object-define-properties obj (%jr-arr "bad"))
     (cl-cc/javascript::%js-object-define-properties obj mixed)
-    (assert-= 1 (gethash "keep" obj))
-    (assert-= 2 (gethash "ok" obj))
-    (assert-false (nth-value 1 (gethash "skip" obj)))))
+    (expect (= 1 (gethash "keep" obj)) :to-be-truthy)
+    (expect (= 2 (gethash "ok" obj)) :to-be-truthy)
+    (expect (nth-value 1 (gethash "skip" obj)) :to-be-falsy)))
 
 ;;; ─── Reflect.defineProperty / Object.defineProperty ─────────────────────────
 
-(deftest js-rt-reflect-define-property
-  "%js-reflect-define-property writes a value descriptor and returns t."
+(it-sequential "js-rt-reflect-define-property"
   (let* ((obj  (cl-cc/javascript::%js-make-object))
          (desc (cl-cc/javascript::%js-make-object "value" 42))
          (ret  (cl-cc/javascript::%js-reflect-define-property obj "x" desc)))
-    (assert-true ret)
-    (assert-= 42 (gethash "x" obj))))
+    (expect ret :to-be-truthy)
+    (expect (= 42 (gethash "x" obj)) :to-be-truthy)))
 
-(deftest js-rt-object-define-property-value
-  "%js-object-define-property with a value descriptor stores the value."
+(it-sequential "js-rt-object-define-property-value"
   (let* ((obj  (cl-cc/javascript::%js-make-object))
          (desc (cl-cc/javascript::%js-make-object "value" 99)))
     (let ((ret (cl-cc/javascript::%js-object-define-property obj "n" desc)))
-      (assert-eq obj ret)
-      (assert-= 99 (gethash "n" obj)))))
+      (expect ret :to-be obj)
+      (expect (= 99 (gethash "n" obj)) :to-be-truthy))))
 
-(deftest js-rt-object-define-property-getter
-  "%js-object-define-property with a get descriptor stores under __get_KEY slot."
+(it-sequential "js-rt-object-define-property-getter"
   (let* ((obj  (cl-cc/javascript::%js-make-object))
          (getter (lambda () 7))
          (desc (cl-cc/javascript::%js-make-object "get" getter)))
     (cl-cc/javascript::%js-object-define-property obj "prop" desc)
-    (assert-eq getter (gethash "__get_prop" obj))))
+    (expect (gethash "__get_prop" obj) :to-be getter)))
 
-(deftest js-rt-object-get-own-property-descriptor-accessor
-  "%js-object-get-own-property-descriptor returns accessor descriptor slots."
+(it-sequential "js-rt-object-get-own-property-descriptor-accessor"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (getter (lambda () 7))
          (setter (lambda (value) value))
          (desc (cl-cc/javascript::%js-make-object "get" getter "set" setter)))
     (cl-cc/javascript::%js-object-define-property obj "prop" desc)
     (let ((actual (cl-cc/javascript::%js-object-get-own-property-descriptor obj "prop")))
-      (assert-eq getter (gethash "get" actual))
-      (assert-eq setter (gethash "set" actual))
-      (assert-true (gethash "enumerable" actual))
-      (assert-true (gethash "configurable" actual))
-      (assert-false (nth-value 1 (gethash "value" actual))))))
+      (expect (gethash "get" actual) :to-be getter)
+      (expect (gethash "set" actual) :to-be setter)
+      (expect (gethash "enumerable" actual) :to-be-truthy)
+      (expect (gethash "configurable" actual) :to-be-truthy)
+      (expect (nth-value 1 (gethash "value" actual)) :to-be-falsy))))
 
-(deftest js-rt-object-get-own-property-descriptors-includes-accessor-property
-  "%js-object-get-own-property-descriptors exposes accessor slots by property name."
+(it-sequential "js-rt-object-get-own-property-descriptors-includes-accessor-property"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (getter (lambda () 10))
          (desc (cl-cc/javascript::%js-make-object "get" getter)))
     (cl-cc/javascript::%js-object-define-property obj "computed" desc)
     (let* ((descs (cl-cc/javascript::%js-object-get-own-property-descriptors obj))
            (actual (gethash "computed" descs)))
-      (assert-eq getter (gethash "get" actual))
-      (assert-false (nth-value 1 (gethash "__get_computed" descs))))))
+      (expect (gethash "get" actual) :to-be getter)
+      (expect (nth-value 1 (gethash "__get_computed" descs)) :to-be-falsy))))
 
-(deftest js-rt-object-get-own-property-descriptor-reflects-object-flags
-  "%js-object-get-own-property-descriptor reflects simplified seal/freeze flags."
+(it-sequential "js-rt-object-get-own-property-descriptor-reflects-object-flags"
   (let* ((sealed (cl-cc/javascript::%js-make-object "a" 1))
          (frozen (cl-cc/javascript::%js-make-object "b" 2)))
     (cl-cc/javascript::%js-object-seal sealed)
     (cl-cc/javascript::%js-object-freeze frozen)
     (let ((sealed-desc (cl-cc/javascript::%js-object-get-own-property-descriptor sealed "a"))
           (frozen-desc (cl-cc/javascript::%js-object-get-own-property-descriptor frozen "b")))
-      (assert-false (gethash "configurable" sealed-desc))
-      (assert-true (gethash "writable" sealed-desc))
-      (assert-false (gethash "configurable" frozen-desc))
-      (assert-false (gethash "writable" frozen-desc)))))
+      (expect (gethash "configurable" sealed-desc) :to-be-falsy)
+      (expect (gethash "writable" sealed-desc) :to-be-truthy)
+      (expect (gethash "configurable" frozen-desc) :to-be-falsy)
+      (expect (gethash "writable" frozen-desc) :to-be-falsy))))
 
-(deftest js-rt-reflect-define-property-respects-prevent-extensions
-  "%js-reflect-define-property returns nil when adding to a non-extensible object."
+(it-sequential "js-rt-reflect-define-property-respects-prevent-extensions"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (desc (cl-cc/javascript::%js-make-object "value" 10)))
     (cl-cc/javascript::%js-object-prevent-extensions obj)
-    (assert-false (cl-cc/javascript::%js-reflect-define-property obj "blocked" desc))
-    (assert-false (nth-value 1 (gethash "blocked" obj)))))
+    (expect (cl-cc/javascript::%js-reflect-define-property obj "blocked" desc) :to-be-falsy)
+    (expect (nth-value 1 (gethash "blocked" obj)) :to-be-falsy)))
 
-(deftest js-rt-object-define-property-signals-on-prevent-extensions
-  "%js-object-define-property signals when adding to a non-extensible object."
+(it-sequential "js-rt-object-define-property-signals-on-prevent-extensions"
   (let* ((obj (cl-cc/javascript::%js-make-object))
          (desc (cl-cc/javascript::%js-make-object "value" 10)))
     (cl-cc/javascript::%js-object-prevent-extensions obj)
-    (assert-signals error
-      (cl-cc/javascript::%js-object-define-property obj "blocked" desc))
-    (assert-false (nth-value 1 (gethash "blocked" obj)))))
+    (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/javascript::%js-object-define-property obj "blocked" desc)) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))
+    (expect (nth-value 1 (gethash "blocked" obj)) :to-be-falsy)))
 
-(deftest js-rt-reflect-define-property-rejects-frozen-redefine
-  "%js-reflect-define-property returns nil when redefining a frozen object."
+(it-sequential "js-rt-reflect-define-property-rejects-frozen-redefine"
   (let* ((obj (cl-cc/javascript::%js-make-object "locked" 1))
          (desc (cl-cc/javascript::%js-make-object "value" 2)))
     (cl-cc/javascript::%js-object-freeze obj)
-    (assert-false (cl-cc/javascript::%js-reflect-define-property obj "locked" desc))
-    (assert-= 1 (gethash "locked" obj))))
+    (expect (cl-cc/javascript::%js-reflect-define-property obj "locked" desc) :to-be-falsy)
+    (expect (= 1 (gethash "locked" obj)) :to-be-truthy)))
 
-(deftest js-rt-object-define-property-rejects-frozen-redefine
-  "%js-object-define-property signals when redefining a frozen object."
+(it-sequential "js-rt-object-define-property-rejects-frozen-redefine"
   (let* ((obj (cl-cc/javascript::%js-make-object "locked" 1))
          (desc (cl-cc/javascript::%js-make-object "value" 2)))
     (cl-cc/javascript::%js-object-freeze obj)
-    (assert-signals error
-      (cl-cc/javascript::%js-object-define-property obj "locked" desc))
-    (assert-= 1 (gethash "locked" obj))))
+    (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/javascript::%js-object-define-property obj "locked" desc)) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy))
+    (expect (= 1 (gethash "locked" obj)) :to-be-truthy)))

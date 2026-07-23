@@ -5,218 +5,228 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Temporal helper functions ───────────────────────────────────────────────
 
-(deftest-each js-rt-temporal-pad
-  "%temporal-pad zero-pads integers to the specified width."
-  :cases (("year-4"   2025 4 "2025")
-          ("month-2"  3    2 "03")
-          ("day-2"    15   2 "15")
-          ("narrow"   9    1 "9"))
-  (n width expected)
-  (assert-string= expected (cl-cc/javascript::%temporal-pad n width)))
+(it-sequential "js-rt-temporal-pad year-4"
+  (destructuring-bind (n width expected) (list 2025 4 "2025")
+    (expect (cl-cc/javascript::%temporal-pad n width) :to-equal expected)))
 
-(deftest-each js-rt-temporal-3way-compare
-  "%temporal-3way-compare returns -1/0/1 for ordered numeric comparison."
-  :cases (("less"    1 2 -1.0d0)
-          ("equal"   5 5  0.0d0)
-          ("greater" 9 3  1.0d0))
-  (a b expected)
-  (assert-= expected (cl-cc/javascript::%temporal-3way-compare a b)))
+(it-sequential "js-rt-temporal-pad month-2"
+  (destructuring-bind (n width expected) (list 3 2 "03")
+    (expect (cl-cc/javascript::%temporal-pad n width) :to-equal expected)))
 
-(deftest-each js-rt-temporal-parse-iso-fields
-  "%temporal-parse-iso-fields decomposes an ISO-8601 datetime string."
-  :cases (("full"      "2025-06-13T14:30:00" 2025 6  13 14 30 0)
-          ("date-only" "2025-01-01"           2025 1   1  0  0 0))
-  (s exp-y exp-mo exp-d exp-h exp-mi exp-s)
-  (multiple-value-bind (y mo d h mi s) (cl-cc/javascript::%temporal-parse-iso-fields s)
-    (assert-= exp-y  y)
-    (assert-= exp-mo mo)
-    (assert-= exp-d  d)
-    (assert-= exp-h  h)
-    (assert-= exp-mi mi)
-    (assert-= exp-s  s)))
+(it-sequential "js-rt-temporal-pad day-2"
+  (destructuring-bind (n width expected) (list 15 2 "15")
+    (expect (cl-cc/javascript::%temporal-pad n width) :to-equal expected)))
 
-(deftest-each js-rt-temporal-duration-to-seconds
-  "%temporal-duration-to-seconds converts duration hash-tables to total seconds."
-  :cases (("one-hour"   "hours"   1 3600)
-          ("one-minute" "minutes" 1 60)
-          ("one-second" "seconds" 1 1)
-          ("one-day"    "days"    1 86400))
-  (unit n expected)
-  (let ((dur (cl-cc/javascript::%js-make-object unit (coerce n 'double-float))))
-    (assert-= expected (cl-cc/javascript::%temporal-duration-to-seconds dur))))
+(it-sequential "js-rt-temporal-pad narrow"
+  (destructuring-bind (n width expected) (list 9 1 "9")
+    (expect (cl-cc/javascript::%temporal-pad n width) :to-equal expected)))
 
-(deftest js-rt-temporal-parse-time-fields
-  "%temporal-parse-time-fields decomposes an HH:MM:SS string."
+(it-sequential "js-rt-temporal-3way-compare less"
+  (destructuring-bind (a b expected) (list 1 2 -1.0d0)
+    (expect (= expected (cl-cc/javascript::%temporal-3way-compare a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-temporal-3way-compare equal"
+  (destructuring-bind (a b expected) (list 5 5 0.0d0)
+    (expect (= expected (cl-cc/javascript::%temporal-3way-compare a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-temporal-3way-compare greater"
+  (destructuring-bind (a b expected) (list 9 3 1.0d0)
+    (expect (= expected (cl-cc/javascript::%temporal-3way-compare a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-temporal-parse-iso-fields full"
+  (destructuring-bind (s exp-y exp-mo exp-d exp-h exp-mi exp-s) (list "2025-06-13T14:30:00" 2025 6 13 14 30 0)
+    (multiple-value-bind (y mo d h mi s) (cl-cc/javascript::%temporal-parse-iso-fields s)
+    (expect (= exp-y y) :to-be-truthy)
+    (expect (= exp-mo mo) :to-be-truthy)
+    (expect (= exp-d d) :to-be-truthy)
+    (expect (= exp-h h) :to-be-truthy)
+    (expect (= exp-mi mi) :to-be-truthy)
+    (expect (= exp-s s) :to-be-truthy))))
+
+(it-sequential "js-rt-temporal-parse-iso-fields date-only"
+  (destructuring-bind (s exp-y exp-mo exp-d exp-h exp-mi exp-s) (list "2025-01-01" 2025 1 1 0 0 0)
+    (multiple-value-bind (y mo d h mi s) (cl-cc/javascript::%temporal-parse-iso-fields s)
+    (expect (= exp-y y) :to-be-truthy)
+    (expect (= exp-mo mo) :to-be-truthy)
+    (expect (= exp-d d) :to-be-truthy)
+    (expect (= exp-h h) :to-be-truthy)
+    (expect (= exp-mi mi) :to-be-truthy)
+    (expect (= exp-s s) :to-be-truthy))))
+
+(it-sequential "js-rt-temporal-duration-to-seconds one-hour"
+  (destructuring-bind (unit n expected) (list "hours" 1 3600)
+    (let ((dur (cl-cc/javascript::%js-make-object unit (coerce n 'double-float))))
+    (expect (= expected (cl-cc/javascript::%temporal-duration-to-seconds dur)) :to-be-truthy))))
+
+(it-sequential "js-rt-temporal-duration-to-seconds one-minute"
+  (destructuring-bind (unit n expected) (list "minutes" 1 60)
+    (let ((dur (cl-cc/javascript::%js-make-object unit (coerce n 'double-float))))
+    (expect (= expected (cl-cc/javascript::%temporal-duration-to-seconds dur)) :to-be-truthy))))
+
+(it-sequential "js-rt-temporal-duration-to-seconds one-second"
+  (destructuring-bind (unit n expected) (list "seconds" 1 1)
+    (let ((dur (cl-cc/javascript::%js-make-object unit (coerce n 'double-float))))
+    (expect (= expected (cl-cc/javascript::%temporal-duration-to-seconds dur)) :to-be-truthy))))
+
+(it-sequential "js-rt-temporal-duration-to-seconds one-day"
+  (destructuring-bind (unit n expected) (list "days" 1 86400)
+    (let ((dur (cl-cc/javascript::%js-make-object unit (coerce n 'double-float))))
+    (expect (= expected (cl-cc/javascript::%temporal-duration-to-seconds dur)) :to-be-truthy))))
+
+(it-sequential "js-rt-temporal-parse-time-fields"
   (multiple-value-bind (h m s) (cl-cc/javascript::%temporal-parse-time-fields "14:30:05")
-    (assert-= 14 h)
-    (assert-= 30 m)
-    (assert-=  5 s)))
+    (expect (= 14 h) :to-be-truthy)
+    (expect (= 30 m) :to-be-truthy)
+    (expect (= 5 s) :to-be-truthy)))
 
-(deftest js-rt-temporal-now-object
-  "Temporal.Now exposes callable constructors for the simplified runtime types."
+(it-sequential "js-rt-temporal-now-object"
   (let* ((now (cl-cc/javascript::%js-temporal-now))
          (instant (funcall (gethash "instant" now)))
          (plain-datetime (funcall (gethash "plainDateTimeISO" now)))
          (plain-date (funcall (gethash "plainDateISO" now)))
          (plain-time (funcall (gethash "plainTimeISO" now)))
          (zoned-datetime (funcall (gethash "zonedDateTimeISO" now))))
-    (assert-string= "UTC" (funcall (gethash "timeZoneId" now)))
-    (assert-string= "Temporal.Instant" (gethash "__type__" instant))
-    (assert-string= "Temporal.PlainDateTime" (gethash "__type__" plain-datetime))
-    (assert-string= "Temporal.PlainDate" (gethash "__type__" plain-date))
-    (assert-string= "Temporal.PlainTime" (gethash "__type__" plain-time))
-    (assert-string= "Temporal.ZonedDateTime" (gethash "__type__" zoned-datetime))))
+    (expect (funcall (gethash "timeZoneId" now)) :to-equal "UTC")
+    (expect (gethash "__type__" instant) :to-equal "Temporal.Instant")
+    (expect (gethash "__type__" plain-datetime) :to-equal "Temporal.PlainDateTime")
+    (expect (gethash "__type__" plain-date) :to-equal "Temporal.PlainDate")
+    (expect (gethash "__type__" plain-time) :to-equal "Temporal.PlainTime")
+    (expect (gethash "__type__" zoned-datetime) :to-equal "Temporal.ZonedDateTime")))
 
-(deftest js-rt-temporal-instant-methods
-  "Temporal.Instant methods cover formatting, arithmetic, comparison, and timezone conversion."
+(it-sequential "js-rt-temporal-instant-methods"
   (let* ((instant (cl-cc/javascript::%js-temporal-instant 0))
          (duration (cl-cc/javascript::%js-temporal-duration :hours 1 :minutes 30))
          (added (funcall (gethash "add" instant) duration))
          (subtracted (funcall (gethash "subtract" added) duration))
          (zoned (funcall (gethash "toZonedDateTimeISO" instant))))
-    (assert-string= "1970-01-01T00:00:00Z" (funcall (gethash "toString" instant)))
-    (assert-= 5400.0d0 (gethash "epochSeconds" added))
-    (assert-= 0.0d0 (gethash "epochSeconds" subtracted))
-    (assert-true (funcall (gethash "equals" instant) subtracted))
-    (assert-= -1.0d0 (funcall (gethash "compare" instant) added))
-    (assert-string= "UTC" (gethash "timeZoneId" zoned))))
+    (expect (funcall (gethash "toString" instant)) :to-equal "1970-01-01T00:00:00Z")
+    (expect (= 5400.0d0 (gethash "epochSeconds" added)) :to-be-truthy)
+    (expect (= 0.0d0 (gethash "epochSeconds" subtracted)) :to-be-truthy)
+    (expect (funcall (gethash "equals" instant) subtracted) :to-be-truthy)
+    (expect (= -1.0d0 (funcall (gethash "compare" instant) added)) :to-be-truthy)
+    (expect (gethash "timeZoneId" zoned) :to-equal "UTC")))
 
-(deftest js-rt-temporal-plain-date-methods
-  "Temporal.PlainDate methods cover formatting and stable conversion helpers."
+(it-sequential "js-rt-temporal-plain-date-methods"
   (let* ((date (cl-cc/javascript::%js-temporal-plain-date 2025 6 18))
          (datetime (funcall (gethash "toPlainDateTime" date))))
-    (assert-string= "2025-06-18" (funcall (gethash "toString" date)))
-    (assert-= 3.0d0 (gethash "dayOfWeek" date))
-    (assert-string= "2025-06-18T00:00:00" (funcall (gethash "toString" datetime)))))
+    (expect (funcall (gethash "toString" date)) :to-equal "2025-06-18")
+    (expect (= 3.0d0 (gethash "dayOfWeek" date)) :to-be-truthy)
+    (expect (funcall (gethash "toString" datetime)) :to-equal "2025-06-18T00:00:00")))
 
-(deftest js-rt-temporal-plain-date-extended
-  "Temporal.PlainDate covers the optional time argument plus add/subtract/compare."
+(it-sequential "js-rt-temporal-plain-date-extended"
   (let* ((date (cl-cc/javascript::%js-temporal-plain-date 2025 6 18))
          (time (cl-cc/javascript::%js-temporal-plain-time 7 8 9))
          (duration (cl-cc/javascript::%js-temporal-duration :days 1))
          (datetime (funcall (gethash "toPlainDateTime" date) time))
          (added (funcall (gethash "add" date) duration))
          (subtracted (funcall (gethash "subtract" added) duration)))
-    (assert-string= "Temporal.PlainDateTime" (gethash "__type__" datetime))
-    (assert-= 2025.0d0 (gethash "year" datetime))
-    (assert-= 6.0d0 (gethash "month" datetime))
-    (assert-= 18.0d0 (gethash "day" datetime))
-    (assert-= 7.0d0 (gethash "hour" datetime))
-    (assert-= 8.0d0 (gethash "minute" datetime))
-    (assert-= 9.0d0 (gethash "second" datetime))
-    (assert-string= "2025-06-19" (funcall (gethash "toString" added)))
-    (assert-string= "2025-06-18" (funcall (gethash "toString" subtracted)))
-    (assert-= -1.0d0 (funcall (gethash "compare" date) added))
-    (assert-true (funcall (gethash "equals" date)
-                          (cl-cc/javascript::%js-temporal-plain-date 2025 6 18)))))
+    (expect (gethash "__type__" datetime) :to-equal "Temporal.PlainDateTime")
+    (expect (= 2025.0d0 (gethash "year" datetime)) :to-be-truthy)
+    (expect (= 6.0d0 (gethash "month" datetime)) :to-be-truthy)
+    (expect (= 18.0d0 (gethash "day" datetime)) :to-be-truthy)
+    (expect (= 7.0d0 (gethash "hour" datetime)) :to-be-truthy)
+    (expect (= 8.0d0 (gethash "minute" datetime)) :to-be-truthy)
+    (expect (= 9.0d0 (gethash "second" datetime)) :to-be-truthy)
+    (expect (funcall (gethash "toString" added)) :to-equal "2025-06-19")
+    (expect (funcall (gethash "toString" subtracted)) :to-equal "2025-06-18")
+    (expect (= -1.0d0 (funcall (gethash "compare" date) added)) :to-be-truthy)
+    (expect (funcall (gethash "equals" date)
+                          (cl-cc/javascript::%js-temporal-plain-date 2025 6 18)) :to-be-truthy)))
 
-(deftest js-rt-temporal-plain-time-methods
-  "Temporal.PlainTime methods cover formatting, arithmetic, and equality."
+(it-sequential "js-rt-temporal-plain-time-methods"
   (let* ((time (cl-cc/javascript::%js-temporal-plain-time 23 59 30))
          (duration (cl-cc/javascript::%js-temporal-duration :seconds 90))
          (added (funcall (gethash "add" time) duration)))
-    (assert-string= "23:59:30" (funcall (gethash "toString" time)))
-    (assert-string= "00:01:00" (funcall (gethash "toString" added)))
-    (assert-true (funcall (gethash "equals" added)
-                          (cl-cc/javascript::%js-temporal-plain-time 0 1 0)))))
+    (expect (funcall (gethash "toString" time)) :to-equal "23:59:30")
+    (expect (funcall (gethash "toString" added)) :to-equal "00:01:00")
+    (expect (funcall (gethash "equals" added)
+                          (cl-cc/javascript::%js-temporal-plain-time 0 1 0)) :to-be-truthy)))
 
-(deftest js-rt-temporal-plain-datetime-methods
-  "Temporal.PlainDateTime methods cover formatting and stable projection helpers."
+(it-sequential "js-rt-temporal-plain-datetime-methods"
   (let* ((datetime (cl-cc/javascript::%js-temporal-plain-datetime 2025 6 18 12 34 56))
          (plain-date (funcall (gethash "toPlainDate" datetime)))
          (plain-time (funcall (gethash "toPlainTime" datetime))))
-    (assert-string= "2025-06-18T12:34:56" (funcall (gethash "toString" datetime)))
-    (assert-string= "2025-06-18" (funcall (gethash "toString" plain-date)))
-    (assert-string= "12:34:56" (funcall (gethash "toString" plain-time)))))
+    (expect (funcall (gethash "toString" datetime)) :to-equal "2025-06-18T12:34:56")
+    (expect (funcall (gethash "toString" plain-date)) :to-equal "2025-06-18")
+    (expect (funcall (gethash "toString" plain-time)) :to-equal "12:34:56")))
 
-(deftest js-rt-temporal-plain-datetime-extended
-  "Temporal.PlainDateTime covers add/subtract/toInstant/equals branches."
+(it-sequential "js-rt-temporal-plain-datetime-extended"
   (let* ((datetime (cl-cc/javascript::%js-temporal-plain-datetime 2025 6 18 12 34 56))
          (duration (cl-cc/javascript::%js-temporal-duration :seconds 4))
          (added (funcall (gethash "add" datetime) duration))
          (subtracted (funcall (gethash "subtract" added) duration))
          (instant (funcall (gethash "toInstant" datetime))))
-    (assert-string= "2025-06-18T12:34:56" (funcall (gethash "toString" datetime)))
-    (assert-string= "2025-06-18T12:35:00" (funcall (gethash "toString" added)))
-    (assert-string= "2025-06-18T12:34:56" (funcall (gethash "toString" subtracted)))
-    (assert-string= "Temporal.Instant" (gethash "__type__" instant))
-    (assert-true (funcall (gethash "equals" datetime)
-                          (cl-cc/javascript::%js-temporal-plain-datetime 2025 6 18 12 34 56)))))
+    (expect (funcall (gethash "toString" datetime)) :to-equal "2025-06-18T12:34:56")
+    (expect (funcall (gethash "toString" added)) :to-equal "2025-06-18T12:35:00")
+    (expect (funcall (gethash "toString" subtracted)) :to-equal "2025-06-18T12:34:56")
+    (expect (gethash "__type__" instant) :to-equal "Temporal.Instant")
+    (expect (funcall (gethash "equals" datetime)
+                          (cl-cc/javascript::%js-temporal-plain-datetime 2025 6 18 12 34 56)) :to-be-truthy)))
 
-(deftest js-rt-temporal-zoned-datetime-methods
-  "Temporal.ZonedDateTime methods cover formatting and conversion helpers."
+(it-sequential "js-rt-temporal-zoned-datetime-methods"
   (let* ((zoned (cl-cc/javascript::%js-temporal-zoned-datetime 2025 6 18 12 34 56 "UTC"))
          (plain-datetime (funcall (gethash "toPlainDateTime" zoned)))
          (plain-date (funcall (gethash "toPlainDate" zoned)))
          (plain-time (funcall (gethash "toPlainTime" zoned)))
          (instant (funcall (gethash "toInstant" zoned))))
-    (assert-string= "2025-06-18T12:34:56+00:00[UTC]" (funcall (gethash "toString" zoned)))
-    (assert-string= "2025-06-18T12:34:56" (funcall (gethash "toString" plain-datetime)))
-    (assert-string= "2025-06-18" (funcall (gethash "toString" plain-date)))
-    (assert-string= "12:34:56" (funcall (gethash "toString" plain-time)))
-    (assert-string= "Temporal.Instant" (gethash "__type__" instant))))
+    (expect (funcall (gethash "toString" zoned)) :to-equal "2025-06-18T12:34:56+00:00[UTC]")
+    (expect (funcall (gethash "toString" plain-datetime)) :to-equal "2025-06-18T12:34:56")
+    (expect (funcall (gethash "toString" plain-date)) :to-equal "2025-06-18")
+    (expect (funcall (gethash "toString" plain-time)) :to-equal "12:34:56")
+    (expect (gethash "__type__" instant) :to-equal "Temporal.Instant")))
 
-(deftest js-rt-temporal-duration-methods
-  "Temporal.Duration methods cover formatting, sign, absolute, negation, and total seconds."
+(it-sequential "js-rt-temporal-duration-methods"
   (let* ((duration (cl-cc/javascript::%js-temporal-duration :years 1 :months 2 :weeks 3 :days 4 :hours 5 :minutes 6 :seconds 7))
          (negative (cl-cc/javascript::%js-temporal-duration :hours -2 :minutes -30))
          (abs-duration (funcall (gethash "abs" negative)))
          (negated (funcall (gethash "negated" duration))))
-    (assert-string= "P1Y2M3W4DT5H6M7S" (funcall (gethash "toString" duration)))
-    (assert-= 1.0d0 (gethash "sign" duration))
-    (assert-= -1.0d0 (gethash "sign" negative))
-    (assert-string= "P0Y0M0W0DT2H30M0S" (funcall (gethash "toString" abs-duration)))
-    (assert-string= "P-1Y-2M-3W-4DT-5H-6M-7S" (funcall (gethash "toString" negated)))
-    (assert-= 38995567.0d0 (funcall (gethash "total" duration)))))
+    (expect (funcall (gethash "toString" duration)) :to-equal "P1Y2M3W4DT5H6M7S")
+    (expect (= 1.0d0 (gethash "sign" duration)) :to-be-truthy)
+    (expect (= -1.0d0 (gethash "sign" negative)) :to-be-truthy)
+    (expect (funcall (gethash "toString" abs-duration)) :to-equal "P0Y0M0W0DT2H30M0S")
+    (expect (funcall (gethash "toString" negated)) :to-equal "P-1Y-2M-3W-4DT-5H-6M-7S")
+    (expect (= 38995567.0d0 (funcall (gethash "total" duration))) :to-be-truthy)))
 
-(deftest js-rt-temporal-normalization-numbers
-  "Temporal number normalization truncates and falls back to the default."
-  (assert-= 3 (cl-cc/javascript::%temporal-normalize-number 3.9))
-  (assert-= 7 (cl-cc/javascript::%temporal-normalize-number nil 7)))
+(it-sequential "js-rt-temporal-normalization-numbers"
+  (expect (= 3 (cl-cc/javascript::%temporal-normalize-number 3.9)) :to-be-truthy)
+  (expect (= 7 (cl-cc/javascript::%temporal-normalize-number nil 7)) :to-be-truthy))
 
-(deftest js-rt-temporal-normalization-encode-decode
-  "Temporal encode/decode round-trips date-time fields."
+(it-sequential "js-rt-temporal-normalization-encode-decode"
   (multiple-value-bind (s mn h d m y dow)
       (cl-cc/javascript::%temporal-decode
        (cl-cc/javascript::%temporal-encode 2025 6 18 12 34 56))
-    (assert-= 56 s)
-    (assert-= 34 mn)
-    (assert-= 12 h)
-    (assert-= 18 d)
-    (assert-= 6 m)
-    (assert-= 2025 y)
-    (assert-true (numberp dow))))
+    (expect (= 56 s) :to-be-truthy)
+    (expect (= 34 mn) :to-be-truthy)
+    (expect (= 12 h) :to-be-truthy)
+    (expect (= 18 d) :to-be-truthy)
+    (expect (= 6 m) :to-be-truthy)
+    (expect (= 2025 y) :to-be-truthy)
+    (expect (numberp dow) :to-be-truthy)))
 
-(deftest js-rt-temporal-normalization-duration
-  "Temporal.Duration normalizes non-number fields (nil minutes, float hours)."
+(it-sequential "js-rt-temporal-normalization-duration"
   (let ((duration (cl-cc/javascript::%js-temporal-duration :hours -2.7 :minutes nil)))
-    (assert-string= "P0Y0M0W0DT-2H0M0S" (funcall (gethash "toString" duration)))
-    (assert-= -1.0d0 (gethash "sign" duration))
-    (assert-= -7200.0d0 (funcall (gethash "total" duration)))))
+    (expect (funcall (gethash "toString" duration)) :to-equal "P0Y0M0W0DT-2H0M0S")
+    (expect (= -1.0d0 (gethash "sign" duration)) :to-be-truthy)
+    (expect (= -7200.0d0 (funcall (gethash "total" duration))) :to-be-truthy)))
 
-(deftest js-rt-temporal-normalization-parse-instant-fallback
-  "Temporal instant parsing falls back to now for invalid ISO strings."
+(it-sequential "js-rt-temporal-normalization-parse-instant-fallback"
   (let ((instant (cl-cc/javascript::%js-temporal-parse-instant "(")))
-    (assert-string= "Temporal.Instant" (gethash "__type__" instant))))
+    (expect (gethash "__type__" instant) :to-equal "Temporal.Instant")))
 
-(deftest js-rt-temporal-normalization-parse-plain-date-fallback
-  "Temporal plain-date parsing falls back to today for invalid ISO strings."
+(it-sequential "js-rt-temporal-normalization-parse-plain-date-fallback"
   (let ((plain-date (cl-cc/javascript::%js-temporal-parse-plain-date "(")))
-    (assert-string= "Temporal.PlainDate" (gethash "__type__" plain-date))))
+    (expect (gethash "__type__" plain-date) :to-equal "Temporal.PlainDate")))
 
-(deftest js-rt-temporal-year-month-and-month-day
-  "Temporal.PlainYearMonth and Temporal.PlainMonthDay stringify as simplified ISO fragments."
+(it-sequential "js-rt-temporal-year-month-and-month-day"
   (let ((year-month (cl-cc/javascript::%js-temporal-plain-year-month 2025 6))
         (month-day (cl-cc/javascript::%js-temporal-plain-month-day 6 18)))
-    (assert-string= "2025-06" (funcall (gethash "toString" year-month)))
-    (assert-string= "--06-18" (funcall (gethash "toString" month-day)))))
+    (expect (funcall (gethash "toString" year-month)) :to-equal "2025-06")
+    (expect (funcall (gethash "toString" month-day)) :to-equal "--06-18")))
 
-(deftest js-rt-temporal-global-factories
-  "The Temporal global object covers constructor, from, and compare branches for simplified factories."
+(it-sequential "js-rt-temporal-global-factories"
   (let* ((temporal cl-cc/javascript::*js-temporal-global*)
          (instant-global (gethash "Instant" temporal))
          (plain-date-global (gethash "PlainDate" temporal))
@@ -258,365 +268,346 @@
          (plain-month-day-from-object (funcall (gethash "from" plain-month-day-global)
                                                (cl-cc/javascript::%js-make-object "month" 6 "day" 18)))
          (plain-month-day-from-fallback (funcall (gethash "from" plain-month-day-global) "ignored")))
-    (assert-string= "Temporal.Instant" (gethash "__type__" instant-now))
-    (assert-= 1.0d0 (gethash "epochSeconds" instant-from-string))
-    (assert-= 2.0d0 (gethash "epochSeconds" instant-from-ms))
-    (assert-= 3.0d0 (gethash "epochSeconds" instant-from-us))
-    (assert-= 4.0d0 (gethash "epochSeconds" instant-from-ns))
-    (assert-= -1.0d0 (funcall (gethash "compare" instant-global) instant-from-string instant-from-ms))
-    (assert-string= "2025-06-18" (funcall (gethash "toString" plain-date-from-object)))
-    (assert-string= "2025-06-19" (funcall (gethash "toString" plain-date-from-string)))
-    (assert-string= "07:08:09" (funcall (gethash "toString" plain-time-from-object)))
-    (assert-string= "10:11:12" (funcall (gethash "toString" plain-time-from-string)))
-    (assert-string= "2025-06-18T12:34:56" (funcall (gethash "toString" plain-datetime-from-object)))
-    (assert-string= "2025-06-18T12:34:56" (funcall (gethash "toString" plain-datetime-from-string)))
-    (assert-string= "1970-01-01T00:00:00+00:00[UTC]" (funcall (gethash "toString" zoned-from-call)))
-    (assert-string= "2025-06-18T12:34:56+00:00[UTC]" (funcall (gethash "toString" zoned-from-string)))
-    (assert-string= "2025-06-18T12:34:56+00:00[UTC]" (funcall (gethash "toString" zoned-from-object)))
-    (assert-string= "P1Y2M0W3DT4H5M6S" (funcall (gethash "toString" duration-from-call)))
-    (assert-string= "P1Y2M0W3DT4H5M6S" (funcall (gethash "toString" duration-from-object)))
-    (assert-string= "P0Y0M0W0DT0H0M0S" (funcall (gethash "toString" duration-from-fallback)))
-    (assert-= -1.0d0 (funcall (gethash "compare" duration-global) duration-from-fallback duration-from-object))
-    (assert-string= "2025-06" (funcall (gethash "toString" plain-year-month-from-object)))
-    (assert-string= "2000-01" (funcall (gethash "toString" plain-year-month-from-fallback)))
-    (assert-string= "--06-18" (funcall (gethash "toString" plain-month-day-from-object)))
-    (assert-string= "--01-01" (funcall (gethash "toString" plain-month-day-from-fallback)))))
+    (expect (gethash "__type__" instant-now) :to-equal "Temporal.Instant")
+    (expect (= 1.0d0 (gethash "epochSeconds" instant-from-string)) :to-be-truthy)
+    (expect (= 2.0d0 (gethash "epochSeconds" instant-from-ms)) :to-be-truthy)
+    (expect (= 3.0d0 (gethash "epochSeconds" instant-from-us)) :to-be-truthy)
+    (expect (= 4.0d0 (gethash "epochSeconds" instant-from-ns)) :to-be-truthy)
+    (expect (= -1.0d0 (funcall (gethash "compare" instant-global) instant-from-string instant-from-ms)) :to-be-truthy)
+    (expect (funcall (gethash "toString" plain-date-from-object)) :to-equal "2025-06-18")
+    (expect (funcall (gethash "toString" plain-date-from-string)) :to-equal "2025-06-19")
+    (expect (funcall (gethash "toString" plain-time-from-object)) :to-equal "07:08:09")
+    (expect (funcall (gethash "toString" plain-time-from-string)) :to-equal "10:11:12")
+    (expect (funcall (gethash "toString" plain-datetime-from-object)) :to-equal "2025-06-18T12:34:56")
+    (expect (funcall (gethash "toString" plain-datetime-from-string)) :to-equal "2025-06-18T12:34:56")
+    (expect (funcall (gethash "toString" zoned-from-call)) :to-equal "1970-01-01T00:00:00+00:00[UTC]")
+    (expect (funcall (gethash "toString" zoned-from-string)) :to-equal "2025-06-18T12:34:56+00:00[UTC]")
+    (expect (funcall (gethash "toString" zoned-from-object)) :to-equal "2025-06-18T12:34:56+00:00[UTC]")
+    (expect (funcall (gethash "toString" duration-from-call)) :to-equal "P1Y2M0W3DT4H5M6S")
+    (expect (funcall (gethash "toString" duration-from-object)) :to-equal "P1Y2M0W3DT4H5M6S")
+    (expect (funcall (gethash "toString" duration-from-fallback)) :to-equal "P0Y0M0W0DT0H0M0S")
+    (expect (= -1.0d0 (funcall (gethash "compare" duration-global) duration-from-fallback duration-from-object)) :to-be-truthy)
+    (expect (funcall (gethash "toString" plain-year-month-from-object)) :to-equal "2025-06")
+    (expect (funcall (gethash "toString" plain-year-month-from-fallback)) :to-equal "2000-01")
+    (expect (funcall (gethash "toString" plain-month-day-from-object)) :to-equal "--06-18")
+    (expect (funcall (gethash "toString" plain-month-day-from-fallback)) :to-equal "--01-01")))
 
 ;;; ─── Date.prototype ──────────────────────────────────────────────────────────
 
-(deftest js-rt-date-now
-  "Date.now() returns a positive integer (milliseconds since Unix epoch)."
+(it-sequential "js-rt-date-now"
   (let ((t1 (cl-cc/javascript::%js-date-now))
         (t2 (cl-cc/javascript::%js-date-now)))
-    (assert-true (integerp t1))
-    (assert-true (>= t2 t1))))
+    (expect (integerp t1) :to-be-truthy)
+    (expect (>= t2 t1) :to-be-truthy)))
 
-(deftest js-rt-date-make-date-no-args
-  "%js-make-date with no args returns a js-date struct."
+(it-sequential "js-rt-date-make-date-no-args"
   (let ((d (cl-cc/javascript::%js-make-date)))
-    (assert-true (cl-cc/javascript::js-date-p d))
-    (assert-true (integerp (cl-cc/javascript::js-date-ms d)))))
+    (expect (cl-cc/javascript::js-date-p d) :to-be-truthy)
+    (expect (integerp (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
-(deftest js-rt-date-make-date-from-ms
-  "%js-make-date from a millisecond value stores the ms directly."
+(it-sequential "js-rt-date-make-date-from-ms"
   (let ((d (cl-cc/javascript::%js-make-date 1000000.0d0)))
-    (assert-= 1000000 (cl-cc/javascript::js-date-ms d))))
+    (expect (= 1000000 (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
-(deftest js-rt-date-make-date-copy
-  "%js-make-date from another Date copies the ms."
+(it-sequential "js-rt-date-make-date-copy"
   (let* ((orig (cl-cc/javascript::%js-make-date 42000.0d0))
          (copy (cl-cc/javascript::%js-make-date orig)))
-    (assert-= 42000 (cl-cc/javascript::js-date-ms copy))))
+    (expect (= 42000 (cl-cc/javascript::js-date-ms copy)) :to-be-truthy)))
 
-(deftest js-rt-date-make-date-string
-  "%js-make-date parses string inputs."
+(it-sequential "js-rt-date-make-date-string"
   (let ((d (cl-cc/javascript::%js-make-date "1970-01-01T01:00:00")))
-    (assert-true (cl-cc/javascript::js-date-p d))
-    (assert-= 3600000 (cl-cc/javascript::js-date-ms d))))
+    (expect (cl-cc/javascript::js-date-p d) :to-be-truthy)
+    (expect (= 3600000 (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
-(deftest js-rt-date-make-date-null
-  "%js-make-date treats null like an omitted argument."
+(it-sequential "js-rt-date-make-date-null"
   (let ((d (cl-cc/javascript::%js-make-date cl-cc/javascript::+js-null+)))
-    (assert-true (cl-cc/javascript::js-date-p d))
-    (assert-true (integerp (cl-cc/javascript::js-date-ms d)))))
+    (expect (cl-cc/javascript::js-date-p d) :to-be-truthy)
+    (expect (integerp (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
-(deftest js-rt-date-parse-string-date-only
-  "%js-date-parse-string parses YYYY-MM-DD to ms."
+(it-sequential "js-rt-date-parse-string-date-only"
   (let ((ms (cl-cc/javascript::%js-date-parse-string "1970-01-01")))
-    (assert-= 0 ms)))
+    (expect (= 0 ms) :to-be-truthy)))
 
-(deftest js-rt-date-parse-string-datetime
-  "%js-date-parse-string parses YYYY-MM-DDTHH:MM:SS."
+(it-sequential "js-rt-date-parse-string-datetime"
   (let ((ms (cl-cc/javascript::%js-date-parse-string "1970-01-01T01:00:00")))
-    (assert-= 3600000 ms)))
+    (expect (= 3600000 ms) :to-be-truthy)))
 
-(deftest js-rt-date-parse-string-trims-spaces
-  "%js-date-parse-string trims surrounding spaces before parsing."
+(it-sequential "js-rt-date-parse-string-trims-spaces"
   (let ((ms (cl-cc/javascript::%js-date-parse-string " 1970-01-01T01:02:03 ")))
-    (assert-= 3723000 ms)))
+    (expect (= 3723000 ms) :to-be-truthy)))
 
-(deftest js-rt-date-parse-string-error
-  "%js-date-parse-string falls back to now on invalid input."
+(it-sequential "js-rt-date-parse-string-error"
   (let ((result (cl-cc/javascript::%js-date-parse-string "not-a-date")))
-    (assert-true (integerp result))))
+    (expect (integerp result) :to-be-truthy)))
 
-(deftest js-rt-date-make-date-fallback
-  "%js-make-date falls back to now for non-date, non-number, non-string inputs."
+(it-sequential "js-rt-date-make-date-fallback"
   (let ((d (cl-cc/javascript::%js-make-date (make-hash-table :test #'equal))))
-    (assert-true (cl-cc/javascript::js-date-p d))
-    (assert-true (integerp (cl-cc/javascript::js-date-ms d)))))
+    (expect (cl-cc/javascript::js-date-p d) :to-be-truthy)
+    (expect (integerp (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
-(deftest js-rt-date-setters-with-undefined-optionals
-  "Date setters preserve omitted optional args when passed +js-undefined+."
+(it-sequential "js-rt-date-setters-with-undefined-optionals"
   (let ((d (cl-cc/javascript::%js-make-date 0)))
     (cl-cc/javascript::%js-date-set-full-year d 1970 cl-cc/javascript::+js-undefined+ cl-cc/javascript::+js-undefined+)
     (cl-cc/javascript::%js-date-set-month d 0 cl-cc/javascript::+js-undefined+)
     (cl-cc/javascript::%js-date-set-hours d 0 cl-cc/javascript::+js-undefined+ cl-cc/javascript::+js-undefined+ cl-cc/javascript::+js-undefined+)
     (cl-cc/javascript::%js-date-set-minutes d 0 cl-cc/javascript::+js-undefined+ cl-cc/javascript::+js-undefined+)
     (cl-cc/javascript::%js-date-set-seconds d 0 cl-cc/javascript::+js-undefined+)
-    (assert-= 0 (cl-cc/javascript::js-date-ms d))))
+    (expect (= 0 (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
 ;;; 97445000 ms = 1970-01-02T03:04:05.000Z
-(deftest js-rt-date-getters
-  "Date.prototype getters return correct decomposed fields for a fixed epoch."
+(it-sequential "js-rt-date-getters"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-= 1970 (cl-cc/javascript::%js-date-get-full-year d))
-    (assert-= 1970 (cl-cc/javascript::%js-date-get-utc-full-year d))
-    (assert-= 0    (cl-cc/javascript::%js-date-get-month d))      ; January = 0
-    (assert-= 2    (cl-cc/javascript::%js-date-get-date d))
-    (assert-= 3    (cl-cc/javascript::%js-date-get-hours d))
-    (assert-= 4    (cl-cc/javascript::%js-date-get-minutes d))
-    (assert-= 5    (cl-cc/javascript::%js-date-get-seconds d))
-    (assert-= 0    (cl-cc/javascript::%js-date-get-milliseconds d))))
+    (expect (= 1970 (cl-cc/javascript::%js-date-get-full-year d)) :to-be-truthy)
+    (expect (= 1970 (cl-cc/javascript::%js-date-get-utc-full-year d)) :to-be-truthy)
+    (expect (= 0 (cl-cc/javascript::%js-date-get-month d)) :to-be-truthy)      ; January = 0
+    (expect (= 2 (cl-cc/javascript::%js-date-get-date d)) :to-be-truthy)
+    (expect (= 3 (cl-cc/javascript::%js-date-get-hours d)) :to-be-truthy)
+    (expect (= 4 (cl-cc/javascript::%js-date-get-minutes d)) :to-be-truthy)
+    (expect (= 5 (cl-cc/javascript::%js-date-get-seconds d)) :to-be-truthy)
+    (expect (= 0 (cl-cc/javascript::%js-date-get-milliseconds d)) :to-be-truthy)))
 
-(deftest js-rt-date-get-time
-  "Date.prototype.getTime returns ms as double-float."
+(it-sequential "js-rt-date-get-time"
   (let ((d (cl-cc/javascript::%js-make-date 12345)))
-    (assert-= 12345.0d0 (cl-cc/javascript::%js-date-get-time d))))
+    (expect (= 12345.0d0 (cl-cc/javascript::%js-date-get-time d)) :to-be-truthy)))
 
-(deftest js-rt-date-to-iso-string
-  "toISOString formats as YYYY-MM-DDTHH:MM:SS.mmmZ."
+(it-sequential "js-rt-date-to-iso-string"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970-01-02T03:04:05.000Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
+    (expect (cl-cc/javascript::%js-date-to-iso-string d) :to-equal "1970-01-02T03:04:05.000Z")))
 
-(deftest js-rt-date-to-iso-string-with-ms
-  "toISOString includes sub-second milliseconds."
+(it-sequential "js-rt-date-to-iso-string-with-ms"
   (let ((d (cl-cc/javascript::%js-make-date 97445123)))
-    (assert-string= "1970-01-02T03:04:05.123Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
+    (expect (cl-cc/javascript::%js-date-to-iso-string d) :to-equal "1970-01-02T03:04:05.123Z")))
 
-(deftest js-rt-date-to-local-date-string
-  "toLocaleDateString returns YYYY/MM/DD."
+(it-sequential "js-rt-date-to-local-date-string"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970/01/02" (cl-cc/javascript::%js-date-to-local-date-string d))))
+    (expect (cl-cc/javascript::%js-date-to-local-date-string d) :to-equal "1970/01/02")))
 
-(deftest js-rt-date-to-time-string
-  "toTimeString returns HH:MM:SS GMT+0000 (...)."
+(it-sequential "js-rt-date-to-time-string"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "03:04:05 GMT+0000 (Coordinated Universal Time)"
-                    (cl-cc/javascript::%js-date-to-time-string d))))
+    (expect (cl-cc/javascript::%js-date-to-time-string d) :to-equal "03:04:05 GMT+0000 (Coordinated Universal Time)")))
 
-(deftest js-rt-date-set-time
-  "setTime updates ms and returns the new value."
+(it-sequential "js-rt-date-set-time"
   (let ((d (cl-cc/javascript::%js-make-date 0)))
     (cl-cc/javascript::%js-date-set-time d 5000)
-    (assert-= 5000 (cl-cc/javascript::js-date-ms d))))
+    (expect (= 5000 (cl-cc/javascript::js-date-ms d)) :to-be-truthy)))
 
-(deftest js-rt-date-set-full-year-preserves-time
-  "setFullYear preserves the existing time components (was bug: zeroed them)."
+(it-sequential "js-rt-date-set-full-year-preserves-time"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))  ; 1970-01-02T03:04:05Z
     (cl-cc/javascript::%js-date-set-full-year d 2024.0d0)
-    (assert-= 3 (cl-cc/javascript::%js-date-get-hours d))
-    (assert-= 4 (cl-cc/javascript::%js-date-get-minutes d))
-    (assert-= 5 (cl-cc/javascript::%js-date-get-seconds d))))
+    (expect (= 3 (cl-cc/javascript::%js-date-get-hours d)) :to-be-truthy)
+    (expect (= 4 (cl-cc/javascript::%js-date-get-minutes d)) :to-be-truthy)
+    (expect (= 5 (cl-cc/javascript::%js-date-get-seconds d)) :to-be-truthy)))
 
-(deftest js-rt-date-set-month
-  "setMonth changes the month (JS 0-based)."
+(it-sequential "js-rt-date-set-month"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))  ; January
     (cl-cc/javascript::%js-date-set-month d 5.0d0)       ; June (0-based)
-    (assert-= 5 (cl-cc/javascript::%js-date-get-month d))))
+    (expect (= 5 (cl-cc/javascript::%js-date-get-month d)) :to-be-truthy)))
 
-(deftest js-rt-date-set-date
-  "setDate changes the day of month."
+(it-sequential "js-rt-date-set-date"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))  ; day 2
     (cl-cc/javascript::%js-date-set-date d 15.0d0)
-    (assert-= 15 (cl-cc/javascript::%js-date-get-date d))))
+    (expect (= 15 (cl-cc/javascript::%js-date-get-date d)) :to-be-truthy)))
 
-(deftest js-rt-date-rebuild-preserves-ms
-  "%js-date-rebuild preserves sub-second milliseconds."
+(it-sequential "js-rt-date-rebuild-preserves-ms"
   (let ((d (cl-cc/javascript::%js-make-date 97445999)))  ; .999 ms
     (cl-cc/javascript::%js-date-rebuild d :sec 10)
-    (assert-= 999 (cl-cc/javascript::%js-date-get-milliseconds d))))
+    (expect (= 999 (cl-cc/javascript::%js-date-get-milliseconds d)) :to-be-truthy)))
 
-(deftest js-rt-date-timezone-offset-utc
-  "getTimezoneOffset returns 0 in the UTC-only date model."
+(it-sequential "js-rt-date-timezone-offset-utc"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-= 0.0d0 (cl-cc/javascript::%js-date-get-timezone-offset d))))
+    (expect (= 0.0d0 (cl-cc/javascript::%js-date-get-timezone-offset d)) :to-be-truthy)))
 
-(deftest js-rt-date-to-utc-string
-  "toUTCString mirrors the ISO string rendering."
+(it-sequential "js-rt-date-to-utc-string"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970-01-02T03:04:05.000Z"
-                    (cl-cc/javascript::%js-date-to-utc-string d))))
+    (expect (cl-cc/javascript::%js-date-to-utc-string d) :to-equal "1970-01-02T03:04:05.000Z")))
 
-(deftest js-rt-date-to-date-string
-  "toDateString formats the weekday and calendar date."
+(it-sequential "js-rt-date-to-date-string"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "Fri Jan 02 1970"
-                    (cl-cc/javascript::%js-date-to-date-string d))))
+    (expect (cl-cc/javascript::%js-date-to-date-string d) :to-equal "Fri Jan 02 1970")))
 
-(deftest js-rt-date-to-json
-  "toJSON returns the ISO string for valid dates."
+(it-sequential "js-rt-date-to-json"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970-01-02T03:04:05.000Z"
-                    (cl-cc/javascript::%js-date-to-json d))))
+    (expect (cl-cc/javascript::%js-date-to-json d) :to-equal "1970-01-02T03:04:05.000Z")))
 
-(deftest js-rt-date-value-of
-  "valueOf aliases getTime."
+(it-sequential "js-rt-date-value-of"
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-= (cl-cc/javascript::%js-date-get-time d)
-              (cl-cc/javascript::%js-date-value-of d))))
+    (expect (= (cl-cc/javascript::%js-date-get-time d) (cl-cc/javascript::%js-date-value-of d)) :to-be-truthy)))
 
-(deftest js-rt-date-set-hours-preserves-ms
-  "setHours preserves sub-second milliseconds and ignores the ms argument."
+(it-sequential "js-rt-date-set-hours-preserves-ms"
   (let ((d (cl-cc/javascript::%js-make-date 97445999)))
     (cl-cc/javascript::%js-date-set-hours d 6 7 8 1)
-    (assert-string= "1970-01-02T06:07:08.999Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
+    (expect (cl-cc/javascript::%js-date-to-iso-string d) :to-equal "1970-01-02T06:07:08.999Z")))
 
-(deftest js-rt-date-set-minutes-preserves-ms
-  "setMinutes preserves sub-second milliseconds and ignores the ms argument."
+(it-sequential "js-rt-date-set-minutes-preserves-ms"
   (let ((d (cl-cc/javascript::%js-make-date 97445999)))
     (cl-cc/javascript::%js-date-set-minutes d 9 10 1)
-    (assert-string= "1970-01-02T03:09:10.999Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
+    (expect (cl-cc/javascript::%js-date-to-iso-string d) :to-equal "1970-01-02T03:09:10.999Z")))
 
-(deftest js-rt-date-set-seconds-preserves-ms
-  "setSeconds preserves sub-second milliseconds and ignores the ms argument."
+(it-sequential "js-rt-date-set-seconds-preserves-ms"
   (let ((d (cl-cc/javascript::%js-make-date 97445999)))
     (cl-cc/javascript::%js-date-set-seconds d 11 1)
-    (assert-string= "1970-01-02T03:04:11.999Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
+    (expect (cl-cc/javascript::%js-date-to-iso-string d) :to-equal "1970-01-02T03:04:11.999Z")))
 
 ;;; ─── JSON stringify ──────────────────────────────────────────────────────────
 
-(deftest-each js-rt-json-stringify-primitives
-  "JSON.stringify handles JS primitive values."
-  :cases (("null"        cl-cc/javascript::+js-null+       "null")
-          ("undefined"   cl-cc/javascript::+js-undefined+  "null")
-          ("true"        t                                  "true")
-          ("false"       nil                                "false")
-          ("integer"     42.0d0                            "42")
-          ("float"       1.5d0                             "1.5")
-          ("string"      "hello"                           "\"hello\"")
-          ("nan"         cl-cc/javascript::*js-nan-float*  "null"))
-  (val expected)
-  (assert-string= expected (cl-cc/javascript::%js-json-stringify val)))
+(it-sequential "js-rt-json-stringify-primitives null"
+  (destructuring-bind (val expected) (list cl-cc/javascript::+js-null+ "null")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
 
-(deftest js-rt-json-stringify-string-escapes
-  "JSON.stringify escapes special characters in strings."
-  (assert-string= "\"line1\\nline2\"" (cl-cc/javascript::%js-json-stringify "line1
-line2"))
-  (assert-string= "\"a\\tb\"" (cl-cc/javascript::%js-json-stringify "a	b"))
-  (assert-string= "\"say \\\"hi\\\"\"" (cl-cc/javascript::%js-json-stringify "say \"hi\"")))
+(it-sequential "js-rt-json-stringify-primitives undefined"
+  (destructuring-bind (val expected) (list cl-cc/javascript::+js-undefined+ "null")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
 
-(deftest js-rt-json-stringify-array
-  "JSON.stringify serializes JS arrays."
+(it-sequential "js-rt-json-stringify-primitives true"
+  (destructuring-bind (val expected) (list t "true")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
+
+(it-sequential "js-rt-json-stringify-primitives false"
+  (destructuring-bind (val expected) (list nil "false")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
+
+(it-sequential "js-rt-json-stringify-primitives integer"
+  (destructuring-bind (val expected) (list 42.0d0 "42")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
+
+(it-sequential "js-rt-json-stringify-primitives float"
+  (destructuring-bind (val expected) (list 1.5d0 "1.5")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
+
+(it-sequential "js-rt-json-stringify-primitives string"
+  (destructuring-bind (val expected) (list "hello" "\"hello\"")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
+
+(it-sequential "js-rt-json-stringify-primitives nan"
+  (destructuring-bind (val expected) (list cl-cc/javascript::*js-nan-float* "null")
+    (expect (cl-cc/javascript::%js-json-stringify val) :to-equal expected)))
+
+(it-sequential "js-rt-json-stringify-string-escapes"
+  (expect (cl-cc/javascript::%js-json-stringify "line1
+line2") :to-equal "\"line1\\nline2\"")
+  (expect (cl-cc/javascript::%js-json-stringify "a	b") :to-equal "\"a\\tb\"")
+  (expect (cl-cc/javascript::%js-json-stringify "say \"hi\"") :to-equal "\"say \\\"hi\\\"\""))
+
+(it-sequential "js-rt-json-stringify-array"
   (let ((arr (cl-cc/javascript::%js-make-array 1.0d0 2.0d0 3.0d0)))
-    (assert-string= "[1,2,3]" (cl-cc/javascript::%js-json-stringify arr))))
+    (expect (cl-cc/javascript::%js-json-stringify arr) :to-equal "[1,2,3]")))
 
-(deftest js-rt-json-stringify-object
-  "JSON.stringify serializes JS objects."
+(it-sequential "js-rt-json-stringify-object"
   (let* ((obj    (cl-cc/javascript::%js-make-object "x" 1.0d0 "y" 2.0d0))
          (result (cl-cc/javascript::%js-json-stringify obj)))
-    (assert-true (cl-cc/javascript::%js-string-includes result "\"x\":1"))
-    (assert-true (cl-cc/javascript::%js-string-includes result "\"y\":2"))))
+    (expect (cl-cc/javascript::%js-string-includes result "\"x\":1") :to-be-truthy)
+    (expect (cl-cc/javascript::%js-string-includes result "\"y\":2") :to-be-truthy)))
 
-(deftest js-rt-json-stringify-nested
-  "JSON.stringify handles nested objects and arrays."
+(it-sequential "js-rt-json-stringify-nested"
   (let* ((inner (cl-cc/javascript::%js-make-object "a" 1.0d0))
          (arr   (cl-cc/javascript::%js-make-array inner))
          (result (cl-cc/javascript::%js-json-stringify arr)))
-    (assert-true (cl-cc/javascript::%js-string-includes result "{"))
-    (assert-true (cl-cc/javascript::%js-string-includes result "\"a\":1"))))
+    (expect (cl-cc/javascript::%js-string-includes result "{") :to-be-truthy)
+    (expect (cl-cc/javascript::%js-string-includes result "\"a\":1") :to-be-truthy)))
 
-(deftest js-rt-json-raw-json
-  "JSON.rawJSON produces a wrapper that stringify emits verbatim."
+(it-sequential "js-rt-json-raw-json"
   (let* ((raw (cl-cc/javascript::%js-json-raw-json "{\"x\":1}"))
          (obj (cl-cc/javascript::%js-make-object "payload" raw)))
-    (assert-true (cl-cc/javascript::%js-json-is-raw-json raw))
-    (assert-true (not (cl-cc/javascript::%js-json-is-raw-json obj)))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-object-get-own-property-descriptor raw "__raw_json__"))
-    (assert-string= "{\"payload\":{\"x\":1}}"
-                    (cl-cc/javascript::%js-json-stringify obj))))
+    (expect (cl-cc/javascript::%js-json-is-raw-json raw) :to-be-truthy)
+    (expect (not (cl-cc/javascript::%js-json-is-raw-json obj)) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-object-get-own-property-descriptor raw "__raw_json__") :to-be cl-cc/javascript::+js-undefined+)
+    (expect (cl-cc/javascript::%js-json-stringify obj) :to-equal "{\"payload\":{\"x\":1}}")))
 
-(deftest js-rt-json-raw-json-invalid
-  "JSON.rawJSON rejects text that is not a complete JSON value."
-  (assert-signals error
-    (cl-cc/javascript::%js-json-raw-json "{bad json}")))
+(it-sequential "js-rt-json-raw-json-invalid"
+  (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/javascript::%js-json-raw-json "{bad json}")) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy)))
 
-(deftest js-rt-json-raw-json-non-string
-  "JSON.rawJSON rejects non-string input."
-  (assert-signals error
-    (cl-cc/javascript::%js-json-raw-json 42.0d0)))
+(it-sequential "js-rt-json-raw-json-non-string"
+  (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/javascript::%js-json-raw-json 42.0d0)) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy)))
 
 ;;; ─── JSON parse ──────────────────────────────────────────────────────────────
 
-(deftest-each js-rt-json-parse-non-undefined
-  "JSON.parse returns non-undefined for valid JSON literals."
-  :cases (("null-lit"  "null")
-          ("true-lit"  "true")
-          ("false-lit" "false")
-          ("number-42" "42")
-          ("str-hello" "\"hello\""))
-  (input)
-  (let ((result (cl-cc/javascript::%js-json-parse input)))
-    (assert-true (not (eq result cl-cc/javascript::+js-undefined+)))))
+(it-sequential "js-rt-json-parse-non-undefined null-lit"
+  (destructuring-bind (input) (list "null")
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
+    (expect (not (eq result cl-cc/javascript::+js-undefined+)) :to-be-truthy))))
 
-(deftest js-rt-json-parse-null
-  "JSON.parse(\"null\") returns the JS null sentinel."
-  (assert-true (eq cl-cc/javascript::+js-null+ (cl-cc/javascript::%js-json-parse "null"))))
+(it-sequential "js-rt-json-parse-non-undefined true-lit"
+  (destructuring-bind (input) (list "true")
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
+    (expect (not (eq result cl-cc/javascript::+js-undefined+)) :to-be-truthy))))
 
-(deftest js-rt-json-parse-booleans
-  "JSON.parse handles true and false."
-  (assert-true (eq t   (cl-cc/javascript::%js-json-parse "true")))
-  (assert-true (eq nil (cl-cc/javascript::%js-json-parse "false"))))
+(it-sequential "js-rt-json-parse-non-undefined false-lit"
+  (destructuring-bind (input) (list "false")
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
+    (expect (not (eq result cl-cc/javascript::+js-undefined+)) :to-be-truthy))))
 
-(deftest-each js-rt-json-parse-number
-  "JSON.parse converts numeric strings to double-float."
-  :cases (("integer"   "42"   42.0d0)
-          ("float"     "3.14" 3.14d0)
-          ("negative"  "-1"   -1.0d0))
-  (str expected)
-  (assert-= expected (cl-cc/javascript::%js-json-parse str)))
+(it-sequential "js-rt-json-parse-non-undefined number-42"
+  (destructuring-bind (input) (list "42")
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
+    (expect (not (eq result cl-cc/javascript::+js-undefined+)) :to-be-truthy))))
 
-(deftest js-rt-json-parse-string
-  "JSON.parse converts quoted strings."
-  (assert-string= "hello" (cl-cc/javascript::%js-json-parse "\"hello\""))
-  (assert-string= "a
-b" (cl-cc/javascript::%js-json-parse "\"a\\nb\"")))
+(it-sequential "js-rt-json-parse-non-undefined str-hello"
+  (destructuring-bind (input) (list "\"hello\"")
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
+    (expect (not (eq result cl-cc/javascript::+js-undefined+)) :to-be-truthy))))
 
-(deftest js-rt-json-parse-array
-  "JSON.parse builds an adjustable vector for arrays."
+(it-sequential "js-rt-json-parse-null"
+  (expect (eq cl-cc/javascript::+js-null+ (cl-cc/javascript::%js-json-parse "null")) :to-be-truthy))
+
+(it-sequential "js-rt-json-parse-booleans"
+  (expect (eq t   (cl-cc/javascript::%js-json-parse "true")) :to-be-truthy)
+  (expect (eq nil (cl-cc/javascript::%js-json-parse "false")) :to-be-truthy))
+
+(it-sequential "js-rt-json-parse-number integer"
+  (destructuring-bind (str expected) (list "42" 42.0d0)
+    (expect (= expected (cl-cc/javascript::%js-json-parse str)) :to-be-truthy)))
+
+(it-sequential "js-rt-json-parse-number float"
+  (destructuring-bind (str expected) (list "3.14" 3.14d0)
+    (expect (= expected (cl-cc/javascript::%js-json-parse str)) :to-be-truthy)))
+
+(it-sequential "js-rt-json-parse-number negative"
+  (destructuring-bind (str expected) (list "-1" -1.0d0)
+    (expect (= expected (cl-cc/javascript::%js-json-parse str)) :to-be-truthy)))
+
+(it-sequential "js-rt-json-parse-string"
+  (expect (cl-cc/javascript::%js-json-parse "\"hello\"") :to-equal "hello")
+  (expect (cl-cc/javascript::%js-json-parse "\"a\\nb\"") :to-equal "a
+b"))
+
+(it-sequential "js-rt-json-parse-array"
   (let ((arr (cl-cc/javascript::%js-json-parse "[1,2,3]")))
-    (assert-true (cl-cc/javascript::%js-vec-p arr))
-    (assert-= 3 (length arr))
-    (assert-= 1.0d0 (aref arr 0))))
+    (expect (cl-cc/javascript::%js-vec-p arr) :to-be-truthy)
+    (expect (= 3 (length arr)) :to-be-truthy)
+    (expect (= 1.0d0 (aref arr 0)) :to-be-truthy)))
 
-(deftest js-rt-json-parse-object
-  "JSON.parse builds a hash-table for objects."
+(it-sequential "js-rt-json-parse-object"
   (let ((obj (cl-cc/javascript::%js-json-parse "{\"x\":1,\"y\":2}")))
-    (assert-true (cl-cc/javascript::%js-ht-p obj))
-    (assert-= 1.0d0 (gethash "x" obj))
-    (assert-= 2.0d0 (gethash "y" obj))))
+    (expect (cl-cc/javascript::%js-ht-p obj) :to-be-truthy)
+    (expect (= 1.0d0 (gethash "x" obj)) :to-be-truthy)
+    (expect (= 2.0d0 (gethash "y" obj)) :to-be-truthy)))
 
-(deftest js-rt-json-parse-nested
-  "JSON.parse handles nested structures."
+(it-sequential "js-rt-json-parse-nested"
   (let ((obj (cl-cc/javascript::%js-json-parse "{\"arr\":[1,2]}")))
     (let ((arr (gethash "arr" obj)))
-      (assert-true (cl-cc/javascript::%js-vec-p arr))
-      (assert-= 2 (length arr)))))
+      (expect (cl-cc/javascript::%js-vec-p arr) :to-be-truthy)
+      (expect (= 2 (length arr)) :to-be-truthy))))
 
-(deftest-each js-rt-json-parse-whitespace
-  "JSON.parse skips leading/trailing whitespace."
-  :cases (("number"  "  42  "    42.0d0)
-          ("string"  "  \"x\"  "  "x"))
-  (input expected)
-  (let ((result (cl-cc/javascript::%js-json-parse input)))
+(it-sequential "js-rt-json-parse-whitespace number"
+  (destructuring-bind (input expected) (list "  42  " 42.0d0)
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
     (if (stringp expected)
-        (assert-string= expected result)
-        (assert-= expected result))))
+        (expect result :to-equal expected)
+        (expect (= expected result) :to-be-truthy)))))
 
-(deftest js-rt-json-parse-invalid
-  "JSON.parse returns +js-undefined+ on invalid input."
-  (assert-true (eq cl-cc/javascript::+js-undefined+ (cl-cc/javascript::%js-json-parse "NOT_JSON"))))
+(it-sequential "js-rt-json-parse-whitespace string"
+  (destructuring-bind (input expected) (list "  \"x\"  " "x")
+    (let ((result (cl-cc/javascript::%js-json-parse input)))
+    (if (stringp expected)
+        (expect result :to-equal expected)
+        (expect (= expected result) :to-be-truthy)))))
 
-(deftest js-rt-json-roundtrip
-  "stringify then parse round-trips a JS object."
+(it-sequential "js-rt-json-parse-invalid"
+  (expect (eq cl-cc/javascript::+js-undefined+ (cl-cc/javascript::%js-json-parse "NOT_JSON")) :to-be-truthy))
+
+(it-sequential "js-rt-json-roundtrip"
   (let* ((orig     (cl-cc/javascript::%js-make-object "name" "Alice" "age" 30.0d0))
          (json     (cl-cc/javascript::%js-json-stringify orig))
          (reparsed (cl-cc/javascript::%js-json-parse json)))
-    (assert-string= "Alice" (gethash "name" reparsed))
-    (assert-= 30.0d0 (gethash "age" reparsed))))
+    (expect (gethash "name" reparsed) :to-equal "Alice")
+    (expect (= 30.0d0 (gethash "age" reparsed)) :to-be-truthy)))

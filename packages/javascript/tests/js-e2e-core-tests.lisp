@@ -9,12 +9,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite cl-cc-javascript-e2e-serial-suite
-  :description "JavaScript end-to-end execution tests"
-  :parent cl-cc-javascript-suite
-  :parallel nil)
 
-(in-suite cl-cc-javascript-e2e-serial-suite)
 
 ;;; ─── Shared helpers (available to all js-e2e-* files via serial load) ────────
 
@@ -34,9 +29,10 @@ real execution path, unlike the parse-only %js-e2e-parse checks."
 (defmacro deftest-js-run (name description &rest cases)
   "Each CASES element is (expected-string source-string).
 Expands to a deftest whose body runs each source and asserts the output."
-  `(deftest ,name ,description
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
      ,@(mapcar (lambda (c)
-                 `(assert-string= ,(first c) (%js-run-capture ,(second c))))
+                 `(expect (%js-run-capture ,(second c)) :to-equal ,(first c)))
                cases)))
 
 (defparameter *js-e2e-batch-sentinel-prefix* "__CL_CC_JS_E2E_CASE_")
@@ -94,12 +90,13 @@ independent of top-level var/function/global binding semantics."
 (defmacro deftest-js-run-isolated-batch (name description &rest cases)
   "Like DEFTEST-JS-RUN, but compiles independent cases together.
 Cases execute in separate function scopes and are split by sentinel output."
-  `(deftest ,name ,description
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
      (let ((outputs (%js-run-capture-isolated-cases
                      (list ,@(mapcar #'second cases)))))
        ,@(loop for case in cases
                for index from 0
-               collect `(assert-string= ,(first case) (nth ,index outputs))))))
+               collect `(expect (nth ,index outputs) :to-equal ,(first case))))))
 
 ;;; ─── Basic programs ──────────────────────────────────────────────────────────
 

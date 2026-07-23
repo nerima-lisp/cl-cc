@@ -7,7 +7,6 @@
 ;;;; and available to all subsequently-loaded js-runtime-* test files.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Shared helpers (used across all js-runtime-* test files) ─────────────────
 
@@ -27,172 +26,269 @@
 
 ;;; ─── typeof ──────────────────────────────────────────────────────────────────
 
-(deftest-each js-rt-typeof
-  "typeof maps CL values to their JS type strings.
-   null and arrays return \"object\" per ECMAScript."
-  :cases (("number"    42                                 "number")
-          ("string"    "hi"                               "string")
-          ("bool-true" t                                  "boolean")
-          ("bool-nil"  nil                                "boolean")
-          ("undefined" cl-cc/javascript::+js-undefined+  "undefined")
-          ("null"      cl-cc/javascript::+js-null+        "object")
-          ("array"     (%jr-arr 1 2)                      "object"))
-  (value expected)
-  (assert-string= expected (cl-cc/javascript::%js-typeof value)))
+(it-sequential "js-rt-typeof number"
+  (destructuring-bind (value expected) (list 42 "number")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof string"
+  (destructuring-bind (value expected) (list "hi" "string")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof bool-true"
+  (destructuring-bind (value expected) (list t "boolean")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof bool-nil"
+  (destructuring-bind (value expected) (list nil "boolean")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof undefined"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-undefined+ "undefined")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof null"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-null+ "object")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof array"
+  (destructuring-bind (value expected) (list (%jr-arr 1 2) "object")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
 
 ;;; ─── ToString ────────────────────────────────────────────────────────────────
 
-(deftest-each js-rt-to-string
-  "ToString coerces CL values to JS string representations."
-  :cases (("integer"   42                                "42")
-          ("true"      t                                 "true")
-          ("false"     nil                               "false")
-          ("null"      cl-cc/javascript::+js-null+       "null")
-          ("undefined" cl-cc/javascript::+js-undefined+  "undefined")
-          ("nan"       :js-nan                           "NaN"))
-  (value expected)
-  (assert-string= expected (cl-cc/javascript::%js-to-string value)))
+(it-sequential "js-rt-to-string integer"
+  (destructuring-bind (value expected) (list 42 "42")
+    (expect (cl-cc/javascript::%js-to-string value) :to-equal expected)))
+
+(it-sequential "js-rt-to-string true"
+  (destructuring-bind (value expected) (list t "true")
+    (expect (cl-cc/javascript::%js-to-string value) :to-equal expected)))
+
+(it-sequential "js-rt-to-string false"
+  (destructuring-bind (value expected) (list nil "false")
+    (expect (cl-cc/javascript::%js-to-string value) :to-equal expected)))
+
+(it-sequential "js-rt-to-string null"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-null+ "null")
+    (expect (cl-cc/javascript::%js-to-string value) :to-equal expected)))
+
+(it-sequential "js-rt-to-string undefined"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-undefined+ "undefined")
+    (expect (cl-cc/javascript::%js-to-string value) :to-equal expected)))
+
+(it-sequential "js-rt-to-string nan"
+  (destructuring-bind (value expected) (list :js-nan "NaN")
+    (expect (cl-cc/javascript::%js-to-string value) :to-equal expected)))
 
 ;;; ─── Strict equality ────────────────────────────────────────────────────────
 
-(deftest-each js-rt-strict-eq
-  "=== (strict equality) uses type+value identity."
-  :cases (("same-num"  3   3   t)
-          ("diff-num"  3   4   nil)
-          ("same-str"  "a" "a" t)
-          ("diff-str"  "a" "b" nil))
-  (a b expected)
-  (assert-equal expected (cl-cc/javascript::%js-strict-eq a b)))
+(it-sequential "js-rt-strict-eq same-num"
+  (destructuring-bind (a b expected) (list 3 3 t)
+    (expect (cl-cc/javascript::%js-strict-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-strict-eq diff-num"
+  (destructuring-bind (a b expected) (list 3 4 nil)
+    (expect (cl-cc/javascript::%js-strict-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-strict-eq same-str"
+  (destructuring-bind (a b expected) (list "a" "a" t)
+    (expect (cl-cc/javascript::%js-strict-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-strict-eq diff-str"
+  (destructuring-bind (a b expected) (list "a" "b" nil)
+    (expect (cl-cc/javascript::%js-strict-eq a b) :to-equal expected)))
 
 ;;; ─── Truthiness ──────────────────────────────────────────────────────────────
 
-(deftest-each js-rt-truthy
-  "0/\"\"/nil/undefined/null are falsy; everything else is truthy."
-  :cases (("truthy-num"  1                                    t)
-          ("truthy-str"  "x"                                  t)
-          ("falsy-zero"  0                                    nil)
-          ("falsy-str"   ""                                   nil)
-          ("falsy-nil"   nil                                  nil)
-          ("falsy-undef" cl-cc/javascript::+js-undefined+     nil)
-          ("falsy-null"  cl-cc/javascript::+js-null+          nil))
-  (value expected)
-  (assert-equal expected (cl-cc/javascript::%js-truthy value)))
+(it-sequential "js-rt-truthy truthy-num"
+  (destructuring-bind (value expected) (list 1 t)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
+
+(it-sequential "js-rt-truthy truthy-str"
+  (destructuring-bind (value expected) (list "x" t)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
+
+(it-sequential "js-rt-truthy falsy-zero"
+  (destructuring-bind (value expected) (list 0 nil)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
+
+(it-sequential "js-rt-truthy falsy-str"
+  (destructuring-bind (value expected) (list "" nil)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
+
+(it-sequential "js-rt-truthy falsy-nil"
+  (destructuring-bind (value expected) (list nil nil)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
+
+(it-sequential "js-rt-truthy falsy-undef"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-undefined+ nil)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
+
+(it-sequential "js-rt-truthy falsy-null"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-null+ nil)
+    (expect (cl-cc/javascript::%js-truthy value) :to-equal expected)))
 
 ;;; ─── Loose equality ──────────────────────────────────────────────────────────
 
-(deftest-each js-rt-loose-eq
-  "== applies type coercion: null==undefined, booleans as numbers, etc."
-  :cases (("identity"      1       1       t)
-          ("null-undef"    cl-cc/javascript::+js-null+      cl-cc/javascript::+js-undefined+ t)
-          ("undef-null"    cl-cc/javascript::+js-undefined+ cl-cc/javascript::+js-null+      t)
-          ("num-str"       3       "3"     t)
-          ("str-num"       "3"     3       t)
-          ("true-1"        t       1       t)
-          ("nan-nan"       :js-nan :js-nan nil)
-          ("mismatch"      1       2       nil))
-  (a b expected)
-  (assert-equal expected (cl-cc/javascript::%js-loose-eq a b)))
+(it-sequential "js-rt-loose-eq identity"
+  (destructuring-bind (a b expected) (list 1 1 t)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq null-undef"
+  (destructuring-bind (a b expected) (list cl-cc/javascript::+js-null+ cl-cc/javascript::+js-undefined+ t)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq undef-null"
+  (destructuring-bind (a b expected) (list cl-cc/javascript::+js-undefined+ cl-cc/javascript::+js-null+ t)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq num-str"
+  (destructuring-bind (a b expected) (list 3 "3" t)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq str-num"
+  (destructuring-bind (a b expected) (list "3" 3 t)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq true-1"
+  (destructuring-bind (a b expected) (list t 1 t)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq nan-nan"
+  (destructuring-bind (a b expected) (list :js-nan :js-nan nil)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
+
+(it-sequential "js-rt-loose-eq mismatch"
+  (destructuring-bind (a b expected) (list 1 2 nil)
+    (expect (cl-cc/javascript::%js-loose-eq a b) :to-equal expected)))
 
 ;;; ─── Bitwise operators ───────────────────────────────────────────────────────
 
-(deftest-each js-rt-bitwise-or
-  "Bitwise OR: coerces to int32, ORs bits, sign-extends."
-  :cases (("simple"   #b1010  #b1100  #b1110)
-          ("neg"      -1      0       -1)
-          ("zero"     0       0       0))
-  (a b expected)
-  (assert-= expected (cl-cc/javascript::%js-bitwise-or a b)))
+(it-sequential "js-rt-bitwise-or simple"
+  (destructuring-bind (a b expected) (list #b1010 #b1100 #b1110)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-or a b)) :to-be-truthy)))
 
-(deftest-each js-rt-bitwise-and
-  "Bitwise AND: coerces to int32, ANDs bits."
-  :cases (("simple"   #b1010  #b1100  #b1000)
-          ("zero"     5       0       0)
-          ("same"     7       7       7))
-  (a b expected)
-  (assert-= expected (cl-cc/javascript::%js-bitwise-and a b)))
+(it-sequential "js-rt-bitwise-or neg"
+  (destructuring-bind (a b expected) (list -1 0 -1)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-or a b)) :to-be-truthy)))
 
-(deftest-each js-rt-bitwise-xor
-  "Bitwise XOR: coerces to int32, XORs bits."
-  :cases (("simple"   #b1010  #b1100  #b0110)
-          ("same"     7       7       0)
-          ("zero"     0       5       5))
-  (a b expected)
-  (assert-= expected (cl-cc/javascript::%js-bitwise-xor a b)))
+(it-sequential "js-rt-bitwise-or zero"
+  (destructuring-bind (a b expected) (list 0 0 0)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-or a b)) :to-be-truthy)))
 
-(deftest-each js-rt-bitwise-not
-  "Bitwise NOT (~x) inverts all 32 bits and sign-extends."
-  :cases (("zero"     0  -1)
-          ("neg-one" -1   0)
-          ("one"      1  -2))
-  (x expected)
-  (assert-= expected (cl-cc/javascript::%js-bitwise-not x)))
+(it-sequential "js-rt-bitwise-and simple"
+  (destructuring-bind (a b expected) (list #b1010 #b1100 #b1000)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-and a b)) :to-be-truthy)))
 
-(deftest-each js-rt-shift-ops-full
-  "Shift operators: <<, >> (arithmetic), and >>> (unsigned, always ≥0)."
-  :cases (("shl-2"    #'cl-cc/javascript::%js-shift-left           2  2       8)
-          ("shl-1"    #'cl-cc/javascript::%js-shift-left           1  4      16)
-          ("shl-0"    #'cl-cc/javascript::%js-shift-left           5  0       5)
-          ("shr-pos"  #'cl-cc/javascript::%js-shift-right          8  2       2)
-          ("shr-neg"  #'cl-cc/javascript::%js-shift-right         -8  2      -2)
-          ("ushr-neg" #'cl-cc/javascript::%js-unsigned-shift-right -8  2 1073741822)
-          ("ushr-pos" #'cl-cc/javascript::%js-unsigned-shift-right  8  2       2))
-  (fn a b expected)
-  (assert-= expected (funcall fn a b)))
+(it-sequential "js-rt-bitwise-and zero"
+  (destructuring-bind (a b expected) (list 5 0 0)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-and a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-and same"
+  (destructuring-bind (a b expected) (list 7 7 7)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-and a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-xor simple"
+  (destructuring-bind (a b expected) (list #b1010 #b1100 #b0110)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-xor a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-xor same"
+  (destructuring-bind (a b expected) (list 7 7 0)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-xor a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-xor zero"
+  (destructuring-bind (a b expected) (list 0 5 5)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-xor a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-not zero"
+  (destructuring-bind (x expected) (list 0 -1)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-not x)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-not neg-one"
+  (destructuring-bind (x expected) (list -1 0)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-not x)) :to-be-truthy)))
+
+(it-sequential "js-rt-bitwise-not one"
+  (destructuring-bind (x expected) (list 1 -2)
+    (expect (= expected (cl-cc/javascript::%js-bitwise-not x)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full shl-2"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-left 2 2 8)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full shl-1"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-left 1 4 16)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full shl-0"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-left 5 0 5)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full shr-pos"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-right 8 2 2)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full shr-neg"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-shift-right -8 2 -2)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full ushr-neg"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-unsigned-shift-right -8 2 1073741822)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-shift-ops-full ushr-pos"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-unsigned-shift-right 8 2 2)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
 ;;; ─── Object basic operations ─────────────────────────────────────────────────
 
-(deftest js-rt-object-make-access
-  "make-object stores key/value pairs accessible via get-prop."
+(it-sequential "js-rt-object-make-access"
   (let ((o (cl-cc/javascript::%js-make-object "a" 1 "b" 2)))
-    (assert-= 1 (cl-cc/javascript::%js-get-prop o "a"))
-    (assert-= 2 (cl-cc/javascript::%js-get-prop o "b"))))
+    (expect (= 1 (cl-cc/javascript::%js-get-prop o "a")) :to-be-truthy)
+    (expect (= 2 (cl-cc/javascript::%js-get-prop o "b")) :to-be-truthy)))
 
-(deftest js-rt-object-keys-values
-  "keys and values return the own enumerable properties (order-independent)."
+(it-sequential "js-rt-object-keys-values"
   (let* ((o  (cl-cc/javascript::%js-make-object "x" 10 "y" 20))
          (ks (sort (%jr-list (cl-cc/javascript::%js-object-keys   o)) #'string<))
          (vs (sort (%jr-list (cl-cc/javascript::%js-object-values o)) #'<)))
-    (assert-equal '("x" "y") ks)
-    (assert-equal '(10 20)   vs)))
+    (expect ks :to-equal '("x" "y"))
+    (expect vs :to-equal '(10 20))))
 
-(deftest js-rt-get-prop-array
-  "get-prop \"length\" and numeric index work on arrays."
+(it-sequential "js-rt-get-prop-array"
   (let ((a (%jr-arr 10 20 30)))
-    (assert-= 3  (cl-cc/javascript::%js-get-prop a "length"))
-    (assert-= 20 (cl-cc/javascript::%js-get-prop a 1))))
+    (expect (= 3 (cl-cc/javascript::%js-get-prop a "length")) :to-be-truthy)
+    (expect (= 20 (cl-cc/javascript::%js-get-prop a 1)) :to-be-truthy)))
 
-(deftest js-rt-object-prop-false-value
-  "get-prop must return nil (CL false) when a key is explicitly set to nil.
-Regression: %js-resolve-object-method used (not (eq stored nil)) which treated
-nil-valued keys as missing."
+(it-sequential "js-rt-object-prop-false-value"
   (let ((obj (cl-cc/javascript::%js-make-object "flag" nil)))
-    (assert-false (cl-cc/javascript::%js-get-prop obj "flag"))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-get-prop obj "absent"))))
+    (expect (cl-cc/javascript::%js-get-prop obj "flag") :to-be-falsy)
+    (expect (cl-cc/javascript::%js-get-prop obj "absent") :to-be cl-cc/javascript::+js-undefined+)))
 
 ;;; ─── for-of / for-in ─────────────────────────────────────────────────────────
 
-(deftest-each js-rt-for-of
-  "for-of collects elements in order from different iterable types."
-  :cases (("array"  (%jr-arr 10 20 30)  '(10 20 30))
-          ("string" "hi"                '("h" "i")))
-  (iterable expected)
-  (let ((seen nil))
+(it-sequential "js-rt-for-of array"
+  (destructuring-bind (iterable expected) (list (%jr-arr 10 20 30) '(10 20 30))
+    (let ((seen nil))
     (cl-cc/javascript::%js-for-of
      iterable
      (lambda (x &rest _) (declare (ignore _)) (push x seen)))
-    (assert-equal expected (nreverse seen))))
+    (expect (nreverse seen) :to-equal expected))))
 
-(deftest js-rt-for-in-object
-  "for-in yields enumerable own keys, skipping __proto__ etc."
+(it-sequential "js-rt-for-of string"
+  (destructuring-bind (iterable expected) (list "hi" '("h" "i"))
+    (let ((seen nil))
+    (cl-cc/javascript::%js-for-of
+     iterable
+     (lambda (x &rest _) (declare (ignore _)) (push x seen)))
+    (expect (nreverse seen) :to-equal expected))))
+
+(it-sequential "js-rt-for-in-object"
   (let ((o (cl-cc/javascript::%js-make-object "a" 1 "b" 2))
         (keys nil))
     (cl-cc/javascript::%js-for-in o (lambda (k &rest _) (declare (ignore _)) (push k keys)))
-    (assert-equal '("a" "b") (sort keys #'string<))))
+    (expect (sort keys #'string<) :to-equal '("a" "b"))))
 
-(deftest js-rt-for-in-skips-accessor-keys
-  "for-in uses %js-internal-key-p, which filters __get_X and __set_X
-accessor slots (regression: old check only matched __X__ form)."
+(it-sequential "js-rt-for-in-skips-accessor-keys"
   (let ((obj (cl-cc/javascript::%js-make-object "a" 1 "b" 2))
         (keys nil))
     (setf (gethash "__get_foo" obj) (lambda () 99))
@@ -200,182 +296,238 @@ accessor slots (regression: old check only matched __X__ form)."
     (setf (gethash "__proto__" obj) cl-cc/javascript::+js-undefined+)
     (cl-cc/javascript::%js-for-in
      obj (lambda (k &rest _) (declare (ignore _)) (push k keys)))
-    (assert-equal '("a" "b") (sort keys #'string<))))
+    (expect (sort keys #'string<) :to-equal '("a" "b"))))
 
 ;;; ─── ToNumber coercions ──────────────────────────────────────────────────────
 
-(deftest-each js-rt-to-number
-  "ToNumber coerces CL values to JS double-floats; strings that cannot parse yield NaN."
-  :cases (("integer"    42                                   42.0d0)
-          ("true"       t                                    1.0d0)
-          ("false"      nil                                  0.0d0)
-          ("null"       cl-cc/javascript::+js-null+          0.0d0)
-          ("empty-str"  ""                                   0.0d0)
-          ("num-str"    "3.14"                               3.14d0)
-          ("int-str"    "42"                                 42.0d0)
-          ("trimmed"    "  7  "                              7.0d0))
-  (value expected)
-  (assert-= expected (cl-cc/javascript::%js-to-number value)))
+(it-sequential "js-rt-to-number integer"
+  (destructuring-bind (value expected) (list 42 42.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
 
-(deftest js-rt-to-number-nan-str
-  "ToNumber(\"abc\") = NaN."
-  (assert-true (cl-cc/javascript::%js-nan-p (cl-cc/javascript::%js-to-number "abc"))))
+(it-sequential "js-rt-to-number true"
+  (destructuring-bind (value expected) (list t 1.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number false"
+  (destructuring-bind (value expected) (list nil 0.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number null"
+  (destructuring-bind (value expected) (list cl-cc/javascript::+js-null+ 0.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number empty-str"
+  (destructuring-bind (value expected) (list "" 0.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number num-str"
+  (destructuring-bind (value expected) (list "3.14" 3.14d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number int-str"
+  (destructuring-bind (value expected) (list "42" 42.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number trimmed"
+  (destructuring-bind (value expected) (list "  7  " 7.0d0)
+    (expect (= expected (cl-cc/javascript::%js-to-number value)) :to-be-truthy)))
+
+(it-sequential "js-rt-to-number-nan-str"
+  (expect (cl-cc/javascript::%js-nan-p (cl-cc/javascript::%js-to-number "abc")) :to-be-truthy))
 
 ;;; ─── typeof: extended types ──────────────────────────────────────────────────
 
-(deftest-each js-rt-typeof-extended
-  "typeof distinguishes host functions, plain hash-tables, and BigInt values."
-  :cases (("function"  (lambda () nil)                         "function")
-          ("object-ht" (cl-cc/javascript::%js-make-ht)         "object")
-          ("bigint"    (cl-cc/javascript::%make-js-bigint 5)   "bigint"))
-  (value expected)
-  (assert-string= expected (cl-cc/javascript::%js-typeof value)))
+(it-sequential "js-rt-typeof-extended function"
+  (destructuring-bind (value expected) (list (lambda () nil) "function")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
 
-(deftest js-rt-typeof-callable-object
-  "typeof returns \"function\" for a hash-table whose \"__call__\" slot is set."
+(it-sequential "js-rt-typeof-extended object-ht"
+  (destructuring-bind (value expected) (list (cl-cc/javascript::%js-make-ht) "object")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof-extended bigint"
+  (destructuring-bind (value expected) (list (cl-cc/javascript::%make-js-bigint 5) "bigint")
+    (expect (cl-cc/javascript::%js-typeof value) :to-equal expected)))
+
+(it-sequential "js-rt-typeof-callable-object"
   (let ((fn-obj (cl-cc/javascript::%js-make-ht)))
     (setf (gethash "__call__" fn-obj) (lambda () nil))
-    (assert-string= "function" (cl-cc/javascript::%js-typeof fn-obj))))
+    (expect (cl-cc/javascript::%js-typeof fn-obj) :to-equal "function")))
 
 ;;; ─── Relational operators ────────────────────────────────────────────────────
 
-(deftest-each js-rt-relational-num
-  "Numeric relational operators (<, >, <=, >=) coerce operands to doubles."
-  :cases (("lt-true"   #'cl-cc/javascript::%js-lt 1 2 t)
-          ("lt-false"  #'cl-cc/javascript::%js-lt 2 1 nil)
-          ("gt-true"   #'cl-cc/javascript::%js-gt 5 3 t)
-          ("gt-false"  #'cl-cc/javascript::%js-gt 3 5 nil)
-          ("le-eq"     #'cl-cc/javascript::%js-le 3 3 t)
-          ("le-less"   #'cl-cc/javascript::%js-le 2 3 t)
-          ("ge-eq"     #'cl-cc/javascript::%js-ge 3 3 t)
-          ("ge-more"   #'cl-cc/javascript::%js-ge 4 3 t))
-  (fn a b expected)
-  (assert-equal expected (funcall fn a b)))
+(it-sequential "js-rt-relational-num lt-true"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-lt 1 2 t)
+    (expect (funcall fn a b) :to-equal expected)))
 
-(deftest-each js-rt-relational-string
-  "String relational comparison is lexicographic (code-unit order)."
-  :cases (("lt-abc"   #'cl-cc/javascript::%js-lt "a" "b" t)
-          ("gt-abc"   #'cl-cc/javascript::%js-gt "b" "a" t)
-          ("lt-same"  #'cl-cc/javascript::%js-lt "a" "a" nil)
-          ("le-same"  #'cl-cc/javascript::%js-le "a" "a" t))
-  (fn a b expected)
-  (assert-equal expected (funcall fn a b)))
+(it-sequential "js-rt-relational-num lt-false"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-lt 2 1 nil)
+    (expect (funcall fn a b) :to-equal expected)))
 
-(deftest js-rt-relational-nan-always-false
-  "Any relational comparison involving NaN returns nil (JS spec)."
+(it-sequential "js-rt-relational-num gt-true"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-gt 5 3 t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-num gt-false"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-gt 3 5 nil)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-num le-eq"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-le 3 3 t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-num le-less"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-le 2 3 t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-num ge-eq"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-ge 3 3 t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-num ge-more"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-ge 4 3 t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-string lt-abc"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-lt "a" "b" t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-string gt-abc"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-gt "b" "a" t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-string lt-same"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-lt "a" "a" nil)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-string le-same"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-le "a" "a" t)
+    (expect (funcall fn a b) :to-equal expected)))
+
+(it-sequential "js-rt-relational-nan-always-false"
   (let ((nan cl-cc/javascript::+js-nan+))
-    (assert-false (cl-cc/javascript::%js-lt nan 1))
-    (assert-false (cl-cc/javascript::%js-gt nan 1))
-    (assert-false (cl-cc/javascript::%js-le nan 1))
-    (assert-false (cl-cc/javascript::%js-ge nan 1))))
+    (expect (cl-cc/javascript::%js-lt nan 1) :to-be-falsy)
+    (expect (cl-cc/javascript::%js-gt nan 1) :to-be-falsy)
+    (expect (cl-cc/javascript::%js-le nan 1) :to-be-falsy)
+    (expect (cl-cc/javascript::%js-ge nan 1) :to-be-falsy)))
 
 ;;; ─── Nullish coalescing ──────────────────────────────────────────────────────
 
-(deftest-each js-rt-nullish-coalesce
-  "?? returns RHS only when LHS is null or undefined; all other falsy values use LHS."
-  :cases (("null-rhs"  cl-cc/javascript::+js-null+       "default" "default")
-          ("undef-rhs" cl-cc/javascript::+js-undefined+  "default" "default")
-          ("false-lhs" nil                               "default" nil)
-          ("zero-lhs"  0                                 "default" 0)
-          ("str-lhs"   "x"                               "default" "x"))
-  (lhs rhs expected)
-  (assert-equal expected (cl-cc/javascript::%js-nullish-coalesce lhs rhs)))
+(it-sequential "js-rt-nullish-coalesce null-rhs"
+  (destructuring-bind (lhs rhs expected) (list cl-cc/javascript::+js-null+ "default" "default")
+    (expect (cl-cc/javascript::%js-nullish-coalesce lhs rhs) :to-equal expected)))
+
+(it-sequential "js-rt-nullish-coalesce undef-rhs"
+  (destructuring-bind (lhs rhs expected) (list cl-cc/javascript::+js-undefined+ "default" "default")
+    (expect (cl-cc/javascript::%js-nullish-coalesce lhs rhs) :to-equal expected)))
+
+(it-sequential "js-rt-nullish-coalesce false-lhs"
+  (destructuring-bind (lhs rhs expected) (list nil "default" nil)
+    (expect (cl-cc/javascript::%js-nullish-coalesce lhs rhs) :to-equal expected)))
+
+(it-sequential "js-rt-nullish-coalesce zero-lhs"
+  (destructuring-bind (lhs rhs expected) (list 0 "default" 0)
+    (expect (cl-cc/javascript::%js-nullish-coalesce lhs rhs) :to-equal expected)))
+
+(it-sequential "js-rt-nullish-coalesce str-lhs"
+  (destructuring-bind (lhs rhs expected) (list "x" "default" "x")
+    (expect (cl-cc/javascript::%js-nullish-coalesce lhs rhs) :to-equal expected)))
 
 ;;; ─── instanceof ──────────────────────────────────────────────────────────────
 
-(deftest js-rt-instanceof-true
-  "instanceof returns true when the constructor's __prototype__ is in the __proto__ chain."
+(it-sequential "js-rt-instanceof-true"
   (let* ((klass (cl-cc/javascript::%js-make-class nil nil))
          (obj   (cl-cc/javascript::%js-new klass)))
-    (assert-true (cl-cc/javascript::%js-instanceof obj klass))))
+    (expect (cl-cc/javascript::%js-instanceof obj klass) :to-be-truthy)))
 
-(deftest js-rt-instanceof-false
-  "instanceof returns nil when the prototype chains do not intersect."
+(it-sequential "js-rt-instanceof-false"
   (let* ((klass-a (cl-cc/javascript::%js-make-class nil nil))
          (klass-b (cl-cc/javascript::%js-make-class nil nil))
          (obj     (cl-cc/javascript::%js-new klass-a)))
-    (assert-false (cl-cc/javascript::%js-instanceof obj klass-b))))
+    (expect (cl-cc/javascript::%js-instanceof obj klass-b) :to-be-falsy)))
 
 ;;; ─── try-catch-finally ───────────────────────────────────────────────────────
 
-(deftest js-rt-try-catch
-  "try-catch: catch receives the thrown value."
+(it-sequential "js-rt-try-catch"
   (let ((caught nil))
     (cl-cc/javascript::%js-try-catch-finally
      (lambda () (cl-cc/javascript::%js-throw "err"))
      (lambda (v) (setf caught v))
      nil)
-    (assert-string= "err" caught)))
+    (expect caught :to-equal "err")))
 
-(deftest js-rt-try-finally-runs
-  "finally runs even when no exception is thrown."
+(it-sequential "js-rt-try-finally-runs"
   (let ((ran nil))
     (cl-cc/javascript::%js-try-catch-finally
      (lambda () 42)
      nil
      (lambda () (setf ran t)))
-    (assert-true ran)))
+    (expect ran :to-be-truthy)))
 
 ;;; ─── JS + operator (add / string-concat) ────────────────────────────────────
 
-(deftest js-rt-add-numeric
-  "%js-add with two numbers returns their sum."
-  (assert-= 7 (cl-cc/javascript::%js-add 3 4)))
+(it-sequential "js-rt-add-numeric"
+  (expect (= 7 (cl-cc/javascript::%js-add 3 4)) :to-be-truthy))
 
-(deftest-each js-rt-add-string-concat
-  "%js-add concatenates when at least one operand is a string."
-  :cases (("str-str"  "a"  "b"  "ab")
-          ("num-str"   1   "x"  "1x")
-          ("str-num"  "x"   1   "x1"))
-  (a b expected)
-  (assert-string= expected (cl-cc/javascript::%js-add a b)))
+(it-sequential "js-rt-add-string-concat str-str"
+  (destructuring-bind (a b expected) (list "a" "b" "ab")
+    (expect (cl-cc/javascript::%js-add a b) :to-equal expected)))
+
+(it-sequential "js-rt-add-string-concat num-str"
+  (destructuring-bind (a b expected) (list 1 "x" "1x")
+    (expect (cl-cc/javascript::%js-add a b) :to-equal expected)))
+
+(it-sequential "js-rt-add-string-concat str-num"
+  (destructuring-bind (a b expected) (list "x" 1 "x1")
+    (expect (cl-cc/javascript::%js-add a b) :to-equal expected)))
 
 ;;; ─── JS /, %, ** arithmetic operators ───────────────────────────────────────
 
-(deftest-each js-rt-arithmetic-ops
-  "Divide, mod, and pow handle JS floating-point semantics."
-  :cases (("div-float" #'cl-cc/javascript::%js-divide 10  4   2.5d0)
-          ("mod-pos"   #'cl-cc/javascript::%js-mod    10  3   1)
-          ("mod-neg"   #'cl-cc/javascript::%js-mod    -5  3  -2)
-          ("pow-two"   #'cl-cc/javascript::%js-pow     2 10 1024))
-  (fn a b expected)
-  (assert-= expected (funcall fn a b)))
+(it-sequential "js-rt-arithmetic-ops div-float"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-divide 10 4 2.5d0)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest js-rt-divide-by-zero-infinity
-  "1/0 yields +Infinity (IEEE 754); 0/0 yields NaN."
-  (assert-true (cl-cc/javascript::%js-float-infinity-p (cl-cc/javascript::%js-divide 1 0)))
-  (assert-true (cl-cc/javascript::%js-nan-p (cl-cc/javascript::%js-divide 0 0))))
+(it-sequential "js-rt-arithmetic-ops mod-pos"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-mod 10 3 1)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
 
-(deftest js-rt-mod-zero-denominator-nan
-  "x % 0 yields NaN."
-  (assert-true (cl-cc/javascript::%js-nan-p (cl-cc/javascript::%js-mod 5 0))))
+(it-sequential "js-rt-arithmetic-ops mod-neg"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-mod -5 3 -2)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-arithmetic-ops pow-two"
+  (destructuring-bind (fn a b expected) (list #'cl-cc/javascript::%js-pow 2 10 1024)
+    (expect (= expected (funcall fn a b)) :to-be-truthy)))
+
+(it-sequential "js-rt-divide-by-zero-infinity"
+  (expect (cl-cc/javascript::%js-float-infinity-p (cl-cc/javascript::%js-divide 1 0)) :to-be-truthy)
+  (expect (cl-cc/javascript::%js-nan-p (cl-cc/javascript::%js-divide 0 0)) :to-be-truthy))
+
+(it-sequential "js-rt-mod-zero-denominator-nan"
+  (expect (cl-cc/javascript::%js-nan-p (cl-cc/javascript::%js-mod 5 0)) :to-be-truthy))
 
 ;;; ─── Property: delete / in / optional-chain ──────────────────────────────────
 
-(deftest js-rt-delete-property
-  "%js-delete removes the named key from an object; absent keys stay undefined."
+(it-sequential "js-rt-delete-property"
   (let ((o (cl-cc/javascript::%js-make-object "a" 1 "b" 2)))
     (cl-cc/javascript::%js-delete o "a")
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-get-prop o "a"))
-    (assert-= 2 (cl-cc/javascript::%js-get-prop o "b"))))
+    (expect (cl-cc/javascript::%js-get-prop o "a") :to-be cl-cc/javascript::+js-undefined+)
+    (expect (= 2 (cl-cc/javascript::%js-get-prop o "b")) :to-be-truthy)))
 
-(deftest-each js-rt-in-operator
-  "%js-in returns t when the key exists, nil otherwise."
-  :cases (("present" "a" t)
-          ("absent"  "z" nil))
-  (key expected)
-  (let ((o (cl-cc/javascript::%js-make-object "a" 1)))
-    (assert-equal expected (cl-cc/javascript::%js-in key o))))
+(it-sequential "js-rt-in-operator present"
+  (destructuring-bind (key expected) (list "a" t)
+    (let ((o (cl-cc/javascript::%js-make-object "a" 1)))
+    (expect (cl-cc/javascript::%js-in key o) :to-equal expected))))
 
-(deftest js-rt-optional-chain-present
-  "a?.b returns the property value when a is a non-null object."
+(it-sequential "js-rt-in-operator absent"
+  (destructuring-bind (key expected) (list "z" nil)
+    (let ((o (cl-cc/javascript::%js-make-object "a" 1)))
+    (expect (cl-cc/javascript::%js-in key o) :to-equal expected))))
+
+(it-sequential "js-rt-optional-chain-present"
   (let ((o (cl-cc/javascript::%js-make-object "x" 42)))
-    (assert-= 42 (cl-cc/javascript::%js-optional-chain o "x"))))
+    (expect (= 42 (cl-cc/javascript::%js-optional-chain o "x")) :to-be-truthy)))
 
-(deftest js-rt-optional-chain-null-undefined
-  "a?.b short-circuits to undefined when a is null or undefined."
-  (assert-eq cl-cc/javascript::+js-undefined+
-             (cl-cc/javascript::%js-optional-chain cl-cc/javascript::+js-null+ "x"))
-  (assert-eq cl-cc/javascript::+js-undefined+
-             (cl-cc/javascript::%js-optional-chain cl-cc/javascript::+js-undefined+ "x")))
+(it-sequential "js-rt-optional-chain-null-undefined"
+  (expect (cl-cc/javascript::%js-optional-chain cl-cc/javascript::+js-null+ "x") :to-be cl-cc/javascript::+js-undefined+)
+  (expect (cl-cc/javascript::%js-optional-chain cl-cc/javascript::+js-undefined+ "x") :to-be cl-cc/javascript::+js-undefined+))

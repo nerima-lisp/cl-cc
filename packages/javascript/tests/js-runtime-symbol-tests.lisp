@@ -6,132 +6,126 @@
 ;;;; Depends on: js-runtime-core-tests.lisp (%jr-arr, %jr-list)
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-javascript-suite)
 
 ;;; ─── Symbol predicate ────────────────────────────────────────────────────────
 
-(deftest-each js-rt-symbol-p
-  "%js-symbol-p returns t only for js-symbol structs."
-  :cases (("symbol"   (cl-cc/javascript::%js-make-symbol "x") t)
-          ("string"   "sym"                                    nil)
-          ("number"   42                                       nil)
-          ("nil"      nil                                      nil))
-  (val expected)
-  (assert-equal expected (cl-cc/javascript::%js-symbol-p val)))
+(it-sequential "js-rt-symbol-p symbol"
+  (destructuring-bind (val expected) (list (cl-cc/javascript::%js-make-symbol "x") t)
+    (expect (cl-cc/javascript::%js-symbol-p val) :to-equal expected)))
+
+(it-sequential "js-rt-symbol-p string"
+  (destructuring-bind (val expected) (list "sym" nil)
+    (expect (cl-cc/javascript::%js-symbol-p val) :to-equal expected)))
+
+(it-sequential "js-rt-symbol-p number"
+  (destructuring-bind (val expected) (list 42 nil)
+    (expect (cl-cc/javascript::%js-symbol-p val) :to-equal expected)))
+
+(it-sequential "js-rt-symbol-p nil"
+  (destructuring-bind (val expected) (list nil nil)
+    (expect (cl-cc/javascript::%js-symbol-p val) :to-equal expected)))
 
 ;;; ─── Symbol creation ─────────────────────────────────────────────────────────
 
-(deftest js-rt-symbol-unique-identity
-  "Two Symbol() calls with the same description are never eq."
+(it-sequential "js-rt-symbol-unique-identity"
   (let ((a (cl-cc/javascript::%js-make-symbol "tag"))
         (b (cl-cc/javascript::%js-make-symbol "tag")))
-    (assert-false (eq a b))))
+    (expect (eq a b) :to-be-falsy)))
 
-(deftest js-rt-symbol-no-description
-  "Symbol() with no arg stores +js-undefined+ as description."
+(it-sequential "js-rt-symbol-no-description"
   (let ((sym (cl-cc/javascript::%js-make-symbol)))
-    (assert-true  (cl-cc/javascript::%js-symbol-p sym))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-symbol-description sym))))
+    (expect (cl-cc/javascript::%js-symbol-p sym) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-symbol-description sym) :to-be cl-cc/javascript::+js-undefined+)))
 
 ;;; ─── toString / description ──────────────────────────────────────────────────
 
-(deftest-each js-rt-symbol-to-string
-  "Symbol.prototype.toString renders 'Symbol(desc)' or 'Symbol()'."
-  :cases (("with-desc"    "tag"                                "Symbol(tag)")
-          ("empty-desc"   ""                                   "Symbol()")
-          ("no-desc"      cl-cc/javascript::+js-undefined+     "Symbol()"))
-  (desc expected)
-  (let* ((sym (cl-cc/javascript::%js-make-symbol desc))
+(it-sequential "js-rt-symbol-to-string with-desc"
+  (destructuring-bind (desc expected) (list "tag" "Symbol(tag)")
+    (let* ((sym (cl-cc/javascript::%js-make-symbol desc))
          (str (cl-cc/javascript::%js-symbol-to-string sym)))
-    (assert-string= expected str)))
+    (expect str :to-equal expected))))
 
-(deftest js-rt-symbol-description-accessor
-  "Symbol.prototype.description returns the description string or +js-undefined+."
+(it-sequential "js-rt-symbol-to-string empty-desc"
+  (destructuring-bind (desc expected) (list "" "Symbol()")
+    (let* ((sym (cl-cc/javascript::%js-make-symbol desc))
+         (str (cl-cc/javascript::%js-symbol-to-string sym)))
+    (expect str :to-equal expected))))
+
+(it-sequential "js-rt-symbol-to-string no-desc"
+  (destructuring-bind (desc expected) (list cl-cc/javascript::+js-undefined+ "Symbol()")
+    (let* ((sym (cl-cc/javascript::%js-make-symbol desc))
+         (str (cl-cc/javascript::%js-symbol-to-string sym)))
+    (expect str :to-equal expected))))
+
+(it-sequential "js-rt-symbol-description-accessor"
   (let ((with-desc (cl-cc/javascript::%js-make-symbol "label"))
         (no-desc   (cl-cc/javascript::%js-make-symbol)))
-    (assert-string= "label" (cl-cc/javascript::%js-symbol-description with-desc))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-symbol-description no-desc))))
+    (expect (cl-cc/javascript::%js-symbol-description with-desc) :to-equal "label")
+    (expect (cl-cc/javascript::%js-symbol-description no-desc) :to-be cl-cc/javascript::+js-undefined+)))
 
 ;;; ─── Global registry — Symbol.for / Symbol.keyFor ────────────────────────────
 
-(deftest js-rt-symbol-for-idempotent
-  "Symbol.for with the same key returns the identical symbol object."
+(it-sequential "js-rt-symbol-for-idempotent"
   (let ((s1 (cl-cc/javascript::%js-symbol-for "my-key"))
         (s2 (cl-cc/javascript::%js-symbol-for "my-key")))
-    (assert-eq s1 s2)))
+    (expect s2 :to-be s1)))
 
-(deftest js-rt-symbol-for-different-keys
-  "Symbol.for with different keys returns distinct symbol objects."
+(it-sequential "js-rt-symbol-for-different-keys"
   (let ((a (cl-cc/javascript::%js-symbol-for "alpha"))
         (b (cl-cc/javascript::%js-symbol-for "beta")))
-    (assert-false (eq a b))))
+    (expect (eq a b) :to-be-falsy)))
 
-(deftest js-rt-symbol-key-for-registered
-  "Symbol.keyFor returns the registry key for a registered symbol."
+(it-sequential "js-rt-symbol-key-for-registered"
   (let ((sym (cl-cc/javascript::%js-symbol-for "registry-key")))
-    (assert-string= "registry-key"
-                    (cl-cc/javascript::%js-symbol-key-for sym))))
+    (expect (cl-cc/javascript::%js-symbol-key-for sym) :to-equal "registry-key")))
 
-(deftest js-rt-symbol-key-for-unregistered
-  "Symbol.keyFor returns +js-undefined+ for non-registry symbols."
+(it-sequential "js-rt-symbol-key-for-unregistered"
   (let ((local (cl-cc/javascript::%js-make-symbol "local")))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-symbol-key-for local))))
+    (expect (cl-cc/javascript::%js-symbol-key-for local) :to-be cl-cc/javascript::+js-undefined+)))
 
-(deftest js-rt-symbol-key-for-non-symbol
-  "Symbol.keyFor returns +js-undefined+ for non-symbol inputs."
-  (assert-eq cl-cc/javascript::+js-undefined+
-             (cl-cc/javascript::%js-symbol-key-for "not-a-symbol")))
+(it-sequential "js-rt-symbol-key-for-non-symbol"
+  (expect (cl-cc/javascript::%js-symbol-key-for "not-a-symbol") :to-be cl-cc/javascript::+js-undefined+))
 
 ;;; ─── Symbol as property key ──────────────────────────────────────────────────
 
-(deftest js-rt-symbol-as-key-format
-  "%js-symbol-as-key produces a '__sym_GENSYM__' string."
+(it-sequential "js-rt-symbol-as-key-format"
   (let* ((sym (cl-cc/javascript::%js-make-symbol "k"))
          (key (cl-cc/javascript::%js-symbol-as-key sym)))
-    (assert-true (stringp key))
-    (assert-true (string= key "__sym_" :end1 6))
-    (assert-true (string= key "__" :start1 (- (length key) 2)))
-    (assert-true (cl-cc/javascript::%js-symbol-storage-key-p key))
-    (assert-eq sym (cl-cc/javascript::%js-symbol-from-storage-key key))
-    (assert-false (cl-cc/javascript::%js-symbol-storage-key-p "not-a-symbol-key"))
-    (assert-eq cl-cc/javascript::+js-undefined+
-               (cl-cc/javascript::%js-symbol-from-storage-key "not-a-symbol-key"))))
+    (expect (stringp key) :to-be-truthy)
+    (expect (string= key "__sym_" :end1 6) :to-be-truthy)
+    (expect (string= key "__" :start1 (- (length key) 2)) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-symbol-storage-key-p key) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-symbol-from-storage-key key) :to-be sym)
+    (expect (cl-cc/javascript::%js-symbol-storage-key-p "not-a-symbol-key") :to-be-falsy)
+    (expect (cl-cc/javascript::%js-symbol-from-storage-key "not-a-symbol-key") :to-be cl-cc/javascript::+js-undefined+)))
 
 ;;; ─── Well-known symbols ──────────────────────────────────────────────────────
 
-(deftest js-rt-well-known-symbols-are-registered
-  "Well-known symbols (iterator, toPrimitive, etc.) are js-symbol instances."
-  (assert-true (cl-cc/javascript::%js-symbol-p cl-cc/javascript::%js-symbol-iterator))
-  (assert-true (cl-cc/javascript::%js-symbol-p cl-cc/javascript::%js-symbol-to-primitive))
-  (assert-true (cl-cc/javascript::%js-symbol-p cl-cc/javascript::%js-symbol-to-string-tag)))
+(it-sequential "js-rt-well-known-symbols-are-registered"
+  (expect (cl-cc/javascript::%js-symbol-p cl-cc/javascript::%js-symbol-iterator) :to-be-truthy)
+  (expect (cl-cc/javascript::%js-symbol-p cl-cc/javascript::%js-symbol-to-primitive) :to-be-truthy)
+  (expect (cl-cc/javascript::%js-symbol-p cl-cc/javascript::%js-symbol-to-string-tag) :to-be-truthy))
 
 ;;; ─── Symbol global object ────────────────────────────────────────────────────
 
-(deftest js-rt-symbol-global-has-well-known-props
-  "*js-symbol-global* exposes well-known symbols and static methods."
+(it-sequential "js-rt-symbol-global-has-well-known-props"
   (let ((g cl-cc/javascript::*js-symbol-global*))
-    (assert-true (cl-cc/javascript::%js-ht-p g))
-    (assert-true (cl-cc/javascript::%js-symbol-p (gethash "iterator" g)))
-    (assert-true (functionp (gethash "for" g)))
-    (assert-true (functionp (gethash "__call__" g)))))
+    (expect (cl-cc/javascript::%js-ht-p g) :to-be-truthy)
+    (expect (cl-cc/javascript::%js-symbol-p (gethash "iterator" g)) :to-be-truthy)
+    (expect (functionp (gethash "for" g)) :to-be-truthy)
+    (expect (functionp (gethash "__call__" g)) :to-be-truthy)))
 
 ;;; ─── Iterator control: iter-values / iter-keys / advance-iterator ────────────
 
-(deftest js-rt-iter-values-from-array
-  "%js-iter-values collects a JS array's elements into a CL list."
+(it-sequential "js-rt-iter-values-from-array"
   (let* ((arr    (%jr-arr 10 20 30))
          (values (cl-cc/javascript::%js-iter-values arr)))
-    (assert-equal '(10 20 30) values)))
+    (expect values :to-equal '(10 20 30))))
 
-(deftest js-rt-iter-values-from-string
-  "%js-iter-values collects individual characters from a string."
-  (assert-equal '("a" "b" "c") (cl-cc/javascript::%js-iter-values "abc")))
+(it-sequential "js-rt-iter-values-from-string"
+  (expect (cl-cc/javascript::%js-iter-values "abc") :to-equal '("a" "b" "c")))
 
-(deftest js-rt-advance-iterator-drains-object
-  "%js-advance-iterator calls body-fn for each {value, done} step."
+(it-sequential "js-rt-advance-iterator-drains-object"
   (let* ((items '(7 8 9))
          (idx   (list 0))
          (iter  (cl-cc/javascript::%js-make-object
@@ -144,4 +138,4 @@
                                 "value" cl-cc/javascript::+js-undefined+ "done" t)))))
          (acc   nil))
     (cl-cc/javascript::%js-advance-iterator iter (lambda (v) (push v acc)))
-    (assert-equal '(9 8 7) acc)))
+    (expect acc :to-equal '(9 8 7))))
