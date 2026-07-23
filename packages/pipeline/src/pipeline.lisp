@@ -539,18 +539,21 @@ takes the top-level path) caught correctly."
 :LISP and :ELISP always return normal s-expressions; when SOURCE-FILE is
 provided, a second value carries top-level source locations for later AST
 annotation.
-:PHP calls parse-php-source and :JAVASCRIPT calls js-program-forms, both of
-which return shared AST nodes directly (the latter prepends a runtime prelude)."
+Non-Lisp languages are parsed by the frontend registered for that language
+keyword via cl-cc/bootstrap:register-backend-parser (PHP/JavaScript register
+their own parsers); the parser returns shared AST nodes directly. The pipeline
+no longer references any frontend package here."
   (cond
     ((member language '(:lisp :elisp))
      (let ((clean-source (%pipeline-strip-shebang-line source)))
        (if source-file
            (%lisp-top-level-source-forms-and-locations clean-source source-file)
            (values (parse-all-forms clean-source) nil))))
-    ((eq language :php)  (parse-php-source source))
-    ((eq language :javascript)
-     (values (cl-cc/javascript:js-program-forms source) nil))
-    (t (error "Unknown language: ~S" language))))
+    (t
+     (let ((parser (cl-cc/bootstrap:backend-parser language)))
+       (if parser
+           (funcall parser source)
+           (error "Unknown language: ~S" language))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Public compilation API

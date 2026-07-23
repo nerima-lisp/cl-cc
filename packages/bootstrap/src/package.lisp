@@ -71,7 +71,11 @@
     #:register-backend-vm-integration-installer
     #:backend-vm-integration-installers
     #:register-backend-global-seeder
-    #:backend-global-seeders))
+    #:backend-global-seeders
+    ;; Frontend parser dispatch: a backend registers its source parser for a
+    ;; language keyword; the pipeline dispatches without naming the backend.
+    #:register-backend-parser
+    #:backend-parser))
 
 (in-package :cl-cc/bootstrap)
 
@@ -138,3 +142,14 @@
 
 (defun backend-global-seeders ()
   *backend-global-seeders*)
+
+(defvar *backend-parsers* '()
+  "Plist of language-keyword -> parser function of (source) => (values forms
+source-locations). Registered by frontends; dispatched by the pipeline.")
+
+(defun register-backend-parser (language fn)
+  (setf (getf *backend-parsers* language) fn)
+  fn)
+
+(defun backend-parser (language)
+  (getf *backend-parsers* language))

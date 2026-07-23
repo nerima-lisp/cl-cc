@@ -30,3 +30,7 @@ homed in :cl-cc/php."
     (nreverse entries)))
 
 (register-backend-bridge-provider #'%php-host-bridge-entries)
+
+;; Register the PHP source parser so the pipeline dispatches by language keyword
+;; without referencing this package (§5-1 frontend dispatch inversion).
+(register-backend-parser :php (lambda (source) (parse-php-source source)))

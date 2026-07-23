@@ -74,3 +74,8 @@
 
 (cl-cc/bootstrap:register-backend-vm-integration-installer #'%install-js-vm-integration)
 (cl-cc/bootstrap:register-backend-global-seeder #'%seed-js-globals)
+
+;; Register the JS source parser (prepends the runtime prelude) so the pipeline
+;; dispatches by language keyword without referencing this package.
+(cl-cc/bootstrap:register-backend-parser
+ :javascript (lambda (source) (values (js-program-forms source) nil)))
