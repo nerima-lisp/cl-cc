@@ -5,202 +5,186 @@
 ;;; type constructors, effect rows, and edge cases.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Product Type Unification ───────────────────────────────────────────
 
-(deftest-each unify-product-cases
-  "Product type unification: identical succeeds; length mismatch fails."
-  :cases (("same-types"
-           (let ((p (cl-cc/type:make-type-product
+(it-sequential "unify-product-cases same-types"
+  (destructuring-bind (types expected-ok) (list (let ((p (cl-cc/type:make-type-product
                      :elems (list cl-cc/type:type-int cl-cc/type:type-string))))
-             (list p p))
-           t)
-          ("length-mismatch"
-           (list (cl-cc/type:make-type-product :elems (list cl-cc/type:type-int))
-                 (cl-cc/type:make-type-product
-                  :elems (list cl-cc/type:type-int cl-cc/type:type-string)))
-           nil))
-  (types expected-ok)
-  (destructuring-bind (lhs rhs) types
+             (list p p)) t)
+    (destructuring-bind (lhs rhs) types
     (multiple-value-bind (s ok) (type-unify lhs rhs)
       (if expected-ok
           (progn
-            (assert-true ok)
-            (assert-true (cl-cc/type:substitution-p s)))
-          (assert-false ok)))))
+            (expect ok :to-be-truthy)
+            (expect (cl-cc/type:substitution-p s) :to-be-truthy))
+          (expect ok :to-be-falsy))))))
+
+(it-sequential "unify-product-cases length-mismatch"
+  (destructuring-bind (types expected-ok) (list (list (cl-cc/type:make-type-product :elems (list cl-cc/type:type-int))
+                 (cl-cc/type:make-type-product
+                  :elems (list cl-cc/type:type-int cl-cc/type:type-string))) nil)
+    (destructuring-bind (lhs rhs) types
+    (multiple-value-bind (s ok) (type-unify lhs rhs)
+      (if expected-ok
+          (progn
+            (expect ok :to-be-truthy)
+            (expect (cl-cc/type:substitution-p s) :to-be-truthy))
+          (expect ok :to-be-falsy))))))
 
 ;;; ─── Union Type Unification ─────────────────────────────────────────────
 
-(deftest unify-union-identical-succeeds
-  "Identical union types unify successfully."
+(it-sequential "unify-union-identical-succeeds"
   (let ((u (cl-cc/type:make-type-union-raw :types (list cl-cc/type:type-int cl-cc/type:type-string))))
     (multiple-value-bind (s ok) (type-unify u u)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))))
 
-(deftest unify-union-left-member-succeeds
-  "Union unifies with a type that is a member (union on left)."
+(it-sequential "unify-union-left-member-succeeds"
   (let ((u (cl-cc/type:make-type-union-raw :types (list cl-cc/type:type-int cl-cc/type:type-string))))
     (multiple-value-bind (s ok) (type-unify u cl-cc/type:type-int)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))))
 
-(deftest unify-union-right-member-succeeds
-  "Union unifies with a type that is a member (union on right)."
+(it-sequential "unify-union-right-member-succeeds"
   (let ((u (cl-cc/type:make-type-union-raw :types (list cl-cc/type:type-int cl-cc/type:type-string))))
     (multiple-value-bind (s ok) (type-unify cl-cc/type:type-string u)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))))
 
-(deftest unify-union-non-member-fails
-  "Union fails to unify with a type that is not a member."
+(it-sequential "unify-union-non-member-fails"
   (let ((u (cl-cc/type:make-type-union-raw :types (list cl-cc/type:type-int cl-cc/type:type-string))))
     (multiple-value-bind (_ ok) (type-unify u cl-cc/type:type-bool)
       (declare (ignore _))
-      (assert-false ok))))
+      (expect ok :to-be-falsy))))
 
 ;;; ─── Primitive Unification Edge Cases ───────────────────────────────────
 
-(deftest unify-different-primitives-fail
-  "Different primitive types fail to unify."
+(it-sequential "unify-different-primitives-fail"
   (multiple-value-bind (s ok) (type-unify cl-cc/type:type-int cl-cc/type:type-string)
     (declare (ignore s))
-    (assert-false ok)))
+    (expect ok :to-be-falsy)))
 
-(deftest unify-error-type-with-anything
-  "type-error unifies with any type."
+(it-sequential "unify-error-type-with-anything"
   (let ((err (cl-cc/type:make-type-error)))
     (multiple-value-bind (s ok) (type-unify err cl-cc/type:type-int)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))
     (multiple-value-bind (s ok) (type-unify cl-cc/type:type-string err)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))))
 
 ;;; ─── Variable Binding ───────────────────────────────────────────────────
 
-(deftest unify-var-bound-in-subst
-  "A variable already bound in subst is followed."
+(it-sequential "unify-var-bound-in-subst"
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (s (subst-extend a cl-cc/type:type-int nil)))
     (multiple-value-bind (s2 ok) (type-unify a cl-cc/type:type-int s)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s2)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s2) :to-be-truthy))))
 
-(deftest unify-var-bound-conflicting-fails
-  "A variable bound to int fails to unify with string."
+(it-sequential "unify-var-bound-conflicting-fails"
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (s (subst-extend a cl-cc/type:type-int nil)))
     (multiple-value-bind (s2 ok) (type-unify a cl-cc/type:type-string s)
       (declare (ignore s2))
-      (assert-false ok))))
+      (expect ok :to-be-falsy))))
 
 ;;; ─── type-unify-lists ───────────────────────────────────────────────────
 
-(deftest unify-lists-empty
-  "Two empty lists unify successfully."
+(it-sequential "unify-lists-empty"
   (multiple-value-bind (s ok) (type-unify-lists nil nil (make-substitution))
-    (assert-true ok)
-    (assert-true (cl-cc/type:substitution-p s))))
+    (expect ok :to-be-truthy)
+    (expect (cl-cc/type:substitution-p s) :to-be-truthy)))
 
-(deftest unify-lists-length-mismatch
-  "Lists of different lengths fail."
+(it-sequential "unify-lists-length-mismatch"
   (multiple-value-bind (s ok) (type-unify-lists
                                 (list cl-cc/type:type-int)
                                 nil
                                 (make-substitution))
     (declare (ignore s))
-    (assert-false ok)))
+    (expect ok :to-be-falsy)))
 
-(deftest unify-lists-pairwise
-  "Lists are unified element-wise."
+(it-sequential "unify-lists-pairwise"
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (b (cl-cc/type:fresh-type-var 'b)))
     (multiple-value-bind (s ok)
         (type-unify-lists (list a b)
                           (list cl-cc/type:type-int cl-cc/type:type-string)
                           (make-substitution))
-      (assert-true ok)
-      (assert-eq 'fixnum (cl-cc/type:type-primitive-name (zonk a s)))
-      (assert-eq 'string (cl-cc/type:type-primitive-name (zonk b s))))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name (zonk a s)) :to-be 'fixnum)
+      (expect (cl-cc/type:type-primitive-name (zonk b s)) :to-be 'string))))
 
-(deftest unify-lists-partial-failure
-  "If any pair fails, the whole list unification fails."
+(it-sequential "unify-lists-partial-failure"
   (multiple-value-bind (s ok)
       (type-unify-lists (list cl-cc/type:type-int cl-cc/type:type-int)
                         (list cl-cc/type:type-int cl-cc/type:type-string)
                         (make-substitution))
     (declare (ignore s))
-    (assert-false ok)))
+    (expect ok :to-be-falsy)))
 
 ;;; ─── Arrow Unification Edge Cases ───────────────────────────────────────
 
-(deftest-each unify-arrow-mismatch-cases
-  "Arrow types that differ in arity or return type fail to unify."
-  :cases (("arity-mismatch"
-           (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int)
-                                           :return cl-cc/type:type-int)
-           (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int cl-cc/type:type-int)
+(it-sequential "unify-arrow-mismatch-cases arity-mismatch"
+  (destructuring-bind (lhs rhs) (list (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int)
+                                           :return cl-cc/type:type-int) (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int cl-cc/type:type-int)
                                            :return cl-cc/type:type-int))
-          ("return-mismatch"
-           (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int)
-                                           :return cl-cc/type:type-int)
-           (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int)
-                                           :return cl-cc/type:type-string)))
-  (lhs rhs)
-  (multiple-value-bind (s ok) (type-unify lhs rhs)
+    (multiple-value-bind (s ok) (type-unify lhs rhs)
     (declare (ignore s))
-    (assert-false ok)))
+    (expect ok :to-be-falsy))))
+
+(it-sequential "unify-arrow-mismatch-cases return-mismatch"
+  (destructuring-bind (lhs rhs) (list (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int)
+                                           :return cl-cc/type:type-int) (cl-cc/type:make-type-arrow-raw :params (list cl-cc/type:type-int)
+                                           :return cl-cc/type:type-string))
+    (multiple-value-bind (s ok) (type-unify lhs rhs)
+    (declare (ignore s))
+    (expect ok :to-be-falsy))))
 
 ;;; ─── Effect Row Unification ─────────────────────────────────────────────
 
-(deftest unify-effect-row-empty-rows-succeed
-  "Two empty effect rows unify successfully."
+(it-sequential "unify-effect-row-empty-rows-succeed"
   (let* ((r1 (cl-cc/type:make-type-effect-row :effects nil :row-var nil))
          (r2 (cl-cc/type:make-type-effect-row :effects nil :row-var nil)))
     (multiple-value-bind (s ok) (type-unify r1 r2)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))))
 
-(deftest unify-effect-row-same-effects-succeed
-  "Effect rows with the same single effect unify successfully."
+(it-sequential "unify-effect-row-same-effects-succeed"
   (let* ((e1 (cl-cc/type:make-type-effect-op :name 'io :args nil))
          (e2 (cl-cc/type:make-type-effect-op :name 'io :args nil))
          (r1 (cl-cc/type:make-type-effect-row :effects (list e1) :row-var nil))
          (r2 (cl-cc/type:make-type-effect-row :effects (list e2) :row-var nil)))
     (multiple-value-bind (s ok) (type-unify r1 r2)
-      (assert-true ok)
-      (assert-true (cl-cc/type:substitution-p s)))))
+      (expect ok :to-be-truthy)
+      (expect (cl-cc/type:substitution-p s) :to-be-truthy))))
 
-(deftest unify-effect-row-open-absorbs-extra-effect
-  "An open effect row (with row-var) absorbs an extra effect by binding the row-var."
+(it-sequential "unify-effect-row-open-absorbs-extra-effect"
   (let* ((rv (cl-cc/type:fresh-type-var 'r))
          (e-io (cl-cc/type:make-type-effect-op :name 'io :args nil))
          (e-exn (cl-cc/type:make-type-effect-op :name 'exn :args nil))
          (r1 (cl-cc/type:make-type-effect-row :effects (list e-io) :row-var rv))
          (r2 (cl-cc/type:make-type-effect-row :effects (list e-io e-exn) :row-var nil)))
     (multiple-value-bind (s ok) (type-unify r1 r2)
-      (assert-true ok)
+      (expect ok :to-be-truthy)
       (let ((bound (zonk rv s)))
-        (assert-true (cl-cc/type:type-effect-row-p bound))))))
+        (expect (cl-cc/type:type-effect-row-p bound) :to-be-truthy)))))
 
-(deftest unify-effect-row-closed-rejects-extra-effect
-  "A closed effect row (no row-var) rejects extra effects; unification fails."
+(it-sequential "unify-effect-row-closed-rejects-extra-effect"
   (let* ((e-io (cl-cc/type:make-type-effect-op :name 'io :args nil))
          (e-exn (cl-cc/type:make-type-effect-op :name 'exn :args nil))
          (r1 (cl-cc/type:make-type-effect-row :effects (list e-io) :row-var nil))
          (r2 (cl-cc/type:make-type-effect-row :effects (list e-io e-exn) :row-var nil)))
     (multiple-value-bind (s ok) (type-unify r1 r2)
       (declare (ignore s))
-      (assert-false ok))))
+      (expect ok :to-be-falsy))))
 
 ;;; ─── Occurs Check in Unification ────────────────────────────────────────
 
-(deftest unify-occurs-check-circular
-  "Occurs check prevents circular type: a ~ (a -> int)."
+(it-sequential "unify-occurs-check-circular"
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (fn (cl-cc/type:make-type-arrow-raw :params (list a) :return cl-cc/type:type-int)))
     (multiple-value-bind (s ok) (type-unify a fn)
       (declare (ignore s))
-      (assert-false ok))))
+      (expect ok :to-be-falsy))))

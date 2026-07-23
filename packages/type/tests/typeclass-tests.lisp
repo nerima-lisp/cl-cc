@@ -6,16 +6,11 @@
 
 (in-package :cl-cc/test)
 
-(defsuite typeclass-suite :description "Multi-parameter typeclass system tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite typeclass-suite)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── typeclass-def struct ──────────────────────────────────────────────────
 
-(deftest typeclass-def-creation
-  "typeclass-def stores all fields; superclasses declared; functor/show creation and register/lookup."
+(it-sequential "typeclass-def-creation"
   (let ((td (make-typeclass-def
              :name 'eq
              :type-params (list (fresh-type-var :name "a"))
@@ -23,16 +18,16 @@
              :methods '((%equal . nil))
              :associated-types nil
              :functional-deps nil)))
-    (assert-true (typeclass-def-p td))
-    (assert-eq 'eq (typeclass-def-name td))
-    (assert-equal 1 (length (typeclass-def-type-params td)))
-    (assert-equal 1 (length (typeclass-def-methods td))))
+    (expect (typeclass-def-p td) :to-be-truthy)
+    (expect (typeclass-def-name td) :to-be 'eq)
+    (expect (length (typeclass-def-type-params td)) :to-equal 1)
+    (expect (length (typeclass-def-methods td)) :to-equal 1))
   (let ((td (make-typeclass-def
              :name 'ord
              :type-params (list (fresh-type-var :name "a"))
              :superclasses '(eq)
              :methods '((%compare . nil)))))
-    (assert-equal '(eq) (cl-cc/type:typeclass-def-superclasses td)))
+    (expect (cl-cc/type:typeclass-def-superclasses td) :to-equal '(eq)))
   (let* ((a  (fresh-type-var :name 'a))
          (tc (make-typeclass-def
               :name 'functor-test
@@ -41,10 +36,10 @@
               :methods (list (cons 'fmap (make-type-arrow (list type-any) type-any)))
               :associated-types nil
               :functional-deps nil)))
-    (assert-true (typeclass-def-p tc))
-    (assert-eq 'functor-test (typeclass-def-name tc))
-    (assert-= 1 (length (typeclass-def-type-params tc)))
-    (assert-= 1 (length (typeclass-def-methods tc))))
+    (expect (typeclass-def-p tc) :to-be-truthy)
+    (expect (typeclass-def-name tc) :to-be 'functor-test)
+    (expect (= 1 (length (typeclass-def-type-params tc))) :to-be-truthy)
+    (expect (= 1 (length (typeclass-def-methods tc))) :to-be-truthy))
   (let* ((a  (fresh-type-var :name 'a))
          (tc (make-typeclass-def
               :name 'show-test
@@ -55,28 +50,24 @@
               :functional-deps nil)))
     (register-typeclass 'show-test tc)
     (let ((retrieved (lookup-typeclass 'show-test)))
-      (assert-true retrieved)
-      (assert-true (typeclass-def-p retrieved))
-      (assert-eq 'show-test (typeclass-def-name retrieved)))))
+      (expect retrieved :to-be-truthy)
+      (expect (typeclass-def-p retrieved) :to-be-truthy)
+      (expect (typeclass-def-name retrieved) :to-be 'show-test))))
 
 ;;; ─── typeclass registry ────────────────────────────────────────────────────
 
-(deftest typeclass-registry-operations
-  "Typeclass registry: round-trip register+lookup; absent name returns nil."
+(it-sequential "typeclass-registry-operations"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq)))
     (let ((td (make-typeclass-def :name 'test-tc :type-params nil :methods nil)))
       (register-typeclass 'test-tc td)
-      (assert-eq td (lookup-typeclass 'test-tc)))
-    (assert-null (lookup-typeclass 'nonexistent))))
+      (expect (lookup-typeclass 'test-tc) :to-be td))
+    (expect (lookup-typeclass 'nonexistent) :to-be-null)))
 
-(deftest typeclass-registry-rejects-noncanonical-input
-  "register-typeclass rejects non-typeclass-def inputs with type-inference-error."
+(it-sequential "typeclass-registry-rejects-noncanonical-input"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq)))
-    (assert-signals type-inference-error
-      (register-typeclass 'bad-input '(:invalid payload)))))
+    (signals type-inference-error (register-typeclass 'bad-input '(:invalid payload)))))
 
-(deftest typeclass-default-methods-merge-into-instance
-  "Instance registration fills missing methods from class defaults."
+(it-sequential "typeclass-default-methods-merge-into-instance"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq))
         (cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
     (register-typeclass 'pretty-test
@@ -87,44 +78,43 @@
                          :defaults '((show . default-show)
                                      (eq . default-eq))))
     (let ((inst (register-typeclass-instance 'pretty-test type-int '((eq . custom-eq)))))
-      (assert-eq 'custom-eq (cdr (assoc 'eq (typeclass-instance-methods inst))))
-      (assert-eq 'default-show (cdr (assoc 'show (typeclass-instance-methods inst)))))))
+      (expect (cdr (assoc 'eq (typeclass-instance-methods inst))) :to-be 'custom-eq)
+      (expect (cdr (assoc 'show (typeclass-instance-methods inst))) :to-be 'default-show))))
 
 
-(deftest typeclass-instance-registration-new
-  "register-typeclass-instance and lookup-typeclass-instance work with canonical API."
+(it-sequential "typeclass-instance-registration-new"
   (register-typeclass-instance 'show-int-test type-int
                                (list (cons 'show (lambda (x) (format nil "~A" x)))))
   (let ((inst (lookup-typeclass-instance 'show-int-test type-int)))
-    (assert-true inst)
-    (assert-true (typeclass-instance-p inst))
-    (assert-eq 'show-int-test (typeclass-instance-class-name inst)))
-  (assert-true (has-typeclass-instance-p 'show-int-test type-int))
-  (assert-false (has-typeclass-instance-p 'show-int-test type-string)))
+    (expect inst :to-be-truthy)
+    (expect (typeclass-instance-p inst) :to-be-truthy)
+    (expect (typeclass-instance-class-name inst) :to-be 'show-int-test))
+  (expect (has-typeclass-instance-p 'show-int-test type-int) :to-be-truthy)
+  (expect (has-typeclass-instance-p 'show-int-test type-string) :to-be-falsy))
 
 ;;; ─── typeclass-instance registry ───────────────────────────────────────────
 
-(deftest typeclass-instance-registry-operations
-  "Instance registry: register+lookup round-trips; unregistered type returns nil."
+(it-sequential "typeclass-instance-registry-operations"
   (let ((cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
     (let ((inst (register-typeclass-instance 'eq type-int '((%equal . t)))))
-      (assert-true (typeclass-instance-p inst))
-      (assert-eq 'eq (cl-cc/type:typeclass-instance-class-name inst))
-      (assert-eq inst (lookup-typeclass-instance 'eq type-int)))
-    (assert-null (lookup-typeclass-instance 'eq type-string))))
+      (expect (typeclass-instance-p inst) :to-be-truthy)
+      (expect (cl-cc/type:typeclass-instance-class-name inst) :to-be 'eq)
+      (expect (lookup-typeclass-instance 'eq type-int) :to-be inst))
+    (expect (lookup-typeclass-instance 'eq type-string) :to-be-null)))
 
-(deftest-each typeclass-instance-registry-rejection-cases
-  "Instance registry rejects both duplicate (same type) and overlapping (type-var) registrations."
-  :cases (("duplicate" type-int)
-          ("overlap"   (fresh-type-var :name "a")))
-  (second-type)
-  (let ((cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
+(it-sequential "typeclass-instance-registry-rejection-cases duplicate"
+  (destructuring-bind (second-type) (list type-int)
+    (let ((cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
     (register-typeclass-instance 'eq type-int nil)
-    (assert-signals type-inference-error
-      (register-typeclass-instance 'eq second-type nil))))
+    (signals type-inference-error (register-typeclass-instance 'eq second-type nil)))))
 
-(deftest typeclass-instance-registry-enforces-functional-dependencies
-  "Functional dependencies reject conflicting instance families."
+(it-sequential "typeclass-instance-registry-rejection-cases overlap"
+  (destructuring-bind (second-type) (list (fresh-type-var :name "a"))
+    (let ((cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
+    (register-typeclass-instance 'eq type-int nil)
+    (signals type-inference-error (register-typeclass-instance 'eq second-type nil)))))
+
+(it-sequential "typeclass-instance-registry-enforces-functional-dependencies"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq))
         (cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
     (register-typeclass 'collection-test
@@ -138,39 +128,64 @@
     (register-typeclass-instance 'collection-test
                                  (make-type-product :elems (list type-int type-string))
                                  nil)
-    (assert-signals type-inference-error
-      (register-typeclass-instance 'collection-test
+    (signals type-inference-error (register-typeclass-instance 'collection-test
                                    (make-type-product :elems (list type-int type-bool))
                                    nil))))
 
 ;;; ─── default-numeric-typeclass-p ──────────────────────────────────────────
 
-(deftest-each default-numeric-typeclass-p-cases
-  "default-numeric-typeclass-p: num/numeric → t; other symbols and non-symbols → nil."
-  :cases (("num"         t   'num)
-          ("numeric"     t   'numeric)
-          ("NUM"         t   'NUM)
-          ("NUMERIC"     t   'NUMERIC)
-          ("eq"          nil 'eq)
-          ("non-symbol"  nil 42)
-          ("nil-input"   nil nil))
-  (expected name)
-  (if expected
-      (assert-true (cl-cc/type::default-numeric-typeclass-p name))
-      (assert-false (cl-cc/type::default-numeric-typeclass-p name))))
+(it-sequential "default-numeric-typeclass-p-cases num"
+  (destructuring-bind (expected name) (list t 'num)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
+
+(it-sequential "default-numeric-typeclass-p-cases numeric"
+  (destructuring-bind (expected name) (list t 'numeric)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
+
+(it-sequential "default-numeric-typeclass-p-cases NUM"
+  (destructuring-bind (expected name) (list t 'NUM)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
+
+(it-sequential "default-numeric-typeclass-p-cases NUMERIC"
+  (destructuring-bind (expected name) (list t 'NUMERIC)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
+
+(it-sequential "default-numeric-typeclass-p-cases eq"
+  (destructuring-bind (expected name) (list nil 'eq)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
+
+(it-sequential "default-numeric-typeclass-p-cases non-symbol"
+  (destructuring-bind (expected name) (list nil 42)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
+
+(it-sequential "default-numeric-typeclass-p-cases nil-input"
+  (destructuring-bind (expected name) (list nil nil)
+    (if expected
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-truthy)
+      (expect (cl-cc/type::default-numeric-typeclass-p name) :to-be-falsy))))
 
 ;;; ─── has-typeclass-instance-p ──────────────────────────────────────────────
 
-(deftest has-typeclass-instance-p-false-before-true-after-registration
-  "has-typeclass-instance-p returns nil before registering, T after."
+(it-sequential "has-typeclass-instance-p-false-before-true-after-registration"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq))
         (cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
-    (assert-false (has-typeclass-instance-p 'eq type-int))
+    (expect (has-typeclass-instance-p 'eq type-int) :to-be-falsy)
     (register-typeclass-instance 'eq type-int nil)
-    (assert-true  (has-typeclass-instance-p 'eq type-int))))
+    (expect (has-typeclass-instance-p 'eq type-int) :to-be-truthy)))
 
-(deftest has-typeclass-instance-p-via-superclass-chain
-  "has-typeclass-instance-p finds an instance through a superclass chain (ord ⊃ eq)."
+(it-sequential "has-typeclass-instance-p-via-superclass-chain"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq))
         (cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
     (register-typeclass-instance 'eq type-int nil)
@@ -179,74 +194,72 @@
                               :superclasses '(eq)
                               :type-params nil
                               :methods nil))
-    (assert-true (has-typeclass-instance-p 'ord type-int))))
+    (expect (has-typeclass-instance-p 'ord type-int) :to-be-truthy)))
 
 ;;; ─── check-typeclass-constraint ────────────────────────────────────────────
 
-(deftest check-typeclass-constraint-behavior
-  "check-typeclass-constraint: accepts known instance, unknown, and free var; signals error for missing instance."
+(it-sequential "check-typeclass-constraint-behavior"
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq))
         (cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
     (register-typeclass-instance 'eq type-int nil)
     (cl-cc/type:check-typeclass-constraint 'eq type-int       (type-env-empty))
     (cl-cc/type:check-typeclass-constraint 'eq cl-cc/type:+type-unknown+ (type-env-empty))
     (cl-cc/type:check-typeclass-constraint 'eq (fresh-type-var :name "a") (type-env-empty))
-    (assert-true t))
+    (expect t :to-be-truthy))
   (let ((cl-cc/type:*typeclass-registry* (make-hash-table :test #'eq))
         (cl-cc/type:*typeclass-instance-registry* (make-hash-table :test #'equal)))
-    (assert-signals type-inference-error
-      (cl-cc/type:check-typeclass-constraint 'eq type-int (type-env-empty)))))
+    (signals type-inference-error (cl-cc/type:check-typeclass-constraint 'eq type-int (type-env-empty)))))
 
 ;;; ─── dict-env operations ───────────────────────────────────────────────────
 
-(deftest dict-env-operations
-  "dict-env: extend+lookup round-trips; lookup in empty env returns nil."
+(it-sequential "dict-env-operations"
   (let* ((env     (type-env-empty))
          (methods '((method-a . :impl-a)))
          (env2    (cl-cc/type:dict-env-extend 'eq type-int methods env)))
-    (assert-equal methods (cl-cc/type:dict-env-lookup 'eq type-int env2))
-    (assert-null          (cl-cc/type:dict-env-lookup 'eq type-int env))))
+    (expect (cl-cc/type:dict-env-lookup 'eq type-int env2) :to-equal methods)
+    (expect (cl-cc/type:dict-env-lookup 'eq type-int env) :to-be-null)))
 
 ;;; ─── %typeclass-instance-overlaps-p ─────────────────────────────────────────
 
-(deftest typeclass-instance-overlaps-p-var-overlaps-concrete
-  "%typeclass-instance-overlaps-p: a type-var overlaps any concrete type."
-  (assert-true (cl-cc/type::%typeclass-instance-overlaps-p
-                (fresh-type-var :name "a") type-int)))
+(it-sequential "typeclass-instance-overlaps-p-var-overlaps-concrete"
+  (expect (cl-cc/type::%typeclass-instance-overlaps-p
+                (fresh-type-var :name "a") type-int) :to-be-truthy))
 
-(deftest typeclass-instance-overlaps-p-different-concretes-do-not-overlap
-  "%typeclass-instance-overlaps-p: two different concrete types do not overlap."
-  (assert-false (cl-cc/type::%typeclass-instance-overlaps-p
-                 type-int type-string)))
+(it-sequential "typeclass-instance-overlaps-p-different-concretes-do-not-overlap"
+  (expect (cl-cc/type::%typeclass-instance-overlaps-p
+                 type-int type-string) :to-be-falsy))
 
-(deftest typeclass-instance-overlaps-p-same-concrete-does-not-overlap
-  "%typeclass-instance-overlaps-p: the same concrete type on both sides does not overlap."
-  (assert-false (cl-cc/type::%typeclass-instance-overlaps-p
-                 type-int type-int)))
+(it-sequential "typeclass-instance-overlaps-p-same-concrete-does-not-overlap"
+  (expect (cl-cc/type::%typeclass-instance-overlaps-p
+                 type-int type-int) :to-be-falsy))
 
 ;;; ─── %typeclass-instance-args ────────────────────────────────────────────────
 
-(deftest typeclass-instance-args-single-type-wraps-in-list
-  "%typeclass-instance-args wraps a single type in a one-element list."
+(it-sequential "typeclass-instance-args-single-type-wraps-in-list"
   (let ((args (cl-cc/type::%typeclass-instance-args type-int)))
-    (assert-= 1 (length args))
-    (assert-eq type-int (first args))))
+    (expect (= 1 (length args)) :to-be-truthy)
+    (expect (first args) :to-be type-int)))
 
-(deftest typeclass-instance-args-product-unpacks-elems
-  "%typeclass-instance-args unpacks type-product elems into a two-element list."
+(it-sequential "typeclass-instance-args-product-unpacks-elems"
   (let* ((prod (make-type-product :elems (list type-int type-string)))
          (args (cl-cc/type::%typeclass-instance-args prod)))
-    (assert-= 2 (length args))
-    (assert-eq type-int    (first args))
-    (assert-eq type-string (second args))))
+    (expect (= 2 (length args)) :to-be-truthy)
+    (expect (first args) :to-be type-int)
+    (expect (second args) :to-be type-string)))
 
 ;;; ─── %typeclass-param-name ────────────────────────────────────────────────
 
-(deftest-each typeclass-param-name-cases
-  "%typeclass-param-name: type-var→var name string; symbol→symbol-name; other→string-upcase."
-  :cases (("type-var" nil)
-          ("symbol"   'foo)
-          ("string"   "bar"))
-  (param-val)
-  (let ((param (or param-val (fresh-type-var :name "TestVar"))))
-    (assert-true (stringp (cl-cc/type::%typeclass-param-name param)))))
+(it-sequential "typeclass-param-name-cases type-var"
+  (destructuring-bind (param-val) (list nil)
+    (let ((param (or param-val (fresh-type-var :name "TestVar"))))
+    (expect (stringp (cl-cc/type::%typeclass-param-name param)) :to-be-truthy))))
+
+(it-sequential "typeclass-param-name-cases symbol"
+  (destructuring-bind (param-val) (list 'foo)
+    (let ((param (or param-val (fresh-type-var :name "TestVar"))))
+    (expect (stringp (cl-cc/type::%typeclass-param-name param)) :to-be-truthy))))
+
+(it-sequential "typeclass-param-name-cases string"
+  (destructuring-bind (param-val) (list "bar")
+    (let ((param (or param-val (fresh-type-var :name "TestVar"))))
+    (expect (stringp (cl-cc/type::%typeclass-param-name param)) :to-be-truthy))))

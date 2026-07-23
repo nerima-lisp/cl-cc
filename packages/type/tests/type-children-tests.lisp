@@ -9,269 +9,329 @@
 (defmacro assert-when-present (value form)
   `(when ,value ,form))
 
-(defsuite type-children-suite
-  :description "type-children / type-bound-var data layer tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite type-children-suite)
 ;;; ─── type-children: leaf types return nil ──────────────────────────────────
 
-(deftest-each type-children-atomic-leaf-types
-  "Leaf types (primitive, variable, rigid, error, nil) have no children."
-  :cases (("int"    type-int)
-          ("string" type-string)
-          ("bool"   type-bool)
-          ("var"    (fresh-type-var :name "a"))
-          ("rigid"  (fresh-rigid-var "r"))
-          ("error"  (make-type-error :message "test"))
-          ("nil"    nil))
-  (leaf-type)
-  (assert-null (cl-cc/type:type-children leaf-type)))
+(it-sequential "type-children-atomic-leaf-types int"
+  (destructuring-bind (leaf-type) (list type-int)
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
+
+(it-sequential "type-children-atomic-leaf-types string"
+  (destructuring-bind (leaf-type) (list type-string)
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
+
+(it-sequential "type-children-atomic-leaf-types bool"
+  (destructuring-bind (leaf-type) (list type-bool)
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
+
+(it-sequential "type-children-atomic-leaf-types var"
+  (destructuring-bind (leaf-type) (list (fresh-type-var :name "a"))
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
+
+(it-sequential "type-children-atomic-leaf-types rigid"
+  (destructuring-bind (leaf-type) (list (fresh-rigid-var "r"))
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
+
+(it-sequential "type-children-atomic-leaf-types error"
+  (destructuring-bind (leaf-type) (list (make-type-error :message "test"))
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
+
+(it-sequential "type-children-atomic-leaf-types nil"
+  (destructuring-bind (leaf-type) (list nil)
+    (expect (cl-cc/type:type-children leaf-type) :to-be-null)))
 
 ;;; ─── type-children: compound types ─────────────────────────────────────────
 
-(deftest type-children-pure-arrow-yields-params-and-return
-  "Pure arrow children: params and return type, 3 total."
+(it-sequential "type-children-pure-arrow-yields-params-and-return"
   (let* ((arr (make-type-arrow (list type-int type-string) type-bool))
          (ch  (cl-cc/type:type-children arr)))
-    (assert-equal 3 (length ch))
-    (assert-true (type-equal-p type-int (first ch)))
-    (assert-true (type-equal-p type-string (second ch)))
-    (assert-true (type-equal-p type-bool (third ch)))))
+    (expect (length ch) :to-equal 3)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy)
+    (expect (type-equal-p type-string (second ch)) :to-be-truthy)
+    (expect (type-equal-p type-bool (third ch)) :to-be-truthy)))
 
-(deftest type-children-arrow-with-effects-has-effect-row-as-child
-  "Arrow with effects: 3rd child is the effect row."
+(it-sequential "type-children-arrow-with-effects-has-effect-row-as-child"
   (let* ((arr (make-type-arrow (list type-int) type-bool :effects +io-effect-row+))
          (ch  (cl-cc/type:type-children arr)))
-    (assert-equal 3 (length ch))
-    (assert-true (type-effect-row-p (third ch)))))
+    (expect (length ch) :to-equal 3)
+    (expect (type-effect-row-p (third ch)) :to-be-truthy)))
 
-(deftest type-children-product
-  "Product type returns its elements."
+(it-sequential "type-children-product"
   (let* ((p  (make-type-product :elems (list type-int type-string type-bool)))
          (ch (cl-cc/type:type-children p)))
-    (assert-equal 3 (length ch))
-    (assert-true (type-equal-p type-int (first ch)))))
+    (expect (length ch) :to-equal 3)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy)))
 
-(deftest-each type-children-binary-collection-types
-  "Union and intersection types return their 2 members as children."
-  :cases (("union"        (make-type-union (list type-int type-string)))
-          ("intersection" (make-type-intersection (list type-int type-string))))
-  (ty)
-  (assert-equal 2 (length (cl-cc/type:type-children ty))))
+(it-sequential "type-children-binary-collection-types union"
+  (destructuring-bind (ty) (list (make-type-union (list type-int type-string)))
+    (expect (length (cl-cc/type:type-children ty)) :to-equal 2)))
 
-(deftest-each type-children-record-variants
-  "Record children: closed → field values; open → fields + row variable."
-  :cases (("closed" nil 2 type-string)
-          ("open"   t   2 nil))
-  (open-p expected-count second-type-or-nil)
-  (let* ((rv (when open-p (fresh-type-var :name "rho")))
+(it-sequential "type-children-binary-collection-types intersection"
+  (destructuring-bind (ty) (list (make-type-intersection (list type-int type-string)))
+    (expect (length (cl-cc/type:type-children ty)) :to-equal 2)))
+
+(it-sequential "type-children-record-variants closed"
+  (destructuring-bind (open-p expected-count second-type-or-nil) (list nil 2 type-string)
+    (let* ((rv (when open-p (fresh-type-var :name "rho")))
          (fields (if open-p
                      (list (cons :x type-int))
                      (list (cons :x type-int) (cons :y type-string))))
          (r  (make-type-record :fields fields :row-var rv))
          (ch (cl-cc/type:type-children r)))
-    (assert-equal expected-count (length ch))
-    (assert-true (type-equal-p type-int (first ch)))
+    (expect (length ch) :to-equal expected-count)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy)
     (assert-when-present open-p
-      (assert-true (type-var-p (second ch))))
+      (expect (type-var-p (second ch)) :to-be-truthy))
     (assert-when-present (not open-p)
-      (assert-true (type-equal-p second-type-or-nil (second ch))))))
+      (expect (type-equal-p second-type-or-nil (second ch)) :to-be-truthy)))))
 
-(deftest-each type-children-variant-variants
-  "Variant children: closed → case values; open → cases + row variable."
-  :cases (("closed" nil)
-          ("open"   t))
-  (open-p)
-  (let* ((rv (when open-p (fresh-type-var :name "rho")))
+(it-sequential "type-children-record-variants open"
+  (destructuring-bind (open-p expected-count second-type-or-nil) (list t 2 nil)
+    (let* ((rv (when open-p (fresh-type-var :name "rho")))
+         (fields (if open-p
+                     (list (cons :x type-int))
+                     (list (cons :x type-int) (cons :y type-string))))
+         (r  (make-type-record :fields fields :row-var rv))
+         (ch (cl-cc/type:type-children r)))
+    (expect (length ch) :to-equal expected-count)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy)
+    (assert-when-present open-p
+      (expect (type-var-p (second ch)) :to-be-truthy))
+    (assert-when-present (not open-p)
+      (expect (type-equal-p second-type-or-nil (second ch)) :to-be-truthy)))))
+
+(it-sequential "type-children-variant-variants closed"
+  (destructuring-bind (open-p) (list nil)
+    (let* ((rv (when open-p (fresh-type-var :name "rho")))
          (cases (if open-p
                     (list (cons :ok type-int))
                     (list (cons :some type-int) (cons :none type-null))))
          (v  (make-type-variant :cases cases :row-var rv))
          (ch (cl-cc/type:type-children v)))
-    (assert-equal 2 (length ch))
+    (expect (length ch) :to-equal 2)
     (assert-when-present open-p
-      (assert-true (type-var-p (second ch))))))
+      (expect (type-var-p (second ch)) :to-be-truthy)))))
 
-(deftest-each type-children-quantifier-return-body
-  "Forall and exists return only the body (1 child)."
-  :cases (("forall" (make-type-forall :var (fresh-type-var :name "a") :body type-int)  type-int)
-          ("exists" (make-type-exists :var (fresh-type-var :name "a") :body type-string) type-string))
-  (ty expected-body)
-  (let ((ch (cl-cc/type:type-children ty)))
-    (assert-equal 1 (length ch))
-    (assert-true (type-equal-p expected-body (first ch)))))
+(it-sequential "type-children-variant-variants open"
+  (destructuring-bind (open-p) (list t)
+    (let* ((rv (when open-p (fresh-type-var :name "rho")))
+         (cases (if open-p
+                    (list (cons :ok type-int))
+                    (list (cons :some type-int) (cons :none type-null))))
+         (v  (make-type-variant :cases cases :row-var rv))
+         (ch (cl-cc/type:type-children v)))
+    (expect (length ch) :to-equal 2)
+    (assert-when-present open-p
+      (expect (type-var-p (second ch)) :to-be-truthy)))))
 
-(deftest type-children-app
-  "Type application returns fun and arg."
+(it-sequential "type-children-quantifier-return-body forall"
+  (destructuring-bind (ty expected-body) (list (make-type-forall :var (fresh-type-var :name "a") :body type-int) type-int)
+    (let ((ch (cl-cc/type:type-children ty)))
+    (expect (length ch) :to-equal 1)
+    (expect (type-equal-p expected-body (first ch)) :to-be-truthy))))
+
+(it-sequential "type-children-quantifier-return-body exists"
+  (destructuring-bind (ty expected-body) (list (make-type-exists :var (fresh-type-var :name "a") :body type-string) type-string)
+    (let ((ch (cl-cc/type:type-children ty)))
+    (expect (length ch) :to-equal 1)
+    (expect (type-equal-p expected-body (first ch)) :to-be-truthy))))
+
+(it-sequential "type-children-app"
   (let* ((app (make-type-app :fun type-int :arg type-string))
          (ch  (cl-cc/type:type-children app)))
-    (assert-equal 2 (length ch))
-    (assert-true (type-equal-p type-int (first ch)))
-    (assert-true (type-equal-p type-string (second ch)))))
+    (expect (length ch) :to-equal 2)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy)
+    (expect (type-equal-p type-string (second ch)) :to-be-truthy)))
 
-(deftest type-children-lambda-and-mu
-  "Type lambda and mu return only the body (1 child)."
+(it-sequential "type-children-lambda-and-mu"
   (let ((a (fresh-type-var :name "a")))
     (let ((ch (cl-cc/type:type-children (cl-cc/type:make-type-lambda :var a :body type-int))))
-      (assert-equal 1 (length ch))
-      (assert-true (type-equal-p type-int (first ch))))
+      (expect (length ch) :to-equal 1)
+      (expect (type-equal-p type-int (first ch)) :to-be-truthy))
     (let ((ch (cl-cc/type:type-children (make-type-mu :var a :body type-int))))
-      (assert-equal 1 (length ch)))))
+      (expect (length ch) :to-equal 1))))
 
-(deftest-each type-children-wrapper-types
-  "Refinement, linear, and capability all return only the base type (1 child)."
-  :cases (("refinement"  (cl-cc/type:make-type-refinement :base type-int :predicate #'numberp))
-          ("linear"      (make-type-linear :base type-int :grade :one))
-          ("capability"  (cl-cc/type:make-type-capability :base type-int :cap 'read)))
-  (ty)
-  (let ((ch (cl-cc/type:type-children ty)))
-    (assert-equal 1 (length ch))
-    (assert-true (type-equal-p type-int (first ch)))))
+(it-sequential "type-children-wrapper-types refinement"
+  (destructuring-bind (ty) (list (cl-cc/type:make-type-refinement :base type-int :predicate #'numberp))
+    (let ((ch (cl-cc/type:type-children ty)))
+    (expect (length ch) :to-equal 1)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy))))
 
-(deftest-each type-children-effect-row-variants
-  "Effect row children: closed → effects only; open → effects + row variable."
-  :cases (("closed" nil 1)
-          ("open"   t   2))
-  (open-p expected-count)
-  (let* ((rv  (when open-p (fresh-type-var :name "rho")))
+(it-sequential "type-children-wrapper-types linear"
+  (destructuring-bind (ty) (list (make-type-linear :base type-int :grade :one))
+    (let ((ch (cl-cc/type:type-children ty)))
+    (expect (length ch) :to-equal 1)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy))))
+
+(it-sequential "type-children-wrapper-types capability"
+  (destructuring-bind (ty) (list (cl-cc/type:make-type-capability :base type-int :cap 'read))
+    (let ((ch (cl-cc/type:type-children ty)))
+    (expect (length ch) :to-equal 1)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy))))
+
+(it-sequential "type-children-effect-row-variants closed"
+  (destructuring-bind (open-p expected-count) (list nil 1)
+    (let* ((rv  (when open-p (fresh-type-var :name "rho")))
          (eff (make-type-effect-op :name 'io :args nil))
          (row (make-type-effect-row :effects (list eff) :row-var rv))
          (ch  (cl-cc/type:type-children row)))
-    (assert-equal expected-count (length ch))
-    (assert-true (cl-cc/type:type-effect-op-p (first ch)))
+    (expect (length ch) :to-equal expected-count)
+    (expect (cl-cc/type:type-effect-op-p (first ch)) :to-be-truthy)
     (assert-when-present open-p
-      (assert-true (type-var-p (second ch))))))
+      (expect (type-var-p (second ch)) :to-be-truthy)))))
 
-(deftest-each type-children-effect-op-cases
-  "Effect op: no args → nil children; with args → children list matching the args."
-  :cases (("no-args"   'io    nil              nil)
-          ("with-args" 'state (list type-int)  1))
-  (name args expected-count)
-  (let* ((eff (make-type-effect-op :name name :args args))
+(it-sequential "type-children-effect-row-variants open"
+  (destructuring-bind (open-p expected-count) (list t 2)
+    (let* ((rv  (when open-p (fresh-type-var :name "rho")))
+         (eff (make-type-effect-op :name 'io :args nil))
+         (row (make-type-effect-row :effects (list eff) :row-var rv))
+         (ch  (cl-cc/type:type-children row)))
+    (expect (length ch) :to-equal expected-count)
+    (expect (cl-cc/type:type-effect-op-p (first ch)) :to-be-truthy)
+    (assert-when-present open-p
+      (expect (type-var-p (second ch)) :to-be-truthy)))))
+
+(it-sequential "type-children-effect-op-cases no-args"
+  (destructuring-bind (name args expected-count) (list 'io nil nil)
+    (let* ((eff (make-type-effect-op :name name :args args))
          (ch  (cl-cc/type:type-children eff)))
     (assert-when-present expected-count
-      (progn (assert-equal expected-count (length ch))
-             (assert-true (type-equal-p type-int (first ch)))))
+      (progn (expect (length ch) :to-equal expected-count)
+             (expect (type-equal-p type-int (first ch)) :to-be-truthy)))
     (assert-when-present (not expected-count)
-      (assert-null ch))))
+      (expect ch :to-be-null)))))
 
-(deftest type-children-handler-has-three-children
-  "Handler type has 3 children: effect, input, output."
+(it-sequential "type-children-effect-op-cases with-args"
+  (destructuring-bind (name args expected-count) (list 'state (list type-int) 1)
+    (let* ((eff (make-type-effect-op :name name :args args))
+         (ch  (cl-cc/type:type-children eff)))
+    (assert-when-present expected-count
+      (progn (expect (length ch) :to-equal expected-count)
+             (expect (type-equal-p type-int (first ch)) :to-be-truthy)))
+    (assert-when-present (not expected-count)
+      (expect ch :to-be-null)))))
+
+(it-sequential "type-children-handler-has-three-children"
   (let* ((eff (make-type-effect-op :name 'io :args nil))
          (h   (cl-cc/type:make-type-handler :effect eff :input type-int :output type-string))
          (ch  (cl-cc/type:type-children h)))
-    (assert-equal 3 (length ch))))
+    (expect (length ch) :to-equal 3)))
 
-(deftest type-children-constraint-has-one-child
-  "Constraint type has 1 child: the type-arg."
+(it-sequential "type-children-constraint-has-one-child"
   (let* ((c  (cl-cc/type:make-type-constraint :class-name 'eq :type-arg type-int))
          (ch (cl-cc/type:type-children c)))
-    (assert-equal 1 (length ch))
-    (assert-true (type-equal-p type-int (first ch)))))
+    (expect (length ch) :to-equal 1)
+    (expect (type-equal-p type-int (first ch)) :to-be-truthy)))
 
-(deftest type-children-qualified-has-two-children
-  "Qualified type has 2 children: constraints and body."
+(it-sequential "type-children-qualified-has-two-children"
   (let* ((c  (cl-cc/type:make-type-constraint :class-name 'eq :type-arg type-int))
          (q  (make-type-qualified :constraints (list c) :body type-string))
          (ch (cl-cc/type:type-children q)))
-    (assert-equal 2 (length ch))
-    (assert-true (type-equal-p type-string (second ch)))))
+    (expect (length ch) :to-equal 2)
+    (expect (type-equal-p type-string (second ch)) :to-be-truthy)))
 
 ;;; ─── type-bound-var ────────────────────────────────────────────────────────
 
-(deftest-each type-bound-var-binding-types
-  "Forall, exists, type-lambda, and mu all bind a type variable."
-  :cases (("forall" (let ((a (fresh-type-var :name "a"))) (make-type-forall :var a :body type-int)))
-          ("exists" (let ((a (fresh-type-var :name "a"))) (make-type-exists :var a :body type-int)))
-          ("lambda" (let ((a (fresh-type-var :name "a"))) (cl-cc/type:make-type-lambda :var a :body type-int)))
-          ("mu"     (let ((a (fresh-type-var :name "a"))) (make-type-mu :var a :body type-int))))
-  (ty)
-  (assert-true (type-var-p (cl-cc/type:type-bound-var ty))))
+(it-sequential "type-bound-var-binding-types forall"
+  (destructuring-bind (ty) (list (let ((a (fresh-type-var :name "a"))) (make-type-forall :var a :body type-int)))
+    (expect (type-var-p (cl-cc/type:type-bound-var ty)) :to-be-truthy)))
 
-(deftest-each type-bound-var-non-binding-cases
-  "Non-binding types (primitive, var, arrow, product, union) return nil for type-bound-var."
-  :cases (("primitive" type-int)
-          ("var"       (fresh-type-var :name "a"))
-          ("arrow"     (make-type-arrow (list type-int) type-bool))
-          ("product"   (make-type-product :elems (list type-int)))
-          ("union"     (make-type-union (list type-int type-string))))
-  (ty)
-  (assert-null (cl-cc/type:type-bound-var ty)))
+(it-sequential "type-bound-var-binding-types exists"
+  (destructuring-bind (ty) (list (let ((a (fresh-type-var :name "a"))) (make-type-exists :var a :body type-int)))
+    (expect (type-var-p (cl-cc/type:type-bound-var ty)) :to-be-truthy)))
+
+(it-sequential "type-bound-var-binding-types lambda"
+  (destructuring-bind (ty) (list (let ((a (fresh-type-var :name "a"))) (cl-cc/type:make-type-lambda :var a :body type-int)))
+    (expect (type-var-p (cl-cc/type:type-bound-var ty)) :to-be-truthy)))
+
+(it-sequential "type-bound-var-binding-types mu"
+  (destructuring-bind (ty) (list (let ((a (fresh-type-var :name "a"))) (make-type-mu :var a :body type-int)))
+    (expect (type-var-p (cl-cc/type:type-bound-var ty)) :to-be-truthy)))
+
+(it-sequential "type-bound-var-non-binding-cases primitive"
+  (destructuring-bind (ty) (list type-int)
+    (expect (cl-cc/type:type-bound-var ty) :to-be-null)))
+
+(it-sequential "type-bound-var-non-binding-cases var"
+  (destructuring-bind (ty) (list (fresh-type-var :name "a"))
+    (expect (cl-cc/type:type-bound-var ty) :to-be-null)))
+
+(it-sequential "type-bound-var-non-binding-cases arrow"
+  (destructuring-bind (ty) (list (make-type-arrow (list type-int) type-bool))
+    (expect (cl-cc/type:type-bound-var ty) :to-be-null)))
+
+(it-sequential "type-bound-var-non-binding-cases product"
+  (destructuring-bind (ty) (list (make-type-product :elems (list type-int)))
+    (expect (cl-cc/type:type-bound-var ty) :to-be-null)))
+
+(it-sequential "type-bound-var-non-binding-cases union"
+  (destructuring-bind (ty) (list (make-type-union (list type-int type-string)))
+    (expect (cl-cc/type:type-bound-var ty) :to-be-null)))
 
 ;;; ─── Integration: type-free-vars still works correctly ─────────────────────
 
-(deftest type-free-vars-via-children-simple
-  "type-free-vars finds var in arrow type."
+(it-sequential "type-free-vars-via-children-simple"
   (let* ((a   (fresh-type-var :name "a"))
          (arr (make-type-arrow (list a) type-int)))
-    (assert-equal 1 (length (type-free-vars arr)))
-    (assert-true (type-var-equal-p a (first (type-free-vars arr))))))
+    (expect (length (type-free-vars arr)) :to-equal 1)
+    (expect (type-var-equal-p a (first (type-free-vars arr))) :to-be-truthy)))
 
-(deftest type-free-vars-forall-bound-var-excluded
-  "type-free-vars on (forall a a) returns nil — the bound var is excluded."
+(it-sequential "type-free-vars-forall-bound-var-excluded"
   (let* ((a (fresh-type-var :name "a"))
          (f (make-type-forall :var a :body a)))
-    (assert-null (type-free-vars f))))
+    (expect (type-free-vars f) :to-be-null)))
 
-(deftest type-free-vars-forall-only-unbound-vars-are-free
-  "type-free-vars on (forall a (a→b)) returns only b."
+(it-sequential "type-free-vars-forall-only-unbound-vars-are-free"
   (let* ((a (fresh-type-var :name "a"))
          (b (fresh-type-var :name "b"))
          (f (make-type-forall :var a :body (make-type-arrow (list a) b))))
-    (assert-equal 1 (length (type-free-vars f)))
-    (assert-true (type-var-equal-p b (first (type-free-vars f))))))
+    (expect (length (type-free-vars f)) :to-equal 1)
+    (expect (type-var-equal-p b (first (type-free-vars f))) :to-be-truthy)))
 
-(deftest type-free-vars-via-children-record
-  "type-free-vars finds vars in record fields and row-var."
+(it-sequential "type-free-vars-via-children-record"
   (let* ((a  (fresh-type-var :name "a"))
          (rv (fresh-type-var :name "rho"))
          (r  (make-type-record :fields (list (cons :x a)) :row-var rv)))
-    (assert-equal 2 (length (type-free-vars r)))))
+    (expect (length (type-free-vars r)) :to-equal 2)))
 
-(deftest type-free-vars-via-children-mu
-  "type-free-vars excludes mu-bound var."
+(it-sequential "type-free-vars-via-children-mu"
   (let* ((a (fresh-type-var :name "a"))
          (b (fresh-type-var :name "b"))
          (m (make-type-mu :var a :body (make-type-product :elems (list a b)))))
-    (assert-equal 1 (length (type-free-vars m)))
-    (assert-true (type-var-equal-p b (first (type-free-vars m))))))
+    (expect (length (type-free-vars m)) :to-equal 1)
+    (expect (type-var-equal-p b (first (type-free-vars m))) :to-be-truthy)))
 
-(deftest type-free-vars-via-children-nested
-  "type-free-vars finds vars in deeply nested type."
+(it-sequential "type-free-vars-via-children-nested"
   (let* ((a (fresh-type-var :name "a"))
          (b (fresh-type-var :name "b"))
          (ty (make-type-union
               (list (make-type-arrow (list a) type-int)
                     (make-type-product :elems (list b type-string))))))
-    (assert-equal 2 (length (type-free-vars ty)))))
+    (expect (length (type-free-vars ty)) :to-equal 2)))
 
 ;;; ─── Integration: type-occurs-p still works correctly ──────────────────────
 
-(deftest type-occurs-p-direct-arrow-and-absent
-  "type-occurs-p: true for direct match and match in arrow; false for absent var."
+(it-sequential "type-occurs-p-direct-arrow-and-absent"
   (let ((a (fresh-type-var :name "a"))
         (b (fresh-type-var :name "b"))
         (s (make-substitution)))
-    (assert-true  (type-occurs-p a a s))
-    (assert-true  (type-occurs-p a (make-type-arrow (list a) type-int) s))
-    (assert-false (type-occurs-p b (make-type-arrow (list a) type-int) s))))
+    (expect (type-occurs-p a a s) :to-be-truthy)
+    (expect (type-occurs-p a (make-type-arrow (list a) type-int) s) :to-be-truthy)
+    (expect (type-occurs-p b (make-type-arrow (list a) type-int) s) :to-be-falsy)))
 
-(deftest type-occurs-p-follows-subst-chain
-  "type-occurs-p follows substitution chains: a occurs in b when b→a."
+(it-sequential "type-occurs-p-follows-subst-chain"
   (let* ((a (fresh-type-var :name "a"))
          (b (fresh-type-var :name "b"))
          (subst (make-substitution)))
     (subst-extend! b a subst)
-    (assert-true (type-occurs-p a b subst))))
+    (expect (type-occurs-p a b subst) :to-be-truthy)))
 
-(deftest type-occurs-p-finds-var-in-nested-union
-  "type-occurs-p finds var nested inside union→product→arrow."
+(it-sequential "type-occurs-p-finds-var-in-nested-union"
   (let* ((a (fresh-type-var :name "a"))
          (ty (make-type-union
               (list type-int
                     (make-type-product :elems
                       (list type-string
                             (make-type-arrow (list a) type-bool)))))))
-    (assert-true (type-occurs-p a ty (make-substitution)))))
+    (expect (type-occurs-p a ty (make-substitution)) :to-be-truthy)))

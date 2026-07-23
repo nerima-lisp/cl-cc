@@ -6,11 +6,8 @@
 
 (in-package :cl-cc/test)
 
-(defsuite multiplicity-suite :description "Graded multiplicity system tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite multiplicity-suite)
 
 (defmacro assert-multiplicity-boolean-case (expected then-form else-form)
   `(if ,expected
@@ -19,184 +16,354 @@
 
 ;;; ─── multiplicity-p ─────────────────────────────────────────────────────────
 
-(deftest-each mult-valid-grades
-  "Valid multiplicity grades are recognized."
-  :cases (("zero"  t :zero)
-          ("one"   t :one)
-          ("omega" t :omega))
-  (expected grade)
-  (assert-true (multiplicity-p grade)))
+(it-sequential "mult-valid-grades zero"
+  (destructuring-bind (expected grade) (list t :zero)
+    (expect (multiplicity-p grade) :to-be-truthy)))
 
-(deftest-each mult-invalid-grades
-  "Invalid values are rejected."
-  :cases (("nil"     nil)
-          ("integer" 0)
-          ("string"  "one")
-          ("keyword" :two))
-  (val)
-  (assert-false (multiplicity-p val)))
+(it-sequential "mult-valid-grades one"
+  (destructuring-bind (expected grade) (list t :one)
+    (expect (multiplicity-p grade) :to-be-truthy)))
+
+(it-sequential "mult-valid-grades omega"
+  (destructuring-bind (expected grade) (list t :omega)
+    (expect (multiplicity-p grade) :to-be-truthy)))
+
+(it-sequential "mult-invalid-grades nil"
+  (destructuring-bind (val) (list nil)
+    (expect (multiplicity-p val) :to-be-falsy)))
+
+(it-sequential "mult-invalid-grades integer"
+  (destructuring-bind (val) (list 0)
+    (expect (multiplicity-p val) :to-be-falsy)))
+
+(it-sequential "mult-invalid-grades string"
+  (destructuring-bind (val) (list "one")
+    (expect (multiplicity-p val) :to-be-falsy)))
+
+(it-sequential "mult-invalid-grades keyword"
+  (destructuring-bind (val) (list :two)
+    (expect (multiplicity-p val) :to-be-falsy)))
 
 ;;; ─── mult-add (semiring join) ───────────────────────────────────────────────
 
-(deftest-each mult-add-identity
-  "0 is the additive identity: 0 + q = q, q + 0 = q."
-  :cases (("zero-left"  :zero  :zero  :zero)
-          ("one-left"   :one   :zero  :one)
-          ("omega-left"  :omega :zero :omega)
-          ("zero-right" :zero  :zero  :zero)
-          ("one-right"  :zero  :one   :one)
-          ("omega-right" :zero :omega :omega))
-  (q1 q2 expected)
-  (assert-eq expected (mult-add q1 q2)))
+(it-sequential "mult-add-identity zero-left"
+  (destructuring-bind (q1 q2 expected) (list :zero :zero :zero)
+    (expect (mult-add q1 q2) :to-be expected)))
 
-(deftest-each mult-add-idempotent
-  "q + q = q (join is idempotent)."
-  :cases (("zero"  :zero :zero)
-          ("one"   :one  :one)
-          ("omega" :omega :omega))
-  (grade expected)
-  (assert-eq expected (mult-add grade grade)))
+(it-sequential "mult-add-identity one-left"
+  (destructuring-bind (q1 q2 expected) (list :one :zero :one)
+    (expect (mult-add q1 q2) :to-be expected)))
 
-(deftest mult-add-one-omega
-  "1 + ω = ω (mixed grades go to unrestricted)."
-  (assert-eq :omega (mult-add :one :omega))
-  (assert-eq :omega (mult-add :omega :one)))
+(it-sequential "mult-add-identity omega-left"
+  (destructuring-bind (q1 q2 expected) (list :omega :zero :omega)
+    (expect (mult-add q1 q2) :to-be expected)))
+
+(it-sequential "mult-add-identity zero-right"
+  (destructuring-bind (q1 q2 expected) (list :zero :zero :zero)
+    (expect (mult-add q1 q2) :to-be expected)))
+
+(it-sequential "mult-add-identity one-right"
+  (destructuring-bind (q1 q2 expected) (list :zero :one :one)
+    (expect (mult-add q1 q2) :to-be expected)))
+
+(it-sequential "mult-add-identity omega-right"
+  (destructuring-bind (q1 q2 expected) (list :zero :omega :omega)
+    (expect (mult-add q1 q2) :to-be expected)))
+
+(it-sequential "mult-add-idempotent zero"
+  (destructuring-bind (grade expected) (list :zero :zero)
+    (expect (mult-add grade grade) :to-be expected)))
+
+(it-sequential "mult-add-idempotent one"
+  (destructuring-bind (grade expected) (list :one :one)
+    (expect (mult-add grade grade) :to-be expected)))
+
+(it-sequential "mult-add-idempotent omega"
+  (destructuring-bind (grade expected) (list :omega :omega)
+    (expect (mult-add grade grade) :to-be expected)))
+
+(it-sequential "mult-add-one-omega"
+  (expect (mult-add :one :omega) :to-be :omega)
+  (expect (mult-add :omega :one) :to-be :omega))
 
 ;;; ─── mult-mul (semiring scale) ──────────────────────────────────────────────
 
-(deftest-each mult-mul-zero-absorbs
-  "0 * q = 0, q * 0 = 0 (zero absorbs)."
-  :cases (("zero-zero"   :zero  :zero  :zero)
-          ("zero-one"    :zero  :one   :zero)
-          ("zero-omega"  :zero  :omega :zero)
-          ("one-zero"    :one   :zero  :zero)
-          ("omega-zero"  :omega :zero  :zero))
-  (q1 q2 expected)
-  (assert-eq expected (mult-mul q1 q2)))
+(it-sequential "mult-mul-zero-absorbs zero-zero"
+  (destructuring-bind (q1 q2 expected) (list :zero :zero :zero)
+    (expect (mult-mul q1 q2) :to-be expected)))
 
-(deftest-each mult-mul-one-identity
-  "1 * q = q, q * 1 = q (one is multiplicative identity)."
-  :cases (("one-one"     :one   :one   :one)
-          ("one-omega"   :one   :omega :omega)
-          ("omega-one"   :omega :one   :omega))
-  (q1 q2 expected)
-  (assert-eq expected (mult-mul q1 q2)))
+(it-sequential "mult-mul-zero-absorbs zero-one"
+  (destructuring-bind (q1 q2 expected) (list :zero :one :zero)
+    (expect (mult-mul q1 q2) :to-be expected)))
 
-(deftest mult-mul-omega-omega
-  "ω * ω = ω."
-  (assert-eq :omega (mult-mul :omega :omega)))
+(it-sequential "mult-mul-zero-absorbs zero-omega"
+  (destructuring-bind (q1 q2 expected) (list :zero :omega :zero)
+    (expect (mult-mul q1 q2) :to-be expected)))
+
+(it-sequential "mult-mul-zero-absorbs one-zero"
+  (destructuring-bind (q1 q2 expected) (list :one :zero :zero)
+    (expect (mult-mul q1 q2) :to-be expected)))
+
+(it-sequential "mult-mul-zero-absorbs omega-zero"
+  (destructuring-bind (q1 q2 expected) (list :omega :zero :zero)
+    (expect (mult-mul q1 q2) :to-be expected)))
+
+(it-sequential "mult-mul-one-identity one-one"
+  (destructuring-bind (q1 q2 expected) (list :one :one :one)
+    (expect (mult-mul q1 q2) :to-be expected)))
+
+(it-sequential "mult-mul-one-identity one-omega"
+  (destructuring-bind (q1 q2 expected) (list :one :omega :omega)
+    (expect (mult-mul q1 q2) :to-be expected)))
+
+(it-sequential "mult-mul-one-identity omega-one"
+  (destructuring-bind (q1 q2 expected) (list :omega :one :omega)
+    (expect (mult-mul q1 q2) :to-be expected)))
+
+(it-sequential "mult-mul-omega-omega"
+  (expect (mult-mul :omega :omega) :to-be :omega))
 
 ;;; ─── mult-leq (ordering) ────────────────────────────────────────────────────
 
-(deftest-each mult-leq-reflexive
-  "q ≤ q is always true (reflexive)."
-  :cases (("zero"  :zero)
-          ("one"   :one)
-          ("omega" :omega))
-  (grade)
-  (assert-true (mult-leq grade grade)))
+(it-sequential "mult-leq-reflexive zero"
+  (destructuring-bind (grade) (list :zero)
+    (expect (mult-leq grade grade) :to-be-truthy)))
 
-(deftest-each mult-leq-zero-bottom
-  "0 ≤ q is always true (zero is bottom)."
-  :cases (("zero-one"   :one)
-          ("zero-omega" :omega))
-  (upper)
-  (assert-true (mult-leq :zero upper)))
+(it-sequential "mult-leq-reflexive one"
+  (destructuring-bind (grade) (list :one)
+    (expect (mult-leq grade grade) :to-be-truthy)))
 
-(deftest-each mult-leq-omega-top
-  "q ≤ ω is always true (omega is top)."
-  :cases (("zero-omega" :zero)
-          ("one-omega"  :one))
-  (lower)
-  (assert-true (mult-leq lower :omega)))
+(it-sequential "mult-leq-reflexive omega"
+  (destructuring-bind (grade) (list :omega)
+    (expect (mult-leq grade grade) :to-be-truthy)))
 
-(deftest-each mult-leq-false-cases
-  "Non-trivial ordering: 1 ≤ 0 and ω ≤ 1 are both false."
-  :cases (("one-not-leq-zero"   :one   :zero)
-          ("omega-not-leq-one"  :omega :one))
-  (lower upper)
-  (assert-false (mult-leq lower upper)))
+(it-sequential "mult-leq-zero-bottom zero-one"
+  (destructuring-bind (upper) (list :one)
+    (expect (mult-leq :zero upper) :to-be-truthy)))
+
+(it-sequential "mult-leq-zero-bottom zero-omega"
+  (destructuring-bind (upper) (list :omega)
+    (expect (mult-leq :zero upper) :to-be-truthy)))
+
+(it-sequential "mult-leq-omega-top zero-omega"
+  (destructuring-bind (lower) (list :zero)
+    (expect (mult-leq lower :omega) :to-be-truthy)))
+
+(it-sequential "mult-leq-omega-top one-omega"
+  (destructuring-bind (lower) (list :one)
+    (expect (mult-leq lower :omega) :to-be-truthy)))
+
+(it-sequential "mult-leq-false-cases one-not-leq-zero"
+  (destructuring-bind (lower upper) (list :one :zero)
+    (expect (mult-leq lower upper) :to-be-falsy)))
+
+(it-sequential "mult-leq-false-cases omega-not-leq-one"
+  (destructuring-bind (lower upper) (list :omega :one)
+    (expect (mult-leq lower upper) :to-be-falsy)))
 
 ;;; ─── mult-to-string ─────────────────────────────────────────────────────────
 
-(deftest-each mult-to-string-values
-  "mult-to-string produces the expected output."
-  :cases (("zero"  "0" :zero)
-          ("one"   "1" :one)
-          ("omega" "ω" :omega))
-  (expected grade)
-  (assert-equal expected (mult-to-string grade)))
+(it-sequential "mult-to-string-values zero"
+  (destructuring-bind (expected grade) (list "0" :zero)
+    (expect (mult-to-string grade) :to-equal expected)))
 
-(deftest-each multiplicity-p-recognition
-  "multiplicity-p accepts :zero/:one/:omega; rejects all other values."
-  :cases (("zero-valid"   :zero  t)
-          ("one-valid"    :one   t)
-          ("omega-valid"  :omega t)
-          ("two-invalid"  :two   nil)
-          ("nil-invalid"  nil    nil)
-          ("int-invalid"  1      nil))
-  (val expected)
-  (assert-multiplicity-boolean-case
+(it-sequential "mult-to-string-values one"
+  (destructuring-bind (expected grade) (list "1" :one)
+    (expect (mult-to-string grade) :to-equal expected)))
+
+(it-sequential "mult-to-string-values omega"
+  (destructuring-bind (expected grade) (list "ω" :omega)
+    (expect (mult-to-string grade) :to-equal expected)))
+
+(it-sequential "multiplicity-p-recognition zero-valid"
+  (destructuring-bind (val expected) (list :zero t)
+    (assert-multiplicity-boolean-case
       expected
-      (assert-true  (cl-cc/type:multiplicity-p val))
-      (assert-false (cl-cc/type:multiplicity-p val))))
+      (expect (cl-cc/type:multiplicity-p val) :to-be-truthy)
+      (expect (cl-cc/type:multiplicity-p val) :to-be-falsy))))
 
-(deftest-each multiplicity-grade-constants
-  "The three multiplicity constants are valid grades with the correct keyword value."
-  :cases (("zero"  +mult-zero+  :zero)
-          ("one"   +mult-one+   :one)
-          ("omega" +mult-omega+ :omega))
-  (grade expected-kw)
-  (assert-true (multiplicity-p grade))
-  (assert-eq expected-kw grade))
-
-(deftest-each multiplicity-add
-  "mult-add implements the commutative semiring join: 0+q=q, 1+1=1, 1+ω=ω."
-  :cases (("0+0=0" :zero  :zero  :zero)
-          ("0+1=1" :zero  :one   :one)
-          ("1+0=1" :one   :zero  :one)
-          ("0+ω=ω" :zero  :omega :omega)
-          ("1+1=1" :one   :one   :one)
-          ("1+ω=ω" :one   :omega :omega)
-          ("ω+ω=ω" :omega :omega :omega))
-  (a b expected)
-  (assert-eq expected (mult-add a b)))
-
-(deftest-each multiplicity-mul
-  "mult-mul is semiring scaling: 0*q=0, 1*q=q, ω*ω=ω."
-  :cases (("0*0=0" :zero  :zero  :zero)
-          ("0*1=0" :zero  :one   :zero)
-          ("0*ω=0" :zero  :omega :zero)
-          ("1*0=0" :one   :zero  :zero)
-          ("1*1=1" :one   :one   :one)
-          ("1*ω=ω" :one   :omega :omega)
-          ("ω*0=0" :omega :zero  :zero)
-          ("ω*1=ω" :omega :one   :omega)
-          ("ω*ω=ω" :omega :omega :omega))
-  (a b expected)
-  (assert-eq expected (mult-mul a b)))
-
-(deftest-each multiplicity-leq
-  "mult-leq implements the partial order 0 ≤ 1 ≤ ω."
-  :cases (("0≤0"  :zero  :zero  t)
-          ("0≤1"  :zero  :one   t)
-          ("0≤ω"  :zero  :omega t)
-          ("1≤1"  :one   :one   t)
-          ("1≤ω"  :one   :omega t)
-          ("ω≤ω"  :omega :omega t)
-          ("1≰0"  :one   :zero  nil)
-          ("ω≰1"  :omega :one   nil)
-          ("ω≰0"  :omega :zero  nil))
-  (a b expected)
-  (assert-multiplicity-boolean-case
+(it-sequential "multiplicity-p-recognition one-valid"
+  (destructuring-bind (val expected) (list :one t)
+    (assert-multiplicity-boolean-case
       expected
-      (assert-true  (mult-leq a b))
-      (assert-false (mult-leq a b))))
+      (expect (cl-cc/type:multiplicity-p val) :to-be-truthy)
+      (expect (cl-cc/type:multiplicity-p val) :to-be-falsy))))
 
-(deftest-each multiplicity-to-string
-  "mult-to-string renders each grade as its canonical symbol."
-  :cases (("zero"  :zero  "0")
-          ("one"   :one   "1")
-          ("omega" :omega "ω"))
-  (grade expected-str)
-  (assert-string= expected-str (mult-to-string grade)))
+(it-sequential "multiplicity-p-recognition omega-valid"
+  (destructuring-bind (val expected) (list :omega t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (cl-cc/type:multiplicity-p val) :to-be-truthy)
+      (expect (cl-cc/type:multiplicity-p val) :to-be-falsy))))
+
+(it-sequential "multiplicity-p-recognition two-invalid"
+  (destructuring-bind (val expected) (list :two nil)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (cl-cc/type:multiplicity-p val) :to-be-truthy)
+      (expect (cl-cc/type:multiplicity-p val) :to-be-falsy))))
+
+(it-sequential "multiplicity-p-recognition nil-invalid"
+  (destructuring-bind (val expected) (list nil nil)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (cl-cc/type:multiplicity-p val) :to-be-truthy)
+      (expect (cl-cc/type:multiplicity-p val) :to-be-falsy))))
+
+(it-sequential "multiplicity-p-recognition int-invalid"
+  (destructuring-bind (val expected) (list 1 nil)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (cl-cc/type:multiplicity-p val) :to-be-truthy)
+      (expect (cl-cc/type:multiplicity-p val) :to-be-falsy))))
+
+(it-sequential "multiplicity-grade-constants zero"
+  (destructuring-bind (grade expected-kw) (list +mult-zero+ :zero)
+    (expect (multiplicity-p grade) :to-be-truthy) (expect grade :to-be expected-kw)))
+
+(it-sequential "multiplicity-grade-constants one"
+  (destructuring-bind (grade expected-kw) (list +mult-one+ :one)
+    (expect (multiplicity-p grade) :to-be-truthy) (expect grade :to-be expected-kw)))
+
+(it-sequential "multiplicity-grade-constants omega"
+  (destructuring-bind (grade expected-kw) (list +mult-omega+ :omega)
+    (expect (multiplicity-p grade) :to-be-truthy) (expect grade :to-be expected-kw)))
+
+(it-sequential "multiplicity-add 0+0=0"
+  (destructuring-bind (a b expected) (list :zero :zero :zero)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-add 0+1=1"
+  (destructuring-bind (a b expected) (list :zero :one :one)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-add 1+0=1"
+  (destructuring-bind (a b expected) (list :one :zero :one)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-add 0+ω=ω"
+  (destructuring-bind (a b expected) (list :zero :omega :omega)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-add 1+1=1"
+  (destructuring-bind (a b expected) (list :one :one :one)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-add 1+ω=ω"
+  (destructuring-bind (a b expected) (list :one :omega :omega)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-add ω+ω=ω"
+  (destructuring-bind (a b expected) (list :omega :omega :omega)
+    (expect (mult-add a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul 0*0=0"
+  (destructuring-bind (a b expected) (list :zero :zero :zero)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul 0*1=0"
+  (destructuring-bind (a b expected) (list :zero :one :zero)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul 0*ω=0"
+  (destructuring-bind (a b expected) (list :zero :omega :zero)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul 1*0=0"
+  (destructuring-bind (a b expected) (list :one :zero :zero)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul 1*1=1"
+  (destructuring-bind (a b expected) (list :one :one :one)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul 1*ω=ω"
+  (destructuring-bind (a b expected) (list :one :omega :omega)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul ω*0=0"
+  (destructuring-bind (a b expected) (list :omega :zero :zero)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul ω*1=ω"
+  (destructuring-bind (a b expected) (list :omega :one :omega)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-mul ω*ω=ω"
+  (destructuring-bind (a b expected) (list :omega :omega :omega)
+    (expect (mult-mul a b) :to-be expected)))
+
+(it-sequential "multiplicity-leq 0≤0"
+  (destructuring-bind (a b expected) (list :zero :zero t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq 0≤1"
+  (destructuring-bind (a b expected) (list :zero :one t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq 0≤ω"
+  (destructuring-bind (a b expected) (list :zero :omega t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq 1≤1"
+  (destructuring-bind (a b expected) (list :one :one t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq 1≤ω"
+  (destructuring-bind (a b expected) (list :one :omega t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq ω≤ω"
+  (destructuring-bind (a b expected) (list :omega :omega t)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq 1≰0"
+  (destructuring-bind (a b expected) (list :one :zero nil)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq ω≰1"
+  (destructuring-bind (a b expected) (list :omega :one nil)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-leq ω≰0"
+  (destructuring-bind (a b expected) (list :omega :zero nil)
+    (assert-multiplicity-boolean-case
+      expected
+      (expect (mult-leq a b) :to-be-truthy)
+      (expect (mult-leq a b) :to-be-falsy))))
+
+(it-sequential "multiplicity-to-string zero"
+  (destructuring-bind (grade expected-str) (list :zero "0")
+    (expect (mult-to-string grade) :to-equal expected-str)))
+
+(it-sequential "multiplicity-to-string one"
+  (destructuring-bind (grade expected-str) (list :one "1")
+    (expect (mult-to-string grade) :to-equal expected-str)))
+
+(it-sequential "multiplicity-to-string omega"
+  (destructuring-bind (grade expected-str) (list :omega "ω")
+    (expect (mult-to-string grade) :to-equal expected-str)))

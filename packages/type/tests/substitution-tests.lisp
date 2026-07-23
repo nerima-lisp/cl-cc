@@ -4,121 +4,112 @@
 ;;; composition, occurs check, generalize/instantiate, and normalization.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-type-serial-suite)
 
 ;;; ─── Substitution Structure ─────────────────────────────────────────────
 
-(deftest-each subst-lookup-empty-cases
-  "Looking up in empty substitution or nil substitution both return nil/not-found."
-  :cases (("empty-subst" (make-substitution))
-          ("nil-subst"   nil))
-  (subst)
-  (let ((v (cl-cc/type:fresh-type-var 'a)))
+(it-sequential "subst-lookup-empty-cases empty-subst"
+  (destructuring-bind (subst) (list (make-substitution))
+    (let ((v (cl-cc/type:fresh-type-var 'a)))
     (multiple-value-bind (val found-p) (subst-lookup v subst)
-      (assert-null val)
-      (assert-false found-p))))
+      (expect val :to-be-null)
+      (expect found-p :to-be-falsy)))))
 
-(deftest subst-make-substitution-starts-at-generation-0
-  "make-substitution creates a fresh substitution at generation 0."
+(it-sequential "subst-lookup-empty-cases nil-subst"
+  (destructuring-bind (subst) (list nil)
+    (let ((v (cl-cc/type:fresh-type-var 'a)))
+    (multiple-value-bind (val found-p) (subst-lookup v subst)
+      (expect val :to-be-null)
+      (expect found-p :to-be-falsy)))))
+
+(it-sequential "subst-make-substitution-starts-at-generation-0"
   (let ((s (make-substitution)))
-    (assert-= 0 (substitution-generation s))))
+    (expect (= 0 (substitution-generation s)) :to-be-truthy)))
 
-(deftest subst-extend-leaves-original-unchanged
-  "subst-extend returns a new substitution; the original is not modified."
+(it-sequential "subst-extend-leaves-original-unchanged"
   (let* ((v  (cl-cc/type:fresh-type-var 'a))
          (s1 (make-substitution))
          (s2 (subst-extend v cl-cc/type:type-int s1)))
     (multiple-value-bind (val found) (subst-lookup v s1)
       (declare (ignore val))
-      (assert-false found))
+      (expect found :to-be-falsy))
     (multiple-value-bind (val found) (subst-lookup v s2)
-      (assert-true found)
-      (assert-eq cl-cc/type:type-int val))))
+      (expect found :to-be-truthy)
+      (expect val :to-be cl-cc/type:type-int))))
 
-(deftest subst-extend-to-nil-creates-generation-1
-  "subst-extend onto nil creates a substitution at generation 1 with the binding."
+(it-sequential "subst-extend-to-nil-creates-generation-1"
   (let* ((v (cl-cc/type:fresh-type-var 'a))
          (s (subst-extend v cl-cc/type:type-int nil)))
     (multiple-value-bind (val found) (subst-lookup v s)
-      (assert-true found)
-      (assert-eq cl-cc/type:type-int val))
-    (assert-= 1 (substitution-generation s))))
+      (expect found :to-be-truthy)
+      (expect val :to-be cl-cc/type:type-int))
+    (expect (= 1 (substitution-generation s)) :to-be-truthy)))
 
-(deftest subst-extend!-mutates-and-increments-generation
-  "subst-extend! mutates the substitution in place; generation increments on each call."
+(it-sequential "subst-extend!-mutates-and-increments-generation"
   (let* ((v1 (cl-cc/type:fresh-type-var 'a))
          (v2 (cl-cc/type:fresh-type-var 'b))
          (s  (make-substitution)))
     (subst-extend! v1 cl-cc/type:type-int s)
     (multiple-value-bind (val found) (subst-lookup v1 s)
-      (assert-true found)
-      (assert-eq cl-cc/type:type-int val))
-    (assert-= 1 (substitution-generation s))
+      (expect found :to-be-truthy)
+      (expect val :to-be cl-cc/type:type-int))
+    (expect (= 1 (substitution-generation s)) :to-be-truthy)
     (subst-extend! v2 cl-cc/type:type-string s)
-    (assert-= 2 (substitution-generation s))))
+    (expect (= 2 (substitution-generation s)) :to-be-truthy)))
 
 ;;; ─── Composition ────────────────────────────────────────────────────────
 
-(deftest subst-compose-nil-nil-returns-valid-substitution
-  "subst-compose of nil and nil returns a valid (empty) substitution."
+(it-sequential "subst-compose-nil-nil-returns-valid-substitution"
   (let ((s (subst-compose nil nil)))
-    (assert-true (cl-cc/type:substitution-p s))))
+    (expect (cl-cc/type:substitution-p s) :to-be-truthy)))
 
-(deftest subst-compose-nil-left-returns-s2
-  "subst-compose nil+s2 is identity on s2 (returns s2 directly)."
+(it-sequential "subst-compose-nil-left-returns-s2"
   (let* ((v  (cl-cc/type:fresh-type-var 'a))
          (s2 (subst-extend v cl-cc/type:type-int nil)))
-    (assert-eq s2 (subst-compose nil s2))))
+    (expect (subst-compose nil s2) :to-be s2)))
 
-(deftest subst-compose-nil-right-preserves-bindings
-  "subst-compose s1+nil preserves all bindings from s1."
+(it-sequential "subst-compose-nil-right-preserves-bindings"
   (let* ((v  (cl-cc/type:fresh-type-var 'a))
          (s1 (subst-extend v cl-cc/type:type-int nil)))
     (multiple-value-bind (val found) (subst-lookup v (subst-compose s1 nil))
-      (assert-true found)
-      (assert-eq cl-cc/type:type-int val))))
+      (expect found :to-be-truthy)
+      (expect val :to-be cl-cc/type:type-int))))
 
-(deftest subst-compose-resolves-chains-through-s2-range
-  "subst-compose: s1 is applied to s2's range, resolving variable chains."
+(it-sequential "subst-compose-resolves-chains-through-s2-range"
   (let* ((a      (cl-cc/type:fresh-type-var 'a))
          (b      (cl-cc/type:fresh-type-var 'b))
          (s2     (subst-extend a b nil))
          (s1     (subst-extend b cl-cc/type:type-int nil))
          (result (subst-compose s1 s2)))
     (multiple-value-bind (val found) (subst-lookup a result)
-      (assert-true found)
-      (assert-true (cl-cc/type:type-primitive-p val))
-      (assert-eq 'fixnum (cl-cc/type:type-primitive-name val)))))
+      (expect found :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-p val) :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name val) :to-be 'fixnum))))
 
 ;;; ─── Zonk: Various Type Constructors ────────────────────────────────────
 
-(deftest zonk-nil-primitive-and-unbound-are-unchanged
-  "zonk: nil, a primitive type, and an unbound type variable all pass through unchanged."
+(it-sequential "zonk-nil-primitive-and-unbound-are-unchanged"
   (let ((s (make-substitution)))
-    (assert-null (zonk nil s))
-    (assert-eq cl-cc/type:type-int (zonk cl-cc/type:type-int s))
+    (expect (zonk nil s) :to-be-null)
+    (expect (zonk cl-cc/type:type-int s) :to-be cl-cc/type:type-int)
     (let ((v (cl-cc/type:fresh-type-var 'a)))
-      (assert-eq v (zonk v s)))))
+      (expect (zonk v s) :to-be v))))
 
-(deftest zonk-bound-var-resolves-to-bound-type
-  "zonk: a type variable bound in the substitution resolves to the bound type."
+(it-sequential "zonk-bound-var-resolves-to-bound-type"
   (let* ((v (cl-cc/type:fresh-type-var 'a))
          (s (subst-extend v cl-cc/type:type-int nil)))
-    (assert-eq cl-cc/type:type-int (zonk v s))))
+    (expect (zonk v s) :to-be cl-cc/type:type-int)))
 
-(deftest zonk-chain-resolves-to-terminal
-  "zonk: a variable chain a→b→int fully resolves to the terminal primitive type."
+(it-sequential "zonk-chain-resolves-to-terminal"
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (b (cl-cc/type:fresh-type-var 'b))
          (s (make-substitution)))
     (subst-extend! a b s)
     (subst-extend! b cl-cc/type:type-int s)
     (let ((result (zonk a s)))
-      (assert-true (cl-cc/type:type-primitive-p result))
-      (assert-eq 'fixnum (cl-cc/type:type-primitive-name result)))))
+      (expect (cl-cc/type:type-primitive-p result) :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name result) :to-be 'fixnum))))
 
-(deftest zonk-arrow-type-substitutes-params-and-return
-  "zonk: type-arrow variables in params and return are substituted correctly."
+(it-sequential "zonk-arrow-type-substitutes-params-and-return"
   (let* ((a     (cl-cc/type:fresh-type-var 'a))
          (b     (cl-cc/type:fresh-type-var 'b))
          (fn-ty (cl-cc/type:make-type-arrow-raw :params (list a) :return b))
@@ -126,34 +117,31 @@
     (subst-extend! a cl-cc/type:type-int s)
     (subst-extend! b cl-cc/type:type-string s)
     (let ((result (zonk fn-ty s)))
-      (assert-true (cl-cc/type:type-arrow-p result))
-      (assert-eq 'fixnum (cl-cc/type:type-primitive-name (car (cl-cc/type:type-arrow-params result))))
-      (assert-eq 'string (cl-cc/type:type-primitive-name (cl-cc/type:type-arrow-return result))))))
+      (expect (cl-cc/type:type-arrow-p result) :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name (car (cl-cc/type:type-arrow-params result))) :to-be 'fixnum)
+      (expect (cl-cc/type:type-primitive-name (cl-cc/type:type-arrow-return result)) :to-be 'string))))
 
-(deftest zonk-product-type-substitutes-elements
-  "zonk: type-product variables in elem positions are substituted."
+(it-sequential "zonk-product-type-substitutes-elements"
   (let* ((a    (cl-cc/type:fresh-type-var 'a))
          (prod (cl-cc/type:make-type-product :elems (list a cl-cc/type:type-string)))
          (s    (subst-extend a cl-cc/type:type-int nil))
          (result (zonk prod s)))
-    (assert-true (cl-cc/type:type-product-p result))
-    (assert-= 2 (length (cl-cc/type:type-product-elems result)))
-    (assert-eq 'fixnum (cl-cc/type:type-primitive-name
-                         (first (cl-cc/type:type-product-elems result))))))
+    (expect (cl-cc/type:type-product-p result) :to-be-truthy)
+    (expect (= 2 (length (cl-cc/type:type-product-elems result))) :to-be-truthy)
+    (expect (cl-cc/type:type-primitive-name
+                         (first (cl-cc/type:type-product-elems result))) :to-be 'fixnum)))
 
-(deftest zonk-forall-type-substitutes-body
-  "zonk: type-forall body variable is substituted, preserving the forall wrapper."
+(it-sequential "zonk-forall-type-substitutes-body"
   (let* ((a        (cl-cc/type:fresh-type-var 'a))
          (b        (cl-cc/type:fresh-type-var 'b))
          (forall-ty (cl-cc/type:make-type-forall :var a :body b))
          (s        (subst-extend b cl-cc/type:type-int nil))
          (result   (zonk forall-ty s)))
-    (assert-true (cl-cc/type:type-forall-p result))
-    (assert-eq 'fixnum (cl-cc/type:type-primitive-name
-                         (cl-cc/type:type-forall-body result)))))
+    (expect (cl-cc/type:type-forall-p result) :to-be-truthy)
+    (expect (cl-cc/type:type-primitive-name
+                         (cl-cc/type:type-forall-body result)) :to-be 'fixnum)))
 
-(deftest zonk-type-app-substitutes-fun-and-arg
-  "zonk: type-app variables in fun and arg positions are both substituted."
+(it-sequential "zonk-type-app-substitutes-fun-and-arg"
   (let* ((a      (cl-cc/type:fresh-type-var 'a))
          (b      (cl-cc/type:fresh-type-var 'b))
          (app-ty (cl-cc/type:make-type-app :fun a :arg b))
@@ -161,29 +149,26 @@
     (subst-extend! a cl-cc/type:type-int s)
     (subst-extend! b cl-cc/type:type-string s)
     (let ((result (zonk app-ty s)))
-      (assert-true (cl-cc/type:type-app-p result))
-      (assert-eq 'fixnum (cl-cc/type:type-primitive-name (cl-cc/type:type-app-fun result)))
-      (assert-eq 'string (cl-cc/type:type-primitive-name (cl-cc/type:type-app-arg result))))))
+      (expect (cl-cc/type:type-app-p result) :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name (cl-cc/type:type-app-fun result)) :to-be 'fixnum)
+      (expect (cl-cc/type:type-primitive-name (cl-cc/type:type-app-arg result)) :to-be 'string))))
 
-(deftest zonk-union-type-substitutes-members
-  "zonk: type-union member variables are substituted, preserving member count."
+(it-sequential "zonk-union-type-substitutes-members"
   (let* ((a        (cl-cc/type:fresh-type-var 'a))
          (union-ty (cl-cc/type:make-type-union-raw :types (list a cl-cc/type:type-string)))
          (s        (subst-extend a cl-cc/type:type-int nil))
          (result   (zonk union-ty s)))
-    (assert-true (cl-cc/type:type-union-p result))
-    (assert-= 2 (length (cl-cc/type:type-union-types result)))))
+    (expect (cl-cc/type:type-union-p result) :to-be-truthy)
+    (expect (= 2 (length (cl-cc/type:type-union-types result))) :to-be-truthy)))
 
-(deftest zonk-effect-row-var-is-resolved
-  "zonk: effect row variable is resolved when bound in the substitution."
+(it-sequential "zonk-effect-row-var-is-resolved"
   (let* ((rv  (cl-cc/type:fresh-type-var 'r))
          (eff (cl-cc/type:make-type-effect-op :name 'io :args nil))
          (row (cl-cc/type:make-type-effect-row :effects (list eff) :row-var rv))
          (s   (subst-extend rv (cl-cc/type:make-type-effect-row :effects nil :row-var nil) nil)))
-    (assert-true (cl-cc/type:type-effect-row-p (zonk row s)))))
+    (expect (cl-cc/type:type-effect-row-p (zonk row s)) :to-be-truthy)))
 
-(deftest zonk-effect-rows-are-merged-when-var-resolves-to-row
-  "zonk: when a row variable resolves to another effect row, effects are merged."
+(it-sequential "zonk-effect-rows-are-merged-when-var-resolves-to-row"
   (let* ((rv   (cl-cc/type:fresh-type-var 'r))
          (eff1 (cl-cc/type:make-type-effect-op :name 'io  :args nil))
          (eff2 (cl-cc/type:make-type-effect-op :name 'exn :args nil))
@@ -191,81 +176,84 @@
          (row2 (cl-cc/type:make-type-effect-row :effects (list eff2) :row-var nil))
          (s    (subst-extend rv row2 nil))
          (result (zonk row1 s)))
-    (assert-true (cl-cc/type:type-effect-row-p result))
-    (assert-= 2 (length (cl-cc/type:type-effect-row-effects result)))))
+    (expect (cl-cc/type:type-effect-row-p result) :to-be-truthy)
+    (expect (= 2 (length (cl-cc/type:type-effect-row-effects result))) :to-be-truthy)))
 
 ;;; ─── Occurs Check ───────────────────────────────────────────────────────
 
-(deftest type-occurs-check
-  "Occurs check: var in itself, in arrow, not in unrelated type, follows subst chains."
+(it-sequential "type-occurs-check"
   (let ((s (make-substitution)))
     (let ((v (cl-cc/type:fresh-type-var 'a)))
-      (assert-true  (type-occurs-p v v s))
-      (assert-true  (type-occurs-p v (cl-cc/type:make-type-arrow-raw :params (list v) :return cl-cc/type:type-int) s))
-      (assert-false (type-occurs-p v cl-cc/type:type-int s))))
+      (expect (type-occurs-p v v s) :to-be-truthy)
+      (expect (type-occurs-p v (cl-cc/type:make-type-arrow-raw :params (list v) :return cl-cc/type:type-int) s) :to-be-truthy)
+      (expect (type-occurs-p v cl-cc/type:type-int s) :to-be-falsy)))
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (b (cl-cc/type:fresh-type-var 'b))
          (fn-ty (cl-cc/type:make-type-arrow-raw :params (list a) :return cl-cc/type:type-int))
          (s (subst-extend b fn-ty nil)))
-    (assert-true (type-occurs-p a b s))))
+    (expect (type-occurs-p a b s) :to-be-truthy)))
 
 ;;; ─── Generalize / Instantiate ───────────────────────────────────────────
 
-(deftest-each generalize-quantification-cases
-  "Free vars outside env are quantified (count=1); vars in env are not (count=0)."
-  :cases (("outside-env" 1 nil)
-          ("in-env"      0 t))
-  (expected-count var-in-env-p)
-  (let* ((a (cl-cc/type:fresh-type-var 'a))
+(it-sequential "generalize-quantification-cases outside-env"
+  (destructuring-bind (expected-count var-in-env-p) (list 1 nil)
+    (let* ((a (cl-cc/type:fresh-type-var 'a))
          (env (if var-in-env-p
                   (cl-cc/type:type-env-extend 'x (cl-cc/type:type-to-scheme a) (cl-cc/type:type-env-empty))
                   nil))
          (ret (if var-in-env-p cl-cc/type:type-int a))
          (fn-ty (cl-cc/type:make-type-arrow-raw :params (list a) :return ret))
          (scheme (generalize env fn-ty)))
-    (assert-= expected-count (length (cl-cc/type:type-scheme-quantified-vars scheme)))))
+    (expect (= expected-count (length (cl-cc/type:type-scheme-quantified-vars scheme))) :to-be-truthy))))
 
-(deftest instantiate-produces-fresh
-  "Instantiate replaces quantified vars with fresh ones."
+(it-sequential "generalize-quantification-cases in-env"
+  (destructuring-bind (expected-count var-in-env-p) (list 0 t)
+    (let* ((a (cl-cc/type:fresh-type-var 'a))
+         (env (if var-in-env-p
+                  (cl-cc/type:type-env-extend 'x (cl-cc/type:type-to-scheme a) (cl-cc/type:type-env-empty))
+                  nil))
+         (ret (if var-in-env-p cl-cc/type:type-int a))
+         (fn-ty (cl-cc/type:make-type-arrow-raw :params (list a) :return ret))
+         (scheme (generalize env fn-ty)))
+    (expect (= expected-count (length (cl-cc/type:type-scheme-quantified-vars scheme))) :to-be-truthy))))
+
+(it-sequential "instantiate-produces-fresh"
   (let* ((a (cl-cc/type:fresh-type-var 'a))
          (fn-ty (cl-cc/type:make-type-arrow-raw :params (list a) :return a))
          (scheme (generalize nil fn-ty))
          (inst1 (instantiate scheme)))
     ;; Instantiation produces an arrow with fresh vars
-    (assert-true (cl-cc/type:type-arrow-p inst1))
+    (expect (cl-cc/type:type-arrow-p inst1) :to-be-truthy)
     (let ((p1 (car (cl-cc/type:type-arrow-params inst1)))
           (r1 (cl-cc/type:type-arrow-return inst1)))
       ;; Param and return should be the same fresh var (since both were 'a')
-      (assert-true (cl-cc/type:type-var-p p1))
-      (assert-true (cl-cc/type:type-var-equal-p p1 r1))
+      (expect (cl-cc/type:type-var-p p1) :to-be-truthy)
+      (expect (cl-cc/type:type-var-equal-p p1 r1) :to-be-truthy)
       ;; Fresh var should be different from the original quantified var
-      (assert-false (cl-cc/type:type-var-equal-p p1 a)))))
+      (expect (cl-cc/type:type-var-equal-p p1 a) :to-be-falsy))))
 
 ;;; ─── Normalize ──────────────────────────────────────────────────────────
 
-(deftest normalize-type-variables-renames-distinct-vars
-  "normalize-type-variables: two distinct type vars get distinct canonical names."
+(it-sequential "normalize-type-variables-renames-distinct-vars"
   (let* ((fn    (cl-cc/type:make-type-arrow-raw
                  :params (list (cl-cc/type:fresh-type-var 'xyz))
                  :return (cl-cc/type:fresh-type-var 'qqq)))
          (normed (cl-cc/type:normalize-type-variables fn)))
     (let ((p (car (cl-cc/type:type-arrow-params normed)))
           (r (cl-cc/type:type-arrow-return normed)))
-      (assert-true  (cl-cc/type:type-var-p p))
-      (assert-true  (cl-cc/type:type-var-p r))
-      (assert-false (cl-cc/type:type-var-equal-p p r)))))
+      (expect (cl-cc/type:type-var-p p) :to-be-truthy)
+      (expect (cl-cc/type:type-var-p r) :to-be-truthy)
+      (expect (cl-cc/type:type-var-equal-p p r) :to-be-falsy))))
 
-(deftest normalize-type-variables-preserves-shared-variable
-  "normalize-type-variables: a variable shared across positions normalizes to the same canonical var."
+(it-sequential "normalize-type-variables-preserves-shared-variable"
   (let* ((v     (cl-cc/type:fresh-type-var 'x))
          (fn    (cl-cc/type:make-type-arrow-raw :params (list v) :return v))
          (normed (cl-cc/type:normalize-type-variables fn)))
-    (assert-true (cl-cc/type:type-var-equal-p
+    (expect (cl-cc/type:type-var-equal-p
                   (car (cl-cc/type:type-arrow-params normed))
-                  (cl-cc/type:type-arrow-return normed)))))
+                  (cl-cc/type:type-arrow-return normed)) :to-be-truthy)))
 
-(deftest zonk-env-substitutes-all-bindings
-  "zonk-env applies the substitution to all bindings in the type environment."
+(it-sequential "zonk-env-substitutes-all-bindings"
   (let* ((a        (cl-cc/type:fresh-type-var 'a))
          (env      (cl-cc/type:make-type-env
                     :bindings (list (cons 'x a)
@@ -273,58 +261,51 @@
          (s        (subst-extend a cl-cc/type:type-int nil))
          (result   (cl-cc/type:zonk-env env s))
          (bindings (cl-cc/type:type-env-bindings result)))
-    (assert-eq 'fixnum (cl-cc/type:type-primitive-name (cdr (first bindings))))
-    (assert-eq 'string (cl-cc/type:type-primitive-name (cdr (second bindings))))))
+    (expect (cl-cc/type:type-primitive-name (cdr (first bindings))) :to-be 'fixnum)
+    (expect (cl-cc/type:type-primitive-name (cdr (second bindings))) :to-be 'string)))
 
 ;;; ─── %nv-canonical / %nv-norm (extracted helpers) ────────────────────────────
 
-(deftest nv-canonical-creates-fresh-var
-  "%nv-canonical: first call creates a fresh var, second call returns same var."
+(it-sequential "nv-canonical-creates-fresh-var"
   (let ((mapping      (make-hash-table :test #'eql))
         (counter-cell (list 0))
         (v            (cl-cc/type:fresh-type-var 'x)))
     (let ((nv1 (cl-cc/type::%nv-canonical v mapping counter-cell)))
-      (assert-true (cl-cc/type:type-var-p nv1))
-      (assert-= 1 (car counter-cell))
+      (expect (cl-cc/type:type-var-p nv1) :to-be-truthy)
+      (expect (= 1 (car counter-cell)) :to-be-truthy)
       (let ((nv2 (cl-cc/type::%nv-canonical v mapping counter-cell)))
-        (assert-eq nv1 nv2)
-        (assert-= 1 (car counter-cell))))))
+        (expect nv2 :to-be nv1)
+        (expect (= 1 (car counter-cell)) :to-be-truthy)))))
 
-(deftest nv-norm-passes-through-non-var
-  "%nv-norm on a non-type-var primitive type returns it unchanged."
+(it-sequential "nv-norm-passes-through-non-var"
   (let ((mapping      (make-hash-table :test #'eql))
         (counter-cell (list 0)))
-    (assert-eq cl-cc/type:type-int
-               (cl-cc/type::%nv-norm cl-cc/type:type-int mapping counter-cell))
-    (assert-= 0 (car counter-cell))))
+    (expect (cl-cc/type::%nv-norm cl-cc/type:type-int mapping counter-cell) :to-be cl-cc/type:type-int)
+    (expect (= 0 (car counter-cell)) :to-be-truthy)))
 
-(deftest nv-norm-renames-type-var
-  "%nv-norm replaces a type-var with its canonical rename."
+(it-sequential "nv-norm-renames-type-var"
   (let ((mapping      (make-hash-table :test #'eql))
         (counter-cell (list 0))
         (v            (cl-cc/type:fresh-type-var 'z)))
     (let ((result (cl-cc/type::%nv-norm v mapping counter-cell)))
-      (assert-true (cl-cc/type:type-var-p result))
-      (assert-false (eq result v)))))
+      (expect (cl-cc/type:type-var-p result) :to-be-truthy)
+      (expect (eq result v) :to-be-falsy))))
 
 ;;; ─── apply-unification ───────────────────────────────────────────────────────
 
-(deftest apply-unification-nil-subst-returns-nil
-  "apply-unification returns NIL when SUBST is NIL (nothing to apply)."
+(it-sequential "apply-unification-nil-subst-returns-nil"
   (let ((ty (cl-cc/type:parse-type-specifier 'fixnum)))
-    (assert-false (cl-cc/type:apply-unification ty nil))))
+    (expect (cl-cc/type:apply-unification ty nil) :to-be-falsy)))
 
-(deftest apply-unification-empty-subst-returns-ty
-  "apply-unification with an empty (but non-nil) substitution returns TY unchanged."
+(it-sequential "apply-unification-empty-subst-returns-ty"
   (let ((ty    (cl-cc/type:parse-type-specifier 'fixnum))
         (subst (make-hash-table :test #'eql)))
-    (assert-eq ty (cl-cc/type:apply-unification ty subst))))
+    (expect (cl-cc/type:apply-unification ty subst) :to-be ty)))
 
-(deftest apply-unification-resolves-mapped-var
-  "apply-unification substitutes a mapped type variable with its concrete type."
+(it-sequential "apply-unification-resolves-mapped-var"
   (let* ((v     (cl-cc/type:fresh-type-var 'x))
           (target (cl-cc/type:parse-type-specifier 'fixnum))
          (subst  (cl-cc/type:subst-extend v target nil)))
     (let ((result (cl-cc/type:apply-unification v subst)))
-      (assert-true result)
-      (assert-false (cl-cc/type:type-var-p result)))))
+      (expect result :to-be-truthy)
+      (expect (cl-cc/type:type-var-p result) :to-be-falsy))))

@@ -22,24 +22,47 @@
              (probe-file (asdf:system-relative-pathname :cl-cc path)))
            (probe-file (merge-pathnames path *default-pathname-defaults*)))))
 
+(defun %type-advanced-cl-weave-anchor-registered-p (anchor)
+  "Return T when ANCHOR names a cl-weave-registered test (it-sequential, post
+cl-weave migration). Walks cl-weave's root suite and matches the anchor by its
+lowercased name (exact, or \"anchor \" prefix for deftest-each cases)."
+  (let ((root-fn (find-symbol "ROOT-SUITE" :cl-weave))
+        (suite-p-fn (find-symbol "SUITE-P" :cl-weave))
+        (children-fn (find-symbol "SUITE-CHILDREN" :cl-weave))
+        (name-fn (find-symbol "TEST-CASE-NAME" :cl-weave)))
+    (when (and root-fn suite-p-fn children-fn name-fn)
+      (let ((target (string-downcase (symbol-name anchor)))
+            (root (ignore-errors (funcall root-fn))))
+        (when root
+          (labels ((walk (node)
+                     (if (funcall suite-p-fn node)
+                         (some #'walk (funcall children-fn node))
+                         (let ((name (funcall name-fn node)))
+                           (and (stringp name)
+                                (or (string-equal name target)
+                                    (let ((p (concatenate 'string target " ")))
+                                      (and (>= (length name) (length p))
+                                           (string-equal (subseq name 0 (length p)) p)))))))))
+            (walk root)))))))
+
 (defun %type-advanced-implementation-test-anchor-available-p (anchor)
   "Return T when ANCHOR has a registered test when the test package is loaded.
-Queries cl-cc/test's *KNOWN-TEST-NAMES* registry (DEFTEST NAME symbol ->
-description), which replaced the old *TEST-REGISTRY*/PERSIST-LOOKUP/
-PERSIST-EACH API this used to call."
+Checks cl-weave's suite tree (it-sequential, post cl-weave migration) first, then
+falls back to cl-cc/test's legacy *KNOWN-TEST-NAMES* (DEFTEST NAME -> description)."
   (and (symbolp anchor)
        (let ((test-package (find-package :cl-cc/test)))
          (if test-package
-             (let ((test-symbol (find-symbol (symbol-name anchor) test-package))
-                   (known-names-symbol (find-symbol "*KNOWN-TEST-NAMES*" test-package)))
-               (and known-names-symbol
-                    (boundp known-names-symbol)
-                    (let ((known-names (symbol-value known-names-symbol)))
-                      (or (and test-symbol
-                               (nth-value 1 (gethash test-symbol known-names)))
-                          (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " [")))
-                            (loop for name being the hash-keys of known-names
-                                  thereis (search case-prefix (symbol-name name))))))))
+             (or (%type-advanced-cl-weave-anchor-registered-p anchor)
+                 (let ((test-symbol (find-symbol (symbol-name anchor) test-package))
+                       (known-names-symbol (find-symbol "*KNOWN-TEST-NAMES*" test-package)))
+                   (and known-names-symbol
+                        (boundp known-names-symbol)
+                        (let ((known-names (symbol-value known-names-symbol)))
+                          (or (and test-symbol
+                                   (nth-value 1 (gethash test-symbol known-names)))
+                              (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " [")))
+                                (loop for name being the hash-keys of known-names
+                                      thereis (search case-prefix (symbol-name name)))))))))
              t))))
 
 (defun %type-advanced-implementation-evidence-complete-p (evidence)

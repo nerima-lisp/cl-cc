@@ -7,11 +7,8 @@
 
 (in-package :cl-cc/test)
 
-(defsuite row-suite :description "Row polymorphism operation tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite row-suite)
 ;;; ─── Helpers ─────────────────────────────────────────────────────────────────
 
 (defun make-closed-record (&rest label-type-pairs)
@@ -30,139 +27,126 @@
 
 ;;; ─── row-extend ──────────────────────────────────────────────────────────────
 
-(deftest row-extend-behavior
-  "row-extend: adds field (2 fields); preserves row-var; shadows existing label."
+(it-sequential "row-extend-behavior"
   (let* ((r (make-closed-record :x type-int))
          (r2 (row-extend :y type-string r)))
-    (assert-true (type-record-p r2))
-    (assert-equal 2 (length (type-record-fields r2))))
+    (expect (type-record-p r2) :to-be-truthy)
+    (expect (length (type-record-fields r2)) :to-equal 2))
   (let* ((rv (fresh-type-var))
          (r2 (row-extend :y type-string (make-open-record rv :x type-int))))
-    (assert-true (type-var-p (type-record-row-var r2))))
+    (expect (type-var-p (type-record-row-var r2)) :to-be-truthy))
   (let* ((r (make-closed-record :x type-int))
          (r2 (row-extend :x type-string r)))
-    (assert-equal 2 (length (type-record-fields r2)))
-    (assert-true (type-equal-p type-string (row-select :x r2)))))
+    (expect (length (type-record-fields r2)) :to-equal 2)
+    (expect (type-equal-p type-string (row-select :x r2)) :to-be-truthy)))
 
 ;;; ─── row-restrict ────────────────────────────────────────────────────────────
 
-(deftest row-restrict-behavior
-  "row-restrict: removes present label; absent label is no-op; preserves row-var."
+(it-sequential "row-restrict-behavior"
   (let* ((r (make-closed-record :x type-int :y type-string))
          (r2 (row-restrict :x r)))
-    (assert-equal 1 (length (type-record-fields r2)))
-    (assert-null (row-select :x r2))
-    (assert-true (type-equal-p type-string (row-select :y r2))))
-  (assert-equal 1 (length (type-record-fields
-                             (row-restrict :z (make-closed-record :x type-int)))))
+    (expect (length (type-record-fields r2)) :to-equal 1)
+    (expect (row-select :x r2) :to-be-null)
+    (expect (type-equal-p type-string (row-select :y r2)) :to-be-truthy))
+  (expect (length (type-record-fields
+                             (row-restrict :z (make-closed-record :x type-int)))) :to-equal 1)
   (let* ((rv (fresh-type-var))
          (r2 (row-restrict :x (make-open-record rv :x type-int))))
-    (assert-true (type-var-p (type-record-row-var r2)))))
+    (expect (type-var-p (type-record-row-var r2)) :to-be-truthy)))
 
 ;;; ─── row-select ──────────────────────────────────────────────────────────────
 
-(deftest row-select-behavior
-  "row-select: returns type for present label; nil for absent; works on type-variant."
+(it-sequential "row-select-behavior"
   (let ((r (make-closed-record :x type-int :y type-string)))
-    (assert-true (type-equal-p type-int (row-select :x r)))
-    (assert-true (type-equal-p type-string (row-select :y r))))
-  (assert-null (row-select :z (make-closed-record :x type-int)))
+    (expect (type-equal-p type-int (row-select :x r)) :to-be-truthy)
+    (expect (type-equal-p type-string (row-select :y r)) :to-be-truthy))
+  (expect (row-select :z (make-closed-record :x type-int)) :to-be-null)
   (let ((v (make-type-variant :cases (list (cons :some type-int) (cons :none type-null))
                               :row-var nil)))
-    (assert-true (type-equal-p type-int  (row-select :some v)))
-    (assert-true (type-equal-p type-null (row-select :none v)))))
+    (expect (type-equal-p type-int  (row-select :some v)) :to-be-truthy)
+    (expect (type-equal-p type-null (row-select :none v)) :to-be-truthy)))
 
 ;;; ─── row-labels ──────────────────────────────────────────────────────────────
 
-(deftest row-labels-behavior
-  "row-labels: returns label list for record; for variant; nil for empty record."
-  (assert-equal '(:x :y) (row-labels (make-closed-record :x type-int :y type-string)))
-  (assert-equal '(:a :b) (row-labels (make-type-variant :cases (list (cons :a type-int)
+(it-sequential "row-labels-behavior"
+  (expect (row-labels (make-closed-record :x type-int :y type-string)) :to-equal '(:x :y))
+  (expect (row-labels (make-type-variant :cases (list (cons :a type-int)
                                                                       (cons :b type-string))
-                                                         :row-var nil)))
-  (assert-null (row-labels (make-closed-record))))
+                                                         :row-var nil)) :to-equal '(:a :b))
+  (expect (row-labels (make-closed-record)) :to-be-null))
 
 ;;; ─── row-closed-p / row-open-p ──────────────────────────────────────────────
 
-(deftest row-closed-open-predicate-behavior
-  "Closed record: closed-p=true, open-p=false. Open record: opposite. Same for variants."
+(it-sequential "row-closed-open-predicate-behavior"
   (let ((r (make-closed-record :x type-int)))
-    (assert-true  (row-closed-p r))
-    (assert-false (row-open-p r)))
+    (expect (row-closed-p r) :to-be-truthy)
+    (expect (row-open-p r) :to-be-falsy))
   (let ((r (make-open-record (fresh-type-var) :x type-int)))
-    (assert-true  (row-open-p r))
-    (assert-false (row-closed-p r)))
-  (assert-true (row-closed-p (make-type-variant :cases nil :row-var nil)))
-  (assert-true (row-open-p   (make-type-variant :cases nil :row-var (fresh-type-var)))))
+    (expect (row-open-p r) :to-be-truthy)
+    (expect (row-closed-p r) :to-be-falsy))
+  (expect (row-closed-p (make-type-variant :cases nil :row-var nil)) :to-be-truthy)
+  (expect (row-open-p   (make-type-variant :cases nil :row-var (fresh-type-var))) :to-be-truthy))
 
 ;;; ─── effect-row operations ──────────────────────────────────────────────────
 
-(deftest effect-row-extend-adds-op
-  "effect-row-extend prepends an effect-op."
+(it-sequential "effect-row-extend-adds-op"
   (let* ((op (cl-cc/type:make-type-effect-op :name :io :args nil))
          (row (make-type-effect-row :effects nil :row-var nil))
          (row2 (cl-cc/type:effect-row-extend op row)))
-    (assert-equal 1 (length (type-effect-row-effects row2)))))
+    (expect (length (type-effect-row-effects row2)) :to-equal 1)))
 
-(deftest effect-row-restrict-removes
-  "effect-row-restrict removes by name."
+(it-sequential "effect-row-restrict-removes"
   (let* ((op1 (cl-cc/type:make-type-effect-op :name :io :args nil))
          (op2 (cl-cc/type:make-type-effect-op :name :state :args nil))
          (row (make-type-effect-row :effects (list op1 op2) :row-var nil))
          (row2 (cl-cc/type:effect-row-restrict :io row)))
-    (assert-equal 1 (length (type-effect-row-effects row2)))))
+    (expect (length (type-effect-row-effects row2)) :to-equal 1)))
 
-(deftest effect-row-member-p-behavior
-  "effect-row-member-p: true for present effect; false for absent."
+(it-sequential "effect-row-member-p-behavior"
   (let ((row-with-io (make-type-effect-row :effects (list (cl-cc/type:make-type-effect-op :name :io :args nil))
                                              :row-var nil))
         (empty-row   (make-type-effect-row :effects nil :row-var nil)))
-    (assert-true  (cl-cc/type:effect-row-member-p :io row-with-io))
-    (assert-false (cl-cc/type:effect-row-member-p :io empty-row))))
+    (expect (cl-cc/type:effect-row-member-p :io row-with-io) :to-be-truthy)
+    (expect (cl-cc/type:effect-row-member-p :io empty-row) :to-be-falsy)))
 
-(deftest row-extend-basic
-  "row-extend adds a label to an existing row."
+(it-sequential "row-extend-basic"
   (let* ((base (make-type-record :fields (list (cons 'x type-int)) :row-var nil))
          (ext  (row-extend 'y type-string base)))
-    (assert-true (type-record-p ext))
-    (assert-= 2 (length (type-record-fields ext)))
-    (assert-true (assoc 'y (type-record-fields ext)))))
+    (expect (type-record-p ext) :to-be-truthy)
+    (expect (= 2 (length (type-record-fields ext))) :to-be-truthy)
+    (expect (assoc 'y (type-record-fields ext)) :to-be-truthy)))
 
-(deftest row-restrict-basic
-  "row-restrict removes a label from a row."
+(it-sequential "row-restrict-basic"
   (let* ((rec (make-type-record :fields (list (cons 'x type-int)
                                               (cons 'y type-string))
                                 :row-var nil))
          (r   (row-restrict 'x rec)))
-    (assert-true (type-record-p r))
-    (assert-= 1 (length (type-record-fields r)))
-    (assert-null (assoc 'x (type-record-fields r)))))
+    (expect (type-record-p r) :to-be-truthy)
+    (expect (= 1 (length (type-record-fields r))) :to-be-truthy)
+    (expect (assoc 'x (type-record-fields r)) :to-be-null)))
 
-(deftest row-select-basic
-  "row-select retrieves a field type by label."
+(it-sequential "row-select-basic"
   (let ((rec (make-type-record :fields (list (cons 'name type-string)
                                              (cons 'age  type-int))
                                :row-var nil)))
-    (assert-true (type-equal-p type-string (row-select 'name rec)))
-    (assert-true (type-equal-p type-int    (row-select 'age  rec)))
-    (assert-null (row-select 'missing rec))))
+    (expect (type-equal-p type-string (row-select 'name rec)) :to-be-truthy)
+    (expect (type-equal-p type-int    (row-select 'age  rec)) :to-be-truthy)
+    (expect (row-select 'missing rec) :to-be-null)))
 
-(deftest row-labels-basic
-  "row-labels returns all field labels in a record row."
+(it-sequential "row-labels-basic"
   (let ((rec (make-type-record :fields (list (cons 'a type-int)
                                              (cons 'b type-bool))
                                :row-var nil)))
     (let ((labs (row-labels rec)))
-      (assert-= 2 (length labs))
-      (assert-true (member 'a labs))
-      (assert-true (member 'b labs)))))
+      (expect (= 2 (length labs)) :to-be-truthy)
+      (expect (member 'a labs) :to-be-truthy)
+      (expect (member 'b labs) :to-be-truthy))))
 
-(deftest row-open-closed
-  "row-closed-p / row-open-p distinguish closed vs open rows."
+(it-sequential "row-open-closed"
   (let* ((closed (make-type-record :fields (list (cons 'x type-int)) :row-var nil))
          (rv     (fresh-type-var :name 'rho))
          (open   (make-type-record :fields (list (cons 'x type-int)) :row-var rv)))
-    (assert-true  (row-closed-p closed))
-    (assert-false (row-open-p   closed))
-    (assert-false (row-closed-p open))
-    (assert-true  (row-open-p   open))))
+    (expect (row-closed-p closed) :to-be-truthy)
+    (expect (row-open-p   closed) :to-be-falsy)
+    (expect (row-closed-p open) :to-be-falsy)
+    (expect (row-open-p   open) :to-be-truthy)))

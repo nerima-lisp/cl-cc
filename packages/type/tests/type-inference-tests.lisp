@@ -1,124 +1,186 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Type Inference Tests
 
-(deftest-each infer-forms-return-type-int
-  "Forms that always infer to type-int via infer-with-env."
-  :cases (("integer-literal"    '42)
-          ("binop-addition"     '(+ 1 2))
-          ("binop-nested"       '(+ (* 2 3) (- 4 1)))
-          ("let-simple"         '(let ((x 42)) x))
-          ("let-multi-binop"    '(let ((x 10) (y 20)) (+ x y)))
-          ("function-call"      '(let ((f (lambda (x) (+ x 1)))) (f 5)))
-          ("print-expr"         '(print 42))
-          ("progn-last"         '(progn 1 2 3))
-          ("let-poly-identity"  '(let ((id (lambda (x) x))) (id 42))))
-  (form)
-  (reset-type-vars!)
-  (let ((ast (lower-sexp-to-ast form)))
+(it-sequential "infer-forms-return-type-int integer-literal"
+  (destructuring-bind (form) (list '42)
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
     (multiple-value-bind (ty subst) (infer-with-env ast)
       (declare (ignore subst))
-      (assert-type-equal ty type-int))))
+      (assert-type-equal ty type-int)))))
 
-(deftest-each infer-env-and-control-flow
-  "Variable env lookup infers declared type; if-expr unifies branches when condition is bool."
-  :cases (("variable-from-env"
-           (lambda ()
+(it-sequential "infer-forms-return-type-int binop-addition"
+  (destructuring-bind (form) (list '(+ 1 2))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int binop-nested"
+  (destructuring-bind (form) (list '(+ (* 2 3) (- 4 1)))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int let-simple"
+  (destructuring-bind (form) (list '(let ((x 42)) x))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int let-multi-binop"
+  (destructuring-bind (form) (list '(let ((x 10) (y 20)) (+ x y)))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int function-call"
+  (destructuring-bind (form) (list '(let ((f (lambda (x) (+ x 1)))) (f 5)))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int print-expr"
+  (destructuring-bind (form) (list '(print 42))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int progn-last"
+  (destructuring-bind (form) (list '(progn 1 2 3))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-forms-return-type-int let-poly-identity"
+  (destructuring-bind (form) (list '(let ((id (lambda (x) x))) (id 42)))
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty type-int)))))
+
+(it-sequential "infer-env-and-control-flow variable-from-env"
+  (destructuring-bind (verify) (list (lambda ()
              (let* ((ast (lower-sexp-to-ast 'x))
                     (env (type-env-extend 'x (type-to-scheme type-int) (type-env-empty))))
                (multiple-value-bind (ty subst) (infer ast env)
                  (declare (ignore subst))
                  (assert-type-equal ty type-int)))))
-          ("if-expression"
-           (lambda ()
+    (reset-type-vars!) (funcall verify)))
+
+(it-sequential "infer-env-and-control-flow if-expression"
+  (destructuring-bind (verify) (list (lambda ()
              (let* ((ast (lower-sexp-to-ast '(if cond-var 1 2)))
                     (env (type-env-extend 'cond-var
                                           (type-to-scheme type-bool)
                                           (type-env-empty))))
                (multiple-value-bind (ty subst) (infer ast env)
                  (declare (ignore subst))
-                 (assert-type-equal ty type-int))))))
-  (verify)
-  (reset-type-vars!)
-  (funcall verify))
+                 (assert-type-equal ty type-int)))))
+    (reset-type-vars!) (funcall verify)))
 
-(deftest-each infer-type-error-signals
-  "Unbound variables signal unbound-variable-error; typed holes signal typed-hole-error."
-  :cases (("unbound-var"
-           (lambda ()
+(it-sequential "infer-type-error-signals unbound-var"
+  (destructuring-bind (verify) (list (lambda ()
              (let ((ast (lower-sexp-to-ast 'undefined-var)))
-               (assert-signals unbound-variable-error
-                 (infer-with-env ast)))))
-          ("typed-hole"
-           (lambda ()
+               (signals unbound-variable-error (infer-with-env ast)))))
+    (reset-type-vars!) (funcall verify)))
+
+(it-sequential "infer-type-error-signals typed-hole"
+  (destructuring-bind (verify) (list (lambda ()
              (let* ((ast (lower-sexp-to-ast '(+ x _)))
                     (env (type-env-extend 'x (type-to-scheme type-int) (type-env-empty))))
-               (assert-signals cl-cc/type::typed-hole-error
-                 (infer ast env))))))
-  (verify)
-  (reset-type-vars!)
-  (funcall verify))
+               (signals cl-cc/type::typed-hole-error (infer ast env)))))
+    (reset-type-vars!) (funcall verify)))
 
-(deftest infer-lambda
-  "Lambda types inferred as function type: identity has 1 param; arithmetic constrains to int."
+(it-sequential "infer-lambda"
   (reset-type-vars!)
   (let ((ast (lower-sexp-to-ast '(lambda (x) x))))
     (multiple-value-bind (ty subst) (infer-with-env ast)
       (declare (ignore subst))
-      (assert-type type-arrow ty)
-      (assert-= 1 (length (type-arrow-params ty)))))
+      (expect (typep ty 'type-arrow) :to-be-truthy)
+      (expect (= 1 (length (type-arrow-params ty))) :to-be-truthy)))
   (reset-type-vars!)
   (let ((ast (lower-sexp-to-ast '(lambda (x) (+ x 1)))))
     (multiple-value-bind (ty subst) (infer-with-env ast)
       (declare (ignore subst))
-      (assert-type type-arrow ty)
+      (expect (typep ty 'type-arrow) :to-be-truthy)
       (assert-type-equal (type-arrow-return ty) type-int)
       (assert-type-equal (first (type-arrow-params ty)) type-int))))
 
 
-(deftest-each infer-quote-type
-  "Quoted forms infer to the type corresponding to their datum."
-  :cases (("symbol"  '(quote hello) type-symbol)
-          ("integer" '(quote 42)    type-int))
-  (form expected-type)
-  (reset-type-vars!)
-  (let ((ast (lower-sexp-to-ast form)))
+(it-sequential "infer-quote-type symbol"
+  (destructuring-bind (form expected-type) (list '(quote hello) type-symbol)
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
     (multiple-value-bind (ty subst) (infer-with-env ast)
       (declare (ignore subst))
-      (assert-type-equal ty expected-type))))
+      (assert-type-equal ty expected-type)))))
+
+(it-sequential "infer-quote-type integer"
+  (destructuring-bind (form expected-type) (list '(quote 42) type-int)
+    (reset-type-vars!) (let ((ast (lower-sexp-to-ast form)))
+    (multiple-value-bind (ty subst) (infer-with-env ast)
+      (declare (ignore subst))
+      (assert-type-equal ty expected-type)))))
 
 ;;; ─── syntactic-value-p (value restriction) ──────────────────────────────────
 
-(deftest-each infer-syntactic-value-p-truthy
-  "Syntactic values: int, var, lambda, quote, function-ref, typed-hole are generalizable."
-  :cases (("int"       (cl-cc/ast:make-ast-int      :value 42))
-          ("var"       (cl-cc/ast:make-ast-var       :name 'x))
-          ("lambda"    (cl-cc/ast:make-ast-lambda    :params '(x) :body nil))
-          ("quote"     (cl-cc/ast:make-ast-quote     :value 'foo))
-          ("function"  (cl-cc/ast:make-ast-function  :name 'f))
-          ("hole"      (cl-cc/ast:make-ast-hole)))
-  (ast)
-  (assert-true (cl-cc/type:syntactic-value-p ast)))
+(it-sequential "infer-syntactic-value-p-truthy int"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-int      :value 42))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-truthy)))
 
-(deftest-each infer-syntactic-value-p-falsy
-  "Non-syntactic values: call, binop, if, let, progn are not generalizable (value restriction)."
-  :cases (("call"   (cl-cc/ast:make-ast-call   :func 'f :args nil))
-          ("binop"  (cl-cc/ast:make-ast-binop  :op '+ :lhs (cl-cc/ast:make-ast-int :value 1)
+(it-sequential "infer-syntactic-value-p-truthy var"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-var       :name 'x))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-truthy)))
+
+(it-sequential "infer-syntactic-value-p-truthy lambda"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-lambda    :params '(x) :body nil))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-truthy)))
+
+(it-sequential "infer-syntactic-value-p-truthy quote"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-quote     :value 'foo))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-truthy)))
+
+(it-sequential "infer-syntactic-value-p-truthy function"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-function  :name 'f))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-truthy)))
+
+(it-sequential "infer-syntactic-value-p-truthy hole"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-hole))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-truthy)))
+
+(it-sequential "infer-syntactic-value-p-falsy call"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-call   :func 'f :args nil))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-falsy)))
+
+(it-sequential "infer-syntactic-value-p-falsy binop"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-binop  :op '+ :lhs (cl-cc/ast:make-ast-int :value 1)
                                                         :rhs (cl-cc/ast:make-ast-int :value 2)))
-          ("if"     (cl-cc/ast:make-ast-if     :cond (cl-cc/ast:make-ast-var :name 'c)
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-falsy)))
+
+(it-sequential "infer-syntactic-value-p-falsy if"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-if     :cond (cl-cc/ast:make-ast-var :name 'c)
                                                  :then (cl-cc/ast:make-ast-int :value 1)
                                                  :else (cl-cc/ast:make-ast-int :value 2)))
-          ("let"    (cl-cc/ast:make-ast-let    :bindings nil :body nil))
-          ("progn"  (cl-cc/ast:make-ast-progn  :forms nil)))
-  (ast)
-  (assert-false (cl-cc/type:syntactic-value-p ast)))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-falsy)))
+
+(it-sequential "infer-syntactic-value-p-falsy let"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-let    :bindings nil :body nil))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-falsy)))
+
+(it-sequential "infer-syntactic-value-p-falsy progn"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-progn  :forms nil))
+    (expect (cl-cc/type:syntactic-value-p ast) :to-be-falsy)))
 
 ;;; ─── infer-if type narrowing ──────────────────────────────────────────────────
 
-(deftest infer-if-narrows-type-in-then-branch
-  "infer-if narrows the guard variable's type to the predicate type in the then branch."
+(it-sequential "infer-if-narrows-type-in-then-branch"
   (reset-type-vars!)
   (let* ((ast (lower-sexp-to-ast '(if (numberp x) (+ x 1) 0)))
          (env (type-env-extend 'x
@@ -127,10 +189,9 @@
                (type-env-empty))))
     (multiple-value-bind (ty subst) (infer ast env)
       (declare (ignore subst))
-      (assert-true ty))))
+      (expect ty :to-be-truthy))))
 
-(deftest infer-if-no-narrowing-without-predicate
-  "infer-if with a plain boolean condition (no predicate call) leaves types unchanged."
+(it-sequential "infer-if-no-narrowing-without-predicate"
   (reset-type-vars!)
   (let* ((ast (lower-sexp-to-ast '(if flag 1 2)))
          (env (type-env-extend 'flag (type-to-scheme type-bool) (type-env-empty))))
@@ -140,41 +201,44 @@
 
 ;;; Generalization / Instantiation Tests
 
-(deftest-each generalize-and-scheme-ops
-  "Generalization: nil env quantifies all free vars; non-nil env excludes env vars. Scheme: instantiate/monomorphic."
-  :cases (("nil-env-quantifies-all"
-           (lambda ()
+(it-sequential "generalize-and-scheme-ops nil-env-quantifies-all"
+  (destructuring-bind (verify) (list (lambda ()
              (let* ((v  (fresh-type-var :name 'a))
                     (fn (make-type-arrow-raw :params (list v) :return v))
                     (s  (generalize nil fn)))
-               (assert-type type-scheme s)
-               (assert-= 1 (length (type-scheme-quantified-vars s))))))
-          ("non-nil-env-excludes"
-           (lambda ()
+               (expect (typep s 'type-scheme) :to-be-truthy)
+               (expect (= 1 (length (type-scheme-quantified-vars s))) :to-be-truthy))))
+    (funcall verify)))
+
+(it-sequential "generalize-and-scheme-ops non-nil-env-excludes"
+  (destructuring-bind (verify) (list (lambda ()
               (let* ((v1   (fresh-type-var :name 'a))
                      (v2   (fresh-type-var :name 'b))
                      (fn   (make-type-arrow-raw :params (list v1) :return v2))
                      (env  (type-env-extend 'x (type-to-scheme v1) (type-env-empty)))
                      (s    (generalize env fn)))
-                (assert-= 1 (length (type-scheme-quantified-vars s)))
-               (assert-true (type-var-equal-p (first (type-scheme-quantified-vars s)) v2)))))
-          ("instantiate-fresh-vars"
-           (lambda ()
+                (expect (= 1 (length (type-scheme-quantified-vars s))) :to-be-truthy)
+               (expect (type-var-equal-p (first (type-scheme-quantified-vars s)) v2) :to-be-truthy))))
+    (funcall verify)))
+
+(it-sequential "generalize-and-scheme-ops instantiate-fresh-vars"
+  (destructuring-bind (verify) (list (lambda ()
              (let* ((v (fresh-type-var :name 'a))
                     (fn-type (make-type-arrow-raw :params (list v) :return v))
                     (scheme (make-type-scheme (list v) fn-type))
                     (inst (instantiate scheme)))
-               (assert-type type-arrow inst)
+               (expect (typep inst 'type-arrow) :to-be-truthy)
                (let ((new-param (first (type-arrow-params inst)))
                      (new-ret (type-arrow-return inst)))
-                 (assert-type type-var new-param)
-                 (assert-false (type-var-equal-p new-param v))
-                 (assert-true (type-var-equal-p new-param new-ret))))))
-          ("monomorphic-scheme"
-           (lambda ()
+                 (expect (typep new-param 'type-var) :to-be-truthy)
+                 (expect (type-var-equal-p new-param v) :to-be-falsy)
+                 (expect (type-var-equal-p new-param new-ret) :to-be-truthy)))))
+    (funcall verify)))
+
+(it-sequential "generalize-and-scheme-ops monomorphic-scheme"
+  (destructuring-bind (verify) (list (lambda ()
              (let ((scheme (type-to-scheme type-int)))
-               (assert-type type-scheme scheme)
-               (assert-null (type-scheme-quantified-vars scheme))
-               (assert-type-equal (type-scheme-type scheme) type-int)))))
-  (verify)
-  (funcall verify))
+               (expect (typep scheme 'type-scheme) :to-be-truthy)
+               (expect (type-scheme-quantified-vars scheme) :to-be-null)
+               (assert-type-equal (type-scheme-type scheme) type-int))))
+    (funcall verify)))

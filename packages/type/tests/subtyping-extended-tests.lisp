@@ -6,7 +6,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite subtyping-suite)
 
 (defmacro assert-subtyping-expected-case (expected then-form else-form)
   `(if ,expected
@@ -15,100 +14,164 @@
 
 ;;; ─── is-subtype-p — extended reflexivity and hierarchy ───────────────────────
 
-(deftest-each is-subtype-reflexive
-  "Every type is a subtype of itself."
-  :cases (("int"    type-int)
-          ("string" type-string)
-          ("bool"   type-bool)
-          ("null"   type-null))
-  (tp)
-  (assert-true (cl-cc/type:is-subtype-p tp tp)))
+(it-sequential "is-subtype-reflexive int"
+  (destructuring-bind (tp) (list type-int)
+    (expect (cl-cc/type:is-subtype-p tp tp) :to-be-truthy)))
 
-(deftest-each is-subtype-primitive-hierarchy
-  "CL numeric type hierarchy is correctly encoded."
-  :cases (("fixnum<integer"   'fixnum  'integer  t)
-          ("integer<rational" 'integer 'rational t)
-          ("rational<real"    'rational 'real    t)
-          ("float<real"       'float   'real     t)
-          ("real<number"      'real    'number   t)
-          ("fixnum<number"    'fixnum  'number   t)
-          ("number<t"         'number  't        t)
-          ("int not<string"   'fixnum  'string   nil))
-  (name1 name2 expected)
-  (assert-subtyping-expected-case expected
-    (assert-true  (cl-cc/type:type-name-subtype-p name1 name2))
-    (assert-false (cl-cc/type:type-name-subtype-p name1 name2))))
+(it-sequential "is-subtype-reflexive string"
+  (destructuring-bind (tp) (list type-string)
+    (expect (cl-cc/type:is-subtype-p tp tp) :to-be-truthy)))
 
-(deftest-each is-subtype-of-top-type
-  "Every primitive type is a subtype of type-any."
-  :cases (("int"    type-int)
-          ("string" type-string)
-          ("bool"   type-bool))
-  (tp)
-  (assert-true (cl-cc/type:is-subtype-p tp type-any)))
+(it-sequential "is-subtype-reflexive bool"
+  (destructuring-bind (tp) (list type-bool)
+    (expect (cl-cc/type:is-subtype-p tp tp) :to-be-truthy)))
 
-(deftest is-subtype-unknown-gradual
-  "type-unknown is consistent with everything (gradual typing escape hatch)."
-  (let ((unk cl-cc/type:+type-unknown+))
-    (assert-true (cl-cc/type:is-subtype-p unk  type-int))
-    (assert-true (cl-cc/type:is-subtype-p type-int unk))))
+(it-sequential "is-subtype-reflexive null"
+  (destructuring-bind (tp) (list type-null)
+    (expect (cl-cc/type:is-subtype-p tp tp) :to-be-truthy)))
 
-(deftest-each is-subtype-union-right
-  "T <: (T1 | T2) iff T <: T1 or T <: T2."
-  :cases (("int in or-int-string"  type-int    t)
-          ("string in or"          type-string  t)
-          ("bool not in"           type-bool    nil))
-  (tp expected)
-  (let ((u (make-type-union (list type-int type-string))))
+(it-sequential "is-subtype-primitive-hierarchy fixnum<integer"
+  (destructuring-bind (name1 name2 expected) (list 'fixnum 'integer t)
     (assert-subtyping-expected-case expected
-      (assert-true  (cl-cc/type:is-subtype-p tp u))
-      (assert-false (cl-cc/type:is-subtype-p tp u)))))
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
 
-(deftest is-subtype-function-contravariant-params
-  "(A->B) <: (C->D) iff C <: A (contravariant params)."
+(it-sequential "is-subtype-primitive-hierarchy integer<rational"
+  (destructuring-bind (name1 name2 expected) (list 'integer 'rational t)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-primitive-hierarchy rational<real"
+  (destructuring-bind (name1 name2 expected) (list 'rational 'real t)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-primitive-hierarchy float<real"
+  (destructuring-bind (name1 name2 expected) (list 'float 'real t)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-primitive-hierarchy real<number"
+  (destructuring-bind (name1 name2 expected) (list 'real 'number t)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-primitive-hierarchy fixnum<number"
+  (destructuring-bind (name1 name2 expected) (list 'fixnum 'number t)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-primitive-hierarchy number<t"
+  (destructuring-bind (name1 name2 expected) (list 'number 't t)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-primitive-hierarchy int not<string"
+  (destructuring-bind (name1 name2 expected) (list 'fixnum 'string nil)
+    (assert-subtyping-expected-case expected
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-truthy)
+    (expect (cl-cc/type:type-name-subtype-p name1 name2) :to-be-falsy))))
+
+(it-sequential "is-subtype-of-top-type int"
+  (destructuring-bind (tp) (list type-int)
+    (expect (cl-cc/type:is-subtype-p tp type-any) :to-be-truthy)))
+
+(it-sequential "is-subtype-of-top-type string"
+  (destructuring-bind (tp) (list type-string)
+    (expect (cl-cc/type:is-subtype-p tp type-any) :to-be-truthy)))
+
+(it-sequential "is-subtype-of-top-type bool"
+  (destructuring-bind (tp) (list type-bool)
+    (expect (cl-cc/type:is-subtype-p tp type-any) :to-be-truthy)))
+
+(it-sequential "is-subtype-unknown-gradual"
+  (let ((unk cl-cc/type:+type-unknown+))
+    (expect (cl-cc/type:is-subtype-p unk  type-int) :to-be-truthy)
+    (expect (cl-cc/type:is-subtype-p type-int unk) :to-be-truthy)))
+
+(it-sequential "is-subtype-union-right int in or-int-string"
+  (destructuring-bind (tp expected) (list type-int t)
+    (let ((u (make-type-union (list type-int type-string))))
+    (assert-subtyping-expected-case expected
+      (expect (cl-cc/type:is-subtype-p tp u) :to-be-truthy)
+      (expect (cl-cc/type:is-subtype-p tp u) :to-be-falsy)))))
+
+(it-sequential "is-subtype-union-right string in or"
+  (destructuring-bind (tp expected) (list type-string t)
+    (let ((u (make-type-union (list type-int type-string))))
+    (assert-subtyping-expected-case expected
+      (expect (cl-cc/type:is-subtype-p tp u) :to-be-truthy)
+      (expect (cl-cc/type:is-subtype-p tp u) :to-be-falsy)))))
+
+(it-sequential "is-subtype-union-right bool not in"
+  (destructuring-bind (tp expected) (list type-bool nil)
+    (let ((u (make-type-union (list type-int type-string))))
+    (assert-subtyping-expected-case expected
+      (expect (cl-cc/type:is-subtype-p tp u) :to-be-truthy)
+      (expect (cl-cc/type:is-subtype-p tp u) :to-be-falsy)))))
+
+(it-sequential "is-subtype-function-contravariant-params"
   (let ((f1 (make-type-arrow (list (make-type-primitive :name 'number)) type-string))
         (f2 (make-type-arrow (list (make-type-primitive :name 'fixnum))  type-string)))
-    (assert-true (cl-cc/type:is-subtype-p f1 f2))))
+    (expect (cl-cc/type:is-subtype-p f1 f2) :to-be-truthy)))
 
 ;;; ─── type-join / type-meet — extended lattice coverage ──────────────────────
 
-(deftest-each type-join-meet-equal-types
-  "join and meet of identical types each return the type itself."
-  :cases (("join-int"    #'cl-cc/type:type-join type-int)
-          ("join-string" #'cl-cc/type:type-join type-string)
-          ("join-bool"   #'cl-cc/type:type-join type-bool)
-          ("meet-int"    #'cl-cc/type:type-meet type-int)
-          ("meet-string" #'cl-cc/type:type-meet type-string))
-  (op tp)
-  (assert-true (type-equal-p tp (funcall op tp tp))))
+(it-sequential "type-join-meet-equal-types join-int"
+  (destructuring-bind (op tp) (list #'cl-cc/type:type-join type-int)
+    (expect (type-equal-p tp (funcall op tp tp)) :to-be-truthy)))
 
-(deftest-each type-lattice-join-meet-subtype
-  "join picks the supertype; meet picks the subtype (fixnum <: integer)."
-  :cases (("join" #'cl-cc/type:type-join 'integer)
-          ("meet" #'cl-cc/type:type-meet 'fixnum))
-  (op expected-name)
-  (let* ((fixnum-t  (make-type-primitive :name 'fixnum))
+(it-sequential "type-join-meet-equal-types join-string"
+  (destructuring-bind (op tp) (list #'cl-cc/type:type-join type-string)
+    (expect (type-equal-p tp (funcall op tp tp)) :to-be-truthy)))
+
+(it-sequential "type-join-meet-equal-types join-bool"
+  (destructuring-bind (op tp) (list #'cl-cc/type:type-join type-bool)
+    (expect (type-equal-p tp (funcall op tp tp)) :to-be-truthy)))
+
+(it-sequential "type-join-meet-equal-types meet-int"
+  (destructuring-bind (op tp) (list #'cl-cc/type:type-meet type-int)
+    (expect (type-equal-p tp (funcall op tp tp)) :to-be-truthy)))
+
+(it-sequential "type-join-meet-equal-types meet-string"
+  (destructuring-bind (op tp) (list #'cl-cc/type:type-meet type-string)
+    (expect (type-equal-p tp (funcall op tp tp)) :to-be-truthy)))
+
+(it-sequential "type-lattice-join-meet-subtype join"
+  (destructuring-bind (op expected-name) (list #'cl-cc/type:type-join 'integer)
+    (let* ((fixnum-t  (make-type-primitive :name 'fixnum))
          (integer-t (make-type-primitive :name 'integer))
          (result    (funcall op fixnum-t integer-t)))
-    (assert-true (type-primitive-p result))
-    (assert-eq expected-name (type-primitive-name result))))
+    (expect (type-primitive-p result) :to-be-truthy)
+    (expect (type-primitive-name result) :to-be expected-name))))
 
-(deftest type-join-incompatible-makes-union
-  "join(fixnum, string) returns their LCA in the CL hierarchy (t, the top type)."
+(it-sequential "type-lattice-join-meet-subtype meet"
+  (destructuring-bind (op expected-name) (list #'cl-cc/type:type-meet 'fixnum)
+    (let* ((fixnum-t  (make-type-primitive :name 'fixnum))
+         (integer-t (make-type-primitive :name 'integer))
+         (result    (funcall op fixnum-t integer-t)))
+    (expect (type-primitive-p result) :to-be-truthy)
+    (expect (type-primitive-name result) :to-be expected-name))))
+
+(it-sequential "type-join-incompatible-makes-union"
   (let* ((fixnum-t (make-type-primitive :name 'fixnum))
          (string-t (make-type-primitive :name 'string))
          (result   (cl-cc/type:type-join fixnum-t string-t)))
-    (assert-true (type-primitive-p result))
-    (assert-eq 't (type-primitive-name result))))
+    (expect (type-primitive-p result) :to-be-truthy)
+    (expect (type-primitive-name result) :to-be 't)))
 
-(deftest type-join-with-unknown-is-other
-  "join(??, T) = T (gradual: unknown absorbs into concrete side)."
+(it-sequential "type-join-with-unknown-is-other"
   (let* ((unk cl-cc/type:+type-unknown+)
          (result (cl-cc/type:type-join unk type-int)))
-    (assert-true (type-equal-p type-int result))))
+    (expect (type-equal-p type-int result) :to-be-truthy)))
 
-(deftest type-meet-incompatible-makes-intersection
-  "meet(fixnum, string) = (and fixnum string) — uninhabited but structurally valid."
+(it-sequential "type-meet-incompatible-makes-intersection"
   (let ((result (cl-cc/type:type-meet type-int type-string)))
-    (assert-true (type-intersection-p result))
-    (assert-= 2 (length (type-intersection-types result)))))
+    (expect (type-intersection-p result) :to-be-truthy)
+    (expect (= 2 (length (type-intersection-types result))) :to-be-truthy)))

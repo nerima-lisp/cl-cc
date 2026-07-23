@@ -2,14 +2,11 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
-(deftest checker-interface-ready
-  "checker.lisp exposes a testable readiness predicate for the bidirectional checker boundary."
-  (assert-true (cl-cc/type::checker-interface-ready-p)))
+(it-sequential "checker-interface-ready"
+  (expect (cl-cc/type::checker-interface-ready-p) :to-be-truthy))
 
-(deftest checker-rigid-constructor-available
-  "checker boundary exposes the canonical rigid constructor path."
+(it-sequential "checker-rigid-constructor-available"
   (let ((sk (cl-cc/type:fresh-rigid-var 'alpha)))
-    (assert-true (cl-cc/type:type-rigid-p sk))
-    (assert-eq 'alpha (cl-cc/type:type-rigid-name sk))))
+    (expect (cl-cc/type:type-rigid-p sk) :to-be-truthy)
+    (expect (cl-cc/type:type-rigid-name sk) :to-be 'alpha)))

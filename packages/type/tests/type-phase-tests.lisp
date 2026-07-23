@@ -5,176 +5,204 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Phase 4-6: Parser Integration Tests
 
-(deftest parse-type-specifier-forall
-  "parse-type-specifier: forall form produces a type-forall binding the named variable."
+(it-sequential "parse-type-specifier-forall"
   (let ((result (cl-cc/type:parse-type-specifier '(forall a (-> a a)))))
-    (assert-true (type-forall-p result))
-    (assert-eq 'a (type-var-name (type-forall-var result)))))
+    (expect (type-forall-p result) :to-be-truthy)
+    (expect (type-var-name (type-forall-var result)) :to-be 'a)))
 
-(deftest parse-type-specifier-effectful-arrow
-  "parse-type-specifier: effectful arrow (-> ! io) has one effect in the effects slot."
+(it-sequential "parse-type-specifier-effectful-arrow"
   (let ((result (cl-cc/type:parse-type-specifier '(-> fixnum fixnum ! io))))
-    (assert-true (type-arrow-p result))
-    (assert-= 1 (length (type-arrow-params result)))
-    (assert-true (type-equal-p type-int (type-arrow-return result)))
+    (expect (type-arrow-p result) :to-be-truthy)
+    (expect (= 1 (length (type-arrow-params result))) :to-be-truthy)
+    (expect (type-equal-p type-int (type-arrow-return result)) :to-be-truthy)
     (let ((effs (type-arrow-effects result)))
-      (assert-true (type-effect-row-p effs))
-      (assert-= 1 (length (type-effect-row-effects effs))))))
+      (expect (type-effect-row-p effs) :to-be-truthy)
+      (expect (= 1 (length (type-effect-row-effects effs))) :to-be-truthy))))
 
-(deftest parse-type-specifier-qualified
-  "parse-type-specifier: => form produces a type-qualified with one named constraint."
+(it-sequential "parse-type-specifier-qualified"
   (let ((result (cl-cc/type:parse-type-specifier '(=> (num a) (-> a a a)))))
-    (assert-true (type-qualified-p result))
-    (assert-= 1 (length (type-qualified-constraints result)))
+    (expect (type-qualified-p result) :to-be-truthy)
+    (expect (= 1 (length (type-qualified-constraints result))) :to-be-truthy)
     (let ((constraint (first (type-qualified-constraints result))))
-      (assert-string= "NUM"
-                      (symbol-name (cl-cc/type:type-constraint-class-name constraint))))))
+      (expect (symbol-name (cl-cc/type:type-constraint-class-name constraint)) :to-equal "NUM"))))
 
 ;;; Phase A: Inference Bug Fixes
 
-(deftest-each phase-a-infer-args-cases
-  "infer-args: empty list → nil; list of (1 \"hello\") → 2 types (int, string)."
-  :cases (("empty"    nil    0)
-          ("multiple" t      2))
-  (use-args-p expected-count)
-  (reset-type-vars!)
-  (let* ((args (if use-args-p
+(it-sequential "phase-a-infer-args-cases empty"
+  (destructuring-bind (use-args-p expected-count) (list nil 0)
+    (reset-type-vars!) (let* ((args (if use-args-p
                    (list (lower-sexp-to-ast 1) (lower-sexp-to-ast "hello"))
                    '()))
          (env (type-env-empty)))
     (multiple-value-bind (types subst)
         (cl-cc/type:infer-args args env)
       (declare (ignore subst))
-      (assert-= expected-count (length types))
+      (expect (= expected-count (length types)) :to-be-truthy)
       (when use-args-p
-        (assert-true (type-equal-p type-int    (first  types)))
-        (assert-true (type-equal-p type-string (second types)))))))
+        (expect (type-equal-p type-int    (first  types)) :to-be-truthy)
+        (expect (type-equal-p type-string (second types)) :to-be-truthy))))))
 
-(deftest phase-a-union-unification-matches-member
-  "Unifying a union type with one of its members succeeds."
+(it-sequential "phase-a-infer-args-cases multiple"
+  (destructuring-bind (use-args-p expected-count) (list t 2)
+    (reset-type-vars!) (let* ((args (if use-args-p
+                   (list (lower-sexp-to-ast 1) (lower-sexp-to-ast "hello"))
+                   '()))
+         (env (type-env-empty)))
+    (multiple-value-bind (types subst)
+        (cl-cc/type:infer-args args env)
+      (declare (ignore subst))
+      (expect (= expected-count (length types)) :to-be-truthy)
+      (when use-args-p
+        (expect (type-equal-p type-int    (first  types)) :to-be-truthy)
+        (expect (type-equal-p type-string (second types)) :to-be-truthy))))))
+
+(it-sequential "phase-a-union-unification-matches-member"
   (let* ((u (cl-cc/type:make-type-union (list type-int type-string))))
     (multiple-value-bind (subst ok) (type-unify u type-int)
       (declare (ignore subst))
-      (assert-true ok))))
+      (expect ok :to-be-truthy))))
 
-(deftest phase-a-empty-progn-infers-to-non-nil
-  "An empty progn infers to type-null, type-unknown, or any other non-nil type."
+(it-sequential "phase-a-empty-progn-infers-to-non-nil"
   (reset-type-vars!)
   (handler-case
     (let* ((ast (lower-sexp-to-ast '(progn))))
       (multiple-value-bind (ty subst) (infer-with-env ast)
         (declare (ignore subst))
-        (assert-true (or (type-equal-p ty type-null)
+        (expect (or (type-equal-p ty type-null)
                          (cl-cc/type:type-unknown-p ty)
-                         (not (null ty))))))
-    (error () (assert-true t))))
+                         (not (null ty))) :to-be-truthy)))
+    (error () (expect t :to-be-truthy))))
 
 ;;; Phase C: Typeclass Dictionary Passing
 
-(deftest phase-c-dict-env-operations
-  "dict-env-extend stores/lookup retrieves method dict; multiple independent classes coexist."
+(it-sequential "phase-c-dict-env-operations"
   (let* ((methods (list (cons 'plus #'+) (cons 'zero 0)))
          (env0 (type-env-empty))
          (env1 (cl-cc/type:dict-env-extend 'num type-int methods env0))
          (found (cl-cc/type:dict-env-lookup 'num type-int env1)))
-    (assert-true found)
-    (assert-= 2 (length found)))
+    (expect found :to-be-truthy)
+    (expect (= 2 (length found)) :to-be-truthy))
   (let* ((env0 (type-env-empty))
          (env1 (cl-cc/type:dict-env-extend 'eq  type-int '((eq-p  . #'equal)) env0))
          (env2 (cl-cc/type:dict-env-extend 'num type-int '((plus  . #'+))     env1)))
-    (assert-true (cl-cc/type:dict-env-lookup 'eq  type-int env2))
-    (assert-true (cl-cc/type:dict-env-lookup 'num type-int env2))))
+    (expect (cl-cc/type:dict-env-lookup 'eq  type-int env2) :to-be-truthy)
+    (expect (cl-cc/type:dict-env-lookup 'num type-int env2) :to-be-truthy)))
 
-(deftest-each phase-c-dict-env-miss
-  "dict-env-lookup returns nil for a wrong type or wrong class key."
-  :cases (("wrong-type"  'num type-string)
-          ("wrong-class" 'ord type-int))
-  (class-name ty)
-  (let* ((env0 (type-env-empty))
+(it-sequential "phase-c-dict-env-miss wrong-type"
+  (destructuring-bind (class-name ty) (list 'num type-string)
+    (let* ((env0 (type-env-empty))
          (env1 (cl-cc/type:dict-env-extend 'num type-int '() env0)))
-    (assert-null (cl-cc/type:dict-env-lookup class-name ty env1))))
+    (expect (cl-cc/type:dict-env-lookup class-name ty env1) :to-be-null))))
+
+(it-sequential "phase-c-dict-env-miss wrong-class"
+  (destructuring-bind (class-name ty) (list 'ord type-int)
+    (let* ((env0 (type-env-empty))
+         (env1 (cl-cc/type:dict-env-extend 'num type-int '() env0)))
+    (expect (cl-cc/type:dict-env-lookup class-name ty env1) :to-be-null))))
 
 
 ;;; Phase D: Row-Based Effect Type Inference
 
-(deftest-each phase-d-effect-row-union-count
-  "effect-row-union result contains the expected number of effects."
-  :cases (("io+state-merges" 2 '(io)  '(state))
-          ("io+pure-left"    1 '(io)  '())
-          ("io+pure-right"   1 '()    '(io)))
-  (expected-count a-names b-names)
-  (let* ((row-a (apply #'%make-effect-row a-names))
+(it-sequential "phase-d-effect-row-union-count io+state-merges"
+  (destructuring-bind (expected-count a-names b-names) (list 2 '(io) '(state))
+    (let* ((row-a (apply #'%make-effect-row a-names))
          (row-b (apply #'%make-effect-row b-names))
          (union (cl-cc/type:effect-row-union row-a row-b)))
-    (assert-true (type-effect-row-p union))
-    (assert-= expected-count (length (type-effect-row-effects union)))))
+    (expect (type-effect-row-p union) :to-be-truthy)
+    (expect (= expected-count (length (type-effect-row-effects union))) :to-be-truthy))))
 
-(deftest-each phase-d-infer-effects-pure-forms
-  "infer-effects returns empty row for pure expressions (arithmetic, let binding)."
-  :cases (("pure-arithmetic" '(+ 1 2))
-          ("pure-let"        '(let ((x 42)) x)))
-  (form)
-  (reset-type-vars!)
-  (let* ((ast (lower-sexp-to-ast form))
+(it-sequential "phase-d-effect-row-union-count io+pure-left"
+  (destructuring-bind (expected-count a-names b-names) (list 1 '(io) '())
+    (let* ((row-a (apply #'%make-effect-row a-names))
+         (row-b (apply #'%make-effect-row b-names))
+         (union (cl-cc/type:effect-row-union row-a row-b)))
+    (expect (type-effect-row-p union) :to-be-truthy)
+    (expect (= expected-count (length (type-effect-row-effects union))) :to-be-truthy))))
+
+(it-sequential "phase-d-effect-row-union-count io+pure-right"
+  (destructuring-bind (expected-count a-names b-names) (list 1 '() '(io))
+    (let* ((row-a (apply #'%make-effect-row a-names))
+         (row-b (apply #'%make-effect-row b-names))
+         (union (cl-cc/type:effect-row-union row-a row-b)))
+    (expect (type-effect-row-p union) :to-be-truthy)
+    (expect (= expected-count (length (type-effect-row-effects union))) :to-be-truthy))))
+
+(it-sequential "phase-d-infer-effects-pure-forms pure-arithmetic"
+  (destructuring-bind (form) (list '(+ 1 2))
+    (reset-type-vars!) (let* ((ast (lower-sexp-to-ast form))
          (row (cl-cc/type:infer-effects ast (type-env-empty))))
-    (assert-true (type-effect-row-p row))
-    (assert-null (type-effect-row-effects row))))
+    (expect (type-effect-row-p row) :to-be-truthy)
+    (expect (type-effect-row-effects row) :to-be-null))))
+
+(it-sequential "phase-d-infer-effects-pure-forms pure-let"
+  (destructuring-bind (form) (list '(let ((x 42)) x))
+    (reset-type-vars!) (let* ((ast (lower-sexp-to-ast form))
+         (row (cl-cc/type:infer-effects ast (type-env-empty))))
+    (expect (type-effect-row-p row) :to-be-truthy)
+    (expect (type-effect-row-effects row) :to-be-null))))
 
 (defun %make-effect-row (&rest names)
   (make-type-effect-row :effects (mapcar (lambda (n) (make-type-effect-op :name n :args nil)) names) :row-var nil))
 
-(deftest-each phase-d-effect-row-subset
-  "effect-row-subset-p: smaller ⊆ larger; larger ⊄ smaller; pure ⊆ any."
-  :cases (("smaller-of-larger"     t   '(io)       '(io state))
-          ("larger-not-of-smaller" nil '(io state) '(io))
-          ("pure-is-subset-of-any" t   '()         '(io)))
-  (expected sub-names sup-names)
-  (let ((sub (apply #'%make-effect-row sub-names))
+(it-sequential "phase-d-effect-row-subset smaller-of-larger"
+  (destructuring-bind (expected sub-names sup-names) (list t '(io) '(io state))
+    (let ((sub (apply #'%make-effect-row sub-names))
         (sup (apply #'%make-effect-row sup-names)))
     (if expected
-        (assert-true (cl-cc/type:effect-row-subset-p sub sup))
-        (assert-false (cl-cc/type:effect-row-subset-p sub sup)))))
+        (expect (cl-cc/type:effect-row-subset-p sub sup) :to-be-truthy)
+        (expect (cl-cc/type:effect-row-subset-p sub sup) :to-be-falsy)))))
+
+(it-sequential "phase-d-effect-row-subset larger-not-of-smaller"
+  (destructuring-bind (expected sub-names sup-names) (list nil '(io state) '(io))
+    (let ((sub (apply #'%make-effect-row sub-names))
+        (sup (apply #'%make-effect-row sup-names)))
+    (if expected
+        (expect (cl-cc/type:effect-row-subset-p sub sup) :to-be-truthy)
+        (expect (cl-cc/type:effect-row-subset-p sub sup) :to-be-falsy)))))
+
+(it-sequential "phase-d-effect-row-subset pure-is-subset-of-any"
+  (destructuring-bind (expected sub-names sup-names) (list t '() '(io))
+    (let ((sub (apply #'%make-effect-row sub-names))
+        (sup (apply #'%make-effect-row sup-names)))
+    (if expected
+        (expect (cl-cc/type:effect-row-subset-p sub sup) :to-be-truthy)
+        (expect (cl-cc/type:effect-row-subset-p sub sup) :to-be-falsy)))))
 
 ;;; Phase E: Rank-N Polymorphism
 
-(deftest phase-e-skolem-creation-and-equality
-  "fresh-rigid-var creates unique rigid variables; equality compares by identity."
+(it-sequential "phase-e-skolem-creation-and-equality"
   (let* ((sk1 (cl-cc/type:fresh-rigid-var 'a))
          (sk2 (cl-cc/type:fresh-rigid-var 'a))
          (sk3 (cl-cc/type:fresh-rigid-var 'b)))
-    (assert-true (cl-cc/type:type-rigid-p sk1))
-    (assert-true (cl-cc/type:type-rigid-p sk2))
+    (expect (cl-cc/type:type-rigid-p sk1) :to-be-truthy)
+    (expect (cl-cc/type:type-rigid-p sk2) :to-be-truthy)
     ;; Two fresh skolems with same name are distinct (unique IDs)
-    (assert-false (cl-cc/type:type-rigid-equal-p sk1 sk2))
-    (assert-eq 'a (cl-cc/type:type-rigid-name sk1))
+    (expect (cl-cc/type:type-rigid-equal-p sk1 sk2) :to-be-falsy)
+    (expect (cl-cc/type:type-rigid-name sk1) :to-be 'a)
     ;; Same skolem is equal to itself
-    (assert-true (cl-cc/type:type-rigid-equal-p sk3 sk3))))
+    (expect (cl-cc/type:type-rigid-equal-p sk3 sk3) :to-be-truthy)))
 
-(deftest phase-e-skolem-escape-absent
-  "A freshly created skolem does not escape an empty substitution."
+(it-sequential "phase-e-skolem-escape-absent"
   (let* ((sk (cl-cc/type:fresh-rigid-var 'a))
          (escaped (cl-cc/type:check-skolem-escape sk (make-substitution))))
-    (assert-null escaped)))
+    (expect escaped :to-be-null)))
 
-(deftest phase-e-check-lambda-against-forall
-  "Checking (lambda (x) x) against a forall type succeeds or returns nil without signaling."
+(it-sequential "phase-e-check-lambda-against-forall"
   (reset-type-vars!)
   (let* ((a      (fresh-type-var :name 'a))
          (fa     (make-type-forall :var a :body (make-type-arrow (list a) a)))
          (id-ast (lower-sexp-to-ast '(lambda (x) x)))
          (env    (type-env-empty)))
-    (assert-true (or (null (check id-ast fa env)) t))))
+    (expect (or (null (check id-ast fa env)) t) :to-be-truthy)))
 
-(deftest phase-e-synthesize-lambda-returns-function-type
-  "Synthesizing (lambda (x) x) returns a canonical arrow type with one parameter."
+(it-sequential "phase-e-synthesize-lambda-returns-function-type"
   (reset-type-vars!)
   (let* ((ast (lower-sexp-to-ast '(lambda (x) x)))
          (env (type-env-empty)))
     (multiple-value-bind (ty subst) (synthesize ast env)
       (declare (ignore subst))
-      (assert-true (typep ty 'type-arrow))
-      (assert-= 1 (length (type-arrow-params ty))))))
+      (expect (typep ty 'type-arrow) :to-be-truthy)
+      (expect (= 1 (length (type-arrow-params ty))) :to-be-truthy))))

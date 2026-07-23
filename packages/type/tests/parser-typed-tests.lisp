@@ -7,7 +7,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite parser-suite)
 
 (defmacro assert-type-expected-case (expected then-form else-form)
   `(if ,expected
@@ -16,185 +15,230 @@
 
 ;;; ─── Row types: Record / Variant ─────────────────────────────────────────
 
-(deftest parse-record-closed
-  "A closed record form produces a type-record with 2 fields and no row-var."
+(it-sequential "parse-record-closed"
   (let ((ty (cl-cc/type:parse-type-specifier '(record (x fixnum) (y string)))))
-    (assert-true (type-record-p ty))
-    (assert-equal 2 (length (type-record-fields ty)))
-    (assert-null (cl-cc/type:type-record-row-var ty))))
+    (expect (type-record-p ty) :to-be-truthy)
+    (expect (length (type-record-fields ty)) :to-equal 2)
+    (expect (cl-cc/type:type-record-row-var ty) :to-be-null)))
 
-(deftest parse-record-open
-  "An open record form produces a type-record with 1 field and a non-nil row-var."
+(it-sequential "parse-record-open"
   (let ((ty (cl-cc/type:parse-type-specifier
              `(record (x fixnum) ,(intern "|" :cl-cc/type) rho))))
-    (assert-true (type-record-p ty))
-    (assert-equal 1 (length (type-record-fields ty)))
-    (assert-true (not (null (cl-cc/type:type-record-row-var ty))))))
+    (expect (type-record-p ty) :to-be-truthy)
+    (expect (length (type-record-fields ty)) :to-equal 1)
+    (expect (not (null (cl-cc/type:type-record-row-var ty))) :to-be-truthy)))
 
-(deftest parse-variant-form
-  "A variant form produces a type-variant with 2 cases."
+(it-sequential "parse-variant-form"
   (let ((ty (cl-cc/type:parse-type-specifier '(variant (some fixnum) (none null)))))
-    (assert-true (type-variant-p ty))
-    (assert-equal 2 (length (cl-cc/type:type-variant-cases ty)))))
+    (expect (type-variant-p ty) :to-be-truthy)
+    (expect (length (cl-cc/type:type-variant-cases ty)) :to-equal 2)))
 
 ;;; ─── Type application fallback ───────────────────────────────────────────
 
-(deftest-each parse-type-app-cases
-  "type-app fallback: single-arg resolves to app; multi-arg chains nested apps."
-  :cases (("single-arg" '(maybe fixnum) nil)
-          ("multi-arg"  '(f a b)        t))
-  (form expect-nested)
-  (let ((ty (cl-cc/type:parse-type-specifier form)))
-    (assert-true (type-app-p ty))
+(it-sequential "parse-type-app-cases single-arg"
+  (destructuring-bind (form expect-nested) (list '(maybe fixnum) nil)
+    (let ((ty (cl-cc/type:parse-type-specifier form)))
+    (expect (type-app-p ty) :to-be-truthy)
     (if expect-nested
-        (assert-true (type-app-p (cl-cc/type:type-app-fun ty)))
-        (assert-true (type-primitive-p (cl-cc/type:type-app-fun ty))))))
+        (expect (type-app-p (cl-cc/type:type-app-fun ty)) :to-be-truthy)
+        (expect (type-primitive-p (cl-cc/type:type-app-fun ty)) :to-be-truthy)))))
+
+(it-sequential "parse-type-app-cases multi-arg"
+  (destructuring-bind (form expect-nested) (list '(f a b) t)
+    (let ((ty (cl-cc/type:parse-type-specifier form)))
+    (expect (type-app-p ty) :to-be-truthy)
+    (if expect-nested
+        (expect (type-app-p (cl-cc/type:type-app-fun ty)) :to-be-truthy)
+        (expect (type-primitive-p (cl-cc/type:type-app-fun ty)) :to-be-truthy)))))
 
 ;;; ─── Constraint spec parsing ─────────────────────────────────────────────
 
-(deftest-each parse-constraint-spec-cases
-  "parse-constraint-spec: list → canonical type-constraint; atom → type-parse-error."
-  :cases (("basic" '(num fixnum) nil)
-          ("error" 'num          t))
-  (input expect-error)
-  (if expect-error
-      (assert-signals cl-cc/type:type-parse-error
-        (cl-cc/type::parse-constraint-spec input))
+(it-sequential "parse-constraint-spec-cases basic"
+  (destructuring-bind (input expect-error) (list '(num fixnum) nil)
+    (if expect-error
+      (signals cl-cc/type:type-parse-error (cl-cc/type::parse-constraint-spec input))
       (let ((c (cl-cc/type::parse-constraint-spec input)))
-        (assert-true (cl-cc/type:type-constraint-p c))
-        (assert-eq 'num (cl-cc/type:type-constraint-class-name c)))))
+        (expect (cl-cc/type:type-constraint-p c) :to-be-truthy)
+        (expect (cl-cc/type:type-constraint-class-name c) :to-be 'num)))))
+
+(it-sequential "parse-constraint-spec-cases error"
+  (destructuring-bind (input expect-error) (list 'num t)
+    (if expect-error
+      (signals cl-cc/type:type-parse-error (cl-cc/type::parse-constraint-spec input))
+      (let ((c (cl-cc/type::parse-constraint-spec input)))
+        (expect (cl-cc/type:type-constraint-p c) :to-be-truthy)
+        (expect (cl-cc/type:type-constraint-class-name c) :to-be 'num)))))
 
 ;;; ─── Lambda list parsing ─────────────────────────────────────────────────
 
-(deftest parse-lambda-list-typed
-  "((x fixnum) (y string)) returns correct names and types."
+(it-sequential "parse-lambda-list-typed"
   (multiple-value-bind (names types)
       (cl-cc/type:parse-lambda-list-with-types '((x fixnum) (y string)))
-    (assert-equal '(x y) names)
-    (assert-equal 2 (length types))
-    (assert-true (type-equal-p type-int (first types)))
-    (assert-true (type-equal-p type-string (second types)))))
+    (expect names :to-equal '(x y))
+    (expect (length types) :to-equal 2)
+    (expect (type-equal-p type-int (first types)) :to-be-truthy)
+    (expect (type-equal-p type-string (second types)) :to-be-truthy)))
 
-(deftest parse-lambda-list-untyped
-  "(x y) returns type-any for each parameter."
+(it-sequential "parse-lambda-list-untyped"
   (multiple-value-bind (names types)
       (cl-cc/type:parse-lambda-list-with-types '(x y))
-    (assert-equal '(x y) names)
-    (assert-true (type-equal-p type-any (first types)))
-    (assert-true (type-equal-p type-any (second types)))))
+    (expect names :to-equal '(x y))
+    (expect (type-equal-p type-any (first types)) :to-be-truthy)
+    (expect (type-equal-p type-any (second types)) :to-be-truthy)))
 
-(deftest parse-lambda-list-mixed
-  "((x fixnum) y) mixes typed and untyped."
+(it-sequential "parse-lambda-list-mixed"
   (multiple-value-bind (names types)
       (cl-cc/type:parse-lambda-list-with-types '((x fixnum) y))
-    (assert-equal '(x y) names)
-    (assert-true (type-equal-p type-int (first types)))
-    (assert-true (type-equal-p type-any (second types)))))
+    (expect names :to-equal '(x y))
+    (expect (type-equal-p type-int (first types)) :to-be-truthy)
+    (expect (type-equal-p type-any (second types)) :to-be-truthy)))
 
-(deftest parse-lambda-list-empty
-  "() returns empty lists."
+(it-sequential "parse-lambda-list-empty"
   (multiple-value-bind (names types)
       (cl-cc/type:parse-lambda-list-with-types nil)
-    (assert-null names)
-    (assert-null types)))
+    (expect names :to-be-null)
+    (expect types :to-be-null)))
 
-(deftest parse-lambda-list-error
-  "Invalid item signals error."
-  (assert-signals cl-cc/type:type-parse-error
-    (cl-cc/type:parse-lambda-list-with-types '(42))))
+(it-sequential "parse-lambda-list-error"
+  (signals cl-cc/type:type-parse-error (cl-cc/type:parse-lambda-list-with-types '(42))))
 
 ;;; ─── parse-typed-parameter ───────────────────────────────────────────────
 
-(deftest-each parse-typed-parameter-cases
-  "parse-typed-parameter: (x fixnum)→int; bare x→any."
-  :cases (("typed" '(x fixnum) type-int)
-          ("bare"  'x          type-any))
-  (param expected-type)
-  (let ((result (cl-cc/type:parse-typed-parameter param)))
-    (assert-eq 'x (car result))
-    (assert-true (type-equal-p expected-type (cdr result)))))
+(it-sequential "parse-typed-parameter-cases typed"
+  (destructuring-bind (param expected-type) (list '(x fixnum) type-int)
+    (let ((result (cl-cc/type:parse-typed-parameter param)))
+    (expect (car result) :to-be 'x)
+    (expect (type-equal-p expected-type (cdr result)) :to-be-truthy))))
+
+(it-sequential "parse-typed-parameter-cases bare"
+  (destructuring-bind (param expected-type) (list 'x type-any)
+    (let ((result (cl-cc/type:parse-typed-parameter param)))
+    (expect (car result) :to-be 'x)
+    (expect (type-equal-p expected-type (cdr result)) :to-be-truthy))))
 
 ;;; ─── parse-typed-optional-parameter ──────────────────────────────────────
 
-(deftest-each parse-optional-parameter-cases
-  "parse-typed-optional-parameter: (x fixnum nil)→int; bare x→any."
-  :cases (("typed" '(x fixnum nil) type-int)
-          ("bare"  'x              type-any))
-  (param expected-type)
-  (let ((result (cl-cc/type:parse-typed-optional-parameter param)))
-    (assert-eq 'x (car result))
-    (assert-true (type-equal-p expected-type (cdr result)))))
+(it-sequential "parse-optional-parameter-cases typed"
+  (destructuring-bind (param expected-type) (list '(x fixnum nil) type-int)
+    (let ((result (cl-cc/type:parse-typed-optional-parameter param)))
+    (expect (car result) :to-be 'x)
+    (expect (type-equal-p expected-type (cdr result)) :to-be-truthy))))
+
+(it-sequential "parse-optional-parameter-cases bare"
+  (destructuring-bind (param expected-type) (list 'x type-any)
+    (let ((result (cl-cc/type:parse-typed-optional-parameter param)))
+    (expect (car result) :to-be 'x)
+    (expect (type-equal-p expected-type (cdr result)) :to-be-truthy))))
 
 ;;; ─── extract-return-type ─────────────────────────────────────────────────
 
-(deftest-each extract-return-type-cases
-  "extract-return-type: body with return-type declare → type-int; without or nil body → nil."
-  :cases (("with-declare" t   '((declare (return-type fixnum)) (+ x 1)))
-          ("no-declare"   nil '((+ x 1)))
-          ("nil-body"     nil nil))
-  (expected body)
-  (assert-type-expected-case expected
-    (assert-true (type-equal-p type-int (cl-cc/type:extract-return-type body)))
-    (assert-null (cl-cc/type:extract-return-type body))))
+(it-sequential "extract-return-type-cases with-declare"
+  (destructuring-bind (expected body) (list t '((declare (return-type fixnum)) (+ x 1)))
+    (assert-type-expected-case expected
+    (expect (type-equal-p type-int (cl-cc/type:extract-return-type body)) :to-be-truthy)
+    (expect (cl-cc/type:extract-return-type body) :to-be-null))))
+
+(it-sequential "extract-return-type-cases no-declare"
+  (destructuring-bind (expected body) (list nil '((+ x 1)))
+    (assert-type-expected-case expected
+    (expect (type-equal-p type-int (cl-cc/type:extract-return-type body)) :to-be-truthy)
+    (expect (cl-cc/type:extract-return-type body) :to-be-null))))
+
+(it-sequential "extract-return-type-cases nil-body"
+  (destructuring-bind (expected body) (list nil nil)
+    (assert-type-expected-case expected
+    (expect (type-equal-p type-int (cl-cc/type:extract-return-type body)) :to-be-truthy)
+    (expect (cl-cc/type:extract-return-type body) :to-be-null))))
 
 ;;; ─── Typed AST nodes ─────────────────────────────────────────────────────
 
-(deftest parse-typed-defun-basic
-  "parse-typed-defun creates ast-defun-typed."
+(it-sequential "parse-typed-defun-basic"
   (let ((node (cl-cc/type:parse-typed-defun '(defun foo ((x fixnum)) (+ x 1)))))
-    (assert-true (cl-cc/type::ast-defun-typed-p node))
-    (assert-eq 'foo (cl-cc/type:ast-defun-typed-name node))
-    (assert-equal '(x) (cl-cc/type:ast-defun-typed-params node))
-    (assert-equal 1 (length (cl-cc/type:ast-defun-typed-param-types node)))
-    (assert-true (type-equal-p type-int (first (cl-cc/type:ast-defun-typed-param-types node))))))
+    (expect (cl-cc/type::ast-defun-typed-p node) :to-be-truthy)
+    (expect (cl-cc/type:ast-defun-typed-name node) :to-be 'foo)
+    (expect (cl-cc/type:ast-defun-typed-params node) :to-equal '(x))
+    (expect (length (cl-cc/type:ast-defun-typed-param-types node)) :to-equal 1)
+    (expect (type-equal-p type-int (first (cl-cc/type:ast-defun-typed-param-types node))) :to-be-truthy)))
 
-(deftest parse-typed-lambda-basic
-  "parse-typed-lambda creates ast-lambda-typed."
+(it-sequential "parse-typed-lambda-basic"
   (let ((node (cl-cc/type:parse-typed-lambda '(lambda ((x fixnum)) (+ x 1)))))
-    (assert-true (cl-cc/type::ast-lambda-typed-p node))
-    (assert-equal '(x) (cl-cc/type:ast-lambda-typed-params node))
-    (assert-equal 1 (length (cl-cc/type:ast-lambda-typed-param-types node)))))
+    (expect (cl-cc/type::ast-lambda-typed-p node) :to-be-truthy)
+    (expect (cl-cc/type:ast-lambda-typed-params node) :to-equal '(x))
+    (expect (length (cl-cc/type:ast-lambda-typed-param-types node)) :to-equal 1)))
 
 ;;; ─── looks-like-type-specifier-p ─────────────────────────────────────────
 
-(deftest-each looks-like-type-specifier-p-cases
-  "looks-like-type-specifier-p: primitives, ?, compound forms → true; unknown → false."
-  :cases (("fixnum"         t   'fixnum)
-          ("string"         t   'string)
-          ("boolean"        t   'boolean)
-          ("question-mark"  t   '?)
-          ("or-composite"   t   '(or fixnum string))
-          ("function-type"  t   '(-> fixnum string))
-          ("values-type"    t   '(values fixnum string))
-          ("unknown-symbol" nil 'my-random-thing))
-  (expected form)
-  (assert-type-expected-case expected
-    (assert-true  (cl-cc/type:looks-like-type-specifier-p form))
-    (assert-false (cl-cc/type:looks-like-type-specifier-p form))))
+(it-sequential "looks-like-type-specifier-p-cases fixnum"
+  (destructuring-bind (expected form) (list t 'fixnum)
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases string"
+  (destructuring-bind (expected form) (list t 'string)
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases boolean"
+  (destructuring-bind (expected form) (list t 'boolean)
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases question-mark"
+  (destructuring-bind (expected form) (list t '?)
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases or-composite"
+  (destructuring-bind (expected form) (list t '(or fixnum string))
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases function-type"
+  (destructuring-bind (expected form) (list t '(-> fixnum string))
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases values-type"
+  (destructuring-bind (expected form) (list t '(values fixnum string))
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
+
+(it-sequential "looks-like-type-specifier-p-cases unknown-symbol"
+  (destructuring-bind (expected form) (list nil 'my-random-thing)
+    (assert-type-expected-case expected
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-truthy)
+    (expect (cl-cc/type:looks-like-type-specifier-p form) :to-be-falsy))))
 
 ;;; ─── parse-type-specifier-maybe ──────────────────────────────────────────
 
-(deftest-each parse-type-specifier-maybe-cases
-  "parse-type-specifier-maybe: recognized type → node; unknown → nil."
-  :cases (("known"   t   'fixnum)
-          ("unknown" nil 'my-random-thing))
-  (expected form)
-  (assert-type-expected-case expected
-    (assert-true (type-equal-p type-int (cl-cc/type::parse-type-specifier-maybe form)))
-    (assert-null (cl-cc/type::parse-type-specifier-maybe form))))
+(it-sequential "parse-type-specifier-maybe-cases known"
+  (destructuring-bind (expected form) (list t 'fixnum)
+    (assert-type-expected-case expected
+    (expect (type-equal-p type-int (cl-cc/type::parse-type-specifier-maybe form)) :to-be-truthy)
+    (expect (cl-cc/type::parse-type-specifier-maybe form) :to-be-null))))
+
+(it-sequential "parse-type-specifier-maybe-cases unknown"
+  (destructuring-bind (expected form) (list nil 'my-random-thing)
+    (assert-type-expected-case expected
+    (expect (type-equal-p type-int (cl-cc/type::parse-type-specifier-maybe form)) :to-be-truthy)
+    (expect (cl-cc/type::parse-type-specifier-maybe form) :to-be-null))))
 
 ;;; ─── make-type-arrow ─────────────────────────────────────────────────────
 
-(deftest make-type-arrow-basic
-  "Creates arrow type from param-types and return-type."
+(it-sequential "make-type-arrow-basic"
   (let ((ty (cl-cc/type:make-type-arrow (list type-int) type-string)))
-    (assert-true (type-arrow-p ty))
-    (assert-equal 1 (length (type-arrow-params ty)))
-    (assert-true (type-equal-p type-string (type-arrow-return ty)))))
+    (expect (type-arrow-p ty) :to-be-truthy)
+    (expect (length (type-arrow-params ty)) :to-equal 1)
+    (expect (type-equal-p type-string (type-arrow-return ty)) :to-be-truthy)))
 
 ;;; ─── Error on non-s-expression ───────────────────────────────────────────
 
-(deftest parse-invalid-atom
-  "Non-symbol non-nil atom signals error."
-  (assert-signals cl-cc/type:type-parse-error
-    (cl-cc/type:parse-type-specifier 42)))
+(it-sequential "parse-invalid-atom"
+  (signals cl-cc/type:type-parse-error (cl-cc/type:parse-type-specifier 42)))

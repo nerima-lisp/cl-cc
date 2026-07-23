@@ -5,153 +5,180 @@
 
 (in-package :cl-cc/test)
 
-(defsuite kind-suite :description "Kind system tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite kind-suite)
 ;;; ─── kind struct predicates ──────────────────────────────────────────────────
 
-(deftest-each kind-singleton-predicates
-  "Each kind singleton constant is recognized by its own predicate."
-  :cases (("type"         #'kind-type-p              +kind-type+)
-          ("effect"       #'kind-effect-p             +kind-effect+)
-          ("constraint"   #'cl-cc/type:kind-constraint-p   +kind-constraint+)
-          ("multiplicity" #'cl-cc/type:kind-multiplicity-p +kind-multiplicity+))
-  (pred-fn kind)
-  (assert-true (funcall pred-fn kind)))
+(it-sequential "kind-singleton-predicates type"
+  (destructuring-bind (pred-fn kind) (list #'kind-type-p +kind-type+)
+    (expect (funcall pred-fn kind) :to-be-truthy)))
 
-(deftest-each kind-row-singletons
-  "Row kind singletons are kind-row-p with the expected element kind."
-  :cases (("row-type"   +kind-row-type+   #'kind-type-p)
-          ("row-effect" +kind-row-effect+ #'kind-effect-p))
-  (row-kind elem-pred)
-  (assert-true (kind-row-p row-kind))
-  (assert-true (funcall elem-pred (kind-row-elem row-kind))))
+(it-sequential "kind-singleton-predicates effect"
+  (destructuring-bind (pred-fn kind) (list #'kind-effect-p +kind-effect+)
+    (expect (funcall pred-fn kind) :to-be-truthy)))
+
+(it-sequential "kind-singleton-predicates constraint"
+  (destructuring-bind (pred-fn kind) (list #'cl-cc/type:kind-constraint-p +kind-constraint+)
+    (expect (funcall pred-fn kind) :to-be-truthy)))
+
+(it-sequential "kind-singleton-predicates multiplicity"
+  (destructuring-bind (pred-fn kind) (list #'cl-cc/type:kind-multiplicity-p +kind-multiplicity+)
+    (expect (funcall pred-fn kind) :to-be-truthy)))
+
+(it-sequential "kind-row-singletons row-type"
+  (destructuring-bind (row-kind elem-pred) (list +kind-row-type+ #'kind-type-p)
+    (expect (kind-row-p row-kind) :to-be-truthy) (expect (funcall elem-pred (kind-row-elem row-kind)) :to-be-truthy)))
+
+(it-sequential "kind-row-singletons row-effect"
+  (destructuring-bind (row-kind elem-pred) (list +kind-row-effect+ #'kind-effect-p)
+    (expect (kind-row-p row-kind) :to-be-truthy) (expect (funcall elem-pred (kind-row-elem row-kind)) :to-be-truthy)))
 
 ;;; ─── kind-fun (arrow construction) ──────────────────────────────────────────
 
-(deftest kind-fun-builds-arrow
-  "kind-fun returns a kind-arrow with correct from/to."
+(it-sequential "kind-fun-builds-arrow"
   (let ((k (kind-fun +kind-type+ +kind-type+)))
-    (assert-true (kind-arrow-p k))
-    (assert-true (kind-type-p (kind-arrow-from k)))
-    (assert-true (kind-type-p (kind-arrow-to k)))))
+    (expect (kind-arrow-p k) :to-be-truthy)
+    (expect (kind-type-p (kind-arrow-from k)) :to-be-truthy)
+    (expect (kind-type-p (kind-arrow-to k)) :to-be-truthy)))
 
-(deftest kind-fun-nested
-  "kind-fun can build nested arrows: * -> * -> *."
+(it-sequential "kind-fun-nested"
   (let ((k (kind-fun +kind-type+ (kind-fun +kind-type+ +kind-type+))))
-    (assert-true (kind-arrow-p k))
-    (assert-true (kind-type-p (kind-arrow-from k)))
-    (assert-true (kind-arrow-p (kind-arrow-to k)))))
+    (expect (kind-arrow-p k) :to-be-truthy)
+    (expect (kind-type-p (kind-arrow-from k)) :to-be-truthy)
+    (expect (kind-arrow-p (kind-arrow-to k)) :to-be-truthy)))
 
 ;;; ─── kind variables ─────────────────────────────────────────────────────────
 
-(deftest kind-var-properties
-  "fresh-kind-var: is a kind-var, unique IDs, self-equal, stores optional name."
+(it-sequential "kind-var-properties"
   (let ((kv  (fresh-kind-var))
         (kv1 (fresh-kind-var))
         (kv2 (fresh-kind-var))
         (kvn (fresh-kind-var "test")))
-    (assert-true  (kind-var-p kv))
-    (assert-false (kind-var-equal-p kv1 kv2))
-    (assert-true  (kind-var-equal-p kv kv))
-    (assert-true  (kind-var-p kvn))
-    (assert-equal "test" (cl-cc/type:kind-var-name kvn))))
+    (expect (kind-var-p kv) :to-be-truthy)
+    (expect (kind-var-equal-p kv1 kv2) :to-be-falsy)
+    (expect (kind-var-equal-p kv kv) :to-be-truthy)
+    (expect (kind-var-p kvn) :to-be-truthy)
+    (expect (cl-cc/type:kind-var-name kvn) :to-equal "test")))
 
 ;;; ─── kind-equal-p ───────────────────────────────────────────────────────────
 
-(deftest-each kind-equal-same
-  "Same-type singletons are equal."
-  :cases (("type-type"     +kind-type+       +kind-type+)
-          ("effect-effect"  +kind-effect+     +kind-effect+)
-          ("constraint"     +kind-constraint+ +kind-constraint+)
-          ("multiplicity"   +kind-multiplicity+ +kind-multiplicity+))
-  (k1 k2)
-  (assert-true (kind-equal-p k1 k2)))
+(it-sequential "kind-equal-same type-type"
+  (destructuring-bind (k1 k2) (list +kind-type+ +kind-type+)
+    (expect (kind-equal-p k1 k2) :to-be-truthy)))
 
-(deftest-each kind-not-equal-different
-  "Different kind singletons are not equal."
-  :cases (("type-vs-effect"  +kind-type+   +kind-effect+)
-          ("type-vs-row"     +kind-type+   +kind-row-type+)
-          ("effect-vs-row"   +kind-effect+ +kind-row-effect+))
-  (k1 k2)
-  (assert-false (kind-equal-p k1 k2)))
+(it-sequential "kind-equal-same effect-effect"
+  (destructuring-bind (k1 k2) (list +kind-effect+ +kind-effect+)
+    (expect (kind-equal-p k1 k2) :to-be-truthy)))
 
-(deftest kind-equal-arrow-and-row
-  "Arrow equality (same/different components) and row kind equality."
-  (assert-true  (kind-equal-p (kind-fun +kind-type+ +kind-type+)
-                               (kind-fun +kind-type+ +kind-type+)))
-  (assert-false (kind-equal-p (kind-fun +kind-type+ +kind-effect+)
-                               (kind-fun +kind-type+ +kind-type+)))
-  (assert-true  (kind-equal-p +kind-row-type+ +kind-row-type+))
-  (assert-false (kind-equal-p +kind-row-type+ +kind-row-effect+)))
+(it-sequential "kind-equal-same constraint"
+  (destructuring-bind (k1 k2) (list +kind-constraint+ +kind-constraint+)
+    (expect (kind-equal-p k1 k2) :to-be-truthy)))
+
+(it-sequential "kind-equal-same multiplicity"
+  (destructuring-bind (k1 k2) (list +kind-multiplicity+ +kind-multiplicity+)
+    (expect (kind-equal-p k1 k2) :to-be-truthy)))
+
+(it-sequential "kind-not-equal-different type-vs-effect"
+  (destructuring-bind (k1 k2) (list +kind-type+ +kind-effect+)
+    (expect (kind-equal-p k1 k2) :to-be-falsy)))
+
+(it-sequential "kind-not-equal-different type-vs-row"
+  (destructuring-bind (k1 k2) (list +kind-type+ +kind-row-type+)
+    (expect (kind-equal-p k1 k2) :to-be-falsy)))
+
+(it-sequential "kind-not-equal-different effect-vs-row"
+  (destructuring-bind (k1 k2) (list +kind-effect+ +kind-row-effect+)
+    (expect (kind-equal-p k1 k2) :to-be-falsy)))
+
+(it-sequential "kind-equal-arrow-and-row"
+  (expect (kind-equal-p (kind-fun +kind-type+ +kind-type+)
+                               (kind-fun +kind-type+ +kind-type+)) :to-be-truthy)
+  (expect (kind-equal-p (kind-fun +kind-type+ +kind-effect+)
+                               (kind-fun +kind-type+ +kind-type+)) :to-be-falsy)
+  (expect (kind-equal-p +kind-row-type+ +kind-row-type+) :to-be-truthy)
+  (expect (kind-equal-p +kind-row-type+ +kind-row-effect+) :to-be-falsy))
 
 ;;; ─── kind-to-string ─────────────────────────────────────────────────────────
 
-(deftest-each kind-to-string-values
-  "kind-to-string produces expected strings."
-  :cases (("star"          "*"            +kind-type+)
-          ("effect"        "Effect"       +kind-effect+)
-          ("constraint"    "Constraint"   +kind-constraint+)
-          ("multiplicity"  "Multiplicity" +kind-multiplicity+)
-          ("row-star"      "Row *"        +kind-row-type+)
-          ("row-effect"    "Row Effect"   +kind-row-effect+))
-  (expected kind)
-  (assert-equal expected (kind-to-string kind)))
+(it-sequential "kind-to-string-values star"
+  (destructuring-bind (expected kind) (list "*" +kind-type+)
+    (expect (kind-to-string kind) :to-equal expected)))
 
-(deftest kind-to-string-computed-kinds
-  "Arrow kind prints as '* -> *'; nested arrow parenthesizes left; named var prints as 'k<name>'."
-  (assert-equal "* -> *" (kind-to-string (kind-fun +kind-type+ +kind-type+)))
+(it-sequential "kind-to-string-values effect"
+  (destructuring-bind (expected kind) (list "Effect" +kind-effect+)
+    (expect (kind-to-string kind) :to-equal expected)))
+
+(it-sequential "kind-to-string-values constraint"
+  (destructuring-bind (expected kind) (list "Constraint" +kind-constraint+)
+    (expect (kind-to-string kind) :to-equal expected)))
+
+(it-sequential "kind-to-string-values multiplicity"
+  (destructuring-bind (expected kind) (list "Multiplicity" +kind-multiplicity+)
+    (expect (kind-to-string kind) :to-equal expected)))
+
+(it-sequential "kind-to-string-values row-star"
+  (destructuring-bind (expected kind) (list "Row *" +kind-row-type+)
+    (expect (kind-to-string kind) :to-equal expected)))
+
+(it-sequential "kind-to-string-values row-effect"
+  (destructuring-bind (expected kind) (list "Row Effect" +kind-row-effect+)
+    (expect (kind-to-string kind) :to-equal expected)))
+
+(it-sequential "kind-to-string-computed-kinds"
+  (expect (kind-to-string (kind-fun +kind-type+ +kind-type+)) :to-equal "* -> *")
   (let ((inner (kind-fun +kind-type+ +kind-type+)))
-    (assert-equal "(* -> *) -> *" (kind-to-string (kind-fun inner +kind-type+))))
+    (expect (kind-to-string (kind-fun inner +kind-type+)) :to-equal "(* -> *) -> *"))
   (let ((kv (fresh-kind-var "foo")))
-    (assert-equal "kfoo" (kind-to-string kv))))
+    (expect (kind-to-string kv) :to-equal "kfoo")))
 
-(deftest kind-type-singleton
-  "+kind-type+ is the singleton * kind."
-  (assert-true (kind-type-p +kind-type+))
-  (assert-true (kind-node-p +kind-type+))
-  (assert-true (kind-equal-p +kind-type+ +kind-type+))
-  (assert-true (kind-equal-p (make-kind-type) (make-kind-type))))
+(it-sequential "kind-type-singleton"
+  (expect (kind-type-p +kind-type+) :to-be-truthy)
+  (expect (kind-node-p +kind-type+) :to-be-truthy)
+  (expect (kind-equal-p +kind-type+ +kind-type+) :to-be-truthy)
+  (expect (kind-equal-p (make-kind-type) (make-kind-type)) :to-be-truthy))
 
-(deftest kind-arrow-creation
-  "kind-fun builds arrow kinds like * -> * for List."
+(it-sequential "kind-arrow-creation"
   (let ((list-kind (kind-fun +kind-type+ +kind-type+)))
-    (assert-true (kind-arrow-p list-kind))
-    (assert-true (kind-equal-p (kind-arrow-from list-kind) +kind-type+))
-    (assert-true (kind-equal-p (kind-arrow-to list-kind)   +kind-type+))
+    (expect (kind-arrow-p list-kind) :to-be-truthy)
+    (expect (kind-equal-p (kind-arrow-from list-kind) +kind-type+) :to-be-truthy)
+    (expect (kind-equal-p (kind-arrow-to list-kind)   +kind-type+) :to-be-truthy)
     (let ((fix-kind (kind-fun list-kind +kind-type+)))
-      (assert-true (kind-arrow-p fix-kind))
-      (assert-true (kind-equal-p (kind-arrow-from fix-kind) list-kind)))))
+      (expect (kind-arrow-p fix-kind) :to-be-truthy)
+      (expect (kind-equal-p (kind-arrow-from fix-kind) list-kind) :to-be-truthy))))
 
-(deftest kind-effect-row-singletons
-  "+kind-effect+ and +kind-row-type+ are the Effect and Row * kinds."
-  (assert-true (kind-effect-p +kind-effect+))
-  (assert-true (kind-row-p +kind-row-type+))
-  (assert-true (kind-row-p +kind-row-effect+))
-  (assert-true (kind-equal-p (kind-row-elem +kind-row-type+)   +kind-type+))
-  (assert-true (kind-equal-p (kind-row-elem +kind-row-effect+) +kind-effect+)))
+(it-sequential "kind-effect-row-singletons"
+  (expect (kind-effect-p +kind-effect+) :to-be-truthy)
+  (expect (kind-row-p +kind-row-type+) :to-be-truthy)
+  (expect (kind-row-p +kind-row-effect+) :to-be-truthy)
+  (expect (kind-equal-p (kind-row-elem +kind-row-type+)   +kind-type+) :to-be-truthy)
+  (expect (kind-equal-p (kind-row-elem +kind-row-effect+) +kind-effect+) :to-be-truthy))
 
-(deftest-each kind-equal-p-basic
-  "kind-equal-p compares structural equality of kind constructors."
-  :cases (("*=*"          t   +kind-type+   +kind-type+)
-          ("Eff=Eff"      t   +kind-effect+ +kind-effect+)
-          ("*≠Eff"        nil +kind-type+   +kind-effect+))
-  (should-be-equal k1 k2)
-  (if should-be-equal
-      (assert-true  (kind-equal-p k1 k2))
-      (assert-false (kind-equal-p k1 k2))))
+(it-sequential "kind-equal-p-basic *=*"
+  (destructuring-bind (should-be-equal k1 k2) (list t +kind-type+ +kind-type+)
+    (if should-be-equal
+      (expect (kind-equal-p k1 k2) :to-be-truthy)
+      (expect (kind-equal-p k1 k2) :to-be-falsy))))
 
-(deftest kind-var-fresh-and-equality
-  "fresh-kind-var generates distinct variables; kind-fun arrows compare structurally."
+(it-sequential "kind-equal-p-basic Eff=Eff"
+  (destructuring-bind (should-be-equal k1 k2) (list t +kind-effect+ +kind-effect+)
+    (if should-be-equal
+      (expect (kind-equal-p k1 k2) :to-be-truthy)
+      (expect (kind-equal-p k1 k2) :to-be-falsy))))
+
+(it-sequential "kind-equal-p-basic *≠Eff"
+  (destructuring-bind (should-be-equal k1 k2) (list nil +kind-type+ +kind-effect+)
+    (if should-be-equal
+      (expect (kind-equal-p k1 k2) :to-be-truthy)
+      (expect (kind-equal-p k1 k2) :to-be-falsy))))
+
+(it-sequential "kind-var-fresh-and-equality"
   (let ((k1 (fresh-kind-var 'k))
         (k2 (fresh-kind-var 'k)))
-    (assert-true (kind-var-p k1))
-    (assert-true (kind-var-p k2))
-    (assert-false (kind-var-equal-p k1 k2))
-    (assert-true  (kind-var-equal-p k1 k1)))
-  (assert-true  (kind-equal-p (kind-fun +kind-type+ +kind-type+)
-                               (kind-fun +kind-type+ +kind-type+)))
-  (assert-false (kind-equal-p (kind-fun +kind-type+ +kind-effect+)
-                               (kind-fun +kind-type+ +kind-type+))))
+    (expect (kind-var-p k1) :to-be-truthy)
+    (expect (kind-var-p k2) :to-be-truthy)
+    (expect (kind-var-equal-p k1 k2) :to-be-falsy)
+    (expect (kind-var-equal-p k1 k1) :to-be-truthy))
+  (expect (kind-equal-p (kind-fun +kind-type+ +kind-type+)
+                               (kind-fun +kind-type+ +kind-type+)) :to-be-truthy)
+  (expect (kind-equal-p (kind-fun +kind-type+ +kind-effect+)
+                               (kind-fun +kind-type+ +kind-type+)) :to-be-falsy))
