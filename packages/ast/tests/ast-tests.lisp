@@ -8,7 +8,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Helper: shared roundtrip combinator
@@ -22,201 +21,165 @@
 ;;; Primitive nodes
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-roundtrip-primitives
-  "Primitive AST node types survive a full serialization cycle"
-  :cases
-  (("int"
-    (cl-cc:make-ast-int :value 42)
-    (lambda (ast2) (assert-= 42 (cl-cc:ast-int-value ast2))))
+(it-sequential "ast-roundtrip-primitives int"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-int :value 42) (lambda (ast2) (assert-= 42 (cl-cc:ast-int-value ast2))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("var"
-    (cl-cc:make-ast-var :name 'x)
-    (lambda (ast2) (assert-eq 'x (cl-cc:ast-var-name ast2))))
+(it-sequential "ast-roundtrip-primitives var"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-var :name 'x) (lambda (ast2) (assert-eq 'x (cl-cc:ast-var-name ast2))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("hole"
-    (cl-cc/ast:make-ast-hole)
-    (lambda (ast2) (assert-type cl-cc:ast-hole ast2)))
+(it-sequential "ast-roundtrip-primitives hole"
+  (destructuring-bind (ast verify) (list (cl-cc/ast:make-ast-hole) (lambda (ast2) (assert-type cl-cc:ast-hole ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("quote-atom"
-    (cl-cc:make-ast-quote :value 'hello)
-    (lambda (ast2) (assert-type cl-cc:ast-quote ast2)))
+(it-sequential "ast-roundtrip-primitives quote-atom"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-quote :value 'hello) (lambda (ast2) (assert-type cl-cc:ast-quote ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("quote-list"
-    (cl-cc:make-ast-quote :value '(x y))
-    (lambda (ast2) (assert-type cl-cc:ast-quote ast2))))
-  (ast verify)
-  (funcall verify (%ast-roundtrip ast)))
+(it-sequential "ast-roundtrip-primitives quote-list"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-quote :value '(x y)) (lambda (ast2) (assert-type cl-cc:ast-quote ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Expression nodes
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-roundtrip-expressions
-  "Expression AST node types survive a full serialization cycle"
-  :cases
-  (("binop"
-    (cl-cc:make-ast-binop :op '+
+(it-sequential "ast-roundtrip-expressions binop"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-binop :op '+
                           :lhs (cl-cc:make-ast-int :value 1)
-                          :rhs (cl-cc:make-ast-int :value 2))
-    (lambda (ast2) (assert-eq '+ (cl-cc:ast-binop-op ast2))))
+                          :rhs (cl-cc:make-ast-int :value 2)) (lambda (ast2) (assert-eq '+ (cl-cc:ast-binop-op ast2))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("if"
-    (cl-cc:make-ast-if :cond (cl-cc:make-ast-int :value 1)
+(it-sequential "ast-roundtrip-expressions if"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-if :cond (cl-cc:make-ast-int :value 1)
                        :then (cl-cc:make-ast-int :value 2)
-                       :else (cl-cc:make-ast-int :value 3))
-    (lambda (ast2) (assert-type cl-cc:ast-if ast2)))
+                       :else (cl-cc:make-ast-int :value 3)) (lambda (ast2) (assert-type cl-cc:ast-if ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("progn"
-    (cl-cc:make-ast-progn :forms (list (cl-cc:make-ast-int :value 1)
-                                       (cl-cc:make-ast-int :value 2)))
-    (lambda (ast2) (assert-= 2 (length (cl-cc:ast-progn-forms ast2)))))
+(it-sequential "ast-roundtrip-expressions progn"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-progn :forms (list (cl-cc:make-ast-int :value 1)
+                                       (cl-cc:make-ast-int :value 2))) (lambda (ast2) (assert-= 2 (length (cl-cc:ast-progn-forms ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("setq"
-    (cl-cc:make-ast-setq :var 'x :value (cl-cc:make-ast-int :value 42))
-    (lambda (ast2) (assert-eq 'x (cl-cc:ast-setq-var ast2)))))
-  (ast verify)
-  (funcall verify (%ast-roundtrip ast)))
+(it-sequential "ast-roundtrip-expressions setq"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-setq :var 'x :value (cl-cc:make-ast-int :value 42)) (lambda (ast2) (assert-eq 'x (cl-cc:ast-setq-var ast2))))
+    (funcall verify (%ast-roundtrip ast))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Binding nodes
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-roundtrip-bindings
-  "Binding AST node types survive a full serialization cycle"
-  :cases
-  (("let"
-    (cl-cc:make-ast-let :bindings (list (cons 'x (cl-cc:make-ast-int :value 1)))
-                        :body     (list (cl-cc:make-ast-var :name 'x)))
-    (lambda (ast2) (assert-= 1 (length (cl-cc:ast-let-bindings ast2)))))
+(it-sequential "ast-roundtrip-bindings let"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-let :bindings (list (cons 'x (cl-cc:make-ast-int :value 1)))
+                        :body     (list (cl-cc:make-ast-var :name 'x))) (lambda (ast2) (assert-= 1 (length (cl-cc:ast-let-bindings ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("lambda"
-    (cl-cc:make-ast-lambda :params (list 'x)
-                           :body   (list (cl-cc:make-ast-var :name 'x)))
-    (lambda (ast2) (assert-= 1 (length (cl-cc:ast-lambda-params ast2)))))
+(it-sequential "ast-roundtrip-bindings lambda"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-lambda :params (list 'x)
+                           :body   (list (cl-cc:make-ast-var :name 'x))) (lambda (ast2) (assert-= 1 (length (cl-cc:ast-lambda-params ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("flet"
-    (cl-cc:make-ast-flet
+(it-sequential "ast-roundtrip-bindings flet"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-flet
      :bindings (list (list 'double '(x)
                            (cl-cc:make-ast-binop
                             :op '* :lhs (cl-cc:make-ast-int :value 2)
                             :rhs (cl-cc:make-ast-var :name 'x))))
-     :body (list (cl-cc:make-ast-int :value 1)))
-    (lambda (ast2) (assert-= 1 (length (cl-cc:ast-flet-bindings ast2)))))
+     :body (list (cl-cc:make-ast-int :value 1))) (lambda (ast2) (assert-= 1 (length (cl-cc:ast-flet-bindings ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("labels"
-    (cl-cc:make-ast-labels
+(it-sequential "ast-roundtrip-bindings labels"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-labels
      :bindings (list (list 'id '(x) (cl-cc:make-ast-var :name 'x)))
-     :body (list (cl-cc:make-ast-int :value 1)))
-    (lambda (ast2) (assert-= 1 (length (cl-cc:ast-labels-bindings ast2))))))
-  (ast verify)
-  (funcall verify (%ast-roundtrip ast)))
+     :body (list (cl-cc:make-ast-int :value 1))) (lambda (ast2) (assert-= 1 (length (cl-cc:ast-labels-bindings ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Control flow nodes
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-roundtrip-control-flow
-  "Control flow AST node types survive a full serialization cycle"
-  :cases
-  (("block"
-    (cl-cc:make-ast-block :name 'loop
-                          :body (list (cl-cc:make-ast-int :value 1)))
-    (lambda (ast2) (assert-type cl-cc:ast-block ast2)))
+(it-sequential "ast-roundtrip-control-flow block"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-block :name 'loop
+                          :body (list (cl-cc:make-ast-int :value 1))) (lambda (ast2) (assert-type cl-cc:ast-block ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("return-from"
-    (cl-cc:make-ast-return-from :name 'loop
-                                :value (cl-cc:make-ast-int :value 42))
-    (lambda (ast2) (assert-eq 'loop (cl-cc:ast-return-from-name ast2))))
+(it-sequential "ast-roundtrip-control-flow return-from"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-return-from :name 'loop
+                                :value (cl-cc:make-ast-int :value 42)) (lambda (ast2) (assert-eq 'loop (cl-cc:ast-return-from-name ast2))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("tagbody"
-    (cl-cc:make-ast-tagbody :tags (list (cons 'start (list (cl-cc:make-ast-int :value 1)))))
-    (lambda (ast2) (assert-type cl-cc:ast-tagbody ast2)))
+(it-sequential "ast-roundtrip-control-flow tagbody"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-tagbody :tags (list (cons 'start (list (cl-cc:make-ast-int :value 1))))) (lambda (ast2) (assert-type cl-cc:ast-tagbody ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("go"
-    (cl-cc:make-ast-go :tag 'start)
-    (lambda (ast2) (assert-eq 'start (cl-cc:ast-go-tag ast2)))))
-  (ast verify)
-  (funcall verify (%ast-roundtrip ast)))
+(it-sequential "ast-roundtrip-control-flow go"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-go :tag 'start) (lambda (ast2) (assert-eq 'start (cl-cc:ast-go-tag ast2))))
+    (funcall verify (%ast-roundtrip ast))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Exception handling nodes
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-roundtrip-exceptions
-  "Exception handling AST node types survive a full serialization cycle"
-  :cases
-  (("catch"
-    (cl-cc:make-ast-catch :tag  (cl-cc:make-ast-var :name 'my-tag)
-                          :body (list (cl-cc:make-ast-int :value 42)))
-    (lambda (ast2) (assert-type cl-cc:ast-catch ast2)))
+(it-sequential "ast-roundtrip-exceptions catch"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-catch :tag  (cl-cc:make-ast-var :name 'my-tag)
+                          :body (list (cl-cc:make-ast-int :value 42))) (lambda (ast2) (assert-type cl-cc:ast-catch ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("throw"
-    (cl-cc:make-ast-throw :tag   (cl-cc:make-ast-var :name 'my-tag)
-                          :value (cl-cc:make-ast-int :value 42))
-    (lambda (ast2) (assert-type cl-cc:ast-throw ast2)))
+(it-sequential "ast-roundtrip-exceptions throw"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-throw :tag   (cl-cc:make-ast-var :name 'my-tag)
+                          :value (cl-cc:make-ast-int :value 42)) (lambda (ast2) (assert-type cl-cc:ast-throw ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("unwind-protect"
-    (cl-cc:make-ast-unwind-protect :protected (cl-cc:make-ast-int :value 1)
-                                   :cleanup   (list (cl-cc:make-ast-int :value 0)))
-    (lambda (ast2) (assert-type cl-cc:ast-unwind-protect ast2))))
-  (ast verify)
-  (funcall verify (%ast-roundtrip ast)))
+(it-sequential "ast-roundtrip-exceptions unwind-protect"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-unwind-protect :protected (cl-cc:make-ast-int :value 1)
+                                   :cleanup   (list (cl-cc:make-ast-int :value 0))) (lambda (ast2) (assert-type cl-cc:ast-unwind-protect ast2)))
+    (funcall verify (%ast-roundtrip ast))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Multiple-values nodes
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-roundtrip-multiple-values
-  "Multiple-values AST node types survive a full serialization cycle"
-  :cases
-  (("values"
-    (cl-cc:make-ast-values :forms (list (cl-cc:make-ast-int :value 1)
-                                        (cl-cc:make-ast-int :value 2)))
-    (lambda (ast2) (assert-= 2 (length (cl-cc:ast-values-forms ast2)))))
+(it-sequential "ast-roundtrip-multiple-values values"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-values :forms (list (cl-cc:make-ast-int :value 1)
+                                        (cl-cc:make-ast-int :value 2))) (lambda (ast2) (assert-= 2 (length (cl-cc:ast-values-forms ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
-   ("multiple-value-bind"
-    (cl-cc:make-ast-multiple-value-bind
+(it-sequential "ast-roundtrip-multiple-values multiple-value-bind"
+  (destructuring-bind (ast verify) (list (cl-cc:make-ast-multiple-value-bind
      :vars        '(a b)
      :values-form (cl-cc:make-ast-values :forms (list (cl-cc:make-ast-int :value 1)
                                                       (cl-cc:make-ast-int :value 2)))
-     :body        (list (cl-cc:make-ast-var :name 'a)))
-    (lambda (ast2) (assert-= 2 (length (cl-cc:ast-mvb-vars ast2))))))
-  (ast verify)
-  (funcall verify (%ast-roundtrip ast)))
+     :body        (list (cl-cc:make-ast-var :name 'a))) (lambda (ast2) (assert-= 2 (length (cl-cc:ast-mvb-vars ast2)))))
+    (funcall verify (%ast-roundtrip ast))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Source location utility
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each ast-location-string-cases
-  "ast-location-string formats source location from node metadata"
-  :cases
-  (("full"
-    (cl-cc:make-ast-int :value 1 :source-file "foo.lisp" :source-line 10 :source-column 5)
-    "foo.lisp:10:5")
-   ("file-line"
-    (cl-cc:make-ast-int :value 1 :source-file "foo.lisp" :source-line 3)
-    "foo.lisp:3")
-   ("unknown"
-    (cl-cc:make-ast-int :value 1)
-    "<unknown location>"))
-  (node expected)
-  (assert-equal expected (cl-cc:ast-location-string node)))
+(it-sequential "ast-location-string-cases full"
+  (destructuring-bind (node expected) (list (cl-cc:make-ast-int :value 1 :source-file "foo.lisp" :source-line 10 :source-column 5) "foo.lisp:10:5")
+    (expect (cl-cc:ast-location-string node) :to-equal expected)))
 
-(deftest ast-error-signals-condition
-  "ast-error signals ast-compilation-error with location from node"
+(it-sequential "ast-location-string-cases file-line"
+  (destructuring-bind (node expected) (list (cl-cc:make-ast-int :value 1 :source-file "foo.lisp" :source-line 3) "foo.lisp:3")
+    (expect (cl-cc:ast-location-string node) :to-equal expected)))
+
+(it-sequential "ast-location-string-cases unknown"
+  (destructuring-bind (node expected) (list (cl-cc:make-ast-int :value 1) "<unknown location>")
+    (expect (cl-cc:ast-location-string node) :to-equal expected)))
+
+(it-sequential "ast-error-signals-condition"
   (let ((node (cl-cc:make-ast-int :value 1 :source-file "t.lisp" :source-line 1)))
-    (assert-signals cl-cc:ast-compilation-error
-      (cl-cc:ast-error node "test error ~A" 42))))
+    (let ((%%signaled1 nil)) (handler-case (progn (cl-cc:ast-error node "test error ~A" 42)) (cl-cc:ast-compilation-error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))))
 
-(deftest ast-node-namespace-and-imports-metadata
-  "AST nodes can store optional namespace and imports metadata."
+(it-sequential "ast-node-namespace-and-imports-metadata"
   (let ((node (cl-cc:make-ast-int :value 1
                                   :namespace "App\\Example"
                                   :imports '("Vendor\\Library"))))
-    (assert-equal "App\\Example" (cl-cc/ast:ast-namespace node))
-    (assert-equal '("Vendor\\Library") (cl-cc/ast:ast-imports node))
+    (expect (cl-cc/ast:ast-namespace node) :to-equal "App\\Example")
+    (expect (cl-cc/ast:ast-imports node) :to-equal '("Vendor\\Library"))
     (setf (cl-cc/ast:ast-namespace node) "App\\Updated"
           (cl-cc/ast:ast-imports node) '("Vendor\\Other"))
-    (assert-equal "App\\Updated" (cl-cc/ast:ast-namespace node))
-    (assert-equal '("Vendor\\Other") (cl-cc/ast:ast-imports node))))
+    (expect (cl-cc/ast:ast-namespace node) :to-equal "App\\Updated")
+    (expect (cl-cc/ast:ast-imports node) :to-equal '("Vendor\\Other"))))
