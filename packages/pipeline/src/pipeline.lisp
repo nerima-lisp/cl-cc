@@ -690,8 +690,8 @@ TARGET and the remaining keyword arguments are forwarded to the expression,
 top-level, and optimization stages."
   (multiple-value-bind (forms source-locations)
       (parse-source-for-language source language :source-file source-file)
+    (%register-backend-runtime-bridges)
     (when (eq language :php)
-      (%register-php-runtime-bridges)
       (php-check-supported-forms forms))
     (when (eq language :javascript)
       (%register-js-runtime-bridges))
@@ -769,8 +769,8 @@ macro evaluation for real file compilation. TARGET and the remaining keyword
 arguments are forwarded to the expression, top-level, and optimization stages."
    (multiple-value-bind (forms source-locations)
        (parse-source-for-language source language :source-file source-file)
+     (%register-backend-runtime-bridges)
      (when (eq language :php)
-       (%register-php-runtime-bridges)
        (php-check-supported-forms forms))
      (when (eq language :javascript)
        (%register-js-runtime-bridges))

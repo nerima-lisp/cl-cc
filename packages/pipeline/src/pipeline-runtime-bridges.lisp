@@ -1,14 +1,15 @@
 ;;;; pipeline-runtime-bridges.lisp - Language runtime bridge registration
 (in-package :cl-cc/pipeline)
 
-(defun %register-php-runtime-bridges ()
+(defun %register-backend-runtime-bridges ()
   "Install every registered backend's runtime helpers as VM host bridges.
 
 The VM host bridge is a whitelist. Backends (php/js/…) own the knowledge of
 which of their functions are callable from compiled code and register a
 provider thunk with cl-cc/bootstrap; here we install whatever the registry
 yields. The pipeline no longer references any backend package for this — see
-cl-cc/php's runtime-bridge-provider.lisp."
+each backend's runtime-bridge-provider.lisp. Called for every language so a
+program of any backend sees its bridges (registration is idempotent)."
   (dolist (provider (cl-cc/bootstrap:backend-bridge-providers))
     (dolist (entry (funcall provider))
       (cl-cc/vm:vm-register-host-bridge (car entry) (cdr entry)))))
@@ -17,7 +18,7 @@ cl-cc/php's runtime-bridge-provider.lisp."
 
 ;; JS function bridges (%JS-*) are now registered via the backend bridge
 ;; registry (see cl-cc/javascript's runtime-bridge-provider.lisp and
-;; %register-php-runtime-bridges above, which installs every provider). Only the
+;; %register-backend-runtime-bridges, which installs every provider). Only the
 ;; VM-closure integration and *JS-* global seeding remain pipeline-side.
 
 (defun %js-runtime-global-symbols ()
