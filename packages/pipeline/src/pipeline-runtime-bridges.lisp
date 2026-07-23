@@ -13,25 +13,12 @@ cl-cc/php's runtime-bridge-provider.lisp."
     (dolist (entry (funcall provider))
       (cl-cc/vm:vm-register-host-bridge (car entry) (cdr entry)))))
 
-(defvar *js-runtime-bridge-symbols-cache* nil)
 (defvar *js-runtime-global-symbols-cache* nil)
 
-(defun %js-runtime-bridge-symbols ()
-  (or *js-runtime-bridge-symbols-cache*
-      (let ((pkg (find-package :cl-cc/javascript)))
-        (when pkg
-          (setf *js-runtime-bridge-symbols-cache*
-                (let (symbols)
-                  (do-symbols (sym pkg)
-                    (when (and (eq (symbol-package sym) pkg)
-                               (fboundp sym)
-                               (not (macro-function sym))
-                               (not (special-operator-p sym))
-                               (let ((name (symbol-name sym)))
-                                 (and (>= (length name) 4)
-                                      (string= "%JS-" name :end2 4))))
-                      (push sym symbols)))
-                  (nreverse symbols)))))))
+;; JS function bridges (%JS-*) are now registered via the backend bridge
+;; registry (see cl-cc/javascript's runtime-bridge-provider.lisp and
+;; %register-php-runtime-bridges above, which installs every provider). Only the
+;; VM-closure integration and *JS-* global seeding remain pipeline-side.
 
 (defun %js-runtime-global-symbols ()
   (or *js-runtime-global-symbols-cache*
@@ -54,19 +41,14 @@ cl-cc/php's runtime-bridge-provider.lisp."
                   (nreverse symbols)))))))
 
 (defun %register-js-runtime-bridges ()
-  "Register JavaScript runtime helpers as VM host bridge functions.
+  "Install the JavaScript runtime's VM-closure integration.
 
-The JS frontend lowers operators, member access, and builtins to calls on
-cl-cc/javascript::%js-* helpers (%js-get-prop, %js-make-array, %js-console-log,
-%js-make-console, ...). Register every fbound, non-macro %JS-* function whose
-home package is :cl-cc/javascript so compiled JS can call them through the VM
-host bridge - the same package-derived whitelist used for PHP."
+The %JS-* function bridges are registered via the backend bridge registry (see
+runtime-bridge-provider.lisp). What remains here is the two-way VM integration
+the pipeline installs into the JS runtime: routing JS callbacks back through the
+VM, recognizing compiled-JS closures as callable, and binding `this'. This
+coupling is the next step of the §5-1 decoupling."
   (when (find-package :cl-cc/javascript)
-    (dolist (sym (%js-runtime-bridge-symbols))
-      (when (and (fboundp sym)
-                 (not (macro-function sym))
-                 (not (special-operator-p sym)))
-        (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))))
       ;; Route JS callbacks (Array.map/filter/reduce/sort) back through the VM
       ;; when the callback is a compiled-JS closure; host functions still go via
       ;; APPLY. Host array methods call (%js-funcall fn ...) -> *js-apply-fn*; this

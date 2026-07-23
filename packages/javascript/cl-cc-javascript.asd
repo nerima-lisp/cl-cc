@@ -101,4 +101,7 @@
    (:file "runtime-method-resolver")
    (:file "runtime-method-resolver-core")
    (:file "runtime-method-resolver-tables")
-   (:file "runtime-method-resolver-dispatch")))
+   (:file "runtime-method-resolver-dispatch")
+   ;; Registers JS's %JS-* helpers as a backend bridge provider. Must load
+   ;; last, after every %JS-* function is defined.
+   (:file "runtime-bridge-provider")))
