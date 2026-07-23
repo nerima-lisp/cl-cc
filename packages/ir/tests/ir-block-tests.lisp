@@ -4,7 +4,6 @@
 ;;; SSA construction/verification → ir-block-ssa-tests.lisp.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -19,38 +18,34 @@
 
 ;;; ─── ir-add-edge ────────────────────────────────────────────────────────────
 
-(deftest ir-add-edge-behavior
-  "ir-add-edge wires predecessor/successor links between blocks."
+(it-sequential "ir-add-edge-behavior"
   (let* ((fn   (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (next  (cl-cc/ir:ir-new-block fn :next)))
     ;; Before edge: no successors, no predecessors
-    (assert-null (cl-cc/ir:irb-successors entry))
-    (assert-null (cl-cc/ir:irb-predecessors next))
+    (expect (cl-cc/ir:irb-successors entry) :to-be-null)
+    (expect (cl-cc/ir:irb-predecessors next) :to-be-null)
     (cl-cc/ir:ir-add-edge entry next)
     ;; After edge: entry has next as successor, next has entry as predecessor
-    (assert-equal (list next)  (cl-cc/ir:irb-successors entry))
-    (assert-equal (list entry) (cl-cc/ir:irb-predecessors next)))
-  ;; Multiple edges from one block
+    (expect (cl-cc/ir:irb-successors entry) :to-equal (list next))
+    (expect (cl-cc/ir:irb-predecessors next) :to-equal (list entry)))
   (let* ((fn    (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (b1    (cl-cc/ir:ir-new-block fn :b1))
          (b2    (cl-cc/ir:ir-new-block fn :b2)))
     (cl-cc/ir:ir-add-edge entry b1)
     (cl-cc/ir:ir-add-edge entry b2)
-    (assert-= 2 (length (cl-cc/ir:irb-successors entry))))
-  ;; Duplicate edge should not be added twice
+    (expect (length (cl-cc/ir:irb-successors entry)) :to-equal 2))
   (let* ((fn    (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (b1    (cl-cc/ir:ir-new-block fn :b1)))
     (cl-cc/ir:ir-add-edge entry b1)
     (cl-cc/ir:ir-add-edge entry b1)
-    (assert-= 1 (length (cl-cc/ir:irb-successors entry)))))
+    (expect (length (cl-cc/ir:irb-successors entry)) :to-equal 1)))
 
 ;;; ─── ir-emit / ir-set-terminator ────────────────────────────────────────────
 
-(deftest ir-emit-behavior
-  "ir-emit appends instructions to a block in order."
+(it-sequential "ir-emit-behavior"
   (let* ((fn   (make-test-fn))
          (blk  (cl-cc/ir:irf-entry fn))
          (i1   (cl-cc/ir:make-ir-inst))
@@ -58,33 +53,30 @@
     (cl-cc/ir:ir-emit blk i1)
     (cl-cc/ir:ir-emit blk i2)
     (let ((body (cl-cc/ir:irb-insts blk)))
-      (assert-= 2 (length body))
-      (assert-eq i1 (first body))
-      (assert-eq i2 (second body)))))
+      (expect (length body) :to-equal 2)
+      (expect (first body) :to-be i1)
+      (expect (second body) :to-be i2))))
 
-(deftest ir-set-terminator-stores
-  "ir-set-terminator stores the given instruction as the block terminator."
+(it-sequential "ir-set-terminator-stores"
   (let* ((fn   (make-test-fn))
          (blk  (cl-cc/ir:irf-entry fn))
          (term (cl-cc/ir:make-ir-inst)))
     (cl-cc/ir:ir-set-terminator blk term)
-    (assert-eq term (cl-cc/ir:irb-terminator blk))))
+    (expect (cl-cc/ir:irb-terminator blk) :to-be term)))
 
 ;;; ─── ir-rpo ─────────────────────────────────────────────────────────────────
 
-(deftest-each ir-rpo-cases
-  "ir-rpo returns blocks in reverse post-order for various graph shapes."
-  :cases
-  (("single-block"
-    (lambda ()
+(it-sequential "ir-rpo-cases single-block"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let ((fn (make-test-fn)))
         (cl-cc/ir:ir-seal-block fn (cl-cc/ir:irf-entry fn))
-        (values fn (list (cl-cc/ir:irf-entry fn)))))
-    (lambda (fn expected-order)
+        (values fn (list (cl-cc/ir:irf-entry fn))))) (lambda (fn expected-order)
       (assert-equal expected-order (cl-cc/ir:ir-rpo fn))))
+    (multiple-value-bind (fn expected-order) (funcall setup)
+    (funcall verify fn expected-order))))
 
-   ("linear-chain"
-    (lambda ()
+(it-sequential "ir-rpo-cases linear-chain"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let* ((fn    (make-test-fn))
              (entry (cl-cc/ir:irf-entry fn))
              (b1    (cl-cc/ir:ir-new-block fn :b1))
@@ -94,12 +86,13 @@
         (cl-cc/ir:ir-seal-block fn entry)
         (cl-cc/ir:ir-seal-block fn b1)
         (cl-cc/ir:ir-seal-block fn b2)
-        (values fn (list entry b1 b2))))
-    (lambda (fn expected-order)
+        (values fn (list entry b1 b2)))) (lambda (fn expected-order)
       (assert-equal expected-order (cl-cc/ir:ir-rpo fn))))
+    (multiple-value-bind (fn expected-order) (funcall setup)
+    (funcall verify fn expected-order))))
 
-   ("diamond"
-    (lambda ()
+(it-sequential "ir-rpo-cases diamond"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let* ((fn    (make-test-fn))
              (entry (cl-cc/ir:irf-entry fn))
              (left  (cl-cc/ir:ir-new-block fn :left))
@@ -113,15 +106,16 @@
         (cl-cc/ir:ir-seal-block fn left)
         (cl-cc/ir:ir-seal-block fn right)
         (cl-cc/ir:ir-seal-block fn join)
-        (values fn (list entry left right join))))
-    (lambda (fn expected-order)
+        (values fn (list entry left right join)))) (lambda (fn expected-order)
       (let ((rpo (cl-cc/ir:ir-rpo fn)))
         (assert-= 4 (length rpo))
         (assert-eq (first expected-order) (first rpo))
         (assert-eq (car (last expected-order)) (car (last rpo))))))
+    (multiple-value-bind (fn expected-order) (funcall setup)
+    (funcall verify fn expected-order))))
 
-   ("back-edge-loop"
-    (lambda ()
+(it-sequential "ir-rpo-cases back-edge-loop"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let* ((fn    (make-test-fn))
              (entry (cl-cc/ir:irf-entry fn))
              (body  (cl-cc/ir:ir-new-block fn :body))
@@ -132,34 +126,30 @@
         (cl-cc/ir:ir-seal-block fn entry)
         (cl-cc/ir:ir-seal-block fn body)
         (cl-cc/ir:ir-seal-block fn exit)
-        (values fn nil)))
-    (lambda (fn _)
+        (values fn nil))) (lambda (fn _)
       (let ((rpo (cl-cc/ir:ir-rpo fn)))
         (assert-= 3 (length rpo))
-        (assert-true (member (cl-cc/ir:irf-entry fn) rpo))))))
-  (setup verify)
-  (multiple-value-bind (fn expected-order) (funcall setup)
-    (funcall verify fn expected-order)))
+        (assert-true (member (cl-cc/ir:irf-entry fn) rpo)))))
+    (multiple-value-bind (fn expected-order) (funcall setup)
+    (funcall verify fn expected-order))))
 
 ;;; ─── ir-dominators ──────────────────────────────────────────────────────────
 
-(deftest-each ir-dominators-cases
-  "ir-dominators computes correct dominator sets."
-  :cases
-  (("entry-dominates-itself"
-    (lambda ()
+(it-sequential "ir-dominators-cases entry-dominates-itself"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let* ((fn    (make-test-fn))
              (entry (cl-cc/ir:irf-entry fn)))
         (cl-cc/ir:ir-seal-block fn entry)
-        (values fn entry (list (cons entry entry)))))
-    (lambda (fn entry checks)
+        (values fn entry (list (cons entry entry))))) (lambda (fn entry checks)
       (declare (ignore entry))
       (let ((idom (cl-cc/ir:ir-dominators fn)))
         (dolist (pair checks)
           (assert-eq (cdr pair) (gethash (car pair) idom))))))
+    (multiple-value-bind (fn entry checks) (funcall setup)
+    (funcall verify fn entry checks))))
 
-   ("linear-chain-dominators"
-    (lambda ()
+(it-sequential "ir-dominators-cases linear-chain-dominators"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let* ((fn    (make-test-fn))
              (entry (cl-cc/ir:irf-entry fn))
              (b1    (cl-cc/ir:ir-new-block fn :b1))
@@ -169,15 +159,16 @@
         (cl-cc/ir:ir-seal-block fn entry)
         (cl-cc/ir:ir-seal-block fn b1)
         (cl-cc/ir:ir-seal-block fn b2)
-        (values fn entry (list (cons b1 entry) (cons b2 b1)))))
-    (lambda (fn entry checks)
+        (values fn entry (list (cons b1 entry) (cons b2 b1))))) (lambda (fn entry checks)
       (declare (ignore entry))
       (let ((idom (cl-cc/ir:ir-dominators fn)))
         (dolist (pair checks)
           (assert-eq (cdr pair) (gethash (car pair) idom))))))
+    (multiple-value-bind (fn entry checks) (funcall setup)
+    (funcall verify fn entry checks))))
 
-   ("diamond-join-dominated-by-entry"
-    (lambda ()
+(it-sequential "ir-dominators-cases diamond-join-dominated-by-entry"
+  (destructuring-bind (setup verify) (list (lambda ()
       (let* ((fn    (make-test-fn))
              (entry (cl-cc/ir:irf-entry fn))
              (left  (cl-cc/ir:ir-new-block fn :left))
@@ -191,40 +182,35 @@
         (cl-cc/ir:ir-seal-block fn left)
         (cl-cc/ir:ir-seal-block fn right)
         (cl-cc/ir:ir-seal-block fn join)
-        (values fn entry (list (cons left entry) (cons right entry) (cons join entry)))))
-    (lambda (fn entry checks)
+        (values fn entry (list (cons left entry) (cons right entry) (cons join entry))))) (lambda (fn entry checks)
       (declare (ignore entry))
       (let ((idom (cl-cc/ir:ir-dominators fn)))
         (dolist (pair checks)
-          (assert-eq (cdr pair) (gethash (car pair) idom)))))))
-  (setup verify)
-  (multiple-value-bind (fn entry checks) (funcall setup)
-    (funcall verify fn entry checks)))
+          (assert-eq (cdr pair) (gethash (car pair) idom))))))
+    (multiple-value-bind (fn entry checks) (funcall setup)
+    (funcall verify fn entry checks))))
 
 ;;; ─── %ir-rpo-dfs (extracted helper) ──────────────────────────────────────────
 
-(deftest ir-rpo-dfs-visits-single-block
-  "%ir-rpo-dfs: single block with no successors appends itself to result-cell."
+(it-sequential "ir-rpo-dfs-visits-single-block"
   (let* ((fn    (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (visited (make-hash-table :test #'eq))
          (cell    (list nil)))
     (cl-cc/ir::%ir-rpo-dfs entry visited cell)
-    (assert-equal (list entry) (car cell))
-    (assert-true  (gethash entry visited))))
+    (expect (car cell) :to-equal (list entry))
+    (expect (gethash entry visited) :to-be-truthy)))
 
-(deftest ir-rpo-dfs-does-not-revisit
-  "%ir-rpo-dfs: calling twice on same block only appends it once."
+(it-sequential "ir-rpo-dfs-does-not-revisit"
   (let* ((fn    (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (visited (make-hash-table :test #'eq))
          (cell    (list nil)))
     (cl-cc/ir::%ir-rpo-dfs entry visited cell)
     (cl-cc/ir::%ir-rpo-dfs entry visited cell)
-    (assert-= 1 (length (car cell)))))
+    (expect (length (car cell)) :to-equal 1)))
 
-(deftest ir-rpo-dfs-traverses-chain
-  "%ir-rpo-dfs currently accumulates helper traversal order [A B C]."
+(it-sequential "ir-rpo-dfs-traverses-chain"
   (let* ((fn  (make-test-fn))
          (a   (cl-cc/ir:irf-entry fn))
          (b   (cl-cc/ir:ir-new-block fn :b))
@@ -234,4 +220,4 @@
     (let ((visited (make-hash-table :test #'eq))
           (cell    (list nil)))
       (cl-cc/ir::%ir-rpo-dfs a visited cell)
-      (assert-equal (list a b c) (car cell)))))
+      (expect (car cell) :to-equal (list a b c)))))
