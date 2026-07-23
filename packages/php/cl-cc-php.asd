@@ -86,4 +86,7 @@
     (:file "php84-features")
     (:file "unsupported")
     (:file "grammar")
-   (:file "grammar-stmt")))
+   (:file "grammar-stmt")
+   ;; Registers PHP's %PHP-* helpers as a backend bridge provider. Must load
+   ;; last, after every %PHP-* function is defined.
+   (:file "runtime-bridge-provider")))

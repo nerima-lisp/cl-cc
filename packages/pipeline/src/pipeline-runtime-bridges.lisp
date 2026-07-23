@@ -1,64 +1,17 @@
 ;;;; pipeline-runtime-bridges.lisp - Language runtime bridge registration
 (in-package :cl-cc/pipeline)
 
-(defparameter *php-runtime-bridge-entries*
-  '((cl-cc/php::%php-array           . cl-cc/php:%php-array)
-    (cl-cc/php::%php-array-ref       . cl-cc/php:%php-array-ref)
-    (cl-cc/php::%php-array-set       . cl-cc/php:%php-array-set)
-    (cl-cc/php::%php-array-unset     . cl-cc/php:%php-array-unset)
-    (cl-cc/php::%php-count           . cl-cc/php:%php-count)
-    (cl-cc/php::%php-strlen          . cl-cc/php:%php-strlen)
-    (cl-cc/php::%php-strtolower      . cl-cc/php:%php-strtolower)
-    (cl-cc/php::%php-strtoupper      . cl-cc/php:%php-strtoupper)
-    (cl-cc/php::%php-stringify       . cl-cc/php:%php-stringify)
-    (cl-cc/php::%php-concat          . cl-cc/php:%php-concat)
-    (cl-cc/php::%php-modulo          . cl-cc/php:%php-modulo)
-    (cl-cc/php::%php-shift-left      . cl-cc/php:%php-shift-left)
-    (cl-cc/php::%php-shift-right     . cl-cc/php:%php-shift-right)
-    (cl-cc/php::%php-spaceship       . cl-cc/php:%php-spaceship)
-    (cl-cc/php::%php-bitwise-and     . cl-cc/php:%php-bitwise-and)
-    (cl-cc/php::%php-bitwise-or      . cl-cc/php:%php-bitwise-or)
-    (cl-cc/php::%php-bitwise-xor     . cl-cc/php:%php-bitwise-xor)
-    (cl-cc/php::%php-bitwise-not     . cl-cc/php:%php-bitwise-not)
-    (cl-cc/php::%php-isset           . cl-cc/php:%php-isset)
-    (cl-cc/php::%php-array-key-exists . cl-cc/php:%php-array-key-exists)
-    (cl-cc/php::%php-yield           . cl-cc/php:%php-yield)
-    (cl-cc/php::%php-yield-from      . cl-cc/php:%php-yield-from)
-    (cl-cc/php::%php-throw           . cl-cc/php:%php-throw)
-    (cl-cc/php::%php-make-exception  . cl-cc/php:%php-make-exception)
-    (cl-cc/php::%php-exception-object-p . cl-cc/php:%php-exception-object-p)
-    (cl-cc/php::%php-exception-value . cl-cc/php:%php-exception-value)
-    (cl-cc/php::%php-exception-matches-p . cl-cc/php:%php-exception-matches-p)
-    (cl-cc/php::%php-enum-make-case  . cl-cc/php:%php-enum-make-case)
-    (cl-cc/php::%php-enum-cases      . cl-cc/php:%php-enum-cases)
-    (cl-cc/php::%php-enum-from       . cl-cc/php:%php-enum-from)
-    (cl-cc/php::%php-enum-try-from   . cl-cc/php:%php-enum-try-from)
-    (cl-cc/php::%php-enum-case-value . cl-cc/php:%php-enum-case-value))
-  "Alist of bridge-symbol -> implementation-symbol pairs for PHP runtime helpers.")
-
 (defun %register-php-runtime-bridges ()
-  "Register PHP runtime helpers as VM host bridge functions.
+  "Install every registered backend's runtime helpers as VM host bridges.
 
-The PHP frontend lowers builtins to calls on cl-cc/php::%php-* helpers, but the
-VM host bridge is a whitelist - only registered symbols are callable from
-compiled code. The hand-maintained *php-runtime-bridge-entries* alist had
-drifted behind the lowering, so derive the whitelist from the package itself:
-register every fbound, non-macro %PHP-* function whose home package is
-:cl-cc/php. The explicit alias entries still run first for any non-%php-
-aliases."
-  (dolist (entry *php-runtime-bridge-entries*)
-    (cl-cc/vm:vm-register-host-bridge (car entry) (fdefinition (cdr entry))))
-  (let ((pkg (find-package :cl-cc/php)))
-    (when pkg
-      (do-symbols (sym pkg)
-        (when (and (eq (symbol-package sym) pkg)
-                   (fboundp sym)
-                   (not (macro-function sym))
-                   (not (special-operator-p sym))
-                   (let ((name (symbol-name sym)))
-                     (and (>= (length name) 5)
-                          (string= "%PHP-" name :end2 5))))
-          (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym)))))))
+The VM host bridge is a whitelist. Backends (php/js/…) own the knowledge of
+which of their functions are callable from compiled code and register a
+provider thunk with cl-cc/bootstrap; here we install whatever the registry
+yields. The pipeline no longer references any backend package for this — see
+cl-cc/php's runtime-bridge-provider.lisp."
+  (dolist (provider (cl-cc/bootstrap:backend-bridge-providers))
+    (dolist (entry (funcall provider))
+      (cl-cc/vm:vm-register-host-bridge (car entry) (cdr entry)))))
 
 (defvar *js-runtime-bridge-symbols-cache* nil)
 (defvar *js-runtime-global-symbols-cache* nil)

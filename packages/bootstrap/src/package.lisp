@@ -58,7 +58,13 @@
     ;; Runtime helpers — used by early parser/expander code before runtime is loaded.
     ;; Must live in bootstrap so packages share the same symbols without conflict.
     #:rt-plist-put
-    #:rt-slot-set))
+    #:rt-slot-set
+    ;; Backend runtime-bridge registry — a backend (php/js/…) registers a
+    ;; provider thunk returning (bridge-symbol . function) pairs; the pipeline
+    ;; installs them into the VM host bridge without referencing any backend
+    ;; package. Lives in bootstrap because php/js and pipeline all use it.
+    #:register-backend-bridge-provider
+    #:backend-bridge-providers))
 
 (in-package :cl-cc/bootstrap)
 
@@ -88,3 +94,20 @@
 (defun rt-slot-set (obj slot-name value)
   "Set SLOT-NAME of OBJ to VALUE and return VALUE."
   (setf (slot-value obj slot-name) value))
+
+;;; Backend runtime-bridge registry -----------------------------------------
+;;; Backends register a provider thunk that returns (bridge-symbol . function)
+;;; pairs; the pipeline installs them into the VM host bridge whitelist. This
+;;; inverts the old coupling where the pipeline scanned each backend package.
+
+(defvar *backend-bridge-providers* '()
+  "List of thunks, each returning a list of (bridge-symbol . function) pairs.")
+
+(defun register-backend-bridge-provider (fn)
+  "Register FN as a backend runtime-bridge provider (idempotent)."
+  (pushnew fn *backend-bridge-providers* :test #'eq)
+  fn)
+
+(defun backend-bridge-providers ()
+  "Return the registered backend runtime-bridge provider thunks."
+  *backend-bridge-providers*)
