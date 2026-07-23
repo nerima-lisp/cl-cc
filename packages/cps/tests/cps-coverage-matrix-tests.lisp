@@ -3,11 +3,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite cps-coverage-suite
-  :description "CPS AST transformation coverage matrix"
-  :parent cl-cc-unit-suite)
 
-(in-suite cps-coverage-suite)
 
 (defun %cps-coverage-int (&optional (value 1))
   "Build a minimal integer AST node for CPS coverage fixtures."
@@ -21,202 +17,234 @@
         t)
     (error () nil)))
 
-(deftest-each cps-ast-coverage
-  "Verify cps-transform-ast* succeeds for every AST special form."
-  :cases
-  (("ast-int" "ast-int"
-    (cl-cc/ast:make-ast-int :value 42))
+(it-sequential "cps-ast-coverage ast-int"
+  (destructuring-bind (label node) (list "ast-int" (cl-cc/ast:make-ast-int :value 42))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-var" "ast-var"
-    (cl-cc/ast:make-ast-var :name 'x))
+(it-sequential "cps-ast-coverage ast-var"
+  (destructuring-bind (label node) (list "ast-var" (cl-cc/ast:make-ast-var :name 'x))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-binop" "ast-binop"
-    (cl-cc/ast:make-ast-binop
+(it-sequential "cps-ast-coverage ast-binop"
+  (destructuring-bind (label node) (list "ast-binop" (cl-cc/ast:make-ast-binop
      :op '+
      :lhs (%cps-coverage-int 1)
      :rhs (%cps-coverage-int 2)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-if" "ast-if"
-    (cl-cc/ast:make-ast-if
+(it-sequential "cps-ast-coverage ast-if"
+  (destructuring-bind (label node) (list "ast-if" (cl-cc/ast:make-ast-if
      :cond (%cps-coverage-int 1)
      :then (%cps-coverage-int 2)
      :else (%cps-coverage-int 3)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-progn" "ast-progn"
-    (cl-cc/ast:make-ast-progn
+(it-sequential "cps-ast-coverage ast-progn"
+  (destructuring-bind (label node) (list "ast-progn" (cl-cc/ast:make-ast-progn
      :forms (list (%cps-coverage-int 1)
                   (%cps-coverage-int 2))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-print" "ast-print"
-    (cl-cc/ast:make-ast-print
+(it-sequential "cps-ast-coverage ast-print"
+  (destructuring-bind (label node) (list "ast-print" (cl-cc/ast:make-ast-print
      :expr (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-let" "ast-let"
-    (cl-cc/ast:make-ast-let
+(it-sequential "cps-ast-coverage ast-let"
+  (destructuring-bind (label node) (list "ast-let" (cl-cc/ast:make-ast-let
      :bindings (list (cons 'x (%cps-coverage-int 1)))
      :body (list (cl-cc/ast:make-ast-var :name 'x))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-lambda" "ast-lambda"
-    (cl-cc/ast:make-ast-lambda
+(it-sequential "cps-ast-coverage ast-lambda"
+  (destructuring-bind (label node) (list "ast-lambda" (cl-cc/ast:make-ast-lambda
      :params '(x)
      :body (list (cl-cc/ast:make-ast-var :name 'x))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-function" "ast-function"
-    (cl-cc/ast:make-ast-function :name 'identity))
+(it-sequential "cps-ast-coverage ast-function"
+  (destructuring-bind (label node) (list "ast-function" (cl-cc/ast:make-ast-function :name 'identity))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-block" "ast-block"
-    (cl-cc/ast:make-ast-block
+(it-sequential "cps-ast-coverage ast-block"
+  (destructuring-bind (label node) (list "ast-block" (cl-cc/ast:make-ast-block
      :name 'done
      :body (list (%cps-coverage-int 1))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-return-from" "ast-return-from"
-    (cl-cc/ast:make-ast-return-from
+(it-sequential "cps-ast-coverage ast-return-from"
+  (destructuring-bind (label node) (list "ast-return-from" (cl-cc/ast:make-ast-return-from
      :name 'done
      :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-tagbody" "ast-tagbody"
-    (cl-cc/ast:make-ast-tagbody
+(it-sequential "cps-ast-coverage ast-tagbody"
+  (destructuring-bind (label node) (list "ast-tagbody" (cl-cc/ast:make-ast-tagbody
      :tags (list (cons 'start (list (%cps-coverage-int 1))))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-go" "ast-go"
-    (cl-cc/ast:make-ast-go :tag 'start))
+(it-sequential "cps-ast-coverage ast-go"
+  (destructuring-bind (label node) (list "ast-go" (cl-cc/ast:make-ast-go :tag 'start))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-catch" "ast-catch"
-    (cl-cc/ast:make-ast-catch
+(it-sequential "cps-ast-coverage ast-catch"
+  (destructuring-bind (label node) (list "ast-catch" (cl-cc/ast:make-ast-catch
      :tag (cl-cc/ast:make-ast-quote :value 'tag)
      :body (list (%cps-coverage-int 1))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-throw" "ast-throw"
-    (cl-cc/ast:make-ast-throw
+(it-sequential "cps-ast-coverage ast-throw"
+  (destructuring-bind (label node) (list "ast-throw" (cl-cc/ast:make-ast-throw
      :tag (cl-cc/ast:make-ast-quote :value 'tag)
      :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-unwind-protect" "ast-unwind-protect"
-    (cl-cc/ast:make-ast-unwind-protect
+(it-sequential "cps-ast-coverage ast-unwind-protect"
+  (destructuring-bind (label node) (list "ast-unwind-protect" (cl-cc/ast:make-ast-unwind-protect
      :protected (%cps-coverage-int 1)
      :cleanup (list (%cps-coverage-int 0))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-flet" "ast-flet"
-    (cl-cc/ast:make-ast-flet
+(it-sequential "cps-ast-coverage ast-flet"
+  (destructuring-bind (label node) (list "ast-flet" (cl-cc/ast:make-ast-flet
      :bindings (list (list 'local-id '(x) (cl-cc/ast:make-ast-var :name 'x)))
      :body (list (%cps-coverage-int 1))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-labels" "ast-labels"
-    (cl-cc/ast:make-ast-labels
+(it-sequential "cps-ast-coverage ast-labels"
+  (destructuring-bind (label node) (list "ast-labels" (cl-cc/ast:make-ast-labels
      :bindings (list (list 'local-id '(x) (cl-cc/ast:make-ast-var :name 'x)))
      :body (list (%cps-coverage-int 1))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-setq" "ast-setq"
-    (cl-cc/ast:make-ast-setq
+(it-sequential "cps-ast-coverage ast-setq"
+  (destructuring-bind (label node) (list "ast-setq" (cl-cc/ast:make-ast-setq
      :var 'x
      :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-defvar" "ast-defvar"
-    (cl-cc/ast:make-ast-defvar
+(it-sequential "cps-ast-coverage ast-defvar"
+  (destructuring-bind (label node) (list "ast-defvar" (cl-cc/ast:make-ast-defvar
      :name '*coverage-var*
      :kind 'defparameter
      :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-defun" "ast-defun"
-    (cl-cc/ast:make-ast-defun
+(it-sequential "cps-ast-coverage ast-defun"
+  (destructuring-bind (label node) (list "ast-defun" (cl-cc/ast:make-ast-defun
      :name 'coverage-function
      :params '(x)
      :body (list (cl-cc/ast:make-ast-var :name 'x))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-defmacro" "ast-defmacro"
-    (cl-cc/ast:make-ast-defmacro
+(it-sequential "cps-ast-coverage ast-defmacro"
+  (destructuring-bind (label node) (list "ast-defmacro" (cl-cc/ast:make-ast-defmacro
      :name 'coverage-macro
      :lambda-list '(x)
      :body '((list 'quote x))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-handler-case" "ast-handler-case"
-    (cl-cc/ast:make-ast-handler-case
+(it-sequential "cps-ast-coverage ast-handler-case"
+  (destructuring-bind (label node) (list "ast-handler-case" (cl-cc/ast:make-ast-handler-case
      :form (%cps-coverage-int 1)
      :clauses (list (list 'error 'e (%cps-coverage-int 0)))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-make-instance" "ast-make-instance"
-    (cl-cc/ast:make-ast-make-instance
+(it-sequential "cps-ast-coverage ast-make-instance"
+  (destructuring-bind (label node) (list "ast-make-instance" (cl-cc/ast:make-ast-make-instance
      :class (cl-cc/ast:make-ast-quote :value 'coverage-class)
      :initargs (list :x (%cps-coverage-int 1))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-slot-value" "ast-slot-value"
-    (cl-cc/ast:make-ast-slot-value
+(it-sequential "cps-ast-coverage ast-slot-value"
+  (destructuring-bind (label node) (list "ast-slot-value" (cl-cc/ast:make-ast-slot-value
      :object (cl-cc/ast:make-ast-var :name 'object)
      :slot 'x))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-set-slot-value" "ast-set-slot-value"
-    (cl-cc/ast:make-ast-set-slot-value
+(it-sequential "cps-ast-coverage ast-set-slot-value"
+  (destructuring-bind (label node) (list "ast-set-slot-value" (cl-cc/ast:make-ast-set-slot-value
      :object (cl-cc/ast:make-ast-var :name 'object)
      :slot 'x
      :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-defclass" "ast-defclass"
-    (cl-cc/ast:make-ast-defclass
+(it-sequential "cps-ast-coverage ast-defclass"
+  (destructuring-bind (label node) (list "ast-defclass" (cl-cc/ast:make-ast-defclass
      :name 'coverage-class
      :superclasses nil
      :slots nil))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-defgeneric" "ast-defgeneric"
-    (cl-cc/ast:make-ast-defgeneric
+(it-sequential "cps-ast-coverage ast-defgeneric"
+  (destructuring-bind (label node) (list "ast-defgeneric" (cl-cc/ast:make-ast-defgeneric
      :name 'coverage-generic
      :params '(object)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-defmethod" "ast-defmethod"
-    (cl-cc/ast:make-ast-defmethod
+(it-sequential "cps-ast-coverage ast-defmethod"
+  (destructuring-bind (label node) (list "ast-defmethod" (cl-cc/ast:make-ast-defmethod
      :name 'coverage-generic
      :params '(object)
      :specializers '(t)
      :body (list (cl-cc/ast:make-ast-var :name 'object))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-quote" "ast-quote"
-    (cl-cc/ast:make-ast-quote :value '(a b c)))
+(it-sequential "cps-ast-coverage ast-quote"
+  (destructuring-bind (label node) (list "ast-quote" (cl-cc/ast:make-ast-quote :value '(a b c)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-the" "ast-the"
-    (cl-cc/ast:make-ast-the
+(it-sequential "cps-ast-coverage ast-the"
+  (destructuring-bind (label node) (list "ast-the" (cl-cc/ast:make-ast-the
      :type 'integer
      :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-values" "ast-values"
-    (cl-cc/ast:make-ast-values
+(it-sequential "cps-ast-coverage ast-values"
+  (destructuring-bind (label node) (list "ast-values" (cl-cc/ast:make-ast-values
      :forms (list (%cps-coverage-int 1)
                   (%cps-coverage-int 2))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-multiple-value-bind" "ast-multiple-value-bind"
-    (cl-cc/ast:make-ast-multiple-value-bind
+(it-sequential "cps-ast-coverage ast-multiple-value-bind"
+  (destructuring-bind (label node) (list "ast-multiple-value-bind" (cl-cc/ast:make-ast-multiple-value-bind
      :vars '(a b)
      :values-form (cl-cc/ast:make-ast-values
                    :forms (list (%cps-coverage-int 1)
                                 (%cps-coverage-int 2)))
      :body (list (cl-cc/ast:make-ast-var :name 'a))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-multiple-value-prog1" "ast-multiple-value-prog1"
-    (cl-cc/ast:make-ast-multiple-value-prog1
+(it-sequential "cps-ast-coverage ast-multiple-value-prog1"
+  (destructuring-bind (label node) (list "ast-multiple-value-prog1" (cl-cc/ast:make-ast-multiple-value-prog1
      :first (%cps-coverage-int 1)
      :forms (list (%cps-coverage-int 2))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-multiple-value-call" "ast-multiple-value-call"
-    (cl-cc/ast:make-ast-multiple-value-call
+(it-sequential "cps-ast-coverage ast-multiple-value-call"
+  (destructuring-bind (label node) (list "ast-multiple-value-call" (cl-cc/ast:make-ast-multiple-value-call
      :func (cl-cc/ast:make-ast-function :name 'list)
      :args (list (%cps-coverage-int 1)
                  (%cps-coverage-int 2))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-apply" "ast-apply"
-    (cl-cc/ast:make-ast-apply
+(it-sequential "cps-ast-coverage ast-apply"
+  (destructuring-bind (label node) (list "ast-apply" (cl-cc/ast:make-ast-apply
      :func (cl-cc/ast:make-ast-function :name 'list)
      :args (list (%cps-coverage-int 1)
                  (cl-cc/ast:make-ast-quote :value '(2 3)))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-call" "ast-call"
-    (cl-cc/ast:make-ast-call
+(it-sequential "cps-ast-coverage ast-call"
+  (destructuring-bind (label node) (list "ast-call" (cl-cc/ast:make-ast-call
      :func 'list
      :args (list (%cps-coverage-int 1)
                  (%cps-coverage-int 2))))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
-   ("ast-set-gethash" "ast-set-gethash"
-    (cl-cc/ast:make-ast-set-gethash
+(it-sequential "cps-ast-coverage ast-set-gethash"
+  (destructuring-bind (label node) (list "ast-set-gethash" (cl-cc/ast:make-ast-set-gethash
      :key (cl-cc/ast:make-ast-quote :value 'key)
      :table (cl-cc/ast:make-ast-var :name 'table)
-     :value (%cps-coverage-int 1))))
-  (label node)
-  (declare (ignore label))
-  (assert-true (%cps-transform-succeeds-p node)))
+     :value (%cps-coverage-int 1)))
+    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
