@@ -13,121 +13,96 @@
 
 (in-package :cl-cc/test)
 
-(defsuite got-plt-suite
-  :description "GOT/PLT section byte generation (got-plt.lisp)"
-  :parent cl-cc-unit-suite)
 
-(in-suite got-plt-suite)
 
 ;;; ─── bind-now-mode ───────────────────────────────────────────────────────
 
-(deftest got-plt-bind-now-mode-returns-df-bind-now
-  "bind-now-mode returns the DF_BIND_NOW flag value (#x8)."
-  (assert-equal cl-cc/binary::+df-bind-now+
-                (cl-cc/binary::bind-now-mode)))
+(it-sequential "got-plt-bind-now-mode-returns-df-bind-now"
+  (expect (cl-cc/binary::bind-now-mode) :to-equal cl-cc/binary::+df-bind-now+))
 
 ;;; ─── add-plt-stubs ───────────────────────────────────────────────────────
 
-(deftest got-plt-add-plt-stubs-empty-returns-16-bytes
-  "add-plt-stubs with no symbols returns only the 16-byte PLT[0] resolver."
+(it-sequential "got-plt-add-plt-stubs-empty-returns-16-bytes"
   (let ((plt (cl-cc/binary::add-plt-stubs '())))
-    (assert-equal 16 (length plt))))
+    (expect (length plt) :to-equal 16)))
 
-(deftest got-plt-add-plt-stubs-one-symbol-returns-32-bytes
-  "add-plt-stubs with one symbol: PLT[0] (16 bytes) + PLT[1] (16 bytes) = 32."
+(it-sequential "got-plt-add-plt-stubs-one-symbol-returns-32-bytes"
   (let ((plt (cl-cc/binary::add-plt-stubs '("foo"))))
-    (assert-equal 32 (length plt))))
+    (expect (length plt) :to-equal 32)))
 
-(deftest got-plt-add-plt-stubs-n-symbols-correct-size
-  "add-plt-stubs with N symbols returns 16*(1+N) bytes."
+(it-sequential "got-plt-add-plt-stubs-n-symbols-correct-size"
   (dolist (n '(0 1 2 5 10))
     (let ((syms (loop repeat n collect "sym")))
-      (assert-equal (* 16 (1+ n))
-                    (length (cl-cc/binary::add-plt-stubs syms))))))
+      (expect (length (cl-cc/binary::add-plt-stubs syms)) :to-equal (* 16 (1+ n))))))
 
-(deftest got-plt-add-plt-stubs-plt0-resolver-opcodes
-  "PLT[0] starts with pushq (%rip+disp32): opcode bytes ff 35."
+(it-sequential "got-plt-add-plt-stubs-plt0-resolver-opcodes"
   (let* ((plt (cl-cc/binary::add-plt-stubs '()))
          (b0 (aref plt 0))
          (b1 (aref plt 1)))
-    (assert-equal #xff b0)
-    (assert-equal #x35 b1)))
+    (expect b0 :to-equal #xff)
+    (expect b1 :to-equal #x35)))
 
-(deftest got-plt-add-plt-stubs-entry-jmpq-opcode
-  "PLT[1] starts with jmpq *GOT(%rip): opcode bytes ff 25."
+(it-sequential "got-plt-add-plt-stubs-entry-jmpq-opcode"
   (let* ((plt (cl-cc/binary::add-plt-stubs '("foo")))
          (b16 (aref plt 16))
          (b17 (aref plt 17)))
-    (assert-equal #xff b16)
-    (assert-equal #x25 b17)))
+    (expect b16 :to-equal #xff)
+    (expect b17 :to-equal #x25)))
 
-(deftest got-plt-add-plt-stubs-entry-push-index
-  "PLT[n] encodes push $0 at offset 22 for the first symbol (index 0)."
+(it-sequential "got-plt-add-plt-stubs-entry-push-index"
   (let* ((plt (cl-cc/binary::add-plt-stubs '("foo")))
          ;; push $0: opcode 68, then 4-byte little-endian index 0
          (push-opcode (aref plt 22))
          (index-lo    (aref plt 23)))
-    (assert-equal #x68 push-opcode)
-    (assert-equal 0    index-lo)))
+    (expect push-opcode :to-equal #x68)
+    (expect index-lo :to-equal 0)))
 
-(deftest got-plt-add-plt-stubs-second-entry-push-index-1
-  "PLT[2] encodes push $1 for the second symbol (index 1)."
+(it-sequential "got-plt-add-plt-stubs-second-entry-push-index-1"
   (let* ((plt (cl-cc/binary::add-plt-stubs '("foo" "bar")))
          (push-opcode (aref plt 38))   ; 16 + 16 + 6 = 38
          (index-lo    (aref plt 39)))
-    (assert-equal #x68 push-opcode)
-    (assert-equal 1    index-lo)))
+    (expect push-opcode :to-equal #x68)
+    (expect index-lo :to-equal 1)))
 
 ;;; ─── add-got-entries ─────────────────────────────────────────────────────
 
-(deftest got-plt-add-got-entries-zero-symbols-has-3-reserved
-  "add-got-entries with 0 symbols: 3 reserved slots × 8 bytes = 24 bytes."
+(it-sequential "got-plt-add-got-entries-zero-symbols-has-3-reserved"
   (let ((got (cl-cc/binary::add-got-entries 0)))
-    (assert-equal 24 (length got))))
+    (expect (length got) :to-equal 24)))
 
-(deftest got-plt-add-got-entries-n-symbols-correct-size
-  "add-got-entries with N symbols: (3+N) × 8 bytes."
+(it-sequential "got-plt-add-got-entries-n-symbols-correct-size"
   (dolist (n '(0 1 2 5 10))
-    (assert-equal (* 8 (+ 3 n))
-                  (length (cl-cc/binary::add-got-entries n)))))
+    (expect (length (cl-cc/binary::add-got-entries n)) :to-equal (* 8 (+ 3 n)))))
 
-(deftest got-plt-add-got-entries-all-zeros
-  "All GOT slots are initialized to zero (filled lazily by ld.so)."
+(it-sequential "got-plt-add-got-entries-all-zeros"
   (let ((got (cl-cc/binary::add-got-entries 2)))
-    (assert-true (every #'zerop got))))
+    (expect (every #'zerop got) :to-be-truthy)))
 
 ;;; ─── add-dynamic-relocations ─────────────────────────────────────────────
 
-(deftest got-plt-add-dynamic-relocations-empty-returns-empty
-  "add-dynamic-relocations with no symbols returns an empty vector."
+(it-sequential "got-plt-add-dynamic-relocations-empty-returns-empty"
   (let ((rela (cl-cc/binary::add-dynamic-relocations '() 0)))
-    (assert-equal 0 (length rela))))
+    (expect (length rela) :to-equal 0)))
 
-(deftest got-plt-add-dynamic-relocations-one-symbol-24-bytes
-  "One symbol → one Elf64_Rela (24 bytes: r_offset u64 + r_info u64 + r_addend s64)."
+(it-sequential "got-plt-add-dynamic-relocations-one-symbol-24-bytes"
   (let ((rela (cl-cc/binary::add-dynamic-relocations '("foo") 0)))
-    (assert-equal 24 (length rela))))
+    (expect (length rela) :to-equal 24)))
 
-(deftest got-plt-add-dynamic-relocations-n-symbols-correct-size
-  "N symbols → N × 24-byte Elf64_Rela entries."
+(it-sequential "got-plt-add-dynamic-relocations-n-symbols-correct-size"
   (dolist (n '(1 2 5))
     (let ((syms (loop repeat n collect "sym")))
-      (assert-equal (* 24 n)
-                    (length (cl-cc/binary::add-dynamic-relocations syms 0))))))
+      (expect (length (cl-cc/binary::add-dynamic-relocations syms 0)) :to-equal (* 24 n)))))
 
-(deftest got-plt-add-dynamic-relocations-r-info-type-is-jump-slot
-  "r_info low 32 bits = R_X86_64_JUMP_SLOT (7) for the first symbol."
-  ;; r_info is at bytes 8-15 of the first Rela entry (little-endian)
+(it-sequential "got-plt-add-dynamic-relocations-r-info-type-is-jump-slot"
   (let* ((rela (cl-cc/binary::add-dynamic-relocations '("foo") 0))
          ;; Low 32 bits of r_info: bytes 8-11
          (r-type (logior (aref rela 8)
                          (ash (aref rela 9)  8)
                          (ash (aref rela 10) 16)
                          (ash (aref rela 11) 24))))
-    (assert-equal cl-cc/binary::+r-x86-64-jump-slot+ r-type)))
+    (expect r-type :to-equal cl-cc/binary::+r-x86-64-jump-slot+)))
 
-(deftest got-plt-add-dynamic-relocations-r-offset-targets-got3
-  "r_offset for symbol 0 targets GOT[3] = got-plt-addr + 24."
+(it-sequential "got-plt-add-dynamic-relocations-r-offset-targets-got3"
   (let* ((got-base #x1000)
          (rela (cl-cc/binary::add-dynamic-relocations '("foo") got-base))
          ;; r_offset: bytes 0-7 of first entry (little-endian u64)
@@ -136,25 +111,23 @@
                            (ash (aref rela 2) 16)
                            (ash (aref rela 3) 24))))
     ;; GOT[3] = got-base + 3*8 = #x1018
-    (assert-equal (+ got-base 24) r-offset)))
+    (expect r-offset :to-equal (+ got-base 24))))
 
 ;;; ─── setup-got-plt (integration) ────────────────────────────────────────
 
-(deftest got-plt-setup-returns-four-values
-  "setup-got-plt returns exactly four values."
+(it-sequential "got-plt-setup-returns-four-values"
   (multiple-value-bind (plt got rela bind-now)
       (cl-cc/binary::setup-got-plt '("foo" "bar"))
-    (assert-true (typep plt  '(simple-array (unsigned-byte 8) (*))))
-    (assert-true (typep got  '(simple-array (unsigned-byte 8) (*))))
-    (assert-true (typep rela '(simple-array (unsigned-byte 8) (*))))
-    (assert-true bind-now)))
+    (expect (typep plt  '(simple-array (unsigned-byte 8) (*))) :to-be-truthy)
+    (expect (typep got  '(simple-array (unsigned-byte 8) (*))) :to-be-truthy)
+    (expect (typep rela '(simple-array (unsigned-byte 8) (*))) :to-be-truthy)
+    (expect bind-now :to-be-truthy)))
 
-(deftest got-plt-setup-sizes-are-consistent
-  "setup-got-plt sizes agree with per-function invariants for N=3 symbols."
+(it-sequential "got-plt-setup-sizes-are-consistent"
   (let ((syms '("malloc" "free" "puts")))
     (multiple-value-bind (plt got rela _)
         (cl-cc/binary::setup-got-plt syms)
       (declare (ignore _))
-      (assert-equal (* 16 (1+ (length syms))) (length plt))
-      (assert-equal (* 8  (+ 3 (length syms))) (length got))
-      (assert-equal (* 24 (length syms)) (length rela)))))
+      (expect (length plt) :to-equal (* 16 (1+ (length syms))))
+      (expect (length got) :to-equal (* 8  (+ 3 (length syms))))
+      (expect (length rela) :to-equal (* 24 (length syms))))))

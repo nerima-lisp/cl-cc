@@ -2,11 +2,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite binary-wxorx-suite
-  :description "FR-694 ELF W^X enforcement tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite binary-wxorx-suite)
 
 (defun %elf-u16le (bytes offset)
   (+ (aref bytes offset)
@@ -44,8 +40,7 @@
              (flags (%elf-u64le bytes (+ header 8))))
         (setf (gethash name result) flags)))))
 
-(deftest fr-694-elf-executable-has-non-executable-gnu-stack
-  "FR-694: Executables include PT_GNU_STACK with PF_R|PF_W and no PF_X."
+(it-sequential "fr-694-elf-executable-has-non-executable-gnu-stack"
   (let* ((bytes (cl-cc/binary::compile-to-elf64-exec #(195) nil))
          (phoff (%elf-u64le bytes 32))
          (phentsize (%elf-u16le bytes 54))
@@ -57,13 +52,11 @@
              (flags (%elf-u32le bytes (+ header 4))))
         (when (= type cl-cc/binary::+pt-gnu-stack+)
           (setf gnu-stack-flags flags))))
-    (assert-true gnu-stack-flags)
-    (assert-equal (logior cl-cc/binary::+pf-r+ cl-cc/binary::+pf-w+)
-                  gnu-stack-flags)
-    (assert-equal 0 (logand gnu-stack-flags cl-cc/binary::+pf-x+))))
+    (expect gnu-stack-flags :to-be-truthy)
+    (expect gnu-stack-flags :to-equal (logior cl-cc/binary::+pf-r+ cl-cc/binary::+pf-w+))
+    (expect (logand gnu-stack-flags cl-cc/binary::+pf-x+) :to-equal 0)))
 
-(deftest fr-694-elf-executable-section-flags-are-wxorx
-  "FR-694: .text is RX, while .data/.bss are RW and never executable."
+(it-sequential "fr-694-elf-executable-section-flags-are-wxorx"
   (let* ((builder (cl-cc/binary::make-elf64-executable))
          (text-flags nil)
          (data-flags nil)
@@ -75,12 +68,9 @@
       (setf text-flags (gethash ".text" flags)
             data-flags (gethash ".data" flags)
             bss-flags (gethash ".bss" flags)))
-    (assert-equal (logior cl-cc/binary::+shf-alloc+ cl-cc/binary::+shf-execinstr+)
-                  text-flags)
-    (assert-equal (logior cl-cc/binary::+shf-alloc+ cl-cc/binary::+shf-write+)
-                  data-flags)
-    (assert-equal (logior cl-cc/binary::+shf-alloc+ cl-cc/binary::+shf-write+)
-                  bss-flags)
-    (assert-equal 0 (logand text-flags cl-cc/binary::+shf-write+))
-    (assert-equal 0 (logand data-flags cl-cc/binary::+shf-execinstr+))
-    (assert-equal 0 (logand bss-flags cl-cc/binary::+shf-execinstr+))))
+    (expect text-flags :to-equal (logior cl-cc/binary::+shf-alloc+ cl-cc/binary::+shf-execinstr+))
+    (expect data-flags :to-equal (logior cl-cc/binary::+shf-alloc+ cl-cc/binary::+shf-write+))
+    (expect bss-flags :to-equal (logior cl-cc/binary::+shf-alloc+ cl-cc/binary::+shf-write+))
+    (expect (logand text-flags cl-cc/binary::+shf-write+) :to-equal 0)
+    (expect (logand data-flags cl-cc/binary::+shf-execinstr+) :to-equal 0)
+    (expect (logand bss-flags cl-cc/binary::+shf-execinstr+) :to-equal 0)))
