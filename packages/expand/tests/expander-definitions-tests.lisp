@@ -2,31 +2,24 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-definitions-suite
-  :description "Definition-form expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-definitions-suite)
 
-(deftest expander-docstring-helpers
-  "%strip-docstring and %extract-docstring handle leading documentation strings."
+(it-sequential "expander-docstring-helpers"
   (let* ((body '("Doc" (foo) (bar)))
          (stripped (cl-cc/expand::%strip-docstring body)))
-    (assert-equal '((foo) (bar)) stripped)
-    (assert-equal "Doc" (cl-cc/expand::%extract-docstring body))))
+    (expect stripped :to-equal '((foo) (bar)))
+    (expect (cl-cc/expand::%extract-docstring body) :to-equal "Doc")))
 
-(deftest expander-defsetf-short-form-registers-updater
-  "defsetf short form registers an updater and rewrites setf to the updater call."
+(it-sequential "expander-defsetf-short-form-registers-updater"
   (let ((accessor 'expander-defsetf-short-accessor)
         (updater 'expander-defsetf-short-updater))
     (cl-cc/expand:compiler-macroexpand-all `(defsetf ,accessor ,updater))
-    (assert-true (gethash accessor cl-cc/expand::*setf-compound-place-handlers*))
+    (expect (gethash accessor cl-cc/expand::*setf-compound-place-handlers*) :to-be-truthy)
     (let ((result (cl-cc/expand:compiler-macroexpand-all `(setf (,accessor obj arg) value))))
-      (assert-eq updater (car result))
-      (assert-equal '(obj arg value) (cdr result)))))
+      (expect (car result) :to-be updater)
+      (expect (cdr result) :to-equal '(obj arg value)))))
 
-(deftest expander-defsetf-long-form-uses-full-lambda-list
-  "defsetf long form supports optional and keyword parameters in the place lambda-list."
+(it-sequential "expander-defsetf-long-form-uses-full-lambda-list"
   (let ((accessor 'expander-defsetf-long-form-accessor))
     (cl-cc/expand:compiler-macroexpand-all
      '(defsetf expander-defsetf-long-form-accessor
@@ -37,26 +30,23 @@
                     '(setf (expander-defsetf-long-form-accessor 10 :scale 7)
                            42)))
            (printed (format nil "~S" result)))
-      (assert-eq 'let (car result))
-      (assert-true (search "X-P" printed))
-      (assert-true (search "SCALE-P" printed))
-      (assert-true (search "NEW-VALUE" printed))
-      (assert-true (gethash accessor cl-cc/expand::*setf-compound-place-handlers*)))))
+      (expect (car result) :to-be 'let)
+      (expect (search "X-P" printed) :to-be-truthy)
+      (expect (search "SCALE-P" printed) :to-be-truthy)
+      (expect (search "NEW-VALUE" printed) :to-be-truthy)
+      (expect (gethash accessor cl-cc/expand::*setf-compound-place-handlers*) :to-be-truthy))))
 
-(deftest expander-defconstant-populates-constant-table
-  "defconstant side-effect: value is stored in *constant-table* for constant folding."
+(it-sequential "expander-defconstant-populates-constant-table"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(defconstant +expander-def-constant+ 42))))
-    (assert-eq 'defparameter (car result))
-    (assert-equal 42 (third result))
-    (assert-equal 42 (gethash '+expander-def-constant+ cl-cc/expand:*constant-table*))))
+    (expect (car result) :to-be 'defparameter)
+    (expect (third result) :to-equal 42)
+    (expect (gethash '+expander-def-constant+ cl-cc/expand:*constant-table*) :to-equal 42)))
 
-(deftest expander-define-symbol-macro-and-get-decoded-time
-  "define-symbol-macro populates the symbol macro table and get-decoded-time expands to decode-universal-time."
+(it-sequential "expander-define-symbol-macro-and-get-decoded-time"
   (let* ((name 'expander-definitions-symbol-macro)
          (expansion '(+ 1 2))
          (result (cl-cc/expand:compiler-macroexpand-all `(define-symbol-macro ,name ,expansion))))
-    (assert-eq 'quote (car result))
-    (assert-eq name (second result))
-    (assert-equal expansion (gethash name cl-cc/expand:*symbol-macro-table*)))
-  (assert-equal '(decode-universal-time (get-universal-time))
-                (cl-cc/expand:compiler-macroexpand-all '(get-decoded-time))))
+    (expect (car result) :to-be 'quote)
+    (expect (second result) :to-be name)
+    (expect (gethash name cl-cc/expand:*symbol-macro-table*) :to-equal expansion))
+  (expect (cl-cc/expand:compiler-macroexpand-all '(get-decoded-time)) :to-equal '(decode-universal-time (get-universal-time))))

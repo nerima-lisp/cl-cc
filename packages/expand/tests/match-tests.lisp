@@ -2,75 +2,61 @@
 
 (in-package :cl-cc/test)
 
-(defsuite match-suite
-  :description "FR-779 structural pattern matching and FR-780 exhaustiveness checks"
-  :parent cl-cc-unit-suite)
 
-(in-suite match-suite)
 
 (defun %match-test-eval (form)
   (eval (our-macroexpand-all form)))
 
-(deftest match-literal-variable-and-wildcard-patterns
-  "MATCH supports literal arms, variable binding, and wildcard fallback."
-  :tags '(:fr-779)
-  (assert-equal :one
-                (%match-test-eval '(match 1
+(it-sequential "match-literal-variable-and-wildcard-patterns"
+  :tags
+  '(:fr-779)
+  (expect (%match-test-eval '(match 1
                                      (0 :zero)
                                      (1 :one)
-                                     (_ :other))))
-  (assert-equal 42
-                (%match-test-eval '(match 41
+                                     (_ :other))) :to-equal :one)
+  (expect (%match-test-eval '(match 41
                                      (0 :zero)
-                                     (x (+ x 1)))))
-  (assert-equal :fallback
-                (%match-test-eval '(match :unknown
+                                     (x (+ x 1)))) :to-equal 42)
+  (expect (%match-test-eval '(match :unknown
                                      (:known :known)
-                                     (_ :fallback)))))
+                                     (_ :fallback))) :to-equal :fallback))
 
-(deftest match-cons-list-and-vector-patterns
-  "MATCH destructures cons cells, proper lists, and vectors."
-  :tags '(:fr-779)
-  (assert-equal 3
-                (%match-test-eval '(match '(1 . 2)
+(it-sequential "match-cons-list-and-vector-patterns"
+  :tags
+  '(:fr-779)
+  (expect (%match-test-eval '(match '(1 . 2)
                                      ((cons x y) (+ x y))
-                                     (_ :no))))
-  (assert-equal 6
-                (%match-test-eval '(match '(1 2 3)
+                                     (_ :no))) :to-equal 3)
+  (expect (%match-test-eval '(match '(1 2 3)
                                      ((list a b c) (+ a b c))
-                                     (_ :no))))
-  (assert-equal 9
-                (%match-test-eval '(match #(4 5)
+                                     (_ :no))) :to-equal 6)
+  (expect (%match-test-eval '(match #(4 5)
                                      ((vector a b) (+ a b))
-                                     (_ :no)))))
+                                     (_ :no))) :to-equal 9))
 
-(deftest match-type-and-guard-patterns
-  "MATCH supports type checks plus WHEN/AND/OR guard combinators."
-  :tags '(:fr-779)
-  (assert-equal 10
-                (%match-test-eval '(match 5
+(it-sequential "match-type-and-guard-patterns"
+  :tags
+  '(:fr-779)
+  (expect (%match-test-eval '(match 5
                                      ((type integer n) (* n 2))
-                                     (_ :no))))
-  (assert-equal :positive-even
-                (%match-test-eval '(match 4
+                                     (_ :no))) :to-equal 10)
+  (expect (%match-test-eval '(match 4
                                      ((when (type integer n)
                                         (and (> n 0) (evenp n)))
                                       :positive-even)
-                                     (_ :no))))
-  (assert-equal :small
-                (%match-test-eval '(match 1
+                                     (_ :no))) :to-equal :positive-even)
+  (expect (%match-test-eval '(match 1
                                      ((or 0 1 2) :small)
-                                     (_ :large))))
-  (assert-equal :non-empty-list
-                (%match-test-eval '(match '(a b)
+                                     (_ :large))) :to-equal :small)
+  (expect (%match-test-eval '(match '(a b)
                                      ((and (type cons) (cons head tail))
                                       (declare (ignore head tail))
                                       :non-empty-list)
-                                     (_ :no)))))
+                                     (_ :no))) :to-equal :non-empty-list))
 
-(deftest match-non-exhaustive-pattern-signals-compiler-style-warning
-  "FR-780: non-exhaustive MATCH forms signal a compiler style-warning."
-  :tags '(:fr-780)
+(it-sequential "match-non-exhaustive-pattern-signals-compiler-style-warning"
+  :tags
+  '(:fr-780)
   (let ((seen nil))
     (handler-bind ((cl-cc/expand:match-exhaustiveness-warning
                      (lambda (warning)
@@ -79,13 +65,13 @@
       (our-macroexpand-1 '(match x
                            (0 :zero)
                            (1 :one))))
-    (assert-true seen)
-    (assert-true (typep seen 'cl-cc/vm:compiler-style-warning))
-    (assert-equal "W0780" (cl-cc/vm:compiler-diagnostic-error-code seen))))
+    (expect seen :to-be-truthy)
+    (expect (typep seen 'cl-cc/vm:compiler-style-warning) :to-be-truthy)
+    (expect (cl-cc/vm:compiler-diagnostic-error-code seen) :to-equal "W0780")))
 
-(deftest match-exhaustive-pattern-does-not-warn
-  "FR-780: wildcard/variable final arms make MATCH exhaustive."
-  :tags '(:fr-780)
+(it-sequential "match-exhaustive-pattern-does-not-warn"
+  :tags
+  '(:fr-780)
   (let ((warnings nil))
     (handler-bind ((cl-cc/expand:match-exhaustiveness-warning
                      (lambda (warning)
@@ -94,11 +80,11 @@
       (our-macroexpand-1 '(match x
                            (0 :zero)
                            (_ :other))))
-    (assert-null warnings)))
+    (expect warnings :to-be-null)))
 
-(deftest match-unreachable-pattern-signals-warning
-  "FR-780: duplicate or post-catch-all MATCH arms are reported as unreachable."
-  :tags '(:fr-780)
+(it-sequential "match-unreachable-pattern-signals-warning"
+  :tags
+  '(:fr-780)
   (let ((warnings nil))
     (handler-bind ((cl-cc/expand:match-unreachable-pattern-warning
                      (lambda (warning)
@@ -110,8 +96,8 @@
                            (1 :duplicate)
                            (_ :other)
                            (2 :after-wildcard))))
-    (assert-= 2 (length warnings))
-    (assert-true (every (lambda (warning)
+    (expect (= 2 (length warnings)) :to-be-truthy)
+    (expect (every (lambda (warning)
                           (equal "W0781"
                                  (cl-cc/vm:compiler-diagnostic-error-code warning)))
-                        warnings))))
+                        warnings) :to-be-truthy)))

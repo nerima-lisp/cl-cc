@@ -3,15 +3,10 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-filesystem-suite
-  :description "Tests for macros-filesystem.lisp"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-filesystem-suite)
 
-(deftest time-expansion
-  "TIME expands to a LET* that measures elapsed universal time."
+(it-sequential "time-expansion"
   (let ((result (our-macroexpand-1 '(time (+ 1 2)))))
-    (assert-eq 'let* (car result))
-    (assert-eq 'get-universal-time (car (second (first (second result)))))
-    (assert-eq 'format (car (third result)))))
+    (expect (car result) :to-be 'let*)
+    (expect (car (second (first (second result)))) :to-be 'get-universal-time)
+    (expect (car (third result)) :to-be 'format)))

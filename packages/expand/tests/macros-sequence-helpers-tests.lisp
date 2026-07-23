@@ -3,45 +3,48 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-sequence-helpers-suite
-  :description "Tests for macros-sequence-helpers.lisp"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-sequence-helpers-suite)
 
 ;;; ── SUBST-IF / SUBST-IF-NOT ────────────────────────────────────────────────
 
-(deftest-each macros-sequence-helpers-let-body-structure
-  "subst-if, member-if, and maphash each expand to a LET whose body begins with a specific inner operator."
-  :cases (("subst-if"  '(subst-if new pred tree)  'labels)
-          ("member-if" '(member-if pred lst)       'do)
-          ("maphash"   '(maphash fn table)         'dolist))
-  (form inner-op)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq 'let (car result))
-    (assert-eq inner-op (car (caddr result)))))
+(it-sequential "macros-sequence-helpers-let-body-structure subst-if"
+  (destructuring-bind (form inner-op) (list '(subst-if new pred tree) 'labels)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'let)
+    (expect (car (caddr result)) :to-be inner-op))))
 
-(deftest-each macros-sequence-helpers-complement-delegation
-  "subst-if-not and member-if-not delegate to their non-not counterparts via COMPLEMENT.
-For member-if-not the (complement pred) cons sits at position 2 (cadr), not
-cadar — caadr would extract the CAR of that cons (the symbol 'complement) and
-then error when (car 'complement) is applied."
-  :cases (("subst-if-not"  '(subst-if-not new pred tree) 'subst-if  #'caddr)
-          ("member-if-not" '(member-if-not pred lst)     'member-if #'cadr))
-  (form outer-op complement-extractor)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq outer-op (car result))
-    (assert-eq 'complement (car (funcall complement-extractor result)))))
+(it-sequential "macros-sequence-helpers-let-body-structure member-if"
+  (destructuring-bind (form inner-op) (list '(member-if pred lst) 'do)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'let)
+    (expect (car (caddr result)) :to-be inner-op))))
+
+(it-sequential "macros-sequence-helpers-let-body-structure maphash"
+  (destructuring-bind (form inner-op) (list '(maphash fn table) 'dolist)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'let)
+    (expect (car (caddr result)) :to-be inner-op))))
+
+(it-sequential "macros-sequence-helpers-complement-delegation subst-if-not"
+  (destructuring-bind (form outer-op complement-extractor) (list '(subst-if-not new pred tree) 'subst-if #'caddr)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be outer-op)
+    (expect (car (funcall complement-extractor result)) :to-be 'complement))))
+
+(it-sequential "macros-sequence-helpers-complement-delegation member-if-not"
+  (destructuring-bind (form outer-op complement-extractor) (list '(member-if-not pred lst) 'member-if #'cadr)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be outer-op)
+    (expect (car (funcall complement-extractor result)) :to-be 'complement))))
 
 ;;; ── VECTOR ──────────────────────────────────────────────────────────────────
 
-(deftest vector-expansion
-  "VECTOR expands to MAKE-ARRAY or a LET around MAKE-ARRAY."
+(it-sequential "vector-expansion"
   (let ((empty-result (our-macroexpand-1 '(vector))))
-    (assert-equal empty-result '(make-array 0)))
+    (expect '(make-array 0) :to-equal empty-result))
   (let ((result (our-macroexpand-1 '(vector a b c))))
-    (assert-eq 'let (car result))
-    (assert-eq 'make-array (car (cadr (car (second result)))))))
+    (expect (car result) :to-be 'let)
+    (expect (car (cadr (car (second result)))) :to-be 'make-array)))
 
 ;;; ── MEMBER-IF / MEMBER-IF-NOT ───────────────────────────────────────────────
 

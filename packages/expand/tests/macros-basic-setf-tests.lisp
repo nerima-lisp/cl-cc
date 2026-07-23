@@ -3,72 +3,89 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-basic-setf-suite
-  :description "Tests for macros-basic.lisp: setf places"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-basic-setf-suite)
 
-(deftest setf-plain-symbol-to-setq
-  "(setf x v) → (setq x v)"
-  (assert-equal (our-macroexpand-1 '(setf x v)) '(setq x v)))
+(it-sequential "setf-plain-symbol-to-setq"
+  (expect '(setq x v) :to-equal (our-macroexpand-1 '(setf x v))))
 
-(deftest-each setf-passthrough-expansions
-  "(setf (accessor ...)) expands without gensym: (accessor* args val)"
-  :cases (("gethash"    '(setf (gethash k ht) v)      "SETF-GETHASH"    '(k ht v))
-          ("slot-value" '(setf (slot-value obj 'slot) v) "RT-SLOT-SET" '(obj 'slot v)))
-  (form expected-name expected-args)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-equal (symbol-name (car result)) expected-name)
-    (assert-equal (cdr result) expected-args)))
+(it-sequential "setf-passthrough-expansions gethash"
+  (destructuring-bind (form expected-name expected-args) (list '(setf (gethash k ht) v) "SETF-GETHASH" '(k ht v))
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect expected-args :to-equal (cdr result)))))
 
-(deftest setf-fill-pointer-expands-to-vm-builtin
-  "(setf (fill-pointer vector) value) expands to the VM fill-pointer setter, not slot-value."
+(it-sequential "setf-passthrough-expansions slot-value"
+  (destructuring-bind (form expected-name expected-args) (list '(setf (slot-value obj 'slot) v) "RT-SLOT-SET" '(obj 'slot v))
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect expected-args :to-equal (cdr result)))))
+
+(it-sequential "setf-fill-pointer-expands-to-vm-builtin"
   (let* ((result (our-macroexpand-1 '(setf (fill-pointer v) n)))
          (setter-form (third result)))
-    (assert-eq 'let (car result))
-    (assert-string= "%SET-FILL-POINTER" (symbol-name (car setter-form)))
-    (assert-eq 'v (second setter-form))))
+    (expect (car result) :to-be 'let)
+    (expect (symbol-name (car setter-form)) :to-equal "%SET-FILL-POINTER")
+    (expect (second setter-form) :to-be 'v)))
 
-(deftest-each place-macro-outer-is-let
-  "Compound-place macros (setf car/nth/getf, case, typecase) wrap in LET."
-  :cases (("setf-car"   '(setf (car x) v))
-          ("setf-nth"   '(setf (nth 2 lst) v))
-          ("setf-getf"  '(setf (getf plist :k) v))
-          ("case"       '(case x (1 :one) (2 :two)))
-          ("typecase"   '(typecase x (integer :int) (string :str))))
-  (form)
-  (assert-eq 'let (car (our-macroexpand-1 form))))
+(it-sequential "place-macro-outer-is-let setf-car"
+  (destructuring-bind (form) (list '(setf (car x) v))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
 
-(deftest-each setf-cons-cell-synonyms
-  "car/first both expand to rplaca; cdr/rest both expand to rplacd."
-  :cases (("car"   '(setf (car x)   v) 'rplaca)
-          ("first" '(setf (first x) v) 'rplaca)
-          ("cdr"   '(setf (cdr x)   v) 'rplacd)
-          ("rest"  '(setf (rest x)  v) 'rplacd))
-  (form expected-fn)
-  (let* ((result (our-macroexpand-1 form))
+(it-sequential "place-macro-outer-is-let setf-nth"
+  (destructuring-bind (form) (list '(setf (nth 2 lst) v))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "place-macro-outer-is-let setf-getf"
+  (destructuring-bind (form) (list '(setf (getf plist :k) v))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "place-macro-outer-is-let case"
+  (destructuring-bind (form) (list '(case x (1 :one) (2 :two)))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "place-macro-outer-is-let typecase"
+  (destructuring-bind (form) (list '(typecase x (integer :int) (string :str)))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "setf-cons-cell-synonyms car"
+  (destructuring-bind (form expected-fn) (list '(setf (car x)   v) 'rplaca)
+    (let* ((result (our-macroexpand-1 form))
          (body   (cddr result)))
-    (assert-eq (caar body) expected-fn)))
+    (expect expected-fn :to-be (caar body)))))
 
-(deftest setf-nth-body-uses-rplaca-nthcdr
-  "(setf (nth n lst) v) body has (rplaca (nthcdr n lst) v)"
+(it-sequential "setf-cons-cell-synonyms first"
+  (destructuring-bind (form expected-fn) (list '(setf (first x) v) 'rplaca)
+    (let* ((result (our-macroexpand-1 form))
+         (body   (cddr result)))
+    (expect expected-fn :to-be (caar body)))))
+
+(it-sequential "setf-cons-cell-synonyms cdr"
+  (destructuring-bind (form expected-fn) (list '(setf (cdr x)   v) 'rplacd)
+    (let* ((result (our-macroexpand-1 form))
+         (body   (cddr result)))
+    (expect expected-fn :to-be (caar body)))))
+
+(it-sequential "setf-cons-cell-synonyms rest"
+  (destructuring-bind (form expected-fn) (list '(setf (rest x)  v) 'rplacd)
+    (let* ((result (our-macroexpand-1 form))
+         (body   (cddr result)))
+    (expect expected-fn :to-be (caar body)))))
+
+(it-sequential "setf-nth-body-uses-rplaca-nthcdr"
   (let* ((result (our-macroexpand-1 '(setf (nth 2 lst) v)))
          (body   (cddr result)))
-    (assert-eq (caar body) 'rplaca)
-    (assert-equal (caadar body) 'nthcdr)))
+    (expect 'rplaca :to-be (caar body))
+    (expect 'nthcdr :to-equal (caadar body))))
 
-(deftest setf-getf-body-uses-rt-plist-put
-  "(setf (getf plist :k) v) body uses rt-plist-put (CL-CC-specific symbol)"
+(it-sequential "setf-getf-body-uses-rt-plist-put"
   (let* ((result    (our-macroexpand-1 '(setf (getf plist :k) v)))
           (setq-form (caddr result)))
-    (assert-eq (car setq-form) 'setq)
-    (assert-equal (symbol-name (car (caddr setq-form))) "RT-PLIST-PUT")))
+    (expect 'setq :to-be (car setq-form))
+    (expect "RT-PLIST-PUT" :to-equal (symbol-name (car (caddr setq-form))))))
 
-(deftest setf-getf-compound-place-uses-recursive-setf
-  "(setf (getf compound-place :k) v) never emits SETQ with a non-symbol variable."
+(it-sequential "setf-getf-compound-place-uses-recursive-setf"
   (let* ((result (our-macroexpand-1 '(setf (getf (cdddr method-entry) :phase) v)))
          (setter-form (caddr result)))
-    (assert-eq 'setf (car setter-form))
-    (assert-equal '(cdddr method-entry) (second setter-form))
-    (assert-equal (symbol-name (car (third setter-form))) "RT-PLIST-PUT")))
+    (expect (car setter-form) :to-be 'setf)
+    (expect (second setter-form) :to-equal '(cdddr method-entry))
+    (expect "RT-PLIST-PUT" :to-equal (symbol-name (car (third setter-form))))))

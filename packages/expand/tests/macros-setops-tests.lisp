@@ -2,100 +2,134 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-setops-suite
-  :description "Set operation macro tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-setops-suite)
 
 (defun %quoted-form (value)
   `(quote ,value))
 
-(deftest-each macros-setops-expand-to-let
-  "All set-operation macros expand to a LET at the top level."
-  :cases (("remove"            '(remove x xs))
-          ("member"            '(member x xs))
-          ("remove-duplicates" '(remove-duplicates xs))
-          ("union"             '(union xs ys))
-          ("set-difference"    '(set-difference xs ys))
-          ("intersection"      '(intersection xs ys))
-          ("subsetp"           '(subsetp xs ys))
-          ("adjoin"            '(adjoin x xs))
-          ("rassoc"            '(rassoc x alist))
-          ("pairlis"           '(pairlis keys data)))
-  (form)
-  (assert-eq 'let (car (our-macroexpand-1 form))))
+(it-sequential "macros-setops-expand-to-let remove"
+  (destructuring-bind (form) (list '(remove x xs))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let member"
+  (destructuring-bind (form) (list '(member x xs))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let remove-duplicates"
+  (destructuring-bind (form) (list '(remove-duplicates xs))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let union"
+  (destructuring-bind (form) (list '(union xs ys))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let set-difference"
+  (destructuring-bind (form) (list '(set-difference xs ys))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let intersection"
+  (destructuring-bind (form) (list '(intersection xs ys))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let subsetp"
+  (destructuring-bind (form) (list '(subsetp xs ys))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let adjoin"
+  (destructuring-bind (form) (list '(adjoin x xs))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let rassoc"
+  (destructuring-bind (form) (list '(rassoc x alist))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "macros-setops-expand-to-let pairlis"
+  (destructuring-bind (form) (list '(pairlis keys data))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
 
 ;;; ── %keyword-test-args ───────────────────────────────────────────────────
 
-(deftest-each keyword-test-args-cases
-  "%keyword-test-args returns :test, :test-not, or nil for three arg patterns."
-  :cases (("test-given"     '#'eq nil     '(:test #'eq))
-          ("test-not-given" nil '#'equal  '(:test-not #'equal))
-          ("neither"        nil nil        nil))
-  (test test-not expected)
-  (assert-equal expected (cl-cc/expand::%keyword-test-args test test-not)))
+(it-sequential "keyword-test-args-cases test-given"
+  (destructuring-bind (test test-not expected) (list '#'eq nil '(:test #'eq))
+    (expect (cl-cc/expand::%keyword-test-args test test-not) :to-equal expected)))
+
+(it-sequential "keyword-test-args-cases test-not-given"
+  (destructuring-bind (test test-not expected) (list nil '#'equal '(:test-not #'equal))
+    (expect (cl-cc/expand::%keyword-test-args test test-not) :to-equal expected)))
+
+(it-sequential "keyword-test-args-cases neither"
+  (destructuring-bind (test test-not expected) (list nil nil nil)
+    (expect (cl-cc/expand::%keyword-test-args test test-not) :to-equal expected)))
 
 ;;; ── %keyword-test-key-args ───────────────────────────────────────────────
 
-(deftest-each keyword-test-key-args-cases
-  "%keyword-test-key-args returns the correct :test/:test-not/:key argument list."
-  :cases (("test-and-key"     '#'eq   nil      '#'car  '(:test #'eq :key #'car))
-          ("test-not-and-key" nil     '#'equal '#'cdr  '(:test-not #'equal :key #'cdr))
-          ("no-test-no-key"   nil     nil      nil     nil)
-          ("test-only"        '#'eql  nil      nil     '(:test #'eql)))
-  (test test-not key expected)
-  (assert-equal expected (cl-cc/expand::%keyword-test-key-args test test-not key)))
+(it-sequential "keyword-test-key-args-cases test-and-key"
+  (destructuring-bind (test test-not key expected) (list '#'eq nil '#'car '(:test #'eq :key #'car))
+    (expect (cl-cc/expand::%keyword-test-key-args test test-not key) :to-equal expected)))
+
+(it-sequential "keyword-test-key-args-cases test-not-and-key"
+  (destructuring-bind (test test-not key expected) (list nil '#'equal '#'cdr '(:test-not #'equal :key #'cdr))
+    (expect (cl-cc/expand::%keyword-test-key-args test test-not key) :to-equal expected)))
+
+(it-sequential "keyword-test-key-args-cases no-test-no-key"
+  (destructuring-bind (test test-not key expected) (list nil nil nil nil)
+    (expect (cl-cc/expand::%keyword-test-key-args test test-not key) :to-equal expected)))
+
+(it-sequential "keyword-test-key-args-cases test-only"
+  (destructuring-bind (test test-not key expected) (list '#'eql nil nil '(:test #'eql))
+    (expect (cl-cc/expand::%keyword-test-key-args test test-not key) :to-equal expected)))
 
 ;;; ── %test-predicate-form ─────────────────────────────────────────────────
 
-(deftest-each test-predicate-form-cases
-  "%test-predicate-form returns complement for test-not, test itself, or #'eql default."
-  :cases (("test-not"  nil '#'equal '(complement #'equal))
-          ("test"      '#'eq nil    '#'eq)
-          ("default"   nil nil      '#'eql))
-  (test test-not expected)
-  (assert-equal expected (cl-cc/expand::%test-predicate-form test test-not)))
+(it-sequential "test-predicate-form-cases test-not"
+  (destructuring-bind (test test-not expected) (list nil '#'equal '(complement #'equal))
+    (expect (cl-cc/expand::%test-predicate-form test test-not) :to-equal expected)))
+
+(it-sequential "test-predicate-form-cases test"
+  (destructuring-bind (test test-not expected) (list '#'eq nil '#'eq)
+    (expect (cl-cc/expand::%test-predicate-form test test-not) :to-equal expected)))
+
+(it-sequential "test-predicate-form-cases default"
+  (destructuring-bind (test test-not expected) (list nil nil '#'eql)
+    (expect (cl-cc/expand::%test-predicate-form test test-not) :to-equal expected)))
 
 ;;; ── macro runtime behaviour ──────────────────────────────────────────────
 
-(deftest macros-setops-member-finds-element
-  "member finds an element in a list using EQL (default)."
-  (assert-true (run-string "(member 2 '(1 2 3))")))
+(it-sequential "macros-setops-member-finds-element"
+  (expect (run-string "(member 2 '(1 2 3))") :to-be-truthy))
 
-(deftest macros-setops-remove-filters-element
-  "remove removes all matching elements."
-  (assert-equal '(1 3) (run-string "(remove 2 '(1 2 3))")))
+(it-sequential "macros-setops-remove-filters-element"
+  (expect (run-string "(remove 2 '(1 2 3))") :to-equal '(1 3)))
 
-(deftest macros-setops-union-no-duplicates
-  "union merges two lists without duplicates."
+(it-sequential "macros-setops-union-no-duplicates"
   (let ((result (run-string "(sort (union '(1 2) '(2 3)) #'<)")))
-    (assert-equal '(1 2 3) result)))
+    (expect result :to-equal '(1 2 3))))
 
-(deftest macros-setops-intersection-common-elements
-  "intersection returns common elements."
+(it-sequential "macros-setops-intersection-common-elements"
   (let ((result (run-string "(sort (intersection '(1 2 3) '(2 3 4)) #'<)")))
-    (assert-equal '(2 3) result)))
+    (expect result :to-equal '(2 3))))
 
-(deftest macros-setops-set-difference-removes-second-set
-  "set-difference removes elements of second list from first."
+(it-sequential "macros-setops-set-difference-removes-second-set"
   (let ((result (run-string "(sort (set-difference '(1 2 3) '(2)) #'<)")))
-    (assert-equal '(1 3) result)))
+    (expect result :to-equal '(1 3))))
 
-(deftest-each macros-setops-hash-fast-path-expands
-  "Large compatible set operations expand to a hash-table fast path."
-  :cases (("union"
-           `(union ,(%quoted-form (loop for i below 24 collect i))
+(it-sequential "macros-setops-hash-fast-path-expands union"
+  (destructuring-bind (form) (list `(union ,(%quoted-form (loop for i below 24 collect i))
                    ,(%quoted-form '(24 25))
                    :test #'eql))
-          ("set-difference"
-           `(set-difference ,(%quoted-form (loop for i below 24 collect i))
+    (let ((expanded (our-macroexpand-1 form)))
+    (expect (%tree-contains-head-p 'make-hash-table expanded) :to-be-truthy))))
+
+(it-sequential "macros-setops-hash-fast-path-expands set-difference"
+  (destructuring-bind (form) (list `(set-difference ,(%quoted-form (loop for i below 24 collect i))
                             ,(%quoted-form '(1 2))
                             :test #'eql))
-          ("intersection"
-           `(intersection ,(%quoted-form (loop for i below 24 collect i))
+    (let ((expanded (our-macroexpand-1 form)))
+    (expect (%tree-contains-head-p 'make-hash-table expanded) :to-be-truthy))))
+
+(it-sequential "macros-setops-hash-fast-path-expands intersection"
+  (destructuring-bind (form) (list `(intersection ,(%quoted-form (loop for i below 24 collect i))
                           ,(%quoted-form '(1 2))
-                          :test #'eql)))
-  (form)
-  (let ((expanded (our-macroexpand-1 form)))
-    (assert-true (%tree-contains-head-p 'make-hash-table expanded))))
+                          :test #'eql))
+    (let ((expanded (our-macroexpand-1 form)))
+    (expect (%tree-contains-head-p 'make-hash-table expanded) :to-be-truthy))))

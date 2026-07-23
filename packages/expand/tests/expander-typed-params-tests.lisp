@@ -7,109 +7,108 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-typed-params-suite
-  :description "Typed-param expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-typed-params-suite)
 
 ;;; ── lambda-list-has-typed-p ─────────────────────────────────────────────────
 
-(deftest typed-params-has-typed-plain-symbol-list
-  "lambda-list-has-typed-p returns nil for a plain symbol list."
-  (assert-false (cl-cc/expand:lambda-list-has-typed-p '(x y z))))
+(it-sequential "typed-params-has-typed-plain-symbol-list"
+  (expect (cl-cc/expand:lambda-list-has-typed-p '(x y z)) :to-be-falsy))
 
-(deftest typed-params-has-typed-with-typed-pair
-  "lambda-list-has-typed-p returns t when at least one param has a type annotation."
-  (assert-true (cl-cc/expand:lambda-list-has-typed-p '((x fixnum) (y string)))))
+(it-sequential "typed-params-has-typed-with-typed-pair"
+  (expect (cl-cc/expand:lambda-list-has-typed-p '((x fixnum) (y string))) :to-be-truthy))
 
-(deftest typed-params-has-typed-mixed-params
-  "lambda-list-has-typed-p returns t when typed and plain params are mixed."
-  (assert-true (cl-cc/expand:lambda-list-has-typed-p '((x integer) y z))))
+(it-sequential "typed-params-has-typed-mixed-params"
+  (expect (cl-cc/expand:lambda-list-has-typed-p '((x integer) y z)) :to-be-truthy))
 
-(deftest typed-params-has-typed-stops-at-lambda-keywords
-  "lambda-list-has-typed-p returns nil when lambda keyword precedes typed pair."
-  (assert-false (cl-cc/expand:lambda-list-has-typed-p '(&optional (x fixnum)))))
+(it-sequential "typed-params-has-typed-stops-at-lambda-keywords"
+  (expect (cl-cc/expand:lambda-list-has-typed-p '(&optional (x fixnum))) :to-be-falsy))
 
-(deftest typed-params-has-typed-empty-list
-  "lambda-list-has-typed-p returns nil for an empty list."
-  (assert-false (cl-cc/expand:lambda-list-has-typed-p '())))
+(it-sequential "typed-params-has-typed-empty-list"
+  (expect (cl-cc/expand:lambda-list-has-typed-p '()) :to-be-falsy))
 
-(deftest-each typed-params-has-typed-builtin-types
-  "lambda-list-has-typed-p recognizes all built-in type keywords."
-  :cases (("fixnum"    '((n fixnum)))
-          ("integer"   '((n integer)))
-          ("string"    '((s string)))
-          ("boolean"   '((b boolean)))
-          ("character" '((c character)))
-          ("list"      '((l list)))
-          ("function"  '((f function))))
-  (params)
-  (assert-true (cl-cc/expand:lambda-list-has-typed-p params)))
+(it-sequential "typed-params-has-typed-builtin-types fixnum"
+  (destructuring-bind (params) (list '((n fixnum)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
+
+(it-sequential "typed-params-has-typed-builtin-types integer"
+  (destructuring-bind (params) (list '((n integer)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
+
+(it-sequential "typed-params-has-typed-builtin-types string"
+  (destructuring-bind (params) (list '((s string)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
+
+(it-sequential "typed-params-has-typed-builtin-types boolean"
+  (destructuring-bind (params) (list '((b boolean)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
+
+(it-sequential "typed-params-has-typed-builtin-types character"
+  (destructuring-bind (params) (list '((c character)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
+
+(it-sequential "typed-params-has-typed-builtin-types list"
+  (destructuring-bind (params) (list '((l list)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
+
+(it-sequential "typed-params-has-typed-builtin-types function"
+  (destructuring-bind (params) (list '((f function)))
+    (expect (cl-cc/expand:lambda-list-has-typed-p params) :to-be-truthy)))
 
 ;;; ── strip-typed-params ──────────────────────────────────────────────────────
 
-(deftest strip-typed-params-extracts-names
-  "strip-typed-params returns plain names as first value."
+(it-sequential "strip-typed-params-extracts-names"
   (multiple-value-bind (plain type-alist)
       (cl-cc/expand:strip-typed-params '((x fixnum) (y string)))
     (declare (ignore type-alist))
-    (assert-equal '(x y) plain)))
+    (expect plain :to-equal '(x y))))
 
-(deftest strip-typed-params-extracts-type-alist
-  "strip-typed-params returns (name . type) pairs as second value."
+(it-sequential "strip-typed-params-extracts-type-alist"
   (multiple-value-bind (plain type-alist)
       (cl-cc/expand:strip-typed-params '((x fixnum) (y string)))
     (declare (ignore plain))
-    (assert-= 2 (length type-alist))
-    (assert-eq 'fixnum (cdr (assoc 'x type-alist)))
-    (assert-eq 'string (cdr (assoc 'y type-alist)))))
+    (expect (= 2 (length type-alist)) :to-be-truthy)
+    (expect (cdr (assoc 'x type-alist)) :to-be 'fixnum)
+    (expect (cdr (assoc 'y type-alist)) :to-be 'string)))
 
-(deftest strip-typed-params-preserves-plain-symbols
-  "Plain symbol params pass through to the plain list unchanged."
+(it-sequential "strip-typed-params-preserves-plain-symbols"
   (multiple-value-bind (plain type-alist)
       (cl-cc/expand:strip-typed-params '((x fixnum) z))
-    (assert-equal '(x z) plain)
-    (assert-= 1 (length type-alist))))
+    (expect plain :to-equal '(x z))
+    (expect (= 1 (length type-alist)) :to-be-truthy)))
 
-(deftest strip-typed-params-preserves-lambda-keywords
-  "&optional and &rest pass through into the plain param list."
+(it-sequential "strip-typed-params-preserves-lambda-keywords"
   (multiple-value-bind (plain type-alist)
       (cl-cc/expand:strip-typed-params '(x &rest args))
     (declare (ignore type-alist))
-    (assert-true (member '&rest plain))))
+    (expect (member '&rest plain) :to-be-truthy)))
 
-(deftest strip-typed-params-empty-list
-  "strip-typed-params on empty list returns two empty lists."
+(it-sequential "strip-typed-params-empty-list"
   (multiple-value-bind (plain type-alist)
       (cl-cc/expand:strip-typed-params '())
-    (assert-null plain)
-    (assert-null type-alist)))
+    (expect plain :to-be-null)
+    (expect type-alist :to-be-null)))
 
 ;;; ── register-function-type / *function-type-registry* ──────────────────────
 
-(deftest register-function-type-stores-entry
-  "register-function-type stores the (param-types . return-type) pair."
+(it-sequential "register-function-type-stores-entry"
   (let ((cl-cc/expand:*function-type-registry*
          (make-hash-table :test #'eq)))
     (cl-cc/expand:register-function-type 'my-fn '(fixnum) 'string)
     (let ((entry (gethash 'my-fn cl-cc/expand:*function-type-registry*)))
-      (assert-true entry)
-      (assert-equal '(fixnum) (car entry))
-      (assert-eq 'string (cdr entry)))))
+      (expect entry :to-be-truthy)
+      (expect (car entry) :to-equal '(fixnum))
+      (expect (cdr entry) :to-be 'string))))
 
-(deftest register-function-type-overwrites-previous
-  "A second register-function-type call overwrites the previous entry."
+(it-sequential "register-function-type-overwrites-previous"
   (let ((cl-cc/expand:*function-type-registry*
          (make-hash-table :test #'eq)))
     (cl-cc/expand:register-function-type 'f '(fixnum) 'fixnum)
     (cl-cc/expand:register-function-type 'f '(string) 'string)
     (let ((entry (gethash 'f cl-cc/expand:*function-type-registry*)))
-      (assert-equal '(string) (car entry))
-      (assert-eq 'string (cdr entry)))))
+      (expect (car entry) :to-equal '(string))
+      (expect (cdr entry) :to-be 'string))))
 
-(deftest function-type-registry-unknown-name-returns-nil
-  "Lookup of an unregistered name returns nil."
+(it-sequential "function-type-registry-unknown-name-returns-nil"
   (let ((cl-cc/expand:*function-type-registry*
          (make-hash-table :test #'eq)))
-    (assert-null (gethash 'no-such-fn cl-cc/expand:*function-type-registry*))))
+    (expect (gethash 'no-such-fn cl-cc/expand:*function-type-registry*) :to-be-null)))

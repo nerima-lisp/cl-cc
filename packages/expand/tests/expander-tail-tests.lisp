@@ -2,20 +2,14 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-tail-suite
-  :description "Tail-form expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-tail-suite)
 
-(deftest expander-tail-round-normalizes-arity
-  "Single-argument rounding forms expand to a two-argument call."
+(it-sequential "expander-tail-round-normalizes-arity"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(round x))))
-    (assert-eq 'round (car result))
-    (assert-equal 1 (third result))))
+    (expect (car result) :to-be 'round)
+    (expect (third result) :to-equal 1)))
 
-(deftest expander-tail-error-and-warn-expand-format-strings
-  "error and warn with format args expand through FORMAT."
+(it-sequential "expander-tail-error-and-warn-expand-format-strings"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(error "oops" 1))))
-    (assert-eq 'error (car result))
-    (assert-true (search "FORMAT" (format nil "~S" (second result))))))
+    (expect (car result) :to-be 'error)
+    (expect (search "FORMAT" (format nil "~S" (second result))) :to-be-truthy)))

@@ -2,22 +2,15 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-list-utils-suite
-  :description "List utility macro tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-list-utils-suite)
 
-(deftest macros-list-utils-sort-expands
-  "SORT expands to a sequence-sorting LET* form."
-  (assert-eq 'let* (car (our-macroexpand-1 '(sort lst #'<)))))
+(it-sequential "macros-list-utils-sort-expands"
+  (expect (car (our-macroexpand-1 '(sort lst #'<))) :to-be 'let*))
 
-(deftest macros-list-utils-list*-and-pushnew
-  "LIST* and PUSHNEW expand to the expected core forms."
-  (assert-equal 'x (our-macroexpand-1 '(list* x)))
-  (assert-eq 'let (car (our-macroexpand-1 '(pushnew x xs)))))
+(it-sequential "macros-list-utils-list*-and-pushnew"
+  (expect (our-macroexpand-1 '(list* x)) :to-equal 'x)
+  (expect (car (our-macroexpand-1 '(pushnew x xs))) :to-be 'let))
 
-(deftest macros-list-utils-stable-sort-and-nreconc
-  "STABLE-SORT delegates to SORT and NRECONC delegates to NCONC/NREVERSE."
-  (assert-equal '(sort xs #'<) (our-macroexpand-1 '(stable-sort xs #'<)))
-  (assert-eq 'nconc (car (our-macroexpand-1 '(nreconc xs tail)))))
+(it-sequential "macros-list-utils-stable-sort-and-nreconc"
+  (expect (our-macroexpand-1 '(stable-sort xs #'<)) :to-equal '(sort xs #'<))
+  (expect (car (our-macroexpand-1 '(nreconc xs tail))) :to-be 'nconc))

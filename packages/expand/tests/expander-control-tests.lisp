@@ -2,44 +2,37 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-control-suite
-  :description "Control-form expander unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite expander-control-suite)
-(deftest-each expand-eval-when-keeps-body
-  "expand-eval-when-form with :execute or :load-toplevel returns a non-nil form."
-  :cases (("execute"       '(:execute))
-          ("load-toplevel" '(:load-toplevel)))
-  (situations)
-  (assert-true (consp (cl-cc/expand::expand-eval-when-form situations '((+ 1 2))))))
+(it-sequential "expand-eval-when-keeps-body execute"
+  (destructuring-bind (situations) (list '(:execute))
+    (expect (consp (cl-cc/expand::expand-eval-when-form situations '((+ 1 2)))) :to-be-truthy)))
 
-(deftest expand-eval-when-compile-only-returns-nil
-  "eval-when :compile-toplevel alone returns nil (excluded from output)."
+(it-sequential "expand-eval-when-keeps-body load-toplevel"
+  (destructuring-bind (situations) (list '(:load-toplevel))
+    (expect (consp (cl-cc/expand::expand-eval-when-form situations '((+ 1 2)))) :to-be-truthy)))
+
+(it-sequential "expand-eval-when-compile-only-returns-nil"
   (handler-bind ((warning #'muffle-warning))
     (let ((result (cl-cc/expand::expand-eval-when-form '(:compile-toplevel) '((+ 1 2)))))
-      (assert-eq nil result))))
+      (expect result :to-be nil))))
 
-(deftest expand-macrolet-form-expands-local-macro
-  "expand-macrolet-form makes a local macro visible in the body."
+(it-sequential "expand-macrolet-form-expands-local-macro"
   (let* ((result (cl-cc/expand::expand-macrolet-form
                   '((my-one () 1))
                   '((my-one))))
          (str (format nil "~S" result)))
-    (assert-true (search "1" str))))
+    (expect (search "1" str) :to-be-truthy)))
 
-(deftest expand-macrolet-form-binds-environment
-  "expand-macrolet-form binds &environment for local macros."
+(it-sequential "expand-macrolet-form-binds-environment"
   (let* ((result (cl-cc/expand::expand-macrolet-form
                   '((probe (&environment env) (if env :has-env :no-env)))
                   '((probe))))
          (str (format nil "~S" result)))
-    (assert-true (search ":HAS-ENV" str))))
+    (expect (search ":HAS-ENV" str) :to-be-truthy)))
 
-(deftest expand-macrolet-form-body-is-progn
-  "expand-macrolet-form with multiple body forms wraps in progn."
+(it-sequential "expand-macrolet-form-body-is-progn"
   (let ((result (cl-cc/expand::expand-macrolet-form
                  '((add1 (x) (+ x 1)))
                  '((add1 2) (add1 3)))))
-    (assert-true (consp result))))
+    (expect (consp result) :to-be-truthy)))

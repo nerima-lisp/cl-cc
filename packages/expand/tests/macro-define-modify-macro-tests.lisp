@@ -2,46 +2,46 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macro-define-modify-macro-suite
-  :description "DEFINE-MODIFY-MACRO expansion tests"
-  :parent cl-cc-unit-suite)
-
-(in-suite macro-define-modify-macro-suite)
 
 
-(deftest define-modify-macro-lambda-list-has-place-first
-  "DEFINE-MODIFY-MACRO generated macro takes PLACE as first parameter"
+
+(it-sequential "define-modify-macro-lambda-list-has-place-first"
   (let* ((result (our-macroexpand-1 '(define-modify-macro my-push (item) cons)))
          (params (caddr result)))
-    (assert-eq (car result) 'cl-cc:our-defmacro)
-    (assert-= (length params) 2)))
+    (expect 'cl-cc:our-defmacro :to-be (car result))
+    (expect (= (length params) 2) :to-be-truthy)))
 
-(deftest define-modify-macro-no-extra-args
-  "DEFINE-MODIFY-MACRO with empty lambda list still generates a valid macro"
+(it-sequential "define-modify-macro-no-extra-args"
   (let ((result (our-macroexpand-1 '(define-modify-macro toggle-flag () not))))
-    (assert-eq (car result) 'cl-cc:our-defmacro)
-    (assert-eq (cadr result) 'toggle-flag)
-    (assert-= (length (caddr result)) 1)))
+    (expect 'cl-cc:our-defmacro :to-be (car result))
+    (expect 'toggle-flag :to-be (cadr result))
+    (expect (= (length (caddr result)) 1) :to-be-truthy)))
 
-(deftest define-modify-macro-body-contains-setf
-  "DEFINE-MODIFY-MACRO generated macro body contains a SETF form"
+(it-sequential "define-modify-macro-body-contains-setf"
   (let* ((result (our-macroexpand-1 '(define-modify-macro my-incf (n) +)))
          (body (cadddr result)))
-    (assert-true (not (null body)))))
+    (expect (not (null body)) :to-be-truthy)))
 
-(deftest-each define-modify-macro-outer-form-shape
-  "DEFINE-MODIFY-MACRO expands to (our-defmacro NAME ...) for any lambda-list style."
-  :cases (("plain"     'my-incf '(define-modify-macro my-incf (n) +))
-          ("optional"  'my-add  '(define-modify-macro my-add (&optional (n 1)) +))
-          ("docstring" 'my-mul  '(define-modify-macro my-mul (factor) * "Multiply.")))
-  (expected-name form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq 'cl-cc:our-defmacro (car result))
-    (assert-eq expected-name (cadr result))))
+(it-sequential "define-modify-macro-outer-form-shape plain"
+  (destructuring-bind (expected-name form) (list 'my-incf '(define-modify-macro my-incf (n) +))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'cl-cc:our-defmacro)
+    (expect (cadr result) :to-be expected-name))))
 
-(deftest define-modify-macro-rest-lambda-list
-  "DEFINE-MODIFY-MACRO with &rest param includes rest var in generated args form."
+(it-sequential "define-modify-macro-outer-form-shape optional"
+  (destructuring-bind (expected-name form) (list 'my-add '(define-modify-macro my-add (&optional (n 1)) +))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'cl-cc:our-defmacro)
+    (expect (cadr result) :to-be expected-name))))
+
+(it-sequential "define-modify-macro-outer-form-shape docstring"
+  (destructuring-bind (expected-name form) (list 'my-mul '(define-modify-macro my-mul (factor) * "Multiply."))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'cl-cc:our-defmacro)
+    (expect (cadr result) :to-be expected-name))))
+
+(it-sequential "define-modify-macro-rest-lambda-list"
   (let* ((result (our-macroexpand-1 '(define-modify-macro my-append (&rest items) append)))
          (params (caddr result)))
-    (assert-eq 'cl-cc:our-defmacro (car result))
-    (assert-true (member '&rest params))))
+    (expect (car result) :to-be 'cl-cc:our-defmacro)
+    (expect (member '&rest params) :to-be-truthy)))

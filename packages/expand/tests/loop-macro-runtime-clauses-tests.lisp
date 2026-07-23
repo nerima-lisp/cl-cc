@@ -1,6 +1,5 @@
 (in-package :cl-cc/test)
 
-(in-suite loop-macro-suite)
 
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;;; Section 19: HASH-VALUES with USING (hash-key)
@@ -108,17 +107,17 @@
 (check-loop-expansion loop-repeat-expansion-has-binding
   "repeat N expansion has a counter binding initialised to N in let*"
   (repeat 4 collect t)
-  (assert-eq 'block (car result))
-  (assert-eq 'let* (car (caddr result)))
-  (assert-true (some (lambda (b) (equal (cadr b) 4))
-                     (cadr (caddr result)))))  ; counter binding with value 4
+  (expect (car result) :to-be 'block)
+  (expect (car (caddr result)) :to-be 'let*)
+  (expect (some (lambda (b) (equal (cadr b) 4))
+                     (cadr (caddr result))) :to-be-truthy))  ; counter binding with value 4
 
 (check-loop-expansion loop-with-expansion-has-binding
   "with var = expr expansion includes the var binding in let*"
   (with x = 42 collect x)
-  (assert-eq 'block (car result))
+  (expect (car result) :to-be 'block)
   (let ((bindings (cadr (caddr result))))
-    (assert-true (some (lambda (b) (equal (cadr b) 42)) bindings))))
+    (expect (some (lambda (b) (equal (cadr b) 42)) bindings) :to-be-truthy)))
 
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;;; Section 26: DO body with WHEN/UNLESS filter — multi-form wrapping

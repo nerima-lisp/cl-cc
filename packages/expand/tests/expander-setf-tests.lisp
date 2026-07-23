@@ -2,34 +2,27 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-setf-suite :description "Setf expander unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite expander-setf-suite)
 ;;; ─── setf expansions ────────────────────────────────────────────────────────
 
-(deftest expander-setf-multi-var-progn
-  "compiler-macroexpand-all: (setf x 1 y 2) expands to progn of setq."
+(it-sequential "expander-setf-multi-var-progn"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(setf x 1 y 2))))
-    (assert-eq 'progn (car result))
-    (assert-eq 'setq (car (second result)))
-    (assert-eq 'setq (car (third result)))))
+    (expect (car result) :to-be 'progn)
+    (expect (car (second result)) :to-be 'setq)
+    (expect (car (third result)) :to-be 'setq)))
 
-(deftest expander-setf-plain-var-to-setq
-  "compiler-macroexpand-all: (setf x 42) expands to (setq x 42)."
+(it-sequential "expander-setf-plain-var-to-setq"
   (let ((result (assert-expansion-head '(setf x 42) 'setq)))
-    (assert-eq 'x (second result))
-    (assert-equal 42 (third result))))
+    (expect (second result) :to-be 'x)
+    (expect (third result) :to-equal 42)))
 
-(deftest expander-setf-aref-to-aset
-  "compiler-macroexpand-all: (setf (aref v i) val) expands to (aset ...)."
+(it-sequential "expander-setf-aref-to-aset"
   (let ((result (assert-expansion-head '(setf (aref v i) val) 'cl-cc/expand::aset)))
-    (assert-eq 'v (second result))
-    (assert-eq 'i (third result))
-    (assert-eq 'val (fourth result))))
+    (expect (second result) :to-be 'v)
+    (expect (third result) :to-be 'i)
+    (expect (fourth result) :to-be 'val)))
 
-(deftest expander-setf-multi-place-dispatches-each
-  "(setf a 1 b 2) expands to progn of two individual setf/setq forms."
+(it-sequential "expander-setf-multi-place-dispatches-each"
   (let ((result (assert-expansion-head '(setf a 1 b 2) 'progn)))
-    (assert-= 2 (length (cdr result)))))
+    (expect (= 2 (length (cdr result))) :to-be-truthy)))

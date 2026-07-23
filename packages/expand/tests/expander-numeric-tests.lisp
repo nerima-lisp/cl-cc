@@ -2,218 +2,236 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-numeric-suite
-  :description "Numeric expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-numeric-suite)
 
 ;;; ─── + and * (variadic fold) ─────────────────────────────────────────────
 
-(deftest-each expander-plus-times-identity
-  "0-arg + and * return their identity elements."
-  :cases (("plus"  '(+) 0)
-          ("times" '(*) 1))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-plus-times-identity plus"
+  (destructuring-bind (form expected) (list '(+) 0)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-plus-times-unary-passthrough
-  "1-arg + and * return the argument unchanged."
-  :cases (("plus"  '(+ x)  'x)
-          ("times" '(* x)  'x))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-plus-times-identity times"
+  (destructuring-bind (form expected) (list '(*) 1)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-plus-times-binary-builtin
-  "2-arg + and * produce the binary builtin form."
-  :cases (("plus"  '(+ a b) '(+ a b))
-          ("times" '(* a b) '(* a b)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-plus-times-unary-passthrough plus"
+  (destructuring-bind (form expected) (list '(+ x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-plus-times-nary-left-fold
-  "3-arg + and * produce left-nested binary calls."
-  :cases (("plus"  '(+ a b c) '(+ (+ a b) c))
-          ("times" '(* a b c) '(* (* a b) c)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-plus-times-unary-passthrough times"
+  (destructuring-bind (form expected) (list '(* x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-plus-times-binary-builtin plus"
+  (destructuring-bind (form expected) (list '(+ a b) '(+ a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-plus-times-binary-builtin times"
+  (destructuring-bind (form expected) (list '(* a b) '(* a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-plus-times-nary-left-fold plus"
+  (destructuring-bind (form expected) (list '(+ a b c) '(+ (+ a b) c))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-plus-times-nary-left-fold times"
+  (destructuring-bind (form expected) (list '(* a b c) '(* (* a b) c))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
 ;;; ─── - (subtraction / unary negation) ───────────────────────────────────
 
-(deftest expander-minus-zero-arg-signals-error
-  "- with zero arguments signals an error."
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all '(-))))
+(it-sequential "expander-minus-zero-arg-signals-error"
+  (signals error (cl-cc/expand:compiler-macroexpand-all '(-))))
 
-(deftest expander-minus-unary-is-negation
-  "- with one arg rewrites to (- 0 x)."
-  (assert-equal '(- 0 7) (cl-cc/expand:compiler-macroexpand-all '(- 7))))
+(it-sequential "expander-minus-unary-is-negation"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(- 7)) :to-equal '(- 0 7)))
 
-(deftest expander-minus-binary-is-passthrough
-  "- with two args passes through unchanged."
-  (assert-equal '(- a b) (cl-cc/expand:compiler-macroexpand-all '(- a b))))
+(it-sequential "expander-minus-binary-is-passthrough"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(- a b)) :to-equal '(- a b)))
 
-(deftest expander-minus-nary-is-left-fold
-  "- with three args left-folds into nested binary subtractions."
-  (assert-equal '(- (- a b) c) (cl-cc/expand:compiler-macroexpand-all '(- a b c))))
+(it-sequential "expander-minus-nary-is-left-fold"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(- a b c)) :to-equal '(- (- a b) c)))
 
 ;;; ─── / (division / reciprocal) ───────────────────────────────────────────
 
-(deftest expander-slash-zero-arg-signals-error
-  "/ with zero arguments signals an error."
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all '(/))))
+(it-sequential "expander-slash-zero-arg-signals-error"
+  (signals error (cl-cc/expand:compiler-macroexpand-all '(/))))
 
-(deftest expander-slash-unary-is-reciprocal
-  "/ with one arg rewrites to (/ 1 x)."
-  (assert-equal '(/ 1 x) (cl-cc/expand:compiler-macroexpand-all '(/ x))))
+(it-sequential "expander-slash-unary-is-reciprocal"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(/ x)) :to-equal '(/ 1 x)))
 
-(deftest expander-slash-binary-is-passthrough
-  "/ with two args passes through unchanged."
-  (assert-equal '(/ a b) (cl-cc/expand:compiler-macroexpand-all '(/ a b))))
+(it-sequential "expander-slash-binary-is-passthrough"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(/ a b)) :to-equal '(/ a b)))
 
-(deftest expander-slash-nary-is-left-fold
-  "/ with three args left-folds into nested binary divisions."
-  (assert-equal '(/ (/ a b) c) (cl-cc/expand:compiler-macroexpand-all '(/ a b c))))
+(it-sequential "expander-slash-nary-is-left-fold"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(/ a b c)) :to-equal '(/ (/ a b) c)))
 
 ;;; ─── log ─────────────────────────────────────────────────────────────────
 
-(deftest expander-log-unary-is-passthrough
-  "log with one arg passes through unchanged."
-  (assert-equal '(log x) (cl-cc/expand:compiler-macroexpand-all '(log x))))
+(it-sequential "expander-log-unary-is-passthrough"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(log x)) :to-equal '(log x)))
 
-(deftest expander-log-binary-is-change-of-base
-  "log with two args expands to (/ (log x) (log base)) change-of-base form."
+(it-sequential "expander-log-binary-is-change-of-base"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(log x y))))
-    (assert-eq '/ (first result))
-    (assert-equal '(log x) (second result))
-    (assert-equal '(log y) (third result))))
+    (expect (first result) :to-be '/)
+    (expect (second result) :to-equal '(log x))
+    (expect (third result) :to-equal '(log y))))
 
-(deftest expander-log-three-arg-signals-error
-  "log with three arguments signals an error."
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all '(log x y z))))
+(it-sequential "expander-log-three-arg-signals-error"
+  (signals error (cl-cc/expand:compiler-macroexpand-all '(log x y z))))
 
 ;;; ─── min / max ────────────────────────────────────────────────────────────
 
-(deftest-each expander-min-max-zero-arg-signals-error
-  "0-arg min and max signal an error."
-  :cases (("min" '(min))
-          ("max" '(max)))
-  (form)
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-min-max-zero-arg-signals-error min"
+  (destructuring-bind (form) (list '(min))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest-each expander-min-max-unary-identity
-  "1-arg min and max return the argument unchanged."
-  :cases (("min" '(min x) 'x)
-          ("max" '(max x) 'x))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-min-max-zero-arg-signals-error max"
+  (destructuring-bind (form) (list '(max))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest-each expander-min-max-binary-builtin
-  "2-arg min and max produce the binary form."
-  :cases (("min" '(min a b) '(min a b))
-          ("max" '(max a b) '(max a b)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-min-max-unary-identity min"
+  (destructuring-bind (form expected) (list '(min x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-min-max-nary-left-fold
-  "3-arg min and max produce a left-nested fold."
-  :cases (("min" '(min a b c) 'min)
-          ("max" '(max a b c) 'max))
-  (form expected-op)
-  (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
-    (assert-eq expected-op (car result))
-    (assert-true (consp (second result)))
-    (assert-eq expected-op (car (second result)))))
+(it-sequential "expander-min-max-unary-identity max"
+  (destructuring-bind (form expected) (list '(max x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-min-max-binary-builtin min"
+  (destructuring-bind (form expected) (list '(min a b) '(min a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-min-max-binary-builtin max"
+  (destructuring-bind (form expected) (list '(max a b) '(max a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-min-max-nary-left-fold min"
+  (destructuring-bind (form expected-op) (list '(min a b c) 'min)
+    (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
+    (expect (car result) :to-be expected-op)
+    (expect (consp (second result)) :to-be-truthy)
+    (expect (car (second result)) :to-be expected-op))))
+
+(it-sequential "expander-min-max-nary-left-fold max"
+  (destructuring-bind (form expected-op) (list '(max a b c) 'max)
+    (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
+    (expect (car result) :to-be expected-op)
+    (expect (consp (second result)) :to-be-truthy)
+    (expect (car (second result)) :to-be expected-op))))
 
 ;;; ─── gcd / lcm ────────────────────────────────────────────────────────────
 
-(deftest-each expander-gcd-lcm-zero-arg-identity
-  "0-arg gcd returns 0; 0-arg lcm returns 1."
-  :cases (("gcd" '(gcd) 0)
-          ("lcm" '(lcm) 1))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-gcd-lcm-zero-arg-identity gcd"
+  (destructuring-bind (form expected) (list '(gcd) 0)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-gcd-lcm-unary-wraps-abs
-  "1-arg gcd and lcm wrap the argument in abs."
-  :cases (("gcd" '(gcd x) '(abs x))
-          ("lcm" '(lcm x) '(abs x)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-gcd-lcm-zero-arg-identity lcm"
+  (destructuring-bind (form expected) (list '(lcm) 1)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-gcd-lcm-binary-builtin
-  "2-arg gcd and lcm produce the binary form."
-  :cases (("gcd" '(gcd a b) '(gcd a b))
-          ("lcm" '(lcm a b) '(lcm a b)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-gcd-lcm-unary-wraps-abs gcd"
+  (destructuring-bind (form expected) (list '(gcd x) '(abs x))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-gcd-lcm-unary-wraps-abs lcm"
+  (destructuring-bind (form expected) (list '(lcm x) '(abs x))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-gcd-lcm-binary-builtin gcd"
+  (destructuring-bind (form expected) (list '(gcd a b) '(gcd a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-gcd-lcm-binary-builtin lcm"
+  (destructuring-bind (form expected) (list '(lcm a b) '(lcm a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
 ;;; ─── float-sign ──────────────────────────────────────────────────────────
 
-(deftest expander-float-sign-unary-is-passthrough
-  "float-sign with one arg passes through unchanged."
-  (assert-equal '(float-sign x) (cl-cc/expand:compiler-macroexpand-all '(float-sign x))))
+(it-sequential "expander-float-sign-unary-is-passthrough"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(float-sign x)) :to-equal '(float-sign x)))
 
-(deftest expander-float-sign-binary-scales-abs
-  "float-sign with two args expands to (* (float-sign x) (abs y))."
+(it-sequential "expander-float-sign-binary-scales-abs"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(float-sign x y))))
-    (assert-eq '* (first result))
-    (assert-equal '(float-sign x) (second result))
-    (assert-equal '(abs y) (third result))))
+    (expect (first result) :to-be '*)
+    (expect (second result) :to-equal '(float-sign x))
+    (expect (third result) :to-equal '(abs y))))
 
-(deftest expander-float-sign-three-arg-signals-error
-  "float-sign with three arguments signals an error."
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all '(float-sign x y z))))
+(it-sequential "expander-float-sign-three-arg-signals-error"
+  (signals error (cl-cc/expand:compiler-macroexpand-all '(float-sign x y z))))
 
 ;;; ─── float ───────────────────────────────────────────────────────────────
 
-(deftest expander-float-unary-is-passthrough
-  "float with one arg passes through unchanged."
-  (assert-equal '(float x) (cl-cc/expand:compiler-macroexpand-all '(float x))))
+(it-sequential "expander-float-unary-is-passthrough"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(float x)) :to-equal '(float x)))
 
-(deftest expander-float-binary-drops-prototype
-  "float with two args drops the prototype, normalizing to (float x)."
-  (assert-equal '(float x) (cl-cc/expand:compiler-macroexpand-all '(float x 1.0))))
+(it-sequential "expander-float-binary-drops-prototype"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(float x 1.0)) :to-equal '(float x)))
 
-(deftest expander-float-three-arg-signals-error
-  "float with three arguments signals an error."
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all '(float x 1.0 extra))))
+(it-sequential "expander-float-three-arg-signals-error"
+  (signals error (cl-cc/expand:compiler-macroexpand-all '(float x 1.0 extra))))
 
 ;;; ─── logand / logior / logxor / logeqv ──────────────────────────────────
 
-(deftest-each expander-logical-bitwise-zero-arg-identity
-  "0-arg bitwise ops return their identity elements."
-  :cases (("logand" '(logand) -1)
-          ("logior" '(logior) 0)
-          ("logxor" '(logxor) 0)
-          ("logeqv" '(logeqv) -1))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-logical-bitwise-zero-arg-identity logand"
+  (destructuring-bind (form expected) (list '(logand) -1)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-logical-bitwise-unary-passthrough
-  "1-arg bitwise ops return the argument unchanged."
-  :cases (("logand" '(logand x) 'x)
-          ("logior" '(logior x) 'x)
-          ("logxor" '(logxor x) 'x)
-          ("logeqv" '(logeqv x) 'x))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-logical-bitwise-zero-arg-identity logior"
+  (destructuring-bind (form expected) (list '(logior) 0)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-logical-bitwise-binary-builtin
-  "2-arg bitwise ops produce the binary form."
-  :cases (("logand" '(logand a b) '(logand a b))
-          ("logior" '(logior a b) '(logior a b))
-          ("logxor" '(logxor a b) '(logxor a b))
-          ("logeqv" '(logeqv a b) '(logeqv a b)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-logical-bitwise-zero-arg-identity logxor"
+  (destructuring-bind (form expected) (list '(logxor) 0)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
-(deftest-each expander-logical-bitwise-nary-left-fold
-  "3-arg bitwise ops produce a left-nested fold with the correct op."
-  :cases (("logand" '(logand a b c) 'logand)
-          ("logior" '(logior a b c) 'logior))
-  (form expected-op)
-  (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
-    (assert-eq expected-op (car result))
-    (assert-true (consp (second result)))
-    (assert-eq expected-op (car (second result)))))
+(it-sequential "expander-logical-bitwise-zero-arg-identity logeqv"
+  (destructuring-bind (form expected) (list '(logeqv) -1)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-unary-passthrough logand"
+  (destructuring-bind (form expected) (list '(logand x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-unary-passthrough logior"
+  (destructuring-bind (form expected) (list '(logior x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-unary-passthrough logxor"
+  (destructuring-bind (form expected) (list '(logxor x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-unary-passthrough logeqv"
+  (destructuring-bind (form expected) (list '(logeqv x) 'x)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-binary-builtin logand"
+  (destructuring-bind (form expected) (list '(logand a b) '(logand a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-binary-builtin logior"
+  (destructuring-bind (form expected) (list '(logior a b) '(logior a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-binary-builtin logxor"
+  (destructuring-bind (form expected) (list '(logxor a b) '(logxor a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-binary-builtin logeqv"
+  (destructuring-bind (form expected) (list '(logeqv a b) '(logeqv a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-logical-bitwise-nary-left-fold logand"
+  (destructuring-bind (form expected-op) (list '(logand a b c) 'logand)
+    (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
+    (expect (car result) :to-be expected-op)
+    (expect (consp (second result)) :to-be-truthy)
+    (expect (car (second result)) :to-be expected-op))))
+
+(it-sequential "expander-logical-bitwise-nary-left-fold logior"
+  (destructuring-bind (form expected-op) (list '(logior a b c) 'logior)
+    (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
+    (expect (car result) :to-be expected-op)
+    (expect (consp (second result)) :to-be-truthy)
+    (expect (car (second result)) :to-be expected-op))))
 

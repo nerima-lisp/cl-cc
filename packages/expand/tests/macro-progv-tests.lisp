@@ -2,41 +2,33 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macro-progv-suite
-  :description "PROGV expansion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macro-progv-suite)
 
-(deftest progv-basic-structure
-  "PROGV expands to a LET* that calls %progv-enter then UNWIND-PROTECT"
+(it-sequential "progv-basic-structure"
   (let ((result (our-macroexpand-1 '(progv '(x y) '(1 2) body))))
-    (assert-eq (car result) 'let*)
-    (assert-= (length (cadr result)) 3)))
+    (expect 'let* :to-be (car result))
+    (expect (= (length (cadr result)) 3) :to-be-truthy)))
 
-(deftest progv-binds-symbols-and-values
-  "PROGV LET* bindings capture the symbols and values expressions"
+(it-sequential "progv-binds-symbols-and-values"
   (let* ((result (our-macroexpand-1 '(progv sym-list val-list body-form)))
          (bindings (cadr result)))
-    (assert-eq (cadr (first bindings)) 'sym-list)
-    (assert-eq (cadr (second bindings)) 'val-list)))
+    (expect 'sym-list :to-be (cadr (first bindings)))
+    (expect 'val-list :to-be (cadr (second bindings)))))
 
-(deftest progv-calls-progv-enter
-  "PROGV third binding calls %progv-enter with the syms and vals temps"
+(it-sequential "progv-calls-progv-enter"
   (let* ((result (our-macroexpand-1 '(progv '(x) '(1) (print x))))
          (bindings (cadr result))
          (saved-binding (third bindings))
          (enter-call (second saved-binding)))
-    (assert-eq (car enter-call) 'cl-cc/expand::%progv-enter)))
+    (expect 'cl-cc/expand::%progv-enter :to-be (car enter-call))))
 
-(deftest progv-body-unwind-structure
-  "PROGV body is UNWIND-PROTECT with PROGN body and %progv-exit cleanup."
+(it-sequential "progv-body-unwind-structure"
   (let* ((result      (our-macroexpand-1 '(progv '(x) '(1) form1 form2)))
          (bindings    (cadr result))
          (saved-var   (first (third bindings)))
          (unwind-form (caddr result))
          (cleanup     (caddr unwind-form)))
-    (assert-eq 'unwind-protect       (car unwind-form))
-    (assert-eq 'progn                (car (cadr unwind-form)))
-    (assert-eq 'cl-cc/expand::%progv-exit   (car cleanup))
-    (assert-eq saved-var             (cadr cleanup))))
+    (expect (car unwind-form) :to-be 'unwind-protect)
+    (expect (car (cadr unwind-form)) :to-be 'progn)
+    (expect (car cleanup) :to-be 'cl-cc/expand::%progv-exit)
+    (expect (cadr cleanup) :to-be saved-var)))

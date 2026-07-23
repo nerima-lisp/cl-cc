@@ -2,48 +2,67 @@
 
 (in-package :cl-cc/test)
 
-(defsuite loop-data-suite
-  :description "LOOP data layer unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite loop-data-suite)
 
-(deftest-each loop-boundary-keywords-contain-core-markers
-  "The LOOP boundary keyword set contains the canonical control markers."
-  :cases (("for"     "FOR")
-          ("collect" "COLLECT")
-          ("finally" "FINALLY")
-          ("named"   "NAMED"))
-  (kw)
-  (assert-true (member kw cl-cc/expand::*loop-boundary-keywords* :test #'string=)))
+(it-sequential "loop-boundary-keywords-contain-core-markers for"
+  (destructuring-bind (kw) (list "FOR")
+    (expect (member kw cl-cc/expand::*loop-boundary-keywords* :test #'string=) :to-be-truthy)))
 
-(deftest loop-vacuous-truth-conditions-are-the-expected-two-symbols
-  "The vacuous-truth condition set is exactly the ANSI LOOP pair."
-  (assert-equal '(:always :never) cl-cc/expand::*loop-vacuous-truth-conditions*))
+(it-sequential "loop-boundary-keywords-contain-core-markers collect"
+  (destructuring-bind (kw) (list "COLLECT")
+    (expect (member kw cl-cc/expand::*loop-boundary-keywords* :test #'string=) :to-be-truthy)))
 
-(deftest-each loop-accum-keyword-table-maps-canonical-and-ing-forms
-  "Canonical and -ING accumulation keywords map to the same internal type."
-  :cases (("collect"    "COLLECT"    :collect)
-          ("collecting" "COLLECTING" :collect)
-          ("summing"    "SUMMING"    :sum)
-          ("nconcing"   "NCONCING"   :nconc))
-  (kw expected)
-  (assert-eq expected (cdr (assoc kw cl-cc/expand::*loop-accum-keyword-table* :test #'string=))))
+(it-sequential "loop-boundary-keywords-contain-core-markers finally"
+  (destructuring-bind (kw) (list "FINALLY")
+    (expect (member kw cl-cc/expand::*loop-boundary-keywords* :test #'string=) :to-be-truthy)))
 
-(deftest-each loop-hash-keyword-tables-map-both-spellings
-  "HASH-KEYS/HASH-VALUES and USING aliases are registered in the data tables."
-  :cases (("hash-keys"   "HASH-KEYS"  cl-cc/expand::*loop-hash-iter-keywords* :hash-keys)
-          ("hash-values" "HASH-VALUE" cl-cc/expand::*loop-hash-iter-keywords* :hash-values)
-          ("using-key"   "HASH-KEY"   cl-cc/expand::*loop-using-keywords*     :hash-key)
-          ("using-value" "HASH-VALUE" cl-cc/expand::*loop-using-keywords*     :hash-value))
-  (kw table expected)
-  (assert-eq expected (cdr (assoc kw table :test #'string=))))
+(it-sequential "loop-boundary-keywords-contain-core-markers named"
+  (destructuring-bind (kw) (list "NAMED")
+    (expect (member kw cl-cc/expand::*loop-boundary-keywords* :test #'string=) :to-be-truthy)))
 
-(deftest-each loop-emitter-dispatch-tables-are-hash-tables
-  "The emitter dispatch tables are EQ hash tables ready for registration."
-  :cases (("iter"      cl-cc/expand::*loop-iter-emitters*)
-          ("acc"       cl-cc/expand::*loop-acc-emitters*)
-          ("condition" cl-cc/expand::*loop-condition-emitters*))
-  (table)
-  (assert-true (hash-table-p table))
-  (assert-eq 'eq (hash-table-test table)))
+(it-sequential "loop-vacuous-truth-conditions-are-the-expected-two-symbols"
+  (expect cl-cc/expand::*loop-vacuous-truth-conditions* :to-equal '(:always :never)))
+
+(it-sequential "loop-accum-keyword-table-maps-canonical-and-ing-forms collect"
+  (destructuring-bind (kw expected) (list "COLLECT" :collect)
+    (expect (cdr (assoc kw cl-cc/expand::*loop-accum-keyword-table* :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-accum-keyword-table-maps-canonical-and-ing-forms collecting"
+  (destructuring-bind (kw expected) (list "COLLECTING" :collect)
+    (expect (cdr (assoc kw cl-cc/expand::*loop-accum-keyword-table* :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-accum-keyword-table-maps-canonical-and-ing-forms summing"
+  (destructuring-bind (kw expected) (list "SUMMING" :sum)
+    (expect (cdr (assoc kw cl-cc/expand::*loop-accum-keyword-table* :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-accum-keyword-table-maps-canonical-and-ing-forms nconcing"
+  (destructuring-bind (kw expected) (list "NCONCING" :nconc)
+    (expect (cdr (assoc kw cl-cc/expand::*loop-accum-keyword-table* :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-hash-keyword-tables-map-both-spellings hash-keys"
+  (destructuring-bind (kw table expected) (list "HASH-KEYS" cl-cc/expand::*loop-hash-iter-keywords* :hash-keys)
+    (expect (cdr (assoc kw table :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-hash-keyword-tables-map-both-spellings hash-values"
+  (destructuring-bind (kw table expected) (list "HASH-VALUE" cl-cc/expand::*loop-hash-iter-keywords* :hash-values)
+    (expect (cdr (assoc kw table :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-hash-keyword-tables-map-both-spellings using-key"
+  (destructuring-bind (kw table expected) (list "HASH-KEY" cl-cc/expand::*loop-using-keywords* :hash-key)
+    (expect (cdr (assoc kw table :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-hash-keyword-tables-map-both-spellings using-value"
+  (destructuring-bind (kw table expected) (list "HASH-VALUE" cl-cc/expand::*loop-using-keywords* :hash-value)
+    (expect (cdr (assoc kw table :test #'string=)) :to-be expected)))
+
+(it-sequential "loop-emitter-dispatch-tables-are-hash-tables iter"
+  (destructuring-bind (table) (list cl-cc/expand::*loop-iter-emitters*)
+    (expect (hash-table-p table) :to-be-truthy) (expect (hash-table-test table) :to-be 'eq)))
+
+(it-sequential "loop-emitter-dispatch-tables-are-hash-tables acc"
+  (destructuring-bind (table) (list cl-cc/expand::*loop-acc-emitters*)
+    (expect (hash-table-p table) :to-be-truthy) (expect (hash-table-test table) :to-be 'eq)))
+
+(it-sequential "loop-emitter-dispatch-tables-are-hash-tables condition"
+  (destructuring-bind (table) (list cl-cc/expand::*loop-condition-emitters*)
+    (expect (hash-table-p table) :to-be-truthy) (expect (hash-table-test table) :to-be 'eq)))

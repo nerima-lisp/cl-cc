@@ -4,21 +4,21 @@
 
 (defmacro assert-expansion-head (form expected-head)
   `(let ((result (cl-cc/expand:compiler-macroexpand-all ,form)))
-     (assert-eq ,expected-head (car result))
+     (expect (car result) :to-be ,expected-head)
      result))
 
 (defmacro assert-no-expansion (form)
-  `(assert-equal ,form (our-macroexpand-1 ,form)))
+  `(expect (our-macroexpand-1 ,form) :to-equal ,form))
 
 (defmacro assert-form-string-contains (form expected-substring)
-  `(assert-true (search ,expected-substring (format nil "~S" ,form))))
+  `(expect (search ,expected-substring (format nil "~S" ,form)) :to-be-truthy))
 
 (defmacro assert-expanded-string-contains (form expected-substring)
   `(assert-form-string-contains (cl-cc/expand:compiler-macroexpand-all ,form)
      ,expected-substring))
 
 (defmacro assert-form-string-not-contains (form unexpected-substring)
-  `(assert-false (search ,unexpected-substring (format nil "~S" ,form))))
+  `(expect (search ,unexpected-substring (format nil "~S" ,form)) :to-be-falsy))
 
 (defmacro assert-expanded-string-not-contains (form unexpected-substring)
   `(assert-form-string-not-contains

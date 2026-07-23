@@ -1,205 +1,193 @@
 (in-package :cl-cc/test)
 
-(defsuite macro-lambda-list-suite
-  :description "Lambda list parser unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macro-lambda-list-suite)
 
-(deftest macro-lambda-list-required-only
-  "parse-lambda-list preserves required parameters in order."
+(it-sequential "macro-lambda-list-required-only"
   (let ((info (cl-cc/expand:parse-lambda-list '(a b c))))
-    (assert-equal '(a b c) (cl-cc/expand::lambda-list-info-required info))))
+    (expect (cl-cc/expand::lambda-list-info-required info) :to-equal '(a b c))))
 
-(deftest macro-lambda-list-key-and-aux
-  "parse-lambda-list records &key and &aux sections."
+(it-sequential "macro-lambda-list-key-and-aux"
   (let ((info (cl-cc/expand:parse-lambda-list '(&key verbose &aux (count 0)))))
-    (assert-true (cl-cc/expand::lambda-list-info-key-params info))
-    (assert-equal '((count 0)) (cl-cc/expand::lambda-list-info-aux info))))
+    (expect (cl-cc/expand::lambda-list-info-key-params info) :to-be-truthy)
+    (expect (cl-cc/expand::lambda-list-info-aux info) :to-equal '((count 0)))))
 
-(deftest macro-lambda-list-whole-section
-  "parse-lambda-list records &whole and resumes parsing required parameters."
+(it-sequential "macro-lambda-list-whole-section"
   (let ((info (cl-cc/expand:parse-lambda-list '(&whole whole-name x &optional y))))
-    (assert-eq 'whole-name (cl-cc/expand::lambda-list-info-whole info))
-    (assert-equal '(x) (cl-cc/expand::lambda-list-info-required info))
-    (assert-equal '((y nil nil)) (cl-cc/expand::lambda-list-info-optional info))))
+    (expect (cl-cc/expand::lambda-list-info-whole info) :to-be 'whole-name)
+    (expect (cl-cc/expand::lambda-list-info-required info) :to-equal '(x))
+    (expect (cl-cc/expand::lambda-list-info-optional info) :to-equal '((y nil nil)))))
 
-(deftest macro-lambda-list-bindings-shape
-  "generate-lambda-bindings and destructure-lambda-list return bindings."
-  (assert-true (assoc 'args (cl-cc/expand:generate-lambda-bindings '(&rest args) 'form)))
-  (assert-true (assoc 'x (cl-cc/expand:destructure-lambda-list '(x &optional y) 'form))))
+(it-sequential "macro-lambda-list-bindings-shape"
+  (expect (assoc 'args (cl-cc/expand:generate-lambda-bindings '(&rest args) 'form)) :to-be-truthy)
+  (expect (assoc 'x (cl-cc/expand:destructure-lambda-list '(x &optional y) 'form)) :to-be-truthy))
 
-(deftest macro-lambda-list-optional-rest-body-environment
-  "parse-lambda-list records optional/rest/body/environment sections correctly."
+(it-sequential "macro-lambda-list-optional-rest-body-environment"
   (let ((info (cl-cc/expand:parse-lambda-list '(a &optional (b 10 b-p) &body body &environment env))))
-    (assert-equal '(a) (cl-cc/expand::lambda-list-info-required info))
-    (assert-equal '((b 10 b-p)) (cl-cc/expand::lambda-list-info-optional info))
-    (assert-eq 'body (cl-cc/expand::lambda-list-info-body info))
-    (assert-eq 'env (cl-cc/expand:lambda-list-info-environment info))))
+    (expect (cl-cc/expand::lambda-list-info-required info) :to-equal '(a))
+    (expect (cl-cc/expand::lambda-list-info-optional info) :to-equal '((b 10 b-p)))
+    (expect (cl-cc/expand::lambda-list-info-body info) :to-be 'body)
+    (expect (cl-cc/expand:lambda-list-info-environment info) :to-be 'env)))
 
-(deftest macro-lambda-list-allow-other-keys-and-key-spec
-  "parse-lambda-list preserves explicit keyword specs and &allow-other-keys." 
+(it-sequential "macro-lambda-list-allow-other-keys-and-key-spec"
   (let ((info (cl-cc/expand:parse-lambda-list '(&key ((:size n) 3 supplied-p) &allow-other-keys))))
-    (assert-true (cl-cc/expand::lambda-list-info-allow-other-keys info))
-    (assert-equal '(((:size n) 3 supplied-p))
-                  (mapcar (lambda (spec) (list (first spec) (second spec) (third spec)))
-                          (cl-cc/expand::lambda-list-info-key-params info)))))
+    (expect (cl-cc/expand::lambda-list-info-allow-other-keys info) :to-be-truthy)
+    (expect (mapcar (lambda (spec) (list (first spec) (second spec) (third spec)))
+                          (cl-cc/expand::lambda-list-info-key-params info)) :to-equal '(((:size n) 3 supplied-p)))))
 
-(deftest macro-lambda-list-generate-bindings-covers-key-and-aux
-  "generate-lambda-bindings emits bindings for &key supplied-p and &aux init forms." 
+(it-sequential "macro-lambda-list-generate-bindings-covers-key-and-aux"
   (let ((bindings (cl-cc/expand:generate-lambda-bindings
                    '(x &key ((:size n) 3 n-p) &aux (count 0))
                    'form)))
-    (assert-true (assoc 'x bindings))
-    (assert-true (assoc 'n bindings))
-    (assert-true (assoc 'n-p bindings))
-    (assert-true (assoc 'count bindings))))
+    (expect (assoc 'x bindings) :to-be-truthy)
+    (expect (assoc 'n bindings) :to-be-truthy)
+    (expect (assoc 'n-p bindings) :to-be-truthy)
+    (expect (assoc 'count bindings) :to-be-truthy)))
 
-(deftest macro-lambda-list-destructure-covers-nested-required-and-key
-  "destructure-lambda-list handles nested required patterns and keyword parameters." 
+(it-sequential "macro-lambda-list-destructure-covers-nested-required-and-key"
   (let ((bindings (cl-cc/expand:destructure-lambda-list
                    '((head tail) &key ((:limit lim) 5 lim-p) &aux (done nil))
                    'form)))
-    (assert-true (assoc 'head bindings))
-    (assert-true (assoc 'tail bindings))
-    (assert-true (assoc 'lim bindings))
-    (assert-true (assoc 'lim-p bindings))
-    (assert-true (assoc 'done bindings))))
+    (expect (assoc 'head bindings) :to-be-truthy)
+    (expect (assoc 'tail bindings) :to-be-truthy)
+    (expect (assoc 'lim bindings) :to-be-truthy)
+    (expect (assoc 'lim-p bindings) :to-be-truthy)
+    (expect (assoc 'done bindings) :to-be-truthy)))
 
-(deftest macro-lambda-list-destructure-whole
-  "destructure-lambda-list binds &whole to the full argument form."
+(it-sequential "macro-lambda-list-destructure-whole"
   (let ((bindings (cl-cc/expand:destructure-lambda-list '(&whole whole x) 'input-form)))
-    (assert-eq 'input-form (cdr (assoc 'whole bindings)))
-    (assert-true (assoc 'x bindings))))
+    (expect (cdr (assoc 'whole bindings)) :to-be 'input-form)
+    (expect (assoc 'x bindings) :to-be-truthy)))
 
 ;;; ── %push-required-bindings ──────────────────────────────────────────────
 
-(deftest push-required-bindings-single
-  "%push-required-bindings emits one (temp (car arg)) + (name temp) pair per required param."
+(it-sequential "push-required-bindings-single"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (bindings nil)
          (result-arg nil))
     (multiple-value-setq (result-arg bindings)
       (cl-cc/expand::%push-required-bindings '(x) 'args bindings gsl))
-    (assert-= 2 (length bindings))
-    (assert-true (assoc 'x bindings))))
+    (expect (= 2 (length bindings)) :to-be-truthy)
+    (expect (assoc 'x bindings) :to-be-truthy)))
 
-(deftest push-required-bindings-advances-cursor
-  "%push-required-bindings advances the current-arg cursor with (cdr arg) after each param."
+(it-sequential "push-required-bindings-advances-cursor"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (bindings nil)
          (result-arg nil))
     (multiple-value-setq (result-arg bindings)
       (cl-cc/expand::%push-required-bindings '(x y) 'args bindings gsl))
-    (assert-equal '(cdr (cdr args)) result-arg)))
+    (expect result-arg :to-equal '(cdr (cdr args)))))
 
 ;;; ── %push-optional-bindings ──────────────────────────────────────────────
 
-(deftest push-optional-bindings-with-supplied-p
-  "%push-optional-bindings emits temp + name + supplied-p binding triples."
+(it-sequential "push-optional-bindings-with-supplied-p"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (bindings nil)
          (result-arg nil))
     (multiple-value-setq (result-arg bindings)
       (cl-cc/expand::%push-optional-bindings
        '((b 10 b-p)) 'remaining bindings gsl))
-    (assert-true (assoc 'b bindings))
-    (assert-true (assoc 'b-p bindings))))
+    (expect (assoc 'b bindings) :to-be-truthy)
+    (expect (assoc 'b-p bindings) :to-be-truthy)))
 
-(deftest push-optional-bindings-without-supplied-p
-  "%push-optional-bindings omits supplied-p binding when slot is nil."
+(it-sequential "push-optional-bindings-without-supplied-p"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (bindings nil)
          (result-arg nil))
     (multiple-value-setq (result-arg bindings)
       (cl-cc/expand::%push-optional-bindings
        '((b 10 nil)) 'remaining bindings gsl))
-    (assert-true (assoc 'b bindings))
-    (assert-= 2 (length bindings))))
+    (expect (assoc 'b bindings) :to-be-truthy)
+    (expect (= 2 (length bindings)) :to-be-truthy)))
 
 ;;; ── %push-key-bindings ───────────────────────────────────────────────────
 
-(deftest push-key-bindings-basic
-  "%push-key-bindings emits (getf ...) val binding and name binding."
+(it-sequential "push-key-bindings-basic"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (bindings nil)
          (result (cl-cc/expand::%push-key-bindings
                   '(((:size n) 3 nil)) 'kwargs bindings gsl)))
-    (assert-true (assoc 'n result))))
+    (expect (assoc 'n result) :to-be-truthy)))
 
-(deftest push-key-bindings-with-supplied-p
-  "%push-key-bindings emits supplied-p binding when supplied-p name is given."
+(it-sequential "push-key-bindings-with-supplied-p"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (bindings nil)
          (result (cl-cc/expand::%push-key-bindings
                   '(((:size n) 3 n-p)) 'kwargs bindings gsl)))
-    (assert-true (assoc 'n result))
-    (assert-true (assoc 'n-p result))))
+    (expect (assoc 'n result) :to-be-truthy)
+    (expect (assoc 'n-p result) :to-be-truthy)))
 
 ;;; ── %push-aux-bindings ───────────────────────────────────────────────────
 
-(deftest push-aux-bindings-single
-  "%push-aux-bindings emits one (name init) binding per aux spec."
+(it-sequential "push-aux-bindings-single"
   (let* ((bindings nil)
          (result (cl-cc/expand::%push-aux-bindings '((count 0)) bindings)))
-    (assert-= 1 (length result))
-    (assert-equal '(count 0) (first result))))
+    (expect (= 1 (length result)) :to-be-truthy)
+    (expect (first result) :to-equal '(count 0))))
 
-(deftest push-aux-bindings-multiple
-  "%push-aux-bindings accumulates multiple aux specs in order."
+(it-sequential "push-aux-bindings-multiple"
   (let* ((bindings nil)
          (result (cl-cc/expand::%push-aux-bindings '((x 1) (y 2)) bindings)))
-    (assert-= 2 (length result))
-    (assert-true (assoc 'x result))
-    (assert-true (assoc 'y result))))
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (assoc 'x result) :to-be-truthy)
+    (expect (assoc 'y result) :to-be-truthy)))
 
 ;;; ── %push-destructured-required-bindings ─────────────────────────────────
 
-(deftest push-destructured-required-simple-name
-  "%push-destructured-required-bindings binds plain symbols directly."
+(it-sequential "push-destructured-required-simple-name"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (result (cl-cc/expand::%push-destructured-required-bindings '(x) 'args nil gsl)))
-    (assert-true (assoc 'x result))))
+    (expect (assoc 'x result) :to-be-truthy)))
 
-(deftest push-destructured-required-nested-list
-  "%push-destructured-required-bindings recurses into sub-patterns."
+(it-sequential "push-destructured-required-nested-list"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (result (cl-cc/expand::%push-destructured-required-bindings '((a b)) 'args nil gsl)))
-    (assert-true (assoc 'a result))
-    (assert-true (assoc 'b result))))
+    (expect (assoc 'a result) :to-be-truthy)
+    (expect (assoc 'b result) :to-be-truthy)))
 
 ;;; ── %push-destructured-key-bindings ──────────────────────────────────────
 
-(deftest push-destructured-key-bindings-emits-getf
-  "%push-destructured-key-bindings emits a (getf ...) binding per key param."
+(it-sequential "push-destructured-key-bindings-emits-getf"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (result (cl-cc/expand::%push-destructured-key-bindings
                   '(((:count n) 0 nil)) 'kw-args nil gsl)))
-    (assert-true (assoc 'n result))))
+    (expect (assoc 'n result) :to-be-truthy)))
 
-(deftest push-destructured-key-bindings-with-supplied-p
-  "%push-destructured-key-bindings emits a supplied-p binding when given."
+(it-sequential "push-destructured-key-bindings-with-supplied-p"
   (let* ((gsl (cl-cc/expand::%make-gensym-local))
          (result (cl-cc/expand::%push-destructured-key-bindings
                   '(((:count n) 0 n-p)) 'kw-args nil gsl)))
-    (assert-true (assoc 'n result))
-    (assert-true (assoc 'n-p result))))
+    (expect (assoc 'n result) :to-be-truthy)
+    (expect (assoc 'n-p result) :to-be-truthy)))
 
 ;;; ── *lambda-list-keyword-transitions* data table ─────────────────────────
 
-(deftest-each lambda-list-keyword-transitions-completeness
-  "*lambda-list-keyword-transitions* maps every standard lambda list keyword to a state."
-  :cases (("&whole"       '&whole       :whole)
-          ("&optional"    '&optional    :optional)
-          ("&rest"        '&rest        :rest)
-          ("&body"        '&body        :body)
-          ("&key"         '&key         :key)
-          ("&aux"         '&aux         :aux)
-          ("&environment" '&environment :environment))
-  (keyword expected-state)
-  (assert-eq expected-state
-             (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*))))
+(it-sequential "lambda-list-keyword-transitions-completeness &whole"
+  (destructuring-bind (keyword expected-state) (list '&whole :whole)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
 
-(deftest lambda-list-keyword-transitions-excludes-allow-other-keys
-  "*lambda-list-keyword-transitions* does NOT contain &allow-other-keys (handled separately)."
-  (assert-null (assoc '&allow-other-keys cl-cc/expand::*lambda-list-keyword-transitions*)))
+(it-sequential "lambda-list-keyword-transitions-completeness &optional"
+  (destructuring-bind (keyword expected-state) (list '&optional :optional)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
+
+(it-sequential "lambda-list-keyword-transitions-completeness &rest"
+  (destructuring-bind (keyword expected-state) (list '&rest :rest)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
+
+(it-sequential "lambda-list-keyword-transitions-completeness &body"
+  (destructuring-bind (keyword expected-state) (list '&body :body)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
+
+(it-sequential "lambda-list-keyword-transitions-completeness &key"
+  (destructuring-bind (keyword expected-state) (list '&key :key)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
+
+(it-sequential "lambda-list-keyword-transitions-completeness &aux"
+  (destructuring-bind (keyword expected-state) (list '&aux :aux)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
+
+(it-sequential "lambda-list-keyword-transitions-completeness &environment"
+  (destructuring-bind (keyword expected-state) (list '&environment :environment)
+    (expect (cdr (assoc keyword cl-cc/expand::*lambda-list-keyword-transitions*)) :to-be expected-state)))
+
+(it-sequential "lambda-list-keyword-transitions-excludes-allow-other-keys"
+  (expect (assoc '&allow-other-keys cl-cc/expand::*lambda-list-keyword-transitions*) :to-be-null))

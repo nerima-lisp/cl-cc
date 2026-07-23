@@ -6,108 +6,91 @@
 
 (in-package :cl-cc/test)
 
-(in-suite macros-hof-suite)
 
 ;;; ── position-if / position-if-not ──────────────────────────────────────────
 
-(deftest position-if-without-key-uses-block
-  "position-if without :key expands to LET with a BLOCK scan path under dispatch."
+(it-sequential "position-if-without-key-uses-block"
   (let ((result (our-macroexpand-1 '(position-if #'oddp lst))))
-    (assert-eq 'let (car result))
-    (assert-true (%tree-contains-head-p 'block result))))
+    (expect (car result) :to-be 'let)
+    (expect (%tree-contains-head-p 'block result) :to-be-truthy)))
 
-(deftest position-if-with-key-expands-to-let
-  "position-if with :key expands to a let (no block needed for key path)."
+(it-sequential "position-if-with-key-expands-to-let"
   (let ((result (our-macroexpand-1 '(position-if #'oddp lst :key #'car))))
-    (assert-eq 'let (car result))))
+    (expect (car result) :to-be 'let)))
 
-(deftest position-if-not-delegates-to-complement
-  "position-if-not without :key delegates to position-if with complement."
+(it-sequential "position-if-not-delegates-to-complement"
   (let ((result (our-macroexpand-1 '(position-if-not #'oddp lst))))
-    (assert-eq 'position-if (car result))
-    (assert-equal 'complement (caadr result))))
+    (expect (car result) :to-be 'position-if)
+    (expect (caadr result) :to-equal 'complement)))
 
-(deftest position-if-not-with-key-forwards-key
-  "position-if-not with :key forwards the :key argument to position-if."
+(it-sequential "position-if-not-with-key-forwards-key"
   (let ((result (our-macroexpand-1 '(position-if-not #'oddp lst :key #'car))))
-    (assert-eq 'position-if (car result))
-    (assert-true (member :key result))))
+    (expect (car result) :to-be 'position-if)
+    (expect (member :key result) :to-be-truthy)))
 
 ;;; ── count-if / count-if-not ─────────────────────────────────────────────────
 
-(deftest count-if-without-key-uses-dolist
-  "count-if without :key expands to LET with a DOLIST counting path under dispatch."
+(it-sequential "count-if-without-key-uses-dolist"
   (let ((result (our-macroexpand-1 '(count-if #'oddp lst))))
-    (assert-eq 'let (car result))
-    (assert-true (%tree-contains-head-p 'dolist result))))
+    (expect (car result) :to-be 'let)
+    (expect (%tree-contains-head-p 'dolist result) :to-be-truthy)))
 
-(deftest count-if-with-key-expands-to-let
-  "count-if with :key expands to a let (key application inline)."
+(it-sequential "count-if-with-key-expands-to-let"
   (let ((result (our-macroexpand-1 '(count-if #'oddp lst :key #'car))))
-    (assert-eq 'let (car result))))
+    (expect (car result) :to-be 'let)))
 
-(deftest count-if-not-delegates-to-complement
-  "count-if-not without :key delegates to count-if with complement."
+(it-sequential "count-if-not-delegates-to-complement"
   (let ((result (our-macroexpand-1 '(count-if-not #'oddp lst))))
-    (assert-eq 'count-if (car result))
-    (assert-equal 'complement (caadr result))))
+    (expect (car result) :to-be 'count-if)
+    (expect (caadr result) :to-equal 'complement)))
 
-(deftest count-if-not-with-key-forwards-key
-  "count-if-not with :key forwards the :key argument to count-if."
+(it-sequential "count-if-not-with-key-forwards-key"
   (let ((result (our-macroexpand-1 '(count-if-not #'oddp lst :key #'car))))
-    (assert-eq 'count-if (car result))
-    (assert-true (member :key result))))
+    (expect (car result) :to-be 'count-if)
+    (expect (member :key result) :to-be-truthy)))
 
 ;;; ── find-if-not ─────────────────────────────────────────────────────────────
 
-(deftest find-if-not-delegates-to-complement
-  "find-if-not without :key delegates to find-if with complement."
+(it-sequential "find-if-not-delegates-to-complement"
   (let ((result (our-macroexpand-1 '(find-if-not #'oddp lst))))
-    (assert-eq 'find-if (car result))
-    (assert-equal 'complement (caadr result))))
+    (expect (car result) :to-be 'find-if)
+    (expect (caadr result) :to-equal 'complement)))
 
-(deftest find-if-not-with-key-forwards-key
-  "find-if-not with :key forwards the :key argument to find-if."
+(it-sequential "find-if-not-with-key-forwards-key"
   (let ((result (our-macroexpand-1 '(find-if-not #'oddp lst :key #'car))))
-    (assert-eq 'find-if (car result))
-    (assert-true (member :key result))))
+    (expect (car result) :to-be 'find-if)
+    (expect (member :key result) :to-be-truthy)))
 
 ;;; ── assoc / assoc-if / assoc-if-not ────────────────────────────────────────
 
-(deftest assoc-without-test-uses-block
-  "assoc without :test expands to LET with a BLOCK alist scan path under dispatch."
+(it-sequential "assoc-without-test-uses-block"
   (let ((result (our-macroexpand-1 '(assoc item alist))))
-    (assert-eq 'let (car result))
-    (assert-true (%tree-contains-head-p 'block result))))
+    (expect (car result) :to-be 'let)
+    (expect (%tree-contains-head-p 'block result) :to-be-truthy)))
 
-(deftest assoc-with-test-also-uses-block
-  "assoc with :test still expands to LET with a BLOCK scan path under dispatch."
+(it-sequential "assoc-with-test-also-uses-block"
   (let ((result (our-macroexpand-1 '(assoc item alist :test #'equal))))
-    (assert-eq 'let (car result))
-    (assert-true (%tree-contains-head-p 'block result))))
+    (expect (car result) :to-be 'let)
+    (expect (%tree-contains-head-p 'block result) :to-be-truthy)))
 
-(deftest assoc-if-uses-dolist
-  "assoc-if expands to LET with a DOLIST predicate alist scan path under dispatch."
+(it-sequential "assoc-if-uses-dolist"
   (let ((result (our-macroexpand-1 '(assoc-if #'oddp alist))))
-    (assert-eq 'let (car result))
-    (assert-true (%tree-contains-head-p 'dolist result))))
+    (expect (car result) :to-be 'let)
+    (expect (%tree-contains-head-p 'dolist result) :to-be-truthy)))
 
-(deftest assoc-if-not-delegates-to-complement
-  "assoc-if-not delegates to assoc-if with complement."
+(it-sequential "assoc-if-not-delegates-to-complement"
   (let ((result (our-macroexpand-1 '(assoc-if-not #'oddp alist))))
-    (assert-eq 'assoc-if (car result))
-    (assert-equal 'complement (caadr result))))
+    (expect (car result) :to-be 'assoc-if)
+    (expect (caadr result) :to-equal 'complement)))
 
 ;;; ── rassoc-if / rassoc-if-not ───────────────────────────────────────────────
 
-(deftest rassoc-if-uses-dolist
-  "rassoc-if expands to let+dolist that checks the CDR of each pair."
+(it-sequential "rassoc-if-uses-dolist"
   (let ((result (our-macroexpand-1 '(rassoc-if #'oddp alist))))
-    (assert-eq 'let (car result))
-    (assert-eq 'dolist (car (caddr result)))))
+    (expect (car result) :to-be 'let)
+    (expect (car (caddr result)) :to-be 'dolist)))
 
-(deftest rassoc-if-not-delegates-to-complement
-  "rassoc-if-not delegates to rassoc-if with complement."
+(it-sequential "rassoc-if-not-delegates-to-complement"
   (let ((result (our-macroexpand-1 '(rassoc-if-not #'oddp alist))))
-    (assert-eq 'rassoc-if (car result))
-    (assert-equal 'complement (caadr result))))
+    (expect (car result) :to-be 'rassoc-if)
+    (expect (caadr result) :to-equal 'complement)))

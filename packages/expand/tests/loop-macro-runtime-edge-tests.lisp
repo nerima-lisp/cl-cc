@@ -5,7 +5,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite loop-macro-suite)
 
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;;; Section 32: Error paths — unknown / malformed clause keywords
@@ -96,40 +95,65 @@
 
 ;;; Consolidation tests
 
-(deftest-each loop-collect-list
-  "LOOP collect/append/do/when/unless accumulations — paths not covered individually."
-  :cases (("for-in-do"      '(1 2 3)           "(let ((r nil)) (loop for x in (list 1 2 3) do (push x r)) (nreverse r))")
-          ("empty"          nil                "(loop for x in nil collect x)")
-          ("from-by"        '(0 2 4)           "(loop for i from 0 below 5 by 2 collect i)")
-          ("on-by-cddr"     '((1 2 3 4) (3 4)) "(loop for x on (list 1 2 3 4) by (function cddr) collect x)")
-          ("unless-do"      '(1 3 5)           "(let ((r nil)) (loop for x in (list 1 2 3 4 5) unless (evenp x) do (push x r)) (nreverse r))")
-          ("when-append"    '(2 2 4 4)         "(loop for x in (list 1 2 3 4) when (evenp x) append (list x x))")
-          ("collect-into-when" '((1 3 5 7 9) (2 4 6 8 10)) "(loop for i from 1 to 10 when (oddp i) collect i into odds when (evenp i) collect i into evens finally (return (list (nreverse odds) (nreverse evens))))"))
-  (expected form)
-  (assert-equal expected (run-string form :stdlib t)))
+(it-sequential "loop-collect-list for-in-do"
+  (destructuring-bind (expected form) (list '(1 2 3) "(let ((r nil)) (loop for x in (list 1 2 3) do (push x r)) (nreverse r))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
-(deftest-each loop-numeric
-  "LOOP numeric accumulations — paths not covered individually."
-  :cases (("repeat-zero"  0  "(let ((n 0)) (loop repeat 0 do (setq n (+ n 1))) n)")
-          ("hash-values" 30  "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 10) (setf (gethash 'y ht) 20) (loop for v being the hash-values of ht sum v))")
-          ("with-clause" 15  "(loop with sum = 0 for i from 1 to 5 do (setq sum (+ sum i)) finally (return sum))")
-          ("sum-into"    15  "(loop for i from 1 to 5 sum i into total finally (return total))"))
-  (expected form)
-  (assert-= expected (run-string form :stdlib t)))
+(it-sequential "loop-collect-list empty"
+  (destructuring-bind (expected form) (list nil "(loop for x in nil collect x)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
-(deftest loop-edge-cases
-  "LOOP: empty hash-keys returns nil; nconc concatenates sublists."
-  (assert-null (run-string "(loop for k being the hash-keys of (make-hash-table) collect k)" :stdlib t))
-  (assert-string= "(a b c d)"
-                  (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
-                    (string-downcase (format nil "~S" (run-string "(loop for x in (list (list 'a 'b) (list 'c 'd)) nconc (copy-list x))" :stdlib t))))))
+(it-sequential "loop-collect-list from-by"
+  (destructuring-bind (expected form) (list '(0 2 4) "(loop for i from 0 below 5 by 2 collect i)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "loop-collect-list on-by-cddr"
+  (destructuring-bind (expected form) (list '((1 2 3 4) (3 4)) "(loop for x on (list 1 2 3 4) by (function cddr) collect x)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "loop-collect-list unless-do"
+  (destructuring-bind (expected form) (list '(1 3 5) "(let ((r nil)) (loop for x in (list 1 2 3 4 5) unless (evenp x) do (push x r)) (nreverse r))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "loop-collect-list when-append"
+  (destructuring-bind (expected form) (list '(2 2 4 4) "(loop for x in (list 1 2 3 4) when (evenp x) append (list x x))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "loop-collect-list collect-into-when"
+  (destructuring-bind (expected form) (list '((1 3 5 7 9) (2 4 6 8 10)) "(loop for i from 1 to 10 when (oddp i) collect i into odds when (evenp i) collect i into evens finally (return (list (nreverse odds) (nreverse evens))))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "loop-numeric repeat-zero"
+  (destructuring-bind (expected form) (list 0 "(let ((n 0)) (loop repeat 0 do (setq n (+ n 1))) n)")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "loop-numeric hash-values"
+  (destructuring-bind (expected form) (list 30 "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 10) (setf (gethash 'y ht) 20) (loop for v being the hash-values of ht sum v))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "loop-numeric with-clause"
+  (destructuring-bind (expected form) (list 15 "(loop with sum = 0 for i from 1 to 5 do (setq sum (+ sum i)) finally (return sum))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "loop-numeric sum-into"
+  (destructuring-bind (expected form) (list 15 "(loop for i from 1 to 5 sum i into total finally (return total))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "loop-edge-cases"
+  (expect (run-string "(loop for k being the hash-keys of (make-hash-table) collect k)" :stdlib t) :to-be-null)
+  (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+                    (string-downcase (format nil "~S" (run-string "(loop for x in (list (list 'a 'b) (list 'c 'd)) nconc (copy-list x))" :stdlib t)))) :to-equal "(a b c d)"))
 
 ;;; Floor/Truncate/Ceiling Multiple Values Tests
 
-(deftest-each floor-truncate-ceiling
-  "floor/truncate/ceiling return quotient and remainder via multiple-value-bind."
-  :cases (("floor"    '(3  2) "(multiple-value-bind (q r) (floor    17 5) (list q r))")
-          ("truncate" '(3  2) "(multiple-value-bind (q r) (truncate 17 5) (list q r))")
-          ("ceiling"  '(4 -3) "(multiple-value-bind (q r) (ceiling  17 5) (list q r))"))
-  (expected form)
-  (assert-equal expected (run-string form :stdlib t)))
+(it-sequential "floor-truncate-ceiling floor"
+  (destructuring-bind (expected form) (list '(3  2) "(multiple-value-bind (q r) (floor    17 5) (list q r))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "floor-truncate-ceiling truncate"
+  (destructuring-bind (expected form) (list '(3  2) "(multiple-value-bind (q r) (truncate 17 5) (list q r))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "floor-truncate-ceiling ceiling"
+  (destructuring-bind (expected form) (list '(4 -3) "(multiple-value-bind (q r) (ceiling  17 5) (list q r))")
+    (expect (run-string form :stdlib t) :to-equal expected)))

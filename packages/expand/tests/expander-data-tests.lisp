@@ -2,74 +2,111 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-data-suite :description "Expander data table unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite expander-data-suite)
-(deftest-each builtin-table-members
-  "Key symbols are present in their respective builtin tables."
-  :cases (("variadic-+"      '+      cl-cc/expand::*variadic-fold-builtins*)
-          ("variadic-*"      '*      cl-cc/expand::*variadic-fold-builtins*)
-          ("variadic-append" 'append cl-cc/expand::*variadic-fold-builtins*)
-          ("variadic-nconc"  'nconc  cl-cc/expand::*variadic-fold-builtins*)
-          ("binary-cons"     'cons   cl-cc/expand::*binary-builtins*)
-          ("binary-="        '=      cl-cc/expand::*binary-builtins*)
-          ("binary-mod"      'mod    cl-cc/expand::*binary-builtins*)
-          ("binary-ash"      'ash    cl-cc/expand::*binary-builtins*)
-          ("binary-bit-ior"  'bit-ior cl-cc/expand::*binary-builtins*)
-          ("unary-car"       'car    cl-cc/expand::*unary-builtins*)
-          ("unary-cdr"       'cdr    cl-cc/expand::*unary-builtins*)
-          ("unary-not"       'not    cl-cc/expand::*unary-builtins*)
-          ("unary-length"    'length cl-cc/expand::*unary-builtins*))
-  (sym table)
-  (assert-true (member sym table)))
+(it-sequential "builtin-table-members variadic-+"
+  (destructuring-bind (sym table) (list '+ cl-cc/expand::*variadic-fold-builtins*)
+    (expect (member sym table) :to-be-truthy)))
 
-(deftest cxr-builtins-completeness
-  "*cxr-builtins* has all 28 compositions."
-  (assert-equal 28 (length cl-cc/expand::*cxr-builtins*))
-  (assert-true (member 'caar cl-cc/expand::*cxr-builtins*))
-  (assert-true (member 'cddddr cl-cc/expand::*cxr-builtins*)))
+(it-sequential "builtin-table-members variadic-*"
+  (destructuring-bind (sym table) (list '* cl-cc/expand::*variadic-fold-builtins*)
+    (expect (member sym table) :to-be-truthy)))
 
-(deftest-each all-builtin-names-members
-  "*all-builtin-names* is the union of all sub-tables and contains representative symbols."
-  :cases (("variadic-+"   '+    cl-cc/expand::*all-builtin-names*)
-          ("binary-cons"  'cons cl-cc/expand::*all-builtin-names*)
-          ("unary-car"    'car  cl-cc/expand::*all-builtin-names*)
-          ("cxr-caar"     'caar cl-cc/expand::*all-builtin-names*)
-          ("special-list" 'list cl-cc/expand::*all-builtin-names*))
-  (sym table)
-  (assert-true (member sym table)))
+(it-sequential "builtin-table-members variadic-append"
+  (destructuring-bind (sym table) (list 'append cl-cc/expand::*variadic-fold-builtins*)
+    (expect (member sym table) :to-be-truthy)))
 
-(deftest expander-data-registry-sanity
-  "Core data registries and query helpers in expander-data.lisp are wired and readable."
-  (assert-true (hash-table-p cl-cc/expand:*accessor-slot-map*))
-  (assert-true (hash-table-p cl-cc/expand:*defstruct-slot-registry*))
-  (assert-true (hash-table-p cl-cc/expand:*defstruct-type-registry*))
-  (assert-true (hash-table-p cl-cc/expand:*symbol-macro-table*))
-  (assert-true (hash-table-p cl-cc/expand:*constant-table*))
-  (assert-true (hash-table-p cl-cc/expand:*compiler-macro-table*))
-  (assert-true (hash-table-p cl-cc/expand::*setf-compound-place-handlers*))
-  (assert-true (functionp cl-cc/expand:*macro-eval-fn*))
-  (assert-true (cl-cc/expand::compiler-special-form-p 'if))
-  (assert-false (cl-cc/expand::compiler-special-form-p 'not-a-special-form))
-  (assert-true (cl-cc/expand::builtin-name-p 'append))
-  (assert-true (cl-cc/expand::builtin-name-p 'bit-ior))
-  (assert-false (cl-cc/expand::builtin-name-p 'bit-or))
-  (assert-false (cl-cc/expand::builtin-name-p 'not-a-builtin))
-   (assert-equal 0 (cl-cc/expand::variadic-fold-identity '+))
-   (assert-equal 1 (cl-cc/expand::variadic-fold-identity '*))
-   (assert-equal nil (cl-cc/expand::variadic-fold-identity 'length)))
+(it-sequential "builtin-table-members variadic-nconc"
+  (destructuring-bind (sym table) (list 'nconc cl-cc/expand::*variadic-fold-builtins*)
+    (expect (member sym table) :to-be-truthy)))
 
-(deftest bootstrap-macro-eval-errors-without-our-eval
-  "%bootstrap-macro-eval rejects host fallback when OUR-EVAL is unavailable."
+(it-sequential "builtin-table-members binary-cons"
+  (destructuring-bind (sym table) (list 'cons cl-cc/expand::*binary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members binary-="
+  (destructuring-bind (sym table) (list '= cl-cc/expand::*binary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members binary-mod"
+  (destructuring-bind (sym table) (list 'mod cl-cc/expand::*binary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members binary-ash"
+  (destructuring-bind (sym table) (list 'ash cl-cc/expand::*binary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members binary-bit-ior"
+  (destructuring-bind (sym table) (list 'bit-ior cl-cc/expand::*binary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members unary-car"
+  (destructuring-bind (sym table) (list 'car cl-cc/expand::*unary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members unary-cdr"
+  (destructuring-bind (sym table) (list 'cdr cl-cc/expand::*unary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members unary-not"
+  (destructuring-bind (sym table) (list 'not cl-cc/expand::*unary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "builtin-table-members unary-length"
+  (destructuring-bind (sym table) (list 'length cl-cc/expand::*unary-builtins*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "cxr-builtins-completeness"
+  (expect (length cl-cc/expand::*cxr-builtins*) :to-equal 28)
+  (expect (member 'caar cl-cc/expand::*cxr-builtins*) :to-be-truthy)
+  (expect (member 'cddddr cl-cc/expand::*cxr-builtins*) :to-be-truthy))
+
+(it-sequential "all-builtin-names-members variadic-+"
+  (destructuring-bind (sym table) (list '+ cl-cc/expand::*all-builtin-names*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "all-builtin-names-members binary-cons"
+  (destructuring-bind (sym table) (list 'cons cl-cc/expand::*all-builtin-names*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "all-builtin-names-members unary-car"
+  (destructuring-bind (sym table) (list 'car cl-cc/expand::*all-builtin-names*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "all-builtin-names-members cxr-caar"
+  (destructuring-bind (sym table) (list 'caar cl-cc/expand::*all-builtin-names*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "all-builtin-names-members special-list"
+  (destructuring-bind (sym table) (list 'list cl-cc/expand::*all-builtin-names*)
+    (expect (member sym table) :to-be-truthy)))
+
+(it-sequential "expander-data-registry-sanity"
+  (expect (hash-table-p cl-cc/expand:*accessor-slot-map*) :to-be-truthy)
+  (expect (hash-table-p cl-cc/expand:*defstruct-slot-registry*) :to-be-truthy)
+  (expect (hash-table-p cl-cc/expand:*defstruct-type-registry*) :to-be-truthy)
+  (expect (hash-table-p cl-cc/expand:*symbol-macro-table*) :to-be-truthy)
+  (expect (hash-table-p cl-cc/expand:*constant-table*) :to-be-truthy)
+  (expect (hash-table-p cl-cc/expand:*compiler-macro-table*) :to-be-truthy)
+  (expect (hash-table-p cl-cc/expand::*setf-compound-place-handlers*) :to-be-truthy)
+  (expect (functionp cl-cc/expand:*macro-eval-fn*) :to-be-truthy)
+  (expect (cl-cc/expand::compiler-special-form-p 'if) :to-be-truthy)
+  (expect (cl-cc/expand::compiler-special-form-p 'not-a-special-form) :to-be-falsy)
+  (expect (cl-cc/expand::builtin-name-p 'append) :to-be-truthy)
+  (expect (cl-cc/expand::builtin-name-p 'bit-ior) :to-be-truthy)
+  (expect (cl-cc/expand::builtin-name-p 'bit-or) :to-be-falsy)
+  (expect (cl-cc/expand::builtin-name-p 'not-a-builtin) :to-be-falsy)
+  (expect (cl-cc/expand::variadic-fold-identity '+) :to-equal 0)
+  (expect (cl-cc/expand::variadic-fold-identity '*) :to-equal 1)
+  (expect (cl-cc/expand::variadic-fold-identity 'length) :to-equal nil))
+
+(it-sequential "bootstrap-macro-eval-errors-without-our-eval"
   (let ((original (when (fboundp 'cl-cc/expand::our-eval)
                     (symbol-function 'cl-cc/expand::our-eval))))
     (unwind-protect
          (progn
            (when original
              (fmakunbound 'cl-cc/expand::our-eval))
-           (assert-signals error
-             (cl-cc/expand::%bootstrap-macro-eval '(+ 1 2))))
+           (signals error (cl-cc/expand::%bootstrap-macro-eval '(+ 1 2))))
       (when original
         (setf (symbol-function 'cl-cc/expand::our-eval) original)))))

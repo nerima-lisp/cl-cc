@@ -3,56 +3,63 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-stdlib-sequence-map-suite
-  :description "Tests for macros-stdlib.lisp: coerce/map/replace/merge"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-stdlib-sequence-map-suite)
 
-(deftest-each coerce-quoted-type-expansions
-  "COERCE with quoted type dispatches to the right coerce-to-* primitive"
-  :cases (("to-string"        '(coerce v 'string)        "COERCE-TO-STRING")
-          ("to-simple-string" '(coerce v 'simple-string) "COERCE-TO-STRING")
-          ("to-list"          '(coerce v 'list)          "COERCE-TO-LIST")
-          ("to-vector"        '(coerce v 'vector)        "COERCE-TO-VECTOR")
-          ("to-character"     '(coerce v 'character)     "CHARACTER"))
-  (form expected-name)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-equal (symbol-name (car result)) expected-name)
-    (assert-equal (cadr result) 'v)))
+(it-sequential "coerce-quoted-type-expansions to-string"
+  (destructuring-bind (form expected-name) (list '(coerce v 'string) "COERCE-TO-STRING")
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect 'v :to-equal (cadr result)))))
 
-(deftest coerce-unquoted-type-fallback
-  "COERCE with a non-literal type dispatches to %coerce-runtime"
+(it-sequential "coerce-quoted-type-expansions to-simple-string"
+  (destructuring-bind (form expected-name) (list '(coerce v 'simple-string) "COERCE-TO-STRING")
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect 'v :to-equal (cadr result)))))
+
+(it-sequential "coerce-quoted-type-expansions to-list"
+  (destructuring-bind (form expected-name) (list '(coerce v 'list) "COERCE-TO-LIST")
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect 'v :to-equal (cadr result)))))
+
+(it-sequential "coerce-quoted-type-expansions to-vector"
+  (destructuring-bind (form expected-name) (list '(coerce v 'vector) "COERCE-TO-VECTOR")
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect 'v :to-equal (cadr result)))))
+
+(it-sequential "coerce-quoted-type-expansions to-character"
+  (destructuring-bind (form expected-name) (list '(coerce v 'character) "CHARACTER")
+    (let ((result (our-macroexpand-1 form)))
+    (expect expected-name :to-equal (symbol-name (car result)))
+    (expect 'v :to-equal (cadr result)))))
+
+(it-sequential "coerce-unquoted-type-fallback"
   (let ((result (our-macroexpand-1 '(coerce v type-var))))
-    (assert-equal (symbol-name (car result)) "%COERCE-RUNTIME")
-    (assert-eq (symbol-package (car result)) (symbol-package 'type-var))
-    (assert-equal (cadr result) 'v)))
+    (expect "%COERCE-RUNTIME" :to-equal (symbol-name (car result)))
+    (expect (symbol-package 'type-var) :to-be (symbol-package (car result)))
+    (expect 'v :to-equal (cadr result))))
 
-(deftest map-delegates-to-mapcar-coerce
-  "(map result-type fn seq) → (coerce (mapcar fn (coerce seq 'list)) result-type)"
-  (assert-equal (our-macroexpand-1 '(map 'list fn seq))
-                '(coerce (mapcar fn (coerce seq 'list)) 'list)))
+(it-sequential "map-delegates-to-mapcar-coerce"
+  (expect '(coerce (mapcar fn (coerce seq 'list)) 'list) :to-equal (our-macroexpand-1 '(map 'list fn seq))))
 
-(deftest-each dest-returning-sequence-expanders
-  "Destination-returning operators: expansion contains the dest variable and returns it."
-  :cases (("map-into" '(map-into dest fn src)))
-  (form)
-  (let* ((result    (our-macroexpand-1 form))
+(it-sequential "dest-returning-sequence-expanders map-into"
+  (destructuring-bind (form) (list '(map-into dest fn src))
+    (let* ((result    (our-macroexpand-1 form))
          (dest-var  (first (first (second result))))
          (last-form (car (last (cddr result)))))
-    (assert-eq 'let (car result))
-    (assert-eq last-form dest-var)))
+    (expect (car result) :to-be 'let)
+    (expect dest-var :to-be last-form))))
 
-(deftest replace-expansion-vector-path
-  "REPLACE: outer LET* with runtime vector/list dispatch."
+(it-sequential "replace-expansion-vector-path"
   (let* ((result (our-macroexpand-1 '(replace dest src))))
-    (assert-eq 'let* (car result))))
+    (expect (car result) :to-be 'let*)))
 
-(deftest merge-expansion
-  "MERGE expands to a LET that binds inputs/predicate and a LABELS recursive helper."
+(it-sequential "merge-expansion"
   (let* ((result   (our-macroexpand-1 '(merge 'list l1 l2 pred)))
          (bindings (second result))
          (body     (caddr result)))
-    (assert-eq 'let (car result))
-    (assert-= 3 (length bindings))
-    (assert-eq 'labels (car body))))
+    (expect (car result) :to-be 'let)
+    (expect (= 3 (length bindings)) :to-be-truthy)
+    (expect (car body) :to-be 'labels)))

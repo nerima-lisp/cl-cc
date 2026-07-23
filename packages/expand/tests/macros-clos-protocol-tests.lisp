@@ -10,100 +10,96 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-clos-protocol-suite
-  :description "Tests for CLOS protocol and MOP support macros"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-clos-protocol-suite)
 
 ;;; ─── print-unreadable-object ──────────────────────────────────────────────
 
-(deftest-each print-unreadable-object-basic-shape
-  "PRINT-UNREADABLE-OBJECT keeps its expected top-level expansion shape."
-  :cases (("base-form-expands-to-let"
-           '(print-unreadable-object (obj stream) body)
-           (lambda (result)
-             (assert-eq 'let (car result))))
-          ("body-wraps-with-angle-brackets"
-           '(print-unreadable-object (obj stream) body)
-           (lambda (result)
+(it-sequential "print-unreadable-object-basic-shape base-form-expands-to-let"
+  (destructuring-bind (form verifier) (list '(print-unreadable-object (obj stream) body) (lambda (result)
+             (expect (car result) :to-be 'let)))
+    (funcall verifier (our-macroexpand-1 form))))
+
+(it-sequential "print-unreadable-object-basic-shape body-wraps-with-angle-brackets"
+  (destructuring-bind (form verifier) (list '(print-unreadable-object (obj stream) body) (lambda (result)
              (let ((body (cddr result)))
-               (assert-true
-                (some (lambda (f)
+               (expect (some (lambda (f)
                         (and (consp f)
                              (eq (car f) 'format)
                              (member "#<" f :test #'equal)))
-                      body)))))
-          ("type-flag-emits-conditional-type-path"
-           '(print-unreadable-object (obj stream :type t) body)
-           (lambda (result)
+                      body) :to-be-truthy))))
+    (funcall verifier (our-macroexpand-1 form))))
+
+(it-sequential "print-unreadable-object-basic-shape type-flag-emits-conditional-type-path"
+  (destructuring-bind (form verifier) (list '(print-unreadable-object (obj stream :type t) body) (lambda (result)
              (let ((body (cddr result)))
-               (assert-true
-                (some (lambda (f) (and (consp f) (eq (car f) 'when))) body))))))
-  (form verifier)
-  (funcall verifier (our-macroexpand-1 form)))
+               (expect (some (lambda (f) (and (consp f) (eq (car f) 'when))) body) :to-be-truthy))))
+    (funcall verifier (our-macroexpand-1 form))))
 
 ;;; ─── describe ─────────────────────────────────────────────────────────────
 
-(deftest-each describe-expansion-shape
-  "DESCRIBE keeps its expected structural expansion contract."
-  :cases (("expands-to-let"
-           (lambda (result)
-             (assert-eq 'let (car result))))
-          ("calls-describe-object"
-           (lambda (result)
+(it-sequential "describe-expansion-shape expands-to-let"
+  (destructuring-bind (verifier) (list (lambda (result)
+             (expect (car result) :to-be 'let)))
+    (funcall verifier (our-macroexpand-1 '(describe obj)))))
+
+(it-sequential "describe-expansion-shape calls-describe-object"
+  (destructuring-bind (verifier) (list (lambda (result)
              (let ((body (cddr result)))
-               (assert-true
-                (some (lambda (f) (and (consp f) (eq (car f) 'describe-object)))
-                      body)))))
-          ("ends-with-values"
-           (lambda (result)
-             (assert-equal '(values) (car (last result))))))
-  (verifier)
-  (funcall verifier (our-macroexpand-1 '(describe obj))))
+               (expect (some (lambda (f) (and (consp f) (eq (car f) 'describe-object)))
+                      body) :to-be-truthy))))
+    (funcall verifier (our-macroexpand-1 '(describe obj)))))
+
+(it-sequential "describe-expansion-shape ends-with-values"
+  (destructuring-bind (verifier) (list (lambda (result)
+             (expect (car (last result)) :to-equal '(values))))
+    (funcall verifier (our-macroexpand-1 '(describe obj)))))
 
 ;;; ─── ensure-class ─────────────────────────────────────────────────────────
 
-(deftest ensure-class-delegates-to-defclass
-  "ENSURE-CLASS expands to a DEFCLASS with the given name."
+(it-sequential "ensure-class-delegates-to-defclass"
   (let ((result (our-macroexpand-1
                  '(cl-cc/expand::ensure-class 'my-class :direct-superclasses '(object)))))
-    (assert-eq 'defclass (car result))))
+    (expect (car result) :to-be 'defclass)))
 
 ;;; ─── define-method-combination ────────────────────────────────────────────
 
-(deftest define-method-combination-returns-quoted-name
-  "DEFINE-METHOD-COMBINATION registers side effects, then returns (QUOTE name)."
+(it-sequential "define-method-combination-returns-quoted-name"
   (let ((result (our-macroexpand-1
                  '(cl-cc::define-method-combination append :identity-with-one-argument t))))
-    (assert-eq 'progn (car result))
-    (assert-equal ''append (car (last result)))))
+    (expect (car result) :to-be 'progn)
+    (expect (car (last result)) :to-equal ''append)))
 
-(deftest-each instance-init-macros-use-shared-helper
-  "REINITIALIZE-INSTANCE and SHARED-INITIALIZE both delegate to %APPLY-INSTANCE-INITARGS."
-  :cases (("reinitialize-instance"
-           '(cl-cc::reinitialize-instance inst :slot 1))
-          ("shared-initialize"
-           '(cl-cc::shared-initialize inst t :slot 1)))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq 'let* (car result))
-    (assert-true (search "%APPLY-INSTANCE-INITARGS"
-                         (string-upcase (format nil "~S" result))))))
+(it-sequential "instance-init-macros-use-shared-helper reinitialize-instance"
+  (destructuring-bind (form) (list '(cl-cc::reinitialize-instance inst :slot 1))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'let*)
+    (expect (search "%APPLY-INSTANCE-INITARGS"
+                         (string-upcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "instance-init-macros-use-shared-helper shared-initialize"
+  (destructuring-bind (form) (list '(cl-cc::shared-initialize inst t :slot 1))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be 'let*)
+    (expect (search "%APPLY-INSTANCE-INITARGS"
+                         (string-upcase (format nil "~S" result))) :to-be-truthy))))
 
 ;;; ─── MOP introspection macros ─────────────────────────────────────────────
 
-(deftest-each mop-class-accessors-expand-to-let
-  "Class MOP accessor macros all expand to a LET guarded by HASH-TABLE-P.
-Uses cl-cc: qualified symbols because our-defmacro registers macros under the
-package where they were defined (src is (in-package :cl-cc)), and the test
-package would otherwise intern fresh uninterned lookup keys."
-  :cases (("class-direct-superclasses"    '(cl-cc/expand::class-direct-superclasses cls))
-          ("class-direct-slots"           '(cl-cc/expand::class-direct-slots cls))
-          ("class-slots"                  '(cl-cc/expand::class-slots cls))
-          ("class-direct-default-initargs" '(cl-cc/expand::class-direct-default-initargs cls)))
-  (form)
-  (assert-eq 'let (car (our-macroexpand-1 form))))
+(it-sequential "mop-class-accessors-expand-to-let class-direct-superclasses"
+  (destructuring-bind (form) (list '(cl-cc/expand::class-direct-superclasses cls))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "mop-class-accessors-expand-to-let class-direct-slots"
+  (destructuring-bind (form) (list '(cl-cc/expand::class-direct-slots cls))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "mop-class-accessors-expand-to-let class-slots"
+  (destructuring-bind (form) (list '(cl-cc/expand::class-slots cls))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "mop-class-accessors-expand-to-let class-direct-default-initargs"
+  (destructuring-bind (form) (list '(cl-cc/expand::class-direct-default-initargs cls))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
 
 (defun %tree-contains-keyword-p (kw form)
   "True if KW appears anywhere in FORM (nested walk)."
@@ -112,43 +108,36 @@ package would otherwise intern fresh uninterned lookup keys."
                           (%tree-contains-keyword-p kw (cdr form))))
         (t nil)))
 
-(deftest class-direct-superclasses-reads-superclasses-key
-  "CLASS-DIRECT-SUPERCLASSES body calls GETHASH with :__superclasses__."
+(it-sequential "class-direct-superclasses-reads-superclasses-key"
   (let* ((result (our-macroexpand-1 '(cl-cc/expand::class-direct-superclasses cls)))
          (body (cddr result)))
-    (assert-true (%tree-contains-keyword-p :__superclasses__ body))))
+    (expect (%tree-contains-keyword-p :__superclasses__ body) :to-be-truthy)))
 
-(deftest generic-function-methods-expands-to-let*
-  "GENERIC-FUNCTION-METHODS expands to a LET* binding the gf and method table."
+(it-sequential "generic-function-methods-expands-to-let*"
   (let ((result (our-macroexpand-1 '(cl-cc/vm::generic-function-methods gf))))
-    (assert-eq 'let* (car result))))
+    (expect (car result) :to-be 'let*)))
 
-(deftest generic-function-methods-calls-hash-table-values
-  "GENERIC-FUNCTION-METHODS body calls HASH-TABLE-VALUES."
+(it-sequential "generic-function-methods-calls-hash-table-values"
   (let* ((result (our-macroexpand-1 '(cl-cc/vm::generic-function-methods gf)))
          (body   (cddr result)))
-    (assert-true (some (lambda (f) (and (consp f) (eq (car f) 'when))) body))))
+    (expect (some (lambda (f) (and (consp f) (eq (car f) 'when))) body) :to-be-truthy)))
 
-(deftest generic-function-method-combination-expands-to-let
-  "GENERIC-FUNCTION-METHOD-COMBINATION expands to a LET with an IF defaulting to 'standard."
+(it-sequential "generic-function-method-combination-expands-to-let"
   (let ((result (our-macroexpand-1 '(cl-cc/vm::generic-function-method-combination gf))))
-    (assert-eq 'let (car result))))
+    (expect (car result) :to-be 'let)))
 
-(deftest generic-function-method-combination-defaults-to-standard
-  "GENERIC-FUNCTION-METHOD-COMBINATION IF branch returns 'STANDARD when no combination set."
+(it-sequential "generic-function-method-combination-defaults-to-standard"
   (let* ((result (our-macroexpand-1 '(cl-cc/vm::generic-function-method-combination gf)))
          (if-form (caddr result))
          (else-branch (cadddr if-form)))
-    (assert-equal ''standard else-branch)))
+    (expect else-branch :to-equal ''standard)))
 
 ;;; ─── parse-float ──────────────────────────────────────────────────────────
 
-(deftest parse-float-expands-to-let
-  "PARSE-FLOAT expands to a form that calls FLOAT and READ-FROM-STRING."
+(it-sequential "parse-float-expands-to-let"
   (let ((result (our-macroexpand-1 '(cl-cc/expand::parse-float "3.14"))))
-    (assert-true result)))
+    (expect result :to-be-truthy)))
 
-(deftest parse-float-with-start-uses-subseq
-  "PARSE-FLOAT with :start handles substring extraction."
+(it-sequential "parse-float-with-start-uses-subseq"
   (let* ((result (our-macroexpand-1 '(cl-cc/expand::parse-float s 2))))
-    (assert-true result)))
+    (expect result :to-be-truthy)))

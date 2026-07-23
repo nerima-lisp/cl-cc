@@ -3,83 +3,88 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-mutation-suite
-  :description "Tests for mutation-style stdlib macros"
-  :parent cl-cc-integration-suite)
 
-(in-suite macros-mutation-suite)
 
-(deftest push-expands-to-setf-cons
-  "PUSH expands to (setf place (cons value place)) — no gensym"
-  (assert-equal (our-macroexpand-1 '(push v lst))
-                '(setf lst (cons v lst))))
+(it-sequential "push-expands-to-setf-cons"
+  (expect '(setf lst (cons v lst)) :to-equal (our-macroexpand-1 '(push v lst))))
 
-(deftest pop-expansion
-  "POP expands to (let ((tmp place)) (setf place (cdr tmp)) (car tmp)) — reads place once."
+(it-sequential "pop-expansion"
   (let* ((result      (our-macroexpand-1 '(pop lst)))
          (bindings    (cadr result))       ; ((#:TMP lst))
          (setf-form   (caddr result))      ; (setf lst (cdr #:TMP))
          (tmp-sym     (caar bindings)))    ; the gensym bound to lst
-    (assert-eq   (car result)               'let)
+    (expect 'let :to-be (car result))
     ;; Binding binds tmp gensym to lst
-    (assert-equal (cadar bindings)          'lst)
+    (expect 'lst :to-equal (cadar bindings))
     ;; Setf form structure: (setf lst (cdr tmp))
-    (assert-eq   (car setf-form)            'setf)
-    (assert-eq   (cadr setf-form)           'lst)
+    (expect 'setf :to-be (car setf-form))
+    (expect 'lst :to-be (cadr setf-form))
     ;; Value arg to setf is (cdr tmp)
-    (assert-eq   (car (caddr setf-form))    'cdr)
-    (assert-eq   (cadr (caddr setf-form))   tmp-sym)))
+    (expect 'cdr :to-be (car (caddr setf-form)))
+    (expect tmp-sym :to-be (cadr (caddr setf-form)))))
 
-(deftest-each incf-decf-expansion
-  "incf/decf expand to (setq x (OP x delta)) for simple symbol places."
-  :cases (("incf-default" '(incf x)   '(setq x (+ x 1)))
-          ("incf-custom"  '(incf x 5) '(setq x (+ x 5)))
-          ("decf-default" '(decf x)   '(setq x (- x 1)))
-          ("decf-custom"  '(decf x 3) '(setq x (- x 3))))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "incf-decf-expansion incf-default"
+  (destructuring-bind (form expected) (list '(incf x) '(setq x (+ x 1)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest pushnew-default-expansion
-  "PUSHNEW with no :test uses default #'eql in MEMBER call."
+(it-sequential "incf-decf-expansion incf-custom"
+  (destructuring-bind (form expected) (list '(incf x 5) '(setq x (+ x 5)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "incf-decf-expansion decf-default"
+  (destructuring-bind (form expected) (list '(decf x) '(setq x (- x 1)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "incf-decf-expansion decf-custom"
+  (destructuring-bind (form expected) (list '(decf x 3) '(setq x (- x 3)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "pushnew-default-expansion"
   (let* ((result    (our-macroexpand-1 '(pushnew item place)))
          (unless-form (caddr result))
          (member-call (second unless-form)))
-    (assert-eq (car result)      'let)
-    (assert-eq (car unless-form) 'unless)
-    (assert-eq (car member-call) 'member)))
+    (expect 'let :to-be (car result))
+    (expect 'unless :to-be (car unless-form))
+    (expect 'member :to-be (car member-call))))
 
-(deftest pushnew-with-test-passes-test-to-member
-  "PUSHNEW :test keyword is forwarded to the MEMBER call."
+(it-sequential "pushnew-with-test-passes-test-to-member"
   (let* ((result      (our-macroexpand-1 '(pushnew item place :test #'equal)))
          (unless-form (caddr result))
          (member-call (second unless-form))
          (last-arg    (car (last member-call))))
-    (assert-= (length member-call) 5)
-    (assert-equal last-arg '#'equal)))
+    (expect (= (length member-call) 5) :to-be-truthy)
+    (expect '#'equal :to-equal last-arg)))
 
-(deftest-each pushnew-runtime-behavior
-  "PUSHNEW adds missing elements but skips duplicates."
-  :cases (("adds-missing"  4 "(let ((lst (list 1 2 3))) (pushnew 4 lst) (length lst))")
-          ("no-duplicate"  3 "(let ((lst (list 1 2 3))) (pushnew 2 lst) (length lst))"))
-  (expected code)
-  (assert-= expected (run-string code)))
+(it-sequential "pushnew-runtime-behavior adds-missing"
+  (destructuring-bind (expected code) (list 4 "(let ((lst (list 1 2 3))) (pushnew 4 lst) (length lst))")
+    (expect (= expected (run-string code)) :to-be-truthy)))
+
+(it-sequential "pushnew-runtime-behavior no-duplicate"
+  (destructuring-bind (expected code) (list 3 "(let ((lst (list 1 2 3))) (pushnew 2 lst) (length lst))")
+    (expect (= expected (run-string code)) :to-be-truthy)))
 
 ;;; ─── compound place: %compound-place-binding ──────────────────────────────
 
-(deftest-each compound-place-expansion-uses-let*
-  "PUSH/POP/INCF/DECF with a compound place (non-symbol) wrap in LET* to evaluate subforms once."
-  :cases (("push-aref" '(push v (aref arr i)))
-          ("pop-aref"  '(pop (aref arr i)))
-          ("incf-aref" '(incf (aref arr i)))
-          ("decf-aref" '(decf (aref arr i))))
-  (form)
-  (assert-eq 'let* (car (our-macroexpand-1 form))))
+(it-sequential "compound-place-expansion-uses-let* push-aref"
+  (destructuring-bind (form) (list '(push v (aref arr i)))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let*)))
 
-(deftest compound-place-subform-evaluated-once
-  "PUSH compound expansion binds index subform to a gensym so it's evaluated only once."
+(it-sequential "compound-place-expansion-uses-let* pop-aref"
+  (destructuring-bind (form) (list '(pop (aref arr i)))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let*)))
+
+(it-sequential "compound-place-expansion-uses-let* incf-aref"
+  (destructuring-bind (form) (list '(incf (aref arr i)))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let*)))
+
+(it-sequential "compound-place-expansion-uses-let* decf-aref"
+  (destructuring-bind (form) (list '(decf (aref arr i)))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let*)))
+
+(it-sequential "compound-place-subform-evaluated-once"
   (let* ((result   (our-macroexpand-1 '(push v (aref arr i))))
          (bindings (second result))
          (names    (mapcar #'first bindings)))
-    (assert-eq 'let* (car result))
-    (assert-true (> (length bindings) 1))
-    (assert-false (member 'i names))))
+    (expect (car result) :to-be 'let*)
+    (expect (> (length bindings) 1) :to-be-truthy)
+    (expect (member 'i names) :to-be-falsy)))

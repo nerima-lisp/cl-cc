@@ -2,108 +2,103 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-basic-suite
-  :description "Basic expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-basic-suite)
 
-(deftest expand-apply-named-fn-binary
-  "expand-apply-named-fn for a binary builtin (cons) normalises to (apply #'cons ...)."
+(it-sequential "expand-apply-named-fn-binary"
   (let ((result (cl-cc/expand::expand-apply-named-fn 'cons 'args)))
-    (assert-eq 'apply (car result))
-    (assert-eq 'function (caadr result))
-    (assert-eq 'cons (cadadr result))
-    (assert-eq 'args (third result))))
+    (expect (car result) :to-be 'apply)
+    (expect (caadr result) :to-be 'function)
+    (expect (cadadr result) :to-be 'cons)
+    (expect (third result) :to-be 'args)))
 
-(deftest expand-apply-named-fn-variadic-plus
-  "expand-apply-named-fn for + keeps APPLY visible to codegen."
+(it-sequential "expand-apply-named-fn-variadic-plus"
   (let ((result (cl-cc/expand::expand-apply-named-fn '+ 'args)))
-    (assert-eq 'apply (car result))
-    (assert-eq 'function (caadr result))
-    (assert-eq '+ (cadadr result))
-    (assert-eq 'args (third result))))
+    (expect (car result) :to-be 'apply)
+    (expect (caadr result) :to-be 'function)
+    (expect (cadadr result) :to-be '+)
+    (expect (third result) :to-be 'args)))
 
-(deftest expand-apply-preserves-function-designator
-  "compiler-macroexpand-all preserves APPLY function designators instead of lambda-wrapping them."
+(it-sequential "expand-apply-preserves-function-designator"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(apply #'+ '(1 2 3)))))
-    (assert-eq 'apply (car result))
-    (assert-eq 'function (caadr result))
-    (assert-eq '+ (cadadr result))
-    (assert-equal '(quote (1 2 3)) (third result))))
+    (expect (car result) :to-be 'apply)
+    (expect (caadr result) :to-be 'function)
+    (expect (cadadr result) :to-be '+)
+    (expect (third result) :to-equal '(quote (1 2 3)))))
 
-(deftest expand-apply-expands-dynamic-function-operand
-  "compiler-macroexpand-all still expands dynamic APPLY function operands."
+(it-sequential "expand-apply-expands-dynamic-function-operand"
   (let ((result (cl-cc/expand:compiler-macroexpand-all
                  '(apply (funcall 'identity #'+) '(1 2)))))
-    (assert-eq 'apply (car result))
-    (assert-eq 'identity (caadr result))))
+    (expect (car result) :to-be 'apply)
+    (expect (caadr result) :to-be 'identity)))
 
-(deftest-each expander-function-builtin-wraps-lambda
-  "#'builtin always expands to a lambda; arity matches the builtin type."
-  :cases (("binary"   'cons 2)
-          ("unary"    'car  1)
-          ("variadic" '+    nil))
-  (name expected-arity)
-  (let ((result (assert-expansion-head `(function ,name) 'lambda)))
+(it-sequential "expander-function-builtin-wraps-lambda binary"
+  (destructuring-bind (name expected-arity) (list 'cons 2)
+    (let ((result (assert-expansion-head `(function ,name) 'lambda)))
     (when expected-arity
-      (assert-equal expected-arity (length (second result))))))
+      (expect (length (second result)) :to-equal expected-arity)))))
 
-(deftest expander-function-non-builtin-passthrough
-  "compiler-macroexpand-all: #'user-fn (not a builtin) passes through as (function user-fn)."
+(it-sequential "expander-function-builtin-wraps-lambda unary"
+  (destructuring-bind (name expected-arity) (list 'car 1)
+    (let ((result (assert-expansion-head `(function ,name) 'lambda)))
+    (when expected-arity
+      (expect (length (second result)) :to-equal expected-arity)))))
+
+(it-sequential "expander-function-builtin-wraps-lambda variadic"
+  (destructuring-bind (name expected-arity) (list '+ nil)
+    (let ((result (assert-expansion-head `(function ,name) 'lambda)))
+    (when expected-arity
+      (expect (length (second result)) :to-equal expected-arity)))))
+
+(it-sequential "expander-function-non-builtin-passthrough"
   (let ((result (assert-expansion-head '(function my-user-defined-fn) 'function)))
-    (assert-eq 'my-user-defined-fn (second result))))
+    (expect (second result) :to-be 'my-user-defined-fn)))
 
-(deftest-each expander-funcall-quoted-to-direct-call
-  "(funcall 'name ...) becomes (name ...) for both user-defined and builtin functions.
-Uses a distinctive unique symbol for the user-fn case so prior tests can't
-have seeded a compiler-macro / type annotation for common names like 'foo
-that would trip the expander during recursion."
-  :cases (("user-fn" '(funcall 'my-unique-test-fn x) 'my-unique-test-fn 'x)
-          ("builtin" '(funcall 'car lst)             'car               'lst))
-  (form expected-head expected-arg)
-  (let ((result (assert-expansion-head form expected-head)))
-    (assert-eq expected-arg  (second result))))
+(it-sequential "expander-funcall-quoted-to-direct-call user-fn"
+  (destructuring-bind (form expected-head expected-arg) (list '(funcall 'my-unique-test-fn x) 'my-unique-test-fn 'x)
+    (let ((result (assert-expansion-head form expected-head)))
+    (expect (second result) :to-be expected-arg))))
 
-(deftest-each expander-make-hash-table-adjusts-test
-  "make-hash-table rewrites explicit :test forms to the dedicated helper path."
-  :cases (("function" '(make-hash-table :test #'equal))
-           ("quoted"   '(make-hash-table :test 'eql)))
-  (form)
-  (let ((result (assert-expansion-head form 'cl-cc/vm::%make-hash-table-with-test)))
-    (assert-true result)))
+(it-sequential "expander-funcall-quoted-to-direct-call builtin"
+  (destructuring-bind (form expected-head expected-arg) (list '(funcall 'car lst) 'car 'lst)
+    (let ((result (assert-expansion-head form expected-head)))
+    (expect (second result) :to-be expected-arg))))
 
-(deftest expander-format-literal-single-aesthetic-directive
-  "format nil with a literal ~A control expands to a direct string conversion."
-  (assert-equal '(princ-to-string value)
-                (cl-cc/expand:compiler-macroexpand-all
-                 '(format nil "~A" value))))
+(it-sequential "expander-make-hash-table-adjusts-test function"
+  (destructuring-bind (form) (list '(make-hash-table :test #'equal))
+    (let ((result (assert-expansion-head form 'cl-cc/vm::%make-hash-table-with-test)))
+    (expect result :to-be-truthy))))
 
-(deftest expander-format-literal-supported-directives
-  "format nil parses supported literal directives without keeping runtime FORMAT."
+(it-sequential "expander-make-hash-table-adjusts-test quoted"
+  (destructuring-bind (form) (list '(make-hash-table :test 'eql))
+    (let ((result (assert-expansion-head form 'cl-cc/vm::%make-hash-table-with-test)))
+    (expect result :to-be-truthy))))
+
+(it-sequential "expander-format-literal-single-aesthetic-directive"
+  (expect (cl-cc/expand:compiler-macroexpand-all
+                 '(format nil "~A" value)) :to-equal '(princ-to-string value)))
+
+(it-sequential "expander-format-literal-supported-directives"
   (let* ((result (cl-cc/expand:compiler-macroexpand-all
                   '(format nil "x=~A n=~D~%~~" value count)))
          (printed (format nil "~S" result)))
-    (assert-eq 'cl-cc/expand::string-concat (car result))
-    (assert-true (search "STRING-CONCAT" printed))
-    (assert-true (search "PRINC-TO-STRING" printed))
-    (assert-true (search "WRITE-TO-STRING" printed))
-    (assert-true (search "*PRINT-BASE*" printed))
-    (assert-true (search (string #\Newline) printed))
-    (assert-true (member "~" result :test #'equal))
-    (assert-false (search "MAKE-STRING-OUTPUT-STREAM" printed))))
+    (expect (car result) :to-be 'cl-cc/expand::string-concat)
+    (expect (search "STRING-CONCAT" printed) :to-be-truthy)
+    (expect (search "PRINC-TO-STRING" printed) :to-be-truthy)
+    (expect (search "WRITE-TO-STRING" printed) :to-be-truthy)
+    (expect (search "*PRINT-BASE*" printed) :to-be-truthy)
+    (expect (search (string #\Newline) printed) :to-be-truthy)
+    (expect (member "~" result :test #'equal) :to-be-truthy)
+    (expect (search "MAKE-STRING-OUTPUT-STREAM" printed) :to-be-falsy)))
 
-(deftest expander-format-literal-unsupported-directive-falls-back
-  "Unsupported literal directives preserve the existing string-stream FORMAT path."
+(it-sequential "expander-format-literal-unsupported-directive-falls-back"
   (let* ((result (cl-cc/expand:compiler-macroexpand-all
                   '(format nil "~S" value)))
          (printed (format nil "~S" result)))
-    (assert-eq 'let (car result))
-    (assert-true (search "MAKE-STRING-OUTPUT-STREAM" printed))
-    (assert-true (search "FORMAT" printed))))
+    (expect (car result) :to-be 'let)
+    (expect (search "MAKE-STRING-OUTPUT-STREAM" printed) :to-be-truthy)
+    (expect (search "FORMAT" printed) :to-be-truthy)))
 
-(deftest expander-format-literal-extra-args-fall-back
-  "Extra arguments fall back so runtime FORMAT still evaluates ignored arguments."
+(it-sequential "expander-format-literal-extra-args-fall-back"
   (let ((result (cl-cc/expand:compiler-macroexpand-all
                  '(format nil "literal" extra))))
-    (assert-eq 'let (car result))))
+    (expect (car result) :to-be 'let)))

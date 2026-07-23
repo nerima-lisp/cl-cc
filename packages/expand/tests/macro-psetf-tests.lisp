@@ -2,54 +2,44 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macro-psetf-suite
-  :description "PSETF expansion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macro-psetf-suite)
 
-(deftest psetf-empty
-  "PSETF with no arguments expands to a LET with empty bindings returning nil"
+(it-sequential "psetf-empty"
   (let ((result (our-macroexpand-1 '(psetf))))
-    (assert-eq (car result) 'let)
-    (assert-null (cadr result))
-    (assert-null (car (last result)))))
+    (expect 'let :to-be (car result))
+    (expect (cadr result) :to-be-null)
+    (expect (car (last result)) :to-be-null)))
 
-(deftest psetf-one-pair-has-single-temp-binding
-  "PSETF with one pair generates exactly one temp binding then a setf assignment."
+(it-sequential "psetf-one-pair-has-single-temp-binding"
   (let ((result (our-macroexpand-1 '(psetf x 10))))
-    (assert-eq (car result) 'let)
-    (assert-= (length (cadr result)) 1)
-    (assert-= (cadr (caadr result)) 10)
-    (assert-eq (car (caddr result)) 'setf)
-    (assert-eq (cadr (caddr result)) 'x)
-    (assert-null (car (last result)))))
+    (expect 'let :to-be (car result))
+    (expect (= (length (cadr result)) 1) :to-be-truthy)
+    (expect (= (cadr (caadr result)) 10) :to-be-truthy)
+    (expect 'setf :to-be (car (caddr result)))
+    (expect 'x :to-be (cadr (caddr result)))
+    (expect (car (last result)) :to-be-null)))
 
-(deftest psetf-two-pairs-captures-both-before-assigning
-  "PSETF with two pairs captures both values into temps before either setf runs."
+(it-sequential "psetf-two-pairs-captures-both-before-assigning"
   (let ((result (our-macroexpand-1 '(psetf a 1 b 2))))
-    (assert-eq (car result) 'let)
-    (assert-= (length (cadr result)) 2)
-    (assert-= (cadr (first (cadr result))) 1)
-    (assert-= (cadr (second (cadr result))) 2)
-    (assert-eq (car (caddr result)) 'setf)
-    (assert-eq (cadr (caddr result)) 'a)
-    (assert-eq (car (cadddr result)) 'setf)
-    (assert-eq (cadr (cadddr result)) 'b)
-    (assert-null (car (last result)))))
+    (expect 'let :to-be (car result))
+    (expect (= (length (cadr result)) 2) :to-be-truthy)
+    (expect (= (cadr (first (cadr result))) 1) :to-be-truthy)
+    (expect (= (cadr (second (cadr result))) 2) :to-be-truthy)
+    (expect 'setf :to-be (car (caddr result)))
+    (expect 'a :to-be (cadr (caddr result)))
+    (expect 'setf :to-be (car (cadddr result)))
+    (expect 'b :to-be (cadr (cadddr result)))
+    (expect (car (last result)) :to-be-null)))
 
-(deftest psetf-odd-args-signals-error
-  "PSETF with an odd number of arguments signals an error"
-  (assert-signals error (our-macroexpand-1 '(psetf x 1 y))))
+(it-sequential "psetf-odd-args-signals-error"
+  (signals error (our-macroexpand-1 '(psetf x 1 y))))
 
-(deftest psetf-three-pairs
-  "PSETF with three pairs captures all values before all assignments"
+(it-sequential "psetf-three-pairs"
   (let ((result (our-macroexpand-1 '(psetf a 1 b 2 c 3))))
-    (assert-eq (car result) 'let)
-    (assert-= (length (cadr result)) 3)
-    (assert-eq (car (caddr result)) 'setf)))
+    (expect 'let :to-be (car result))
+    (expect (= (length (cadr result)) 3) :to-be-truthy)
+    (expect 'setf :to-be (car (caddr result)))))
 
-(deftest integration-psetf-full-expansion
-  "Full expansion of PSETF: top-level is LET (macro fully expanded)"
+(it-sequential "integration-psetf-full-expansion"
   (let ((result (our-macroexpand '(psetf x 1 y 2))))
-    (assert-eq (car result) 'let)))
+    (expect 'let :to-be (car result))))

@@ -2,51 +2,39 @@
 
 (in-package :cl-cc/test)
 
-(defsuite runtime-stdlib-3-sequence-suite
-  :description "Runtime stdlib sequence operation completion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite runtime-stdlib-3-sequence-suite)
 
-(deftest sequence-every-some-accept-multiple-sequences
-  "EVERY/SOME/NOTANY/NOTEVERY accept &rest sequence arguments."
-  (assert-true (%tree-contains-head-p 'apply (our-macroexpand-1 '(every #'< '(1 2) '(3 4)))))
-  (assert-true (%tree-contains-head-p 'apply (our-macroexpand-1 '(some #'= '(1 2) '(0 2)))))
-  (assert-eq 'not (car (our-macroexpand-1 '(notany #'= '(1) '(2)))))
-  (assert-eq 'not (car (our-macroexpand-1 '(notevery #'< '(1) '(2))))))
+(it-sequential "sequence-every-some-accept-multiple-sequences"
+  (expect (%tree-contains-head-p 'apply (our-macroexpand-1 '(every #'< '(1 2) '(3 4)))) :to-be-truthy)
+  (expect (%tree-contains-head-p 'apply (our-macroexpand-1 '(some #'= '(1 2) '(0 2)))) :to-be-truthy)
+  (expect (car (our-macroexpand-1 '(notany #'= '(1) '(2)))) :to-be 'not)
+  (expect (car (our-macroexpand-1 '(notevery #'< '(1) '(2)))) :to-be 'not))
 
-(deftest sequence-substitute-count-from-end-expands
-  "SUBSTITUTE/NSUBSTITUTE preserve :COUNT and :FROM-END keyword support."
+(it-sequential "sequence-substitute-count-from-end-expands"
   (let ((expanded (our-macroexpand-1 '(substitute 9 1 '(1 2 1) :count 1 :from-end t))))
-    (assert-eq 'let* (car expanded)))
-  (assert-equal (our-macroexpand-1 '(nsubstitute 9 1 xs :count 1 :from-end t))
-                '(substitute 9 1 xs :count 1 :from-end t)))
+    (expect (car expanded) :to-be 'let*))
+  (expect '(substitute 9 1 xs :count 1 :from-end t) :to-equal (our-macroexpand-1 '(nsubstitute 9 1 xs :count 1 :from-end t))))
 
-(deftest sequence-mismatch-start-end-expands
-  "MISMATCH supports START/END keyword arguments."
+(it-sequential "sequence-mismatch-start-end-expands"
   (let ((expanded (our-macroexpand-1 '(mismatch xs ys :start1 1 :end1 3 :start2 2 :end2 4))))
-    (assert-eq 'let (car expanded))))
+    (expect (car expanded) :to-be 'let)))
 
-(deftest sequence-remove-duplicates-from-end-expands
-  "REMOVE-DUPLICATES accepts :FROM-END."
+(it-sequential "sequence-remove-duplicates-from-end-expands"
   (let ((expanded (our-macroexpand-1 '(remove-duplicates xs :from-end t))))
-    (assert-eq 'let (car expanded))))
+    (expect (car expanded) :to-be 'let)))
 
-(deftest sequence-remove-duplicates-vector-expands-to-coerce
-  "REMOVE-DUPLICATES preserves vector result coercion."
+(it-sequential "sequence-remove-duplicates-vector-expands-to-coerce"
   (let ((expanded (our-macroexpand-1 '(remove-duplicates #(1 2 1)))))
-    (assert-true (%tree-contains-head-p 'coerce expanded))))
+    (expect (%tree-contains-head-p 'coerce expanded) :to-be-truthy)))
 
-(deftest sequence-concatenate-coerces-inputs-for-list-vector
-  "CONCATENATE normalizes non-list inputs before APPEND for list/vector results."
+(it-sequential "sequence-concatenate-coerces-inputs-for-list-vector"
   (let ((list-exp (our-macroexpand-1 '(concatenate 'list #(1 2) '(3))))
         (vec-exp  (our-macroexpand-1 '(concatenate 'vector '(1) #(2)))))
-    (assert-true (%tree-contains-head-p 'coerce list-exp))
-    (assert-true (%tree-contains-head-p 'coerce vec-exp))))
+    (expect (%tree-contains-head-p 'coerce list-exp) :to-be-truthy)
+    (expect (%tree-contains-head-p 'coerce vec-exp) :to-be-truthy)))
 
-(deftest loop-arithmetic-iota-and-type-hints
-  "FR-1124: LOOP recognizes simple arithmetic collect and typed iteration hints."
+(it-sequential "loop-arithmetic-iota-and-type-hints"
   (let ((expanded (our-macroexpand-1 '(loop for i from 0 below n collect i))))
-    (assert-true (member (symbol-name (car expanded)) '("IOTA") :test #'string=)))
+    (expect (member (symbol-name (car expanded)) '("IOTA") :test #'string=) :to-be-truthy))
   (let ((typed (our-macroexpand-1 '(loop for i of-type fixnum from 0 below n sum i))))
-    (assert-true (%tree-contains-head-p 'the typed))))
+    (expect (%tree-contains-head-p 'the typed) :to-be-truthy)))

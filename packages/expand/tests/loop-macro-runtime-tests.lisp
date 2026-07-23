@@ -1,8 +1,6 @@
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
-(in-suite loop-macro-suite)
 
 (check-loop-equal loop-if-collect
   "if (synonym for when) filters correctly"
@@ -116,18 +114,17 @@
 ;;;; Section 16: INITIALLY / FINALLY
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-(deftest loop-initially-runs-first
-  "initially clause runs before iteration begins"
+(it-sequential "loop-initially-runs-first"
   (let ((result (run-string
                   "(let ((log nil))
                      (loop initially (push 'init log)
                            for x in '(1 2 3)
                            do (push x log))
                      (nreverse log))")))
-    (assert-true (consp result))
-    (assert-= 4 (length result))
-    (assert-string= "INIT" (symbol-name (car result)))
-    (assert-equal '(1 2 3) (cdr result))))
+    (expect (consp result) :to-be-truthy)
+    (expect (= 4 (length result)) :to-be-truthy)
+    (expect (symbol-name (car result)) :to-equal "INIT")
+    (expect (cdr result) :to-equal '(1 2 3))))
 
 (check-loop-= loop-finally-runs-last
   "finally clause runs after iteration ends (sum 1+2+3+4=10, then *10=100)"

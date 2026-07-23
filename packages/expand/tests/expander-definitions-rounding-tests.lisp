@@ -2,26 +2,21 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-definitions-rounding-suite :description "Definition-form rounding unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite expander-definitions-rounding-suite)
-(deftest expander-rounding-one-arg-normalization
-  "1-arg rounding forms are normalized to 2-arg (op n 1) for all *rounding-ops*."
+(it-sequential "expander-rounding-one-arg-normalization"
   (let ((cases '((floor . (floor n))
                  (ceiling . (ceiling n))
                  (truncate . (truncate n))
                  (round . (round n)))))
     (dolist (case cases)
       (let ((result (cl-cc/expand:compiler-macroexpand-all (cdr case))))
-        (assert-eq (car case) (car result))
-        (assert-eq 'n (second result))
-        (assert-equal 1 (third result))))))
+        (expect (car result) :to-be (car case))
+        (expect (second result) :to-be 'n)
+        (expect (third result) :to-equal 1)))))
 
-(deftest expander-floor-two-arg-unchanged
-  "compiler-macroexpand-all: (floor x d) with explicit divisor passes through."
+(it-sequential "expander-floor-two-arg-unchanged"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(floor n 3))))
-    (assert-eq 'floor (car result))
-    (assert-eq 'n (second result))
-    (assert-equal 3 (third result))))
+    (expect (car result) :to-be 'floor)
+    (expect (second result) :to-be 'n)
+    (expect (third result) :to-equal 3)))

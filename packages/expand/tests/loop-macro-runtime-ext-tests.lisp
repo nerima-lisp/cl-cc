@@ -7,7 +7,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite loop-macro-suite)
 
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;;; Section 28: FOR i FROM n without an upper bound (WHILE-terminated)

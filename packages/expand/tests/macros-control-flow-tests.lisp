@@ -2,184 +2,187 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-control-flow-suite
-  :description "Macro control-flow expansion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-control-flow-suite)
 
-(deftest-each when-macro-expansions
-  "WHEN expands to (if test (progn ...) nil)"
-  :cases (("multi-body"   '(when test body1 body2) '(if test (progn body1 body2) nil))
-          ("single-body"  '(when test body)        '(if test (progn body) nil))
-          ("no-body"      '(when test)             '(if test (progn) nil)))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "when-macro-expansions multi-body"
+  (destructuring-bind (form expected) (list '(when test body1 body2) '(if test (progn body1 body2) nil))
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest when-idempotent-expansion
-  "Fully expanding representative WHEN forms twice yields the same form."
-  :timeout 5
+(it-sequential "when-macro-expansions single-body"
+  (destructuring-bind (form expected) (list '(when test body) '(if test (progn body) nil))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "when-macro-expansions no-body"
+  (destructuring-bind (form expected) (list '(when test) '(if test (progn) nil))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "when-idempotent-expansion"
+  :timeout
+  5
   (dolist (form '((when t body)
                   (when flag body1 body2)
                   (when (= x 0) (print 1))))
     (let* ((exp1 (our-macroexpand form))
            (exp2 (our-macroexpand exp1)))
-      (assert-equal exp1 exp2))))
+      (expect exp2 :to-equal exp1))))
 
-(deftest unless-idempotent-expansion
-  "Fully expanding representative UNLESS forms twice yields the same form."
-  :timeout 5
+(it-sequential "unless-idempotent-expansion"
+  :timeout
+  5
   (dolist (form '((unless t body)
                   (unless flag body1 body2)
                   (unless (= x 0) (print 1))))
     (let* ((exp1 (our-macroexpand form))
            (exp2 (our-macroexpand exp1)))
-      (assert-equal exp1 exp2))))
+      (expect exp2 :to-equal exp1))))
 
-(deftest-each unless-macro-expansions
-  "UNLESS expands to (if test nil (progn ...))"
-  :cases (("multi-body"   '(unless test body1 body2) '(if test nil (progn body1 body2)))
-          ("single-body"  '(unless test body)        '(if test nil (progn body)))
-          ("no-body"      '(unless test)             '(if test nil (progn))))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "unless-macro-expansions multi-body"
+  (destructuring-bind (form expected) (list '(unless test body1 body2) '(if test nil (progn body1 body2)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest-each cond-macro-simple-expansions
-  "COND base cases expand correctly"
-  :cases (("empty"       '(cond)            nil)
-          ("single-expr" '(cond (x))        '(or x (cond)))
-          ("single-full" '(cond (test body)) '(if test (progn body) (cond))))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "unless-macro-expansions single-body"
+  (destructuring-bind (form expected) (list '(unless test body) '(if test nil (progn body)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest cond-macro-multiple-clauses
-  "Test COND with multiple clauses"
+(it-sequential "unless-macro-expansions no-body"
+  (destructuring-bind (form expected) (list '(unless test) '(if test nil (progn)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "cond-macro-simple-expansions empty"
+  (destructuring-bind (form expected) (list '(cond) nil)
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "cond-macro-simple-expansions single-expr"
+  (destructuring-bind (form expected) (list '(cond (x)) '(or x (cond)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "cond-macro-simple-expansions single-full"
+  (destructuring-bind (form expected) (list '(cond (test body)) '(if test (progn body) (cond)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "cond-macro-multiple-clauses"
   (let ((result (our-macroexpand-1 '(cond (test1 body1) (test2 body2) (t body3)))))
-    (assert-eq (car result) 'if)
-    (assert-equal (cadr result) 'test1)
-    (assert-eq (caaddr result) 'progn)
-    (assert-equal (car (cdaddr result)) 'body1)))
+    (expect 'if :to-be (car result))
+    (expect 'test1 :to-equal (cadr result))
+    (expect 'progn :to-be (caaddr result))
+    (expect 'body1 :to-equal (car (cdaddr result)))))
 
-(deftest-each and-macro-simple-expansions
-  "AND expands each arity correctly.
-In the full test context, our-macroexpand-1 recurses through nested AND forms,
-so (and a b c) arrives as fully-nested IFs rather than (if a (and b c) nil)."
-  :cases (("empty"         '(and)       t)
-          ("single-arg"    '(and x)     'x)
-          ("two-args"      '(and a b)   '(if a (and b) nil))
-          ("multiple-args" '(and a b c) '(if a (and b c) nil)))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "and-macro-simple-expansions empty"
+  (destructuring-bind (form expected) (list '(and) t)
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest and-full-expansion-creates-nested-ifs
-  "Full AND expansion of (and a b c) produces nested IFs with a at top."
+(it-sequential "and-macro-simple-expansions single-arg"
+  (destructuring-bind (form expected) (list '(and x) 'x)
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "and-macro-simple-expansions two-args"
+  (destructuring-bind (form expected) (list '(and a b) '(if a (and b) nil))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "and-macro-simple-expansions multiple-args"
+  (destructuring-bind (form expected) (list '(and a b c) '(if a (and b c) nil))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "and-full-expansion-creates-nested-ifs"
   (let ((result (our-macroexpand-all '(and a b c))))
-    (assert-eq 'if (car result))
-    (assert-equal 'a (cadr result))
-    (assert-eq 'if (caaddr result))))
+    (expect (car result) :to-be 'if)
+    (expect (cadr result) :to-equal 'a)
+    (expect (caaddr result) :to-be 'if)))
 
-(deftest and-idempotent-expansion
-  "Fully expanding AND forms twice yields the same form."
-  :timeout 5
+(it-sequential "and-idempotent-expansion"
+  :timeout
+  5
   (dolist (form '((and a b)
                   (and a b c)
                   (and (= x 0) flag (print 1))))
     (let* ((exp1 (our-macroexpand form))
            (exp2 (our-macroexpand exp1)))
-      (assert-equal exp1 exp2))))
+      (expect exp2 :to-equal exp1))))
 
-(deftest-each or-macro-simple-expansions
-  "OR expands to nil for empty and identity for single arg"
-  :cases (("empty"      '(or)  nil)
-          ("single-arg" '(or x) 'x))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "or-macro-simple-expansions empty"
+  (destructuring-bind (form expected) (list '(or) nil)
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest or-macro-multi-arg-expansion
-  "OR with 2 args: LET wrapping IF; full 3-arg expansion nests two LETs."
+(it-sequential "or-macro-simple-expansions single-arg"
+  (destructuring-bind (form expected) (list '(or x) 'x)
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "or-macro-multi-arg-expansion"
   (let ((result (our-macroexpand-1 '(or a b))))
-    (assert-eq (car result) 'let)
-    (assert-= (length result) 3)
-    (assert-eq (car (caddr result)) 'if))
+    (expect 'let :to-be (car result))
+    (expect (= (length result) 3) :to-be-truthy)
+    (expect 'if :to-be (car (caddr result))))
   (let ((result (our-macroexpand-all '(or a b c))))
-    (assert-eq (car result) 'let)
+    (expect 'let :to-be (car result))
     (let ((inner (cadddr (caddr result))))
-      (assert-eq (car inner) 'let))))
+      (expect 'let :to-be (car inner)))))
 
-(deftest-each let*-macro-base-cases
-  "LET* base cases: empty bindings wraps in PROGN; single binding wraps in LET."
-  :cases (("empty"  '(let* () body1 body2)  '(progn body1 body2))
-          ("single" '(let* ((a 1)) body)     '(let ((a 1)) (let* nil body))))
-  (form expected)
-  (assert-equal expected (our-macroexpand-1 form)))
+(it-sequential "let*-macro-base-cases empty"
+  (destructuring-bind (form expected) (list '(let* () body1 body2) '(progn body1 body2))
+    (expect (our-macroexpand-1 form) :to-equal expected)))
 
-(deftest let*-one-step-nests-remainder-in-let*
-  "LET* one-step expansion peels the first binding into a LET; the remainder stays LET*."
+(it-sequential "let*-macro-base-cases single"
+  (destructuring-bind (form expected) (list '(let* ((a 1)) body) '(let ((a 1)) (let* nil body)))
+    (expect (our-macroexpand-1 form) :to-equal expected)))
+
+(it-sequential "let*-one-step-nests-remainder-in-let*"
   (let ((result (our-macroexpand-1 '(let* ((a 1) (b a)) body))))
-    (assert-eq (car result) 'let)
-    (assert-equal (cadr result) '((a 1)))
-    (assert-eq (car (caddr result)) 'let*)))
+    (expect 'let :to-be (car result))
+    (expect '((a 1)) :to-equal (cadr result))
+    (expect 'let* :to-be (car (caddr result)))))
 
-(deftest let*-full-expansion-produces-nested-lets
-  "LET* full expansion of 2-binding form produces a nested LET chain."
+(it-sequential "let*-full-expansion-produces-nested-lets"
   (let ((result (our-macroexpand-all '(let* ((a 1) (b a)) body))))
-    (assert-eq (car result) 'let)
-    (assert-equal (cadr result) '((a 1)))
-    (assert-eq (caaddr result) 'let)))
+    (expect 'let :to-be (car result))
+    (expect '((a 1)) :to-equal (cadr result))
+    (expect 'let :to-be (caaddr result))))
 
-(deftest let*-dependency-chain-nests-correctly
-  "LET* with a 3-binding dependency chain (x y z) nests all bindings into LETs."
+(it-sequential "let*-dependency-chain-nests-correctly"
   (let ((result (our-macroexpand-all '(let* ((x 1) (y (+ x 1)) (z (* y 2))) body))))
-    (assert-eq (car result) 'let)
+    (expect 'let :to-be (car result))
     (let ((y-binding (caddr result)))
-      (assert-eq (car y-binding) 'let))))
+      (expect 'let :to-be (car y-binding)))))
 
-(deftest prog1-expansion-binds-result-and-returns-it
-  "PROG1 expands to a LET binding first-form to a gensym, evaluates body, then returns the gensym."
+(it-sequential "prog1-expansion-binds-result-and-returns-it"
   (let ((result (our-macroexpand-1 '(prog1 first-form body1 body2))))
-    (assert-eq (car result) 'let)
-    (assert-true (symbolp (caaadr result)))
-    (assert-eq (cadr (caadr result)) 'first-form)
-    (assert-eq (car (last result)) (caaadr result)))
+    (expect 'let :to-be (car result))
+    (expect (symbolp (caaadr result)) :to-be-truthy)
+    (expect 'first-form :to-be (cadr (caadr result)))
+    (expect (caaadr result) :to-be (car (last result))))
   (let ((result (our-macroexpand-1 '(prog1 first-form))))
-    (assert-eq (car result) 'let)
-    (assert-= (length result) 3)))
+    (expect 'let :to-be (car result))
+    (expect (= (length result) 3) :to-be-truthy)))
 
-(deftest prog2-expansion-evaluates-first-then-returns-second
-  "PROG2 expands to PROGN with first-form then a LET binding second-form and returning it."
+(it-sequential "prog2-expansion-evaluates-first-then-returns-second"
   (let ((result (our-macroexpand-1 '(prog2 first-form second-form body1 body2))))
-    (assert-eq (car result) 'progn)
-    (assert-eq (cadr result) 'first-form)
-    (assert-eq (car (caddr result)) 'let)
+    (expect 'progn :to-be (car result))
+    (expect 'first-form :to-be (cadr result))
+    (expect 'let :to-be (car (caddr result)))
     (let ((let-body (caddr result)))
-      (assert-eq (car (last let-body)) (caaadr let-body))))
+      (expect (caaadr let-body) :to-be (car (last let-body)))))
   (let ((result (our-macroexpand-1 '(prog2 first-form second-form body))))
-    (assert-eq (car result) 'progn)
-    (assert-eq (cadr result) 'first-form)
-    (assert-eq (caaddr result) 'let)))
+    (expect 'progn :to-be (car result))
+    (expect 'first-form :to-be (cadr result))
+    (expect 'let :to-be (caaddr result))))
 
-(deftest defun-c-runtime-contracts
-  "DEFUN/C expands to DEFUN with runtime pre/postcondition guards."
-  :timeout 10
+(it-sequential "defun-c-runtime-contracts"
+  :timeout
+  10
   (let ((expanded-1
           (our-macroexpand-1
            '(defun/c add1-positive-mcf (x)
               :requires (> x 0)
               :ensures (= result (+ x 1))
               (+ x 1)))))
-    (assert-eq 'defun (car expanded-1))
-    (assert-eq 'add1-positive-mcf (cadr expanded-1))
-    (assert-equal '(x) (caddr expanded-1))
-    (assert-true
-     (some (lambda (form) (and (consp form) (eq (car form) 'unless)))
-           (cdddr expanded-1)))
-    (assert-true
-     (some (lambda (form) (and (consp form) (eq (car form) 'let)))
-           (cdddr expanded-1)))))
+    (expect (car expanded-1) :to-be 'defun)
+    (expect (cadr expanded-1) :to-be 'add1-positive-mcf)
+    (expect (caddr expanded-1) :to-equal '(x))
+    (expect (some (lambda (form) (and (consp form) (eq (car form) 'unless)))
+           (cdddr expanded-1)) :to-be-truthy)
+    (expect (some (lambda (form) (and (consp form) (eq (car form) 'let)))
+           (cdddr expanded-1)) :to-be-truthy)))
 
-(deftest macroexpansion-memoization-reuses-cached-result
-  "Repeated macro expansion of the same form is stable.
-The cache is opportunistic, so we only require the same result each time."
+(it-sequential "macroexpansion-memoization-reuses-cached-result"
   (let ((count 0)
         (name (gensym "CACHE-TEST-")))
     (cl-cc/expand:register-macro name
@@ -188,6 +191,6 @@ The cache is opportunistic, so we only require the same result each time."
                              (incf count)
                              '(+ 1 2)))
     (let ((form (list name 'x)))
-      (assert-equal '(+ 1 2) (our-macroexpand-all form nil))
-      (assert-equal '(+ 1 2) (our-macroexpand-all form nil))
-      (assert-true (<= count 2)))))
+      (expect (our-macroexpand-all form nil) :to-equal '(+ 1 2))
+      (expect (our-macroexpand-all form nil) :to-equal '(+ 1 2))
+      (expect (<= count 2) :to-be-truthy))))
