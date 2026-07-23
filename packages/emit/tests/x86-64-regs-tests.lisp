@@ -6,153 +6,197 @@
 
 (in-package :cl-cc/test)
 
-(defsuite x86-64-regs-suite
-  :description "Register map and translation tests for x86-64-regs.lisp"
-  :parent cl-cc-unit-suite)
 
-(in-suite x86-64-regs-suite)
 
 ;;; ─── x86-64-red-zone-spill-p ─────────────────────────────────────────────
 
-(deftest x86-64-regs-red-zone-spill-leaf-within-limit-returns-true
-  "x86-64-red-zone-spill-p: leaf=T with count≤16 returns T."
-  (assert-true (cl-cc/codegen::x86-64-red-zone-spill-p t 1))
-  (assert-true (cl-cc/codegen::x86-64-red-zone-spill-p t 16)))
+(it-sequential "x86-64-regs-red-zone-spill-leaf-within-limit-returns-true"
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p t 1) :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p t 16) :to-be-truthy))
 
-(deftest x86-64-regs-red-zone-spill-non-leaf-always-false
-  "x86-64-red-zone-spill-p: leaf=NIL always returns NIL regardless of count."
-  (assert-false (cl-cc/codegen::x86-64-red-zone-spill-p nil 1))
-  (assert-false (cl-cc/codegen::x86-64-red-zone-spill-p nil 16)))
+(it-sequential "x86-64-regs-red-zone-spill-non-leaf-always-false"
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p nil 1) :to-be-falsy)
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p nil 16) :to-be-falsy))
 
-(deftest x86-64-regs-red-zone-spill-leaf-exceeds-limit-returns-false
-  "x86-64-red-zone-spill-p: leaf=T with count>16 returns NIL."
-  (assert-false (cl-cc/codegen::x86-64-red-zone-spill-p t 17))
-  (assert-false (cl-cc/codegen::x86-64-red-zone-spill-p t 100)))
+(it-sequential "x86-64-regs-red-zone-spill-leaf-exceeds-limit-returns-false"
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p t 17) :to-be-falsy)
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p t 100) :to-be-falsy))
 
-(deftest x86-64-regs-red-zone-spill-zero-count-returns-false
-  "x86-64-red-zone-spill-p: leaf=T with count=0 returns NIL."
-  (assert-false (cl-cc/codegen::x86-64-red-zone-spill-p t 0)))
+(it-sequential "x86-64-regs-red-zone-spill-zero-count-returns-false"
+  (expect (cl-cc/codegen::x86-64-red-zone-spill-p t 0) :to-be-falsy))
 
-(deftest x86-64-stack-frame-packing-mixed-width-locals
-  "FR-416: mixed-width stack locals are reordered by alignment to avoid padding holes."
+(it-sequential "x86-64-stack-frame-packing-mixed-width-locals"
   (multiple-value-bind (layout frame-size)
       (cl-cc/codegen::x86-64-pack-stack-frame-locals
        '((flag 1 1) (wide 8 8) (word 4 4))
        :stack-alignment 8)
-    (assert-equal '((wide . -8) (word . -12) (flag . -13)) layout)
-    (assert-equal 16 frame-size)))
+    (expect layout :to-equal '((wide . -8) (word . -12) (flag . -13)))
+    (expect frame-size :to-equal 16)))
 
-(deftest x86-64-stack-frame-packing-accepts-plist-locals
-  "FR-416: stack-frame packer accepts plist descriptors from future lowering passes."
+(it-sequential "x86-64-stack-frame-packing-accepts-plist-locals"
   (multiple-value-bind (layout frame-size)
       (cl-cc/codegen::x86-64-pack-stack-frame-locals
        '((:name :byte :size 1 :align 1)
          (:name :double :size 8 :align 8))
        :stack-alignment 16)
-    (assert-equal '((:double . -8) (:byte . -9)) layout)
-    (assert-equal 16 frame-size)))
+    (expect layout :to-equal '((:double . -8) (:byte . -9)))
+    (expect frame-size :to-equal 16)))
 
 ;;; ─── vm-reg-to-x86 (no regalloc) ─────────────────────────────────────────
 
-(deftest-each x86-64-regs-vm-reg-to-x86-naive-map
-  "vm-reg-to-x86 uses naive *vm-reg-map* when *current-regalloc* is nil.
-Codes 4 and 5 are rsp/rbp (reserved as stack/base pointers) and are skipped,
-so R4→rsi=6 and R5→rdi=7 in the naive mapping."
-  :cases (("r0" :R0 0)   ; rax = 0
-          ("r1" :R1 1)   ; rcx = 1
-          ("r2" :R2 2)   ; rdx = 2
-          ("r3" :R3 3)   ; rbx = 3
-          ("r4" :R4 6)   ; rsi = 6 (skips rsp=4)
-          ("r5" :R5 7)   ; rdi = 7 (skips rbp=5)
-          ("r6" :R6 8)   ; r8  = 8
-          ("r7" :R7 9))  ; r9  = 9
-  (vreg expected-code)
-  (let ((cl-cc/codegen::*current-regalloc* nil)
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r0"
+  (destructuring-bind (vreg expected-code) (list :R0 0)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
         (cl-cc/codegen::*phys-reg-to-x86-code* nil))
-    (assert-= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg))))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
 
-(deftest x86-64-regs-vm-reg-to-x86-out-of-range-errors
-  "vm-reg-to-x86 signals error for an unmapped VM register."
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r1"
+  (destructuring-bind (vreg expected-code) (list :R1 1)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r2"
+  (destructuring-bind (vreg expected-code) (list :R2 2)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r3"
+  (destructuring-bind (vreg expected-code) (list :R3 3)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r4"
+  (destructuring-bind (vreg expected-code) (list :R4 6)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r5"
+  (destructuring-bind (vreg expected-code) (list :R5 7)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r6"
+  (destructuring-bind (vreg expected-code) (list :R6 8)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-naive-map r7"
+  (destructuring-bind (vreg expected-code) (list :R7 9)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-reg-to-x86-code* nil))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-x86 vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-x86-out-of-range-errors"
   (let ((cl-cc/codegen::*current-regalloc* nil)
         (cl-cc/codegen::*phys-reg-to-x86-code* nil))
-    (assert-signals error (cl-cc/codegen::vm-reg-to-x86 :R99))))
+    (signals error (cl-cc/codegen::vm-reg-to-x86 :R99))))
 
 ;;; ─── vm-reg-to-xmm (no regalloc) ────────────────────────────────────────
 
-(deftest-each x86-64-regs-vm-reg-to-xmm-naive-map
-  "vm-reg-to-xmm uses naive *vm-fp-reg-map* when *current-regalloc* is nil."
-  :cases (("xmm0" :R0 0)
-          ("xmm1" :R1 1)
-          ("xmm2" :R2 2)
-          ("xmm7" :R7 7))
-  (vreg expected-code)
-  (let ((cl-cc/codegen::*current-regalloc* nil)
+(it-sequential "x86-64-regs-vm-reg-to-xmm-naive-map xmm0"
+  (destructuring-bind (vreg expected-code) (list :R0 0)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
         (cl-cc/codegen::*phys-fp-reg-to-x86-code*
          '((:xmm0 . 0) (:xmm1 . 1) (:xmm2 . 2) (:xmm3 . 3)
            (:xmm4 . 4) (:xmm5 . 5) (:xmm6 . 6) (:xmm7 . 7))))
-    (assert-= expected-code (cl-cc/codegen::vm-reg-to-xmm vreg))))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-xmm vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-xmm-naive-map xmm1"
+  (destructuring-bind (vreg expected-code) (list :R1 1)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-fp-reg-to-x86-code*
+         '((:xmm0 . 0) (:xmm1 . 1) (:xmm2 . 2) (:xmm3 . 3)
+           (:xmm4 . 4) (:xmm5 . 5) (:xmm6 . 6) (:xmm7 . 7))))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-xmm vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-xmm-naive-map xmm2"
+  (destructuring-bind (vreg expected-code) (list :R2 2)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-fp-reg-to-x86-code*
+         '((:xmm0 . 0) (:xmm1 . 1) (:xmm2 . 2) (:xmm3 . 3)
+           (:xmm4 . 4) (:xmm5 . 5) (:xmm6 . 6) (:xmm7 . 7))))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-xmm vreg)) :to-be-truthy))))
+
+(it-sequential "x86-64-regs-vm-reg-to-xmm-naive-map xmm7"
+  (destructuring-bind (vreg expected-code) (list :R7 7)
+    (let ((cl-cc/codegen::*current-regalloc* nil)
+        (cl-cc/codegen::*phys-fp-reg-to-x86-code*
+         '((:xmm0 . 0) (:xmm1 . 1) (:xmm2 . 2) (:xmm3 . 3)
+           (:xmm4 . 4) (:xmm5 . 5) (:xmm6 . 6) (:xmm7 . 7))))
+    (expect (= expected-code (cl-cc/codegen::vm-reg-to-xmm vreg)) :to-be-truthy))))
 
 ;;; ─── vm-const-to-integer ─────────────────────────────────────────────────
 
-(deftest-each x86-64-regs-vm-const-to-integer-cases
-  "vm-const-to-integer coerces various CL values to integers."
-  :cases (("nil"     nil   0)
-          ("t"       t     1)
-          ("zero"    0     0)
-          ("pos"     42    42)
-          ("neg"    -7    -7)
-          ("other"  3.14  0))
-  (val expected)
-  (assert-= expected (cl-cc/codegen::vm-const-to-integer val)))
+(it-sequential "x86-64-regs-vm-const-to-integer-cases nil"
+  (destructuring-bind (val expected) (list nil 0)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
+
+(it-sequential "x86-64-regs-vm-const-to-integer-cases t"
+  (destructuring-bind (val expected) (list t 1)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
+
+(it-sequential "x86-64-regs-vm-const-to-integer-cases zero"
+  (destructuring-bind (val expected) (list 0 0)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
+
+(it-sequential "x86-64-regs-vm-const-to-integer-cases pos"
+  (destructuring-bind (val expected) (list 42 42)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
+
+(it-sequential "x86-64-regs-vm-const-to-integer-cases neg"
+  (destructuring-bind (val expected) (list -7 -7)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
+
+(it-sequential "x86-64-regs-vm-const-to-integer-cases other"
+  (destructuring-bind (val expected) (list 3.14 0)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
 
 ;;; ─── x86-64-double-float-bits ────────────────────────────────────────────
 
-(deftest x86-64-regs-double-float-bits-valid-64-bit-range
-  "x86-64-double-float-bits: result for 1.0 is a non-negative 64-bit integer."
+(it-sequential "x86-64-regs-double-float-bits-valid-64-bit-range"
   (let ((bits (cl-cc/codegen::x86-64-double-float-bits 1.0)))
-    (assert-true (integerp bits))
-    (assert-true (>= bits 0))
-    (assert-true (< bits (expt 2 64)))))
+    (expect (integerp bits) :to-be-truthy)
+    (expect (>= bits 0) :to-be-truthy)
+    (expect (< bits (expt 2 64)) :to-be-truthy)))
 
-(deftest x86-64-regs-double-float-bits-ieee754-values
-  "x86-64-double-float-bits: 0.0→0; 1.0→IEEE 754 representation #x3FF0000000000000."
-  (assert-= 0 (cl-cc/codegen::x86-64-double-float-bits 0.0))
-  (assert-= #x3FF0000000000000 (cl-cc/codegen::x86-64-double-float-bits 1.0)))
+(it-sequential "x86-64-regs-double-float-bits-ieee754-values"
+  (expect (= 0 (cl-cc/codegen::x86-64-double-float-bits 0.0)) :to-be-truthy)
+  (expect (= #x3FF0000000000000 (cl-cc/codegen::x86-64-double-float-bits 1.0)) :to-be-truthy))
 
 ;;; ─── x86-64-compute-float-vregs ──────────────────────────────────────────
 
-(deftest x86-64-regs-compute-float-vregs-empty-returns-empty-table
-  "x86-64-compute-float-vregs on nil returns an empty hash table."
+(it-sequential "x86-64-regs-compute-float-vregs-empty-returns-empty-table"
   (let ((result (cl-cc/codegen::x86-64-compute-float-vregs nil)))
-    (assert-true (hash-table-p result))
-    (assert-= 0 (hash-table-count result))))
+    (expect (hash-table-p result) :to-be-truthy)
+    (expect (= 0 (hash-table-count result)) :to-be-truthy)))
 
-(deftest x86-64-regs-compute-float-vregs-float-const-marks-register
-  "x86-64-compute-float-vregs marks a register as float when loaded from a float constant."
+(it-sequential "x86-64-regs-compute-float-vregs-float-const-marks-register"
   (let* ((insts (list (cl-cc:make-vm-const :dst :R0 :value 3.14)))
          (result (cl-cc/codegen::x86-64-compute-float-vregs insts)))
-    (assert-true (gethash :R0 result))))
+    (expect (gethash :R0 result) :to-be-truthy)))
 
-(deftest x86-64-regs-compute-float-vregs-int-const-does-not-mark
-  "x86-64-compute-float-vregs does not mark a register loaded from an integer constant."
+(it-sequential "x86-64-regs-compute-float-vregs-int-const-does-not-mark"
   (let* ((insts (list (cl-cc:make-vm-const :dst :R0 :value 42)))
          (result (cl-cc/codegen::x86-64-compute-float-vregs insts)))
-    (assert-false (gethash :R0 result))))
+    (expect (gethash :R0 result) :to-be-falsy)))
 
-(deftest x86-64-regs-compute-float-vregs-propagates-via-move
-  "x86-64-compute-float-vregs propagates float type through vm-move."
+(it-sequential "x86-64-regs-compute-float-vregs-propagates-via-move"
   (let* ((insts (list (cl-cc:make-vm-const :dst :R0 :value 1.0)
                       (cl-cc:make-vm-move :dst :R1 :src :R0)))
          (result (cl-cc/codegen::x86-64-compute-float-vregs insts)))
-    (assert-true (gethash :R0 result))
-    (assert-true (gethash :R1 result))))
+    (expect (gethash :R0 result) :to-be-truthy)
+    (expect (gethash :R1 result) :to-be-truthy)))
 
 ;;; ─── *vm-reg-map* and *phys-reg-to-x86-code* data checks ─────────────────
 
-(deftest x86-64-regs-vm-reg-map-covers-eight-vregs
-  "*vm-reg-map* covers exactly 8 virtual registers."
-  (assert-= 8 (length cl-cc/codegen::*vm-reg-map*)))
+(it-sequential "x86-64-regs-vm-reg-map-covers-eight-vregs"
+  (expect (= 8 (length cl-cc/codegen::*vm-reg-map*)) :to-be-truthy))
 
-(deftest x86-64-regs-phys-reg-to-x86-code-covers-fifteen-registers
-  "*phys-reg-to-x86-code* covers exactly 15 physical registers including RBP."
-  (assert-= 15 (length cl-cc/codegen::*phys-reg-to-x86-code*)))
+(it-sequential "x86-64-regs-phys-reg-to-x86-code-covers-fifteen-registers"
+  (expect (= 15 (length cl-cc/codegen::*phys-reg-to-x86-code*)) :to-be-truthy))

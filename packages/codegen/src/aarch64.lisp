@@ -108,7 +108,7 @@ This virtual register must be spilled to the stack frame before use.
 Call %aarch64-emit-spill-load / %aarch64-emit-spill-store to materialize."
                virtual-register
                index
-               (length *aarch64-register-pool)))))
+               (length *aarch64-register-pool*)))))
 
 (defmethod emit-instruction ((target aarch64-target) (inst vm-const) stream)
   (format stream "  mov ~A, #~A~%"

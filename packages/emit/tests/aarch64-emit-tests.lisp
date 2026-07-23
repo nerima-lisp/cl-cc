@@ -5,11 +5,8 @@
 
 (in-package :cl-cc/test)
 
-(defsuite aarch64-emit-suite :description "AArch64 assembly emit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite aarch64-emit-suite)
 ;;; ─── Helper ─────────────────────────────────────────────────────────────────
 
 (defun %aarch64-emit (target inst)
@@ -29,133 +26,150 @@
 
 ;;; ─── target-register ──────────────────────────────────────────────────────────
 
-(deftest-each aarch64-target-register-pool
-  "AArch64 target-register maps :R0..:R7 to x0..x7."
-  :cases (("r0" :r0 "x0")
-          ("r1" :r1 "x1")
-          ("r2" :r2 "x2")
-          ("r3" :r3 "x3")
-          ("r4" :r4 "x4")
-          ("r5" :r5 "x5")
-          ("r6" :r6 "x6")
-          ("r7" :r7 "x7"))
-  (vreg expected)
-  (let ((tgt (%make-aarch64-target)))
-    (assert-equal expected (cl-cc/codegen::target-register tgt vreg))))
+(it-sequential "aarch64-target-register-pool r0"
+  (destructuring-bind (vreg expected) (list :r0 "x0")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
 
-(deftest aarch64-target-register-overflow
-  "AArch64 target-register signals error for :R8+ (pool exhausted)."
+(it-sequential "aarch64-target-register-pool r1"
+  (destructuring-bind (vreg expected) (list :r1 "x1")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-pool r2"
+  (destructuring-bind (vreg expected) (list :r2 "x2")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-pool r3"
+  (destructuring-bind (vreg expected) (list :r3 "x3")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-pool r4"
+  (destructuring-bind (vreg expected) (list :r4 "x4")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-pool r5"
+  (destructuring-bind (vreg expected) (list :r5 "x5")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-pool r6"
+  (destructuring-bind (vreg expected) (list :r6 "x6")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-pool r7"
+  (destructuring-bind (vreg expected) (list :r7 "x7")
+    (let ((tgt (%make-aarch64-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "aarch64-target-register-overflow"
+  ;; The caller-saved pool holds x0-x17 (18 registers); :R18 is the first
+  ;; virtual register beyond it and must signal (spilling required).
   (let ((tgt (%make-aarch64-target)))
-    (assert-signals error (cl-cc/codegen::target-register tgt :r8))))
+    (signals error (cl-cc/codegen::target-register tgt :r18))))
 
 ;;; ─── emit-instruction methods ──────────────────────────────────────────────────
 
-(deftest aarch64-emit-const
-  "vm-const emits mov xN, #value (immediate prefix)."
+(it-sequential "aarch64-emit-const"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-const :dst :r0 :value 42))))
-    (assert-true (search "mov" asm))
-    (assert-true (search "x0" asm))
-    (assert-true (search "#42" asm))))
+    (expect (search "mov" asm) :to-be-truthy)
+    (expect (search "x0" asm) :to-be-truthy)
+    (expect (search "#42" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-move
-  "vm-move emits mov xD, xS."
+(it-sequential "aarch64-emit-move"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-move :dst :r0 :src :r1))))
-    (assert-true (search "mov" asm))
-    (assert-true (search "x0" asm))
-    (assert-true (search "x1" asm))))
+    (expect (search "mov" asm) :to-be-truthy)
+    (expect (search "x0" asm) :to-be-truthy)
+    (expect (search "x1" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-add
-  "vm-add emits 3-operand add xD, xL, xR."
+(it-sequential "aarch64-emit-add"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))))
-    (assert-true (search "add" asm))
-    (assert-true (search "x0" asm))
-    (assert-true (search "x1" asm))
-    (assert-true (search "x2" asm))))
+    (expect (search "add" asm) :to-be-truthy)
+    (expect (search "x0" asm) :to-be-truthy)
+    (expect (search "x1" asm) :to-be-truthy)
+    (expect (search "x2" asm) :to-be-truthy)))
 
-(deftest-each aarch64-emit-arithmetic-mnemonics
-  "vm-sub and vm-mul each emit their expected mnemonic in the output."
-  :cases (("sub" (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2) "sub")
-          ("mul" (make-vm-mul :dst :r0 :lhs :r1 :rhs :r2) "mul"))
-  (inst expected-mnemonic)
-  (let* ((tgt (%make-aarch64-target))
+(it-sequential "aarch64-emit-arithmetic-mnemonics sub"
+  (destructuring-bind (inst expected-mnemonic) (list (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2) "sub")
+    (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt inst)))
-    (assert-true (search expected-mnemonic asm))))
+    (expect (search expected-mnemonic asm) :to-be-truthy))))
 
-(deftest aarch64-emit-label
-  "vm-label emits label: format."
+(it-sequential "aarch64-emit-arithmetic-mnemonics mul"
+  (destructuring-bind (inst expected-mnemonic) (list (make-vm-mul :dst :r0 :lhs :r1 :rhs :r2) "mul")
+    (let* ((tgt (%make-aarch64-target))
+         (asm (%aarch64-emit tgt inst)))
+    (expect (search expected-mnemonic asm) :to-be-truthy))))
+
+(it-sequential "aarch64-emit-label"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-label :name "loop"))))
-    (assert-true (search ".align 4" asm))
-    (assert-true (search "loop:" asm))))
+    (expect (search ".align 4" asm) :to-be-truthy)
+    (expect (search "loop:" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-jump
-  "vm-jump emits b label (unconditional branch)."
+(it-sequential "aarch64-emit-jump"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-jump :label "done"))))
-    (assert-true (search "b " asm))
-    (assert-true (search "done" asm))))
+    (expect (search "b " asm) :to-be-truthy)
+    (expect (search "done" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-jump-zero
-  "vm-jump-zero emits cmp+b.eq sequence."
+(it-sequential "aarch64-emit-jump-zero"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-jump-zero :reg :r0 :label "else"))))
-    (assert-true (search "cmp" asm))
-    (assert-true (search "#0" asm))
-    (assert-true (search "b.eq" asm))
-    (assert-true (search "else" asm))))
+    (expect (search "cmp" asm) :to-be-truthy)
+    (expect (search "#0" asm) :to-be-truthy)
+    (expect (search "b.eq" asm) :to-be-truthy)
+    (expect (search "else" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-halt
-  "vm-halt emits mov x0+ret."
+(it-sequential "aarch64-emit-halt"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-halt :reg :r0))))
-    (assert-true (search "mov x0" asm))
-    (assert-true (search "ret" asm))))
+    (expect (search "mov x0" asm) :to-be-truthy)
+    (expect (search "ret" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-print-calls-bl-rt-print
-  "vm-print emits bl rt-print with x0 as the argument register."
+(it-sequential "aarch64-emit-print-calls-bl-rt-print"
   (let* ((tgt (%make-aarch64-target))
          (asm (%aarch64-emit tgt (make-vm-print :reg :r0))))
-    (assert-true (search "bl rt-print" asm))
-    (assert-true (search "x0" asm))))
+    (expect (search "bl rt-print" asm) :to-be-truthy)
+    (expect (search "x0" asm) :to-be-truthy)))
 
-(deftest aarch64-emit-unsupported-instruction-signals-error
-  "Unsupported instructions (vm-ret on AArch64) signal an error."
+(it-sequential "aarch64-emit-unsupported-instruction-signals-error"
   (let ((tgt (%make-aarch64-target)))
-    (assert-signals error (%aarch64-emit tgt (make-vm-ret :reg :r0)))))
+    (signals error (%aarch64-emit tgt (make-vm-ret :reg :r0)))))
 
-(deftest aarch64-emit-spill-operations
-  "vm-spill-store emits str [x29-N], reg; vm-spill-load emits ldr reg, [x29-N]."
+(it-sequential "aarch64-emit-spill-operations"
   (let ((tgt (%make-aarch64-target)))
     (let ((asm (%aarch64-emit tgt (make-vm-spill-store :src-reg :x19 :slot 2))))
-      (assert-true (search "str" asm))
-      (assert-true (search "x29" asm))
-      (assert-true (search "16" asm))
-      (assert-true (search "x19" asm)))
+      (expect (search "str" asm) :to-be-truthy)
+      (expect (search "x29" asm) :to-be-truthy)
+      (expect (search "16" asm) :to-be-truthy)
+      (expect (search "x19" asm) :to-be-truthy))
     (let ((asm (%aarch64-emit tgt (make-vm-spill-load :dst-reg :x20 :slot 3))))
-      (assert-true (search "ldr" asm))
-      (assert-true (search "x20" asm))
-      (assert-true (search "x29" asm))
-      (assert-true (search "24" asm)))))
+      (expect (search "ldr" asm) :to-be-truthy)
+      (expect (search "x20" asm) :to-be-truthy)
+      (expect (search "x29" asm) :to-be-truthy)
+      (expect (search "24" asm) :to-be-truthy))))
 
 ;;; ─── Checked arithmetic emitters (FR-303) ────────────────────────────────────
 
-(deftest aarch64-emit-add-checked-emits-12-bytes
-  "emit-a64-vm-add-checked emits exactly 12 bytes: ADDS(4)+B.cond(4)+BRK(4)."
+(it-sequential "aarch64-emit-add-checked-emits-12-bytes"
   (let* ((inst (cl-cc:make-vm-add-checked :dst :r0 :lhs :r1 :rhs :r2))
          (bytes (%collect-a64-bytes #'cl-cc/codegen::emit-a64-vm-add-checked inst)))
-    (assert-= 12 (length bytes))))
+    (expect (= 12 (length bytes)) :to-be-truthy)))
 
-(deftest aarch64-emit-sub-checked-emits-12-bytes
-  "emit-a64-vm-sub-checked emits exactly 12 bytes: SUBS(4)+B.cond(4)+BRK(4)."
+(it-sequential "aarch64-emit-sub-checked-emits-12-bytes"
   (let* ((inst (cl-cc:make-vm-sub-checked :dst :r0 :lhs :r1 :rhs :r2))
          (bytes (%collect-a64-bytes #'cl-cc/codegen::emit-a64-vm-sub-checked inst)))
-    (assert-= 12 (length bytes))))
+    (expect (= 12 (length bytes)) :to-be-truthy)))
 
-(deftest aarch64-emit-mul-checked-emits-24-bytes
-  "emit-a64-vm-mul-checked emits exactly 24 bytes: MUL(4)+SMULH(4)+ASR(4)+CMP(4)+B.cond(4)+BRK(4)."
+(it-sequential "aarch64-emit-mul-checked-emits-24-bytes"
   (let* ((inst (cl-cc:make-vm-mul-checked :dst :r0 :lhs :r1 :rhs :r2))
          (bytes (%collect-a64-bytes #'cl-cc/codegen::emit-a64-vm-mul-checked inst)))
-    (assert-= 24 (length bytes))))
+    (expect (= 24 (length bytes)) :to-be-truthy)))

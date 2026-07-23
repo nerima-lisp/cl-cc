@@ -149,10 +149,15 @@ Supported verifier-friendly forms:
      (error "Unsupported eBPF instruction form: ~S" inst))))
 
 (defun %ebpf-instruction-heap-op-p (insn)
-  "Conservative guard: reject obvious heap operations for eBPF lowering."
+  "Conservative guard: reject obvious heap operations for eBPF lowering.
+Matches by symbol-name so the guard fires regardless of which package the
+caller's instruction opcodes are interned in (callers routinely pass lists
+read in their own package, e.g. CL-CC/TEST)."
   (and (consp insn)
-       (member (car insn) '(alloc malloc free make-array make-instance cons)
-               :test #'eq)))
+       (symbolp (car insn))
+       (member (symbol-name (car insn))
+               '("ALLOC" "MALLOC" "FREE" "MAKE-ARRAY" "MAKE-INSTANCE" "CONS")
+               :test #'string=)))
 
 (defun %ebpf-program-exits-p (instructions)
   (and instructions (eq (caar (last instructions)) :exit)))

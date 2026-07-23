@@ -2,10 +2,8 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
-(deftest mlir-lowers-clcc-dialect-arithmetic-call-return-and-branch
-  "FR-712: MIR lowers through clcc dialect ops to valid func/arith/cf MLIR text."
+(it-sequential "mlir-lowers-clcc-dialect-arithmetic-call-return-and-branch"
   (let* ((fn (mir-make-function :mlir-add-or-sub))
          (entry (mirf-entry fn))
          (then-block (mir-new-block fn :label :then))
@@ -31,22 +29,21 @@
     (mir-emit else-block :sub :dst diff :srcs (list rhs lhs) :type :integer)
     (mir-emit else-block :ret :srcs (list diff))
     (let ((mlir (cl-cc/emit:emit-mlir fn :name "fr712-real")))
-      (assert-true (search "module @fr712_real {" mlir))
-      (assert-true (search "func.func @mlir_add_or_sub(%arg0: i64, %arg1: i64) -> i64" mlir))
-      (assert-true (search "%reg2 = arith.constant 1 : i1" mlir))
-      (assert-true (search "cf.cond_br %reg2, ^then, ^else" mlir))
-      (assert-true (search "%reg3 = arith.addi %arg0, %arg1 : i64" mlir))
-      (assert-true (search "arith.constant 2 : i64" mlir))
-      (assert-true (search "%reg4 = arith.muli %reg3" mlir))
-      (assert-true (search "%reg5 = func.call @external_inc(%reg4) : (i64) -> i64" mlir))
-      (assert-true (search "func.func private @external_inc(i64) -> i64" mlir))
-      (assert-true (search "%reg6 = arith.subi %arg1, %arg0 : i64" mlir))
-      (assert-true (search "func.return %reg5 : i64" mlir))
-      (assert-false (search "TODO" mlir))
-      (assert-false (search "bridge-only" mlir)))))
+      (expect (search "module @fr712_real {" mlir) :to-be-truthy)
+      (expect (search "func.func @mlir_add_or_sub(%arg0: i64, %arg1: i64) -> i64" mlir) :to-be-truthy)
+      (expect (search "%reg2 = arith.constant 1 : i1" mlir) :to-be-truthy)
+      (expect (search "cf.cond_br %reg2, ^then, ^else" mlir) :to-be-truthy)
+      (expect (search "%reg3 = arith.addi %arg0, %arg1 : i64" mlir) :to-be-truthy)
+      (expect (search "arith.constant 2 : i64" mlir) :to-be-truthy)
+      (expect (search "%reg4 = arith.muli %reg3" mlir) :to-be-truthy)
+      (expect (search "%reg5 = func.call @external_inc(%reg4) : (i64) -> i64" mlir) :to-be-truthy)
+      (expect (search "func.func private @external_inc(i64) -> i64" mlir) :to-be-truthy)
+      (expect (search "%reg6 = arith.subi %arg1, %arg0 : i64" mlir) :to-be-truthy)
+      (expect (search "func.return %reg5 : i64" mlir) :to-be-truthy)
+      (expect (search "TODO" mlir) :to-be-falsy)
+      (expect (search "bridge-only" mlir) :to-be-falsy))))
 
-(deftest mlir-lowers-void-call-and-return
-  "FR-712: clcc.call without a destination lowers to func.call with no results."
+(it-sequential "mlir-lowers-void-call-and-return"
   (let* ((fn (mir-make-function :mlir-void-call))
          (entry (mirf-entry fn)))
     (mir-emit entry :call
@@ -55,14 +52,13 @@
               :type :void)
     (mir-emit entry :ret)
     (let ((mlir (cl-cc/emit:emit-mlir fn :name "fr712-void")))
-      (assert-true (search "func.func private @notify(i64)" mlir))
-      (assert-true (search "func.call @notify" mlir))
-      (assert-true (search ": (i64) -> ()" mlir))
-      (assert-true (search "func.return" mlir))
-      (assert-false (search "-> none" mlir)))))
+      (expect (search "func.func private @notify(i64)" mlir) :to-be-truthy)
+      (expect (search "func.call @notify" mlir) :to-be-truthy)
+      (expect (search ": (i64) -> ()" mlir) :to-be-truthy)
+      (expect (search "func.return" mlir) :to-be-truthy)
+      (expect (search "-> none" mlir) :to-be-falsy))))
 
-(deftest mlir-unsupported-phi-signals-error
-  "FR-712: MIR phi nodes are rejected explicitly rather than emitting invalid MLIR."
+(it-sequential "mlir-unsupported-phi-signals-error"
   (let* ((fn (mir-make-function :mlir-phi))
          (entry (mirf-entry fn))
          (merge (mir-new-block fn :label :merge))
@@ -71,14 +67,13 @@
     (mir-emit entry :jump :srcs (list merge))
     (mir-emit merge :phi :dst value :srcs (list (cons entry (make-mir-const :value 1 :type :integer))))
     (mir-emit merge :ret :srcs (list value))
-    (assert-signals error (cl-cc/emit:emit-mlir fn :name "fr712-phi"))))
+    (signals error (cl-cc/emit:emit-mlir fn :name "fr712-phi"))))
 
-(deftest mlir-capabilities-describe-clcc-lowering-patterns
-  "The MLIR capability metadata exposes concrete clcc dialect ops and lowering patterns."
+(it-sequential "mlir-capabilities-describe-clcc-lowering-patterns"
   (let ((caps (cl-cc/emit:mlir-bridge-capabilities)))
-    (assert-true (member :defined-dialect caps))
-    (assert-true (search "CLCC.ADD" (format nil "~S" caps)))
-    (assert-true (search "ARITH.ADDI" (format nil "~S" caps)))
-    (assert-true (search "FUNC.CALL" (format nil "~S" caps)))
-    (assert-true (search "FUNC.RETURN" (format nil "~S" caps)))
-    (assert-false (member :bridge-only caps))))
+    (expect (member :defined-dialect caps) :to-be-truthy)
+    (expect (search "CLCC.ADD" (format nil "~S" caps)) :to-be-truthy)
+    (expect (search "ARITH.ADDI" (format nil "~S" caps)) :to-be-truthy)
+    (expect (search "FUNC.CALL" (format nil "~S" caps)) :to-be-truthy)
+    (expect (search "FUNC.RETURN" (format nil "~S" caps)) :to-be-truthy)
+    (expect (member :bridge-only caps) :to-be-falsy)))

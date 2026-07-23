@@ -21,6 +21,10 @@
 (defparameter *wasm-sign-extension-enabled* t
   "FR-234: Use i32.extend8_s/i32.extend16_s/i64.extend*_s opcodes.") ;; MVP v1.1
 
+(defparameter *wasm-multi-value-enabled* t
+  "FR-235: Return CL (values a b c) as a native Wasm multi-value tuple on the
+stack (block result types) instead of a heap vector.") ;; MVP v1.1
+
 (defparameter *wasm-bulk-memory-enabled* t
   "FR-228: Use memory.copy/memory.fill/memory.init/data.drop.") ;; MVP v1.1
 
@@ -291,6 +295,10 @@
 
 (defparameter *wasm-reference-typed-strings-enabled* nil
   "FR-251: Use stringref type for native string representation. Phase 1.")
+
+(defparameter *wasm-string-builtins-enabled* t
+  "FR-218: Use Wasm String Builtins (string.new_utf8_array / string.encode_wtf16_array
+/ string.measure_wtf16) to lower CL strings; enables zero-copy JS<->Wasm strings.") ;; Chrome 117+
 
 (defparameter *wasm-stack-switching-enabled* nil
   "FR-205: Use cont.new/cont.bind/resume/suspend for coroutines. Phase 2, experimental.")

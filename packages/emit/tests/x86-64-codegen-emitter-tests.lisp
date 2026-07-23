@@ -5,7 +5,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite x86-64-codegen-suite)
 
 ;;; ─── Comparison emitter byte content ────────────────────────────────────────
 ;;;
@@ -14,56 +13,110 @@
 ;;; The SETcc sub-sequence is at offset [3]: 0F <opcode2> ModRM.
 ;;; So byte index 4 is the condition opcode distinguishing each comparison.
 
-(deftest-each x86-64-comparison-emitter-setcc-opcode
-  "Each comparison emitter embeds the correct SETcc condition opcode at byte index 4."
-  :cases (("vm-lt"     (lambda (s) (cl-cc/codegen::emit-vm-lt
-                          (cl-cc:make-vm-lt :dst :R0 :lhs :R1 :rhs :R2) s))    #x9C)
-          ("vm-gt"     (lambda (s) (cl-cc/codegen::emit-vm-gt
-                          (cl-cc:make-vm-gt :dst :R0 :lhs :R1 :rhs :R2) s))    #x9F)
-          ("vm-le"     (lambda (s) (cl-cc/codegen::emit-vm-le
-                          (cl-cc:make-vm-le :dst :R0 :lhs :R1 :rhs :R2) s))    #x9E)
-          ("vm-ge"     (lambda (s) (cl-cc/codegen::emit-vm-ge
-                          (cl-cc:make-vm-ge :dst :R0 :lhs :R1 :rhs :R2) s))    #x9D)
-          ("vm-num-eq" (lambda (s) (cl-cc/codegen::emit-vm-num-eq
-                          (cl-cc:make-vm-num-eq :dst :R0 :lhs :R1 :rhs :R2) s)) #x94)
-          ("vm-eq"     (lambda (s) (cl-cc/codegen::emit-vm-eq
-                          (cl-cc:make-vm-eq :dst :R0 :lhs :R1 :rhs :R2) s))    #x94))
-  (emit-fn expected-opcode2)
-  (let* ((bytes (%x86-collect-bytes emit-fn))
+(it-sequential "x86-64-comparison-emitter-setcc-opcode vm-lt"
+  (destructuring-bind (emit-fn expected-opcode2) (list (lambda (s) (cl-cc/codegen::emit-vm-lt
+                          (cl-cc:make-vm-lt :dst :R0 :lhs :R1 :rhs :R2) s)) #x9C)
+    (let* ((bytes (%x86-collect-bytes emit-fn))
          ;; CMP rax,rcx = 3 bytes; SETcc sequence starts at offset 3.
          ;; SETcc on low reg (rax=0): 0F <opcode2> ModRM -- opcode2 is at index 4.
          (setcc-opcode2 (nth 4 bytes)))
-    (assert-= 10 (length bytes))
-    (assert-= expected-opcode2 setcc-opcode2)))
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= expected-opcode2 setcc-opcode2) :to-be-truthy))))
 
-(deftest-each x86-64-comparison-emitter-cmp-opcode
-  "All comparison emitters begin with a CMP rr64 whose opcode byte is #x39."
-  :cases (("vm-lt"     (lambda (s) (cl-cc/codegen::emit-vm-lt
+(it-sequential "x86-64-comparison-emitter-setcc-opcode vm-gt"
+  (destructuring-bind (emit-fn expected-opcode2) (list (lambda (s) (cl-cc/codegen::emit-vm-gt
+                          (cl-cc:make-vm-gt :dst :R0 :lhs :R1 :rhs :R2) s)) #x9F)
+    (let* ((bytes (%x86-collect-bytes emit-fn))
+         ;; CMP rax,rcx = 3 bytes; SETcc sequence starts at offset 3.
+         ;; SETcc on low reg (rax=0): 0F <opcode2> ModRM -- opcode2 is at index 4.
+         (setcc-opcode2 (nth 4 bytes)))
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= expected-opcode2 setcc-opcode2) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-setcc-opcode vm-le"
+  (destructuring-bind (emit-fn expected-opcode2) (list (lambda (s) (cl-cc/codegen::emit-vm-le
+                          (cl-cc:make-vm-le :dst :R0 :lhs :R1 :rhs :R2) s)) #x9E)
+    (let* ((bytes (%x86-collect-bytes emit-fn))
+         ;; CMP rax,rcx = 3 bytes; SETcc sequence starts at offset 3.
+         ;; SETcc on low reg (rax=0): 0F <opcode2> ModRM -- opcode2 is at index 4.
+         (setcc-opcode2 (nth 4 bytes)))
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= expected-opcode2 setcc-opcode2) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-setcc-opcode vm-ge"
+  (destructuring-bind (emit-fn expected-opcode2) (list (lambda (s) (cl-cc/codegen::emit-vm-ge
+                          (cl-cc:make-vm-ge :dst :R0 :lhs :R1 :rhs :R2) s)) #x9D)
+    (let* ((bytes (%x86-collect-bytes emit-fn))
+         ;; CMP rax,rcx = 3 bytes; SETcc sequence starts at offset 3.
+         ;; SETcc on low reg (rax=0): 0F <opcode2> ModRM -- opcode2 is at index 4.
+         (setcc-opcode2 (nth 4 bytes)))
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= expected-opcode2 setcc-opcode2) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-setcc-opcode vm-num-eq"
+  (destructuring-bind (emit-fn expected-opcode2) (list (lambda (s) (cl-cc/codegen::emit-vm-num-eq
+                          (cl-cc:make-vm-num-eq :dst :R0 :lhs :R1 :rhs :R2) s)) #x94)
+    (let* ((bytes (%x86-collect-bytes emit-fn))
+         ;; CMP rax,rcx = 3 bytes; SETcc sequence starts at offset 3.
+         ;; SETcc on low reg (rax=0): 0F <opcode2> ModRM -- opcode2 is at index 4.
+         (setcc-opcode2 (nth 4 bytes)))
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= expected-opcode2 setcc-opcode2) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-setcc-opcode vm-eq"
+  (destructuring-bind (emit-fn expected-opcode2) (list (lambda (s) (cl-cc/codegen::emit-vm-eq
+                          (cl-cc:make-vm-eq :dst :R0 :lhs :R1 :rhs :R2) s)) #x94)
+    (let* ((bytes (%x86-collect-bytes emit-fn))
+         ;; CMP rax,rcx = 3 bytes; SETcc sequence starts at offset 3.
+         ;; SETcc on low reg (rax=0): 0F <opcode2> ModRM -- opcode2 is at index 4.
+         (setcc-opcode2 (nth 4 bytes)))
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= expected-opcode2 setcc-opcode2) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-cmp-opcode vm-lt"
+  (destructuring-bind (emit-fn) (list (lambda (s) (cl-cc/codegen::emit-vm-lt
                           (cl-cc:make-vm-lt :dst :R0 :lhs :R1 :rhs :R2) s)))
-          ("vm-gt"     (lambda (s) (cl-cc/codegen::emit-vm-gt
-                          (cl-cc:make-vm-gt :dst :R0 :lhs :R1 :rhs :R2) s)))
-          ("vm-le"     (lambda (s) (cl-cc/codegen::emit-vm-le
-                          (cl-cc:make-vm-le :dst :R0 :lhs :R1 :rhs :R2) s)))
-          ("vm-ge"     (lambda (s) (cl-cc/codegen::emit-vm-ge
-                          (cl-cc:make-vm-ge :dst :R0 :lhs :R1 :rhs :R2) s)))
-          ("vm-num-eq" (lambda (s) (cl-cc/codegen::emit-vm-num-eq
-                          (cl-cc:make-vm-num-eq :dst :R0 :lhs :R1 :rhs :R2) s)))
-          ("vm-eq"     (lambda (s) (cl-cc/codegen::emit-vm-eq
-                          (cl-cc:make-vm-eq :dst :R0 :lhs :R1 :rhs :R2) s))))
-  (emit-fn)
-  ;; REX.W prefix at byte 0; CMP opcode #x39 at byte 1
-  (let ((bytes (%x86-collect-bytes emit-fn)))
-    (assert-= #x39 (nth 1 bytes))))
+    (let ((bytes (%x86-collect-bytes emit-fn)))
+    (expect (= #x39 (nth 1 bytes)) :to-be-truthy))))
 
-(deftest x86-64-num-eq-and-eq-share-encoding
-  "vm-num-eq and vm-eq use identical byte sequences (both use SETE/#x94)."
+(it-sequential "x86-64-comparison-emitter-cmp-opcode vm-gt"
+  (destructuring-bind (emit-fn) (list (lambda (s) (cl-cc/codegen::emit-vm-gt
+                          (cl-cc:make-vm-gt :dst :R0 :lhs :R1 :rhs :R2) s)))
+    (let ((bytes (%x86-collect-bytes emit-fn)))
+    (expect (= #x39 (nth 1 bytes)) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-cmp-opcode vm-le"
+  (destructuring-bind (emit-fn) (list (lambda (s) (cl-cc/codegen::emit-vm-le
+                          (cl-cc:make-vm-le :dst :R0 :lhs :R1 :rhs :R2) s)))
+    (let ((bytes (%x86-collect-bytes emit-fn)))
+    (expect (= #x39 (nth 1 bytes)) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-cmp-opcode vm-ge"
+  (destructuring-bind (emit-fn) (list (lambda (s) (cl-cc/codegen::emit-vm-ge
+                          (cl-cc:make-vm-ge :dst :R0 :lhs :R1 :rhs :R2) s)))
+    (let ((bytes (%x86-collect-bytes emit-fn)))
+    (expect (= #x39 (nth 1 bytes)) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-cmp-opcode vm-num-eq"
+  (destructuring-bind (emit-fn) (list (lambda (s) (cl-cc/codegen::emit-vm-num-eq
+                          (cl-cc:make-vm-num-eq :dst :R0 :lhs :R1 :rhs :R2) s)))
+    (let ((bytes (%x86-collect-bytes emit-fn)))
+    (expect (= #x39 (nth 1 bytes)) :to-be-truthy))))
+
+(it-sequential "x86-64-comparison-emitter-cmp-opcode vm-eq"
+  (destructuring-bind (emit-fn) (list (lambda (s) (cl-cc/codegen::emit-vm-eq
+                          (cl-cc:make-vm-eq :dst :R0 :lhs :R1 :rhs :R2) s)))
+    (let ((bytes (%x86-collect-bytes emit-fn)))
+    (expect (= #x39 (nth 1 bytes)) :to-be-truthy))))
+
+(it-sequential "x86-64-num-eq-and-eq-share-encoding"
   (let ((num-eq-bytes (%x86-collect-bytes
                        (lambda (s) (cl-cc/codegen::emit-vm-num-eq
                                     (cl-cc:make-vm-num-eq :dst :R0 :lhs :R1 :rhs :R2) s))))
         (eq-bytes (%x86-collect-bytes
                    (lambda (s) (cl-cc/codegen::emit-vm-eq
                                 (cl-cc:make-vm-eq :dst :R0 :lhs :R1 :rhs :R2) s)))))
-    (assert-equal num-eq-bytes eq-bytes)))
+    (expect eq-bytes :to-equal num-eq-bytes)))
 
 ;;; ─── Unary emitter byte content ──────────────────────────────────────────────
 ;;;
@@ -73,78 +126,82 @@
 ;;; vm-inc:    MOV dst←src (3) + ADD dst,1 imm8 (4) = 7 bytes
 ;;; vm-dec:    MOV dst←src (3) + SUB dst,1 imm8 (4) = 7 bytes
 
-(deftest-each x86-64-unary-emitter-byte-count
-  "Unary VM instruction emitters produce the correct total byte count."
-  :cases (("vm-neg"    (lambda (s) (cl-cc/codegen::emit-vm-neg
-                          (cl-cc:make-vm-neg :dst :R0 :src :R1) s))    6)
-          ("vm-lognot" (lambda (s) (cl-cc/codegen::emit-vm-lognot
-                          (cl-cc:make-vm-lognot :dst :R0 :src :R1) s)) 6)
-          ("vm-not"    (lambda (s) (cl-cc/codegen::emit-vm-not
-                          (cl-cc:make-vm-not :dst :R0 :src :R1) s))   10)
-          ("vm-inc"    (lambda (s) (cl-cc/codegen::emit-vm-inc
-                          (cl-cc:make-vm-inc :dst :R0 :src :R1) s))    7)
-          ("vm-dec"    (lambda (s) (cl-cc/codegen::emit-vm-dec
-                          (cl-cc:make-vm-dec :dst :R0 :src :R1) s))    7))
-  (emit-fn expected-size)
-  (assert-= expected-size (length (%x86-collect-bytes emit-fn))))
+(it-sequential "x86-64-unary-emitter-byte-count vm-neg"
+  (destructuring-bind (emit-fn expected-size) (list (lambda (s) (cl-cc/codegen::emit-vm-neg
+                          (cl-cc:make-vm-neg :dst :R0 :src :R1) s)) 6)
+    (expect (= expected-size (length (%x86-collect-bytes emit-fn))) :to-be-truthy)))
 
-(deftest x86-64-unary-encoding-details
-  "vm-neg starts with MOV (#x48,#x89); vm-not uses TEST+SETE (#x0F at byte 3); vm-inc/dec use #x83 ADD/SUB."
+(it-sequential "x86-64-unary-emitter-byte-count vm-lognot"
+  (destructuring-bind (emit-fn expected-size) (list (lambda (s) (cl-cc/codegen::emit-vm-lognot
+                          (cl-cc:make-vm-lognot :dst :R0 :src :R1) s)) 6)
+    (expect (= expected-size (length (%x86-collect-bytes emit-fn))) :to-be-truthy)))
+
+(it-sequential "x86-64-unary-emitter-byte-count vm-not"
+  (destructuring-bind (emit-fn expected-size) (list (lambda (s) (cl-cc/codegen::emit-vm-not
+                          (cl-cc:make-vm-not :dst :R0 :src :R1) s)) 10)
+    (expect (= expected-size (length (%x86-collect-bytes emit-fn))) :to-be-truthy)))
+
+(it-sequential "x86-64-unary-emitter-byte-count vm-inc"
+  (destructuring-bind (emit-fn expected-size) (list (lambda (s) (cl-cc/codegen::emit-vm-inc
+                          (cl-cc:make-vm-inc :dst :R0 :src :R1) s)) 7)
+    (expect (= expected-size (length (%x86-collect-bytes emit-fn))) :to-be-truthy)))
+
+(it-sequential "x86-64-unary-emitter-byte-count vm-dec"
+  (destructuring-bind (emit-fn expected-size) (list (lambda (s) (cl-cc/codegen::emit-vm-dec
+                          (cl-cc:make-vm-dec :dst :R0 :src :R1) s)) 7)
+    (expect (= expected-size (length (%x86-collect-bytes emit-fn))) :to-be-truthy)))
+
+(it-sequential "x86-64-unary-encoding-details"
   (let ((neg-bytes (%x86-collect-bytes
                     (lambda (s) (cl-cc/codegen::emit-vm-neg
                                  (cl-cc:make-vm-neg :dst :R0 :src :R1) s)))))
-    (assert-= #x48 (nth 0 neg-bytes))
-    (assert-= #x89 (nth 1 neg-bytes)))
+    (expect (= #x48 (nth 0 neg-bytes)) :to-be-truthy)
+    (expect (= #x89 (nth 1 neg-bytes)) :to-be-truthy))
   (let ((not-bytes (%x86-collect-bytes
                     (lambda (s) (cl-cc/codegen::emit-vm-not
                                  (cl-cc:make-vm-not :dst :R0 :src :R1) s)))))
-    (assert-= #x48 (nth 0 not-bytes))
-    (assert-= #x0F (nth 3 not-bytes))
-    (assert-= #x94 (nth 4 not-bytes)))
+    (expect (= #x48 (nth 0 not-bytes)) :to-be-truthy)
+    (expect (= #x0F (nth 3 not-bytes)) :to-be-truthy)
+    (expect (= #x94 (nth 4 not-bytes)) :to-be-truthy))
   (let ((inc-bytes (%x86-collect-bytes
                     (lambda (s) (cl-cc/codegen::emit-vm-inc
                                  (cl-cc:make-vm-inc :dst :R0 :src :R1) s))))
         (dec-bytes (%x86-collect-bytes
                     (lambda (s) (cl-cc/codegen::emit-vm-dec
                                  (cl-cc:make-vm-dec :dst :R0 :src :R1) s)))))
-    (assert-= #x83 (nth 4 inc-bytes))
-    (assert-= #x83 (nth 4 dec-bytes))
-    (assert-= 1 (car (last inc-bytes)))
-    (assert-= 1 (car (last dec-bytes)))))
+    (expect (= #x83 (nth 4 inc-bytes)) :to-be-truthy)
+    (expect (= #x83 (nth 4 dec-bytes)) :to-be-truthy)
+    (expect (= 1 (car (last inc-bytes))) :to-be-truthy)
+    (expect (= 1 (car (last dec-bytes))) :to-be-truthy)))
 
 ;;; ─── build-label-offsets ────────────────────────────────────────────────────
 
-(deftest x86-64-build-label-offsets-empty
-  "build-label-offsets on empty instruction list returns a hash with zero entries."
-  (assert-= 0 (hash-table-count (cl-cc/codegen::build-label-offsets '() 0))))
+(it-sequential "x86-64-build-label-offsets-empty"
+  (expect (= 0 (hash-table-count (cl-cc/codegen::build-label-offsets '() 0))) :to-be-truthy))
 
-(deftest x86-64-build-label-offsets-first-label-at-zero
-  "A label as the first instruction maps to offset 0."
+(it-sequential "x86-64-build-label-offsets-first-label-at-zero"
   (let* ((lbl (cl-cc:make-vm-label :name "entry"))
          (offsets (cl-cc/codegen::build-label-offsets (list lbl) 0)))
-    (assert-= 0 (gethash "entry" offsets))))
+    (expect (= 0 (gethash "entry" offsets)) :to-be-truthy)))
 
-(deftest x86-64-build-label-offsets-prologue-offset
-  "A non-zero prologue size shifts the label offset accordingly."
+(it-sequential "x86-64-build-label-offsets-prologue-offset"
   (let* ((lbl (cl-cc:make-vm-label :name "start"))
          (offsets (cl-cc/codegen::build-label-offsets (list lbl) 6)))
-    (assert-= 6 (gethash "start" offsets))))
+    (expect (= 6 (gethash "start" offsets)) :to-be-truthy)))
 
-(deftest x86-64-build-label-offsets-after-const-is-10
-  "A vm-const instruction contributes 10 bytes, so a label after it maps to offset 10."
+(it-sequential "x86-64-build-label-offsets-after-const-is-10"
   (let* ((const-inst (cl-cc:make-vm-const :dst :R0 :value 42))
          (lbl (cl-cc:make-vm-label :name "after-const"))
          (offsets (cl-cc/codegen::build-label-offsets (list const-inst lbl) 0)))
-    (assert-= 10 (gethash "after-const" offsets))))
+    (expect (= 10 (gethash "after-const" offsets)) :to-be-truthy)))
 
-(deftest x86-64-build-label-offsets-elided-self-move
-  "A self-move (dst = src) is elided; label after it stays at offset 0."
+(it-sequential "x86-64-build-label-offsets-elided-self-move"
   (let* ((insts (list (cl-cc:make-vm-move :dst :R0 :src :R0)
                       (cl-cc:make-vm-label :name "after-self-move")
                       (cl-cc:make-vm-halt :reg :R0)))
          (offsets (let ((cl-cc/codegen::*current-regalloc* nil))
                     (cl-cc/codegen::build-label-offsets insts 0))))
-    (assert-= 0 (gethash "after-self-move" offsets))))
+    (expect (= 0 (gethash "after-self-move" offsets)) :to-be-truthy)))
 
 ;;; ─── FR-072 shrink-wrapping ────────────────────────────────────────────────
 
@@ -154,8 +211,7 @@
           do (setf (gethash vreg ht) phys))
     ht))
 
-(deftest x86-64-shrink-wrap-delays-save-to-cold-block
-  "FR-072: a callee-saved register used only in a cold block is saved/restored in that block."
+(it-sequential "x86-64-shrink-wrap-delays-save-to-cold-block"
   (let* ((insts (list (cl-cc:make-vm-jump-zero :reg :R0 :label "cold")
                       (cl-cc:make-vm-halt :reg :R0)
                       (cl-cc:make-vm-label :name "cold")
@@ -165,13 +221,12 @@
          (rbx cl-cc/codegen::+rbx+))
     (multiple-value-bind (annotated entry-regs final-regs)
         (cl-cc/codegen::x86-64-shrink-wrap-instructions insts (list rbx) assignment)
-      (assert-equal nil entry-regs)
-      (assert-equal nil final-regs)
-      (assert-= 1 (count-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-save)) annotated))
-      (assert-= 1 (count-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-restore)) annotated)))))
+      (expect entry-regs :to-equal nil)
+      (expect final-regs :to-equal nil)
+      (expect (= 1 (count-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-save)) annotated)) :to-be-truthy)
+      (expect (= 1 (count-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-restore)) annotated)) :to-be-truthy))))
 
-(deftest x86-64-shrink-wrap-early-return-path-skips-save
-  "FR-072: an early-return path before the first callee-saved use has no save pseudo-op before it."
+(it-sequential "x86-64-shrink-wrap-early-return-path-skips-save"
   (let* ((insts (list (cl-cc:make-vm-jump-zero :reg :R0 :label "cold")
                       (cl-cc:make-vm-halt :reg :R0)
                       (cl-cc:make-vm-label :name "cold")
@@ -185,17 +240,16 @@
       (let ((early-halt (position-if (lambda (x) (typep x 'cl-cc/vm::vm-halt)) annotated))
             (save (position-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-save))
                                annotated)))
-        (assert-true (< early-halt save))))))
+        (expect (< early-halt save) :to-be-truthy)))))
 
-(deftest x86-64-shrink-wrap-degenerate-entry-use-stays-monolithic
-  "FR-072: a register touched in the entry block falls back to the monolithic prologue/epilogue."
+(it-sequential "x86-64-shrink-wrap-degenerate-entry-use-stays-monolithic"
   (let* ((insts (list (cl-cc:make-vm-add :dst :R1 :lhs :R2 :rhs :R3)
                       (cl-cc:make-vm-halt :reg :R1)))
          (assignment (%fr072-assignment :R1 :rbx))
          (rbx cl-cc/codegen::+rbx+))
     (multiple-value-bind (annotated entry-regs final-regs)
         (cl-cc/codegen::x86-64-shrink-wrap-instructions insts (list rbx) assignment)
-      (assert-equal (list rbx) entry-regs)
-      (assert-equal (list rbx) final-regs)
-      (assert-false (find-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-save))
-                             annotated)))))
+      (expect entry-regs :to-equal (list rbx))
+      (expect final-regs :to-equal (list rbx))
+      (expect (find-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-save))
+                             annotated) :to-be-falsy))))

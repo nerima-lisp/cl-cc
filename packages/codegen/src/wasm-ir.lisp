@@ -102,7 +102,12 @@
 ;;; Function definition
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
-(defstruct (wasm-function-def (:conc-name wasm-func-))
+(defstruct (wasm-function-def (:conc-name wasm-func-)
+                              ;; Constructors: the descriptive MAKE-WASM-FUNCTION-DEF
+                              ;; and the short MAKE-WASM-FUNC matching the WASM-FUNC-
+                              ;; accessor convention.
+                              (:constructor make-wasm-function-def)
+                              (:constructor make-wasm-func))
   "A WASM function definition in the code section."
   (index nil)               ; assigned function index (imports come first)
   (wat-name nil)            ; WAT name (e.g. "$fn_myname")

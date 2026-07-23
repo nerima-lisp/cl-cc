@@ -3,7 +3,7 @@
   ;; Native cl-weave test API, imported so files can be migrated off the
   ;; home-grown deftest/assert-* to it-sequential/expect incrementally
   ;; (testing-framework -> cl-weave migration; see docs/).
-  (:import-from :cl-weave #:it-sequential #:it-sequential-each #:expect)
+  (:import-from :cl-weave #:it-sequential #:it-sequential-each #:expect #:signals)
   (:shadowing-import-from :cl-cc/type
    :type-node
    :type-primitive   :type-scheme

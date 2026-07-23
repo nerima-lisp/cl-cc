@@ -10,11 +10,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite x86-64-sequences-suite
-  :description "x86-64 instruction sequence emitter tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite x86-64-sequences-suite)
 
 ;;; ─── Helper ──────────────────────────────────────────────────────────────
 
@@ -26,37 +22,38 @@
 
 ;;; ─── emit-idiv-r11 ───────────────────────────────────────────────────────
 
-(deftest x86-seq-idiv-r11-emits-3-bytes
-  "emit-idiv-r11 emits exactly 3 bytes: REX.W.B F7 /7."
+(it-sequential "x86-seq-idiv-r11-emits-3-bytes"
   (let ((bs (%collect-seq-bytes #'cl-cc/codegen::emit-idiv-r11)))
-    (assert-= 3 (length bs))
-    (assert-= #x49 (first bs))   ; REX.W=1, REX.B=1
-    (assert-= #xF7 (second bs))  ; IDIV opcode
-    (assert-= (cl-cc/codegen::modrm 3 7 3) (third bs)))) ; mod=11, reg=7, rm=3
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #x49 (first bs)) :to-be-truthy)   ; REX.W=1, REX.B=1
+    (expect (= #xF7 (second bs)) :to-be-truthy)  ; IDIV opcode
+    (expect (= (cl-cc/codegen::modrm 3 7 3) (third bs)) :to-be-truthy))) ; mod=11, reg=7, rm=3
 
 ;;; ─── emit-cqo ────────────────────────────────────────────────────────────
 
-(deftest x86-seq-cqo-emits-2-bytes
-  "emit-cqo emits exactly 2 bytes: REX.W (48) and 99."
+(it-sequential "x86-seq-cqo-emits-2-bytes"
   (let ((bs (%collect-seq-bytes #'cl-cc/codegen::emit-cqo)))
-    (assert-= 2 (length bs))
-    (assert-= #x48 (first bs))
-    (assert-= #x99 (second bs))))
+    (expect (= 2 (length bs)) :to-be-truthy)
+    (expect (= #x48 (first bs)) :to-be-truthy)
+    (expect (= #x99 (second bs)) :to-be-truthy)))
 
 ;;; ─── emit-idiv-sequence ──────────────────────────────────────────────────
 
-(deftest-each x86-seq-idiv-sequence-18-bytes
-  "emit-idiv-sequence emits 18 bytes for both quotient and remainder modes."
-  :cases (("quotient"  nil)
-          ("remainder" t))
-  (remainder-p)
-  (let ((bs (%collect-seq-bytes
+(it-sequential "x86-seq-idiv-sequence-18-bytes quotient"
+  (destructuring-bind (remainder-p) (list nil)
+    (let ((bs (%collect-seq-bytes
              (lambda (s) (cl-cc/codegen::emit-idiv-sequence
                           cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ remainder-p s)))))
-    (assert-= 18 (length bs))))
+    (expect (= 18 (length bs)) :to-be-truthy))))
 
-(deftest x86-seq-idiv-sequence-contains-cqo
-  "emit-idiv-sequence includes CQO bytes (48 99) in the output."
+(it-sequential "x86-seq-idiv-sequence-18-bytes remainder"
+  (destructuring-bind (remainder-p) (list t)
+    (let ((bs (%collect-seq-bytes
+             (lambda (s) (cl-cc/codegen::emit-idiv-sequence
+                          cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ remainder-p s)))))
+    (expect (= 18 (length bs)) :to-be-truthy))))
+
+(it-sequential "x86-seq-idiv-sequence-contains-cqo"
   (let ((bs (%collect-seq-bytes
              (lambda (s) (cl-cc/codegen::emit-idiv-sequence
                           cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ nil s)))))
@@ -65,10 +62,9 @@
                          when (and (= (nth i bs) #x48)
                                    (= (nth (1+ i) bs) #x99))
                            return i)))
-      (assert-true cqo-pos))))
+      (expect cqo-pos :to-be-truthy))))
 
-(deftest x86-seq-mul-high-sequence-encodings
-  "emit-mul-high-sequence preserves RAX/RDX around MUL/IMUL and captures the high half from RDX into R11."
+(it-sequential "x86-seq-mul-high-sequence-encodings"
   (let ((umulh-bytes (%collect-seq-bytes
                       (lambda (s)
                         (cl-cc/codegen::emit-mul-high-sequence
@@ -83,96 +79,111 @@
                          cl-cc/codegen::+rcx+
                          t
                          s)))))
-    (assert-equal '(#x49 #x89 #xCB #x50 #x52 #x48 #x89 #xC0 #x49 #xF7 #xE3 #x49 #x89 #xD3 #x5A #x58)
-                  umulh-bytes)
-    (assert-equal '(#x49 #x89 #xCB #x50 #x52 #x48 #x89 #xC0 #x49 #xF7 #xEB #x49 #x89 #xD3 #x5A #x58)
-                  smulh-bytes)))
+    (expect umulh-bytes :to-equal '(#x49 #x89 #xCB #x50 #x52 #x48 #x89 #xC0 #x49 #xF7 #xE3 #x49 #x89 #xD3 #x5A #x58))
+    (expect smulh-bytes :to-equal '(#x49 #x89 #xCB #x50 #x52 #x48 #x89 #xC0 #x49 #xF7 #xEB #x49 #x89 #xD3 #x5A #x58))))
 
 ;;; ─── emit-sal-r64-cl / emit-sar-r64-cl / emit-ror-r64-cl ────────────────
 
-(deftest-each x86-seq-shift-r64-cl-cases
-  "emit-sal/sar/ror-r64-cl each emit 3 bytes with 0xD3 as the opcode byte."
-  :cases (("sal" #'cl-cc/codegen::emit-sal-r64-cl)
-          ("sar" #'cl-cc/codegen::emit-sar-r64-cl)
-          ("ror" #'cl-cc/codegen::emit-ror-r64-cl))
-  (emitter)
-  (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ s)))))
-    (assert-= 3 (length bs))
-    (assert-= #xD3 (second bs))))
+(it-sequential "x86-seq-shift-r64-cl-cases sal"
+  (destructuring-bind (emitter) (list #'cl-cc/codegen::emit-sal-r64-cl)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ s)))))
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #xD3 (second bs)) :to-be-truthy))))
+
+(it-sequential "x86-seq-shift-r64-cl-cases sar"
+  (destructuring-bind (emitter) (list #'cl-cc/codegen::emit-sar-r64-cl)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ s)))))
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #xD3 (second bs)) :to-be-truthy))))
+
+(it-sequential "x86-seq-shift-r64-cl-cases ror"
+  (destructuring-bind (emitter) (list #'cl-cc/codegen::emit-ror-r64-cl)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ s)))))
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #xD3 (second bs)) :to-be-truthy))))
 
 ;;; ─── emit-add/sub/and-ri8 ────────────────────────────────────────────────
 
-(deftest-each x86-seq-alu-ri8-cases
-  "emit-add/sub/and-ri8 each emit 4 bytes: REX + 0x83 + ModRM + imm8."
-  :cases (("add" #'cl-cc/codegen::emit-add-ri8  5)
-          ("sub" #'cl-cc/codegen::emit-sub-ri8  8)
-          ("and" #'cl-cc/codegen::emit-and-ri8 15))
-  (emitter imm8)
-  (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ imm8 s)))))
-    (assert-= 4 (length bs))
-    (assert-= #x83 (second bs))
-    (assert-= imm8 (fourth bs))))
+(it-sequential "x86-seq-alu-ri8-cases add"
+  (destructuring-bind (emitter imm8) (list #'cl-cc/codegen::emit-add-ri8 5)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ imm8 s)))))
+    (expect (= 4 (length bs)) :to-be-truthy)
+    (expect (= #x83 (second bs)) :to-be-truthy)
+    (expect (= imm8 (fourth bs)) :to-be-truthy))))
+
+(it-sequential "x86-seq-alu-ri8-cases sub"
+  (destructuring-bind (emitter imm8) (list #'cl-cc/codegen::emit-sub-ri8 8)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ imm8 s)))))
+    (expect (= 4 (length bs)) :to-be-truthy)
+    (expect (= #x83 (second bs)) :to-be-truthy)
+    (expect (= imm8 (fourth bs)) :to-be-truthy))))
+
+(it-sequential "x86-seq-alu-ri8-cases and"
+  (destructuring-bind (emitter imm8) (list #'cl-cc/codegen::emit-and-ri8 15)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ imm8 s)))))
+    (expect (= 4 (length bs)) :to-be-truthy)
+    (expect (= #x83 (second bs)) :to-be-truthy)
+    (expect (= imm8 (fourth bs)) :to-be-truthy))))
 
 ;;; ─── emit-jge-short ──────────────────────────────────────────────────────
 
-(deftest x86-seq-jge-short-emits-2-bytes
-  "emit-jge-short emits 2 bytes: 7D + offset."
+(it-sequential "x86-seq-jge-short-emits-2-bytes"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-jge-short 10 s)))))
-    (assert-= 2 (length bs))
-    (assert-= #x7D (first bs))
-    (assert-= 10 (second bs))))
+    (expect (= 2 (length bs)) :to-be-truthy)
+    (expect (= #x7D (first bs)) :to-be-truthy)
+    (expect (= 10 (second bs)) :to-be-truthy)))
 
 ;;; ─── CMOV variants ───────────────────────────────────────────────────────
 
-(deftest x86-seq-cmovl-rr64-emits-correct-prefix
-  "emit-cmovl-rr64 uses opcode 0F 4C."
+(it-sequential "x86-seq-cmovl-rr64-emits-correct-prefix"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-cmovl-rr64 cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
-    (assert-true (> (length bs) 2))
-    (assert-true (member #x0F bs))
-    (assert-true (member #x4C bs))))
+    (expect (> (length bs) 2) :to-be-truthy)
+    (expect (member #x0F bs) :to-be-truthy)
+    (expect (member #x4C bs) :to-be-truthy)))
 
-(deftest x86-seq-cmovg-rr64-emits-correct-opcode
-  "emit-cmovg-rr64 uses opcode 0F 4F."
+(it-sequential "x86-seq-cmovg-rr64-emits-correct-opcode"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-cmovg-rr64 cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
-    (assert-true (member #x0F bs))
-    (assert-true (member #x4F bs))))
+    (expect (member #x0F bs) :to-be-truthy)
+    (expect (member #x4F bs) :to-be-truthy)))
 
-(deftest x86-seq-cmovne-rr64-emits-correct-opcode
-  "emit-cmovne-rr64 uses opcode 0F 45."
+(it-sequential "x86-seq-cmovne-rr64-emits-correct-opcode"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-cmovne-rr64 cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
-    (assert-true (member #x0F bs))
-    (assert-true (member #x45 bs))))
+    (expect (member #x0F bs) :to-be-truthy)
+    (expect (member #x45 bs) :to-be-truthy)))
 
 ;;; ─── Boolean ops on registers ────────────────────────────────────────────
 
-(deftest-each x86-seq-boolean-rr64-cases
-  "emit-and/or/xor-rr64 each emit at least 3 bytes."
-  :cases (("and" #'cl-cc/codegen::emit-and-rr64)
-          ("or"  #'cl-cc/codegen::emit-or-rr64)
-          ("xor" #'cl-cc/codegen::emit-xor-rr64))
-  (emitter)
-  (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
-    (assert-true (>= (length bs) 3))))
+(it-sequential "x86-seq-boolean-rr64-cases and"
+  (destructuring-bind (emitter) (list #'cl-cc/codegen::emit-and-rr64)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
+    (expect (>= (length bs) 3) :to-be-truthy))))
+
+(it-sequential "x86-seq-boolean-rr64-cases or"
+  (destructuring-bind (emitter) (list #'cl-cc/codegen::emit-or-rr64)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
+    (expect (>= (length bs) 3) :to-be-truthy))))
+
+(it-sequential "x86-seq-boolean-rr64-cases xor"
+  (destructuring-bind (emitter) (list #'cl-cc/codegen::emit-xor-rr64)
+    (let ((bs (%collect-seq-bytes (lambda (s) (funcall emitter cl-cc/codegen::+rax+ cl-cc/codegen::+rcx+ s)))))
+    (expect (>= (length bs) 3) :to-be-truthy))))
 
 ;;; ─── Unary ops ───────────────────────────────────────────────────────────
 
-(deftest x86-seq-not-neg-r64-3-bytes
-  "emit-not-r64 and emit-neg-r64 each emit 3 bytes with 0xF7 as opcode."
+(it-sequential "x86-seq-not-neg-r64-3-bytes"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-not-r64 cl-cc/codegen::+rax+ s)))))
-    (assert-= 3 (length bs))
-    (assert-= #xF7 (second bs)))
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #xF7 (second bs)) :to-be-truthy))
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-neg-r64 cl-cc/codegen::+rax+ s)))))
-    (assert-= 3 (length bs))
-    (assert-= #xF7 (second bs))))
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #xF7 (second bs)) :to-be-truthy)))
 
-(deftest x86-seq-dec-r64-emits-3-bytes
-  "emit-dec-r64 emits 3 bytes: REX + FF /1 ModRM."
+(it-sequential "x86-seq-dec-r64-emits-3-bytes"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-dec-r64 cl-cc/codegen::+rax+ s)))))
-    (assert-= 3 (length bs))
-    (assert-= #xFF (second bs))))
+    (expect (= 3 (length bs)) :to-be-truthy)
+    (expect (= #xFF (second bs)) :to-be-truthy)))
 
-(deftest x86-seq-bswap-r32-emits-correct-bytes
-  "emit-bswap-r32 emits REX + 0F C8+reg for 64-bit bswap."
+(it-sequential "x86-seq-bswap-r32-emits-correct-bytes"
   (let ((bs (%collect-seq-bytes (lambda (s) (cl-cc/codegen::emit-bswap-r32 cl-cc/codegen::+rax+ s)))))
-    (assert-true (>= (length bs) 2))
-    (assert-true (member #x0F bs))))
+    (expect (>= (length bs) 2) :to-be-truthy)
+    (expect (member #x0F bs) :to-be-truthy)))

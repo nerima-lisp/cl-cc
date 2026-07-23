@@ -2,10 +2,8 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
-(deftest llvm-ir-lowers-mir-arithmetic-memory-control-and-call
-  "FR-690: MIR functions lower to textual LLVM IR with SSA, blocks, memory, branches, and external declarations."
+(it-sequential "llvm-ir-lowers-mir-arithmetic-memory-control-and-call"
   (let* ((fn (mir-make-function :llvm-add-or-sub))
          (entry (mirf-entry fn))
          (then-block (mir-new-block fn :label :then))
@@ -34,15 +32,15 @@
     (mir-emit else-block :sub :dst diff :srcs (list rhs loaded) :type :integer)
     (mir-emit else-block :ret :srcs (list diff))
     (let ((ir (cl-cc/emit:emit-llvm-ir fn :name "fr690-real")))
-      (assert-true (search "target triple = \"x86_64-unknown-linux-gnu\"" ir))
-      (assert-true (search "define i64 @llvm-add-or-sub(i64 %reg0, i64 %reg1)" ir))
-      (assert-true (search "%reg2 = alloca i8, i64 8" ir))
-      (assert-true (search "store i64 %reg0, ptr %reg2" ir))
-      (assert-true (search "%reg3 = load i64, ptr %reg2" ir))
-      (assert-true (search "%reg4 = icmp slt i64 %reg3, %reg1" ir))
-      (assert-true (search "br i1 %reg4, label %then, label %else" ir))
-      (assert-true (search "%reg5 = add i64 %reg3, %reg1" ir))
-      (assert-true (search "%reg6 = call i64 @external-inc(i64 %reg5)" ir))
-      (assert-true (search "declare i64 @external-inc(i64)" ir))
-      (assert-false (search "TODO" ir))
-      (assert-false (search "bridge-only" ir)))))
+      (expect (search "target triple = \"x86_64-unknown-linux-gnu\"" ir) :to-be-truthy)
+      (expect (search "define i64 @llvm-add-or-sub(i64 %reg0, i64 %reg1)" ir) :to-be-truthy)
+      (expect (search "%reg2 = alloca i8, i64 8" ir) :to-be-truthy)
+      (expect (search "store i64 %reg0, ptr %reg2" ir) :to-be-truthy)
+      (expect (search "%reg3 = load i64, ptr %reg2" ir) :to-be-truthy)
+      (expect (search "%reg4 = icmp slt i64 %reg3, %reg1" ir) :to-be-truthy)
+      (expect (search "br i1 %reg4, label %then, label %else" ir) :to-be-truthy)
+      (expect (search "%reg5 = add i64 %reg3, %reg1" ir) :to-be-truthy)
+      (expect (search "%reg6 = call i64 @external-inc(i64 %reg5)" ir) :to-be-truthy)
+      (expect (search "declare i64 @external-inc(i64)" ir) :to-be-truthy)
+      (expect (search "TODO" ir) :to-be-falsy)
+      (expect (search "bridge-only" ir) :to-be-falsy))))

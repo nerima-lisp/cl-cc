@@ -5,95 +5,80 @@
 
 (in-package :cl-cc/test)
 
-(defsuite wasm-trampoline-suite :description "WASM trampoline builder tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite wasm-trampoline-suite)
 ;;; ─── group-into-basic-blocks ──────────────────────────────────────────────────
 
-(deftest trampoline-bb-empty
-  "group-into-basic-blocks on empty list returns empty."
-  (assert-null (cl-cc/codegen::group-into-basic-blocks nil)))
+(it-sequential "trampoline-bb-empty"
+  (expect (cl-cc/codegen::group-into-basic-blocks nil) :to-be-null))
 
-(deftest trampoline-bb-no-labels
-  "Instructions with no labels form a single basic block with nil label."
+(it-sequential "trampoline-bb-no-labels"
   (let* ((instrs (list (make-vm-const :dst :r0 :value 1)
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs)))
-    (assert-equal 1 (length bbs))
-    (assert-null (cl-cc/codegen::wasm-bb-label (first bbs)))
-    (assert-equal 0 (cl-cc/codegen::wasm-bb-pc-index (first bbs)))
-    (assert-equal 2 (length (cl-cc/codegen::wasm-bb-instructions (first bbs))))))
+    (expect (length bbs) :to-equal 1)
+    (expect (cl-cc/codegen::wasm-bb-label (first bbs)) :to-be-null)
+    (expect (cl-cc/codegen::wasm-bb-pc-index (first bbs)) :to-equal 0)
+    (expect (length (cl-cc/codegen::wasm-bb-instructions (first bbs))) :to-equal 2)))
 
-(deftest trampoline-bb-label-grouping
-  "group-into-basic-blocks correctly groups instructions across label boundary cases."
-  ;; single label followed by instructions → one block
+(it-sequential "trampoline-bb-label-grouping"
   (let* ((instrs (list (make-vm-label :name "entry")
                        (make-vm-const :dst :r0 :value 42)
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs)))
-    (assert-equal 1 (length bbs))
-    (assert-equal "entry" (cl-cc/codegen::wasm-bb-label (first bbs)))
-    (assert-equal 0 (cl-cc/codegen::wasm-bb-pc-index (first bbs)))
-    (assert-equal 2 (length (cl-cc/codegen::wasm-bb-instructions (first bbs)))))
-  ;; two labels produce two blocks with ascending pc-index
+    (expect (length bbs) :to-equal 1)
+    (expect (cl-cc/codegen::wasm-bb-label (first bbs)) :to-equal "entry")
+    (expect (cl-cc/codegen::wasm-bb-pc-index (first bbs)) :to-equal 0)
+    (expect (length (cl-cc/codegen::wasm-bb-instructions (first bbs))) :to-equal 2))
   (let* ((instrs (list (make-vm-label :name "a")
                        (make-vm-const :dst :r0 :value 1)
                        (make-vm-label :name "b")
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs)))
-    (assert-equal 2 (length bbs))
-    (assert-equal "a" (cl-cc/codegen::wasm-bb-label (first bbs)))
-    (assert-equal 0 (cl-cc/codegen::wasm-bb-pc-index (first bbs)))
-    (assert-equal "b" (cl-cc/codegen::wasm-bb-label (second bbs)))
-    (assert-equal 1 (cl-cc/codegen::wasm-bb-pc-index (second bbs))))
-  ;; instructions before first label form a nil-label entry block
+    (expect (length bbs) :to-equal 2)
+    (expect (cl-cc/codegen::wasm-bb-label (first bbs)) :to-equal "a")
+    (expect (cl-cc/codegen::wasm-bb-pc-index (first bbs)) :to-equal 0)
+    (expect (cl-cc/codegen::wasm-bb-label (second bbs)) :to-equal "b")
+    (expect (cl-cc/codegen::wasm-bb-pc-index (second bbs)) :to-equal 1))
   (let* ((instrs (list (make-vm-const :dst :r0 :value 0)
                        (make-vm-label :name "loop")
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs)))
-    (assert-equal 2 (length bbs))
-    (assert-null (cl-cc/codegen::wasm-bb-label (first bbs)))
-    (assert-equal 1 (length (cl-cc/codegen::wasm-bb-instructions (first bbs))))
-    (assert-equal "loop" (cl-cc/codegen::wasm-bb-label (second bbs))))
-  ;; two consecutive labels with no instructions between produce two blocks
+    (expect (length bbs) :to-equal 2)
+    (expect (cl-cc/codegen::wasm-bb-label (first bbs)) :to-be-null)
+    (expect (length (cl-cc/codegen::wasm-bb-instructions (first bbs))) :to-equal 1)
+    (expect (cl-cc/codegen::wasm-bb-label (second bbs)) :to-equal "loop"))
   (let* ((instrs (list (make-vm-label :name "a")
                        (make-vm-label :name "b")
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs)))
-    (assert-equal 2 (length bbs))
-    (assert-equal "a" (cl-cc/codegen::wasm-bb-label (first bbs)))
-    (assert-equal 0 (length (cl-cc/codegen::wasm-bb-instructions (first bbs))))
-    (assert-equal "b" (cl-cc/codegen::wasm-bb-label (second bbs)))))
+    (expect (length bbs) :to-equal 2)
+    (expect (cl-cc/codegen::wasm-bb-label (first bbs)) :to-equal "a")
+    (expect (length (cl-cc/codegen::wasm-bb-instructions (first bbs))) :to-equal 0)
+    (expect (cl-cc/codegen::wasm-bb-label (second bbs)) :to-equal "b")))
 
-(deftest trampoline-bb-struct-predicate
-  "wasm-basic-block-p recognizes wasm-basic-block structs."
+(it-sequential "trampoline-bb-struct-predicate"
   (let* ((instrs (list (make-vm-label :name "x")))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs)))
-    (assert-true (cl-cc/codegen::wasm-basic-block-p (first bbs)))))
+    (expect (cl-cc/codegen::wasm-basic-block-p (first bbs)) :to-be-truthy)))
 
 ;;; ─── build-label-pc-map ───────────────────────────────────────────────────────
 
-(deftest trampoline-pc-map-zero-entries
-  "build-label-pc-map returns a 0-count map for empty input or instructions with no labels."
-  (assert-true (hash-table-p (cl-cc/codegen::build-label-pc-map nil)))
-  (assert-equal 0 (hash-table-count (cl-cc/codegen::build-label-pc-map nil)))
+(it-sequential "trampoline-pc-map-zero-entries"
+  (expect (hash-table-p (cl-cc/codegen::build-label-pc-map nil)) :to-be-truthy)
+  (expect (hash-table-count (cl-cc/codegen::build-label-pc-map nil)) :to-equal 0)
   (let* ((instrs (list (make-vm-const :dst :r0 :value 1)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs))
          (m (cl-cc/codegen::build-label-pc-map bbs)))
-    (assert-equal 0 (hash-table-count m))))
+    (expect (hash-table-count m) :to-equal 0)))
 
-(deftest trampoline-pc-map-labels
-  "build-label-pc-map maps labels to correct pc-indices for single and multiple labels."
-  ;; single label maps to pc-index 0
+(it-sequential "trampoline-pc-map-labels"
   (let* ((instrs (list (make-vm-label :name "main")
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs))
          (m (cl-cc/codegen::build-label-pc-map bbs)))
-    (assert-equal 1 (hash-table-count m))
-    (assert-equal 0 (gethash "main" m)))
-  ;; three labels each map to their correct ascending pc-index
+    (expect (hash-table-count m) :to-equal 1)
+    (expect (gethash "main" m) :to-equal 0))
   (let* ((instrs (list (make-vm-label :name "a")
                        (make-vm-const :dst :r0 :value 1)
                        (make-vm-label :name "b")
@@ -102,114 +87,163 @@
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs))
          (m (cl-cc/codegen::build-label-pc-map bbs)))
-    (assert-equal 3 (hash-table-count m))
-    (assert-equal 0 (gethash "a" m))
-    (assert-equal 1 (gethash "b" m))
-    (assert-equal 2 (gethash "c" m))))
+    (expect (hash-table-count m) :to-equal 3)
+    (expect (gethash "a" m) :to-equal 0)
+    (expect (gethash "b" m) :to-equal 1)
+    (expect (gethash "c" m) :to-equal 2)))
 
-(deftest trampoline-pc-map-with-implicit-entry
-  "build-label-pc-map correctly handles implicit entry block + labeled blocks."
+(it-sequential "trampoline-pc-map-with-implicit-entry"
   (let* ((instrs (list (make-vm-const :dst :r0 :value 0)
                        (make-vm-label :name "loop")
                        (make-vm-ret :reg :r0)))
          (bbs (cl-cc/codegen::group-into-basic-blocks instrs))
          (m (cl-cc/codegen::build-label-pc-map bbs)))
     ;; Only the labeled block appears in the map
-    (assert-equal 1 (hash-table-count m))
-    (assert-equal 1 (gethash "loop" m))))
+    (expect (hash-table-count m) :to-equal 1)
+    (expect (gethash "loop" m) :to-equal 1)))
 
 ;;; ─── %make-eq-hash-table ────────────────────────────────────────────────────
 
-(deftest-each trampoline-make-eq-hash-table
-  "%make-eq-hash-table builds a correct EQ hash-table from an alist."
-  :cases (("dotted-pair"  '((a . 1) (b . 2))  'a  1)
-          ("list-style"   '((x 10))            'x  10)
-          ("two-keys"     '((m . "v1") (n . "v2")) 'n "v2"))
-  (alist key expected)
-  (let ((ht (cl-cc/codegen::%make-eq-hash-table alist)))
-    (assert-equal expected (gethash key ht))))
+(it-sequential "trampoline-make-eq-hash-table dotted-pair"
+  (destructuring-bind (alist key expected) (list '((a . 1) (b . 2)) 'a 1)
+    (let ((ht (cl-cc/codegen::%make-eq-hash-table alist)))
+    (expect (gethash key ht) :to-equal expected))))
 
-(deftest trampoline-make-eq-hash-table-size
-  "%make-eq-hash-table creates a table with the correct number of entries."
+(it-sequential "trampoline-make-eq-hash-table list-style"
+  (destructuring-bind (alist key expected) (list '((x 10)) 'x 10)
+    (let ((ht (cl-cc/codegen::%make-eq-hash-table alist)))
+    (expect (gethash key ht) :to-equal expected))))
+
+(it-sequential "trampoline-make-eq-hash-table two-keys"
+  (destructuring-bind (alist key expected) (list '((m . "v1") (n . "v2")) 'n "v2")
+    (let ((ht (cl-cc/codegen::%make-eq-hash-table alist)))
+    (expect (gethash key ht) :to-equal expected))))
+
+(it-sequential "trampoline-make-eq-hash-table-size"
   (let ((ht (cl-cc/codegen::%make-eq-hash-table '((a . 1) (b . 2) (c . 3)))))
-    (assert-equal 3 (hash-table-count ht))))
+    (expect (hash-table-count ht) :to-equal 3)))
 
 ;;; ─── WASM dispatch tables ───────────────────────────────────────────────────
 
-(deftest-each trampoline-binop-table-lookups
-  "*wasm-i64-binop-table* maps VM binary instruction types to i64 opcode strings."
-  :cases (("vm-add"    'vm-add         "i64.add")
-          ("vm-sub"    'vm-sub         "i64.sub")
-          ("vm-mul"    'vm-mul         "i64.mul")
-          ("vm-logand" 'vm-logand      "i64.and")
-          ("vm-logior" 'vm-logior      "i64.or")
-          ("vm-logxor" 'vm-logxor      "i64.xor"))
-  (type-sym expected-opcode)
-  (assert-equal expected-opcode (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*)))
+(it-sequential "trampoline-binop-table-lookups vm-add"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-add "i64.add")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*) :to-equal expected-opcode)))
 
-(deftest-each trampoline-cmp-table-lookups
-  "*wasm-i64-cmp-table* maps VM comparison instruction types to i64 opcode strings."
-  :cases (("vm-lt"     'vm-lt    "i64.lt_s")
-          ("vm-gt"     'vm-gt    "i64.gt_s")
-          ("vm-le"     'vm-le    "i64.le_s")
-          ("vm-ge"     'vm-ge    "i64.ge_s")
-          ("vm-eq"     'vm-eq    "i64.eq"))
-  (type-sym expected-opcode)
-  (assert-equal expected-opcode (gethash type-sym cl-cc/codegen::*wasm-i64-cmp-table*)))
+(it-sequential "trampoline-binop-table-lookups vm-sub"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-sub "i64.sub")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*) :to-equal expected-opcode)))
 
-(deftest-each trampoline-unary-table-lookups
-  "*wasm-unary-fixnum-table* maps VM unary instruction types to i64 format strings."
-  :cases (("vm-inc"      'vm-inc      "(i64.add ~A (i64.const 1))")
-          ("vm-dec"      'vm-dec      "(i64.sub ~A (i64.const 1))")
-          ("vm-neg"      'vm-neg      "(i64.sub (i64.const 0) ~A)")
-          ("vm-lognot"   'vm-lognot   "(i64.xor ~A (i64.const -1))")
-          ("vm-logcount" 'vm-logcount "(i64.popcnt ~A)"))
-  (type-sym expected-fmt)
-  (assert-equal expected-fmt (gethash type-sym cl-cc/codegen::*wasm-unary-fixnum-table*)))
+(it-sequential "trampoline-binop-table-lookups vm-mul"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-mul "i64.mul")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*) :to-equal expected-opcode)))
 
-(deftest-each trampoline-minmax-table-lookups
-  "*wasm-minmax-table* maps min/max instruction types to WASM comparison opcodes."
-  :cases (("vm-min" 'vm-min "i64.le_s")
-          ("vm-max" 'vm-max "i64.ge_s"))
-  (type-sym expected-opcode)
-  (assert-equal expected-opcode (gethash type-sym cl-cc/codegen::*wasm-minmax-table*)))
+(it-sequential "trampoline-binop-table-lookups vm-logand"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-logand "i64.and")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*) :to-equal expected-opcode)))
 
-(deftest trampoline-struct-get-table-entries
-  "*wasm-struct-get-table* covers vm-car and vm-cdr with struct.get format strings."
-  (assert-true (search "struct.get $cons_t 0"
-                       (gethash 'vm-car cl-cc/codegen::*wasm-struct-get-table*)))
-  (assert-true (search "struct.get $cons_t 1"
-                       (gethash 'vm-cdr cl-cc/codegen::*wasm-struct-get-table*))))
+(it-sequential "trampoline-binop-table-lookups vm-logior"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-logior "i64.or")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-binop-table-lookups vm-logxor"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-logxor "i64.xor")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-binop-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-cmp-table-lookups vm-lt"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-lt "i64.lt_s")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-cmp-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-cmp-table-lookups vm-gt"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-gt "i64.gt_s")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-cmp-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-cmp-table-lookups vm-le"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-le "i64.le_s")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-cmp-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-cmp-table-lookups vm-ge"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-ge "i64.ge_s")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-cmp-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-cmp-table-lookups vm-eq"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-eq "i64.eq")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-i64-cmp-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-unary-table-lookups vm-inc"
+  (destructuring-bind (type-sym expected-fmt) (list 'vm-inc "(i64.add ~A (i64.const 1))")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-unary-fixnum-table*) :to-equal expected-fmt)))
+
+(it-sequential "trampoline-unary-table-lookups vm-dec"
+  (destructuring-bind (type-sym expected-fmt) (list 'vm-dec "(i64.sub ~A (i64.const 1))")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-unary-fixnum-table*) :to-equal expected-fmt)))
+
+(it-sequential "trampoline-unary-table-lookups vm-neg"
+  (destructuring-bind (type-sym expected-fmt) (list 'vm-neg "(i64.sub (i64.const 0) ~A)")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-unary-fixnum-table*) :to-equal expected-fmt)))
+
+(it-sequential "trampoline-unary-table-lookups vm-lognot"
+  (destructuring-bind (type-sym expected-fmt) (list 'vm-lognot "(i64.xor ~A (i64.const -1))")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-unary-fixnum-table*) :to-equal expected-fmt)))
+
+(it-sequential "trampoline-unary-table-lookups vm-logcount"
+  (destructuring-bind (type-sym expected-fmt) (list 'vm-logcount "(i64.popcnt ~A)")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-unary-fixnum-table*) :to-equal expected-fmt)))
+
+(it-sequential "trampoline-minmax-table-lookups vm-min"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-min "i64.le_s")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-minmax-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-minmax-table-lookups vm-max"
+  (destructuring-bind (type-sym expected-opcode) (list 'vm-max "i64.ge_s")
+    (expect (gethash type-sym cl-cc/codegen::*wasm-minmax-table*) :to-equal expected-opcode)))
+
+(it-sequential "trampoline-struct-get-table-entries"
+  (expect (search "struct.get $cons_t 0"
+                       (gethash 'vm-car cl-cc/codegen::*wasm-struct-get-table*)) :to-be-truthy)
+  (expect (search "struct.get $cons_t 1"
+                       (gethash 'vm-cdr cl-cc/codegen::*wasm-struct-get-table*)) :to-be-truthy))
 
 ;;; ─── %wasm-const-value-to-wat ─────────────────────────────────────────────
 
-(deftest-each wasm-const-value-to-wat-cases
-  "%wasm-const-value-to-wat maps CL constant values to WASM WAT strings."
-  :cases (("integer-42"  42    "(ref.i31")
-          ("nil"         nil   "(ref.null eq)")
-          ("true"        t     "(ref.i31 (i32.const 1))"))
-  (val expected-prefix)
-  (let ((result (cl-cc/codegen::%wasm-const-value-to-wat val)))
-    (assert-true (stringp result))
-    (assert-true (or (string= result expected-prefix)
+(it-sequential "wasm-const-value-to-wat-cases integer-42"
+  (destructuring-bind (val expected-prefix) (list 42 "(ref.i31")
+    (let ((result (cl-cc/codegen::%wasm-const-value-to-wat val)))
+    (expect (stringp result) :to-be-truthy)
+    (expect (or (string= result expected-prefix)
                      (and (>= (length result) (length expected-prefix))
-                          (string= expected-prefix result :end2 (length expected-prefix)))))))
+                          (string= expected-prefix result :end2 (length expected-prefix)))) :to-be-truthy))))
 
-(deftest wasm-const-value-to-wat-string-signals-error
-  "%wasm-const-value-to-wat signals error for unsupported string constants."
-  (assert-signals error (cl-cc/codegen::%wasm-const-value-to-wat "unsupported")))
+(it-sequential "wasm-const-value-to-wat-cases nil"
+  (destructuring-bind (val expected-prefix) (list nil "(ref.null eq)")
+    (let ((result (cl-cc/codegen::%wasm-const-value-to-wat val)))
+    (expect (stringp result) :to-be-truthy)
+    (expect (or (string= result expected-prefix)
+                     (and (>= (length result) (length expected-prefix))
+                          (string= expected-prefix result :end2 (length expected-prefix)))) :to-be-truthy))))
+
+(it-sequential "wasm-const-value-to-wat-cases true"
+  (destructuring-bind (val expected-prefix) (list t "(ref.i31 (i32.const 1))")
+    (let ((result (cl-cc/codegen::%wasm-const-value-to-wat val)))
+    (expect (stringp result) :to-be-truthy)
+    (expect (or (string= result expected-prefix)
+                     (and (>= (length result) (length expected-prefix))
+                          (string= expected-prefix result :end2 (length expected-prefix)))) :to-be-truthy))))
+
+(it-sequential "wasm-const-value-to-wat-string-produces-utf8-array"
+  ;; WASM GC string support (docs/wasm.md FRs) lowers Lisp strings to a
+  ;; string.new_utf8_array constructor; strings are no longer "unsupported".
+  (let ((wat (cl-cc/codegen::%wasm-const-value-to-wat "unsupported")))
+    (expect (search "string.new_utf8_array" wat) :to-be-truthy)))
 
 ;;; ─── %wasm-if-eqref ────────────────────────────────────────────────────────
 
-(deftest-each wasm-if-eqref-structure
-  "%wasm-if-eqref produces (if (result eqref) ...) WAT strings."
-  :cases (("basic" "(i64.ge_s x (i64.const 0))" "then-wat" "else-wat"))
-  (cond-wat then-wat else-wat)
-  (let ((result (cl-cc/codegen::%wasm-if-eqref cond-wat then-wat else-wat)))
-    (assert-true (search "(if (result eqref)" result))
-    (assert-true (search cond-wat result))
-    (assert-true (search "(then" result))
-    (assert-true (search "(else" result))))
+(it-sequential "wasm-if-eqref-structure basic"
+  (destructuring-bind (cond-wat then-wat else-wat) (list "(i64.ge_s x (i64.const 0))" "then-wat" "else-wat")
+    (let ((result (cl-cc/codegen::%wasm-if-eqref cond-wat then-wat else-wat)))
+    (expect (search "(if (result eqref)" result) :to-be-truthy)
+    (expect (search cond-wat result) :to-be-truthy)
+    (expect (search "(then" result) :to-be-truthy)
+    (expect (search "(else" result) :to-be-truthy))))
 
 ;;; ─── User-level dense CASE br_table lowering ──────────────────────────────
 
@@ -219,20 +253,15 @@
     (dolist (entry entries map)
       (setf (gethash (car entry) map) (cdr entry)))))
 
-(deftest wasm-dense-case-targets-detects-density
-  "Dense integer case targets satisfy the br_table density predicate."
-  (assert-true
-   (cl-cc/codegen::wasm-dense-integer-case-targets-p
-    '((10 . "case10") (11 . "case11") (12 . "case12") (13 . "case13")))))
+(it-sequential "wasm-dense-case-targets-detects-density"
+  (expect (cl-cc/codegen::wasm-dense-integer-case-targets-p
+    '((10 . "case10") (11 . "case11") (12 . "case12") (13 . "case13"))) :to-be-truthy))
 
-(deftest wasm-sparse-case-targets-do-not-use-br-table
-  "Sparse integer case targets stay on the fallback if-chain/binary-tree path."
-  (assert-false
-   (cl-cc/codegen::wasm-dense-integer-case-targets-p
-    '((1 . "case1") (100 . "case100") (200 . "case200") (300 . "case300")))))
+(it-sequential "wasm-sparse-case-targets-do-not-use-br-table"
+  (expect (cl-cc/codegen::wasm-dense-integer-case-targets-p
+    '((1 . "case1") (100 . "case100") (200 . "case200") (300 . "case300"))) :to-be-falsy))
 
-(deftest wasm-dense-case-emits-user-br-table
-  "Dense integer case dispatch emits a user-level br_table with default target."
+(it-sequential "wasm-dense-case-emits-user-br-table"
   (let* ((reg-map (cl-cc/codegen::make-wasm-reg-map-for-function 0))
          (label-pc-map (%test-label-pc-map '("case10" . 10)
                                            '("case11" . 11)
@@ -241,12 +270,11 @@
                                            '("otherwise" . 99)))
          (out (make-string-output-stream)))
     (cl-cc/codegen::wasm-reg-to-local reg-map :R0)
-    (assert-true
-     (cl-cc/codegen::maybe-emit-wasm-dense-case-br-table
+    (expect (cl-cc/codegen::maybe-emit-wasm-dense-case-br-table
       :R0
       '((10 . "case10") (11 . "case11") (12 . "case12") (13 . "case13"))
       "otherwise"
-      label-pc-map reg-map out))
+      label-pc-map reg-map out) :to-be-truthy)
     (let ((wat (get-output-stream-string out)))
       (assert-output-contains wat "dense integer CASE lowered to WASM br_table")
       (assert-output-contains wat "br_table")
@@ -254,8 +282,7 @@
       (assert-output-contains wat "(i64.const 10)")
       (assert-output-contains wat "(i32.const 99)"))))
 
-(deftest wasm-sparse-case-emits-no-user-br-table
-  "Sparse integer case dispatch returns NIL and emits no user-level br_table."
+(it-sequential "wasm-sparse-case-emits-no-user-br-table"
   (let* ((reg-map (cl-cc/codegen::make-wasm-reg-map-for-function 0))
          (label-pc-map (%test-label-pc-map '("case1" . 1)
                                            '("case100" . 100)
@@ -264,10 +291,9 @@
                                            '("otherwise" . 99)))
          (out (make-string-output-stream)))
     (cl-cc/codegen::wasm-reg-to-local reg-map :R0)
-    (assert-false
-     (cl-cc/codegen::maybe-emit-wasm-dense-case-br-table
+    (expect (cl-cc/codegen::maybe-emit-wasm-dense-case-br-table
       :R0
       '((1 . "case1") (100 . "case100") (200 . "case200") (300 . "case300"))
       "otherwise"
-      label-pc-map reg-map out))
-    (assert-false (search "br_table" (get-output-stream-string out) :test #'char=))))
+      label-pc-map reg-map out) :to-be-falsy)
+    (expect (search "br_table" (get-output-stream-string out) :test #'char=) :to-be-falsy)))

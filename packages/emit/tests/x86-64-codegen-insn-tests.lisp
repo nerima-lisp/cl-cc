@@ -10,59 +10,53 @@
 
 (in-package :cl-cc/test)
 
-(in-suite x86-64-codegen-suite)
 
-(deftest x86-64-bswap-emitter-encoding
-  "emit-vm-bswap emits a MOV followed by BSWAP r32."
+(it-sequential "x86-64-bswap-emitter-encoding"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-bswap (cl-cc:make-vm-bswap :dst :R0 :src :R1) s)))))
-    (assert-= 5 (length bytes))
-    (assert-= #x48 (first bytes))
-    (assert-= #x89 (second bytes))
-    (assert-= #xC8 (third bytes))
-    (assert-= #x0F (fourth bytes))
-    (assert-= #xC8 (fifth bytes))))
+    (expect (= 5 (length bytes)) :to-be-truthy)
+    (expect (= #x48 (first bytes)) :to-be-truthy)
+    (expect (= #x89 (second bytes)) :to-be-truthy)
+    (expect (= #xC8 (third bytes)) :to-be-truthy)
+    (expect (= #x0F (fourth bytes)) :to-be-truthy)
+    (expect (= #xC8 (fifth bytes)) :to-be-truthy)))
 
-(deftest x86-64-add-emitter-two-address-lowering
-  "emit-vm-add lowers to MOV dst,lhs before ADD dst,rhs to satisfy x86 two-address form."
+(it-sequential "x86-64-add-emitter-two-address-lowering"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-add
                    (cl-cc:make-vm-add :dst :R0 :lhs :R1 :rhs :R2) s)))))
-    (assert-= 6 (length bytes))
+    (expect (= 6 (length bytes)) :to-be-truthy)
     ;; MOV rax,rcx / ADD rax,rdx
-    (assert-= #x48 (nth 0 bytes))
-    (assert-= #x89 (nth 1 bytes))
-    (assert-= #xC8 (nth 2 bytes))
-    (assert-= #x48 (nth 3 bytes))
-    (assert-= #x01 (nth 4 bytes))
-    (assert-= #xD0 (nth 5 bytes))))
+    (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #x89 (nth 1 bytes)) :to-be-truthy)
+    (expect (= #xC8 (nth 2 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 3 bytes)) :to-be-truthy)
+    (expect (= #x01 (nth 4 bytes)) :to-be-truthy)
+    (expect (= #xD0 (nth 5 bytes)) :to-be-truthy)))
 
-(deftest x86-64-select-emitter-encoding
-  "emit-vm-select uses MOV + TEST + CMOVNE branchless lowering."
+(it-sequential "x86-64-select-emitter-encoding"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-select
                    (cl-cc:make-vm-select :dst :R0 :cond-reg :R1 :then-reg :R2 :else-reg :R3)
                    s)))))
-    (assert-eq #'cl-cc/codegen::emit-vm-select
-               (gethash 'cl-cc/vm::vm-select cl-cc/codegen::*x86-64-emitter-table*))
-    (assert-= 10 (length bytes))
-    (assert-= #x48 (nth 0 bytes))
-    (assert-= #x89 (nth 1 bytes))
-    (assert-= #x48 (nth 3 bytes))
-    (assert-= #x85 (nth 4 bytes))
-    (assert-= #x48 (nth 6 bytes))
-    (assert-= #x0F (nth 7 bytes))
-    (assert-= #x45 (nth 8 bytes))
+    (expect (gethash 'cl-cc/vm::vm-select cl-cc/codegen::*x86-64-emitter-table*) :to-be #'cl-cc/codegen::emit-vm-select)
+    (expect (= 10 (length bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #x89 (nth 1 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 3 bytes)) :to-be-truthy)
+    (expect (= #x85 (nth 4 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 6 bytes)) :to-be-truthy)
+    (expect (= #x0F (nth 7 bytes)) :to-be-truthy)
+    (expect (= #x45 (nth 8 bytes)) :to-be-truthy)
     (dolist (branch-opcode '(#x70 #x71 #x72 #x73 #x74 #x75 #x76 #x77
                              #x78 #x79 #x7A #x7B #x7C #x7D #x7E #x7F
                              #xE9 #xEB))
-      (assert-false (member branch-opcode bytes :test #'=)))))
+      (expect (member branch-opcode bytes :test #'=) :to-be-falsy))))
 
-(deftest x86-64-jump-zero-test-je-adjacent
-  "emit-vm-jump-zero-inst emits TEST immediately followed by JE rel8."
+(it-sequential "x86-64-jump-zero-test-je-adjacent"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-jump-zero-inst
@@ -70,106 +64,98 @@
                    s 0 (let ((ht (make-hash-table :test #'equal)))
                          (setf (gethash "L1" ht) 9)
                          ht))))))
-    (assert-= 5 (length bytes))
-    (assert-= #x48 (nth 0 bytes))
-    (assert-= #x85 (nth 1 bytes))
-    (assert-= #x74 (nth 3 bytes))))
+    (expect (= 5 (length bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #x85 (nth 1 bytes)) :to-be-truthy)
+    (expect (= #x74 (nth 3 bytes)) :to-be-truthy)))
 
-(deftest x86-64-logcount-emitter-encoding
-  "emit-vm-logcount emits POPCNT with the expected opcode sequence."
+(it-sequential "x86-64-logcount-emitter-encoding"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-logcount
                    (cl-cc:make-vm-logcount :dst :R0 :src :R1) s)))))
-    (assert-= 5 (length bytes))
-    (assert-= #xF3 (nth 0 bytes))
-    (assert-= #x48 (nth 1 bytes))
-    (assert-= #x0F (nth 2 bytes))
-    (assert-= #xB8 (nth 3 bytes))))
+    (expect (= 5 (length bytes)) :to-be-truthy)
+    (expect (= #xF3 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 1 bytes)) :to-be-truthy)
+    (expect (= #x0F (nth 2 bytes)) :to-be-truthy)
+    (expect (= #xB8 (nth 3 bytes)) :to-be-truthy)))
 
-(deftest x86-64-integer-length-emitter-encoding
-  "emit-vm-integer-length emits xor/test/je/lzcnt/neg/add sequence."
+(it-sequential "x86-64-integer-length-emitter-encoding"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-integer-length
                    (cl-cc:make-vm-integer-length :dst :R0 :src :R1) s)))))
-    (assert-= 22 (length bytes))
+    (expect (= 22 (length bytes)) :to-be-truthy)
     ;; xor rax,rax / test rcx,rcx / je rel8 / lzcnt rax,rcx / neg rax / add rax,64
-    (assert-= #x48 (nth 0 bytes))
-    (assert-= #x31 (nth 1 bytes))
-    (assert-= #x48 (nth 3 bytes))
-    (assert-= #x85 (nth 4 bytes))
-    (assert-= #x74 (nth 6 bytes))
-    (assert-= #xF3 (nth 8 bytes))
-    (assert-= #x48 (nth 9 bytes))
-    (assert-= #x0F (nth 10 bytes))
-    (assert-= #xBD (nth 11 bytes))))
+    (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #x31 (nth 1 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 3 bytes)) :to-be-truthy)
+    (expect (= #x85 (nth 4 bytes)) :to-be-truthy)
+    (expect (= #x74 (nth 6 bytes)) :to-be-truthy)
+    (expect (= #xF3 (nth 8 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 9 bytes)) :to-be-truthy)
+    (expect (= #x0F (nth 10 bytes)) :to-be-truthy)
+    (expect (= #xBD (nth 11 bytes)) :to-be-truthy)))
 
-(deftest x86-64-call-encoding
-  "vm-call emits CALL r64 (#xFF /2) followed by MOV dst←rax: 6 bytes total."
+(it-sequential "x86-64-call-encoding"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-call-like-inst
                    (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil) s)))))
-    (assert-= 6 (length bytes))
-    (assert-= #x48 (nth 0 bytes))
-    (assert-= #xFF (nth 1 bytes))
-    (assert-= #xD1 (nth 2 bytes))
-    (assert-= #x48 (nth 3 bytes))
-    (assert-= #x89 (nth 4 bytes))
-    (assert-= #xC0 (nth 5 bytes))))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #xFF (nth 1 bytes)) :to-be-truthy)
+    (expect (= #xD1 (nth 2 bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 3 bytes)) :to-be-truthy)
+    (expect (= #x89 (nth 4 bytes)) :to-be-truthy)
+    (expect (= #xC0 (nth 5 bytes)) :to-be-truthy)))
 
-(deftest x86-64-tail-call-encoding
-  "vm-tail-call emits JMP r64 (#xFF /4) only: 3 bytes, no move-to-result register."
+(it-sequential "x86-64-tail-call-encoding"
   (let ((bytes (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-tail-call-inst
                    (cl-cc:make-vm-tail-call :dst :R0 :func :R1 :args nil) s)))))
-    (assert-= 3 (length bytes))
-    (assert-= #x48 (nth 0 bytes))
-    (assert-= #xFF (nth 1 bytes))
-    (assert-= #xE1 (nth 2 bytes))))
+    (expect (= 3 (length bytes)) :to-be-truthy)
+    (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #xFF (nth 1 bytes)) :to-be-truthy)
+    (expect (= #xE1 (nth 2 bytes)) :to-be-truthy)))
 
-(deftest x86-64-call-encoding-retpoline
-  "vm-call emits retpoline-expanded sequence when enabled."
+(it-sequential "x86-64-call-encoding-retpoline"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-use-retpoline* t))
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-call-like-inst
                      (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil) s))))))
-    (assert-= 44 (length bytes))
+    (expect (= 44 (length bytes)) :to-be-truthy)
     ;; starts with CALL rel32
-    (assert-= #xE8 (nth 0 bytes))
+    (expect (= #xE8 (nth 0 bytes)) :to-be-truthy)
     ;; includes PAUSE + LFENCE in thunk capture loop
-    (assert-true (find #xF3 bytes))
-    (assert-true (find #xAE bytes))))
+    (expect (find #xF3 bytes) :to-be-truthy)
+    (expect (find #xAE bytes) :to-be-truthy)))
 
-(deftest x86-64-tail-call-encoding-retpoline
-  "vm-tail-call emits retpoline-expanded sequence when enabled."
+(it-sequential "x86-64-tail-call-encoding-retpoline"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-use-retpoline* t))
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-tail-call-inst
                      (cl-cc:make-vm-tail-call :dst :R0 :func :R1 :args nil) s))))))
-    (assert-= 20 (length bytes))
-    (assert-= #xE8 (nth 0 bytes))
-    (assert-true (find #xF3 bytes))
-    (assert-= #xC3 (car (last bytes)))))
+    (expect (= 20 (length bytes)) :to-be-truthy)
+    (expect (= #xE8 (nth 0 bytes)) :to-be-truthy)
+    (expect (find #xF3 bytes) :to-be-truthy)
+    (expect (= #xC3 (car (last bytes))) :to-be-truthy)))
 
-(deftest x86-64-call-cfi-guard-avoids-clobbering-rax-target
-  "CFI guard uses a non-RAX scratch register when indirect target is RAX."
+(it-sequential "x86-64-call-cfi-guard-avoids-clobbering-rax-target"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-cfi-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-call-like-inst
                      (cl-cc:make-vm-call :dst :R1 :func :R0 :args nil) s))))))
     ;; CALL RAX must remain at end of non-retpoline path.
-    (assert-equal '(#x48 #xFF #xD0) (subseq bytes (- (length bytes) 6) (- (length bytes) 3)))
+    (expect (subseq bytes (- (length bytes) 6) (- (length bytes) 3)) :to-equal '(#x48 #xFF #xD0))
     ;; Guard must not clobber target via `mov rax, [rax]`.
-    (assert-false (search '(#x48 #x8B #x00) bytes :test #'eql))))
+    (expect (search '(#x48 #x8B #x00) bytes :test #'eql) :to-be-falsy)))
 
-(deftest x86-64-shadow-stack-control-inst-emits-nop-when-shadow-stack-disabled
-  "Non-local control VM instructions reserve a 2-byte integration slot when shadow-stack is disabled."
+(it-sequential "x86-64-shadow-stack-control-inst-emits-nop-when-shadow-stack-disabled"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* nil))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -178,12 +164,11 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 2 (length bytes))
-    (assert-= #x66 (nth 0 bytes))
-    (assert-= #x90 (nth 1 bytes))))
+    (expect (= 2 (length bytes)) :to-be-truthy)
+    (expect (= #x66 (nth 0 bytes)) :to-be-truthy)
+    (expect (= #x90 (nth 1 bytes)) :to-be-truthy)))
 
-(deftest x86-64-shadow-stack-control-inst-emits-saveprevssp-when-enabled
-  "Non-local control push/bind paths emit CET SAVEPREVSSP-based save slot when enabled."
+(it-sequential "x86-64-shadow-stack-control-inst-emits-saveprevssp-when-enabled"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -192,11 +177,10 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x0F #x01 #xEA #x66 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x0F #x01 #xEA #x66 #x90))))
 
-(deftest x86-64-shadow-stack-control-inst-uses-distinct-restore-marker
-  "Pop/invoke restart paths emit CET RSTORSSP-based restore slot."
+(it-sequential "x86-64-shadow-stack-control-inst-uses-distinct-restore-marker"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -205,11 +189,10 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x0F #x01 #x28 #x66 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x0F #x01 #x28 #x66 #x90))))
 
-(deftest x86-64-shadow-stack-control-inst-uses-incsspq-for-adjust-paths
-  "Condition/error non-local paths emit CET INCSSPQ-based adjust slot."
+(it-sequential "x86-64-shadow-stack-control-inst-uses-incsspq-for-adjust-paths"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -218,11 +201,10 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90))))
 
-(deftest x86-64-shadow-stack-control-inst-covers-vm-establish-catch
-  "VM catch establishment path also lowers to CET save slot when enabled."
+(it-sequential "x86-64-shadow-stack-control-inst-covers-vm-establish-catch"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -232,11 +214,10 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x0F #x01 #xEA #x66 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x0F #x01 #xEA #x66 #x90))))
 
-(deftest x86-64-shadow-stack-control-inst-covers-vm-remove-handler
-  "VM handler removal path lowers to CET restore slot when enabled."
+(it-sequential "x86-64-shadow-stack-control-inst-covers-vm-remove-handler"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -245,11 +226,10 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x0F #x01 #x28 #x66 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x0F #x01 #x28 #x66 #x90))))
 
-(deftest x86-64-shadow-stack-control-inst-covers-vm-sync-handler-regs
-  "VM handler snapshot sync path lowers to CET adjust slot when enabled."
+(it-sequential "x86-64-shadow-stack-control-inst-covers-vm-sync-handler-regs"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -258,11 +238,10 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90))))
 
-(deftest x86-64-shadow-stack-control-inst-covers-vm-throw
-  "VM throw path lowers to CET adjust slot when enabled."
+(it-sequential "x86-64-shadow-stack-control-inst-covers-vm-throw"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -271,5 +250,5 @@
                      s
                      0
                      (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90) bytes)))
+    (expect (= 6 (length bytes)) :to-be-truthy)
+    (expect bytes :to-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90))))
