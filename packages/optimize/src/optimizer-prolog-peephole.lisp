@@ -5,8 +5,8 @@
 ;;; Contains: %remove-self-move-p, %match-peephole-rule,
 ;;; %maybe-peephole-rewrite, apply-prolog-peephole.
 ;;;
-;;; Rule data lives in prolog-data.lisp. Solver/query functions live in
-;;; prolog-solver.lisp.
+;;; Rule data lives in peephole-data.lisp. UNIFY/LOGIC-SUBSTITUTE come from
+;;; the external :cl-prolog engine (imported unqualified in package.lisp).
 ;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (defun %remove-self-move-p (instruction)
@@ -18,17 +18,17 @@
 (defun %match-peephole-rule (rule current next)
   "Return replacement instructions when RULE matches CURRENT and NEXT."
   (destructuring-bind (cur-pat next-pat result-list) rule
-    (let ((env (unify cur-pat current nil)))
-      (unless (eq env :unify-fail)
-        (let ((env2 (unify next-pat next env)))
-          (unless (eq env2 :unify-fail)
+    (multiple-value-bind (env ok) (unify cur-pat current nil)
+      (when ok
+        (multiple-value-bind (env2 ok2) (unify next-pat next env)
+          (when ok2
             (mapcar (lambda (template)
                       (logic-substitute template env2))
                     result-list)))))))
 
 (defun %maybe-peephole-rewrite (current next)
   "Try all peephole rules for CURRENT/NEXT and return replacements if one matches."
-  (dolist (rule cl-cc/prolog::*peephole-rules*)
+  (dolist (rule *peephole-rules*)
     (let ((replacements (%match-peephole-rule rule current next)))
       (when replacements
         (return replacements)))))

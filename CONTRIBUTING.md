@@ -38,7 +38,7 @@ CLCC_SUITE_TIMEOUT=1200 nix run .#test
 rm -rf ~/.cache/common-lisp/ && mkdir -p ~/.cache/common-lisp/
 ```
 
-`nix run .#test` は `cl-cc/test:run-tests` にマッピングされ、標準の高速ユニットテスト計画を実行します。統合テストおよびセルフホスティングE2Eテストはスイート分類に基づいて明示的に実行します。
+`nix run .#test` は `cl-weave:run-all` にマッピングされ、標準の高速ユニットテスト計画を実行します（テストの登録・実行・レポートはcl-weaveに委譲されています。詳細は `packages/testing-framework/src/framework-definitions.lisp` を参照）。統合テストおよびセルフホスティングE2Eテストはスイート分類に基づいて明示的に実行します。
 
 ## プロジェクト構造
 

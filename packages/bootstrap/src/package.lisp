@@ -3,17 +3,17 @@
 ;;;; packages/bootstrap/src/package.lisp — :cl-cc/bootstrap
 ;;;;
 ;;;; Phase 2 prerequisite: the 12 symbols that must be interned before
-;;;; cl-cc/prolog and cl-cc/compile load.
+;;;; cl-cc/optimize (egraph rules) and cl-cc/compile load.
 ;;;;
 ;;;; Why a separate package?
-;;;;   cl-cc/prolog uses binop/const/var/cmp/... as Prolog predicate atoms
-;;;;   in the solver/query layer and as the DCG token bridge (dcg.lisp).
-;;;;   cl-cc/compile defines our-eval; cl-cc/prolog calls it back at runtime.
-;;;;   Without a common bootstrap both subsystems would need to import from
-;;;;   :cl-cc, which loads *after* prolog — creating a circular dependency.
+;;;;   cl-cc/optimize's egraph rewrite rules (egraph-rules.lisp) use binop/const/var/cmp/... as Prolog pattern atoms
+;;;;   matched via cl-prolog:UNIFY.
+;;;;   cl-cc/compile defines our-eval, called back by the compiler pipeline at runtime.
+;;;;   Without a common bootstrap these subsystems would need to import from
+;;;;   :cl-cc, which loads *after* them — creating a circular dependency.
 ;;;;
 ;;;; Consumers:
-;;;;   cl-cc/prolog   — (:use :cl :cl-cc/bootstrap)
+;;;;   cl-cc/optimize — (:use :cl :cl-cc/bootstrap :cl-cc/vm) [egraph rule pattern atoms]
 ;;;;   cl-cc/compile  — (:use :cl ... :cl-cc/bootstrap)  [defines our-eval, our-load here]
 ;;;;   cl-cc/parse    — (:use :cl ... :cl-cc/bootstrap)  [defines lexer-token-* here]
 ;;;;   cl-cc/expand   — (:use :cl :cl-cc/bootstrap)       [references our-eval, our-load, run-string-repl]
@@ -30,7 +30,7 @@
 (defpackage :cl-cc/bootstrap
   (:use :cl)
   (:export
-   ;; Compiler re-entry point — defined in cl-cc/compile, called by cl-cc/prolog
+   ;; Compiler re-entry point — defined in cl-cc/compile, called by the pipeline
    #:our-eval
    ;; REPL entry points — defined in cl-cc/compile; referenced in cl-cc/expand macro templates
    ;; Must live in bootstrap so expand can reference them before compile loads.

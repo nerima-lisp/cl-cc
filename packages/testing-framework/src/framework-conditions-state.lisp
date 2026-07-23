@@ -1,61 +1,23 @@
 (in-package :cl-cc/test)
 
 ;;; ------------------------------------------------------------
-;;; Conditions
+;;; Internal state still used by the retained compatibility macros
+;;; (definvariant/defmetamorphic/defbenchmark/assert-snapshot). Everything
+;;; else that used to live here (test-failure/skip-condition/pending-
+;;; condition/expected-fail-condition, *suite-registry*/*test-registry*/
+;;; *current-suite*, *tap-mutex*, *coverage-reload-in-progress*) belonged to
+;;; the removed custom registry/TAP/coverage runner and has no cl-weave
+;;; equivalent to preserve.
 ;;; ------------------------------------------------------------
-
-(define-condition test-failure (error)
-  ((message :initarg :message :reader test-failure-message))
-  (:report (lambda (c s)
-             (format s "Test failure: ~A" (test-failure-message c)))))
-
-(define-condition skip-condition (condition)
-  ((reason :initarg :reason :reader skip-reason))
-  (:report (lambda (c s)
-             (format s "SKIP: ~A" (skip-reason c)))))
-
-(define-condition pending-condition (condition)
-  ((reason :initarg :reason :reader pending-reason))
-  (:report (lambda (c s)
-             (format s "TODO: ~A" (pending-reason c)))))
-
-(define-condition expected-fail-condition (condition)
-  ((reason :initarg :reason :reader expected-fail-reason))
-  (:report (lambda (c s)
-             (format s "EXPECTED-FAIL: ~A" (expected-fail-reason c)))))
-
-;;; ------------------------------------------------------------
-;;; Internal State
-;;; ------------------------------------------------------------
-
-(defvar *suite-registry* (persist-empty)
-  "symbol -> plist (:name :description :parent :before-each :after-each).
-   Immutable persistent-map; mutated only by `setf' rebinding the symbol.")
-
-(defvar *test-registry* (persist-empty)
-  "symbol -> plist (:name :fn :suite :timeout :depends-on :tags :docstring).
-   Immutable persistent-map; mutated only by `setf' rebinding the symbol.")
-
-(defvar *current-suite* nil
-  "Currently active suite symbol.")
 
 (defvar *invariant-registry* '()
   "List of invariant functions called after every test.")
-
-(defvar *tap-mutex* (sb-thread:make-mutex :name "tap-output")
-  "Mutex for thread-safe TAP output.")
 
 (defvar *snapshot-dir* "tests/snapshots/"
   "Directory for snapshot files.")
 
 (defvar *metamorphic-relations* '()
   "List of metamorphic relation plists.")
-
-(defvar *coverage-reload-in-progress* nil
-  "Internal guard used by `run-suite` to force exactly one sb-cover reload.
-When coverage mode is enabled, the test framework recompiles the local ASDF
-systems with coverage instrumentation before executing tests. This guard
-prevents recursive reload loops while that happens.")
 
 (defvar *benchmark-registry* '()
   "List of benchmark plists (:NAME :FN :WARMUP :ITERATIONS :DOCSTRING).

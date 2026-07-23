@@ -171,11 +171,6 @@ surface."
          (reset-repl-state)
          (setf *package* ,saved-package)))))
 
-(defmacro with-fresh-prolog (&body body)
-  "Run BODY with an empty Prolog rule database and restore the prior state."
-  `(with-cleared-hash-table (cl-cc/prolog::*prolog-rules*)
-     ,@body))
-
 (defun make-test-vm ()
   "Create a fresh VM I/O state for instruction-level testing."
   (cl-cc:make-vm-state))
@@ -212,11 +207,9 @@ surface."
        ',name)))
 
 (defun %run-invariants ()
-  "Run all registered invariants, signaling test-failure with invariant name on violation."
+  "Run all registered invariants, failing with the invariant name on violation."
   (dolist (inv *invariant-registry*)
     (handler-case
         (funcall (cdr inv))
-      (test-failure (c)
-        (error 'test-failure
-               :message (format nil "Invariant ~S violated: ~A"
-                                (car inv) (test-failure-message c)))))))
+      (error (c)
+        (cl-weave:fail "Invariant ~S violated: ~A" (car inv) c)))))

@@ -109,7 +109,9 @@ let
   apps = rec {
     default = repl;
 
-    # `test` runs the canonical fast unit plan via `cl-cc/test:run-tests`.
+    # `test` runs the canonical fast unit plan via `cl-weave:run-all`
+    # (packages/testing-framework's DEFTEST/etc. macros register into
+    # cl-weave's suite tree; see framework-definitions.lisp).
     # `nix flake check` invokes this same program through `checks.tests`.
     # Warm-cache reuse: the FASL cleaner is disabled by default so repeat
     # invocations stay fast. Manual cleanup: `rm -rf ~/.cache/common-lisp/`.
@@ -177,11 +179,6 @@ let
         ''(format t "# starting fast test plan (unit)~%")''
         ''
           (let* ((args (uiop:command-line-arguments))
-                           (filter (loop for rest on args
-                                         when (and (string= (first rest) "--filter") (second rest))
-                                           collect (second rest)))
-                           (workers-env (uiop:getenv "CL_CC_TEST_WORKERS"))
-                           (workers (ignore-errors (and workers-env (parse-integer workers-env))))
                            (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
                            (warm-stdlib (and (not (member "--no-warm-stdlib" args :test #'string=))
                                              (not (and warm-env
@@ -196,14 +193,12 @@ let
                                   (cl-cc:warm-stdlib-cache)
                                   (format t "# stdlib cache ready~%"))
                                 (format t "# stdlib cache warm skipped~%"))
-                            ;; Keep the fast path for 2+ workers, but fall back to the
-                            ;; serial runner when the caller explicitly asks for 1 worker.
-                            (uiop:symbol-call :cl-cc/test (quote run-tests)
-                                              :parallel (not (and workers (<= workers 1)))
-                                              :filter filter
-                                              :warm-stdlib warm-stdlib))
+                            ;; cl-weave is the test engine: registration/execution/
+                            ;; reporting/concurrency all delegate to it now (see
+                            ;; packages/testing-framework/src/framework-definitions.lisp).
+                            (uiop:quit (if (cl-weave:run-all :reporter :spec) 0 1)))
                         (error (e)
-                          (format t "~&not ok - run-tests fatal error: ~A~%" e)
+                          (format t "~&not ok - run-all fatal error: ~A~%" e)
                           (format *error-output* "~&FATAL: ~A~%" e)
                           (uiop:quit 1))))''
       ];
@@ -228,30 +223,29 @@ let
       ];
       lispPostLoadEvalForms = [
         ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
-        ''(format t "# enabling coverage before reloading :cl-cc-test~%")''
-        "(cl-cc/test:enable-coverage)"
+        ''(format t "# reloading :cl-cc-test under sb-cover instrumentation~%")''
         ''
           (handler-case
                         (asdf:load-system :cl-cc-test :force t)
                       (error (e)
                         (format *error-output* "~&FATAL: ~A~%" e)
                         (uiop:quit 1)))''
-        ''(format t "# starting coverage test plan (sb-cover + unit)~%")''
+        # cl-weave owns the coverage run/reset/report lifecycle (see
+        # framework-definitions.lisp); this app no longer excludes the
+        # integration/e2e suites from the coverage pass — cl-weave's
+        # RUN-ALL always runs the full suite tree from its root.
+        ''(format t "# starting coverage test plan (cl-weave + sb-cover)~%")''
         ''
           (let* ((args (uiop:command-line-arguments))
                            (filter (loop for rest on args
                                          when (and (string= (first rest) "--filter") (second rest))
-                                           collect (second rest))))
+                                           return (second rest))))
                       (handler-case
-                          (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-suite)
-                                                              :parallel nil
-                                                              :random nil
-                                                              :coverage t
-                                                              :exclude-suites (quote (cl-cc/test:cl-cc-integration-suite cl-cc/test:cl-cc-e2e-suite))
-                                                              :filter filter
-                                                              :quit-p nil)))
-                            (declaim (optimize (sb-cover:store-coverage-data 0)))
-                            (uiop:quit (if failed 1 0)))
+                          (uiop:quit (if (cl-weave:run-all :reporter :spec
+                                                            :name-filter filter
+                                                            :coverage t
+                                                            :coverage-report-directory "coverage-report/")
+                                         0 1))
                         (error (e)
                           (format t "~&not ok - coverage fatal error: ~A~%" e)
                           (format *error-output* "~&FATAL: ~A~%" e)
@@ -304,21 +298,22 @@ let
                       (error (e)
                         (format *error-output* "~&FATAL: ~A~%" e)
                         (uiop:quit 1)))''
-        ''(format t "# starting coverage test plan (sb-cover + javascript)~%")''
+        # :cl-cc-javascript-test depends only on :cl-cc/:cl-cc-testing-framework/
+        # :cl-cc-javascript (NOT the :cl-cc-test aggregate), so cl-weave's global
+        # suite tree in this process already contains nothing but the JS tests —
+        # no extra suite/location scoping is needed.
+        ''(format t "# starting coverage test plan (cl-weave + sb-cover, javascript)~%")''
         ''
           (let* ((args (uiop:command-line-arguments))
                            (filter (loop for rest on args
                                          when (and (string= (first rest) "--filter") (second rest))
-                                           collect (second rest))))
+                                           return (second rest))))
                       (handler-case
-                          (let ((failed (cl-cc/test:run-suite (quote cl-cc/test:cl-cc-javascript-suite)
-                                                              :parallel nil
-                                                              :random nil
-                                                              :coverage t
-                                                              :filter filter
-                                                              :quit-p nil)))
-                            (declaim (optimize (sb-cover:store-coverage-data 0)))
-                            (uiop:quit (if failed 1 0)))
+                          (uiop:quit (if (cl-weave:run-all :reporter :spec
+                                                            :name-filter filter
+                                                            :coverage t
+                                                            :coverage-report-directory "coverage-report-js/")
+                                         0 1))
                         (error (e)
                           (format t "~&not ok - coverage fatal error: ~A~%" e)
                           (format *error-output* "~&FATAL: ~A~%" e)

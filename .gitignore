@@ -22,6 +22,9 @@ a.out
 # SBCL core files
 *.core
 
+# cl-weave snapshot file locks (transient, created while writing snapshots)
+*.sexp.lock
+
 # Editor artifacts
 *~
 \#*\#

@@ -94,7 +94,7 @@ surface that currently relies on `rt-fboundp` during bootstrapping and tests.")
 
 (defparameter *rt-bootstrap-package-names*
   '(:cl :cl-user :keyword :cl-cc/bootstrap :cl-cc/runtime :cl-cc :cl-cc/vm :cl-cc/compile :cl-cc/expand
-    :cl-cc/parse :cl-cc/type :cl-cc/prolog :cl-cc/optimize :cl-cc/emit :cl-cc/ast)
+    :cl-cc/parse :cl-cc/type :cl-cc/optimize :cl-cc/emit :cl-cc/ast)
   "Conservative bootstrap package seed for the runtime package registry.
 This avoids importing the full host package universe while preserving the packages
 the compiler/runtime currently names directly during selfhost and test flows.")

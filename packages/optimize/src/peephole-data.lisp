@@ -1,6 +1,13 @@
-(in-package :cl-cc/prolog)
+;;;; packages/optimize/src/peephole-data.lisp — Peephole optimization data
+;;;;
+;;;; Moved from packages/prolog/src/peephole-data.lisp as part of the
+;;;; migration off cl-cc's own homegrown Prolog engine onto the external
+;;;; cl-prolog library (see optimizer-prolog-peephole.lisp). Rule patterns
+;;;; are plain S-expressions matched via CL-PROLOG:UNIFY, unrelated to
+;;;; cl-prolog's goal/builtin dispatch, so no package qualification is
+;;;; needed for the ?-prefixed pattern variables here.
 
-;;; Peephole optimization data
+(in-package :cl-cc/optimize)
 
 (defparameter *peephole-copy-prop-rules*
   '(

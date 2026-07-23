@@ -88,10 +88,14 @@
 
 (deftest builtin-prolog-facts-registered
   "Prolog facts are registered for each builtin convention."
-  (let ((unary-rules (gethash 'cl-cc/compile::builtin-unary cl-cc/prolog::*prolog-rules*))
-        (binary-rules (gethash 'cl-cc/compile::builtin-binary cl-cc/prolog::*prolog-rules*))
-        (string-cmp-rules (gethash 'cl-cc/compile::builtin-string-cmp cl-cc/prolog::*prolog-rules*))
-        (nullary-rules (gethash 'cl-cc/compile::builtin-nullary cl-cc/prolog::*prolog-rules*)))
+  (let ((unary-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
+                                             '(cl-cc/compile::builtin-unary ?sym ?ctor)))
+        (binary-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
+                                              '(cl-cc/compile::builtin-binary ?sym ?ctor)))
+        (string-cmp-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
+                                                   '(cl-cc/compile::builtin-string-cmp ?sym ?ctor)))
+        (nullary-rules (cl-prolog:query-prolog cl-cc/compile::*builtin-rulebase*
+                                               '(cl-cc/compile::builtin-nullary ?sym ?ctor))))
     (assert-true (> (length unary-rules) 50))
     (assert-true (> (length binary-rules) 15))
     (assert-true (> (length string-cmp-rules) 10))
@@ -99,17 +103,11 @@
 
 (deftest builtin-prolog-fact-structure
   "Prolog facts have correct (predicate cl-sym vm-ctor) structure."
-  (let* ((unary-rules (gethash 'cl-cc/compile::builtin-unary cl-cc/prolog::*prolog-rules*))
-         (car-fact (find-if (lambda (r)
-                              (let ((head (cl-cc/prolog::rule-head r)))
-                                (and (= (length head) 3)
-                                     (eq (second head) 'car))))
-                            unary-rules)))
-    (assert-true car-fact)
-    (let ((head (cl-cc/prolog::rule-head car-fact)))
-      (assert-eq (first head) 'cl-cc/compile::builtin-unary)
-      (assert-eq (second head) 'car)
-      (assert-eq (third head) 'cl-cc/vm:make-vm-car))))
+  (let ((car-solution (cl-prolog:query-prolog-first
+                       cl-cc/compile::*builtin-rulebase*
+                       '(cl-cc/compile::builtin-unary car ?ctor))))
+    (assert-true car-solution)
+    (assert-eq 'cl-cc/vm:make-vm-car (cl-prolog:solution-binding '?ctor car-solution))))
 
 ;;; ─── Emitter Dispatch Tests ────────────────────────────────────────────────
 

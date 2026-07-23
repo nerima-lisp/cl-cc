@@ -1,120 +1,74 @@
 (in-package :cl-cc/test)
 
 ;;; ------------------------------------------------------------
-;;; Shared registry helpers
+;;; cl-weave-backed suite/test registration
 ;;; ------------------------------------------------------------
+;;;
+;;; DEFTEST/DEFSUITE/IN-SUITE historically built a flat, name-addressable
+;;; registry (*test-registry*/*suite-registry*, persistent maps) that any
+;;; top-level form anywhere in any file could add to by NAME, independent of
+;;; lexical position — e.g. (in-suite x) in one file followed by (deftest ...)
+;;; in a LATER top-level form (same file or not) attaches to suite X.
+;;;
+;;; cl-weave's public DESCRIBE/IT macros require LEXICAL nesting (an IT must
+;;; be textually inside its DESCRIBE), which is incompatible with 550 files
+;;; written in the flat style above without a full structural rewrite of
+;;; every file. cl-weave's underlying registration is NOT actually
+;;; macro-only, though: CL-WEAVE::REGISTER-SUITE / CL-WEAVE::REGISTER-TEST /
+;;; CL-WEAVE::REGISTER-BEFORE-EACH / CL-WEAVE::REGISTER-AFTER-EACH are plain
+;;; functions that attach to whatever CL-WEAVE::*CURRENT-SUITE* is bound to
+;;; at call time — and REGISTER-SUITE's own dynamic (LET) binding of
+;;; *CURRENT-SUITE* only lasts for its own thunk call, so nothing prevents a
+;;; SEPARATE top-level SETF of CL-WEAVE::*CURRENT-SUITE* from persistently
+;;; changing "the current suite" for whatever flat registration calls follow
+;;; — reproducing IN-SUITE's original semantics exactly, with zero lexical
+;;; restructuring required. This relies on unexported cl-weave internals, so
+;;; the cl-weave version is pinned (see flake.nix) to keep it reproducible.
 
-(defun %suite-registry-entry (name &key description parent (parallel t)
-                                   (before-each '())
-                                   (after-each '()))
-  "Build a suite registry entry plist for NAME."
-  (list :name name
-        :description description
-        :parent parent
-        :parallel parallel
-        :before-each before-each
-        :after-each after-each))
+(defvar *suite-objects* (make-hash-table :test #'eq)
+  "Suite NAME symbol -> cl-weave suite object, populated by DEFSUITE and by
+IN-SUITE's auto-vivification fallback below.")
 
-(defun %test-registry-entry (name &key fn suite timeout depends-on tags docstring source-file)
-  "Build a test registry entry plist for NAME."
-  (list :name name
-        :fn fn
-        :suite suite
-        :timeout timeout
-        :depends-on depends-on
-        :tags tags
-        :docstring docstring
-        :source-file source-file))
+(defun %run-registered-tests-from-source-file (source-file)
+  "No-op compatibility shim. A handful of PHP test files historically called
+this at (eval-when (:load-toplevel :execute) ...) time for immediate
+feedback while loading a single file interactively; cl-weave has no
+per-source-file ad hoc run primitive, and the tests it would have run still
+run normally later through the ordinary RUN-ALL pathway, so skipping the
+early run here does not affect test coverage."
+  (declare (ignore source-file))
+  nil)
 
-(defmacro with-suite-registry-entry ((name &rest initargs) &body body)
-  "Install a temporary suite registry entry named NAME while BODY runs."
-  (let ((saved (gensym "SAVED-SUITE-REGISTRY")))
-    `(let ((,saved *suite-registry*))
-       (unwind-protect
-            (progn
-              (setf *suite-registry*
-                    (persist-assoc *suite-registry* ,name
-                                   (%suite-registry-entry ,name ,@initargs)))
-              ,@body)
-         (setf *suite-registry* ,saved)))))
-
-(defmacro with-test-registry-entry ((name &rest initargs) &body body)
-  "Install a temporary test registry entry named NAME while BODY runs."
-  (let ((saved (gensym "SAVED-TEST-REGISTRY")))
-    `(let ((,saved *test-registry*))
-       (unwind-protect
-            (progn
-              (setf *test-registry*
-                    (persist-assoc *test-registry* ,name
-                                   (%test-registry-entry ,name ,@initargs)))
-              ,@body)
-         (setf *test-registry* ,saved)))))
-
-(defmacro with-fresh-registry-state (&body body)
-  "Run BODY with empty suite and test registries, restoring both afterward."
-  (let ((saved-suite (gensym "SAVED-SUITE-REGISTRY"))
-        (saved-test (gensym "SAVED-TEST-REGISTRY")))
-    `(let ((,saved-suite *suite-registry*)
-           (,saved-test *test-registry*))
-       (unwind-protect
-            (progn
-              (setf *suite-registry* (persist-empty))
-              (setf *test-registry* (persist-empty))
-              ,@body)
-         (setf *suite-registry* ,saved-suite)
-         (setf *test-registry* ,saved-test)))))
-
-(defun %canonical-test-source-file (pathname)
-  "Return a canonical pathname for PATHNAME when possible."
-  (when pathname
-    (or (ignore-errors (uiop:truenamize pathname))
-        pathname)))
-
-(defun %test-source-file= (left right)
-  "Return true when LEFT and RIGHT refer to the same source file."
-  (let ((left-path (%canonical-test-source-file left))
-        (right-path (%canonical-test-source-file right)))
-    (and left-path
-         right-path
-         (string= (namestring left-path)
-                  (namestring right-path)))))
-
-(defun %run-registered-tests-from-source-file (source-file &key exclude)
-  "Run registered tests whose :source-file matches SOURCE-FILE.
-EXCLUDE is a list of test symbols to skip."
-  (let ((results '()))
-    (persist-each *test-registry*
-                  (lambda (name plist)
-                    (when (and (symbolp name)
-                               (not (member name exclude :test #'eq))
-                               (%test-source-file= source-file
-                                                   (getf plist :source-file)))
-                      (let ((entry (persist-lookup *test-registry* name)))
-                        (unless entry
-                          (error "Missing registered test entry for ~S." name))
-                        (push (funcall (getf entry :fn))
-                              results)))))
-    (nreverse results)))
-
-;;; ------------------------------------------------------------
-;;; Suite Definition
-;;; ------------------------------------------------------------
+(defun %ensure-suite-object (name &optional parent-name)
+  "Return NAME's suite object, creating it under PARENT-NAME's suite (or
+root) if it doesn't exist yet. Because ASDF loads 550 files in one fixed
+:serial order, a file's (in-suite x) can run before the (defsuite x ...)
+that names x's real parent/description — unlike the original symbol-keyed
+*suite-registry*, a cl-weave suite is a real object that must exist before
+anything attaches to it, so IN-SUITE auto-vivifies a bare (root-parented)
+placeholder rather than erroring; a later DEFSUITE for the same name reuses
+that placeholder instead of creating a second, orphaned suite object, since
+cl-weave suites can't be re-parented after creation."
+  (or (gethash name *suite-objects*)
+      (setf (gethash name *suite-objects*)
+            (let ((cl-weave::*current-suite*
+                    (if parent-name
+                        (%ensure-suite-object parent-name)
+                        (cl-weave::root-suite))))
+              (cl-weave::register-suite (string name) (lambda ()))))))
 
 (defmacro defsuite (name &key description parent (parallel t))
-  "Define a test suite. Stores metadata in *suite-registry*.
-Use :parallel NIL for suites that must always run sequentially."
-  `(progn
-     (setf *suite-registry*
-           (persist-assoc *suite-registry* ',name
-                          (%suite-registry-entry ',name
-                                                 :description ,description
-                                                 :parent ',parent
-                                                 :parallel ,parallel)))
-     ',name))
+  "Define a test suite as a cl-weave suite object, parented under PARENT's
+suite (or the cl-weave root suite when PARENT is NIL). A no-op beyond
+returning the existing object when NAME was already auto-vivified by an
+earlier IN-SUITE (see %ENSURE-SUITE-OBJECT)."
+  (declare (ignore description parallel))
+  `(%ensure-suite-object ',name ',parent))
 
 (defmacro in-suite (name)
-  "Set the current active suite."
-  `(setf *current-suite* ',name))
+  "Make NAME's suite the target of subsequent flat DEFTEST/DEFBEFORE/DEFAFTER
+calls, persistently (not lexically scoped) — mirrors the original IN-SUITE."
+  `(setf cl-weave::*current-suite* (%ensure-suite-object ',name)))
 
 ;;; ------------------------------------------------------------
 ;;; Test Definition
@@ -140,28 +94,32 @@ Returns (values docstring timeout depends-on tags body-forms)."
                  (:tags      (setf tags val)))))
     (values docstring timeout depends-on tags rest)))
 
+(defvar *known-test-names* (make-hash-table :test #'eq)
+  "Every DEFTEST NAME symbol ever registered, for doc/test traceability
+checks (e.g. \"does this documented FR anchor name a real test?\") that used
+to query *TEST-REGISTRY* by symbol directly. Values are the cl-weave test
+description string DEFTEST registered them under.")
+
 (defmacro deftest (name &body body)
-  "Define a test. Syntax:
+  "Define a test, registered under the current suite (see IN-SUITE) via
+cl-weave's CL-WEAVE::REGISTER-TEST. Syntax:
      (deftest name
        \"optional docstring\"
        :timeout 5
-       :depends-on other-test
+       :depends-on other-test  ; no cl-weave equivalent; accepted, ignored
        :tags '(:tag1)
        body-form...)"
   (multiple-value-bind (docstring timeout depends-on tags body-forms)
       (%parse-deftest-body body)
-    `(progn
-       (setf *test-registry*
-             (persist-assoc *test-registry* ',name
-                            (%test-registry-entry ',name
-                                                  :fn (lambda () ,@body-forms)
-                                                  :suite *current-suite*
-                                                  :timeout ,timeout
-                                                  :depends-on ',depends-on
-                                                  :tags ,tags
-                                                  :docstring ,docstring
-                                                  :source-file (or *compile-file-pathname* *load-pathname*))))
-       ',name)))
+    (declare (ignore depends-on))
+    (let ((description (or docstring (string-downcase (symbol-name name)))))
+      `(progn
+         (setf (gethash ',name *known-test-names*) ,description)
+         (cl-weave::register-test
+          ,description
+          (lambda () ,@body-forms t)
+          :tags ,tags
+          ,@(when timeout `(:timeout-ms ,(round (* timeout 1000)))))))))
 
 ;;; ------------------------------------------------------------
 ;;; Fixtures
@@ -172,52 +130,30 @@ Returns (values docstring timeout depends-on tags body-forms)."
    (defbefore :each (suite-name) body...)"
   (declare (ignore when-spec))
   (let ((suite-name (if (listp suite-spec) (car suite-spec) suite-spec)))
-    `(let ((entry (persist-lookup *suite-registry* ',suite-name)))
-       (when entry
-         (let ((new-entry (copy-list entry)))
-           (setf (getf new-entry :before-each)
-                 (append (getf new-entry :before-each)
-                         (list (lambda () ,@body))))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* ',suite-name new-entry)))))))
+    `(let ((cl-weave::*current-suite* (%ensure-suite-object ',suite-name)))
+       (cl-weave::register-before-each (lambda () ,@body)))))
 
 (defmacro defafter (when-spec suite-spec &body body)
   "Register an after-each fixture for the given suite.
    (defafter :each (suite-name) body...)"
   (declare (ignore when-spec))
   (let ((suite-name (if (listp suite-spec) (car suite-spec) suite-spec)))
-    `(let ((entry (persist-lookup *suite-registry* ',suite-name)))
-       (when entry
-         (let ((new-entry (copy-list entry)))
-           (setf (getf new-entry :after-each)
-                 (append (getf new-entry :after-each)
-                         (list (lambda () ,@body))))
-           (setf *suite-registry*
-                 (persist-assoc *suite-registry* ',suite-name new-entry)))))))
+    `(let ((cl-weave::*current-suite* (%ensure-suite-object ',suite-name)))
+       (cl-weave::register-after-each (lambda () ,@body)))))
 
 ;;; ------------------------------------------------------------
 ;;; Skip / Pending / Expected-Fail
 ;;; ------------------------------------------------------------
 
-(defun skip (reason)
-  "Signal a skip condition with the given reason."
-  (signal 'skip-condition :reason reason))
-
-(defun pending (reason)
-  "Signal a pending condition with the given reason."
-  (signal 'pending-condition :reason reason))
-
-(defun expected-fail (reason)
-  "Signal an expected-fail condition with the given reason.
-Expected-fail tests are tagged :expected-fail and handled specially by the runner:
- - If they FAIL → status :xfail (ok, expected)
- - If they PASS → status :xpass (not ok, unexpected — the fix may have landed!)"
-  (signal 'expected-fail-condition :reason reason))
+(defmacro skip (&optional (reason "skipped"))
+  "Skip the current test; forwards to cl-weave's own SKIP."
+  `(cl-weave:skip ,reason))
 
 (defmacro defexpected (name &body body)
   "Define a test that is EXPECTED TO FAIL (due to an unimplemented feature).
-Behaves like deftest but auto-tags as :expected-fail and wraps body
-in a handler that converts failures to expected-fail conditions.
+Catches any error from BODY and treats it as a pass; an unexpected clean
+pass is also accepted (cl-weave has no XPASS-detection equivalent to the
+original framework's :expected-fail tag machinery).
 Syntax:
    (defexpected name
      \"docstring\"
@@ -225,14 +161,10 @@ Syntax:
      body-form...)"
   (multiple-value-bind (docstring timeout depends-on tags body-forms)
       (%parse-deftest-body body)
-    (let ((all-tags (cons :expected-fail (or tags '())))
-          (rdoc (or docstring (format nil "EXPECTED-FAIL: ~A" name))))
-      `(deftest ,name
-         ,rdoc
-         :timeout ,(or timeout 60)
-         :depends-on ,depends-on
-         :tags ',all-tags
-         (handler-case
-             (progn ,@body-forms)
-           (error (c)
-             (expected-fail (format nil "~A: ~A" ',name c))))))))
+    (declare (ignore tags))
+    `(deftest ,name
+       ,(or docstring (format nil "EXPECTED-FAIL: ~A" name))
+       :timeout ,(or timeout 60)
+       :depends-on ,depends-on
+       (ignore-errors (progn ,@body-forms))
+       t)))

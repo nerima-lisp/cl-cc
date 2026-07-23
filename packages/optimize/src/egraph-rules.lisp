@@ -20,6 +20,10 @@
 
 ;;; ─── Rule Registry ───────────────────────────────────────────────────────
 
+(defparameter *egraph-rulebase* (cl-prolog:make-rulebase)
+  "Fact database of EGRAPH-RULE(NAME, PATTERN, REPLACEMENT) triples, the
+source of truth EGRAPH-BUILTIN-RULES reconstructs the rule table from.")
+
 (defparameter *egraph-rule-guards* (make-hash-table :test #'eq)
   "Rule-name → guard function mapping used when reconstructing rules from Prolog rule entries.")
 
@@ -45,7 +49,7 @@ Rule structure itself is sourced from the Prolog rule database emitted by `defru
 ;;;            :when (lambda (b _) (numberp (egraph-binding-value b '?a))))
 
 (defmacro defrule (name pattern replacement &key when)
-  "Define an e-graph rewrite rule guard and emit a matching Prolog rule."
+  "Define an e-graph rewrite rule guard and assert a matching Prolog fact."
   `(progn
      (egraph-rule-register ',name ',pattern ',replacement
                            ,(if when
@@ -53,7 +57,9 @@ Rule structure itself is sourced from the Prolog rule database emitted by `defru
                                    (declare (ignorable bindings eg))
                                    ,when)
                                 nil))
-     (cl-cc/prolog:def-rule (egraph-rule ,name ,pattern ,replacement))
+     (cl-prolog:query-prolog-first
+      *egraph-rulebase*
+      '(cl-prolog:assertz (egraph-rule ,name ,pattern ,replacement)))
      ',name))
 
 ;;; ─── Binding Helpers ─────────────────────────────────────────────────────

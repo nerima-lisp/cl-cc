@@ -186,10 +186,6 @@
           cl-cc:execute-instruction
           cl-cc:instruction->sexp
           cl-cc:sexp->instruction
-          ;; Prolog
-          cl-cc/prolog:unify
-          cl-cc/prolog:logic-substitute
-          cl-cc/prolog:logic-var-p
           ;; CLOS AST
           cl-cc:ast-defclass
           cl-cc:ast-defclass-name

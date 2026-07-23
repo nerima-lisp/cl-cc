@@ -5,14 +5,10 @@
 ;;;; The facade :cl-cc package uses :cl-cc/parse so compiler modules continue
 ;;;; to see parse-* / cst-* / lexer-* / diagnostic-* symbols unqualified.
 ;;;;
-;;;; Symbols pre-interned by :cl-cc/prolog (MAKE-CST-TOKEN, LEXER-TOKEN-P,
-;;;; LEXER-TOKEN-TYPE, LEXER-TOKEN-VALUE) come from :cl-cc/bootstrap and are
-;;;; intentionally excluded from exports to avoid NAME-CONFLICT errors. They
-;;;; remain exported from :cl-cc via package-exports-1.lisp.
-;;;;
-;;;; DCG public symbols (def-dcg-rule, phrase, phrase-all) come from
-;;;; :cl-cc/prolog. Internal DCG helpers remain unexported on purpose and are
-;;;; not re-exported here.
+;;;; Symbols pre-interned in :cl-cc/bootstrap (MAKE-CST-TOKEN, LEXER-TOKEN-P,
+;;;; LEXER-TOKEN-TYPE, LEXER-TOKEN-VALUE) are intentionally excluded from
+;;;; exports here to avoid NAME-CONFLICT errors. They remain exported from
+;;;; :cl-cc via package-exports-1.lisp.
 
 (defpackage :cl-cc/parse
   (:use :cl :cl-cc/ast :cl-cc/bootstrap)

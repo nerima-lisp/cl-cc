@@ -131,4 +131,4 @@
 ;; ----------------------------------------------------------------------------
 
 (defun run-control-flow-tests ()
-  (run-suite 'control-flow-tests))
+  (cl-weave:run 'control-flow-tests :reporter :spec))

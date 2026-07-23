@@ -17,7 +17,6 @@
                                :name nil :type nil)))
       (ensure-system-asd :cl-cc-bootstrap "packages/bootstrap/cl-cc-bootstrap.asd" here)
       (ensure-system-asd :cl-cc-ast "packages/ast/cl-cc-ast.asd" here)
-      (ensure-system-asd :cl-cc-prolog "packages/prolog/cl-cc-prolog.asd" here)
       (ensure-system-asd :cl-cc-binary "packages/binary/cl-cc-binary.asd" here)
       (ensure-system-asd :cl-cc-runtime "packages/runtime/cl-cc-runtime.asd" here)
       (ensure-system-asd :cl-cc-bytecode "packages/bytecode/cl-cc-bytecode.asd" here)
@@ -46,7 +45,7 @@
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-prolog :cl-cc-parse :cl-cc-binary
+  :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-binary
                 :cl-cc-runtime :cl-cc-bytecode :cl-cc-ir :cl-cc-mir :cl-cc-target
                 :cl-cc-type :cl-cc-optimize :cl-cc-regalloc :cl-cc-emit :cl-cc-expand
                 :cl-cc-compile :cl-cc-cps :cl-cc-codegen :cl-cc-vm :cl-cc-stdlib
@@ -81,6 +80,10 @@
       ;; VM no longer defines fallback packages; this optional ASDF reference is
       ;; the development/test bridge to packages/tools/cl-cc-tools.asd.
       (maybe-load-asd :cl-cc-tools "packages/tools/cl-cc-tools.asd" here)
+      ;; Prolog-based call-graph analysis tools built on the external
+      ;; cl-prolog engine. Optional, like the other entries in this block:
+      ;; probe-file guards so the production Nix derivation succeeds without it.
+      (maybe-load-asd :cl-cc-prolog-tools "packages/prolog-tools/cl-cc-prolog-tools.asd" here)
       (maybe-load-asd :cl-cc-test "cl-cc-test.asd" here))))
 
 ;; :cl-cc-cli is defined in packages/cli/cl-cc-cli.asd.

@@ -11,12 +11,16 @@
 
 ;;; Bootstrap provides binop/const/var/cmp atoms used by egraph-rules as
 ;;; Prolog predicate keys. cl-cc/vm provides all VM instruction types and
-;;; accessors. cl-cc/prolog provides def-rule, query-all, and the DCG entry
-;;; points used by the optimizer's Prolog-backed peephole pass.
+;;; accessors. The external :cl-prolog engine backs the Prolog peephole pass
+;;; (CL-PROLOG:UNIFY / CL-PROLOG:LOGIC-SUBSTITUTE, imported unqualified below)
+;;; and the egraph rewrite-rule registry (CL-PROLOG:ASSERTZ / CL-PROLOG:QUERY-PROLOG,
+;;; referenced qualified at their call sites since those are goal-dispatch
+;;; builtins whose symbol identity matters).
 ;;; cl-cc/type is accessed qualified (cl-cc/type:...) so not in :use.
 
 (defpackage :cl-cc/optimize
-  (:use :cl :cl-cc/bootstrap :cl-cc/vm :cl-cc/prolog)
+  (:use :cl :cl-cc/bootstrap :cl-cc/vm)
+  (:import-from :cl-prolog #:unify #:logic-substitute)
   (:shadowing-import-from :cl-cc/vm
     ;; defpackage :shadow from facade-package-defpackage.lisp
     #:get-universal-time #:get-internal-real-time #:get-internal-run-time

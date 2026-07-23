@@ -66,7 +66,7 @@
 (deftest fr-316-assert-faster-than-failure
   "FR-316: assert-faster-than reports a deterministic failure below zero ns."
   :tags '(:fr-316)
-  (assert-signals test-failure
+  (assert-signals cl-weave:test-failure
     (assert-faster-than -1
       (values))))
 
@@ -76,7 +76,7 @@
   ;; assert-no-consing is strict SBCL-bytes-consed; allow for JIT allocation
   (handler-case
       (assert-no-consing (values))
-    (test-failure ()
+    (cl-weave:test-failure ()
       ;; Expected: test framework may observe internal SBCL allocation
       (values))))
 

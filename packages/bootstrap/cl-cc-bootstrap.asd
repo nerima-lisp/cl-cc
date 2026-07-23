@@ -4,10 +4,10 @@
 ;;;; package-by-feature monorepo design.  cl-cc.asd loads this via
 ;;;; (load (merge-pathnames "packages/bootstrap/cl-cc-bootstrap.asd" here))
 ;;;; before any other subsystem so the 12 exported symbols exist in
-;;;; :cl-cc/bootstrap before cl-cc/prolog or cl-cc/compile are defined.
+;;;; :cl-cc/bootstrap before cl-cc/optimize or cl-cc/compile are defined.
 
 (asdf:defsystem :cl-cc-bootstrap
-  :description "cl-cc bootstrap: pre-interned symbols shared by cl-cc/prolog and cl-cc/compile"
+  :description "cl-cc bootstrap: pre-interned symbols shared by cl-cc/optimize and cl-cc/compile"
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"

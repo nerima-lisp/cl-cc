@@ -16,17 +16,6 @@
 ;;; Benchmark support (FR-316)
 ;;; ------------------------------------------------------------
 
-(defun %benchmark-now-ns ()
-  "Return the current internal real time converted to nanoseconds."
-  (floor (* (get-internal-real-time) 1000000000)
-         internal-time-units-per-second))
-
-(defun %benchmark-duration-ns (thunk)
-  "Run THUNK once and return its elapsed duration in nanoseconds."
-  (let ((start (%benchmark-now-ns)))
-    (funcall thunk)
-    (- (%benchmark-now-ns) start)))
-
 (defun %benchmark-percentile (sorted-values percentile)
   "Return the nearest-rank PERCENTILE from SORTED-VALUES."
   (let ((count (length sorted-values)))
@@ -74,15 +63,20 @@ The result contains stable machine-readable keys: :ITERATION-COUNT,
 (defun run-benchmark (name thunk &key (warmup 1) (iterations 10) output-stream)
   "Run THUNK as benchmark NAME and return a benchmark result plist.
 
-WARMUP controls unmeasured iterations. ITERATIONS controls measured
-iterations. When OUTPUT-STREAM is non-NIL, a JSON representation is written to
-that stream before the result plist is returned."
+Timing itself is delegated to CL-WEAVE:MEASURE (one cl-weave sample per
+measured call, so ITERATIONS maps to cl-weave's :SAMPLES and each sample is a
+single unaveraged call) to avoid re-implementing a raw get-internal-real-time
+loop; the resulting per-call millisecond samples are converted to
+nanoseconds and reduced through BENCHMARK-STATISTICS to keep this framework's
+existing :DURATIONS-NS/:P99-NS/:STDDEV-NS plist shape. WARMUP controls
+unmeasured iterations. When OUTPUT-STREAM is non-NIL, a JSON representation
+is written to that stream before the result plist is returned."
   (check-type warmup (integer 0 *))
   (check-type iterations (integer 1 *))
-  (loop repeat warmup
-        do (funcall thunk))
-  (let* ((durations (loop repeat iterations collect (%benchmark-duration-ns thunk)))
-         (stats (benchmark-statistics durations :warmup-count warmup))
+  (let* ((measured (cl-weave:measure thunk :warmup warmup :samples iterations :iterations 1))
+         (durations-ns (mapcar (lambda (ms) (round (* ms 1000000)))
+                                (cl-weave:benchmark-result-samples measured)))
+         (stats (benchmark-statistics durations-ns :warmup-count warmup))
          (result (list* :name name stats)))
     (when output-stream
       (write-benchmark-result-json result output-stream)

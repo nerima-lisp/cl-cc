@@ -1,4 +1,10 @@
-{ lib, sbcl, ... }:
+{
+  lib,
+  sbcl,
+  clProlog,
+  clWeave,
+  ...
+}:
 let
   projectRoot = ../.;
 
@@ -17,19 +23,23 @@ let
     };
 
   # Build an ASDF system via sbcl.buildASDFSystem with shared boilerplate.
+  # extraLispLibs threads in external (non cl-cc-*) derivations -- e.g. the
+  # external cl-prolog engine -- alongside deps, which only resolves names
+  # against allSystems (internal cl-cc-* systems).
   mkAsdfSystem =
     {
       name,
       src,
       deps,
       allSystems,
+      extraLispLibs ? [ ],
     }:
     sbcl.buildASDFSystem {
       pname = name;
       version = "0.1.0";
       src = pkgSrc src;
       systems = [ name ];
-      lispLibs = map (n: allSystems.${n}) deps;
+      lispLibs = (map (n: allSystems.${n}) deps) ++ extraLispLibs;
     };
 
   # 14 leaf systems — preserved verbatim from the original flake.nix.
@@ -61,10 +71,6 @@ let
     cl-cc-mir = {
       src = "packages/mir";
       deps = [ ];
-    };
-    cl-cc-prolog = {
-      src = "packages/prolog";
-      deps = [ "cl-cc-bootstrap" ];
     };
     cl-cc-type = {
       src = "packages/type";
@@ -109,9 +115,9 @@ let
       src = "packages/optimize";
       deps = [
         "cl-cc-vm"
-        "cl-cc-prolog"
         "cl-cc-type"
       ];
+      extraLispLibs = [ clProlog ];
     };
     cl-cc-target = {
       src = "packages/target";
@@ -167,7 +173,6 @@ let
       deps = [
         "cl-cc-bootstrap"
         "cl-cc-ast"
-        "cl-cc-prolog"
         "cl-cc-parse"
         "cl-cc-type"
         "cl-cc-optimize"
@@ -178,6 +183,7 @@ let
         "cl-cc-target"
         "cl-cc-regalloc"
       ];
+      extraLispLibs = [ clProlog ];
     };
     cl-cc-stdlib = {
       src = "packages/stdlib";
@@ -188,7 +194,6 @@ let
       deps = [
         "cl-cc-bootstrap"
         "cl-cc-ast"
-        "cl-cc-prolog"
         "cl-cc-parse"
         "cl-cc-php"
         "cl-cc-javascript"
@@ -212,7 +217,6 @@ let
         "cl-cc-runtime"
         "cl-cc-compile"
         "cl-cc-ast"
-        "cl-cc-prolog"
         "cl-cc-parse"
         "cl-cc-optimize"
         "cl-cc-emit"
@@ -265,6 +269,7 @@ let
         "cl-cc"
         "cl-cc-php"
       ];
+      extraLispLibs = [ clWeave ];
     };
     cl-cc-tools = {
       src = "packages/tools";
@@ -276,13 +281,49 @@ let
     sys:
     lib.mapAttrs (
       name:
-      { src, deps }:
+      {
+        src,
+        deps,
+        extraLispLibs ? [ ],
+      }:
       mkAsdfSystem {
-        inherit name src deps;
+        inherit name src deps extraLispLibs;
         allSystems = sys;
       }
     ) (leafSpec // derivedSpec)
   );
+
+  # Prolog-based call-graph analysis tools (packages/prolog-tools), built on
+  # the external cl-prolog engine — a standalone leaf package registered via
+  # `maybe-load-asd` in cl-cc.asd rather than folded into the `:cl-cc`
+  # dependency closure, so it is exposed here rather than through
+  # `mkAsdfSystem`'s internal-only `deps` lookup (which only resolves names
+  # against `productionAsdfSystems`, not external flake inputs).
+  cl-cc-prolog-tools = sbcl.buildASDFSystem {
+    pname = "cl-cc-prolog-tools";
+    version = "0.1.0";
+    src = pkgSrc "packages/prolog-tools";
+    systems = [ "cl-cc-prolog-tools" ];
+    lispLibs = [
+      productionAsdfSystems.cl-cc-ast
+      clProlog
+    ];
+  };
+
+  # Its cl-weave test suite is a separate system/derivation so the
+  # cl-weave dependency stays test-only, never reaching the production
+  # cl-cc-prolog-tools closure above.
+  cl-cc-prolog-tools-test = sbcl.buildASDFSystem {
+    pname = "cl-cc-prolog-tools-test";
+    version = "0.1.0";
+    src = pkgSrc "packages/prolog-tools";
+    systems = [ "cl-cc-prolog-tools/tests" ];
+    lispLibs = [
+      productionAsdfSystems.cl-cc-ast
+      clProlog
+      clWeave
+    ];
+  };
 
   # Test systems live in a separate attrset so Nix consumers can opt into
   # the heavier test FASLs only when needed. lispLibs flow from
@@ -340,6 +381,7 @@ let
 in
 {
   inherit productionAsdfSystems testAsdfSystems;
+  inherit cl-cc-prolog-tools cl-cc-prolog-tools-test;
   sbclWithCLCC = sbcl.withPackages (_: lib.attrValues productionAsdfSystems);
   sbclWithTests = sbcl.withPackages (
     _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-test" ]

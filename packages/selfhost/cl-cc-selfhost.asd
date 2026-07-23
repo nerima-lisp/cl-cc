@@ -11,7 +11,7 @@
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-pipeline :cl-cc-expand :cl-cc-vm
                :cl-cc-runtime :cl-cc-compile
-               :cl-cc-ast :cl-cc-prolog :cl-cc-parse :cl-cc-optimize :cl-cc-emit :cl-cc-stdlib)
+               :cl-cc-ast :cl-cc-parse :cl-cc-optimize :cl-cc-emit :cl-cc-stdlib)
   :pathname "src"
   :serial t
   :components

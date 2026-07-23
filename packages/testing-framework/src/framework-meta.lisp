@@ -57,8 +57,8 @@
                  (transformed-result (ignore-errors (eval transformed))))
             (when (and original-result transformed-result)
               (unless (ignore-errors (funcall rel-fn original-result transformed-result))
-                (%fail-test (format nil "Metamorphic relation ~S violated"
-                                    (getf relation :name))
-                            :expected (list expr original-result)
-                            :actual   (list transformed transformed-result))))))))))
+                (cl-weave:fail "Metamorphic relation ~S violated (expected ~S, got ~S)"
+                               (getf relation :name)
+                               (list expr original-result)
+                               (list transformed transformed-result))))))))))
 

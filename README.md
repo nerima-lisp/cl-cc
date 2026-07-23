@@ -22,10 +22,11 @@ cl-cc compile file.lisp -o out --arch x86-64
 cl-cc compile file.js -o out --arch x86-64
 ```
 
-`nix run .#test` maps to `cl-cc/test:run-tests` and executes the canonical
-fast unit plan. Integration, E2E, conformance, and documentation/evidence
-suites are selected by suite taxonomy and run explicitly; they no longer depend
-on `slow` names.
+`nix run .#test` maps to `cl-weave:run-all` and executes the canonical
+fast unit plan (test registration/execution/reporting is delegated to
+cl-weave; see `packages/testing-framework/src/framework-definitions.lisp`).
+Integration, E2E, conformance, and documentation/evidence suites are selected
+by suite taxonomy and run explicitly; they no longer depend on `slow` names.
 `nix flake check` invokes the same fast plan via `checks.tests`.
 
 Timeouts are explicit for test execution. Set `CLCC_TEST_TIMEOUT` to override

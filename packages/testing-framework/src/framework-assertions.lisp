@@ -1,34 +1,29 @@
 (in-package :cl-cc/test)
 
 ;;; ------------------------------------------------------------
-;;; Assertion helpers
+;;; %fail-test compatibility shim
 ;;; ------------------------------------------------------------
-
-(defun %format-value (val)
-  "Format a value for diagnostic output."
-  (let ((*print-length* 20)
-        (*print-level* 5))
-    (format nil "~S" val)))
 
 (defun %fail-test (message &key expected actual form at)
-  "Record a test failure and signal test-failure condition."
-  (let ((yaml (with-output-to-string (s)
-                (format s "  ---~%")
-                (format s "  message: ~S~%" message)
-                (when expected
-                  (format s "  expected: ~A~%" (%format-value expected)))
-                (when actual
-                  (format s "  actual: ~A~%" (%format-value actual)))
-                (when form
-                  (format s "  form: ~A~%" form))
-                (when at
-                  (format s "  at: ~A~%" at))
-                (format s "  ..."))))
-    (error 'test-failure :message yaml)))
+  "Compatibility shim preserving the original %FAIL-TEST keyword signature
+for the handful of test-support files (framework-compiler-run-string.lisp)
+that build their own failure messages, backed by CL-WEAVE:FAIL."
+  (declare (ignore at))
+  (cl-weave:fail "~A~@[ (expected ~S)~]~@[ (got ~S)~]~@[ [form: ~S]~]"
+                 message expected actual form))
 
 ;;; ------------------------------------------------------------
-;;; Core assertion macros
+;;; Assertion macros, backed by CL-WEAVE:FAIL
 ;;; ------------------------------------------------------------
+;;;
+;;; Preserves every original assert-* macro's name and call signature (in
+;;; particular the EXPECTED-then-ACTUAL argument order the original
+;;; %assert-binary/%define-binary-assertion used, which is the reverse of
+;;; cl-weave's own EXPECT/:to-equal ACTUAL-then-EXPECTED convention) so none
+;;; of the ~14,000 existing call sites across the test suite need to change.
+;;; CL-WEAVE:FAIL is a thin wrapper around CL-WEAVE::SIGNAL-ASSERTION-FAILURE
+;;; and is exported public API, unlike the registration functions in
+;;; framework-definitions.lisp.
 
 (defmacro %assert-binary (predicate failure-message expected actual)
   "Shared implementation for binary assertion macros."
@@ -37,10 +32,7 @@
     `(let ((,e ,expected)
            (,a ,actual))
        (unless (,predicate ,e ,a)
-         (%fail-test ,failure-message
-                     :expected ,e
-                     :actual ,a
-                     :form '(,predicate ,expected ,actual)))
+         (cl-weave:fail "~A (expected ~S, got ~S)" ,failure-message ,e ,a))
        t)))
 
 (defmacro %assert-unary (predicate failure-message expected-value form)
@@ -48,10 +40,7 @@
   (let ((v (gensym "V")))
     `(let ((,v ,form))
        (unless (,predicate ,v)
-         (%fail-test ,failure-message
-                     :expected ',expected-value
-                     :actual ,v
-                     :form ',form))
+         (cl-weave:fail "~A (expected ~S, got ~S)" ,failure-message ',expected-value ,v))
        t)))
 
 (defmacro %define-binary-assertion (name predicate failure-message docstring)
@@ -92,10 +81,7 @@
   (let ((o (gensym "O")))
     `(let ((,o ,object))
        (unless (typep ,o ',type-name)
-         (%fail-test "assert-type failed"
-                     :expected ',type-name
-                     :actual (type-of ,o)
-                     :form '(typep ,object ,type-name)))
+         (cl-weave:fail "assert-type failed (expected ~S, got ~S)" ',type-name (type-of ,o)))
        t)))
 
 (defmacro assert-signals (condition-type form)
@@ -103,14 +89,12 @@
   `(handler-case
        (progn
          ,form
-         (%fail-test (format nil "assert-signals: expected ~S to be signaled, but no condition was raised"
-                             ',condition-type)
-                     :form ',form))
+         (cl-weave:fail "assert-signals: expected ~S to be signaled, but no condition was raised"
+                        ',condition-type))
      (,condition-type () t)
      (error (c)
-       (%fail-test (format nil "assert-signals: expected ~S but got ~S: ~A"
-                           ',condition-type (type-of c) c)
-                   :form ',form))))
+       (cl-weave:fail "assert-signals: expected ~S but got ~S: ~A"
+                      ',condition-type (type-of c) c))))
 
 (defmacro assert-values (form &rest expected-values)
   "Assert multiple return values of form."
@@ -118,11 +102,8 @@
     `(let ((,actuals (multiple-value-list ,form)))
        (let ((expected-list (list ,@expected-values)))
          (unless (equal ,actuals expected-list)
-           (%fail-test "assert-values failed"
-                       :expected expected-list
-                       :actual ,actuals
-                       :form ',form))
-          t))))
+           (cl-weave:fail "assert-values failed (expected ~S, got ~S)" expected-list ,actuals))
+         t))))
 
 (defmacro assert-faster-than (max-ns &body body)
   "Assert BODY completes in no more than MAX-NS nanoseconds.
@@ -134,14 +115,12 @@ intended for focused smoke tests, not statistical performance claims."
         (duration (gensym "DURATION")))
     `(let ((,limit ,max-ns))
        (check-type ,limit integer)
-       (let ((,start (%benchmark-now-ns)))
+       (let ((,start (get-internal-real-time)))
          ,@body
-         (let ((,duration (- (%benchmark-now-ns) ,start)))
+         (let ((,duration (round (* (- (get-internal-real-time) ,start)
+                                    (/ 1000000000 internal-time-units-per-second)))))
            (when (> ,duration ,limit)
-             (%fail-test "assert-faster-than failed"
-                         :expected ,limit
-                         :actual ,duration
-                         :form '(assert-faster-than ,max-ns ,@body)))
+             (cl-weave:fail "assert-faster-than failed (expected <= ~Dns, got ~Dns)" ,limit ,duration))
            t)))))
 
 (defmacro assert-no-consing (&body body)
@@ -154,10 +133,7 @@ intended for focused smoke tests, not statistical performance claims."
        (let* ((,after (sb-ext:get-bytes-consed))
               (,delta (- ,after ,before)))
          (when (plusp ,delta)
-           (%fail-test "assert-no-consing failed"
-                       :expected 0
-                       :actual ,delta
-                       :form '(assert-no-consing ,@body)))
+           (cl-weave:fail "assert-no-consing failed (consed ~D bytes)" ,delta))
          t))))
 
 (defmacro assert-no-allocation (&body body)
@@ -169,10 +145,8 @@ intended for focused smoke tests, not statistical performance claims."
   (let ((e (gensym "E")) (a (gensym "A")))
     `(let ((,e ,expected) (,a ,actual))
        (unless (type-equal-p ,e ,a)
-         (%fail-test "assert-type-equal: types not equal"
-                     :expected (type-to-string ,e)
-                     :actual   (type-to-string ,a)
-                     :form '(type-equal-p ,expected ,actual)))
+         (cl-weave:fail "assert-type-equal: types not equal (expected ~A, got ~A)"
+                        (type-to-string ,e) (type-to-string ,a)))
        t)))
 
 (defmacro assert-unifies (t1 t2)
@@ -181,10 +155,7 @@ intended for focused smoke tests, not statistical performance claims."
     `(multiple-value-bind (,s ,ok) (type-unify ,t1 ,t2)
        (declare (ignore ,s))
        (unless ,ok
-         (%fail-test "assert-unifies: types failed to unify"
-                     :expected "unification success"
-                     :actual   "unification failure"
-                     :form '(type-unify ,t1 ,t2)))
+         (cl-weave:fail "assert-unifies: types failed to unify"))
        t)))
 
 (defmacro assert-not-unifies (t1 t2)
@@ -193,10 +164,7 @@ intended for focused smoke tests, not statistical performance claims."
     `(multiple-value-bind (,s ,ok) (type-unify ,t1 ,t2)
        (declare (ignore ,s))
        (when ,ok
-         (%fail-test "assert-not-unifies: types unexpectedly unified"
-                     :expected "unification failure"
-                     :actual   "unification success"
-                     :form '(type-unify ,t1 ,t2)))
+         (cl-weave:fail "assert-not-unifies: types unexpectedly unified"))
        t)))
 
 ;;; ------------------------------------------------------------
@@ -209,12 +177,8 @@ Eliminates the (if pred (assert-true ...) (assert-false ...)) pattern."
   (let ((v (gensym "V")) (e (gensym "E")))
     `(let ((,v ,form) (,e ,expected))
        (if ,e
-           (unless ,v
-             (%fail-test "assert-bool: expected truthy value"
-                         :expected t :actual ,v :form ',form))
-           (when ,v
-             (%fail-test "assert-bool: expected falsy value"
-                         :expected nil :actual ,v :form ',form)))
+           (unless ,v (cl-weave:fail "assert-bool: expected truthy value, got ~S" ,v))
+           (when ,v (cl-weave:fail "assert-bool: expected falsy value, got ~S" ,v)))
        t)))
 
 (defmacro assert-list-contains (list-form members-form &key length)
@@ -226,14 +190,12 @@ MEMBERS-FORM must evaluate to a list. Optionally assert LIST-FORM has exactly LE
            (,ms ,members-form))
        (dolist (m ,ms)
          (unless (member m ,ls :test #'equal)
-           (%fail-test "assert-list-contains: missing member"
-                       :expected m :actual ,ls :form ',list-form)))
+           (cl-weave:fail "assert-list-contains: missing member ~S in ~S" m ,ls)))
        ,@(when length
            `((let ((actual-len (length ,ls)))
                (unless (= ,length actual-len)
-                 (%fail-test "assert-list-contains: wrong length"
-                             :expected ,length :actual actual-len
-                             :form '(length ,list-form))))))
+                 (cl-weave:fail "assert-list-contains: wrong length (expected ~D, got ~D)"
+                                ,length actual-len)))))
        t)))
 
 (defmacro assert-bitfield (word-form &rest field-specs)
@@ -245,8 +207,26 @@ Each field-spec is (byte-position byte-width expected-value)."
                    (destructuring-bind (pos width expected) spec
                      `(let ((actual (ldb (byte ,width ,pos) ,w)))
                         (unless (= ,expected actual)
-                          (%fail-test "assert-bitfield: field mismatch"
-                                      :expected ,expected :actual actual
-                                      :at ,(format nil "byte(~A,~A)" width pos))))))
+                          (cl-weave:fail "assert-bitfield: field mismatch at byte(~A,~A) (expected ~S, got ~S)"
+                                         ,width ,pos ,expected actual)))))
                  field-specs)
        t)))
+
+;;; ------------------------------------------------------------
+;;; assert-no-crash / assert-terminates (from framework-fuzz.lisp)
+;;; ------------------------------------------------------------
+
+(defmacro assert-no-crash (&body forms)
+  "Assert that FORMS complete without signaling any serious condition."
+  `(handler-case
+       (progn ,@forms)
+     (serious-condition (c)
+       (cl-weave:fail "assert-no-crash: unexpected condition: ~A" c))))
+
+(defmacro assert-terminates (form &key (timeout 5))
+  "Assert that FORM completes within TIMEOUT seconds."
+  `(handler-case
+       (sb-ext:with-timeout ,timeout
+         ,form)
+     (sb-ext:timeout ()
+       (cl-weave:fail "assert-terminates: form did not terminate within ~A seconds" ,timeout))))

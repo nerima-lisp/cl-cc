@@ -26,16 +26,10 @@
   "Return T when ANCHOR names a registered cl-cc/test test."
   (let ((test-symbol (find-symbol (symbol-name anchor) :cl-cc/test)))
     (or (and test-symbol
-             (cl-cc/test:persist-lookup cl-cc/test::*test-registry* test-symbol))
-        (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " ["))
-              (found nil))
-          (cl-cc/test:persist-each
-           cl-cc/test::*test-registry*
-           (lambda (name _plist)
-             (declare (ignore _plist))
-             (when (search case-prefix (symbol-name name))
-               (setf found t))))
-          found))))
+             (nth-value 1 (gethash test-symbol cl-cc/test::*known-test-names*)))
+        (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " [")))
+          (loop for name being the hash-keys of cl-cc/test::*known-test-names*
+                thereis (search case-prefix (symbol-name name)))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Advanced feature registry / representation tests

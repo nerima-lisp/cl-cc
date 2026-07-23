@@ -1,25 +1,18 @@
+;;;; packages/optimize/tests/optimizer-prolog-peephole-tests.lisp
+;;;;
+;;;; Relocated from packages/prolog/tests/prolog-peephole-tests.lisp and
+;;;; prolog-peephole-tests-internal.lisp as part of the migration off cl-cc's
+;;;; own homegrown Prolog engine onto the external cl-prolog library — this
+;;;; is genuine cl-cc functionality (the peephole optimizer), unlike the rest
+;;;; of packages/prolog/tests, which tested the now-removed engine's own
+;;;; unification/DCG/builtin-dispatch machinery (now the external cl-prolog
+;;;; library's responsibility to test, not cl-cc's). The two TYPE-OF/3 tests
+;;;; from the original file exercised packages/prolog's dead (no production
+;;;; caller) declarative type-inference rules and were dropped, not ported.
+
 (in-package :cl-cc/test)
 
 (in-suite cl-cc-coverage-unstable-unit-suite)
-
-(deftest prolog-type-of-integer-const
-  "type-of/3: integer constant has type (integer-type)."
-  (assert-prolog-goal-results=
-   (list 'cl-cc/prolog::type-of '(cl-cc/prolog::const 42) nil '?t)
-   (list '(cl-cc/prolog::integer-type))
-   ?t))
-
-(deftest-each prolog-type-of-operation-types
-  "type-of/3 resolves operation types: binop → integer-type, cmp → boolean-type."
-  :cases (("binop" '(cl-cc/prolog::binop + (cl-cc/prolog::const 1) (cl-cc/prolog::const 2))
-           '(cl-cc/prolog::integer-type))
-          ("cmp"   '(cl-cc/prolog::cmp < (cl-cc/prolog::const 1) (cl-cc/prolog::const 2))
-           '(cl-cc/prolog::boolean-type)))
-  (expr expected-type)
-  (assert-prolog-goal-results=
-   (list 'cl-cc/prolog::type-of expr nil '?t)
-   (list expected-type)
-   ?t))
 
 (deftest-each prolog-peephole-equality-cases
   "Peephole: const-move fusion, passthrough, single-instruction identity, and jump-chain shortening."
@@ -113,3 +106,28 @@
           ("move-different-source" '((:move :r1 :r0) (:move :r3 :r2))))
   (insts)
   (assert-equal insts (cl-cc/optimize:apply-prolog-peephole insts)))
+
+;;; %peephole-walk unit tests (internal helper)
+
+(deftest-each peephole-walk-direct-cases
+  "%peephole-walk: nil→nil; singleton→singleton; non-matching pair passes through."
+  :cases (("nil"       nil                              nil)
+          ("singleton" '((:const :r0 1))                '((:const :r0 1)))
+          ("no-match"  '((:add :r1 :r0 :r0) (:sub :r2 :r1 :r1))
+                       '((:add :r1 :r0 :r0) (:sub :r2 :r1 :r1))))
+  (input expected)
+  (assert-equal expected (cl-cc/optimize::%peephole-walk input nil)))
+
+(deftest peephole-walk-matching-pair-fused
+  "%peephole-walk: a matching const→move pair is fused into a single const."
+  (assert-equal '((:const :r1 99))
+                (cl-cc/optimize::%peephole-walk
+                 '((:const :r0 99) (:move :r1 :r0))
+                 nil)))
+
+(deftest peephole-walk-out-accumulator-is-prepended
+  "%peephole-walk: instructions in OUT are prepended (reversed) to the result."
+  (assert-equal '((:add :r2 :r1 :r1) (:const :r0 1))
+                (cl-cc/optimize::%peephole-walk
+                 '((:const :r0 1))
+                 '((:add :r2 :r1 :r1)))))

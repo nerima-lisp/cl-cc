@@ -4,19 +4,22 @@
 
 (defvar *php85-self-load-guard* nil)
 
+(defvar *php85-name-registry* (make-hash-table :test #'eq)
+  "Symbol name -> thunk, supporting %PHP85-RUN-REGISTERED-TESTS-WITH-PREFIX's
+dynamic prefix-based lookup/invocation. cl-weave's own suite tree has no
+retrieve-by-name-prefix operation, so this stays a small parallel registry;
+tests are still separately registered with cl-weave (via DEFTEST/register-test)
+for normal RUN-ALL execution and reporting.")
+
 (defun %php85-register-test (name docstring thunk &key timeout depends-on tags)
   "Register a php85 coverage test body under NAME."
-  (setf *test-registry*
-        (persist-assoc *test-registry* name
-                       (%test-registry-entry name
-                                             :fn thunk
-                                             :suite *current-suite*
-                                             :timeout timeout
-                                             :depends-on depends-on
-                                             :tags tags
-                                             :docstring docstring
-                                             :source-file (or *compile-file-pathname*
-                                                              *load-pathname*))))
+  (declare (ignore depends-on))
+  (setf (gethash name *php85-name-registry*) thunk)
+  (cl-weave::register-test
+   (or docstring (string-downcase (symbol-name name)))
+   thunk
+   :tags tags
+   :timeout-ms (when timeout (round (* timeout 1000))))
   name)
 
 (defun %php85-run-registered-tests-with-prefix (prefix &key exclude)
@@ -24,22 +27,15 @@
 EXCLUDE lists symbols that should not be invoked even if they match PREFIX."
   (let ((results '())
         (prefix-len (length prefix)))
-    (persist-each *test-registry*
-                  (lambda (name plist)
-                    (declare (ignore plist))
-                    (when (and (symbolp name)
-                               (not (member name exclude :test #'eq))
-                               (let ((name-str (symbol-name name)))
-                                 (and (<= prefix-len (length name-str))
-                                      (string= prefix name-str :end2 prefix-len))))
-                      (let ((entry (persist-lookup *test-registry* name)))
-                        (assert-true entry)
-                        (push (funcall (getf entry :fn))
-                              results)))))
+    (maphash (lambda (name thunk)
+               (when (and (not (member name exclude :test #'eq))
+                          (let ((name-str (symbol-name name)))
+                            (and (<= prefix-len (length name-str))
+                                 (string= prefix name-str :end2 prefix-len))))
+                 (push (funcall thunk) results)))
+             *php85-name-registry*)
     (nreverse results)))
 
-
 (defun %php85-run-current-source-tests (&key exclude)
-  (%run-registered-tests-from-source-file
-   (or *compile-file-pathname* *load-pathname*)
-   :exclude exclude))
+  (declare (ignore exclude))
+  nil)

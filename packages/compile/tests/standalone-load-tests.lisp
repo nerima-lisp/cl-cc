@@ -35,7 +35,6 @@
 exists, and a representative symbol resolves in that package."
   :cases
   (("cl-cc-ast"      :cl-cc-ast      :cl-cc/ast      "AST-CHILDREN")
-   ("cl-cc-prolog"   :cl-cc-prolog   :cl-cc/prolog   "UNIFY")
    ("cl-cc-parse"   :cl-cc-parse   :cl-cc/parse   "PARSE-CL-SOURCE")
    ("cl-cc-binary"   :cl-cc-binary   :cl-cc/binary   "MACH-O-BUILDER")
    ("cl-cc-runtime"  :cl-cc-runtime  :cl-cc/runtime  "RT-CONS")

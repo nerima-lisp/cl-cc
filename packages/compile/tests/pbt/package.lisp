@@ -12,12 +12,7 @@
                  #:defsuite
                  #:in-suite
                  #:deftest
-                 #:run-suite
                  #:%fail-test
-                 #:test-failure
-                 #:*test-registry*
-                 #:*current-suite*
-                 #:*suite-registry*
                  #:assert-true
                  #:assert-false
                  #:assert-=
@@ -62,7 +57,7 @@
                 :instruction->sexp :sexp->instruction :vm-dst :vm-src :vm-lhs :vm-rhs
                 :vm-value :vm-car-reg :vm-cdr-reg :vm-cons-reg :vm-val-reg
                 :vm-closure-reg :vm-closure-index)
-(:import-from :cl-cc/prolog
+(:import-from :cl-prolog
               :unify
               :logic-substitute :logic-var-p)
   (:export

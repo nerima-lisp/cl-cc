@@ -3,7 +3,7 @@
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (:cl-cc-vm :cl-cc-prolog :cl-cc-type :cl-cc-ast)
+  :depends-on (:cl-cc-vm :cl-prolog :cl-cc-type :cl-cc-ast)
   :pathname "src"
   :serial t
   :components
@@ -18,6 +18,7 @@
    (:file "egraph")
    (:file "egraph-match")
    (:file "egraph-saturation")
+   (:file "peephole-data")
    (:file "egraph-rules")
    (:file "egraph-rules-advanced")
    (:file "optimizer-tables")

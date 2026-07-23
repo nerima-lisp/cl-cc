@@ -19,21 +19,13 @@
 
 (defmacro testing (label &body body)
   "Run BODY as a named sub-case within the current test.
-TAP output will include the context path: outer > inner.
-Uses *testing-context* to accumulate nesting depth."
+Uses *testing-context* to accumulate nesting depth for diagnostics."
   (let ((ctx-var (gensym "CTX")))
     `(let* ((,ctx-var (if *testing-context*
                           (format nil "~A > ~A" *testing-context* ,label)
                           ,label))
             (*testing-context* ,ctx-var))
-       (handler-case
-           (progn ,@body)
-         (test-failure (c)
-           ;; Re-signal with context prepended to the message
-           (let ((orig-msg (test-failure-message c)))
-             (error 'test-failure
-                    :message (format nil "~A~%  context: ~A"
-                                     orig-msg ,ctx-var))))))))
+       ,@body)))
 
 ;;; ------------------------------------------------------------
 ;;; FR-016 — assert-snapshot: Snapshot Testing
@@ -81,10 +73,8 @@ When *update-snapshots* is t, overwrites the saved file with the current value."
           t)
           ;; Normal run: compare
           ((not (equal ,saved-var ,actual-var))
-           (%fail-test (format nil "assert-snapshot ~S mismatch" ,name)
-                       :expected ,saved-var
-                       :actual   ,actual-var
-                       :form     ',form))
+           (cl-weave:fail "assert-snapshot ~S mismatch (expected ~S, got ~S)"
+                          ,name ,saved-var ,actual-var))
           (t t)))))
 
 ;;; ------------------------------------------------------------

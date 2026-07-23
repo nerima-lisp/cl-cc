@@ -13,22 +13,13 @@
   :serial t
   :components
   (;; Unit tests — each module now lives in its workspace's tests/ dir
-   (:module "testing-framework-tests"
-    :pathname "packages/testing-framework/tests"
-    :serial t
-    :components
-    ((:file "framework-assertions-tests")
-       (:file "framework-meta-tests")
-       (:file "framework-meta-coverage-tests")
-       (:file "fr-350-coverage-tests")
-       (:file "fr-353-pbt-tests")
-       (:file "prolog-fixture-invariant-tests")
-     (:file "timing-tests")
-     (:file "persistent-tests")
-     (:file "persistent-tests-2")
-     (:file "framework-runner-tests")
-     (:file "framework-parallel-tests")
-     (:file "entrypoint-contract-tests")))
+   ;;
+   ;; testing-framework-tests (framework-runner-tests, framework-parallel-tests,
+   ;; persistent-tests, timing-tests, entrypoint-contract-tests, ...) tested the
+   ;; removed homegrown registry/TAP/parallel-worker/coverage runner's own
+   ;; internals directly; there is no equivalent to port them to now that
+   ;; cl-weave is the engine (cl-weave has its own 615-test self-suite covering
+   ;; the same ground for cl-weave's own internals).
     (:module "cli-tests"
      :pathname "packages/cli/tests"
      :serial t
@@ -157,8 +148,10 @@
       (:file "php85-tests-language")
       (:file "php85-tests-runtime-objects")
       (:file "php85-tests-runtime-tokenizer")
-      (:file "php85-tests-runtime-behavior")
-      (:file "php85-tests-registration")))
+      (:file "php85-tests-runtime-behavior")))
+      ;; php85-tests-registration.lisp dropped: it meta-tested the removed
+      ;; homegrown *test-registry*/persist-* registration mechanism's own
+      ;; internals directly, which has no cl-weave equivalent to preserve.
    (:module "javascript-tests"
     :pathname "packages/javascript/tests"
     :serial t
@@ -202,25 +195,6 @@
       (:file "js-runtime-symbol-tests")
       (:file "js-runtime-typed-array-methods-tests")
       (:file "js-runtime-misc-tests")))
-     (:module "prolog-tests"
-      :pathname "packages/prolog/tests"
-      :serial t
-      :components
-      ((:file "prolog-test-support-core")
-       (:file "prolog-test-support-fixtures")
-       (:file "prolog-test-support-projections")
-       (:file "prolog-test-support-unify")
-       (:file "prolog-test-support-peephole")
-       (:file "prolog-tests")
-       (:file "prolog-tests-builtins")
-       (:file "prolog-tests-builtins-internal")
-       (:file "prolog-tests-solver")
-       (:file "prolog-tests-rules")
-       (:file "prolog-data-tests")
-       (:file "prolog-peephole-tests-internal")
-       (:file "prolog-peephole-tests")
-       (:file "dcg-tests-core")
-       (:file "dcg-tests-builtins")))
    (:module "expand-tests"
     :pathname "packages/expand/tests"
     :serial t
@@ -502,6 +476,7 @@
      (:file "egraph-rules-tests")
      (:file "egraph-negation-tests")
      (:file "egraph-rules-bitwise-tests")
+     (:file "optimizer-prolog-peephole-tests")
      (:file "optimizer-tests")
      (:file "optimizer-e2e-tests")
      (:file "optimizer-tests-lowlevel2")

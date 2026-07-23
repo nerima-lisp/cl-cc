@@ -7,7 +7,6 @@
   (:use :cl
         :cl-cc/bootstrap
         :cl-cc/ast
-        :cl-cc/prolog
         :cl-cc/parse
         :cl-cc/optimize
         :cl-cc/emit

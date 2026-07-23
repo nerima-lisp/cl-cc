@@ -81,7 +81,6 @@ Computed at call time so the result is path-independent across compile/load cont
   (append
    (%asdf-source-files :cl-cc-bootstrap  "packages/bootstrap/")
    (%asdf-source-files :cl-cc-ast        "packages/ast/")
-   (%asdf-source-files :cl-cc-prolog     "packages/prolog/")
    (%asdf-source-files :cl-cc-ir         "packages/ir/")
    (%asdf-source-files :cl-cc-mir        "packages/mir/")
    (%asdf-source-files :cl-cc-binary     "packages/binary/")
@@ -100,9 +99,6 @@ Computed at call time so the result is path-independent across compile/load cont
 
 (defparameter *selfhost-representative-files*
   '("packages/parse/src/cst.lisp"
-    "packages/prolog/src/prolog-data.lisp"
-    "packages/prolog/src/prolog-unification.lisp"
-    "packages/prolog/src/prolog-rules.lisp"
     "packages/parse/src/lexer.lisp"
     "packages/cps/src/cps.lisp"
     "packages/optimize/src/optimizer.lisp"

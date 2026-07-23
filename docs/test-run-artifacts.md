@@ -4,11 +4,10 @@
 
 高速な通常 test entrypoint は **`nix run .#test`** です。
 
-- `nix run .#test` -> `cl-cc/test:run-tests`（canonical fast unit plan）
+- `nix run .#test` -> `cl-weave:run-all`（canonical fast unit plan。テストの登録・実行・レポートは cl-weave に委譲されています。詳細は `packages/testing-framework/src/framework-definitions.lisp` を参照）
 - `nix flake check` -> 同じ fast unit plan を `checks.tests` 経由で derivation として実行
 
-`run-tests` は `run-suite 'cl-cc-suite ...` を呼び、integration / e2e suites を suite taxonomy で除外した fast unit plan を実行します。
-Long-running suites は `slow` という名前に依存せず、suite taxonomy で明示実行します。
+Long-running suites（integration / e2e）は `slow` という名前に依存せず、suite taxonomy で明示実行します。
 
 ## 検証チェックリスト
 

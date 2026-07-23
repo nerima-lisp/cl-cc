@@ -10,7 +10,7 @@
   :parent cl-cc-unit-suite)
 
 (defsuite cl-cc-egraph-prolog-serial-suite
-  :description "Serial egraph tests requiring query-all replacement"
+  :description "Serial egraph tests requiring CL-PROLOG:QUERY-PROLOG replacement"
   :parent cl-cc-coverage-unstable-unit-suite
   :parallel nil)
 
@@ -123,11 +123,18 @@
 
 (deftest egraph-builtin-rules-consults-prolog-facts
   "egraph-builtin-rules consults the Prolog egraph-rule facts when they are available."
+  ;; The binding-alist keys below must be the exact ?NAME/?LHS/?RHS symbols
+  ;; CL-CC/OPTIMIZE::EGRAPH-BUILTIN-RULES queries with (package-qualified,
+  ;; since this file is (in-package :cl-cc/test)) — CL-PROLOG:SOLUTION-BINDING
+  ;; looks a variable up by symbol identity, not name.
   (let ((called nil))
-    (with-replaced-function (cl-cc/prolog:query-all
-                             (lambda (goal)
+    (with-replaced-function (cl-prolog:query-prolog
+                             (lambda (rulebase goal)
+                               (declare (ignore rulebase))
                                (setf called goal)
-                               '((egraph-rule fold-add (add (const ?a) (const ?b)) (const)))))
+                               (list (list (cons 'cl-cc/optimize::?name 'cl-cc/optimize::fold-add)
+                                           (cons 'cl-cc/optimize::?lhs '(add (const ?a) (const ?b)))
+                                           (cons 'cl-cc/optimize::?rhs '(const))))))
       (let ((rules (cl-cc/optimize:egraph-builtin-rules)))
         (assert-true called)
         (let ((rule (find 'cl-cc/optimize::fold-add rules

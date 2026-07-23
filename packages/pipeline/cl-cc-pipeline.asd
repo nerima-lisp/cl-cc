@@ -12,7 +12,7 @@
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-prolog :cl-cc-parse :cl-cc-php :cl-cc-javascript
+  :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-php :cl-cc-javascript
                 :cl-cc-type
                 :cl-cc-optimize :cl-cc-vm :cl-cc-expand :cl-cc-emit
                 :cl-cc-stdlib :cl-cc-binary :cl-cc-mir :cl-cc-codegen :cl-cc-compile)

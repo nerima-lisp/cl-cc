@@ -3,11 +3,16 @@
 ;;;; Canonical ASDF system for the CL-CC testing framework.
 
 (asdf:defsystem :cl-cc-testing-framework
-  :description "CL-CC testing framework — deftest, deftest-each, assert-*, fuzz, runner"
+  :description "CL-CC testing framework — deftest/assert-*/fixture compatibility
+macros preserving the original call surface, backed by the external cl-weave
+engine (registration, execution, reporting, parallelism all delegate to
+cl-weave; see framework-definitions.lisp for how DEFTEST/DEFSUITE/IN-SUITE
+map onto cl-weave's suite tree without requiring lexical restructuring of
+every test file)."
   :author "takeokunn"
   :license "MIT"
-  :version "0.1.0"
-  :depends-on (:cl-cc :cl-cc-php)
+  :version "0.2.0"
+  :depends-on (:cl-cc :cl-cc-php :cl-weave)
   :pathname "src"
   :serial t
   :components
@@ -16,23 +21,14 @@
    (:file "package-imports-core")
    (:file "package-imports-backend")
    (:file "package-exports")
-   (:file "persistent")
-   (:file "persistent-api")
    (:file "framework-conditions-state")
-   (:file "framework-timeouts")
    (:file "framework-definitions")
    (:file "framework")
    (:file "framework-fixtures")
-    (:file "framework-assertions")
-   (:file "framework-discovery")
+   (:file "framework-assertions")
    (:file "framework-advanced")
    (:file "framework-compiler-run-string")
    (:file "framework-compiler")
    (:file "framework-pbt")
-   (:file "framework-tap")
    (:file "framework-meta")
-   (:file "framework-mutation")
-   (:file "framework-fuzz")
-   (:file "framework-parallel")
-   (:file "framework-parallel-runner")
-   (:file "framework-runner")))
+   (:file "framework-fuzz")))

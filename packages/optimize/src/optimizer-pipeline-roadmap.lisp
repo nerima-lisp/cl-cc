@@ -189,30 +189,22 @@ Accepted STATUS keywords: :implemented, :partial, :planned, :unknown."
                            "packages/optimize/src/optimizer-speculative-passes.lisp")))))))
 
 (defun %opt-roadmap-test-anchor-registered-p (anchor)
-  "Return T when ANCHOR names a loaded cl-cc/test test."
+  "Return T when ANCHOR names a loaded cl-cc/test test.
+Queries cl-cc/test's *KNOWN-TEST-NAMES* registry (DEFTEST NAME symbol ->
+description), which replaced the old *TEST-REGISTRY*/PERSIST-LOOKUP/
+PERSIST-EACH API this used to call."
   (let ((test-package (find-package :cl-cc/test)))
     (if test-package
         (let ((test-symbol (find-symbol (symbol-name anchor) test-package))
-              (registry-symbol (find-symbol "*TEST-REGISTRY*" test-package))
-              (lookup-symbol (find-symbol "PERSIST-LOOKUP" test-package))
-              (each-symbol (find-symbol "PERSIST-EACH" test-package)))
-          (and registry-symbol lookup-symbol each-symbol
-               (boundp registry-symbol)
-               (fboundp lookup-symbol)
-               (fboundp each-symbol)
-               (or (and test-symbol
-                        (funcall (symbol-function lookup-symbol)
-                                 (symbol-value registry-symbol)
-                                 test-symbol))
-                   (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " ["))
-                         (found nil))
-                     (funcall (symbol-function each-symbol)
-                              (symbol-value registry-symbol)
-                              (lambda (name _plist)
-                                (declare (ignore _plist))
-                                (when (search case-prefix (symbol-name name))
-                                  (setf found t))))
-                      found))))
+              (known-names-symbol (find-symbol "*KNOWN-TEST-NAMES*" test-package)))
+          (and known-names-symbol
+               (boundp known-names-symbol)
+               (let ((known-names (symbol-value known-names-symbol)))
+                 (or (and test-symbol
+                          (nth-value 1 (gethash test-symbol known-names)))
+                     (let ((case-prefix (concatenate 'string "/" (symbol-name anchor) " [")))
+                       (loop for name being the hash-keys of known-names
+                             thereis (search case-prefix (symbol-name name))))))))
         nil)))
 
 (defun %opt-roadmap-api-entry-fbound-p (entry)
