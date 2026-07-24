@@ -8,6 +8,12 @@
   (:import-from :cl-cc/test
                  #:%fail-test
                  #:run-string)
+  (:import-from :cl-weave
+                 #:it-sequential
+                 #:it-sequential-each
+                 #:it-todo
+                 #:expect
+                 #:signals)
   (:import-from :cl-cc
                 :ast-node :ast-int :ast-var :ast-binop :ast-if :ast-progn :ast-print
                 :ast-let :ast-lambda :ast-function :ast-flet :ast-labels :ast-block

@@ -1,12 +1,7 @@
 ;;;; tests/e2e/selfhost-portability-tests.lisp — SBCL Dependency Ratchet
 (in-package :cl-cc/test)
 
-(defsuite selfhost-portability-suite
-  :description "SBCL dependency ratchet for self-hosting core closure"
-  :parent cl-cc-e2e-suite
-  :parallel nil)
 
-(in-suite selfhost-portability-suite)
 
 (defparameter *disallowed-sbcl-packages*
   '("SB-EXT:" "SB-THREAD:" "SB-POSIX:" "SB-ALIEN:" "SB-GRAY:"
@@ -29,8 +24,7 @@
                    (string= entry (subseq file-path 0 (length entry)))))
       (return t))))
 
-(deftest selfhost-no-sbcl-references-in-core
-  "Verify that no selfhost core source file uses disallowed SBCL packages."
+(it-sequential "selfhost-no-sbcl-references-in-core"
   (let ((violations nil) (total-files 0))
     (dolist (file-path (selfhost-all-source-files))
       (incf total-files)
@@ -55,5 +49,4 @@
     (unless (null violations)
       (fail "~D selfhost core file(s) contain disallowed SBCL references:~%~{~%  ~A:~D  ~A~}"
             (length violations) (nreverse violations)))
-    (assert-true (> total-files 10)
-                 "Expected >10 selfhost core files, found ~D" total-files)))
+    (expect (> total-files 10) :to-be-truthy)))

@@ -4,67 +4,44 @@
 
 (in-package :cl-cc/test)
 
-(defsuite ansi-conformance-package-smoke-suite
-  :description "Package system self-hosting smoke tests (should PASS)"
-  :parent cl-cc-unit-suite
-  :parallel nil)
 
-(in-suite ansi-conformance-package-smoke-suite)
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Smoke Test 1: find-package → intern → export → find-symbol pipeline
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-smoke-find-package
-  "find-package should work via runtime registry."
-  :timeout 10
-  :tags '(:package :smoke :find-package)
+(it-sequential "pkg-smoke-find-package"
   (let ((pkg (cl-cc/runtime::rt-find-package "CL-USER")))
-    (assert-true pkg)
-    (assert-equal "CL-USER" (cl-cc/runtime::rt-package-name pkg))))
+    (expect pkg :to-be-truthy)
+    (expect (cl-cc/runtime::rt-package-name pkg) :to-equal "CL-USER")))
 
-(deftest pkg-smoke-find-package-cl
-  "find-package should find the CL package."
-  :timeout 10
-  :tags '(:package :smoke :find-package)
+(it-sequential "pkg-smoke-find-package-cl"
   (let ((pkg (cl-cc/runtime::rt-find-package "CL")))
-    (assert-true pkg)
-    (assert-equal "CL" (cl-cc/runtime::rt-package-name pkg))))
+    (expect pkg :to-be-truthy)
+    (expect (cl-cc/runtime::rt-package-name pkg) :to-equal "CL")))
 
-(deftest pkg-smoke-intern
-  "rt-intern should create/find symbols in a package."
-  :timeout 10
-  :tags '(:package :smoke :intern)
+(it-sequential "pkg-smoke-intern"
   (let* ((pkg (cl-cc/runtime::rt-find-package "CL-USER"))
          (sym (cl-cc/runtime::rt-intern "SMOKE-TEST-SYM" pkg)))
-    (assert-true sym)
-    (assert-equal "SMOKE-TEST-SYM" (cl-cc/runtime::rt-symbol-name sym))))
+    (expect sym :to-be-truthy)
+    (expect (cl-cc/runtime::rt-symbol-name sym) :to-equal "SMOKE-TEST-SYM")))
 
-(deftest pkg-smoke-export
-  "rt-export should add symbols to a package's export list."
-  :timeout 10
-  :tags '(:package :smoke :export)
+(it-sequential "pkg-smoke-export"
   (let* ((pkg (cl-cc/runtime::rt-find-package "CL-USER"))
          (sym (cl-cc/runtime::rt-intern "SMOKE-EXPORT-SYM" pkg))
          (result (cl-cc/runtime::rt-export (list sym) pkg)))
-    (assert-true result)))
+    (expect result :to-be-truthy)))
 
-(deftest pkg-smoke-find-symbol
-  "rt-find-symbol should locate exported symbols."
-  :timeout 10
-  :tags '(:package :smoke :find-symbol)
+(it-sequential "pkg-smoke-find-symbol"
   (let* ((pkg (cl-cc/runtime::rt-find-package "CL-USER"))
          (sym (cl-cc/runtime::rt-intern "SMOKE-FIND-SYM" pkg))
          (_ (cl-cc/runtime::rt-export (list sym) pkg)))
     (multiple-value-bind (found status)
         (cl-cc/runtime::rt-find-symbol "SMOKE-FIND-SYM" pkg)
-      (assert-true found)
-      (assert-eq :external status))))
+      (expect found :to-be-truthy)
+      (expect status :to-be :external))))
 
-(deftest pkg-smoke-use-package
-  "rt-use-package and rt-unuse-package should work."
-  :timeout 10
-  :tags '(:package :smoke :use-package)
+(it-sequential "pkg-smoke-use-package"
   (let* ((lib (cl-cc/runtime::rt-find-package "CL-USER"))
          (user (or (cl-cc/runtime::rt-find-package "SMOKE-USER-PKG")
                    (cl-cc/runtime::rt-make-package "SMOKE-USER-PKG")))
@@ -74,31 +51,25 @@
     (cl-cc/runtime::rt-use-package (list lib) user)
     (multiple-value-bind (found status)
         (cl-cc/runtime::rt-find-symbol "SMOKE-USE-FN" user)
-      (assert-true found)
-      (assert-eq :inherited status))
+      (expect found :to-be-truthy)
+      (expect status :to-be :inherited))
     ;; unuse-package
     (cl-cc/runtime::rt-unuse-package (list lib) user)
     (multiple-value-bind (found status)
         (cl-cc/runtime::rt-find-symbol "SMOKE-USE-FN" user)
-      (assert-null found))))
+      (expect found :to-be-null))))
 
-(deftest pkg-smoke-list-all-packages
-  "rt-list-all-packages should return known packages."
-  :timeout 10
-  :tags '(:package :smoke :list-all-packages)
+(it-sequential "pkg-smoke-list-all-packages"
   (let ((pkgs (cl-cc/runtime::rt-list-all-packages)))
-    (assert-true (>= (length pkgs) 2))
-    (assert-true (find "CL-USER" pkgs
+    (expect (>= (length pkgs) 2) :to-be-truthy)
+    (expect (find "CL-USER" pkgs
                        :test #'equal
-                       :key #'cl-cc/runtime::rt-package-name))
-    (assert-true (find "CL" pkgs
+                       :key #'cl-cc/runtime::rt-package-name) :to-be-truthy)
+    (expect (find "CL" pkgs
                        :test #'equal
-                       :key #'cl-cc/runtime::rt-package-name))))
+                       :key #'cl-cc/runtime::rt-package-name) :to-be-truthy)))
 
-(deftest pkg-smoke-import
-  "rt-import should make external symbols internal in target package."
-  :timeout 10
-  :tags '(:package :smoke :import)
+(it-sequential "pkg-smoke-import"
   (let* ((src (or (cl-cc/runtime::rt-find-package "SMOKE-SRC")
                   (cl-cc/runtime::rt-make-package "SMOKE-SRC")))
          (dst (or (cl-cc/runtime::rt-find-package "SMOKE-DST")
@@ -108,13 +79,10 @@
     (cl-cc/runtime::rt-import (list sym) dst)
     (multiple-value-bind (found status)
         (cl-cc/runtime::rt-find-symbol "SMOKE-IMPORT-FN" dst)
-      (assert-true found)
-      (assert-eq :internal status))))
+      (expect found :to-be-truthy)
+      (expect status :to-be :internal))))
 
-(deftest pkg-smoke-symbol-name
-  "rt-symbol-name should return symbol name string."
-  :timeout 10
-  :tags '(:package :smoke :symbol-name)
+(it-sequential "pkg-smoke-symbol-name"
   (let* ((pkg (cl-cc/runtime::rt-find-package "CL-USER"))
          (sym (cl-cc/runtime::rt-intern "SYMBOL-NAME-TEST" pkg)))
-    (assert-equal "SYMBOL-NAME-TEST" (cl-cc/runtime::rt-symbol-name sym))))
+    (expect (cl-cc/runtime::rt-symbol-name sym) :to-equal "SYMBOL-NAME-TEST")))
