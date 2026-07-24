@@ -168,35 +168,46 @@ SCALE must be one of 1, 2, 4, or 8 when INDEX is non-NIL."
 
 ;;; ── Integer arithmetic and compare ──────────────────────────────────────────
 
-(defun emit-add-rr64 (dst src stream)
-  "ADD dst, src (64-bit).
+;;; These emitters are pure opcode-table entries: same REX/ModRM skeleton,
+;;; one differing byte. The three defmacros below capture the skeleton (logic)
+;;; so each instruction is declared as a single data row (mnemonic + opcode).
 
-   Encoding: REX.W + 01 /r"
-  (emit-byte (rex-prefix :w 1 :r (ash src -3) :b (ash dst -3)) stream)
-  (emit-byte #x01 stream)
-  (emit-byte (modrm 3 src dst) stream))
+(defmacro define-alu-rr64 (name opcode description)
+  "Define EMIT-<name>-RR64 — a REX.W <opcode> /r 64-bit reg,reg ALU emitter."
+  `(defun ,(intern (format nil "EMIT-~A-RR64" name)) (dst src stream)
+     ,description
+     (emit-byte (rex-prefix :w 1 :r (ash src -3) :b (ash dst -3)) stream)
+     (emit-byte ,opcode stream)
+     (emit-byte (modrm 3 src dst) stream)))
 
-(defun emit-sub-rr64 (dst src stream)
-  "SUB dst, src (64-bit).
+(defmacro define-alu-ri32 (name ext description)
+  "Define EMIT-<name>-RI32 — a REX.W 81 /<ext> id 64-bit reg,imm32 ALU emitter."
+  `(defun ,(intern (format nil "EMIT-~A-RI32" name)) (reg imm stream)
+     ,description
+     (emit-byte (rex-prefix :w 1 :b (ash reg -3)) stream)
+     (emit-byte #x81 stream)
+     (emit-byte (modrm 3 ,ext reg) stream)
+     (emit-dword imm stream)))
 
-    Encoding: REX.W + 29 /r"
-  (emit-byte (rex-prefix :w 1 :r (ash src -3) :b (ash dst -3)) stream)
-  (emit-byte #x29 stream)
-  (emit-byte (modrm 3 src dst) stream))
+(defmacro define-f7-unary-rm64 (name ext description)
+  "Define EMIT-<name>-RM64 — a REX.W F7 /<ext> 64-bit unary r/m64 emitter."
+  `(defun ,(intern (format nil "EMIT-~A-RM64" name)) (src stream)
+     ,description
+     (emit-byte (rex-prefix :w 1 :b (ash src -3)) stream)
+     (emit-byte #xF7 stream)
+     (emit-byte (modrm 3 ,ext src) stream)))
 
-(defun emit-add-ri32 (reg imm stream)
-  "ADD reg, imm32 (sign-extended to 64-bit). REX.W + 81 /0 id"
-  (emit-byte (rex-prefix :w 1 :b (ash reg -3)) stream)
-  (emit-byte #x81 stream)
-  (emit-byte (modrm 3 0 reg) stream)
-  (emit-dword imm stream))
+(define-alu-rr64 add #x01 "ADD dst, src (64-bit). Encoding: REX.W + 01 /r")
+(define-alu-rr64 sub #x29 "SUB dst, src (64-bit). Encoding: REX.W + 29 /r")
+(define-alu-rr64 cmp #x39 "CMP dst, src (64-bit). Encoding: REX.W + 39 /r")
 
-(defun emit-sub-ri32 (reg imm stream)
-  "SUB reg, imm32 (sign-extended to 64-bit). REX.W + 81 /5 id"
-  (emit-byte (rex-prefix :w 1 :b (ash reg -3)) stream)
-  (emit-byte #x81 stream)
-  (emit-byte (modrm 3 5 reg) stream)
-  (emit-dword imm stream))
+(define-alu-ri32 add 0 "ADD reg, imm32 (sign-extended to 64-bit). REX.W + 81 /0 id")
+(define-alu-ri32 sub 5 "SUB reg, imm32 (sign-extended to 64-bit). REX.W + 81 /5 id")
+
+(define-f7-unary-rm64 mul  4 "MUL r/m64 (unsigned 64-bit multiply, implicit RAX and RDX:RAX result). REX.W + F7 /4")
+(define-f7-unary-rm64 imul 5 "IMUL r/m64 (signed 64-bit multiply, implicit RAX and RDX:RAX result). REX.W + F7 /5")
+(define-f7-unary-rm64 div  6 "DIV r/m64 (unsigned 64-bit divide RDX:RAX by SRC). REX.W + F7 /6. Quotient to RAX, remainder to RDX.")
+(define-f7-unary-rm64 idiv 7 "IDIV r/m64 (signed 64-bit divide RDX:RAX by SRC). REX.W + F7 /7. Quotient to RAX, remainder to RDX.")
 
 (defun emit-imul-rr64 (dst src stream)
   "IMUL dst, src (64-bit signed multiply).
@@ -206,46 +217,6 @@ SCALE must be one of 1, 2, 4, or 8 when INDEX is non-NIL."
   (emit-byte #x0F stream)
   (emit-byte #xAF stream)
   (emit-byte (modrm 3 dst src) stream))
-
-(defun emit-mul-rm64 (src stream)
-  "MUL r/m64 (unsigned 64-bit multiply with implicit RAX and RDX:RAX result).
-
-   Encoding: REX.W + F7 /4"
-  (emit-byte (rex-prefix :w 1 :b (ash src -3)) stream)
-  (emit-byte #xF7 stream)
-  (emit-byte (modrm 3 4 src) stream))
-
-(defun emit-imul-rm64 (src stream)
-  "IMUL r/m64 (signed 64-bit multiply with implicit RAX and RDX:RAX result).
-
-   Encoding: REX.W + F7 /5"
-  (emit-byte (rex-prefix :w 1 :b (ash src -3)) stream)
-  (emit-byte #xF7 stream)
-  (emit-byte (modrm 3 5 src) stream))
-
-(defun emit-div-rm64 (src stream)
-  "DIV r/m64 (unsigned 64-bit divide RDX:RAX by SRC).
-
-   Encoding: REX.W + F7 /6. Quotient is written to RAX, remainder to RDX."
-  (emit-byte (rex-prefix :w 1 :b (ash src -3)) stream)
-  (emit-byte #xF7 stream)
-  (emit-byte (modrm 3 6 src) stream))
-
-(defun emit-idiv-rm64 (src stream)
-  "IDIV r/m64 (signed 64-bit divide RDX:RAX by SRC).
-
-   Encoding: REX.W + F7 /7. Quotient is written to RAX, remainder to RDX."
-  (emit-byte (rex-prefix :w 1 :b (ash src -3)) stream)
-  (emit-byte #xF7 stream)
-  (emit-byte (modrm 3 7 src) stream))
-
-(defun emit-cmp-rr64 (op1 op2 stream)
-  "CMP op1, op2 (64-bit compare).
-
-   Encoding: REX.W + 39 /r"
-  (emit-byte (rex-prefix :w 1 :r (ash op2 -3) :b (ash op1 -3)) stream)
-  (emit-byte #x39 stream)
-  (emit-byte (modrm 3 op2 op1) stream))
 
 ;;; ── Stack, control flow ───────────────────────────────────────────────────────
 
