@@ -16,6 +16,7 @@
    (:file "x86-64")
    (:file "x86-64-encoding")
    (:file "x86-64-encoding-instrs")
+   (:file "x86-64-encoding-instrs-xmm")
     (:file "x86-64-sequences")
     (:file "x86-64-regs")
     (:file "post-ra-scheduler")
