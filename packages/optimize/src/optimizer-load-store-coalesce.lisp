@@ -113,10 +113,6 @@ If the first two accesses cannot be widened/coalesced, NIL is returned."
     (:array (make-vm-aset :array-reg base :index-reg offset :val-reg value))
     (:slot  (make-vm-slot-write :obj-reg base :slot-name offset :value-reg value))))
 
-(defun %opt-lsc-byte-mask (lane-count)
-  "Return a mask covering LANE-COUNT packed byte lanes."
-  (1- (ash 1 (* +opt-coalesce-lane-bits+ lane-count))))
-
 (defun %opt-lsc-extract-loads (group fresh)
   "Rewrite GROUP of adjacent loads into one wider load plus byte extractions."
   (multiple-value-bind (_ family base start-offset _value first-inst)

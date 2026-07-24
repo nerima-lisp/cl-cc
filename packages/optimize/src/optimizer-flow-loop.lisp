@@ -238,14 +238,6 @@ The pass is idempotent within a loop range and does not alter control flow."
 
 ;;; ─── Conservative code sinking (FR-163 subset) ──────────────────────────
 
-(defun %opt-reg-read-count (instructions reg)
-  "Count reads of REG in INSTRUCTIONS."
-  (let ((count 0))
-    (dolist (inst instructions count)
-      (dolist (r (opt-inst-read-regs inst))
-        (when (eq r reg)
-          (incf count))))))
-
 (defun %opt-copy-inst (inst)
   "Return a structural copy of INST when it can be sexp-round-tripped."
   (handler-case
@@ -312,13 +304,6 @@ analysis."
                                                                                type-facts)))
                                        (subseq linear-insts (1+ lo) hi))))))
                     uses)))))
-
-(defun %opt-first-inst-after-label-index (vec label-index)
-  "Return first index after LABEL-INDEX that is not a vm-label, or NIL."
-  (loop for i from (1+ label-index) below (length vec)
-        for inst = (aref vec i)
-        unless (vm-label-p inst)
-        do (return i)))
 
 (defun %opt-block-terminator-index (insts)
   "Return the index of the first terminator in INSTS, or NIL."

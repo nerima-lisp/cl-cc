@@ -16,11 +16,6 @@
     (vm-aset :store)
     (t nil)))
 
-(defun %opt-copy-constant-env (env)
-  (let ((copy (make-hash-table :test #'eq)))
-    (maphash (lambda (k v) (setf (gethash k copy) v)) env)
-    copy))
-
 (defun %opt-update-memory-pattern-constants (inst env)
   (typecase inst
     (vm-const
@@ -367,21 +362,9 @@ shifted directly."
       (opt-make-interval (ash (opt-interval-lo value-interval) k)
                          (ash (opt-interval-hi value-interval) k)))))
 
-(defun opt-interval-contains-p (interval value)
-  "Return T when VALUE is proven to be inside INTERVAL."
-  (and interval
-       (<= (opt-interval-lo interval) value)
-       (<= value (opt-interval-hi interval))))
-
 (defun opt-interval-nonnegative-p (interval)
   "Return T when INTERVAL is proven to contain only non-negative integers."
   (and interval (<= 0 (opt-interval-lo interval))))
-
-(defun opt-interval-subset-p (inner outer)
-  "Return T when INNER is proven to be a subset of OUTER."
-  (and inner outer
-       (<= (opt-interval-lo outer) (opt-interval-lo inner))
-       (<= (opt-interval-hi inner) (opt-interval-hi outer))))
 
 (defun opt-interval-widen (old new &key
                                  (negative-infinity +opt-range-negative-infinity+)
