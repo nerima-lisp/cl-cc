@@ -270,24 +270,24 @@
 
 (it-sequential "a64-reg-number-table x0"
   (destructuring-bind (reg verify) (list :x0 (lambda (entry)
-             (assert-equal 0 (cdr entry))))
+             (expect (cdr entry) :to-equal 0)))
     (let ((entry (assoc reg cl-cc/codegen::*aarch64-reg-number*)))
     (funcall verify entry))))
 
 (it-sequential "a64-reg-number-table x7"
   (destructuring-bind (reg verify) (list :x7 (lambda (entry)
-             (assert-equal 7 (cdr entry))))
+             (expect (cdr entry) :to-equal 7)))
     (let ((entry (assoc reg cl-cc/codegen::*aarch64-reg-number*)))
     (funcall verify entry))))
 
 (it-sequential "a64-reg-number-table x30"
   (destructuring-bind (reg verify) (list :x30 (lambda (entry)
-             (assert-equal 30 (cdr entry))))
+             (expect (cdr entry) :to-equal 30)))
     (let ((entry (assoc reg cl-cc/codegen::*aarch64-reg-number*)))
     (funcall verify entry))))
 
 (it-sequential "a64-reg-number-table x18-absent"
   (destructuring-bind (reg verify) (list :x18 (lambda (entry)
-             (assert-null entry)))
+             (expect entry :to-be-null)))
     (let ((entry (assoc reg cl-cc/codegen::*aarch64-reg-number*)))
     (funcall verify entry))))

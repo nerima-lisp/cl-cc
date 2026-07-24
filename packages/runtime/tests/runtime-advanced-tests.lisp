@@ -204,35 +204,35 @@
     (expect (cl-cc/runtime:rt-get-output-stream-string s) :to-equal "test")))
 
 (it-sequential "rt-stream-predicates input-true"
-  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-input-stream-p :input (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-input-stream-p :input (lambda (pred-fn stream) (expect (= 1 (funcall pred-fn stream)) :to-be-truthy)))
     (let ((stream (ecase direction
                   (:input  (make-string-input-stream "x"))
                   (:output (make-string-output-stream)))))
     (funcall verify pred-fn stream))))
 
 (it-sequential "rt-stream-predicates input-false"
-  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-input-stream-p :output (lambda (pred-fn stream) (assert-= 0 (funcall pred-fn stream))))
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-input-stream-p :output (lambda (pred-fn stream) (expect (= 0 (funcall pred-fn stream)) :to-be-truthy)))
     (let ((stream (ecase direction
                   (:input  (make-string-input-stream "x"))
                   (:output (make-string-output-stream)))))
     (funcall verify pred-fn stream))))
 
 (it-sequential "rt-stream-predicates output-true"
-  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-output-stream-p :output (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-output-stream-p :output (lambda (pred-fn stream) (expect (= 1 (funcall pred-fn stream)) :to-be-truthy)))
     (let ((stream (ecase direction
                   (:input  (make-string-input-stream "x"))
                   (:output (make-string-output-stream)))))
     (funcall verify pred-fn stream))))
 
 (it-sequential "rt-stream-predicates output-false"
-  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-output-stream-p :input (lambda (pred-fn stream) (assert-= 0 (funcall pred-fn stream))))
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-output-stream-p :input (lambda (pred-fn stream) (expect (= 0 (funcall pred-fn stream)) :to-be-truthy)))
     (let ((stream (ecase direction
                   (:input  (make-string-input-stream "x"))
                   (:output (make-string-output-stream)))))
     (funcall verify pred-fn stream))))
 
 (it-sequential "rt-stream-predicates open-true"
-  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-open-stream-p :input (lambda (pred-fn stream) (assert-= 1 (funcall pred-fn stream))))
+  (destructuring-bind (pred-fn direction verify) (list #'cl-cc/runtime:rt-open-stream-p :input (lambda (pred-fn stream) (expect (= 1 (funcall pred-fn stream)) :to-be-truthy)))
     (let ((stream (ecase direction
                   (:input  (make-string-input-stream "x"))
                   (:output (make-string-output-stream)))))

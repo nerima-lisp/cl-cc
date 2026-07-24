@@ -30,9 +30,9 @@ Returns the byte vector, or NIL on error."
 
 (defun %a64-assert-emitted-bytes (expected bytes)
   "Assert that BYTES match EXPECTED and preserve 4-byte instruction width."
-  (assert-= (length expected) (length bytes))
-  (assert-= 0 (mod (length bytes) 4))
-  (assert-equal expected bytes))
+  (expect (= (length expected) (length bytes)) :to-be-truthy)
+  (expect (= 0 (mod (length bytes) 4)) :to-be-truthy)
+  (expect bytes :to-equal expected))
 
 (defun %fr072-a64-assignment (&rest pairs)
   (let ((ht (make-hash-table :test #'eq)))

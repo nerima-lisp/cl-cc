@@ -71,7 +71,7 @@
       (let ((fn (make-test-fn)))
         (cl-cc/ir:ir-seal-block fn (cl-cc/ir:irf-entry fn))
         (values fn (list (cl-cc/ir:irf-entry fn))))) (lambda (fn expected-order)
-      (assert-equal expected-order (cl-cc/ir:ir-rpo fn))))
+      (expect (cl-cc/ir:ir-rpo fn) :to-equal expected-order)))
     (multiple-value-bind (fn expected-order) (funcall setup)
     (funcall verify fn expected-order))))
 
@@ -87,7 +87,7 @@
         (cl-cc/ir:ir-seal-block fn b1)
         (cl-cc/ir:ir-seal-block fn b2)
         (values fn (list entry b1 b2)))) (lambda (fn expected-order)
-      (assert-equal expected-order (cl-cc/ir:ir-rpo fn))))
+      (expect (cl-cc/ir:ir-rpo fn) :to-equal expected-order)))
     (multiple-value-bind (fn expected-order) (funcall setup)
     (funcall verify fn expected-order))))
 
@@ -108,9 +108,9 @@
         (cl-cc/ir:ir-seal-block fn join)
         (values fn (list entry left right join)))) (lambda (fn expected-order)
       (let ((rpo (cl-cc/ir:ir-rpo fn)))
-        (assert-= 4 (length rpo))
-        (assert-eq (first expected-order) (first rpo))
-        (assert-eq (car (last expected-order)) (car (last rpo))))))
+        (expect (= 4 (length rpo)) :to-be-truthy)
+        (expect (first rpo) :to-be (first expected-order))
+        (expect (car (last rpo)) :to-be (car (last expected-order))))))
     (multiple-value-bind (fn expected-order) (funcall setup)
     (funcall verify fn expected-order))))
 
@@ -128,8 +128,8 @@
         (cl-cc/ir:ir-seal-block fn exit)
         (values fn nil))) (lambda (fn _)
       (let ((rpo (cl-cc/ir:ir-rpo fn)))
-        (assert-= 3 (length rpo))
-        (assert-true (member (cl-cc/ir:irf-entry fn) rpo)))))
+        (expect (= 3 (length rpo)) :to-be-truthy)
+        (expect (member (cl-cc/ir:irf-entry fn) rpo) :to-be-truthy))))
     (multiple-value-bind (fn expected-order) (funcall setup)
     (funcall verify fn expected-order))))
 
@@ -144,7 +144,7 @@
       (declare (ignore entry))
       (let ((idom (cl-cc/ir:ir-dominators fn)))
         (dolist (pair checks)
-          (assert-eq (cdr pair) (gethash (car pair) idom))))))
+          (expect (gethash (car pair) idom) :to-be (cdr pair))))))
     (multiple-value-bind (fn entry checks) (funcall setup)
     (funcall verify fn entry checks))))
 
@@ -163,7 +163,7 @@
       (declare (ignore entry))
       (let ((idom (cl-cc/ir:ir-dominators fn)))
         (dolist (pair checks)
-          (assert-eq (cdr pair) (gethash (car pair) idom))))))
+          (expect (gethash (car pair) idom) :to-be (cdr pair))))))
     (multiple-value-bind (fn entry checks) (funcall setup)
     (funcall verify fn entry checks))))
 
@@ -186,7 +186,7 @@
       (declare (ignore entry))
       (let ((idom (cl-cc/ir:ir-dominators fn)))
         (dolist (pair checks)
-          (assert-eq (cdr pair) (gethash (car pair) idom))))))
+          (expect (gethash (car pair) idom) :to-be (cdr pair))))))
     (multiple-value-bind (fn entry checks) (funcall setup)
     (funcall verify fn entry checks))))
 

@@ -30,7 +30,7 @@
 
 (it-sequential "mir-const-types integer"
   (destructuring-bind (val type verify) (list 42 :integer (lambda (c)
-             (assert-equal 42 (mirc-value c))))
+             (expect (mirc-value c) :to-equal 42)))
     (let ((c (make-mir-const :value val :type type)))
     (expect (mir-const-p c) :to-be-truthy)
     (expect (mirc-type c) :to-be type)
@@ -38,7 +38,7 @@
 
 (it-sequential "mir-const-types nil"
   (destructuring-bind (val type verify) (list nil :pointer (lambda (c)
-             (assert-null (mirc-value c))))
+             (expect (mirc-value c) :to-be-null)))
     (let ((c (make-mir-const :value val :type type)))
     (expect (mir-const-p c) :to-be-truthy)
     (expect (mirc-type c) :to-be type)
@@ -46,7 +46,7 @@
 
 (it-sequential "mir-const-types string"
   (destructuring-bind (val type verify) (list "hello" :any (lambda (c)
-             (assert-equal "hello" (mirc-value c))))
+             (expect (mirc-value c) :to-equal "hello")))
     (let ((c (make-mir-const :value val :type type)))
     (expect (mir-const-p c) :to-be-truthy)
     (expect (mirc-type c) :to-be type)

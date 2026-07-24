@@ -16,11 +16,11 @@
   (cons (make-vm-label :name label) body))
 
 (defun assert-segment (segment kind &key label body-length)
-  (assert-eq kind (car segment))
+  (expect (car segment) :to-be kind)
   (when label
-    (assert-equal label (second segment)))
+    (expect (second segment) :to-equal label))
   (when body-length
-    (assert-equal body-length (length (third segment)))))
+    (expect (length (third segment)) :to-equal body-length)))
 
 ;;; ─── collect-entry-labels ─────────────────────────────────────────────────────
 

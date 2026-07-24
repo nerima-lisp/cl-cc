@@ -433,12 +433,12 @@
 ;;; FR-687: make-string :element-type with both keywords
 (it-sequential "compile-make-string-element-type length"
   (destructuring-bind (form verify) (list "(length (make-string 5 :element-type 'character))" (lambda (result)
-             (assert-= 5 result)))
+             (expect (= 5 result) :to-be-truthy)))
     (funcall verify (run-string form))))
 
 (it-sequential "compile-make-string-element-type fill"
   (destructuring-bind (form verify) (list "(make-string 3 :initial-element #\\x :element-type 'character)" (lambda (result)
-             (assert-string= "xxx" result)))
+             (expect result :to-equal "xxx")))
     (funcall verify (run-string form))))
 
 ;;; FR-254: with-region macro expansion/compile path

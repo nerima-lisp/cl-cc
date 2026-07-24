@@ -17,7 +17,7 @@
 (defun %jr-assert-string-props (object expected-props)
   (dolist (prop expected-props)
     (destructuring-bind (key expected) prop
-      (assert-string= expected (gethash key object)))))
+      (expect (gethash key object) :to-equal expected))))
 
 ;;; ─── Module exports ─────────────────────────────────────────────────────────
 

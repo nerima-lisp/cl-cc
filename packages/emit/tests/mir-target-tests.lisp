@@ -59,77 +59,77 @@
 
 (it-sequential "target-registry-lookup x86-64"
   (destructuring-bind (name verify) (list :x86-64 (lambda (target)
-             (assert-eq *x86-64-target* target)))
+             (expect target :to-be *x86-64-target*)))
     (funcall verify (find-target name))))
 
 (it-sequential "target-registry-lookup aarch64"
   (destructuring-bind (name verify) (list :aarch64 (lambda (target)
-             (assert-eq *aarch64-target* target)))
+             (expect target :to-be *aarch64-target*)))
     (funcall verify (find-target name))))
 
 (it-sequential "target-registry-lookup riscv64"
   (destructuring-bind (name verify) (list :riscv64 (lambda (target)
-             (assert-eq *riscv64-target* target)))
+             (expect target :to-be *riscv64-target*)))
     (funcall verify (find-target name))))
 
 (it-sequential "target-registry-lookup wasm32"
   (destructuring-bind (name verify) (list :wasm32 (lambda (target)
-             (assert-eq *wasm32-target* target)))
+             (expect target :to-be *wasm32-target*)))
     (funcall verify (find-target name))))
 
 (it-sequential "target-registry-lookup nonexistent"
   (destructuring-bind (name verify) (list :nonexistent (lambda (target)
-             (assert-null target)))
+             (expect target :to-be-null)))
     (funcall verify (find-target name))))
 
 (it-sequential "target-64-bit-predicate x86-64"
   (destructuring-bind (target verify) (list *x86-64-target* (lambda (target)
-             (assert-true (target-64-bit-p target))))
+             (expect (target-64-bit-p target) :to-be-truthy)))
     (funcall verify target)))
 
 (it-sequential "target-64-bit-predicate aarch64"
   (destructuring-bind (target verify) (list *aarch64-target* (lambda (target)
-             (assert-true (target-64-bit-p target))))
+             (expect (target-64-bit-p target) :to-be-truthy)))
     (funcall verify target)))
 
 (it-sequential "target-64-bit-predicate riscv64"
   (destructuring-bind (target verify) (list *riscv64-target* (lambda (target)
-             (assert-true (target-64-bit-p target))))
+             (expect (target-64-bit-p target) :to-be-truthy)))
     (funcall verify target)))
 
 (it-sequential "target-64-bit-predicate wasm32"
   (destructuring-bind (target verify) (list *wasm32-target* (lambda (target)
-             (assert-false (target-64-bit-p target))))
+             (expect (target-64-bit-p target) :to-be-falsy)))
     (funcall verify target)))
 
 (it-sequential "target-feature-predicate x86-64-fused-cmp"
   (destructuring-bind (target feature verify) (list *x86-64-target* :has-fused-cmp-branch (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-feature-predicate aarch64-tail-call"
   (destructuring-bind (target feature verify) (list *aarch64-target* :has-native-tail-call (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-feature-predicate riscv64-psabi"
   (destructuring-bind (target feature verify) (list *riscv64-target* :riscv-elf-psabi (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-feature-predicate wasm32-wasi"
   (destructuring-bind (target feature verify) (list *wasm32-target* :wasi-0.2 (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-feature-predicate x86-64-no-wasi"
   (destructuring-bind (target feature verify) (list *x86-64-target* :wasi-0.2 (lambda (target feature)
-             (assert-false (target-has-feature-p target feature))))
+             (expect (target-has-feature-p target feature) :to-be-falsy)))
     (funcall verify target feature)))
 
 (it-sequential "target-feature-predicate wasm32-no-sysv"
   (destructuring-bind (target feature verify) (list *wasm32-target* :sysv-abi (lambda (target feature)
-             (assert-false (target-has-feature-p target feature))))
+             (expect (target-has-feature-p target feature) :to-be-falsy)))
     (funcall verify target feature)))
 
 (it-sequential "target-scratch-regs-excluded-from-allocatable"

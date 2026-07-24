@@ -178,7 +178,7 @@
 
 (it-sequential "clos-type-inference-slot-types slot-fixnum"
   (destructuring-bind (form check-result expected-type-name) (list "(progn (defclass point () ((x :initarg :x :type fixnum) (y :initarg :y :type fixnum)))
-              (let ((p (make-instance 'point :x 10 :y 20))) (slot-value p 'x)))" (lambda (r) (assert-= 10 r)) "FIXNUM")
+              (let ((p (make-instance 'point :x 10 :y 20))) (slot-value p 'x)))" (lambda (r) (expect (= 10 r) :to-be-truthy)) "FIXNUM")
     (multiple-value-bind (result type) (run-string-typed form)
     (funcall check-result result)
     (expect (typep type 'cl-cc/type:type-primitive) :to-be-truthy)
@@ -186,7 +186,7 @@
 
 (it-sequential "clos-type-inference-slot-types slot-string"
   (destructuring-bind (form check-result expected-type-name) (list "(progn (defclass person () ((name :initarg :name :type string)))
-              (let ((p (make-instance 'person :name \"Alice\"))) (slot-value p 'name)))" (lambda (r) (assert-string= "Alice" r)) "STRING")
+              (let ((p (make-instance 'person :name \"Alice\"))) (slot-value p 'name)))" (lambda (r) (expect r :to-equal "Alice")) "STRING")
     (multiple-value-bind (result type) (run-string-typed form)
     (funcall check-result result)
     (expect (typep type 'cl-cc/type:type-primitive) :to-be-truthy)
@@ -210,7 +210,7 @@
 ;;; Type Narrowing Tests
 
 (it-sequential "type-narrowing-predicate numberp-to-fixnum"
-  (destructuring-bind (form check-result expected-type-name) (list "(let ((x 42)) (if (numberp x) (+ x 1) 0))" (lambda (r) (assert-= 43 r)) "FIXNUM")
+  (destructuring-bind (form check-result expected-type-name) (list "(let ((x 42)) (if (numberp x) (+ x 1) 0))" (lambda (r) (expect (= 43 r) :to-be-truthy)) "FIXNUM")
     (handler-bind ((warning #'muffle-warning))
     (multiple-value-bind (result type) (run-string-typed form)
       (funcall check-result result)
@@ -219,7 +219,7 @@
         (expect (symbol-name (cl-cc/type:type-primitive-name type)) :to-equal expected-type-name))))))
 
 (it-sequential "type-narrowing-predicate stringp-to-string"
-  (destructuring-bind (form check-result expected-type-name) (list "(let ((x \"hello\")) (if (stringp x) x \"default\"))" (lambda (r) (assert-string= "hello" r)) nil)
+  (destructuring-bind (form check-result expected-type-name) (list "(let ((x \"hello\")) (if (stringp x) x \"default\"))" (lambda (r) (expect r :to-equal "hello")) nil)
     (handler-bind ((warning #'muffle-warning))
     (multiple-value-bind (result type) (run-string-typed form)
       (funcall check-result result)

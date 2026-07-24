@@ -28,44 +28,44 @@
 (it-sequential "lower-let-lambda-and-defun-details let-declaration"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(let ((x 1)) (declare (ignore x)) 42))))
-               (assert-true (cl-cc/ast:ast-let-p node))
-               (assert-equal '((ignore x)) (cl-cc/ast:ast-let-declarations node)))))
+               (expect (cl-cc/ast:ast-let-p node) :to-be-truthy)
+               (expect (cl-cc/ast:ast-let-declarations node) :to-equal '((ignore x))))))
     (funcall verify)))
 
 (it-sequential "lower-let-lambda-and-defun-details let-bare-symbol"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(let (x) x))))
-               (assert-true (cl-cc/ast:ast-let-p node))
+               (expect (cl-cc/ast:ast-let-p node) :to-be-truthy)
                (let ((binding (first (cl-cc/ast:ast-let-bindings node))))
-                 (assert-eq 'x (car binding))
-                 (assert-true (cl-cc/ast:ast-quote-p (cdr binding)))))))
+                 (expect (car binding) :to-be 'x)
+                 (expect (cl-cc/ast:ast-quote-p (cdr binding)) :to-be-truthy)))))
     (funcall verify)))
 
 (it-sequential "lower-let-lambda-and-defun-details lambda-params"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(lambda (x y) (+ x y)))))
-               (assert-true (cl-cc/ast:ast-lambda-p node))
-               (assert-equal '(x y) (cl-cc::ast-lambda-params node))
-               (assert-= 1 (length (cl-cc::ast-lambda-body node))))))
+               (expect (cl-cc/ast:ast-lambda-p node) :to-be-truthy)
+               (expect (cl-cc::ast-lambda-params node) :to-equal '(x y))
+               (expect (= 1 (length (cl-cc::ast-lambda-body node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-let-lambda-and-defun-details defun-form"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(defun my-func (a b) (+ a b)))))
-               (assert-true (cl-cc/ast:ast-defun-p node))
-               (assert-eq 'my-func (cl-cc/ast:ast-defun-name node))
-               (assert-equal '(a b) (cl-cc::ast-defun-params node))
-               (assert-= 1 (length (cl-cc::ast-defun-body node))))))
+               (expect (cl-cc/ast:ast-defun-p node) :to-be-truthy)
+               (expect (cl-cc/ast:ast-defun-name node) :to-be 'my-func)
+               (expect (cl-cc::ast-defun-params node) :to-equal '(a b))
+               (expect (= 1 (length (cl-cc::ast-defun-body node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-let-lambda-and-defun-details let-single-element"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(let ((x)) x))))
-               (assert-true (cl-cc/ast:ast-let-p node))
+               (expect (cl-cc/ast:ast-let-p node) :to-be-truthy)
                (let ((binding (first (cl-cc/ast:ast-let-bindings node))))
-                 (assert-eq 'x (car binding))
-                 (assert-true (cl-cc/ast:ast-quote-p (cdr binding)))
-                 (assert-null (cl-cc/ast:ast-quote-value (cdr binding)))))))
+                 (expect (car binding) :to-be 'x)
+                 (expect (cl-cc/ast:ast-quote-p (cdr binding)) :to-be-truthy)
+                 (expect (cl-cc/ast:ast-quote-value (cdr binding)) :to-be-null)))))
     (funcall verify)))
 
 (it-sequential "lower-definition-and-binding-forms defvar-with-value"
@@ -157,63 +157,63 @@
 (it-sequential "lower-unwind-generic-the-cases unwind-protect"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(unwind-protect (risky) (cleanup)))))
-               (assert-true (cl-cc/ast:ast-unwind-protect-p node))
-               (assert-= 1 (length (cl-cc::ast-unwind-cleanup node))))))
+               (expect (cl-cc/ast:ast-unwind-protect-p node) :to-be-truthy)
+               (expect (= 1 (length (cl-cc::ast-unwind-cleanup node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-unwind-generic-the-cases generic-call"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(my-func 1 2 3))))
-               (assert-true (cl-cc/ast:ast-call-p node))
-               (assert-= 3 (length (cl-cc/ast:ast-call-args node))))))
+               (expect (cl-cc/ast:ast-call-p node) :to-be-truthy)
+               (expect (= 3 (length (cl-cc/ast:ast-call-args node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-unwind-generic-the-cases the-form"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(the fixnum x))))
-               (assert-true (cl-cc/ast:ast-the-p node))
-               (assert-eq 'fixnum (cl-cc/ast:ast-the-type node)))))
+               (expect (cl-cc/ast:ast-the-p node) :to-be-truthy)
+               (expect (cl-cc/ast:ast-the-type node) :to-be 'fixnum))))
     (funcall verify)))
 
 (it-sequential "lower-local-and-binding-forms flet"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(flet ((helper (x) (* x 2))) (helper 5)))))
-               (assert-true (cl-cc/ast:ast-flet-p node))
-               (assert-= 1 (length (cl-cc::ast-flet-bindings node)))
-               (assert-= 1 (length (cl-cc::ast-flet-body node))))))
+               (expect (cl-cc/ast:ast-flet-p node) :to-be-truthy)
+               (expect (= 1 (length (cl-cc::ast-flet-bindings node))) :to-be-truthy)
+               (expect (= 1 (length (cl-cc::ast-flet-body node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-local-and-binding-forms labels"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(labels ((fact (n) (if (= n 0) 1 (* n (fact (- n 1)))))) (fact 5)))))
-               (assert-true (cl-cc/ast:ast-labels-p node))
-               (assert-= 1 (length (cl-cc::ast-labels-bindings node))))))
+               (expect (cl-cc/ast:ast-labels-p node) :to-be-truthy)
+               (expect (= 1 (length (cl-cc::ast-labels-bindings node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-local-and-binding-forms handler-case"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(handler-case (risky) (error (e) (print e))))))
-               (assert-true (cl-cc/ast:ast-handler-case-p node))
-               (assert-= 1 (length (cl-cc/ast:ast-handler-case-clauses node))))))
+               (expect (cl-cc/ast:ast-handler-case-p node) :to-be-truthy)
+               (expect (= 1 (length (cl-cc/ast:ast-handler-case-clauses node))) :to-be-truthy))))
     (funcall verify)))
 
 (it-sequential "lower-local-and-binding-forms declare-type"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(defun add1 (x) (declare (type fixnum x)) (+ x 1)))))
-               (assert-true (cl-cc/ast:ast-defun-p node))
-               (assert-equal '((x fixnum)) (cl-cc::ast-defun-params node)))
+               (expect (cl-cc/ast:ast-defun-p node) :to-be-truthy)
+               (expect (cl-cc::ast-defun-params node) :to-equal '((x fixnum))))
              (let ((node (lower '(lambda (x) (declare (type fixnum x)) (+ x 1)))))
-               (assert-true (cl-cc/ast:ast-lambda-p node))
-               (assert-equal '((x fixnum)) (cl-cc::ast-lambda-params node)))))
+               (expect (cl-cc/ast:ast-lambda-p node) :to-be-truthy)
+               (expect (cl-cc::ast-lambda-params node) :to-equal '((x fixnum))))))
     (funcall verify)))
 
 (it-sequential "lower-local-and-binding-forms declare-dynamic"
   (destructuring-bind (verify) (list (lambda ()
              (let ((node (lower '(lambda (&rest args) (declare (dynamic-extent args)) args))))
-               (assert-true (cl-cc/ast:ast-lambda-p node))
-               (assert-eq 'args (cl-cc::ast-lambda-rest-param node))
-               (assert-equal '((dynamic-extent args)) (cl-cc::ast-lambda-declarations node))
-               (assert-= 1 (length (cl-cc::ast-lambda-body node))))))
+               (expect (cl-cc/ast:ast-lambda-p node) :to-be-truthy)
+               (expect (cl-cc::ast-lambda-rest-param node) :to-be 'args)
+               (expect (cl-cc::ast-lambda-declarations node) :to-equal '((dynamic-extent args)))
+               (expect (= 1 (length (cl-cc::ast-lambda-body node))) :to-be-truthy))))
     (funcall verify)))
 
 ;;; ─── lower-sexp-to-ast: error cases ────────────────────────────────────────

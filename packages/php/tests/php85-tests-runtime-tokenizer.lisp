@@ -4,15 +4,13 @@
 (%php85-register-test 'php85-image-type-constants-match-current-values
   "PHP 8.5 IMAGETYPE_* constants match current extension values."
   (lambda ()
-    (assert-string= "0:18:19:20:21:22"
-                    (%php-run-capture
-                     "<?php echo IMAGETYPE_UNKNOWN . ':' . IMAGETYPE_WEBP . ':' . IMAGETYPE_AVIF . ':' . IMAGETYPE_HEIF . ':' . IMAGETYPE_SVG . ':' . IMAGETYPE_COUNT;"))))
+    (expect (%php-run-capture
+                     "<?php echo IMAGETYPE_UNKNOWN . ':' . IMAGETYPE_WEBP . ':' . IMAGETYPE_AVIF . ':' . IMAGETYPE_HEIF . ':' . IMAGETYPE_SVG . ':' . IMAGETYPE_COUNT;") :to-equal "0:18:19:20:21:22")))
 
 (%php85-register-test 'php85-image-type-functions-support-svg
   "PHP 8.5 image type helpers support current IMAGETYPE_* values."
   (lambda ()
-    (assert-string= ".svg:svg:image/svg+xml:.webp:webp:image/webp:.avif:avif:image/avif:.heif:heif:image/heif:Y:Y:false"
-                    (%php-run-capture
+    (expect (%php-run-capture
                      "<?php
 echo image_type_to_extension(IMAGETYPE_SVG) . ':' .
      image_type_to_extension(IMAGETYPE_SVG, false) . ':' .
@@ -29,13 +27,12 @@ echo image_type_to_extension(IMAGETYPE_SVG) . ':' .
      (function_exists('image_type_to_extension') ? 'Y' : 'N') . ':' .
      (function_exists('image_type_to_mime_type') ? 'Y' : 'N') . ':' .
      (image_type_to_extension(9999) === false ? 'false' : 'other');
-"))))
+") :to-equal ".svg:svg:image/svg+xml:.webp:webp:image/webp:.avif:avif:image/avif:.heif:heif:image/heif:Y:Y:false")))
 
 (%php85-register-test 'php85-getimagesize-svg-reports-units-and-exif-type
   "PHP 8.5 getimagesize returns SVG dimensions, units, MIME, and image type."
   (lambda ()
-    (assert-string= "12:34:type:image/svg+xml:cm:px:exif:false:Y:Y"
-                    (%php-run-capture
+    (expect (%php-run-capture
                      "<?php
 $f = tempnam(sys_get_temp_dir(), 'clcc-svg-');
 file_put_contents($f, '<svg width=\"12cm\" height=\"34px\" xmlns=\"http://www.w3.org/2000/svg\"></svg>');
@@ -51,7 +48,7 @@ echo $size[0] . ':' .
      (function_exists('getimagesize') ? 'Y' : 'N') . ':' .
      (function_exists('exif_imagetype') ? 'Y' : 'N');
 unlink($f);
-"))))
+") :to-equal "12:34:type:image/svg+xml:cm:px:exif:false:Y:Y")))
 
 (%php85-register-test 'php85-token-name-reports-tokenizer-constants
   "PHP 8.5 tokenizer constants have token_name mappings."
@@ -138,19 +135,19 @@ unlink($f);
                     "T_BAD_CHARACTER"))
       (multiple-value-bind (token-id found)
           (cl-cc/php::%php-lookup-constant name)
-        (assert-true found)
-        (assert-string= name (cl-cc/php::%php-token-name token-id))))
-    (assert-string= "UNKNOWN" (cl-cc/php::%php-token-name -1))))
+        (expect found :to-be-truthy)
+        (expect (cl-cc/php::%php-token-name token-id) :to-equal name)))
+    (expect (cl-cc/php::%php-token-name -1) :to-equal "UNKNOWN")))
 
 (%php85-register-test 'php85-token-get-all-exposes-pipe-and-void-cast
   "PHP 8.5 token_get_all exposes pipe and void-cast tokens."
   (lambda ()
     (multiple-value-bind (pipe-id pipe-found)
         (cl-cc/php::%php-lookup-constant "T_PIPE")
-      (assert-true pipe-found)
+      (expect pipe-found :to-be-truthy)
       (multiple-value-bind (void-id void-found)
           (cl-cc/php::%php-lookup-constant "T_VOID_CAST")
-        (assert-true void-found)
+        (expect void-found :to-be-truthy)
         (let* ((tokens (cl-cc/php::%php-token-get-all "<?php $x = (VOID) $y |> strlen;"))
                (entries (cl-cc/php::%php-array-values-list tokens)))
           (flet ((entry-id (entry)
@@ -166,22 +163,22 @@ unlink($f);
                   (void-token (find-if (lambda (entry)
                                          (eql void-id (entry-id entry)))
                                        entries)))
-              (assert-true pipe-token)
-              (assert-true void-token)
-              (assert-string= "|>" (entry-text pipe-token))
-              (assert-string= "(VOID)" (entry-text void-token))
-              (assert-equal 1 (entry-line pipe-token))
-              (assert-equal 1 (entry-line void-token)))))))))
+              (expect pipe-token :to-be-truthy)
+              (expect void-token :to-be-truthy)
+              (expect (entry-text pipe-token) :to-equal "|>")
+              (expect (entry-text void-token) :to-equal "(VOID)")
+              (expect (entry-line pipe-token) :to-equal 1)
+              (expect (entry-line void-token) :to-equal 1))))))))
 
 (%php85-register-test 'php85-token-get-all-models-html-boundaries
   "PHP 8.5 token_get_all models inline HTML and PHP close tags."
   (lambda ()
     (multiple-value-bind (inline-id inline-found)
         (cl-cc/php::%php-lookup-constant "T_INLINE_HTML")
-      (assert-true inline-found)
+      (expect inline-found :to-be-truthy)
       (multiple-value-bind (close-id close-found)
           (cl-cc/php::%php-lookup-constant "T_CLOSE_TAG")
-        (assert-true close-found)
+        (expect close-found :to-be-truthy)
         (let* ((tokens (cl-cc/php::%php-token-get-all "hello <?php echo 1; ?> world"))
                (entries (cl-cc/php::%php-array-values-list tokens)))
           (flet ((entry-id (entry)
@@ -197,12 +194,12 @@ unlink($f);
                   (close-token (find-if (lambda (entry)
                                           (eql close-id (entry-id entry)))
                                         entries)))
-              (assert-equal 2 (length inline-tokens))
-              (assert-string= "hello " (entry-text (first inline-tokens)))
-              (assert-string= " world" (entry-text (second inline-tokens)))
-              (assert-true close-token)
-              (assert-string= "?>" (entry-text close-token))
-              (assert-equal 1 (entry-line close-token)))))))))
+              (expect (length inline-tokens) :to-equal 2)
+              (expect (entry-text (first inline-tokens)) :to-equal "hello ")
+              (expect (entry-text (second inline-tokens)) :to-equal " world")
+              (expect close-token :to-be-truthy)
+              (expect (entry-text close-token) :to-equal "?>")
+              (expect (entry-line close-token) :to-equal 1))))))))
 
 (%php85-register-test 'php85-token-get-all-models-open-tags-and-keywords
   "PHP 8.5 token_get_all models open-tag trivia, keywords, and TOKEN_PARSE context."
@@ -218,15 +215,15 @@ unlink($f);
                     (cl-cc/php::%php-token-name (entry-id entry)))))
       (let* ((tokens (cl-cc/php::%php-token-get-all "<?php echo; ?>"))
              (entries (cl-cc/php::%php-array-values-list tokens)))
-        (assert-string= "T_OPEN_TAG" (entry-name (first entries)))
-        (assert-string= "<?php " (entry-text (first entries)))
-        (assert-true (find "T_ECHO" entries :key #'entry-name :test #'string=))
-        (assert-true (find "T_CLOSE_TAG" entries :key #'entry-name :test #'string=)))
+        (expect (entry-name (first entries)) :to-equal "T_OPEN_TAG")
+        (expect (entry-text (first entries)) :to-equal "<?php ")
+        (expect (find "T_ECHO" entries :key #'entry-name :test #'string=) :to-be-truthy)
+        (expect (find "T_CLOSE_TAG" entries :key #'entry-name :test #'string=) :to-be-truthy))
       (let* ((tokens (cl-cc/php::%php-token-get-all "/* comment */"))
              (entries (cl-cc/php::%php-array-values-list tokens)))
-        (assert-equal 1 (length entries))
-        (assert-string= "T_INLINE_HTML" (entry-name (first entries)))
-        (assert-string= "/* comment */" (entry-text (first entries))))
+        (expect (length entries) :to-equal 1)
+        (expect (entry-name (first entries)) :to-equal "T_INLINE_HTML")
+        (expect (entry-text (first entries)) :to-equal "/* comment */"))
       (dolist (item '(("abstract" . "T_ABSTRACT")
                       ("array" . "T_ARRAY")
                       ("as" . "T_AS")
@@ -303,32 +300,31 @@ unlink($f);
         (let* ((tokens (cl-cc/php::%php-token-get-all
                         (format nil "<?php ~A" (car item))))
                (entries (cl-cc/php::%php-array-values-list tokens)))
-          (assert-true (find (cdr item) entries :key #'entry-name :test #'string=))))
+          (expect (find (cdr item) entries :key #'entry-name :test #'string=) :to-be-truthy)))
       (let* ((tokens (cl-cc/php::%php-token-get-all
                       (concatenate 'string "<?php " (string (code-char 0)))))
              (entries (cl-cc/php::%php-array-values-list tokens)))
-        (assert-true (find "T_BAD_CHARACTER" entries :key #'entry-name :test #'string=)))
+        (expect (find "T_BAD_CHARACTER" entries :key #'entry-name :test #'string=) :to-be-truthy))
       (let* ((source "<?php class A { const PUBLIC = 1; function f() {} }")
              (regular (cl-cc/php::%php-array-values-list
                        (cl-cc/php::%php-token-get-all source)))
              (parsed (cl-cc/php::%php-array-values-list
                       (cl-cc/php::%php-token-get-all source 1))))
-        (assert-true (find "T_CLASS" regular :key #'entry-name :test #'string=))
-        (assert-true (find "T_CONST" regular :key #'entry-name :test #'string=))
-        (assert-true (find "T_PUBLIC" regular :key #'entry-name :test #'string=))
-        (assert-true (find "T_FUNCTION" regular :key #'entry-name :test #'string=))
-        (assert-false (find "T_PUBLIC" parsed :key #'entry-name :test #'string=))
-        (assert-true (find-if (lambda (entry)
+        (expect (find "T_CLASS" regular :key #'entry-name :test #'string=) :to-be-truthy)
+        (expect (find "T_CONST" regular :key #'entry-name :test #'string=) :to-be-truthy)
+        (expect (find "T_PUBLIC" regular :key #'entry-name :test #'string=) :to-be-truthy)
+        (expect (find "T_FUNCTION" regular :key #'entry-name :test #'string=) :to-be-truthy)
+        (expect (find "T_PUBLIC" parsed :key #'entry-name :test #'string=) :to-be-falsy)
+        (expect (find-if (lambda (entry)
                                 (and (string= "T_STRING" (entry-name entry))
                                      (string= "PUBLIC" (entry-text entry))))
-                              parsed))))))
+                              parsed) :to-be-truthy)))))
 
 (%php85-register-test 'php85-tokenizer-builtins-execute-from-php-source
   "PHP 8.5 tokenizer builtins are callable from PHP code."
   (lambda ()
-    (assert-string= "T_PIPE:T_VOID_CAST:T_INLINE_HTML:T_CLOSE_TAG:T_YIELD_FROM:T_ATTRIBUTE:T_NAME_FULLY_QUALIFIED:T_NAME_QUALIFIED:T_NAME_RELATIVE:T_NS_SEPARATOR:T_BAD_CHARACTER"
-                    (%php-run-capture
-                     "<?php echo token_name(T_PIPE) . ':' . token_name(T_VOID_CAST) . ':' . token_name(T_INLINE_HTML) . ':' . token_name(T_CLOSE_TAG) . ':' . token_name(T_YIELD_FROM) . ':' . token_name(T_ATTRIBUTE) . ':' . token_name(T_NAME_FULLY_QUALIFIED) . ':' . token_name(T_NAME_QUALIFIED) . ':' . token_name(T_NAME_RELATIVE) . ':' . token_name(T_NS_SEPARATOR) . ':' . token_name(T_BAD_CHARACTER);"))))
+    (expect (%php-run-capture
+                     "<?php echo token_name(T_PIPE) . ':' . token_name(T_VOID_CAST) . ':' . token_name(T_INLINE_HTML) . ':' . token_name(T_CLOSE_TAG) . ':' . token_name(T_YIELD_FROM) . ':' . token_name(T_ATTRIBUTE) . ':' . token_name(T_NAME_FULLY_QUALIFIED) . ':' . token_name(T_NAME_QUALIFIED) . ':' . token_name(T_NAME_RELATIVE) . ':' . token_name(T_NS_SEPARATOR) . ':' . token_name(T_BAD_CHARACTER);") :to-equal "T_PIPE:T_VOID_CAST:T_INLINE_HTML:T_CLOSE_TAG:T_YIELD_FROM:T_ATTRIBUTE:T_NAME_FULLY_QUALIFIED:T_NAME_QUALIFIED:T_NAME_RELATIVE:T_NS_SEPARATOR:T_BAD_CHARACTER")))
 
 (%php85-register-test 'php85-extension-new-free-functions-are-registered
   "New PHP 8.5 extension-level free functions are registered as builtins."
@@ -337,7 +333,7 @@ unlink($f);
                              "enchant_dict_remove"
                              "pg_close_stmt"
                              "pg_service"))
-      (assert-true (cl-cc/php::%php-function-exists function-name)))))
+      (expect (cl-cc/php::%php-function-exists function-name) :to-be-truthy))))
 
 (%php85-register-test 'php85-cookie-and-session-builtins-are-registered
   "Cookie and session helpers affected by PHP 8.5 are registered as builtins."
@@ -349,7 +345,7 @@ unlink($f);
                              "session_set_cookie_params"
                              "session_get_cookie_params"
                              "session_start"))
-      (assert-true (cl-cc/php::%php-function-exists function-name)))))
+      (expect (cl-cc/php::%php-function-exists function-name) :to-be-truthy))))
 
 (%php85-register-test 'php85-extension-new-free-function-helpers-update-modeled-state
   "PHP 8.5 enchant and pgsql compatibility helpers update modeled runtime state."
@@ -358,16 +354,16 @@ unlink($f);
           (words (make-hash-table :test #'equal)))
       (setf (gethash "words" dict) words
             (gethash "hello" words) t)
-      (assert-true (cl-cc/php:%php-enchant-dict-remove dict "hello"))
-      (assert-false (gethash "hello" words)))
+      (expect (cl-cc/php:%php-enchant-dict-remove dict "hello") :to-be-truthy)
+      (expect (gethash "hello" words) :to-be-falsy))
     (let ((connection (make-hash-table :test #'equal))
           (statements (make-hash-table :test #'equal)))
       (setf (gethash "statements" connection) statements
             (gethash "stmt1" statements) t
             (gethash "service" connection) "analytics")
-      (assert-string= "analytics" (cl-cc/php:%php-pg-service connection))
-      (assert-true (cl-cc/php:%php-pg-close-stmt connection "stmt1"))
-      (assert-false (gethash "stmt1" statements)))))
+      (expect (cl-cc/php:%php-pg-service connection) :to-equal "analytics")
+      (expect (cl-cc/php:%php-pg-close-stmt connection "stmt1") :to-be-truthy)
+      (expect (gethash "stmt1" statements) :to-be-falsy))))
 
 (%php85-register-test 'php85-setcookie-partitioned-option-queues-set-cookie-header
   "PHP 8.5 setcookie() accepts partitioned cookies when secure is enabled."
@@ -375,11 +371,10 @@ unlink($f);
     (let ((cl-cc/php::*php-http-response-code* 200)
           (cl-cc/php::*php-http-headers* nil)
           (cl-cc/php::*php-output-started-p* nil))
-      (assert-string= "[\"Set-Cookie: chip=a+b; secure; Partitioned\"]"
-                      (%php-run-capture
+      (expect (%php-run-capture
                        "<?php
 setcookie('chip', 'a b', ['secure' => true, 'partitioned' => true]);
-echo json_encode(headers_list());")))))
+echo json_encode(headers_list());") :to-equal "[\"Set-Cookie: chip=a+b; secure; Partitioned\"]"))))
 
 (%php85-register-test 'php85-setcookie-options-are-case-insensitive
   "PHP 8.5 setcookie() option keys are case-insensitive."
@@ -387,11 +382,10 @@ echo json_encode(headers_list());")))))
     (let ((cl-cc/php::*php-http-response-code* 200)
           (cl-cc/php::*php-http-headers* nil)
           (cl-cc/php::*php-output-started-p* nil))
-      (assert-string= "[\"Set-Cookie: chip=v; secure; SameSite=Strict; Partitioned\"]"
-                      (%php-run-capture
+      (expect (%php-run-capture
                        "<?php
 setcookie('chip', 'v', ['Secure' => true, 'SameSite' => 'Strict', 'Partitioned' => true]);
-echo json_encode(headers_list());")))))
+echo json_encode(headers_list());") :to-equal "[\"Set-Cookie: chip=v; secure; SameSite=Strict; Partitioned\"]"))))
 
 (%php85-register-test 'php85-setrawcookie-partitioned-option-queues-set-cookie-header
   "PHP 8.5 setrawcookie() keeps raw values and supports partitioned cookies."
@@ -399,11 +393,10 @@ echo json_encode(headers_list());")))))
     (let ((cl-cc/php::*php-http-response-code* 200)
           (cl-cc/php::*php-http-headers* nil)
           (cl-cc/php::*php-output-started-p* nil))
-      (assert-string= "[\"Set-Cookie: raw=a b; secure; SameSite=None; Partitioned\"]"
-                      (%php-run-capture
+      (expect (%php-run-capture
                        "<?php
 setrawcookie('raw', 'a b', ['secure' => true, 'samesite' => 'None', 'partitioned' => true]);
-echo json_encode(headers_list());")))))
+echo json_encode(headers_list());") :to-equal "[\"Set-Cookie: raw=a b; secure; SameSite=None; Partitioned\"]"))))
 
 (%php85-register-test 'php85-cookie-partitioned-requires-secure
   "PHP 8.5 partitioned cookies require secure cookies."
@@ -417,9 +410,8 @@ echo json_encode(headers_list());")))))
                              (list t "partitioned" t)))
                            nil)
                        (cl-cc/php:php-exception (e) e))))
-      (assert-true condition)
-      (assert-true
-       (cl-cc/php:%php-exception-matches-p condition 'value-error)))))
+      (expect condition :to-be-truthy)
+      (expect (cl-cc/php:%php-exception-matches-p condition 'value-error) :to-be-truthy))))
 
 (%php85-register-test 'php85-cookie-option-validation-matches-php85
   "PHP 8.5 setcookie() rejects numeric keys, unknown keys, and invalid SameSite values."
@@ -436,15 +428,12 @@ echo json_encode(headers_list());")))))
         (cl-cc/php::%php-array-set numeric-options 0 t)
         (cl-cc/php::%php-array-set unknown-options "bogus" t)
         (cl-cc/php::%php-array-set bad-samesite-options "samesite" "Relaxed")
-        (assert-true
-         (raises-value-error-p
-          (lambda () (cl-cc/php::%php-setcookie "chip" "v" numeric-options))))
-        (assert-true
-         (raises-value-error-p
-          (lambda () (cl-cc/php::%php-setcookie "chip" "v" unknown-options))))
-        (assert-true
-         (raises-value-error-p
-          (lambda () (cl-cc/php::%php-setcookie "chip" "v" bad-samesite-options))))))))
+        (expect (raises-value-error-p
+          (lambda () (cl-cc/php::%php-setcookie "chip" "v" numeric-options))) :to-be-truthy)
+        (expect (raises-value-error-p
+          (lambda () (cl-cc/php::%php-setcookie "chip" "v" unknown-options))) :to-be-truthy)
+        (expect (raises-value-error-p
+          (lambda () (cl-cc/php::%php-setcookie "chip" "v" bad-samesite-options))) :to-be-truthy)))))
 
 (%php85-register-test 'php85-session-cookie-params-support-partitioned
   "PHP 8.5 session cookie params expose and emit partitioned cookies."
@@ -456,8 +445,7 @@ echo json_encode(headers_list());")))))
           (cl-cc/php::*php-session-id* "")
           (cl-cc/php::*php-session-name* "PHPSESSID")
           (cl-cc/php::*php-session-active-p* nil))
-      (assert-string= "Y:true:[\"Set-Cookie: PHPSESSID=12345; path=/; secure; Partitioned\"]"
-                      (%php-run-capture
+      (expect (%php-run-capture
                        "<?php
 $registered = function_exists('session_set_cookie_params') && function_exists('session_get_cookie_params') && function_exists('session_start') ? 'Y' : 'N';
 session_id('12345');
@@ -465,39 +453,35 @@ session_set_cookie_params(['secure' => true, 'partitioned' => true]);
 $params = session_get_cookie_params();
 $partitioned = $params['partitioned'] ? 'true' : 'false';
 session_start();
-echo $registered . ':' . $partitioned . ':' . json_encode(headers_list());")))))
+echo $registered . ':' . $partitioned . ':' . json_encode(headers_list());") :to-equal "Y:true:[\"Set-Cookie: PHPSESSID=12345; path=/; secure; Partitioned\"]"))))
 
 (%php85-register-test 'php85-mail-function-is-registered-and-returns-true
   "PHP 8.5 mail() is registered and accepts mail requests in the CLI model."
   (lambda ()
-    (assert-string= "Y:true"
-                    (%php-run-capture
+    (expect (%php-run-capture
                      "<?php
 $registered = function_exists('mail') ? 'Y' : 'N';
 $result = mail('to@example.com', 'subject', 'message', ['X-Test: value'], '-f bounce@example.com');
-echo $registered . ':' . ($result ? 'true' : 'false');"))))
+echo $registered . ':' . ($result ? 'true' : 'false');") :to-equal "Y:true")))
 
 (%php85-register-test 'php85-session-cookie-param-options-are-case-insensitive
   "PHP 8.5 session cookie param option keys are case-insensitive."
   (lambda ()
     (let ((cl-cc/php::*php-session-cookie-params* nil)
           (cl-cc/php::*php-session-active-p* nil))
-      (assert-string= "true:true"
-                      (%php-run-capture
+      (expect (%php-run-capture
                        "<?php
 session_set_cookie_params(['Secure' => true, 'Partitioned' => true]);
 $params = session_get_cookie_params();
-echo ($params['secure'] ? 'true' : 'false') . ':' . ($params['partitioned'] ? 'true' : 'false');")))))
+echo ($params['secure'] ? 'true' : 'false') . ':' . ($params['partitioned'] ? 'true' : 'false');") :to-equal "true:true"))))
 
 (%php85-register-test 'php85-session-cookie-params-order-includes-partitioned-after-secure
   "PHP 8.5 session_get_cookie_params() inserts partitioned after secure."
   (lambda ()
     (let ((cl-cc/php::*php-session-cookie-params* nil))
-      (assert-string=
-       "lifetime,path,domain,secure,partitioned,httponly,samesite"
-       (format nil "~{~A~^,~}"
+      (expect (format nil "~{~A~^,~}"
                (cl-cc/php::%php-array-ordered-keys
-                (cl-cc/php::%php-session-get-cookie-params)))))))
+                (cl-cc/php::%php-session-get-cookie-params))) :to-equal "lifetime,path,domain,secure,partitioned,httponly,samesite"))))
 
 (%php85-register-test 'php85-session-start-cookie-partitioned-requires-secure
   "PHP 8.5 session_start() warns and fails when cookie_partitioned lacks cookie_secure."
@@ -510,8 +494,7 @@ echo ($params['secure'] ? 'true' : 'false') . ':' . ($params['partitioned'] ? 't
           (cl-cc/php::*php-session-name* "PHPSESSID")
           (cl-cc/php::*php-session-active-p* nil)
           (cl-cc/php::*php-error-handler-stack* nil))
-      (assert-string= "2:false:[]"
-                      (%php-run-capture
+      (expect (%php-run-capture
                        "<?php
 function php85_session_warning($errno, $errstr, $file, $line) { echo $errno . ':'; return true; }
 set_error_handler('php85_session_warning', E_WARNING);
@@ -519,35 +502,32 @@ session_id('12345');
 session_set_cookie_params(['partitioned' => true]);
 $ok = session_start();
 restore_error_handler();
-echo ($ok ? 'true' : 'false') . ':' . json_encode(headers_list());")))))
+echo ($ok ? 'true' : 'false') . ':' . json_encode(headers_list());") :to-equal "2:false:[]"))))
 
 (%php85-register-test 'php85-filter-throw-on-failure-constant-is-defined
   "PHP 8.5 defines FILTER_THROW_ON_FAILURE for filter functions."
   (lambda ()
 (multiple-value-bind (value found)
       (cl-cc/php::%php-lookup-constant "FILTER_THROW_ON_FAILURE")
-    (assert-true found)
-    (assert-= 268435456 value))))
+    (expect found :to-be-truthy)
+    (expect (= 268435456 value) :to-be-truthy))))
 
 (%php85-register-test 'php85-filter-var-validates-int
   "filter_var() supports integer validation."
   (lambda ()
-(assert-string= "42:false"
-                 (%php-run-capture
-                  "<?php echo filter_var('42', FILTER_VALIDATE_INT) . ':' . (filter_var('abc', FILTER_VALIDATE_INT) === false ? 'false' : 'bad');"))))
+(expect (%php-run-capture
+                  "<?php echo filter_var('42', FILTER_VALIDATE_INT) . ':' . (filter_var('abc', FILTER_VALIDATE_INT) === false ? 'false' : 'bad');") :to-equal "42:false")))
 
 (%php85-register-test 'php85-filter-var-validates-boolean-false
   "FILTER_VALIDATE_BOOLEAN can return a successful false result."
   (lambda ()
-(assert-string= "false"
-                 (%php-run-capture
-                  "<?php echo filter_var('false', FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false ? 'false' : 'bad';"))))
+(expect (%php-run-capture
+                  "<?php echo filter_var('false', FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false ? 'false' : 'bad';") :to-equal "false")))
 
 (%php85-register-test 'php85-filter-var-throws-on-validation-failure
   "FILTER_THROW_ON_FAILURE raises the PHP 8.5 filter exception on validation failure."
   (lambda ()
-(assert-signals cl-cc/php:php-exception
-    (cl-cc/php:%php-filter-var "abc" 257 268435456))))
+(let ((%%signaled1 nil)) (handler-case (progn (cl-cc/php:%php-filter-var "abc" 257 268435456)) (cl-cc/php:php-exception () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))))
 
 (%php85-register-test 'php85-filter-var-throws-filter-failed-exception
   "FILTER_THROW_ON_FAILURE reports the PHP 8.5 Filter\\FilterFailedException class."
@@ -557,17 +537,15 @@ echo ($ok ? 'true' : 'false') . ':' . json_encode(headers_list());")))))
                            (cl-cc/php:%php-filter-var "abc" 257 268435456)
                            nil)
                        (cl-cc/php:php-exception (e) e))))
-      (assert-true condition)
-      (assert-true
-       (cl-cc/php:%php-exception-matches-p
+      (expect condition :to-be-truthy)
+      (expect (cl-cc/php:%php-exception-matches-p
         condition
-        (intern "FILTER\\FILTERFAILEDEXCEPTION" :cl-cc/php))))))
+        (intern "FILTER\\FILTERFAILEDEXCEPTION" :cl-cc/php)) :to-be-truthy))))
 
 (%php85-register-test 'php85-filter-var-rejects-null-and-throw-flags-together
   "FILTER_THROW_ON_FAILURE cannot be combined with FILTER_NULL_ON_FAILURE."
   (lambda ()
-(assert-signals cl-cc/php:php-exception
-    (cl-cc/php:%php-filter-var "42" 257 (+ 134217728 268435456)))))
+(let ((%%signaled2 nil)) (handler-case (progn (cl-cc/php:%php-filter-var "42" 257 (+ 134217728 268435456))) (cl-cc/php:php-exception () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy))))
 
 
 (eval-when (:load-toplevel :execute)

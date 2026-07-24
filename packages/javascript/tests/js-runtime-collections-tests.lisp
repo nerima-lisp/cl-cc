@@ -26,14 +26,12 @@
               entries))))
 
 (defun %jr-assert-set-has-all (set expected-values)
-  (assert-= (length expected-values)
-            (cl-cc/javascript::%js-set-size set))
+  (expect (= (length expected-values) (cl-cc/javascript::%js-set-size set)) :to-be-truthy)
   (dolist (value expected-values)
-    (assert-true (cl-cc/javascript::%js-set-has set value))))
+    (expect (cl-cc/javascript::%js-set-has set value) :to-be-truthy)))
 
 (defun %jr-assert-set-keys (expected-values set)
-  (assert-equal expected-values
-                (%jr-list (cl-cc/javascript::%js-set-keys set))))
+  (expect (%jr-list (cl-cc/javascript::%js-set-keys set)) :to-equal expected-values))
 
 (it-sequential "js-rt-set-basic"
   (let ((s (%jr-set 1 2 3)))
