@@ -228,14 +228,20 @@
   (emit-byte #x6E stream)
   (emit-byte (modrm 3 dst-xmm src-gpr) stream))
 
-(defun emit-movsd-xx (dst-xmm src-xmm stream)
-  "MOVSD xmm, xmm (scalar double copy)."
-  (emit-byte #xF2 stream)
-  (when (or (>= dst-xmm 8) (>= src-xmm 8))
-    (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
-  (emit-byte #x0F stream)
-  (emit-byte #x10 stream)
-  (emit-byte (modrm 3 dst-xmm src-xmm) stream))
+;;; The scalar-double reg,reg emitters share one F2 0F <opcode> skeleton and
+;;; differ only by the opcode byte — one data row each.
+(defmacro define-sd-xx-op (name opcode description)
+  "Define EMIT-<name>-XX — an F2 0F <opcode> /r scalar-double reg,reg emitter."
+  `(defun ,(intern (format nil "EMIT-~A-XX" name)) (dst-xmm src-xmm stream)
+     ,description
+     (emit-byte #xF2 stream)
+     (when (or (>= dst-xmm 8) (>= src-xmm 8))
+       (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
+     (emit-byte #x0F stream)
+     (emit-byte ,opcode stream)
+     (emit-byte (modrm 3 dst-xmm src-xmm) stream)))
+
+(define-sd-xx-op movsd #x10 "MOVSD xmm, xmm (scalar double copy).")
 
 (defun emit-movsd-xm (dst-xmm base offset stream)
   "MOVSD xmm, [base + offset] (scalar double load)."
@@ -255,32 +261,11 @@
   (emit-byte #x11 stream)
   (%emit-modrm-address (x86-64-memory-mod base offset) src-xmm base offset stream))
 
-(defun emit-addsd-xx (dst-xmm src-xmm stream)
-  "ADDSD xmm, xmm (scalar double add)."
-  (emit-byte #xF2 stream)
-  (when (or (>= dst-xmm 8) (>= src-xmm 8))
-    (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
-  (emit-byte #x0F stream)
-  (emit-byte #x58 stream)
-  (emit-byte (modrm 3 dst-xmm src-xmm) stream))
+(define-sd-xx-op addsd #x58 "ADDSD xmm, xmm (scalar double add).")
 
-(defun emit-subsd-xx (dst-xmm src-xmm stream)
-  "SUBSD xmm, xmm (scalar double subtract)."
-  (emit-byte #xF2 stream)
-  (when (or (>= dst-xmm 8) (>= src-xmm 8))
-    (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
-  (emit-byte #x0F stream)
-  (emit-byte #x5C stream)
-  (emit-byte (modrm 3 dst-xmm src-xmm) stream))
+(define-sd-xx-op subsd #x5C "SUBSD xmm, xmm (scalar double subtract).")
 
-(defun emit-mulsd-xx (dst-xmm src-xmm stream)
-  "MULSD xmm, xmm (scalar double multiply)."
-  (emit-byte #xF2 stream)
-  (when (or (>= dst-xmm 8) (>= src-xmm 8))
-    (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
-  (emit-byte #x0F stream)
-  (emit-byte #x59 stream)
-  (emit-byte (modrm 3 dst-xmm src-xmm) stream))
+(define-sd-xx-op mulsd #x59 "MULSD xmm, xmm (scalar double multiply).")
 
 (defun emit-vfmadd132sd-xxx (dst-xmm add-xmm mul-xmm stream)
   "VFMADD132SD dst, add, mul: dst = dst * mul + add."
@@ -298,20 +283,6 @@
     (emit-byte #x99 stream)
     (emit-byte (modrm 3 dst-xmm mul-xmm) stream)))
 
-(defun emit-divsd-xx (dst-xmm src-xmm stream)
-  "DIVSD xmm, xmm (scalar double divide)."
-  (emit-byte #xF2 stream)
-  (when (or (>= dst-xmm 8) (>= src-xmm 8))
-    (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
-  (emit-byte #x0F stream)
-  (emit-byte #x5E stream)
-  (emit-byte (modrm 3 dst-xmm src-xmm) stream))
+(define-sd-xx-op divsd #x5E "DIVSD xmm, xmm (scalar double divide).")
 
-(defun emit-sqrtsd-xx (dst-xmm src-xmm stream)
-  "SQRTSD xmm, xmm (scalar double square root)."
-  (emit-byte #xF2 stream)
-  (when (or (>= dst-xmm 8) (>= src-xmm 8))
-    (emit-byte (rex-prefix :r (ash dst-xmm -3) :b (ash src-xmm -3)) stream))
-  (emit-byte #x0F stream)
-  (emit-byte #x51 stream)
-  (emit-byte (modrm 3 dst-xmm src-xmm) stream))
+(define-sd-xx-op sqrtsd #x51 "SQRTSD xmm, xmm (scalar double square root).")
