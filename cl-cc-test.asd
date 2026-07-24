@@ -84,12 +84,6 @@
        (:file "runtime-stdlib-3-io-tests")
        (:file "crash-report-tests")
        (:file "vm-mop-tests")))
-    (:module "ast-tests"
-     :pathname "packages/ast/tests"
-     :serial t
-     :components
-     ((:file "ast-tests")
-      (:file "ast-analysis-tests")))
     (:module "parse-tests"
     :pathname "packages/parse/tests"
     :serial t
@@ -285,41 +279,6 @@
         (:file "runtime-stdlib-2-expand-tests")
         (:file "runtime-stdlib-3-expander-tests")
         (:file "runtime-stdlib-3-sequence-tests")))
-   (:module "type-tests"
-    :pathname "packages/type/tests"
-    :serial t
-    :components
-     ((:file "type-tests")
-      (:file "type-inference-tests")
-      (:file "type-effect-tests")
-      (:file "type-phase-tests")
-       (:file "type-2026-nodes-tests")
-       (:file "type-2026-advanced-registry-tests")
-       (:file "type-2026-advanced-semantic-tests")
-      (:file "kind-tests")
-     (:file "multiplicity-tests")
-     (:file "row-tests")
-     (:file "subtyping-tests")
-     (:file "subtyping-extended-tests")
-     (:file "effect-tests")
-     (:file "constraint-tests")
-     (:file "solver-tests")
-     (:file "solver-collect-tests")
-     (:file "representation-tests")
-     (:file "substitution-tests")
-     (:file "unification-tests")
-     (:file "type-children-tests")
-     (:file "types-extended-coverage-tests")
-     (:file "checker-tests")
-     (:file "typeclass-tests")
-     (:file "printer-tests")
-     (:file "parser-tests")
-     (:file "parser-arrow-quantifier-tests")
-     (:file "parser-typed-tests")
-     (:file "inference-tests")
-     (:file "inference-forms-tests")
-     (:file "inference-effect-tests")
-     (:file "exhaustiveness-tests")))
    (:module "ir-tests"
     :pathname "packages/ir/tests"
     :serial t

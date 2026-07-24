@@ -16,6 +16,38 @@
         "type": "github"
       }
     },
+    "cl-cc-ast": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784816576,
+        "narHash": "sha256-rTqKsjES5FJu8F/63zNMQaHtkHeCfYR33EwKTil7+Qc=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-ast",
+        "rev": "e88efda6430e82bd9e93b9a033f114c88d17cb0a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-ast",
+        "type": "github"
+      }
+    },
+    "cl-cc-type": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784817489,
+        "narHash": "sha256-dZwQ384AczGeWmdInvF6ZsIVSpFe2UCRctXYs3OZKws=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-type",
+        "rev": "33e001e07ebb14d98d1688b6014424ebeec9c2a7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-type",
+        "type": "github"
+      }
+    },
     "cl-cli": {
       "flake": false,
       "locked": {
@@ -151,6 +183,8 @@
     "root": {
       "inputs": {
         "cl-boundary-kit": "cl-boundary-kit",
+        "cl-cc-ast": "cl-cc-ast",
+        "cl-cc-type": "cl-cc-type",
         "cl-cli": "cl-cli",
         "cl-dataflow": "cl-dataflow",
         "cl-parser-kit": "cl-parser-kit",

@@ -168,11 +168,32 @@ Accepted STATUS keywords: :implemented, :partial, :planned, :unknown."
         (push (opt-roadmap-feature-id feature) ids)))
     (nreverse ids)))
 
+(defun %opt-roadmap-external-module-pathname (candidate)
+  "Resolve CANDIDATE against an externalized subsystem's source directory.
+Since ast/type were extracted to the external cl-cc-ast / cl-cc-type repos,
+roadmap evidence paths still spelled `packages/ast/...` / `packages/type/...`
+resolve against those systems' source directories (whose layout keeps the
+`src/`-relative suffix), stripping the vendored-tree prefix."
+  (flet ((resolve (system prefix)
+           (let ((suffix (subseq candidate (length prefix)))
+                 (root (ignore-errors (asdf:system-source-directory system))))
+             (when root
+               (ignore-errors (probe-file (merge-pathnames suffix root)))))))
+    (cond
+      ((and (>= (length candidate) 13)
+            (string= "packages/ast/" (subseq candidate 0 13)))
+       (resolve :cl-cc-ast "packages/ast/"))
+      ((and (>= (length candidate) 14)
+            (string= "packages/type/" (subseq candidate 0 14)))
+       (resolve :cl-cc-type "packages/type/"))
+      (t nil))))
+
 (defun %opt-roadmap-module-present-p (path)
   "Return T when PATH identifies a checkout file."
   (labels ((present-p (candidate)
              (or (ignore-errors (probe-file (asdf:system-relative-pathname :cl-cc candidate)))
-                 (probe-file (merge-pathnames candidate (uiop:getcwd))))))
+                 (probe-file (merge-pathnames candidate (uiop:getcwd)))
+                 (%opt-roadmap-external-module-pathname candidate))))
     (and (stringp path)
          (or (present-p path)
              (and (string= path "packages/optimize/src/optimizer-speculative-ic.lisp")

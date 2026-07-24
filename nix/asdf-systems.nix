@@ -8,6 +8,8 @@
   clBoundaryKit,
   clCli,
   clTtyKit,
+  clCcAst,
+  clCcType,
   ...
 }:
 let
@@ -53,10 +55,6 @@ let
       src = "packages/bootstrap";
       deps = [ ];
     };
-    cl-cc-ast = {
-      src = "packages/ast";
-      deps = [ ];
-    };
     cl-cc-binary = {
       src = "packages/binary";
       deps = [ ];
@@ -77,16 +75,12 @@ let
       src = "packages/mir";
       deps = [ ];
     };
-    cl-cc-type = {
-      src = "packages/type";
-      deps = [ "cl-cc-ast" ];
-    };
     cl-cc-parse = {
       src = "packages/parse";
       deps = [
-        "cl-cc-ast"
         "cl-cc-bootstrap"
       ];
+      extraLispLibs = [ clCcAst ];
     };
     cl-cc-vm = {
       src = "packages/vm";
@@ -102,33 +96,34 @@ let
     cl-cc-php = {
       src = "packages/php";
       deps = [
-        "cl-cc-ast"
         "cl-cc-bootstrap"
         "cl-cc-parse"
         "cl-cc-vm"
       ];
+      extraLispLibs = [ clCcAst ];
     };
     cl-cc-javascript = {
       src = "packages/javascript";
       deps = [
-        "cl-cc-ast"
         "cl-cc-bootstrap"
         "cl-cc-parse"
         # vm-integration.lisp wires the JS runtime into the VM (§5-1 step B).
         "cl-cc-vm"
       ];
+      extraLispLibs = [ clCcAst ];
     };
     cl-cc-optimize = {
       src = "packages/optimize";
       deps = [
         "cl-cc-vm"
-        "cl-cc-type"
       ];
       # clProlog backs the peephole/e-graph rewrite rules; clParserKit tokenizes
-      # and parses the `--pass-pipeline` spec string.
+      # and parses the `--pass-pipeline` spec string; clCcType is the externalized
+      # type system (brings clCcAst transitively).
       extraLispLibs = [
         clProlog
         clParserKit
+        clCcType
       ];
     };
     cl-cc-target = {
@@ -149,16 +144,16 @@ let
       src = "packages/expand";
       deps = [
         "cl-cc-bootstrap"
-        "cl-cc-type"
         "cl-cc-vm"
       ];
+      extraLispLibs = [ clCcType ];
     };
     cl-cc-cps = {
       src = "packages/cps";
       deps = [
         "cl-cc-bootstrap"
-        "cl-cc-ast"
       ];
+      extraLispLibs = [ clCcAst ];
     };
     cl-cc-codegen = {
       src = "packages/codegen";
@@ -184,9 +179,7 @@ let
       src = "packages/compile";
       deps = [
         "cl-cc-bootstrap"
-        "cl-cc-ast"
         "cl-cc-parse"
-        "cl-cc-type"
         "cl-cc-optimize"
         "cl-cc-vm"
         "cl-cc-expand"
@@ -195,7 +188,11 @@ let
         "cl-cc-target"
         "cl-cc-regalloc"
       ];
-      extraLispLibs = [ clProlog ];
+      extraLispLibs = [
+        clProlog
+        clCcAst
+        clCcType
+      ];
     };
     cl-cc-stdlib = {
       src = "packages/stdlib";
@@ -205,11 +202,9 @@ let
       src = "packages/pipeline";
       deps = [
         "cl-cc-bootstrap"
-        "cl-cc-ast"
         "cl-cc-parse"
         "cl-cc-php"
         "cl-cc-javascript"
-        "cl-cc-type"
         "cl-cc-optimize"
         "cl-cc-vm"
         "cl-cc-expand"
@@ -217,6 +212,10 @@ let
         "cl-cc-stdlib"
         "cl-cc-binary"
         "cl-cc-compile"
+      ];
+      extraLispLibs = [
+        clCcAst
+        clCcType
       ];
     };
     cl-cc-selfhost = {
@@ -228,12 +227,12 @@ let
         "cl-cc-vm"
         "cl-cc-runtime"
         "cl-cc-compile"
-        "cl-cc-ast"
         "cl-cc-parse"
         "cl-cc-optimize"
         "cl-cc-emit"
         "cl-cc-stdlib"
       ];
+      extraLispLibs = [ clCcAst ];
     };
     cl-cc-repl = {
       src = "packages/repl";
@@ -246,17 +245,18 @@ let
         "cl-cc-parse"
         "cl-cc-compile"
         "cl-cc-runtime"
-        "cl-cc-ast"
         "cl-cc-optimize"
         "cl-cc-emit"
         "cl-cc-stdlib"
       ];
       # cl-tty-kit provides ANSI/style/screen + input-decoder primitives for
       # the interactive REPL front-end; cl-boundary-kit models its console/
-      # system-exit I/O as swappable, testable boundaries.
+      # system-exit I/O as swappable, testable boundaries; clCcAst is the
+      # externalized AST system.
       extraLispLibs = [
         clTtyKit
         clBoundaryKit
+        clCcAst
       ];
     };
   };
@@ -274,6 +274,13 @@ let
         (projectRoot + "/cl-cc-test.asd")
       ];
       deps = leafNames;
+      # ast/type are no longer leaves (extracted to external repos); the
+      # umbrella :cl-cc still :depends-on :cl-cc-ast/:cl-cc-type, so the
+      # external derivations must be on the ASDF registry at load time.
+      extraLispLibs = [
+        clCcAst
+        clCcType
+      ];
     };
     cl-cc-cli = {
       src = "packages/cli";
@@ -339,7 +346,7 @@ let
     src = pkgSrc "packages/prolog-tools";
     systems = [ "cl-cc-prolog-tools" ];
     lispLibs = [
-      productionAsdfSystems.cl-cc-ast
+      clCcAst
       clProlog
     ];
   };
@@ -353,7 +360,7 @@ let
     src = pkgSrc "packages/prolog-tools";
     systems = [ "cl-cc-prolog-tools/tests" ];
     lispLibs = [
-      productionAsdfSystems.cl-cc-ast
+      clCcAst
       clProlog
       clWeave
     ];

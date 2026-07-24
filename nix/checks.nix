@@ -6,6 +6,7 @@
   packagesDefault,
   clProlog,
   clWeave,
+  clCcAst,
 }:
 {
   checks = {
@@ -52,7 +53,6 @@
             root = ../.;
             fileset = lib.fileset.unions [
               ../packages/prolog-tools
-              ../packages/ast
             ];
           };
         }
@@ -63,10 +63,11 @@
           export HOME="$TMPDIR/home"
           export XDG_CACHE_HOME="$TMPDIR/cache"
           mkdir -p "$HOME" "$XDG_CACHE_HOME"
-          export CL_SOURCE_REGISTRY="${clProlog}//:${clWeave}//:$PWD//:"
+          # cl-cc-ast is now an external derivation; put it on the source
+          # registry rather than loading a vendored packages/ast/*.asd.
+          export CL_SOURCE_REGISTRY="${clProlog}//:${clWeave}//:${clCcAst}//:$PWD//:"
           sbcl --non-interactive \
             --eval '(require :asdf)' \
-            --eval '(asdf:load-asd (truename "packages/ast/cl-cc-ast.asd"))' \
             --eval '(asdf:load-asd (truename "packages/prolog-tools/cl-cc-prolog-tools.asd"))' \
             --eval '(asdf:test-system :cl-cc-prolog-tools)'
           touch $out

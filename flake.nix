@@ -51,6 +51,17 @@
       url = "github:nerima-lisp/cl-tty-kit";
       flake = false;
     };
+    # cl-cc-ast and cl-cc-type were extracted out of this monorepo into their
+    # own nerima-lisp repos; they are consumed here as plain source trees and
+    # built with cl-cc's own sbcl.buildASDFSystem, exactly like cl-prolog above.
+    cl-cc-ast = {
+      url = "github:nerima-lisp/cl-cc-ast";
+      flake = false;
+    };
+    cl-cc-type = {
+      url = "github:nerima-lisp/cl-cc-type";
+      flake = false;
+    };
   };
 
   outputs =
@@ -119,6 +130,23 @@
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
           };
+          # Externalized ast/type systems (previously vendored under packages/).
+          # clCcType depends on clCcAst, mirroring the :cl-cc-type -> :cl-cc-ast
+          # ASDF dependency, so any cl-cc package consuming clCcType transitively
+          # gets clCcAst as well.
+          clCcAst = sbcl.buildASDFSystem {
+            pname = "cl-cc-ast";
+            version = "0.1.0";
+            src = inputs.cl-cc-ast;
+            systems = [ "cl-cc-ast" ];
+          };
+          clCcType = sbcl.buildASDFSystem {
+            pname = "cl-cc-type";
+            version = "0.1.0";
+            src = inputs.cl-cc-type;
+            systems = [ "cl-cc-type" ];
+            lispLibs = [ clCcAst ];
+          };
           asdf = import ./nix/asdf-systems.nix {
             inherit
               pkgs
@@ -131,6 +159,8 @@
               clBoundaryKit
               clCli
               clTtyKit
+              clCcAst
+              clCcType
               ;
           };
           inherit (asdf)
@@ -170,6 +200,7 @@
               sbclWithTests
               clProlog
               clWeave
+              clCcAst
               ;
             inherit (appsModule) apps;
             packagesDefault = binaryModule.default;
@@ -183,6 +214,11 @@
             // {
               inherit (binaryModule) default;
               inherit cl-cc-prolog-tools cl-cc-prolog-tools-test;
+              # Externalized ast/type systems, exposed as package outputs so
+              # they remain `nix build`-able even though they are no longer part
+              # of productionAsdfSystems (they live in their own repos now).
+              cl-cc-ast = clCcAst;
+              cl-cc-type = clCcType;
               test-image = testImage;
             };
           inherit (appsModule) apps;
