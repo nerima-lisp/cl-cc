@@ -6,21 +6,7 @@
 (defpackage :cl-cc/pbt
   (:use :cl)
   (:import-from :cl-cc/test
-                 #:cl-cc-suite
-                 #:cl-cc-integration-suite
-                 #:cl-cc-integration-serial-suite
-                 #:defsuite
-                 #:in-suite
-                 #:deftest
                  #:%fail-test
-                 #:assert-true
-                 #:assert-false
-                 #:assert-=
-                 #:assert-eq
-                 #:assert-equal
-                 #:assert-null
-                 #:assert-type
-                 #:assert-signals
                  #:run-string)
   (:import-from :cl-cc
                 :ast-node :ast-int :ast-var :ast-binop :ast-if :ast-progn :ast-print
