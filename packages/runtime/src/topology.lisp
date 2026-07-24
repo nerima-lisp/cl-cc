@@ -59,18 +59,27 @@
                 (or (sb-ext:posix-getenv "PATH")
                     "/usr/bin:/bin:/usr/sbin:/sbin"))))
 
+(defparameter *rt-topology-probe-timeout-seconds* 2
+  "Timeout in seconds for external CPU/NUMA topology probe commands
+(numactl, getconf, nproc, sysctl).  These run at heap/GC configuration time,
+so a hung probe must never stall the runtime; on timeout the probe is treated
+as unavailable (NIL), exactly like a command failure.")
+
 (defun %rt-run-program-output (program args)
-  (ignore-errors
-    (let ((out (make-string-output-stream)))
-      (let ((process (sb-ext:run-program program args
-                                         :search t
-                                         :output out
-                                         :error nil
-                                         :wait t
-                                         #+darwin :environment
-                                         #+darwin (%rt-darwin-run-program-environment))))
-        (when (and process (zerop (sb-ext:process-exit-code process)))
-          (%rt-trim (get-output-stream-string out)))))))
+  (handler-case
+      (sb-ext:with-timeout *rt-topology-probe-timeout-seconds*
+        (ignore-errors
+          (let ((out (make-string-output-stream)))
+            (let ((process (sb-ext:run-program program args
+                                               :search t
+                                               :output out
+                                               :error nil
+                                               :wait t
+                                               #+darwin :environment
+                                               #+darwin (%rt-darwin-run-program-environment))))
+              (when (and process (zerop (sb-ext:process-exit-code process)))
+                (%rt-trim (get-output-stream-string out)))))))
+    (sb-ext:timeout () nil)))
 
 (defun %rt-parse-non-negative-integer (string &key start end)
   (ignore-errors

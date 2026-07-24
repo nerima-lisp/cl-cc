@@ -143,6 +143,26 @@ Frame-pointer functions restore non-RBP callee-saved registers, then use
   (let ((term (%native-block-terminator block)))
     (and term (%native-inst-reads-phys-p term phys-key assignment))))
 
+(defun %native-weave-shrink-wrap-pseudos (cfg save-map restore-map)
+  "Rebuild the instruction stream with SAVE-MAP pseudos after each block label and
+RESTORE-MAP pseudos inserted before each block terminator."
+  (let ((result nil))
+    (loop for block across (cfg-blocks cfg) do
+      (when (bb-label block)
+        (push (bb-label block) result))
+      (dolist (pseudo (reverse (gethash block save-map)))
+        (push pseudo result))
+      (let* ((insts (bb-instructions block))
+             (term (%native-block-terminator block))
+             (body (if term (butlast insts) insts)))
+        (dolist (inst body)
+          (push inst result))
+        (dolist (pseudo (reverse (gethash block restore-map)))
+          (push pseudo result))
+        (when term
+          (push term result))))
+    (nreverse result)))
+
 (defun %native-shrink-wrap-plan (instructions reg-codes assignment make-save make-restore)
   "Return three values: annotated instructions, entry-save regs, final-restore regs.
 
@@ -197,22 +217,8 @@ register falls back to the monolithic entry/final epilogue path."
                        (push (funcall make-restore reg-code) (gethash block restore-map))))))))))
       (setf entry-regs (nreverse fallback)
             final-regs (nreverse fallback))
-      (let ((result nil))
-        (loop for block across (cfg-blocks cfg) do
-          (when (bb-label block)
-            (push (bb-label block) result))
-          (dolist (pseudo (reverse (gethash block save-map)))
-            (push pseudo result))
-          (let* ((insts (bb-instructions block))
-                 (term (%native-block-terminator block))
-                 (body (if term (butlast insts) insts)))
-            (dolist (inst body)
-              (push inst result))
-            (dolist (pseudo (reverse (gethash block restore-map)))
-              (push pseudo result))
-            (when term
-              (push term result))))
-        (values (nreverse result) entry-regs final-regs)))))
+      (values (%native-weave-shrink-wrap-pseudos cfg save-map restore-map)
+              entry-regs final-regs))))
 
 (defun x86-64-shrink-wrap-instructions (instructions save-regs assignment)
   "Annotate INSTRUCTIONS with x86-64 callee-save shrink-wrap pseudo-ops."

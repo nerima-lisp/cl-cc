@@ -164,3 +164,26 @@ fell through to the default arm."
 (deftest etypecase-dispatch-runtime
   "etypecase dispatches like typecase for a matching clause."
   (assert-equal "I" (run-string "(etypecase 42 (string \"S\") (integer \"I\"))")))
+
+;;; Property-Based Differential Tests
+;;;
+;;; ASSERT-PBT (framework-pbt.lisp) checks a property against many random
+;;; samples instead of a handful of fixed cases; these two exercise it against
+;;; the compiler's own arithmetic and CONS lowering, comparing RUN-STRING's
+;;; guest-side result to the equivalent host Lisp computation.
+
+(deftest pbt-addition-matches-host-arithmetic
+  "Property: compiling and running (+ a b) matches host Lisp addition, for
+random small integers including negatives."
+  (assert-pbt (:trials 50 :threshold 1.0)
+      ((a (- (random 200) 100))
+       (b (- (random 200) 100)))
+    (= (+ a b) (run-string (format nil "(+ ~D ~D)" a b)))))
+
+(deftest pbt-multiplication-matches-host-arithmetic
+  "Property: compiling and running (* a b) matches host Lisp multiplication,
+for random small integers including negatives."
+  (assert-pbt (:trials 50 :threshold 1.0)
+      ((a (- (random 40) 20))
+       (b (- (random 40) 20)))
+    (= (* a b) (run-string (format nil "(* ~D ~D)" a b)))))

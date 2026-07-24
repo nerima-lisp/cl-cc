@@ -556,3 +556,215 @@
   (let* ((cur (cl-cc/regalloc::make-live-interval :vreg :r0 :start 5 :end 10))
          (s   (cl-cc/regalloc::make-lsa-state :active nil)))
     (assert-eq cur (cl-cc/regalloc::%lsa-best-spill-candidate s cur))))
+
+;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+;;; Graph-coloring allocation (regalloc-color.lisp, FR-061 / FR-199)
+;;;
+;;; The :color allocation strategy (regalloc-allocate.lisp dispatch) is not
+;;; exercised by the linear-scan-focused tests above, so the Chaitin-Briggs
+;;; coloring path and stack-slot sharing were previously unrun.  These tests
+;;; drive it directly through its internal and public entry points.
+;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+(defun %rc-interval (vreg start end &key use-positions crosses-call-p return-value-p fp-p)
+  "Construct a live-interval for graph-coloring tests."
+  (cl-cc/regalloc::make-live-interval
+   :vreg vreg :start start :end end
+   :use-positions (or use-positions (list start end))
+   :crosses-call-p crosses-call-p
+   :return-value-p return-value-p
+   :fp-p fp-p))
+
+;;; ─── %intervals-overlap-p ──────────────────────────────────────────────
+
+(deftest-each color-intervals-overlap-p
+  "%intervals-overlap-p treats shared or touching ranges as interference and disjoint ranges as clear."
+  :cases (("exact"        0 10 0 10  t)
+          ("partial"      0  8 5 12  t)
+          ("contained"    0 20 5 10  t)
+          ("touching-end" 0 10 10 20 t)
+          ("disjoint"     0  5 6 10  nil))
+  (sa ea sb eb expected)
+  (assert-bool expected
+               (cl-cc/regalloc::%intervals-overlap-p (%rc-interval :a sa ea)
+                                                     (%rc-interval :b sb eb))))
+
+;;; ─── %color-build-interference-graph ───────────────────────────────────
+
+(deftest color-build-graph-overlap-adds-mutual-edges
+  "Overlapping intervals become each other's neighbors in the interference graph."
+  (let ((g (cl-cc/regalloc::%color-build-interference-graph
+            (list (%rc-interval :a 0 10) (%rc-interval :b 5 15)))))
+    (assert-true (member :b (gethash :a g)))
+    (assert-true (member :a (gethash :b g)))))
+
+(deftest color-build-graph-disjoint-has-no-edges
+  "Disjoint intervals share no interference edges."
+  (let ((g (cl-cc/regalloc::%color-build-interference-graph
+            (list (%rc-interval :a 0 5) (%rc-interval :b 6 10)))))
+    (assert-null (gethash :a g))
+    (assert-null (gethash :b g))))
+
+(deftest color-build-graph-skips-nil-vreg
+  "Intervals with a nil vreg are excluded from the interference graph."
+  (let ((g (cl-cc/regalloc::%color-build-interference-graph
+            (list (%rc-interval nil 0 10) (%rc-interval :b 0 10)))))
+    (assert-= 1 (hash-table-count g))
+    (assert-null (gethash nil g))))
+
+;;; ─── %color-simplify ───────────────────────────────────────────────────
+
+(deftest color-simplify-no-spill-when-k-sufficient
+  "With k colors >= register pressure, no node is marked as a potential spill."
+  (let* ((a (%rc-interval :a 0 10))
+         (b (%rc-interval :b 5 15))
+         (g (cl-cc/regalloc::%color-build-interference-graph (list a b)))
+         (imap (cl-cc/regalloc::%interval-map (list a b)))
+         (stack (cl-cc/regalloc::%color-simplify g imap 2)))
+    (assert-= 2 (length stack))
+    (assert-true (every (lambda (e) (not (cdr e))) stack))))
+
+(deftest color-simplify-marks-spill-under-pressure
+  "Three mutually interfering intervals with only k=2 colors force a spill mark."
+  (let* ((a (%rc-interval :a 0 20 :use-positions '(0 5 10 15)))
+         (b (%rc-interval :b 0 20 :use-positions '(1 6 11 16)))
+         (c (%rc-interval :c 0 20 :use-positions '(2)))
+         (g (cl-cc/regalloc::%color-build-interference-graph (list a b c)))
+         (imap (cl-cc/regalloc::%interval-map (list a b c)))
+         (stack (cl-cc/regalloc::%color-simplify g imap 2)))
+    (assert-= 3 (length stack))
+    (assert-true (some #'cdr stack))))
+
+;;; ─── %color-spill-priority / %color-spill-candidate ────────────────────
+
+(deftest-each color-spill-priority-ml-disabled
+  "%color-spill-priority scores uses/length plus call-cross and return-value bonuses when ML costing is off."
+  :cases (("uses-over-length" 0 10 '(1 2 3 4 5) nil nil 1/2)
+          ("call-cross-bonus" 0 10 '(1)         t   nil 11/10)
+          ("return-bonus"     0 10 '(1)         nil t   11/10)
+          ("length-clamp"     5  5 '(5)         nil nil 1))
+  (start end uses call ret expected)
+  (let ((cl-cc/regalloc::*ml-regalloc-enabled* nil))
+    (assert-= expected
+              (cl-cc/regalloc::%color-spill-priority
+               (%rc-interval :v start end :use-positions uses
+                             :crosses-call-p call :return-value-p ret)))))
+
+(deftest color-spill-candidate-picks-lowest-priority
+  "%color-spill-candidate evicts the cheapest (lowest-priority) interval."
+  (let* ((cl-cc/regalloc::*ml-regalloc-enabled* nil)
+         (low  (%rc-interval :low  0 20 :use-positions '(1)))
+         (high (%rc-interval :high 0 10 :use-positions '(0 1 2 3 4 5 6 7 8 9 10)))
+         (g (cl-cc/regalloc::%color-build-interference-graph (list low high)))
+         (imap (cl-cc/regalloc::%interval-map (list low high))))
+    (assert-eq :low (cl-cc/regalloc::%color-spill-candidate g imap))))
+
+;;; ─── %color-select-register ────────────────────────────────────────────
+
+(deftest color-select-register-avoids-neighbor-colors
+  "%color-select-register returns the first register not used by a colored neighbor."
+  (let* ((a (%rc-interval :a 0 10))
+         (b (%rc-interval :b 0 10))
+         (g (cl-cc/regalloc::%color-build-interference-graph (list a b)))
+         (assign (make-hash-table :test #'eq)))
+    (setf (gethash :b assign) :r0)
+    (assert-eq :r1 (cl-cc/regalloc::%color-select-register :a g assign '(:r0 :r1)))))
+
+(deftest color-select-register-nil-when-all-conflict
+  "%color-select-register returns nil when every candidate register conflicts with a neighbor."
+  (let* ((a (%rc-interval :a 0 10))
+         (b (%rc-interval :b 0 10))
+         (g (cl-cc/regalloc::%color-build-interference-graph (list a b)))
+         (assign (make-hash-table :test #'eq)))
+    (setf (gethash :b assign) :r0)
+    (assert-null (cl-cc/regalloc::%color-select-register :a g assign '(:r0)))))
+
+;;; ─── color-allocate (public Chaitin-Briggs driver) ─────────────────────
+
+(deftest color-allocate-assigns-when-registers-available
+  "color-allocate assigns a physical register to every interval and spills nothing when k suffices."
+  (multiple-value-bind (assignment spill-map spill-count)
+      (cl-cc/regalloc::color-allocate (list (%rc-interval :a 0 10)
+                                            (%rc-interval :b 12 20))
+                                      '(:r0 :r1))
+    (assert-true (gethash :a assignment))
+    (assert-true (gethash :b assignment))
+    (assert-= 0 (hash-table-count spill-map))
+    (assert-= 0 spill-count)))
+
+(deftest color-allocate-spills-when-k-exceeded
+  "color-allocate spills exactly one interval when three mutually interfering vregs exceed two registers."
+  (multiple-value-bind (assignment spill-map spill-count)
+      (cl-cc/regalloc::color-allocate (list (%rc-interval :a 0 20)
+                                            (%rc-interval :b 0 20)
+                                            (%rc-interval :c 0 20))
+                                      '(:r0 :r1))
+    (declare (ignore assignment))
+    (assert-= 1 (hash-table-count spill-map))
+    (assert-true (>= spill-count 1))))
+
+(deftest color-allocate-empty-intervals
+  "color-allocate returns empty maps and zero spill count for an empty interval list."
+  (multiple-value-bind (assignment spill-map spill-count)
+      (cl-cc/regalloc::color-allocate '() '(:r0 :r1))
+    (assert-= 0 (hash-table-count assignment))
+    (assert-= 0 (hash-table-count spill-map))
+    (assert-= 0 spill-count)))
+
+(deftest color-allocate-for-target-separates-gpr-and-fp
+  "color-allocate-for-target colors GPR and FP intervals in their own register classes without spilling."
+  (let* ((gpr (%rc-interval :gpr 0 10 :fp-p nil))
+         (fp  (%rc-interval :fpr 0 10 :fp-p t))
+         (cc  (cl-cc/target::make-target-desc
+               :name :x86-64
+               :gpr-names #(:rdi :rsi :rdx :rcx :r8 :r9 :rbx :r12)
+               :arg-regs '(:rdi :rsi :rdx :rcx :r8 :r9)
+               :ret-reg :rax
+               :fp-arg-regs '(:xmm0 :xmm1 :xmm2 :xmm3)
+               :fp-ret-reg :xmm0
+               :callee-saved '(:rbx :r12)
+               :scratch-regs nil)))
+    (multiple-value-bind (assignment spill-map spill-count)
+        (cl-cc/regalloc::color-allocate-for-target (list gpr fp) cc)
+      (assert-true (gethash :gpr assignment))
+      (assert-true (gethash :fpr assignment))
+      (assert-= 0 (hash-table-count spill-map))
+      (assert-= 0 spill-count))))
+
+;;; ─── stack-slot sharing (color-spill-slots / regalloc-color-spill-slots) ─
+
+(deftest color-spill-slots-non-overlapping-share-slot
+  "color-spill-slots collapses two non-overlapping spilled intervals onto one shared stack slot."
+  (let ((m (cl-cc/regalloc::color-spill-slots (list (%rc-interval :a 0 5)
+                                                    (%rc-interval :b 6 10))
+                                              0)))
+    (assert-= (gethash :a m) (gethash :b m))))
+
+(deftest color-spill-slots-overlapping-distinct-slots
+  "color-spill-slots assigns distinct slots to two overlapping spilled intervals."
+  (let ((m (cl-cc/regalloc::color-spill-slots (list (%rc-interval :a 0 10)
+                                                    (%rc-interval :b 5 15))
+                                              0)))
+    (assert-true (/= (gethash :a m) (gethash :b m)))))
+
+(deftest color-spill-slots-respects-offset
+  "color-spill-slots keeps every assigned slot above the supplied slot offset."
+  (let ((m (cl-cc/regalloc::color-spill-slots (list (%rc-interval :a 0 5)) 3)))
+    (assert-true (>= (gethash :a m) 4))))
+
+(deftest regalloc-color-spill-slots-passthrough-when-none-spilled
+  "regalloc-color-spill-slots returns the original spill-map unchanged when no interval is spilled."
+  (let* ((orig (make-hash-table :test #'eq))
+         (result (cl-cc/regalloc::regalloc-color-spill-slots
+                  (list (%rc-interval :a 0 10)) orig 0)))
+    (assert-eq orig result)))
+
+(deftest regalloc-color-spill-slots-applies-coloring
+  "regalloc-color-spill-slots shares a slot between non-overlapping spilled vregs present in the spill-map."
+  (let* ((spill-map (let ((ht (make-hash-table :test #'eq)))
+                      (setf (gethash :a ht) 1 (gethash :b ht) 2)
+                      ht))
+         (result (cl-cc/regalloc::regalloc-color-spill-slots
+                  (list (%rc-interval :a 0 5) (%rc-interval :b 6 10))
+                  spill-map 0)))
+    (assert-= (gethash :a result) (gethash :b result))))

@@ -13,13 +13,20 @@ Default NIL preserves the existing optimizer output and the 7746/0 baseline.")
 (defun %autotune-trim (string)
   (and string (string-trim '(#\Space #\Tab #\Newline #\Return) string)))
 
+(defparameter *autotune-probe-timeout-seconds* 2
+  "Timeout in seconds for external cache-geometry probe commands (sysctl).
+A hung probe is treated as failure (NIL), which leaves auto-tuning disabled
+rather than stalling optimization.")
+
 (defun %autotune-run-program-line (program args)
   "Return a trimmed single-line command result, or NIL on failure."
   (handler-case
-      (let ((out (make-string-output-stream)))
-        (let ((proc (sb-ext:run-program program args :output out :error nil :search t)))
-          (when (zerop (sb-ext:process-exit-code proc))
-            (%autotune-trim (get-output-stream-string out)))))
+      (sb-ext:with-timeout *autotune-probe-timeout-seconds*
+        (let ((out (make-string-output-stream)))
+          (let ((proc (sb-ext:run-program program args :output out :error nil :search t)))
+            (when (zerop (sb-ext:process-exit-code proc))
+              (%autotune-trim (get-output-stream-string out))))))
+    (sb-ext:timeout () nil)
     (error () nil)))
 
 (defun %autotune-parse-cache-size (value)

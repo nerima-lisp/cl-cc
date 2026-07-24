@@ -105,6 +105,16 @@
   "Return T when VALUE is a symbol/string designator used by semantic metadata."
   (or (symbolp value) (stringp value)))
 
+(defun %type-advanced-head-symbol-form-p (value names &optional (min-length 2))
+  "Return T when VALUE is a cons whose symbol head names one of NAMES (by
+upcased name) and whose length is at least MIN-LENGTH."
+  (and (consp value)
+       (symbolp (first value))
+       (member (string-upcase (symbol-name (first value)))
+               names
+               :test #'string=)
+       (>= (length value) min-length)))
+
 (defun %type-advanced-boolean-value-p (value)
   "Return T when VALUE is an explicit boolean."
   (or (null value)
@@ -157,12 +167,8 @@
 
 (defun %type-advanced-generator-form-p (value)
   "Return T when VALUE is a plausible type-directed generator descriptor."
-  (and (consp value)
-       (symbolp (first value))
-       (member (string-upcase (symbol-name (first value)))
-               '("ARBITRARY" "ENUM" "FUZZ" "SIZED" "GENERATOR")
-               :test #'string=)
-       (>= (length value) 2)))
+  (%type-advanced-head-symbol-form-p
+   value '("ARBITRARY" "ENUM" "FUZZ" "SIZED" "GENERATOR")))
 
 (defun %type-advanced-fingerprint-p (value)
   "Return T when VALUE is a plausible interface fingerprint token."
@@ -205,12 +211,8 @@
 
 (defun %type-advanced-pointerish-form-p (value)
   "Return T when VALUE resembles a typed pointer/reference descriptor."
-  (and (consp value)
-       (symbolp (first value))
-       (member (string-upcase (symbol-name (first value)))
-               '("POINTER" "PTR" "FOREIGN-POINTER" "C-PTR" "SLOT-REF" "CAR-REF")
-               :test #'string=)
-       (>= (length value) 2)))
+  (%type-advanced-head-symbol-form-p
+   value '("POINTER" "PTR" "FOREIGN-POINTER" "C-PTR" "SLOT-REF" "CAR-REF")))
 
 (defun %type-advanced-effect-label-list-p (value)
   "Return T when VALUE is a non-empty list of unique effect labels."
@@ -230,10 +232,5 @@
 
 (defun %type-advanced-staged-form-p (value)
   "Return T when VALUE is a plausible code/splice/run descriptor."
-  (and (consp value)
-       (symbolp (first value))
-       (member (string-upcase (symbol-name (first value)))
-               '("CODE" "QUOTE" "SPLICE" "RUN")
-               :test #'string=)
-       (>= (length value) 2)))
+  (%type-advanced-head-symbol-form-p value '("CODE" "QUOTE" "SPLICE" "RUN")))
 

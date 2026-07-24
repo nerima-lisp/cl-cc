@@ -17,7 +17,7 @@
     :timeout 15
     :cases
     (("two-class-switch"
-      (:a :a :b :a)
+      '(:a :a :b :a)
       "(progn
          (defclass pic-class-a () ())
          (defclass pic-class-b () ())
@@ -28,7 +28,7 @@
                 (b (make-instance 'pic-class-b)))
            (list (pic-id a) (pic-id a) (pic-id b) (pic-id a))))")
       ("multi-arg-pic"
-       (:x=1 :y=2 :x=3 :y=4)
+       '((:x= 1) (:y= 2) (:x= 3) (:y= 4))
        "(progn
           (defclass point-x () ((v :initarg :v)))
           (defclass point-y () ((v :initarg :v)))
@@ -41,7 +41,7 @@
                 (y4 (make-instance 'point-y :v 4)))
             (list (pick-x x1) (pick-x y2) (pick-x x3) (pick-x y4))))")
       ("three-class-thrash"
-       (:a :b :c :a :b :c)
+       '(:a :b :c :a :b :c)
        "(progn
           (defclass thrash-a () ())
           (defclass thrash-b () ())
@@ -56,7 +56,7 @@
             (list (thrash-id a) (thrash-id b) (thrash-id c)
                   (thrash-id a) (thrash-id b) (thrash-id c))))")
       ("mixed-with-inheritance"
-       (:base :derived :base)
+       '(:base :derived :base)
        "(progn
           (defclass pic-base () ())
           (defclass pic-derived (pic-base) ())
@@ -72,25 +72,24 @@
 ;; VM-level PIC profiling tests -- cache hit/miss counters and type-feedback
 (deftest fr-009-pic-cache-transitions-and-profiling
     "FR-009 PIC cache transitions and profiling counters."
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state :profile-enabled-p t))
+  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+         (generic-caches (make-hash-table :test #'equal))
          (method-a (make-instance 'cl-cc/vm::vm-closure-object
                                   :entry-label 'prof-method-a :params '(:x)))
          (method-b (make-instance 'cl-cc/vm::vm-closure-object
                                   :entry-label 'prof-method-b :params '(:x))))
-    (setf (cl-cc/vm::vm-io-state-generic-caches state)
-          (make-hash-table :test #'equal))
-    (let ((ht (gethash 'prof-gf-fn
-                       (cl-cc/vm::vm-io-state-generic-caches state))))
+    (setf (cl-cc/vm::vm-profile-enabled-p state) t)
+    (let ((ht (gethash 'prof-gf-fn generic-caches)))
       (unless ht
         (setf ht (make-hash-table :test #'eq))
-        (setf (gethash 'prof-gf-fn
-                       (cl-cc/vm::vm-io-state-generic-caches state)) ht))
+        (setf (gethash 'prof-gf-fn generic-caches) ht))
       ;; Simulate 6-call PIC sequence: miss, hit, miss, hit, miss, hit
       (setf (gethash 'prof-a-class ht) (cons method-a 0))
       (incf (cdr (gethash 'prof-a-class ht)))
       (setf (gethash 'prof-b-class ht) (cons method-b 0))
       (incf (cdr (gethash 'prof-b-class ht)))
-      (setf (gethash 'prof-a-class ht) (cons method-a 0))
+      ;; Second access to prof-a-class is a cache HIT: increment its counter
+      ;; rather than re-installing (which would reset the count).
       (incf (cdr (gethash 'prof-a-class ht)))
       (let* ((entry-a (gethash 'prof-a-class ht))
              (entry-b (gethash 'prof-b-class ht)))

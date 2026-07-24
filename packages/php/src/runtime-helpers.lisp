@@ -558,13 +558,19 @@ an integer (3.0 -> \"3\").  princ-to-string leaked the CL form: \"1.5d0\", \"5/2
         ((eq value t) 1)
         (t (truncate value))))
 
-(defun %php-modulo (a b)
-  "Return A % B using PHP-style integer truncation toward zero."
-  (rem (%php-to-integer a) (%php-to-integer b)))
+(defmacro define-php-int-binop (name op &optional doc)
+  "Define binary PHP helper NAME applying OP to both operands coerced via %PHP-TO-INTEGER."
+  `(defun ,name (a b) ,@(when doc (list doc))
+     (,op (%php-to-integer a) (%php-to-integer b))))
 
-(defun %php-shift-left (a b)
-  "Return A shifted left by B bits."
-  (ash (%php-to-integer a) (%php-to-integer b)))
+(defmacro define-php-comparison (name cmp &optional doc)
+  "Define binary PHP relational helper NAME, returning a PHP boolean by comparing
+the %PHP-SPACESHIP result against 0 with CMP."
+  `(defun ,name (a b) ,@(when doc (list doc))
+     (and (,cmp (%php-spaceship a b) 0) t)))
+
+(define-php-int-binop %php-modulo     rem "Return A % B using PHP-style integer truncation toward zero.")
+(define-php-int-binop %php-shift-left ash "Return A shifted left by B bits.")
 
 (defun %php-shift-right (a b)
   "Return A shifted right by B bits, preserving sign for negative integers."
@@ -587,22 +593,14 @@ an integer (3.0 -> \"3\").  princ-to-string leaked the CL form: \"1.5d0\", \"5/2
 ;;; was "integer", (5>3) === true was false, and match(true){$x>3=>…} never
 ;;; matched.  Deriving from %php-spaceship also gives correct PHP comparison
 ;;; semantics (numeric strings, type juggling) for free.
-(defun %php-lt (a b) "PHP a < b."  (and (< (%php-spaceship a b) 0) t))
-(defun %php-gt (a b) "PHP a > b."  (and (> (%php-spaceship a b) 0) t))
-(defun %php-le (a b) "PHP a <= b." (and (<= (%php-spaceship a b) 0) t))
-(defun %php-ge (a b) "PHP a >= b." (and (>= (%php-spaceship a b) 0) t))
+(define-php-comparison %php-lt <  "PHP a < b.")
+(define-php-comparison %php-gt >  "PHP a > b.")
+(define-php-comparison %php-le <= "PHP a <= b.")
+(define-php-comparison %php-ge >= "PHP a >= b.")
 
-(defun %php-bitwise-and (a b)
-  "Return PHP bitwise AND for integer-coerced operands."
-  (logand (%php-to-integer a) (%php-to-integer b)))
-
-(defun %php-bitwise-or (a b)
-  "Return PHP bitwise OR for integer-coerced operands."
-  (logior (%php-to-integer a) (%php-to-integer b)))
-
-(defun %php-bitwise-xor (a b)
-  "Return PHP bitwise XOR for integer-coerced operands."
-  (logxor (%php-to-integer a) (%php-to-integer b)))
+(define-php-int-binop %php-bitwise-and logand "Return PHP bitwise AND for integer-coerced operands.")
+(define-php-int-binop %php-bitwise-or  logior "Return PHP bitwise OR for integer-coerced operands.")
+(define-php-int-binop %php-bitwise-xor logxor "Return PHP bitwise XOR for integer-coerced operands.")
 
 (defun %php-bitwise-not (a)
   "Return PHP bitwise NOT for an integer-coerced operand."

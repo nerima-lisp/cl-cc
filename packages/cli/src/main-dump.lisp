@@ -17,7 +17,6 @@
 ;;; ANSI color codes for IR dumps, built with cl-tty-kit's SGR builder rather
 ;;; than hand-assembled escape strings.  ansi-sgr N yields exactly ESC[Nm, so
 ;;; these remain byte-identical to the previous hand-written constants.
-(defparameter +ansi-esc+     (string (code-char 27)))
 (defparameter +ansi-reset+   (cl-tty-kit:ansi-sgr 0))
 (defparameter +ansi-label+   (cl-tty-kit:ansi-sgr 32))
 (defparameter +ansi-opcode+  (cl-tty-kit:ansi-sgr 34))

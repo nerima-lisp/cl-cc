@@ -128,3 +128,21 @@
 (deftest target-op-legal-default
   "Unregistered ops are legal by default (permissive)."
   (assert-true (cl-cc/target:target-op-legal-p cl-cc/target:*x86-64-target* :add)))
+
+(deftest target-op-legal-p-honors-explicit-illegal-entry
+  "An op registered as NIL in LEGAL-OPS is reported illegal, exercising the non-default branch."
+  (let ((tgt (cl-cc/target:make-target-desc :name :legal-test)))
+    (setf (gethash :fancy-op (cl-cc/target:target-legal-ops tgt)) nil)
+    (assert-false (cl-cc/target:target-op-legal-p tgt :fancy-op))
+    ;; ops with no entry remain legal by default
+    (assert-true (cl-cc/target:target-op-legal-p tgt :add))))
+
+(deftest target-op-expand-invokes-registered-legalizer
+  "target-op-expand calls a functional LEGAL-OPS entry and returns its replacement insts; returns NIL when no expansion is registered."
+  (let ((tgt (cl-cc/target:make-target-desc :name :expand-test)))
+    (setf (gethash :wide-mul (cl-cc/target:target-legal-ops tgt))
+          (lambda (op dst srcs) (list (list :expanded op dst srcs))))
+    (assert-equal '((:expanded :wide-mul :d (:a :b)))
+                  (cl-cc/target:target-op-expand tgt :wide-mul :d '(:a :b)))
+    ;; ops legal by default (T entry) have no expansion function → NIL
+    (assert-null (cl-cc/target:target-op-expand tgt :add :d '(:a :b)))))

@@ -203,7 +203,7 @@ The returned bytes start with Elf64_Chdr:
     (binary-buffer-write-u32le buf 29) ; unit_length
     (binary-buffer-write-u16le buf 3)  ; version
     (binary-buffer-write-u32le buf 16) ; header_length
-    (binary-buffer-write-bytes buf #(1 1 1 #xfb 14 13))
+    (binary-buffer-write-bytes buf '(1 1 1 #xfb 14 13))
     (dotimes (_ 12) (declare (ignore _)) (elf-buf-u8 buf 0))
     (elf-buf-u8 buf 0) ; include dirs
     (elf-buf-u8 buf 0) ; file names
@@ -466,6 +466,31 @@ The returned bytes start with Elf64_Chdr:
     (elf64-write-dynamic-entry buf +dt-null+ 0)
     (binary-buffer-to-array buf)))
 
+(defun %elf64-write-exec-ehdr (out builder entry-point phoff shoff phnum n-sections shstrtab-idx)
+  "Write the 64-byte ELF header for an ET_EXEC/ET_DYN image."
+  (elf-buf-u8 out +elf-magic-0+)
+  (elf-buf-u8 out +elf-magic-1+)
+  (elf-buf-u8 out +elf-magic-2+)
+  (elf-buf-u8 out +elf-magic-3+)
+  (elf-buf-u8 out +elf-class-64+)
+  (elf-buf-u8 out +elf-data-lsb+)
+  (elf-buf-u8 out +elf-version-cur+)
+  (elf-buf-u8 out +elf-osabi-none+)
+  (binary-buffer-write-pad out 8)
+  (binary-buffer-write-u16le out (elf64-elf-type builder))
+  (binary-buffer-write-u16le out (elf64-machine builder))
+  (binary-buffer-write-u32le out +elf-version-cur+)
+  (binary-buffer-write-u64le out entry-point)
+  (binary-buffer-write-u64le out phoff)
+  (binary-buffer-write-u64le out shoff)
+  (binary-buffer-write-u32le out 0)
+  (binary-buffer-write-u16le out +elf64-ehdr-size+)
+  (binary-buffer-write-u16le out +elf64-phdr-size+)
+  (binary-buffer-write-u16le out phnum)
+  (binary-buffer-write-u16le out +elf64-shdr-size+)
+  (binary-buffer-write-u16le out n-sections)
+  (binary-buffer-write-u16le out shstrtab-idx))
+
 (defun elf64-finalize-executable (builder)
   "Assemble an ELF64 ET_EXEC or ET_DYN image with program headers."
   (let* ((dynamic-p (= (elf64-elf-type builder) +elf-type-dyn+))
@@ -580,28 +605,7 @@ The returned bytes start with Elf64_Chdr:
          (data-load-memsz (+ data-load-filesz bss-size))
          (out (elf-make-buffer)))
     ;; ELF header.
-    (elf-buf-u8 out +elf-magic-0+)
-    (elf-buf-u8 out +elf-magic-1+)
-    (elf-buf-u8 out +elf-magic-2+)
-    (elf-buf-u8 out +elf-magic-3+)
-    (elf-buf-u8 out +elf-class-64+)
-    (elf-buf-u8 out +elf-data-lsb+)
-    (elf-buf-u8 out +elf-version-cur+)
-    (elf-buf-u8 out +elf-osabi-none+)
-    (binary-buffer-write-pad out 8)
-    (binary-buffer-write-u16le out (elf64-elf-type builder))
-    (binary-buffer-write-u16le out (elf64-machine builder))
-    (binary-buffer-write-u32le out +elf-version-cur+)
-    (binary-buffer-write-u64le out entry-point)
-    (binary-buffer-write-u64le out phoff)
-    (binary-buffer-write-u64le out shoff)
-    (binary-buffer-write-u32le out 0)
-    (binary-buffer-write-u16le out +elf64-ehdr-size+)
-    (binary-buffer-write-u16le out +elf64-phdr-size+)
-    (binary-buffer-write-u16le out phnum)
-    (binary-buffer-write-u16le out +elf64-shdr-size+)
-    (binary-buffer-write-u16le out n-sections)
-    (binary-buffer-write-u16le out shstrtab-idx)
+    (%elf64-write-exec-ehdr out builder entry-point phoff shoff phnum n-sections shstrtab-idx)
     ;; Program headers.
     (elf64-write-phdr out +pt-phdr+ +pf-r+ phoff (+ base phoff) (+ base phoff)
                       (* phnum +elf64-phdr-size+) (* phnum +elf64-phdr-size+) 8)

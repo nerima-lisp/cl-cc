@@ -80,8 +80,8 @@
   "Assign fixed stack slots to split BOUNDARIES."
   (loop for boundary in boundaries
         for slot from 1
-        do (setf (split-boundary-slot boundary) slot)
-        finally (return (1- slot))))
+        do (setf (split-boundary-slot boundary) slot))
+  (length boundaries))
 
 (defun %boundaries-by-position (boundaries keyfn)
   "Index BOUNDARIES by position returned by KEYFN."

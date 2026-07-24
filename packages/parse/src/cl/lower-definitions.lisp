@@ -172,7 +172,9 @@
                              (error "Invalid handler-case clause: ~S" clause))
                            (list* (first clause)
                                   (when (second clause) (first (second clause)))
-                                  (mapcar #'lower-sexp-to-ast (cddr clause))))
+                                  (mapcar #'lower-sexp-to-ast
+                                          (nth-value 1 (%extract-leading-declarations
+                                                        (cddr clause))))))
                          (cddr node))))
     (make-ast-handler-case
      :form    (lower-sexp-to-ast (second node))

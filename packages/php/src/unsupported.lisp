@@ -4,10 +4,7 @@
 
 (defun %php-unsupported-call-p (ast)
   "Return true when AST is a PHP unsupported-form marker call."
-  (and (ast-call-p ast)
-       (let ((func (ast-call-func ast)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) '%php-unsupported)))))
+  (%php-helper-call-p ast '%php-unsupported))
 
 (defun %php-unsupported-message (ast)
   "Return the compile-time diagnostic message stored in unsupported marker AST."

@@ -37,14 +37,14 @@
   "CLOS MOP helpers expose direct/effective slots, slot metadata, metaclass, and redefinition migration."
   :tags '(:ansi-gap :mop)
   :cases (("direct-vs-effective-slots"
-           '((b) (a b))
+           '((cl-cc::b) (cl-cc::a cl-cc::b))
            "(progn
               (defclass mop-base () ((a :initarg :a)))
               (defclass mop-child (mop-base) ((b :initarg :b)))
               (list (mapcar #'slot-definition-name (class-direct-slots (find-class 'mop-child)))
                     (mapcar #'slot-definition-name (class-slots (find-class 'mop-child)))))")
           ("slot-type-initfunction-metaclass"
-           '(x integer 7 standard-class)
+           '(cl-cc::x integer 7 standard-class)
            "(progn
               (defclass typed-mop () ((x :initarg :x :initform 7 :type integer)) (:metaclass standard-class))
               (let ((slot (car (class-slots (find-class 'typed-mop)))))

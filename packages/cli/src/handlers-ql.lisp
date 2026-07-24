@@ -176,13 +176,23 @@
   (%verify-sha256 output sha256)
   output)
 
+(defparameter *extract-timeout-seconds* 300
+  "Maximum wall-clock seconds allowed for extracting a downloaded archive.
+Bounds a hung or pathological (e.g. decompression-bomb) tar invocation; the
+value is generous so legitimate large dist archives still extract.")
+
 (defun %extract-tar-gz (archive directory)
   "Extract ARCHIVE into DIRECTORY with the system tar implementation."
   (ensure-directories-exist (merge-pathnames #P".keep" directory))
   (unless (let ((fe (find-symbol "FIND-EXECUTABLE" :uiop))) (and fe (funcall fe "tar")))
     (error "Cannot extract ~A: tar executable not found" archive))
-  (uiop:run-program (list "tar" "-xzf" (namestring archive) "-C" (namestring directory))
-                    :output :interactive :error-output :interactive)
+  (handler-case
+      (sb-ext:with-timeout *extract-timeout-seconds*
+        (uiop:run-program (list "tar" "-xzf" (namestring archive) "-C" (namestring directory))
+                          :output :interactive :error-output :interactive))
+    (sb-ext:timeout ()
+      (error "Extraction of ~A timed out after ~A second~:P"
+             archive *extract-timeout-seconds*)))
   directory)
 
 (defun %quicklisp-dist-url ()

@@ -591,25 +591,26 @@ Returns :internal when all conventions are :internal; :external otherwise."
                                :errors                   (append (nreverse errors) promoted-errors)))))
 
 
-(defun %compile-toplevel-forms-core (forms ctx target type-check safety opts werror werror-categories)
-  "Compile FORMS with per-form recovery and return the accumulated top-level state."
+(defun %compile-toplevel-forms-core (forms ctx target type-check safety opts)
+  "Compile FORMS with per-form recovery and return the accumulated top-level state.
+Must run inside %WITH-TOPLEVEL-COMPILATION-DYNAMIC-ENV so the exception-table and
+load-time-value accumulators bound there stay live through finalization."
   (let ((last-reg      nil)
         (last-type     nil)
         (last-cps      nil)
         (compiled-asts nil)
         (errors        nil)
         (type-env      (type-env-empty)))
-    (%with-toplevel-compilation-dynamic-env (werror werror-categories)
-      (loop for form in forms
-            for form-index from 0
-            do (unless (%toplevel-compilation-boundary-form-p form)
-                 (%with-toplevel-form-compilation-recovery
-                     (ctx opts form form-index errors string-literal-pool-snapshot)
-                   (multiple-value-setq (last-reg last-type last-cps type-env compiled-asts)
-                     (%process-toplevel-form form ctx target type-env type-check safety opts compiled-asts)))))
-      (setf (ctx-type-env ctx) type-env)
-      (resolve-forward-references (ctx-global-functions ctx) :errorp t)
-      (values last-reg last-type last-cps compiled-asts errors))))
+    (loop for form in forms
+          for form-index from 0
+          do (unless (%toplevel-compilation-boundary-form-p form)
+               (%with-toplevel-form-compilation-recovery
+                   (ctx opts form form-index errors string-literal-pool-snapshot)
+                 (multiple-value-setq (last-reg last-type last-cps type-env compiled-asts)
+                   (%process-toplevel-form form ctx target type-env type-check safety opts compiled-asts)))))
+    (setf (ctx-type-env ctx) type-env)
+    (resolve-forward-references (ctx-global-functions ctx) :errorp t)
+    (values last-reg last-type last-cps compiled-asts errors)))
 
 (defun compile-toplevel-forms (forms &key (target :x86_64) type-check (safety 1)
                                           speed (inline-threshold-scale 1)
@@ -642,9 +643,10 @@ Security-mitigation keywords (:retpoline :spectre-mitigations :stack-protector
                                            :trace-json-stream trace-json-stream
                                            :werror werror
                                            :werror-categories werror-categories)))
-    (multiple-value-bind (last-reg last-type last-cps compiled-asts errors)
-        (%compile-toplevel-forms-core forms ctx target type-check safety opts werror werror-categories)
-      (%finalize-toplevel-compilation ctx target last-reg last-type last-cps compiled-asts opts errors compilation-tier))))
+    (%with-toplevel-compilation-dynamic-env (werror werror-categories)
+      (multiple-value-bind (last-reg last-type last-cps compiled-asts errors)
+          (%compile-toplevel-forms-core forms ctx target type-check safety opts)
+        (%finalize-toplevel-compilation ctx target last-reg last-type last-cps compiled-asts opts errors compilation-tier)))))
 
 ;;; Function call compilation (%resolve-func-sym-reg, %try-compile-*,
 ;;; %compile-normal-call, compile-ast (ast-call)) is in codegen-calls.lisp (loads next).

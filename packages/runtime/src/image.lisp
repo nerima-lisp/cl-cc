@@ -455,6 +455,21 @@ stub with an ELF/Mach-O mmap loader."
          (compression-code (%rt-core-compression-code compression)))
     (%rt-core-write-file path bytes compression-code executable)))
 
+(defun %rt-core-locate-data-segment (bytes offset base segment-count)
+  "Scan SEGMENT-COUNT segment-table entries starting at OFFSET, returning the
+data segment's absolute offset and size as two values (NIL NIL when absent)."
+  (let ((data-offset nil)
+        (data-size nil))
+    (dotimes (_ segment-count)
+      (multiple-value-bind (kind offset*) (%rt-image-read-u8 bytes offset)
+        (multiple-value-bind (seg-offset offset**) (%rt-image-read-u32 bytes offset*)
+          (multiple-value-bind (seg-size offset***) (%rt-image-read-u32 bytes offset**)
+            (when (= kind +rt-core-segment-data+)
+              (setf data-offset (+ base seg-offset)
+                    data-size seg-size))
+            (setf offset offset***)))))
+    (values data-offset data-size)))
+
 (defun rt-load-core (path &key dynamic-space-size)
   "Load a CL-CC core using mmap-backed lazy byte access and restore roots.
 
@@ -479,16 +494,8 @@ function bindings, packages, and restore hooks."
                   (multiple-value-bind (compressed-size offset) (%rt-image-read-u32 bytes offset)
                     (declare (ignore compressed-size))
                     (multiple-value-bind (stored-crc offset) (%rt-image-read-u32 bytes offset)
-                    (let ((data-offset nil)
-                          (data-size nil))
-                      (dotimes (_ segment-count)
-                        (multiple-value-bind (kind offset*) (%rt-image-read-u8 bytes offset)
-                          (multiple-value-bind (seg-offset offset**) (%rt-image-read-u32 bytes offset*)
-                            (multiple-value-bind (seg-size offset***) (%rt-image-read-u32 bytes offset**)
-                              (when (= kind +rt-core-segment-data+)
-                                (setf data-offset (+ base seg-offset)
-                                      data-size seg-size))
-                              (setf offset offset***)))))
+                    (multiple-value-bind (data-offset data-size)
+                        (%rt-core-locate-data-segment bytes offset base segment-count)
                       (unless data-offset (error "Core contains no data segment"))
                       (let* ((compressed (subseq bytes data-offset (+ data-offset data-size)))
                              (crc (%rt-image-crc32 compressed)))

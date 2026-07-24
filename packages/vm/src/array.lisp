@@ -357,6 +357,44 @@ storage word.  :ANY/T arrays retain pointer-scannable element semantics."
 
 ;;; ─── Execute basic array instructions ───────────────────────────────────
 
+(defun %vm-make-displaced-array (dimensions elt-type displaced-to displaced-index-offset fp adj)
+  (cond
+    ((and fp adj)
+     (make-array dimensions :element-type (or elt-type t)
+                 :displaced-to displaced-to
+                 :displaced-index-offset displaced-index-offset
+                 :fill-pointer (if (eq fp t) 0 fp)
+                 :adjustable t))
+    (fp
+     (make-array dimensions :element-type (or elt-type t)
+                 :displaced-to displaced-to
+                 :displaced-index-offset displaced-index-offset
+                 :fill-pointer (if (eq fp t) 0 fp)))
+    (adj
+     (make-array dimensions :element-type (or elt-type t)
+                 :displaced-to displaced-to
+                 :displaced-index-offset displaced-index-offset
+                 :adjustable t))
+    (t
+     (make-array dimensions :element-type (or elt-type t)
+                 :displaced-index-offset displaced-index-offset
+                 :displaced-to displaced-to))))
+
+(defun %vm-make-standard-array (dimensions elt-type init-elem fp adj)
+  (cond
+    ((and fp adj)
+     (make-array dimensions :element-type (or elt-type t) :initial-element init-elem
+                 :fill-pointer (if (eq fp t) 0 fp)
+                 :adjustable t))
+    (fp
+     (make-array dimensions :element-type (or elt-type t) :initial-element init-elem
+                 :fill-pointer (if (eq fp t) 0 fp)))
+    (adj
+     (make-array dimensions :element-type (or elt-type t) :initial-element init-elem
+                 :adjustable t))
+    (t
+     (make-array dimensions :element-type (or elt-type t) :initial-element init-elem))))
+
 (defmethod execute-instruction ((inst vm-make-array) state pc labels)
   (declare (ignore labels))
   (let* ((size (vm-reg-get state (vm-size-reg inst)))
@@ -395,27 +433,8 @@ storage word.  :ANY/T arrays retain pointer-scannable element semantics."
            (specialized-type (%vm-normalize-specialized-element-type elt-type))
            (arr (cond
                      (displaced-to
-                      (cond
-                        ((and fp adj)
-                         (make-array dimensions-designator :element-type (or elt-type t)
-                                     :displaced-to displaced-to
-                                     :displaced-index-offset displaced-index-offset
-                                     :fill-pointer (if (eq fp t) 0 fp)
-                                     :adjustable t))
-                        (fp
-                         (make-array dimensions-designator :element-type (or elt-type t)
-                                     :displaced-to displaced-to
-                                     :displaced-index-offset displaced-index-offset
-                                     :fill-pointer (if (eq fp t) 0 fp)))
-                        (adj
-                         (make-array dimensions-designator :element-type (or elt-type t)
-                                     :displaced-to displaced-to
-                                     :displaced-index-offset displaced-index-offset
-                                     :adjustable t))
-                        (t
-                         (make-array dimensions-designator :element-type (or elt-type t)
-                                     :displaced-index-offset displaced-index-offset
-                                     :displaced-to displaced-to))))
+                      (%vm-make-displaced-array dimensions-designator elt-type displaced-to
+                                                displaced-index-offset fp adj))
                     ((and vector-dimensions-p
                           (member specialized-type '(:fixnum :double-float :character :bit)
                                    :test #'eq)
@@ -423,20 +442,8 @@ storage word.  :ANY/T arrays retain pointer-scannable element semantics."
                           (not adj)
                           (not init-present-p))
                      (vm-make-specialized-array total-size specialized-type))
-                    ((and fp adj)
-                    (make-array dimensions-designator :element-type (or elt-type t) :initial-element init-elem
-                                :fill-pointer (if (eq fp t) 0 fp)
-                                :adjustable t))
-                   (fp
-                    (make-array dimensions-designator :element-type (or elt-type t) :initial-element init-elem
-                                :fill-pointer (if (eq fp t) 0 fp)))
-                   (adj
-                    (make-array dimensions-designator :element-type (or elt-type t) :initial-element init-elem
-                                :adjustable t))
-                   (init-present-p
-                    (make-array dimensions-designator :element-type (or elt-type t) :initial-element init-elem))
                    (t
-                    (make-array dimensions-designator :element-type (or elt-type t) :initial-element init-elem)))))
+                    (%vm-make-standard-array dimensions-designator elt-type init-elem fp adj)))))
     (vm-reg-set state (vm-dst inst) (if copy-on-write (%vm-cow-vector-share arr) arr))
     (values (1+ pc) nil nil)))
 

@@ -56,11 +56,19 @@ Returns (values closure-data bindings non-constant-defaults supplied-p-entries).
              (reg (make-register ctx)))
         (multiple-value-bind (default-val is-constant)
             (if default-ast (extract-constant-value default-ast) (values nil t))
-          (if (and default-ast (not is-constant))
-              (progn
-                (push (funcall make-entry param name reg *non-constant-default-sentinel*) closure-data)
-                (push (cons reg default-ast) non-constant-defaults))
-              (push (funcall make-entry param name reg default-val) closure-data)))
+          (cond
+            ;; When a supplied-p variable is tracked, the VM slot must default
+            ;; to the sentinel so EMIT-SUPPLIED-P-CHECKS can distinguish an
+            ;; absent argument from a supplied one. The real default (constant
+            ;; or not) is filled in after the supplied-p check.
+            ((and supplied-p-name default-ast)
+             (push (funcall make-entry param name reg *non-constant-default-sentinel*) closure-data)
+             (push (cons reg default-ast) non-constant-defaults))
+            ((and default-ast (not is-constant))
+             (push (funcall make-entry param name reg *non-constant-default-sentinel*) closure-data)
+             (push (cons reg default-ast) non-constant-defaults))
+            (t
+             (push (funcall make-entry param name reg default-val) closure-data))))
         (push (cons name reg) bindings)
         ;; FR-696: allocate register for supplied-p variable
         (when supplied-p-name

@@ -238,16 +238,19 @@ host CL closure."
       `(quote ,name))))
 
 (defun make-host-macro-expander (lambda-list body)
-  "Build a host-evaluated macro expander for local MACROLET bindings."
+  "Build a host-evaluated macro expander for local MACROLET bindings.
+Quasiquotes in BODY are pre-expanded (as in MAKE-MACRO-EXPANDER) so the host
+eval can construct the expansion instead of calling the undefined UNQUOTE."
   (let ((environment-sym (lambda-list-info-environment
-                          (parse-lambda-list lambda-list))))
+                          (parse-lambda-list lambda-list)))
+        (expanded-body (mapcar #'our-macroexpand-all body)))
     (lambda (form env)
       (let* ((form-var (gensym "FORM"))
              (effective-env (or env '(:macrolet-environment)))
              (macro-body (if environment-sym
                              `((let ((,environment-sym ',effective-env))
-                                 ,@body))
-                             body))
+                                 ,@expanded-body))
+                             expanded-body))
              (eval-form `(let ((,form-var ',form))
                            ,(%nest-let-bindings
                              (generate-lambda-bindings lambda-list form-var)

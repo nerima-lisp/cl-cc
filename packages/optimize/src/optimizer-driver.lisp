@@ -40,10 +40,6 @@ catch ill-formed sequences (duplicate labels, unknown jump targets, use-before-d
 
 ;;; ─── Pass Pipeline Parsing ───────────────────────────────────────────────
 
-(defun %opt-trim-whitespace (s)
-  "Strip leading/trailing ASCII whitespace from S."
-  (string-trim '(#\Space #\Tab #\Newline #\Return) s))
-
 ;;; The --pass-pipeline spec ("sccp,cse,dce") is tokenized and parsed with the
 ;;; external cl-parser-kit library instead of a hand-rolled comma split: a
 ;;; whitespace-skipping tokenizer emits pass-name and comma tokens, and a

@@ -84,6 +84,10 @@
       ;; cl-prolog engine. Optional, like the other entries in this block:
       ;; probe-file guards so the production Nix derivation succeeds without it.
       (maybe-load-asd :cl-cc-prolog-tools "packages/prolog-tools/cl-cc-prolog-tools.asd" here)
+      ;; FR-320 minimal Lisp code formatter. Optional, like the other entries
+      ;; in this block: probe-file guards so the production Nix derivation
+      ;; succeeds without it.
+      (maybe-load-asd :cl-cc-formatter "packages/formatter/cl-cc-formatter.asd" here)
       (maybe-load-asd :cl-cc-test "cl-cc-test.asd" here))))
 
 ;; :cl-cc-cli is defined in packages/cli/cl-cc-cli.asd.

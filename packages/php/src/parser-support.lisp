@@ -26,6 +26,16 @@
 (defun %php-unsupported (message)
   (error "Unsupported PHP parse form: ~A" message))
 
+(defun %php-helper-call-p (node symbol &optional arity)
+  "Return true when NODE is a call to the PHP runtime helper named SYMBOL.
+When ARITY is non-nil, also require exactly that many positional args."
+  (and (ast-call-p node)
+       (let ((func (ast-call-func node)))
+         (and (ast-var-p func)
+              (eq (ast-var-name func) symbol)))
+       (or (null arity)
+           (= (length (ast-call-args node)) arity))))
+
 (defvar *php-by-ref-param-registry* (make-hash-table :test #'equal))
 
 (defparameter *php-named-param-registry* (make-hash-table :test #'equal))
@@ -39,10 +49,7 @@
   (string-downcase (%php-param-name param)))
 
 (defun %php-spread-call-p (node)
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) 'cl-cc/php::%php-spread)))))
+  (%php-helper-call-p node 'cl-cc/php::%php-spread))
 
 (defun %php-args-have-spread-p (args)
   (some #'%php-spread-call-p args))
@@ -124,10 +131,7 @@
               :variadic variadic-param)))
 
 (defun %php-named-arg-call-p (node)
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) 'cl-cc/php::%php-named-arg)))))
+  (%php-helper-call-p node 'cl-cc/php::%php-named-arg))
 
 (defun %php-args-have-named-p (args)
   (some #'%php-named-arg-call-p args))
@@ -151,10 +155,7 @@
   (cdr (assoc param defaults :test #'eq)))
 
 (defun %php-array-constructor-call-p (node)
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) 'cl-cc/php::%php-array)))))
+  (%php-helper-call-p node 'cl-cc/php::%php-array))
 
 (defun %php-array-auto-entry-p (entry)
   (let ((elements (and (ast-list-p entry) (ast-list-elements entry))))

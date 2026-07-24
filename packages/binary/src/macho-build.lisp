@@ -785,6 +785,12 @@ reordering directly controls the final text layout."
                                code-signature-bytes)
     (buffer-get-bytes buffer)))
 
+(defparameter *macho-codesign-timeout-seconds* 30
+  "Timeout in seconds for the external codesign invocation.
+codesign has been observed to hang (e.g. on keychain access); on timeout the
+binary is left unsigned, matching the existing best-effort semantics where a
+codesign failure is ignored.")
+
 (defun write-mach-o-file (filename mach-o-bytes &key (codesign t))
   "Write MACH-O-BYTES to FILENAME as a binary file."
   (declare (type (or pathname string) filename)
@@ -798,10 +804,13 @@ reordering directly controls the final text layout."
   (when codesign
     (let ((codesign-program (probe-file "/usr/bin/codesign")))
       (when codesign-program
-        (ignore-errors
-          (sb-ext:run-program (namestring codesign-program)
-                              (list "-s" "-" "-f" (namestring (pathname filename)))
-                              :search nil
-                              :output nil
-                              :error nil)))))
+        (handler-case
+            (sb-ext:with-timeout *macho-codesign-timeout-seconds*
+              (sb-ext:run-program (namestring codesign-program)
+                                  (list "-s" "-" "-f" (namestring (pathname filename)))
+                                  :search nil
+                                  :output nil
+                                  :error nil))
+          (sb-ext:timeout () nil)
+          (error () nil)))))
   filename)

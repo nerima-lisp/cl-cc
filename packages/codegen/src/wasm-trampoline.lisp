@@ -587,6 +587,45 @@ FR-145: Checks *wasm-fixnum-unboxed-regs* table for the register."
   "Return the VM register carrying CAPTURE's value."
   (if (consp capture) (cdr capture) capture))
 
+(defun emit-wasm-typed-closure-alloc (reg-map dst entry-index captured stream prefix)
+  "FR-144 typed-env path: build the closure environment with array.new_fixed and
+wrap the typed (ref $eqref_array_t) directly in $closure_t, skipping the $env_t
+struct.  FR-142: keep the array.new_fixed result typed to avoid a redundant ref.cast."
+  (format stream "~%~A;; FR-144: typed closure env using array.new_fixed" prefix)
+  (format stream "~%~A(local.set ~D (array.new_fixed $eqref_array_t ~D~{ ~A~}))"
+           prefix (wasm-reg-map-tmp-index reg-map)
+           (length captured)
+           (loop for capture in captured
+                 for reg = (%wasm-captured-value-reg capture)
+                 collect (reg-local-ref reg-map reg)))
+  (format stream "~%~A~A"
+          prefix
+          (reg-local-set
+            reg-map dst
+             (format nil "(struct.new $closure_t ~A (ref.cast (ref $eqref_array_t) (local.get ~D)))"
+                     (wasm-table-const-wat entry-index)
+                     (wasm-reg-map-tmp-index reg-map))))
+  (reg-record-type reg-map dst :closure))
+
+(defun emit-wasm-boxed-closure-alloc (reg-map dst entry-index captured stream prefix)
+  "Env-struct path: allocate a mutable $eqref_array_t, populate it via array.set,
+then wrap it in an $env_t struct inside $closure_t."
+  (let ((tmp (wasm-reg-map-tmp-index reg-map)))
+    (format stream "~%~A(local.set ~D (array.new $eqref_array_t (ref.null eq) (i32.const ~D)))"
+            prefix tmp (length captured))
+    (loop for capture in captured
+          for idx from 0
+          for reg = (%wasm-captured-value-reg capture)
+          do (format stream "~%~A(array.set $eqref_array_t (ref.cast (ref $eqref_array_t) (local.get ~D)) (i32.const ~D) ~A)"
+                     prefix tmp idx (reg-local-ref reg-map reg)))
+    (format stream "~%~A~A"
+            prefix
+            (reg-local-set
+             reg-map dst
+              (format nil "(struct.new $closure_t ~A (struct.new $env_t (ref.cast (ref $eqref_array_t) (local.get ~D)) (ref.null $env_t)))"
+                      (wasm-table-const-wat entry-index) tmp)))
+    (reg-record-type reg-map dst :closure)))
+
 (defun emit-wasm-closure-allocation (reg-map dst entry-index captured stream indent)
   "Emit closure allocation using $closure_t and $env_t GC structs.
    FR-144: When *wasm-typed-closure-env-enabled*, uses array.new_fixed directly
@@ -603,53 +642,22 @@ the stack for immediate use, avoiding one ref.cast per closure construction.
 FR-144: Use typed closure environment array via array.new_fixed eqref for direct
 index access instead of the intermediate $env_t struct wrapper."
   (let ((prefix (make-string indent :initial-element #\Space)))
-    (if captured
-        (if *wasm-typed-closure-env-enabled*
-            (progn
-               ;; FR-144: Typed env path — use array.new_fixed directly
-               (format stream "~%~A;; FR-144: typed closure env using array.new_fixed" prefix)
-               (format stream "~%~A(local.set ~D (array.new_fixed $eqref_array_t ~D~{ ~A~}))"
-                        prefix (wasm-reg-map-tmp-index reg-map)
-                        (length captured)
-                        (loop for capture in captured
-                              for reg = (%wasm-captured-value-reg capture)
-                              collect (reg-local-ref reg-map reg)))
-               (format stream "~%~A~A"
-                       prefix
-                       (reg-local-set
-                         reg-map dst
-                          (format nil "(struct.new $closure_t ~A (ref.cast (ref $eqref_array_t) (local.get ~D)))"
-                                  (wasm-table-const-wat entry-index)
-                                  (wasm-reg-map-tmp-index reg-map))))
-               (reg-record-type reg-map dst :closure))
-            (progn
-              ;; Original env struct path
-              (let ((tmp (wasm-reg-map-tmp-index reg-map)))
-                (format stream "~%~A(local.set ~D (array.new $eqref_array_t (ref.null eq) (i32.const ~D)))"
-                        prefix tmp (length captured))
-                (loop for capture in captured
-                      for idx from 0
-                      for reg = (%wasm-captured-value-reg capture)
-                      do (format stream "~%~A(array.set $eqref_array_t (ref.cast (ref $eqref_array_t) (local.get ~D)) (i32.const ~D) ~A)"
-                                 prefix tmp idx (reg-local-ref reg-map reg)))
-                (format stream "~%~A~A"
-                        prefix
-                        (reg-local-set
-                         reg-map dst
-                          (format nil "(struct.new $closure_t ~A (struct.new $env_t (ref.cast (ref $eqref_array_t) (local.get ~D)) (ref.null $env_t)))"
-                                  (wasm-table-const-wat entry-index) tmp)))
-                (reg-record-type reg-map dst :closure))))
-        (progn
-          (format stream "~%~A~A"
-                   prefix
-                   (reg-local-set
-                    reg-map dst
-                     (format nil "(struct.new $closure_t ~A ~A)"
-                             (wasm-table-const-wat entry-index)
-                             (if *wasm-typed-closure-env-enabled*
-                                 "(ref.null $eqref_array_t)"
-                                 "(ref.null $env_t)"))))
-          (reg-record-type reg-map dst :closure)))))
+    (cond
+      ((and captured *wasm-typed-closure-env-enabled*)
+       (emit-wasm-typed-closure-alloc reg-map dst entry-index captured stream prefix))
+      (captured
+       (emit-wasm-boxed-closure-alloc reg-map dst entry-index captured stream prefix))
+      (t
+       (format stream "~%~A~A"
+                prefix
+                (reg-local-set
+                 reg-map dst
+                  (format nil "(struct.new $closure_t ~A ~A)"
+                          (wasm-table-const-wat entry-index)
+                          (if *wasm-typed-closure-env-enabled*
+                              "(ref.null $eqref_array_t)"
+                              "(ref.null $env_t)"))))
+       (reg-record-type reg-map dst :closure)))))
 
 (defun wasm-closure-ref-wat (reg-map closure-reg index)
   "Return WAT for reading captured INDEX from CLOSURE-REG.

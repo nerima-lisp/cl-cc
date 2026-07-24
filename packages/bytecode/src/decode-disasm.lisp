@@ -14,6 +14,9 @@
 (defun instruction-format (opcode)
   "Return the format keyword for OPCODE.
 
+   The opcode→format mapping lives in *opcode-info-data* (decode.lisp) next to
+   the mnemonic table; unknown opcodes classify as :special.
+
    Formats:
      :3op     — [opcode:8][dst:8][src1:8][src2:8]
      :2op     — [opcode:8][dst:8][src:8][pad:8]
@@ -21,46 +24,7 @@
      :branch  — [opcode:8][offset:24]
      :special — everything else (NOP, RETURN_NIL, POP_HANDLER, POP_UNWIND, etc.)"
   (declare (type (unsigned-byte 8) opcode))
-  (case opcode
-    ;; 3-operand: arithmetic, comparisons, call, collections, slots
-    ((#x10 #x11 #x12 #x13 #x14
-      #x20 #x21 #x22
-      #x23 #x24 #x25 #x26 #x27
-      #x33 #x34
-      #x01
-      #x40
-      #x50 #x51
-      #x54
-      #x60
-      #x63 #x64 #x65
-      #x67 #x68
-      #x70)
-      :3op)
-    ;; 2-operand: unary ops, moves, type predicates
-    ((#x02
-      #x03 #x04
-      #x15 #x16 #x17
-      #x35
-      #x41 #x42 #x43
-      #x52 #x53
-      #x61 #x62
-      #x66
-      #x71 #x72 #x73 #x74 #x75
-      #x80 #x81
-      #x92
-      #x94)
-      :2op)
-    ;; Immediate: load-fixnum, conditional branches, push-handler
-    ((#x05
-      #x31 #x32
-      #x90)
-      :imm)
-    ;; Branch: unconditional jump, push-unwind
-    ((#x30 #x93)
-      :branch)
-    ;; Special / zero-operand
-    (otherwise
-     :special)))
+  (gethash opcode *opcode-formats* :special))
 
 ;;; ------------------------------------------------------------
 ;;; Single-Instruction Disassembler

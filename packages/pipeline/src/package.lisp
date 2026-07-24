@@ -82,13 +82,9 @@
     #:*lto-enabled*
     #:make-lto-module
     #:lto-serialize-module
-    #:serialize-lto-ir
     #:lto-deserialize-module
-    #:deserialize-lto-ir
     #:lto-merge-modules
     #:lto-optimize-modules
-    #:thin-lto-build-summary
-    #:generate-thin-lto-summaries
     #:thin-lto-optimize-modules
      #:prepare-incremental-compilation
      #:commit-incremental-compilation
@@ -106,7 +102,6 @@
     #:arena-alloc
     #:with-compilation-arena
     #:compile-files-to-native-parallel
-    #:compile-files-parallel
     #:hot-reload-call
     #:hot-reload-swap
     #:make-hot-reload-entry

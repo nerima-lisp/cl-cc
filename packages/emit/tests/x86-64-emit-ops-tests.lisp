@@ -221,22 +221,14 @@
 
 ;;; ─── Bignum Runtime Call Emitter Tests ───────────────────────────────────
 
-(deftest x86-emit-add-bignum-emits-bytes
-  "emit-vm-add-bignum emits non-empty byte sequence for runtime bignum call."
-  (let* ((inst (cl-cc:make-vm-add-checked :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-emit-ops-bytes #'cl-cc/codegen::emit-vm-add-bignum inst)))
-    (assert-true (> (length bytes) 0))))
-
-(deftest x86-emit-sub-bignum-emits-bytes
-  "emit-vm-sub-bignum emits non-empty byte sequence for runtime bignum call."
-  (let* ((inst (cl-cc:make-vm-sub-checked :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-emit-ops-bytes #'cl-cc/codegen::emit-vm-sub-bignum inst)))
-    (assert-true (> (length bytes) 0))))
-
-(deftest x86-emit-mul-bignum-emits-bytes
-  "emit-vm-mul-bignum emits non-empty byte sequence for runtime bignum call."
-  (let* ((inst (cl-cc:make-vm-mul-checked :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-emit-ops-bytes #'cl-cc/codegen::emit-vm-mul-bignum inst)))
+(deftest-each x86-emit-bignum-ops-emit-bytes
+  "emit-vm-{add,sub,mul}-bignum emit a non-empty byte sequence for the runtime bignum call."
+  :cases (("add" #'cl-cc:make-vm-add-checked #'cl-cc/codegen::emit-vm-add-bignum)
+          ("sub" #'cl-cc:make-vm-sub-checked #'cl-cc/codegen::emit-vm-sub-bignum)
+          ("mul" #'cl-cc:make-vm-mul-checked #'cl-cc/codegen::emit-vm-mul-bignum))
+  (ctor emitter)
+  (let ((bytes (%collect-emit-ops-bytes
+                emitter (funcall ctor :dst :r0 :lhs :r1 :rhs :r2))))
     (assert-true (> (length bytes) 0))))
 
 (deftest x86-bignum-flag-dispatches-to-bignum-emitter

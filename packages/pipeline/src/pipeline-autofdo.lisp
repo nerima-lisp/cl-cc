@@ -95,20 +95,27 @@
                        perf-map)))
     (and entry (third entry))))
 
+(defparameter *autofdo-addr2line-timeout-seconds* 10
+  "Timeout in seconds for a single addr2line symbolization call.
+addr2line is an external tool invoked per-sample-IP; on timeout the IP is left
+unresolved (NIL) rather than stalling profile ingestion.")
+
 (defun %autofdo-addr2line-function (ip executable-path)
   "Resolve IP with addr2line when EXECUTABLE-PATH is available."
   (when (and executable-path (probe-file executable-path))
     (handler-case
-        (let ((out (make-string-output-stream)))
-          (let ((proc (sb-ext:run-program "addr2line"
-                                          (list "-f" "-e" (namestring executable-path)
-                                                (format nil "0x~X" ip))
-                                          :output out :error nil :search t)))
-            (when (zerop (sb-ext:process-exit-code proc))
-              (let* ((text (get-output-stream-string out))
-                     (lines (uiop:split-string text :separator '(#\Newline #\Return)))
-                     (fn (first (remove "" lines :test #'string=))))
-                (and fn (not (string= fn "??")) fn)))))
+        (sb-ext:with-timeout *autofdo-addr2line-timeout-seconds*
+          (let ((out (make-string-output-stream)))
+            (let ((proc (sb-ext:run-program "addr2line"
+                                            (list "-f" "-e" (namestring executable-path)
+                                                  (format nil "0x~X" ip))
+                                            :output out :error nil :search t)))
+              (when (zerop (sb-ext:process-exit-code proc))
+                (let* ((text (get-output-stream-string out))
+                       (lines (uiop:split-string text :separator '(#\Newline #\Return)))
+                       (fn (first (remove "" lines :test #'string=))))
+                  (and fn (not (string= fn "??")) fn))))))
+      (sb-ext:timeout () nil)
       (error () nil))))
 
 (defun %autofdo-map-ip (ip perf-map executable-path)

@@ -317,7 +317,7 @@ Used by run-string-repl for incremental REPL execution."
                            (vm-check-call-stack-depth state))
                         (vm-profile-inst-hit state instruction)
                         (multiple-value-bind (next-pc halted value)
-                            (execute-instruction instruction state pc labels)
+                            (vm-execute-instruction-guarded instruction state pc labels)
                           (when halted
                             (return (vm-force-trampoline-result value)))
                           (setf pc next-pc)))
@@ -368,7 +368,7 @@ Otherwise a fresh state is created from OUTPUT-STREAM."
                            (vm-profile-inst-hit state instruction)
                            (vm-profile-sample state)
                            (multiple-value-bind (next-pc halted value)
-                               (execute-instruction instruction state pc labels)
+                               (vm-execute-instruction-guarded instruction state pc labels)
                              (when (and next-pc
                                         (or (typep instruction 'vm-jump)
                                             (typep instruction 'vm-jump-zero)

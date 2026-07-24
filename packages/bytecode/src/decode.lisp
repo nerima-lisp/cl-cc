@@ -58,91 +58,107 @@
   (%sign-extend (ldb (byte 24 0) word) 24))
 
 ;;; ------------------------------------------------------------
-;;; Opcode Name Table
+;;; Opcode Information Table
 ;;; ------------------------------------------------------------
 
-;;; Declarative alist of (opcode-constant . mnemonic).
-;;; #. evaluates each constant at read time; dolist builds the lookup table.
-(defparameter *opcode-name-data*
+;;; Single source of truth for every known opcode: (constant mnemonic format).
+;;; #. evaluates each constant at read time; the loops below derive the
+;;; mnemonic and instruction-format lookup tables from this one table so the
+;;; two can never drift out of sync.
+;;;
+;;; Instruction formats:
+;;;   :3op     — [opcode:8][dst:8][src1:8][src2:8]
+;;;   :2op     — [opcode:8][dst:8][src:8][pad:8]
+;;;   :imm     — [opcode:8][dst:8][imm16:16]
+;;;   :branch  — [opcode:8][offset:24]
+;;;   :special — zero-operand / raw (NOP, RETURN_NIL, POP_HANDLER, ...)
+(defparameter *opcode-info-data*
   '(;; Misc
-    (#.+op-nop+          . "NOP")
+    (#.+op-nop+          "NOP"          :special)
     ;; Load / Move
-    (#.+op-load-const+   . "LOAD_CONST")
-    (#.+op-move+         . "MOVE")
-    (#.+op-load-nil+     . "LOAD_NIL")
-    (#.+op-load-true+    . "LOAD_TRUE")
-    (#.+op-load-fixnum+  . "LOAD_FIXNUM")
+    (#.+op-load-const+   "LOAD_CONST"   :3op)
+    (#.+op-move+         "MOVE"         :2op)
+    (#.+op-load-nil+     "LOAD_NIL"     :2op)
+    (#.+op-load-true+    "LOAD_TRUE"    :2op)
+    (#.+op-load-fixnum+  "LOAD_FIXNUM"  :imm)
     ;; Arithmetic
-    (#.+op-add+          . "ADD")
-    (#.+op-sub+          . "SUB")
-    (#.+op-mul+          . "MUL")
-    (#.+op-div+          . "DIV")
-    (#.+op-mod+          . "MOD")
-    (#.+op-neg+          . "NEG")
-    (#.+op-inc+          . "INC")
-    (#.+op-dec+          . "DEC")
+    (#.+op-add+          "ADD"          :3op)
+    (#.+op-sub+          "SUB"          :3op)
+    (#.+op-mul+          "MUL"          :3op)
+    (#.+op-div+          "DIV"          :3op)
+    (#.+op-mod+          "MOD"          :3op)
+    (#.+op-neg+          "NEG"          :2op)
+    (#.+op-inc+          "INC"          :2op)
+    (#.+op-dec+          "DEC"          :2op)
     ;; Comparison
-    (#.+op-eq+           . "EQ")
-    (#.+op-eql+          . "EQL")
-    (#.+op-equal+        . "EQUAL")
-    (#.+op-num-lt+       . "NUM_LT")
-    (#.+op-num-gt+       . "NUM_GT")
-    (#.+op-num-le+       . "NUM_LE")
-    (#.+op-num-ge+       . "NUM_GE")
-    (#.+op-num-eq+       . "NUM_EQ")
+    (#.+op-eq+           "EQ"           :3op)
+    (#.+op-eql+          "EQL"          :3op)
+    (#.+op-equal+        "EQUAL"        :3op)
+    (#.+op-num-lt+       "NUM_LT"       :3op)
+    (#.+op-num-gt+       "NUM_GT"       :3op)
+    (#.+op-num-le+       "NUM_LE"       :3op)
+    (#.+op-num-ge+       "NUM_GE"       :3op)
+    (#.+op-num-eq+       "NUM_EQ"       :3op)
     ;; Control Flow
-    (#.+op-jump+         . "JUMP")
-    (#.+op-jump-if-nil+  . "JUMP_IF_NIL")
-    (#.+op-jump-if-true+ . "JUMP_IF_TRUE")
-    (#.+op-call+         . "CALL")
-    (#.+op-tail-call+    . "TAIL_CALL")
-    (#.+op-return+       . "RETURN")
-    (#.+op-return-nil+   . "RETURN_NIL")
+    (#.+op-jump+         "JUMP"         :branch)
+    (#.+op-jump-if-nil+  "JUMP_IF_NIL"  :imm)
+    (#.+op-jump-if-true+ "JUMP_IF_TRUE" :imm)
+    (#.+op-call+         "CALL"         :3op)
+    (#.+op-tail-call+    "TAIL_CALL"    :3op)
+    (#.+op-return+       "RETURN"       :2op)
+    (#.+op-return-nil+   "RETURN_NIL"   :special)
     ;; Closure & Upvalue
-    (#.+op-make-closure+  . "MAKE_CLOSURE")
-    (#.+op-get-upvalue+   . "GET_UPVALUE")
-    (#.+op-set-upvalue+   . "SET_UPVALUE")
-    (#.+op-close-upvalue+ . "CLOSE_UPVALUE")
+    (#.+op-make-closure+  "MAKE_CLOSURE"  :3op)
+    (#.+op-get-upvalue+   "GET_UPVALUE"   :2op)
+    (#.+op-set-upvalue+   "SET_UPVALUE"   :2op)
+    (#.+op-close-upvalue+ "CLOSE_UPVALUE" :2op)
     ;; Object Access
-    (#.+op-get-slot+      . "GET_SLOT")
-    (#.+op-set-slot+      . "SET_SLOT")
-    (#.+op-get-global+    . "GET_GLOBAL")
-    (#.+op-set-global+    . "SET_GLOBAL")
-    (#.+op-make-instance+ . "MAKE_INSTANCE")
+    (#.+op-get-slot+      "GET_SLOT"      :3op)
+    (#.+op-set-slot+      "SET_SLOT"      :3op)
+    (#.+op-get-global+    "GET_GLOBAL"    :2op)
+    (#.+op-set-global+    "SET_GLOBAL"    :2op)
+    (#.+op-make-instance+ "MAKE_INSTANCE" :3op)
     ;; Collections
-    (#.+op-cons+          . "CONS")
-    (#.+op-car+           . "CAR")
-    (#.+op-cdr+           . "CDR")
-    (#.+op-make-vector+   . "MAKE_VECTOR")
-    (#.+op-vector-ref+    . "VECTOR_REF")
-    (#.+op-vector-set+    . "VECTOR_SET")
-    (#.+op-make-hash+     . "MAKE_HASH")
-    (#.+op-hash-ref+      . "HASH_REF")
-    (#.+op-hash-set+      . "HASH_SET")
+    (#.+op-cons+          "CONS"          :3op)
+    (#.+op-car+           "CAR"           :2op)
+    (#.+op-cdr+           "CDR"           :2op)
+    (#.+op-make-vector+   "MAKE_VECTOR"   :3op)
+    (#.+op-vector-ref+    "VECTOR_REF"    :3op)
+    (#.+op-vector-set+    "VECTOR_SET"    :3op)
+    (#.+op-make-hash+     "MAKE_HASH"     :2op)
+    (#.+op-hash-ref+      "HASH_REF"      :3op)
+    (#.+op-hash-set+      "HASH_SET"      :3op)
     ;; Type Check
-    (#.+op-type-check+    . "TYPE_CHECK")
-    (#.+op-fixnump+       . "FIXNUMP")
-    (#.+op-consp+         . "CONSP")
-    (#.+op-symbolp+       . "SYMBOLP")
-    (#.+op-functionp+     . "FUNCTIONP")
-    (#.+op-stringp+       . "STRINGP")
+    (#.+op-type-check+    "TYPE_CHECK"    :3op)
+    (#.+op-fixnump+       "FIXNUMP"       :2op)
+    (#.+op-consp+         "CONSP"         :2op)
+    (#.+op-symbolp+       "SYMBOLP"       :2op)
+    (#.+op-functionp+     "FUNCTIONP"     :2op)
+    (#.+op-stringp+       "STRINGP"       :2op)
     ;; Multiple Values
-    (#.+op-values+        . "VALUES")
-    (#.+op-recv-values+   . "RECV_VALUES")
+    (#.+op-values+        "VALUES"        :2op)
+    (#.+op-recv-values+   "RECV_VALUES"   :2op)
     ;; Exception Handling
-    (#.+op-push-handler+  . "PUSH_HANDLER")
-    (#.+op-pop-handler+   . "POP_HANDLER")
-    (#.+op-signal+        . "SIGNAL")
-    (#.+op-push-unwind+   . "PUSH_UNWIND")
-    (#.+op-pop-unwind+    . "POP_UNWIND")
+    (#.+op-push-handler+  "PUSH_HANDLER"  :imm)
+    (#.+op-pop-handler+   "POP_HANDLER"   :special)
+    (#.+op-signal+        "SIGNAL"        :2op)
+    (#.+op-push-unwind+   "PUSH_UNWIND"   :branch)
+    (#.+op-pop-unwind+    "POP_UNWIND"    :2op)
     ;; Wide prefix
-    (#.+op-wide+          . "WIDE"))
-  "Alist of (opcode-byte . mnemonic-string) for all known opcodes.")
+    (#.+op-wide+          "WIDE"          :special))
+  "Table of (opcode-byte mnemonic-string instruction-format) for all known opcodes.")
 
 (defvar *opcode-names*
   (loop with ht = (make-hash-table :test #'eql)
-        for (code . name) in *opcode-name-data*
+        for (code name) in *opcode-info-data*
         do (setf (gethash code ht) name)
         finally (return ht))
   "Hash table mapping opcode byte value to its mnemonic string.")
+
+(defvar *opcode-formats*
+  (loop with ht = (make-hash-table :test #'eql)
+        for (code nil format) in *opcode-info-data*
+        do (setf (gethash code ht) format)
+        finally (return ht))
+  "Hash table mapping opcode byte value to its instruction-format keyword.")
 

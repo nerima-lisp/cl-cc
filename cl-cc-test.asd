@@ -9,7 +9,8 @@
   :author "takeokunn"
   :license "MIT"
   :version "0.1.0"
-  :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools)
+  :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools
+               :cl-cc-formatter)
   :serial t
   :components
   (;; Unit tests — each module now lives in its workspace's tests/ dir
@@ -506,6 +507,9 @@
      (:file "mir-target-tests")
      (:file "mir-isel-tests")
      (:file "regalloc-tests")
+     (:file "regalloc-lsa-tests")
+     (:file "regalloc-color-tests")
+     (:file "regalloc-spill-tests")
      (:file "wasm-tests")
       (:file "wasm-ir-tests")
       (:file "wasm-types-tests")
@@ -562,6 +566,16 @@
       :components
       ((:file "lsp-server-tests")
        (:file "dap-server-tests")))
+     (:module "formatter-tests"
+      :pathname "packages/formatter/tests"
+      :serial t
+      :components
+      ((:file "formatter-tests")))
+     (:module "docgen-tests"
+      :pathname "packages/docgen/tests"
+      :serial t
+      :components
+      ((:file "docgen-suite-tests")))
      (:module "runtime-tests"
       :pathname "packages/runtime/tests"
       :serial t

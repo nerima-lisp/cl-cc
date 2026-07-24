@@ -14,13 +14,20 @@
 (defun %loop-tile-trim-newline (string)
   (string-trim '(#\Space #\Tab #\Newline #\Return) string))
 
+(defparameter *opt-loop-tile-probe-timeout-seconds* 2
+  "Timeout in seconds for external cache-size probe commands (sysctl).
+A hung probe is treated as failure (NIL), which disables FR-515 tiling rather
+than stalling optimization.")
+
 (defun %loop-tile-run-program-line (program args)
   "Return PROGRAM output as a trimmed string, or NIL on failure."
   (handler-case
-      (let ((out (make-string-output-stream)))
-        (let ((proc (sb-ext:run-program program args :output out :error nil :search t)))
-          (when (zerop (sb-ext:process-exit-code proc))
-            (%loop-tile-trim-newline (get-output-stream-string out)))))
+      (sb-ext:with-timeout *opt-loop-tile-probe-timeout-seconds*
+        (let ((out (make-string-output-stream)))
+          (let ((proc (sb-ext:run-program program args :output out :error nil :search t)))
+            (when (zerop (sb-ext:process-exit-code proc))
+              (%loop-tile-trim-newline (get-output-stream-string out))))))
+    (sb-ext:timeout () nil)
     (error () nil)))
 
 (defun %loop-tile-parse-positive-integer (string)

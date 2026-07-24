@@ -29,6 +29,44 @@
       (assert-true (search "SMOKE" out))
       (assert-true (search "ENTRY" out)))))
 
+(deftest mir-format-value-phi-operand
+  "mir-format-value renders a (pred-block . value) phi operand as [label:value]."
+  (let* ((fn  (mir-make-function :f))
+         (blk (mir-new-block fn :label :loop))
+         (v   (mir-new-value fn :name :x))
+         (out (mir-format-value (cons blk v))))
+    (assert-true (search "LOOP" out))
+    (assert-true (search "%0"   out))
+    (assert-true (search "["    out))))
+
+(deftest mir-format-value-unknown-operand-falls-back-to-aesthetic
+  "mir-format-value falls back to ~S for operands that are neither value, const, nor phi pair."
+  (assert-equal ":FOO" (mir-format-value :foo)))
+
+(deftest mir-print-inst-emits-meta-comment
+  "mir-print-inst appends instruction metadata as a trailing comment."
+  (let* ((fn   (mir-make-function :f))
+         (blk  (mirf-entry fn))
+         (dst  (mir-new-value fn :name :r))
+         (inst (mir-emit blk :call :dst dst :meta '(:effect-kind :read-only)))
+         (out  (with-output-to-string (s) (mir-print-inst inst s))))
+    (assert-true (search ";" out))
+    (assert-true (search "READ-ONLY" out))))
+
+(deftest mir-print-block-shows-preds-and-phis
+  "mir-print-block annotates predecessor labels and prints phi nodes ahead of the body."
+  (let* ((fn    (mir-make-function :f))
+         (entry (mirf-entry fn))
+         (blk   (mir-new-block fn :label :merge))
+         (phi   (mir-new-value fn :name :p)))
+    (mir-add-succ entry blk)
+    (mir-emit blk :phi :dst phi)
+    (let ((out (with-output-to-string (s) (mir-print-block blk s))))
+      (assert-true (search "MERGE" out))
+      (assert-true (search "preds:" out))
+      (assert-true (search "ENTRY" out))
+      (assert-true (search "PHI" out)))))
+
 ;;;; ─── target-desc ──────────────────────────────────────────────────────
 
 (deftest target-x86-64-description

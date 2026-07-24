@@ -117,7 +117,7 @@ Folds static (list ...) parts together and eliminates nil splices."
 (defun our-macroexpand-all (form &optional env)
   "Recursively expand all macros in FORM, including in subforms."
   (cond
-    ((%qq-head-p form "BACKQUOTE")
+    ((or (%qq-head-p form "BACKQUOTE") (%qq-head-p form "QUASIQUOTE"))
      (our-macroexpand-all (%expand-quasiquote (second form)) env))
     ((and (consp form) (eq (car form) 'quote))
      form)

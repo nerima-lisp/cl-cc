@@ -68,11 +68,17 @@
     (format *log-output* "[~D] ~A~%" level msg)
     (force-output *log-output*)))
 
-(defun log-trace (message &rest attrs) (when (<= *log-level* +log-level-trace+) (rt-log +log-level-trace+ message :attrs attrs)))
-(defun log-debug (message &rest attrs) (when (<= *log-level* +log-level-debug+) (rt-log +log-level-debug+ message :attrs attrs)))
-(defun log-info  (message &rest attrs) (when (<= *log-level* +log-level-info+)  (rt-log +log-level-info+  message :attrs attrs)))
-(defun log-warn  (message &rest attrs) (when (<= *log-level* +log-level-warn+)  (rt-log +log-level-warn+  message :attrs attrs)))
-(defun log-error (message &rest attrs) (when (<= *log-level* +log-level-error+) (rt-log +log-level-error+ message :attrs attrs)))
+(defmacro define-log-level (name level)
+  "Define log entry point NAME forwarding to RT-LOG at LEVEL when *LOG-LEVEL* permits."
+  `(defun ,name (message &rest attrs)
+     (when (<= *log-level* ,level)
+       (rt-log ,level message :attrs attrs))))
+
+(define-log-level log-trace +log-level-trace+)
+(define-log-level log-debug +log-level-debug+)
+(define-log-level log-info  +log-level-info+)
+(define-log-level log-warn  +log-level-warn+)
+(define-log-level log-error +log-level-error+)
 
 (defmacro with-log-context (bindings &body body)
   "Bind logging context entries for the duration of BODY.

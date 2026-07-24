@@ -11,6 +11,12 @@
   (wat "" :type string)
   (metadata nil :type list))
 
+(defparameter *wasm-tool-timeout-seconds* 120
+  "Timeout in seconds for external Wasm toolchain invocations (wasm-opt,
+wat2wasm, wasm2wat).  These are optional post-processing tools whose runtime
+scales with module size, so the bound is generous; on timeout the caller falls
+back to the un-processed bytes/WAT exactly as it does on tool failure.")
+
 (defun wasm-tool-available-p (program)
   "Return T when PROGRAM can be found on PATH."
   (let ((path (ignore-errors (cl-cc/runtime:rt-getenv "PATH"))))
@@ -29,8 +35,10 @@
   (declare (ignore input-file))
   (when (and argv (wasm-tool-available-p (first argv)))
     (handler-case
-        (uiop:run-program argv :output :string :error-output :string
-                              :ignore-error-status nil)
+        (sb-ext:with-timeout *wasm-tool-timeout-seconds*
+          (uiop:run-program argv :output :string :error-output :string
+                                :ignore-error-status nil))
+      (sb-ext:timeout () nil)
       (error () nil))))
 
 (defun %wasm-write-bytes-file (path bytes)
@@ -138,13 +146,14 @@
             (tmp-out (%wasm-temp-path "wasm")))
         (unwind-protect
              (handler-case
-                 (progn
+                 (sb-ext:with-timeout *wasm-tool-timeout-seconds*
                    (%wasm-write-bytes-file tmp-in wasm-bytes)
                    (uiop:run-program (list "wasm-opt" "-O3" "--strip-debug"
                                            "--remove-unused-module-elements"
                                            (namestring tmp-in) "-o" (namestring tmp-out))
                                      :ignore-error-status nil)
                    (if (probe-file tmp-out) (%wasm-read-bytes-file tmp-out) wasm-bytes))
+               (sb-ext:timeout () wasm-bytes)
                (error () wasm-bytes))
           (ignore-errors (delete-file tmp-in))
           (ignore-errors (delete-file tmp-out))))
@@ -169,13 +178,14 @@
             (tmp-wasm (%wasm-temp-path "wasm")))
         (unwind-protect
              (handler-case
-                 (progn
+                 (sb-ext:with-timeout *wasm-tool-timeout-seconds*
                    (with-open-file (out tmp-wat :direction :output :if-exists :supersede
                                                 :if-does-not-exist :create)
                      (write-string wat out))
                    (uiop:run-program (list "wat2wasm" (namestring tmp-wat) "-o" (namestring tmp-wasm))
                                      :ignore-error-status nil)
                    (if (probe-file tmp-wasm) (%wasm-read-bytes-file tmp-wasm) fallback-bytes))
+               (sb-ext:timeout () fallback-bytes)
                (error () fallback-bytes))
           (ignore-errors (delete-file tmp-wat))
           (ignore-errors (delete-file tmp-wasm))))

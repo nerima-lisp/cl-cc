@@ -8,19 +8,6 @@
 (in-package :cl-cc/test)
 (in-suite cl-cc-unit-suite)
 
-;;; ─── %opt-trim-whitespace ────────────────────────────────────────────────────
-
-(deftest-each opt-trim-whitespace-cases
-  "%opt-trim-whitespace strips leading/trailing spaces, tabs, and newlines."
-  :cases (("spaces"      "hello"      "  hello  ")
-          ("tabs"        "world"      (format nil "~Cworld~C" #\Tab #\Tab))
-          ("newlines"    "foo"        (format nil "~Cfoo~C" #\Newline #\Newline))
-          ("mixed"       "bar"        (format nil " ~C~C bar ~C~C " #\Tab #\Newline #\Newline #\Tab))
-          ("no-trim"     "bare"       "bare")
-          ("empty"       ""           ""))
-  (expected input)
-  (assert-equal expected (cl-cc/optimize::%opt-trim-whitespace input)))
-
 ;;; ─── opt-parse-pass-pipeline-string ─────────────────────────────────────────
 
 (deftest-each parse-pass-pipeline-string-cases

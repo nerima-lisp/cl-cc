@@ -24,26 +24,17 @@
 
 (defun %php-array-ref-call-p (node)
   "Return true when NODE is a %php-array-ref helper call."
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) 'cl-cc/php::%php-array-ref)))
-       (= (length (ast-call-args node)) 2)))
+  (%php-helper-call-p node 'cl-cc/php::%php-array-ref 2))
 
 (defun %php-array-literal-call-p (node)
   "Return true when NODE is a %php-array constructor call (an array literal),
 i.e. a valid destructuring-assignment target like [$a, $b] or list($a, $b)."
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) 'cl-cc/php::%php-array)))))
+  (%php-helper-call-p node 'cl-cc/php::%php-array))
 
 (defun %php-list-constructor-p (node)
   "True when NODE is a [..] / list(..) constructor (a %php-array call) — i.e. a
 nested destructuring target."
-  (and (ast-call-p node)
-       (let ((f (ast-call-func node)))
-         (and (ast-var-p f) (eq (ast-var-name f) 'cl-cc/php::%php-array)))))
+  (%php-helper-call-p node 'cl-cc/php::%php-array))
 
 (defun %php-collect-list-bindings (lhs val bindings)
   "Accumulate destructuring bindings for LHS (a %php-array constructor) pulling
@@ -95,10 +86,7 @@ marker."
 
 (defun %php-array-append-call-p (node)
   "Return true when NODE is an ARRAY[] append-target marker."
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) 'cl-cc/php::%php-array-append-target)))))
+  (%php-helper-call-p node 'cl-cc/php::%php-array-append-target))
 
 (defun %php-array-unset-call (array key)
   "Lower unset(ARRAY[KEY]) to the PHP ordered-array deletion helper."

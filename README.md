@@ -1,6 +1,6 @@
 # cl-cc
 
-[![CI](https://github.com/takeokunn/cl-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/takeokunn/cl-cc/actions/workflows/ci.yml)
+[![CI](https://github.com/nerima-lisp/cl-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/nerima-lisp/cl-cc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Built with Nix](https://img.shields.io/badge/Built_with-Nix-5277C3.svg?logo=nixos)](https://nixos.org)
 

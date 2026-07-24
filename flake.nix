@@ -51,6 +51,20 @@
       url = "github:nerima-lisp/cl-tty-kit";
       flake = false;
     };
+    # cl-cc-ast and cl-cc-type are the first subsystems split out of this
+    # monorepo (see docs/repo-split-design.md). Adopted the same way as the
+    # toolkits above: plain source trees, built with cl-cc's own
+    # sbcl.buildASDFSystem and injected into the internal system graph under
+    # their original names, so every `deps = [ "cl-cc-ast" ... ]` resolves to
+    # the external derivation transparently. cl-cc-type depends on cl-cc-ast.
+    cl-cc-ast = {
+      url = "github:nerima-lisp/cl-cc-ast";
+      flake = false;
+    };
+    cl-cc-type = {
+      url = "github:nerima-lisp/cl-cc-type";
+      flake = false;
+    };
   };
 
   outputs =
@@ -119,6 +133,22 @@
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
           };
+          # First subsystems split out of the monorepo. clCcAst is a
+          # dependency-free leaf; clCcType depends on it. Injected into the
+          # internal system graph by name in nix/asdf-systems.nix.
+          clCcAst = sbcl.buildASDFSystem {
+            pname = "cl-cc-ast";
+            version = "0.1.0";
+            src = inputs.cl-cc-ast;
+            systems = [ "cl-cc-ast" ];
+          };
+          clCcType = sbcl.buildASDFSystem {
+            pname = "cl-cc-type";
+            version = "0.1.0";
+            src = inputs.cl-cc-type;
+            systems = [ "cl-cc-type" ];
+            lispLibs = [ clCcAst ];
+          };
           asdf = import ./nix/asdf-systems.nix {
             inherit
               pkgs
@@ -131,6 +161,8 @@
               clBoundaryKit
               clCli
               clTtyKit
+              clCcAst
+              clCcType
               ;
           };
           inherit (asdf)

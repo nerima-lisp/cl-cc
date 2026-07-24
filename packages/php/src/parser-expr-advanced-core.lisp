@@ -200,10 +200,7 @@
 
 (defun %php-reference-marker-p (node)
   "Return true when NODE is the internal &EXPR marker."
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) '%php-reference-marker)))))
+  (%php-helper-call-p node '%php-reference-marker))
 
 (defun %php-reference-marker-expr (node)
   "Return the referenced expression stored in a reference marker."
@@ -217,10 +214,7 @@
 
 (defun %php-reference-assignment-marker-p (node)
   "Return true when NODE is the internal reference-assignment marker."
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) '%php-reference-assignment-marker)))))
+  (%php-helper-call-p node '%php-reference-assignment-marker))
 
 (defun %php-reference-assignment-dest (node)
   "Return the destination symbol for a reference-assignment marker."
@@ -239,10 +233,7 @@
 
 (defun %php-variable-init-expression-marker-p (node)
   "Return true when NODE is the internal first-use variable init marker."
-  (and (ast-call-p node)
-       (let ((func (ast-call-func node)))
-         (and (ast-var-p func)
-              (eq (ast-var-name func) '%php-variable-init-expression-marker)))))
+  (%php-helper-call-p node '%php-variable-init-expression-marker))
 
 (defun %php-variable-init-expression-var (node)
   "Return the variable symbol stored in a first-use init marker."

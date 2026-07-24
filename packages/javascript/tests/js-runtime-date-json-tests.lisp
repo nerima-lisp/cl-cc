@@ -374,28 +374,17 @@
   (let ((d (cl-cc/javascript::%js-make-date 12345)))
     (assert-= 12345.0d0 (cl-cc/javascript::%js-date-get-time d))))
 
-(deftest js-rt-date-to-iso-string
-  "toISOString formats as YYYY-MM-DDTHH:MM:SS.mmmZ."
-  (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970-01-02T03:04:05.000Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
-
-(deftest js-rt-date-to-iso-string-with-ms
-  "toISOString includes sub-second milliseconds."
-  (let ((d (cl-cc/javascript::%js-make-date 97445123)))
-    (assert-string= "1970-01-02T03:04:05.123Z"
-                    (cl-cc/javascript::%js-date-to-iso-string d))))
-
-(deftest js-rt-date-to-local-date-string
-  "toLocaleDateString returns YYYY/MM/DD."
-  (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970/01/02" (cl-cc/javascript::%js-date-to-local-date-string d))))
-
-(deftest js-rt-date-to-time-string
-  "toTimeString returns HH:MM:SS GMT+0000 (...)."
-  (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "03:04:05 GMT+0000 (Coordinated Universal Time)"
-                    (cl-cc/javascript::%js-date-to-time-string d))))
+(deftest-each js-rt-date-to-string-formats
+  "Date rendering helpers format %js-make-date output as the expected string."
+  :cases (("iso-string"        97445000 #'cl-cc/javascript::%js-date-to-iso-string        "1970-01-02T03:04:05.000Z")
+          ("iso-string-with-ms" 97445123 #'cl-cc/javascript::%js-date-to-iso-string       "1970-01-02T03:04:05.123Z")
+          ("local-date-string" 97445000 #'cl-cc/javascript::%js-date-to-local-date-string "1970/01/02")
+          ("time-string"       97445000 #'cl-cc/javascript::%js-date-to-time-string        "03:04:05 GMT+0000 (Coordinated Universal Time)")
+          ("utc-string"        97445000 #'cl-cc/javascript::%js-date-to-utc-string         "1970-01-02T03:04:05.000Z")
+          ("date-string"       97445000 #'cl-cc/javascript::%js-date-to-date-string        "Fri Jan 02 1970")
+          ("json"              97445000 #'cl-cc/javascript::%js-date-to-json               "1970-01-02T03:04:05.000Z"))
+  (ms fn expected)
+  (assert-string= expected (funcall fn (cl-cc/javascript::%js-make-date ms))))
 
 (deftest js-rt-date-set-time
   "setTime updates ms and returns the new value."
@@ -433,24 +422,6 @@
   "getTimezoneOffset returns 0 in the UTC-only date model."
   (let ((d (cl-cc/javascript::%js-make-date 97445000)))
     (assert-= 0.0d0 (cl-cc/javascript::%js-date-get-timezone-offset d))))
-
-(deftest js-rt-date-to-utc-string
-  "toUTCString mirrors the ISO string rendering."
-  (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970-01-02T03:04:05.000Z"
-                    (cl-cc/javascript::%js-date-to-utc-string d))))
-
-(deftest js-rt-date-to-date-string
-  "toDateString formats the weekday and calendar date."
-  (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "Fri Jan 02 1970"
-                    (cl-cc/javascript::%js-date-to-date-string d))))
-
-(deftest js-rt-date-to-json
-  "toJSON returns the ISO string for valid dates."
-  (let ((d (cl-cc/javascript::%js-make-date 97445000)))
-    (assert-string= "1970-01-02T03:04:05.000Z"
-                    (cl-cc/javascript::%js-date-to-json d))))
 
 (deftest js-rt-date-value-of
   "valueOf aliases getTime."

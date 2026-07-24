@@ -147,4 +147,3 @@ FR-145: Checks *wasm-fixnum-unboxed-regs* table for the register."
   "Clear the unboxed-fixnum mark for REG (FR-145)."
   (when *wasm-fixnum-unboxed-regs*
     (remhash reg *wasm-fixnum-unboxed-regs*)))
-))

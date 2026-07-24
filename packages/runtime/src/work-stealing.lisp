@@ -127,7 +127,7 @@ All spawned tasks must complete before leaving the scope."
      (unwind-protect
          (progn ,@body)
        ;; Wait for all workers to drain
-       (drain-all-workers)))))
+       (drain-all-workers))))
 
 ;;; ──── Helpers ────
 (defun make-worker (id deques)

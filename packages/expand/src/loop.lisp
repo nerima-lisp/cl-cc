@@ -98,7 +98,11 @@ Body:         DO forms...   INITIALLY forms...   FINALLY forms..."
   (or (%loop-iota-pattern clauses)
       (let* ((ir           (parse-loop-clauses clauses))
          (iterations   (getf ir :iterations))
-         (body         (getf ir :body))
+         ;; DO forms in original clause order, kept in their OWN variable
+         ;; (rather than seeding the shared push+nreverse `body` accumulator
+         ;; below) — see the ④ assembly comment for why mixing them in there
+         ;; is unsound.
+         (do-forms     (nreverse (getf ir :body)))
          (accumulations (getf ir :accumulations))
          (conditions   (getf ir :conditions))
          (initially    (getf ir :initially))
@@ -111,7 +115,9 @@ Body:         DO forms...   INITIALLY forms...   FINALLY forms..."
           (end-tests   nil)
           (pre-body    nil)
           (acc-vars    nil)
-          (result-form nil))
+          (result-form nil)
+          (condition-forms nil)   ; WHILE/UNTIL/ALWAYS/… checks, own accumulator
+          (body        nil))      ; accumulation (COLLECT/SUM/…) forms only
 
       ;; ① Emit iteration specs — uniform dispatch through *loop-iter-emitters*.
       ;;    :repeat and :with are registered in the same table as FOR variants.
@@ -126,16 +132,24 @@ Body:         DO forms...   INITIALLY forms...   FINALLY forms..."
             (setf pre-body   (nconc new-pre    pre-body))
             (setf step-forms (nconc new-steps  step-forms)))))
 
-      ;; ② Emit conditions BEFORE accumulations (push order → nreverse places
-      ;;    conditions ahead of accumulations in the final body).
-      ;;    ANSI requires WHILE/UNTIL to test before any accumulation.
+      ;; ② Emit WHILE/UNTIL/ALWAYS/NEVER/THEREIS checks into CONDITION-FORMS,
+      ;;    a dedicated accumulator (NOT the shared `body` list used by DO/
+      ;;    accumulation forms below).  `body` was seeded with the already-
+      ;;    reversed DO-forms until FR/regression review found that pushing
+      ;;    condition checks onto that same list and nreversing once at the
+      ;;    end put the checks AFTER the DO-forms instead of before them —
+      ;;    i.e. `(loop while X do FORM)` silently became a do-while loop
+      ;;    that always ran FORM at least once even when X was initially
+      ;;    false.  Keeping condition checks in their own list and splicing
+      ;;    them in first at assembly time (④) guarantees ANSI's "test before
+      ;;    body" ordering regardless of push/reverse bookkeeping elsewhere.
       (dolist (cond conditions)
         (let* ((type    (car cond))
                (form    (cadr cond))
                (emitter (gethash type *loop-condition-emitters*)))
           (unless emitter
             (error "Unknown loop condition type: ~S" type))
-          (push (funcall emitter form end-tag) body)))
+          (push (funcall emitter form end-tag) condition-forms)))
 
       ;; ③ Emit accumulation specs — fully table-driven via *loop-acc-emitters*.
       (dolist (acc accumulations)
@@ -157,9 +171,13 @@ Body:         DO forms...   INITIALLY forms...   FINALLY forms..."
       ;; ④ Assemble tagbody.
       ;;    :initially/:finally — already forward-ordered by finalize-loop-state.
       ;;    bindings/end-tests/pre-body/step-forms — push-accumulated; nreverse corrects.
-      ;;    body — push-accumulated across parse + ②③; nreverse corrects.
+      ;;    condition-forms/body — push-accumulated in ②③; nreverse corrects each.
+      ;;    Per-iteration order is CONDITIONS, then DO-forms, then accumulations
+      ;;    (ANSI requires WHILE/UNTIL to test before any DO/accumulation form).
       ;; FR-539: replace (loop-finish) with (go end-tag) in body and finally forms.
-      (let ((assembled-body    (%loop-replace-finish (nreverse body) end-tag))
+      (let ((assembled-body    (append (%loop-replace-finish (nreverse condition-forms) end-tag)
+                                        (%loop-replace-finish do-forms end-tag)
+                                        (%loop-replace-finish (nreverse body) end-tag)))
             (assembled-finally (%loop-replace-finish finally end-tag)))
         `(block ,(or loop-name nil)  ; FR-638: named loop
            (let* ,(nreverse bindings)

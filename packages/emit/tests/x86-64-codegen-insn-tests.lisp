@@ -235,31 +235,21 @@
     (assert-= 6 (length bytes))
     (assert-equal '(#xF3 #x0F #x01 #xEA #x66 #x90) bytes)))
 
-(deftest x86-64-shadow-stack-control-inst-covers-vm-remove-handler
-  "VM handler removal path lowers to CET restore slot when enabled."
+(deftest-each x86-64-shadow-stack-control-inst-covers-vm-handler-ops
+  "VM handler-management instructions lower to CET control slots when shadow stack is enabled."
+  :cases (("remove-handler"    #'cl-cc/vm::make-vm-remove-handler    '(#xF3 #x0F #x01 #x28 #x66 #x90))
+          ("sync-handler-regs"  #'cl-cc/vm::make-vm-sync-handler-regs '(#xF3 #x48 #x0F #xAE #xE8 #x90)))
+  (make-fn expected-bytes)
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-remove-handler)
+                     (funcall make-fn)
                      s
                      0
                      (make-hash-table :test #'equal)))))))
     (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x0F #x01 #x28 #x66 #x90) bytes)))
-
-(deftest x86-64-shadow-stack-control-inst-covers-vm-sync-handler-regs
-  "VM handler snapshot sync path lowers to CET adjust slot when enabled."
-  (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
-                 (%x86-collect-bytes
-                  (lambda (s)
-                    (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-sync-handler-regs)
-                     s
-                     0
-                     (make-hash-table :test #'equal)))))))
-    (assert-= 6 (length bytes))
-    (assert-equal '(#xF3 #x48 #x0F #xAE #xE8 #x90) bytes)))
+    (assert-equal expected-bytes bytes)))
 
 (deftest x86-64-shadow-stack-control-inst-covers-vm-throw
   "VM throw path lowers to CET adjust slot when enabled."

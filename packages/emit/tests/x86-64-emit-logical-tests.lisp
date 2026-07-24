@@ -42,47 +42,30 @@
          (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-false-pred inst)))
     (assert-true (>= (length bytes) 4))))
 
-;;; ─── emit-vm-and / emit-vm-or ────────────────────────────────────────────
+;;; ─── fixed-size binary logical emitters ──────────────────────────────────
 
-(deftest x86-emit-vm-and-emits-17-bytes
-  "emit-vm-and emits exactly 17 bytes (as documented in the source layout comment)."
-  (let* ((inst (make-vm-and :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-and inst)))
-    (assert-= 17 (length bytes))))
-
-(deftest x86-emit-vm-or-emits-17-bytes
-  "emit-vm-or emits exactly 17 bytes (as documented in the source layout comment)."
-  (let* ((inst (make-vm-or :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-or inst)))
-    (assert-= 17 (length bytes))))
+(deftest-each x86-emit-logical-fixed-size-emitters
+  "Binary logical emitters produce their documented fixed byte counts."
+  :cases (("and"    #'make-vm-and    #'cl-cc/codegen::emit-vm-and    17)
+          ("or"     #'make-vm-or     #'cl-cc/codegen::emit-vm-or     17)
+          ("logeqv" #'make-vm-logeqv #'cl-cc/codegen::emit-vm-logeqv  9)
+          ("logbitp" #'make-vm-logbitp #'cl-cc/codegen::emit-vm-logbitp 15))
+  (ctor emitter expected-length)
+  (let ((bytes (%collect-logical-bytes
+                emitter (funcall ctor :dst :r0 :lhs :r1 :rhs :r2))))
+    (assert-= expected-length (length bytes))))
 
 ;;; ─── emit-vm-logand / emit-vm-logior / emit-vm-logxor ───────────────────
 
-(deftest x86-emit-logand-emits-bytes
-  "emit-vm-logand emits a non-empty sequence (define-binary-alu-emitter pattern)."
-  (let* ((inst (make-vm-logand :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-logand inst)))
+(deftest-each x86-emit-alu-logical-emit-bytes
+  "define-binary-alu-emitter logical ops emit a non-empty sequence."
+  :cases (("logand" #'make-vm-logand #'cl-cc/codegen::emit-vm-logand)
+          ("logior" #'make-vm-logior #'cl-cc/codegen::emit-vm-logior)
+          ("logxor" #'make-vm-logxor #'cl-cc/codegen::emit-vm-logxor))
+  (ctor emitter)
+  (let ((bytes (%collect-logical-bytes
+                emitter (funcall ctor :dst :r0 :lhs :r1 :rhs :r2))))
     (assert-true (> (length bytes) 0))))
-
-(deftest x86-emit-logior-emits-bytes
-  "emit-vm-logior emits a non-empty sequence."
-  (let* ((inst (make-vm-logior :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-logior inst)))
-    (assert-true (> (length bytes) 0))))
-
-(deftest x86-emit-logxor-emits-bytes
-  "emit-vm-logxor emits a non-empty sequence."
-  (let* ((inst (make-vm-logxor :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-logxor inst)))
-    (assert-true (> (length bytes) 0))))
-
-;;; ─── emit-vm-logeqv ──────────────────────────────────────────────────────
-
-(deftest x86-emit-logeqv-emits-9-bytes
-  "emit-vm-logeqv emits exactly 9 bytes (MOV+XOR+NOT, 3 bytes each)."
-  (let* ((inst (make-vm-logeqv :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-logeqv inst)))
-    (assert-= 9 (length bytes))))
 
 ;;; ─── emit-vm-logtest ─────────────────────────────────────────────────────
 
@@ -92,11 +75,3 @@
          (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-logtest inst)))
     (assert-true (> (length bytes) 0))
     (assert-true (<= (length bytes) 14))))
-
-;;; ─── emit-vm-logbitp ─────────────────────────────────────────────────────
-
-(deftest x86-emit-logbitp-emits-15-bytes
-  "emit-vm-logbitp emits exactly 15 bytes (PUSH+MOV+MOV+SAR+AND+POP layout)."
-  (let* ((inst (make-vm-logbitp :dst :r0 :lhs :r1 :rhs :r2))
-         (bytes (%collect-logical-bytes #'cl-cc/codegen::emit-vm-logbitp inst)))
-    (assert-= 15 (length bytes))))

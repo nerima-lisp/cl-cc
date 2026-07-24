@@ -33,22 +33,14 @@
 
 ;;; ─── opt-pass-strength-reduce — multiply by power of 2 ──────────────────
 
-(deftest strength-reduce-mul-by-power-of-2-emits-ash
-  "opt-pass-strength-reduce replaces (* x 4) with (ash x 2) via vm-ash."
-  ;; Input: CONST :R0 ← 4 ;  MUL :R1 ← :X * :R0
-  (let* ((const-4 (make-vm-const :dst :r0 :value 4))
-         (mul     (make-vm-mul   :dst :r1 :lhs :x :rhs :r0))
-         (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-4 mul))))
-    ;; The mul should become ash; check no vm-mul in output
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
-
-(deftest strength-reduce-mul-rhs-power-of-2-emits-ash
-  "opt-pass-strength-reduce handles commutative case (power-of-2 on lhs)."
-  ;; Input: CONST :R0 ← 8 ;  MUL :R1 ← :R0 * :X
-  (let* ((const-8 (make-vm-const :dst :r0 :value 8))
-         (mul     (make-vm-mul   :dst :r1 :lhs :r0 :rhs :x))
-         (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-8 mul))))
+(deftest-each strength-reduce-mul-by-power-of-2-emits-ash
+  "opt-pass-strength-reduce replaces multiply-by-power-of-2 with vm-ash for either operand."
+  :cases (("power-on-rhs" 4 :x :r0)
+          ("power-on-lhs" 8 :r0 :x))
+  (value lhs rhs)
+  (let* ((const-n (make-vm-const :dst :r0 :value value))
+         (mul     (make-vm-mul   :dst :r1 :lhs lhs :rhs rhs))
+         (result  (cl-cc/optimize::opt-pass-strength-reduce (list const-n mul))))
     (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-mul)) result))
     (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result))))
 

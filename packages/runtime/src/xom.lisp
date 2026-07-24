@@ -35,13 +35,21 @@ it.  Disabled by default; unsupported hardware signals an explicit error.")
         (search "X86_64" machine)
         (search "AMD64" machine))))
 
+(defparameter *rt-cpu-feature-probe-timeout-seconds* 2
+  "Timeout in seconds for the external `sysctl -a` CPU feature probe.
+Mirrors codegen's host-probe bound so a hung sysctl cannot stall JIT feature
+detection; on timeout the probe falls through to /proc/cpuinfo / NIL.")
+
 (defun %rt-cpu-feature-text ()
   "Return best-effort CPU feature text for capability detection."
   (or (ignore-errors
         (when (and (find-package :uiop) (fboundp 'uiop:run-program))
-          (uiop:run-program '("sysctl" "-a")
-                            :output :string
-                            :ignore-error-status t)))
+          (handler-case
+              (sb-ext:with-timeout *rt-cpu-feature-probe-timeout-seconds*
+                (uiop:run-program '("sysctl" "-a")
+                                  :output :string
+                                  :ignore-error-status t))
+            (sb-ext:timeout () nil))))
       (ignore-errors
         (with-open-file (in "/proc/cpuinfo" :direction :input)
           (let ((out (make-string-output-stream)))

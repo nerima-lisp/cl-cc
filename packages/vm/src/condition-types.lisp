@@ -369,8 +369,8 @@ forms, prefer the smallest covering range."
 
 (defun %vm-restore-frame-for-exception-propagation (state frame)
   "Restore one caller frame while propagating an exception-table lookup."
-  (destructuring-bind (return-pc _dst-reg old-closure-env saved-regs) frame
-    (declare (ignore _dst-reg))
+  (destructuring-bind (return-pc _dst-reg old-closure-env saved-regs &rest _extra) frame
+    (declare (ignore _dst-reg _extra))
     (vm-restore-registers state saved-regs)
     (when old-closure-env
       (setf (vm-closure-env state) old-closure-env))
@@ -390,9 +390,12 @@ this models dynamic propagation without a runtime handler stack."
                  (when entry
                    (return (%vm-jump-to-exception-entry state entry condition)))
                  (if (vm-call-stack state)
+                     ;; The popped frame's return PC points just past the call
+                     ;; instruction; probe at the call site itself (return-pc - 1)
+                     ;; so a protected range covering the call still matches.
                      (setf probe-pc
-                           (%vm-restore-frame-for-exception-propagation
-                            state (vm-pop-call-frame state)))
+                           (1- (%vm-restore-frame-for-exception-propagation
+                                state (vm-pop-call-frame state))))
                      (progn
                       (when error-p
                         (unless (typep condition 'vm-fatal-error)
@@ -415,33 +418,104 @@ this models dynamic propagation without a runtime handler stack."
         (setf (gethash labels *vm-label-exception-tables*) exception-table)))
     labels))
 
+(defun %vm-signal-condition (state labels pc error-value)
+  "Route ERROR-VALUE through the zero-cost exception table, then the legacy
+handler stack.  Returns EXECUTE-INSTRUCTION values transferring control to the
+matching guest handler.  When no handler matches, prints a VM backtrace and
+raises, exactly as the VM-SIGNAL-ERROR opcode has always done."
+  (multiple-value-bind (next-pc handled-p value)
+      (vm-dispatch-exception-table state labels pc error-value :error-p nil)
+    (declare (ignore value))
+    (if next-pc
+        (values next-pc handled-p nil)
+        (let ((matching-handler nil)
+              (handlers-to-skip 0))
+          (dolist (entry (vm-handler-stack state))
+            (if (vm-error-type-matches-p error-value (third entry))
+                (progn (setf matching-handler entry) (return))
+                (incf handlers-to-skip)))
+          (if matching-handler
+              (progn
+                (dotimes (i (1+ handlers-to-skip)) (pop (vm-handler-stack state)))
+                (destructuring-bind (handler-label result-reg _type saved-call-stack saved-regs
+                                     &optional saved-method-call-stack)
+                    matching-handler
+                  (declare (ignore _type))
+                  (%vm-unwind-to-handler state labels handler-label result-reg
+                                         saved-call-stack saved-regs saved-method-call-stack
+                                         error-value)))
+              (progn
+                (unless (typep error-value 'vm-fatal-error)
+                  (vm-print-backtrace state :labels labels))
+                (if (typep error-value 'condition)
+                    (error error-value)
+                    (error "Unhandled error in VM: ~S" error-value))))))))
+
 (defmethod execute-instruction ((inst vm-signal-error) state pc labels)
   "Signal an error using the zero-cost exception table before legacy stacks."
-  (let ((error-value (vm-reg-get state (vm-error-reg inst))))
-    (multiple-value-bind (next-pc handled-p value)
-        (vm-dispatch-exception-table state labels pc error-value :error-p nil)
-      (declare (ignore value))
-      (if next-pc
-          (values next-pc handled-p nil)
-          (let ((matching-handler nil)
-                (handlers-to-skip 0))
-            (dolist (entry (vm-handler-stack state))
-              (if (vm-error-type-matches-p error-value (third entry))
-                  (progn (setf matching-handler entry) (return))
-                  (incf handlers-to-skip)))
-            (if matching-handler
-                (progn
-                  (dotimes (i (1+ handlers-to-skip)) (pop (vm-handler-stack state)))
-                  (destructuring-bind (handler-label result-reg _type saved-call-stack saved-regs
-                                       &optional saved-method-call-stack)
-                      matching-handler
-                    (declare (ignore _type))
-                    (%vm-unwind-to-handler state labels handler-label result-reg
-                                           saved-call-stack saved-regs saved-method-call-stack
-                                           error-value)))
-                (progn
-                  (unless (typep error-value 'vm-fatal-error)
-                    (vm-print-backtrace state :labels labels))
-                  (if (typep error-value 'condition)
-                      (error error-value)
-                      (error "Unhandled error in VM: ~S" error-value)))))))))
+  (%vm-signal-condition state labels pc (vm-reg-get state (vm-error-reg inst))))
+
+;;; ── Host-error routing into the guest condition system ──────────────────
+;;;
+;;; A guest program may trigger a *host* Lisp error while an instruction runs
+;;; (e.g. calling an undefined function, or a host TYPE-ERROR from a builtin).
+;;; ANSI CL requires such an error to be catchable by an enclosing guest
+;;; HANDLER-CASE/HANDLER-BIND.  Only the VM-SIGNAL-ERROR opcode consulted the
+;;; guest handler system, so host-raised conditions escaped uncaught.  The run
+;;; loop wraps each instruction with VM-EXECUTE-INSTRUCTION-GUARDED, which — when
+;;; a guest handler is actually in scope — offers a routable host condition to
+;;; the very same dispatch path the opcode uses.
+
+(defun %vm-host-error-routable-p (condition)
+  "Return T when a host-raised CONDITION should be offered to the guest condition
+system.  Excludes VM infrastructure guards that guest HANDLER-CASE must not
+swallow (stack-overflow, evaluation deadline)."
+  (and (typep condition 'error)
+       (not (typep condition 'vm-stack-overflow))
+       (not (typep condition 'vm-eval-deadline-exceeded))))
+
+(defun %vm-exception-table-would-handle-p (state labels pc condition)
+  "Non-destructively test whether the PC→handler side table has a live entry for
+CONDITION at PC or at any caller frame's return PC."
+  (and (%vm-exception-table-for-labels labels)
+       (or (vm-find-exception-table-entry labels pc condition)
+           ;; Probe each caller at its call site (return-pc - 1), matching the
+           ;; unwinding walk in VM-DISPATCH-EXCEPTION-TABLE.
+           (loop for frame in (vm-call-stack state)
+                 thereis (vm-find-exception-table-entry labels (1- (first frame)) condition)))))
+
+(defun %vm-guest-handler-exists-p (state labels pc condition)
+  "Non-destructively test whether a guest handler (exception table or legacy
+handler stack) would catch CONDITION signalled at PC."
+  (or (%vm-exception-table-would-handle-p state labels pc condition)
+      (some (lambda (entry)
+              (and (not (eq (first entry) :catch))
+                   (vm-error-type-matches-p condition (third entry))))
+            (vm-handler-stack state))))
+
+(defun %vm-guest-handlers-active-p (state labels)
+  "Return T when any guest condition handler could be in scope for STATE."
+  (or (vm-handler-stack state)
+      (%vm-exception-table-for-labels labels)))
+
+(defun vm-execute-instruction-guarded (instruction state pc labels)
+  "Execute INSTRUCTION, routing a host-raised CL:ERROR into the guest condition
+system so a compiled HANDLER-CASE/HANDLER-BIND catches it exactly as a guest
+ERROR call would.  When no guest handler is in scope, or none matches, the host
+condition propagates unchanged.  Returns the same values as EXECUTE-INSTRUCTION."
+  (if (%vm-guest-handlers-active-p state labels)
+      (let ((routed nil))
+        (multiple-value-bind (next-pc halted value)
+            (block done
+              (handler-bind
+                  ((error
+                     (lambda (condition)
+                       (when (and (%vm-host-error-routable-p condition)
+                                  (%vm-guest-handler-exists-p state labels pc condition))
+                         (setf routed condition)
+                         (return-from done)))))
+                (execute-instruction instruction state pc labels)))
+          (if routed
+              (%vm-signal-condition state labels pc routed)
+              (values next-pc halted value))))
+      (execute-instruction instruction state pc labels)))
