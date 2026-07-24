@@ -25,16 +25,4 @@ Returns the pass ratio for inspection."
       (assert-true (>= ratio threshold))
       ratio)))
 
-(defmacro assert-pbt ((&key (trials 50) (threshold 0.90)) generate &body check)
-  "Assert a property holds with probability >= THRESHOLD over TRIALS random samples.
-GENERATE is a LET* binding list; CHECK body runs in that scope and returns boolean."
-  `(%pbt-run ,trials ,threshold
-             (lambda ()
-               (let* ,generate
-                 ,@check))))
 
-(defmacro deftest-pbt (name docstring &key (trials 50) (threshold 0.90) generate check)
-  "Define a property-based test. See assert-pbt for argument semantics."
-  `(deftest ,name
-     ,docstring
-     (assert-pbt (:trials ,trials :threshold ,threshold) ,generate ,check)))

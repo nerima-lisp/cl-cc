@@ -99,50 +99,6 @@ When *update-snapshots* is t, overwrites the saved file with the current value."
              base-name (first case-entry) (length vars) (length case-vals)))
     case-vals))
 
-(defmacro deftest-each (base-name docstring &rest args)
-  "Define one test per entry in CASES.
-Each case is a list whose first element is the case label string and
-whose remaining elements are bound to the variables in the VARS list.
-
-Syntax:
-  (deftest-each base-name
-    \"docstring\"
-    :cases ((\"label\" val ...) ...)
-    (var ...)
-    body...)
-
-Generates tests named SOURCE/BASE-NAME [label] for each case so
-parameterized tests from different files do not silently collide in the global registry."
-  (let* ((cases-pos (position :cases args))
-         (cases     (if cases-pos (nth (1+ cases-pos) args) nil))
-         (body      (if cases-pos (nthcdr (+ 2 cases-pos) args) args)))
-    (unless cases-pos
-      (error "DEFTEST-EACH ~A requires a :CASES clause" base-name))
-    (unless (listp cases)
-      (error "DEFTEST-EACH ~A requires :CASES to be a list, got ~S" base-name cases))
-    (destructuring-bind (vars &rest body-forms) body
-      (unless body-forms
-        (error "DEFTEST-EACH ~A requires at least one body form" base-name))
-      (let* ((checked-vars (%deftest-each-check-vars base-name vars))
-             (source-id  (pathname-name
-                          (or *compile-file-pathname*
-                              *load-pathname*
-                              *default-pathname-defaults*)))
-             (expansions
-               (loop for case-entry in cases
-                     for case-vals = (%deftest-each-case-values base-name checked-vars case-entry)
-                     for case-label = (first case-entry)
-                     for test-name = (intern
-                                      (format nil "~A/~A [~A]"
-                                              (string-upcase source-id)
-                                              (symbol-name base-name)
-                                              case-label))
-                     for bindings = (mapcar #'list checked-vars case-vals)
-                     collect `(deftest ,test-name
-                                ,docstring
-                                (let ,bindings
-                                  ,@body-forms)))))
-        `(progn ,@expansions)))))
 
 ;;; ------------------------------------------------------------
 ;;; Flaky Detection

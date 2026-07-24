@@ -367,51 +367,9 @@ precondition signals an error because generated sequences should be executable."
 ;;; deftest-fuzz Macro (FR-031)
 ;;; ------------------------------------------------------------
 
-(defmacro deftest-fuzz (name &rest args)
-  "Define a fuzz test that generates COUNT random programs and tests each.
-   NAME: test name symbol registered in *test-registry*.
-   COUNT: number of random programs to generate and test.
-   MAX-DEPTH: maximum AST depth passed to gen-random-program (actual depth is 1..max-depth).
-   TIMEOUT-PER-TEST: seconds before an individual fuzz iteration is abandoned (not a failure).
-   FEATURES: quoted list of feature keywords for gen-random-program.
-   BODY: forms executed for each generated program; the symbols FEATURES and DEPTH
-         are bound to the current feature list and chosen depth respectively."
-  ;; Extract keyword args, body starts at first non-keyword element.
-  (let* ((known-keys '(:count :max-depth :timeout-per-test :features))
-         (count           (or (getf args :count)           100))
-         (max-depth       (or (getf args :max-depth)       3))
-         (timeout-per-test (or (getf args :timeout-per-test) 5))
-         (features        (or (getf args :features)        ''(:arithmetic :let :if)))
-         (body            (loop for rest on args by #'cddr
-                                when (not (member (car rest) known-keys))
-                                  return rest))
-         (features-var (gensym "FEATURES"))
-         (depth-var (gensym "DEPTH")))
-    `(deftest ,name
-       (let ((,features-var ,features))
-         (loop repeat ,count
-               do (let* ((depth (1+ (random ,max-depth)))
-                         (features ,features-var)
-                         (,depth-var depth))
-                    (declare (ignorable ,depth-var features))
-                    (handler-case
-                        (sb-ext:with-timeout ,timeout-per-test
-                          ,@body)
-                       (sb-ext:timeout ()
-                         ;; Timeout on an individual fuzz iteration is acceptable; skip it.
-                         nil))))))))
 
 
 ;;; ------------------------------------------------------------
 ;;; Built-in Fuzz Tests
 ;;; ------------------------------------------------------------
 
-(deftest-fuzz compiler-robustness
-  :count 10
-  :max-depth 3
-  :timeout-per-test 1
-  :features '(:arithmetic :let :if :progn)
-  (let ((prog (gen-random-program features depth)))
-    (assert-no-crash (compile-string (write-to-string prog)))
-    (when (compilable-p prog)
-      (assert-terminates (run-string (write-to-string prog)) :timeout 1))))

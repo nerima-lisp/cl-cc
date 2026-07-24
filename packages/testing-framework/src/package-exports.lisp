@@ -22,20 +22,8 @@
            cl-cc-e2e-suite
            cl-cc-conformance-suite
           run-suite
-          deftest
           defsuite
           in-suite
-          assert-=
-          assert-eq
-          assert-eql
-          assert-equal
-          assert-string=
-          assert-null
-          assert-true
-          assert-false
-          assert-type
-          assert-signals
-          assert-values
           assert-faster-than
           assert-no-consing
           assert-no-allocation
@@ -47,16 +35,11 @@
           assert-bitfield
           assert-snapshot
           assert-compiles-to
-          assert-pbt
-          deftest-pbt
           assert-evaluates-to
           assert-macro-expands-to
           assert-infers-type
-          deftest-each
           ;; High-level test macros (requirement #7)
           deftest-compile
-          deftest-codegen
-          deftest-vm
            defbenchmark
            run-benchmark
            benchmark-statistics
@@ -74,7 +57,6 @@
            pending
            expected-fail
            defexpected
-           deftest-fuzz
            shrink
            shrink-integer
            shrink-list
