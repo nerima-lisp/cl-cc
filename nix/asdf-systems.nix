@@ -10,6 +10,8 @@
   clTtyKit,
   clCcAst,
   clCcType,
+  clCcPhpSrc,
+  clCcJsSrc,
   ...
 }:
 let
@@ -92,25 +94,6 @@ let
     cl-cc-docgen = {
       src = "packages/docgen";
       deps = [ ];
-    };
-    cl-cc-php = {
-      src = "packages/php";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-parse"
-        "cl-cc-vm"
-      ];
-      extraLispLibs = [ clCcAst ];
-    };
-    cl-cc-javascript = {
-      src = "packages/javascript";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-parse"
-        # vm-integration.lisp wires the JS runtime into the VM (§5-1 step B).
-        "cl-cc-vm"
-      ];
-      extraLispLibs = [ clCcAst ];
     };
     cl-cc-optimize = {
       src = "packages/optimize";
@@ -203,8 +186,6 @@ let
       deps = [
         "cl-cc-bootstrap"
         "cl-cc-parse"
-        "cl-cc-php"
-        "cl-cc-javascript"
         "cl-cc-optimize"
         "cl-cc-vm"
         "cl-cc-expand"
@@ -213,6 +194,10 @@ let
         "cl-cc-binary"
         "cl-cc-compile"
       ];
+      # php/js are no longer pipeline dependencies: the frontends were
+      # externalized into optional plugin repos and self-register through the
+      # §5-1 backend-bridge protocol (pipeline-runtime-bridges.lisp iterates
+      # cl-cc/bootstrap:backend-bridge-providers, referencing neither directly).
       extraLispLibs = [
         clCcAst
         clCcType
@@ -366,6 +351,38 @@ let
     ];
   };
 
+  # Externalized PHP/JS language frontends (previously vendored under
+  # packages/php + packages/javascript). Like cl-cc-prolog-tools they depend on
+  # internal cl-cc systems (bootstrap/parse/vm), so they are built here — AFTER
+  # the productionAsdfSystems fixpoint — rather than in flake.nix's scope. They
+  # are optional plugins: nothing in productionAsdfSystems depends on them; they
+  # self-register with the pipeline via the §5-1 backend-bridge protocol when
+  # loaded. Their sources come straight from the external repos (flake inputs).
+  clCcPhp = sbcl.buildASDFSystem {
+    pname = "cl-cc-php";
+    version = "0.1.0";
+    src = clCcPhpSrc;
+    systems = [ "cl-cc-php" ];
+    lispLibs = [
+      clCcAst
+      productionAsdfSystems.cl-cc-bootstrap
+      productionAsdfSystems.cl-cc-parse
+      productionAsdfSystems.cl-cc-vm
+    ];
+  };
+  clCcJs = sbcl.buildASDFSystem {
+    pname = "cl-cc-javascript";
+    version = "0.1.0";
+    src = clCcJsSrc;
+    systems = [ "cl-cc-javascript" ];
+    lispLibs = [
+      clCcAst
+      productionAsdfSystems.cl-cc-bootstrap
+      productionAsdfSystems.cl-cc-parse
+      productionAsdfSystems.cl-cc-vm
+    ];
+  };
+
   # Test systems live in a separate attrset so Nix consumers can opt into
   # the heavier test FASLs only when needed. lispLibs flow from
   # productionAsdfSystems, never recursively from testAsdfSystems.
@@ -385,11 +402,17 @@ let
       version = "0.1.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc-test" ];
-      lispLibs = with productionAsdfSystems; [
+      # cl-cc-test :depends-on the php/js plugins so the remaining cross-cutting
+      # tests (vm-bridge, pipeline-native cache-key, e2e) can drive PHP/JS
+      # compilation; the frontends now come from the external derivations.
+      lispLibs = (with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
+      ]) ++ [
+        clCcPhp
+        clCcJs
       ];
     };
     "cl-cc-javascript-test" = sbcl.buildASDFSystem {
@@ -397,13 +420,14 @@ let
       version = "0.1.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc-javascript-test" ];
-      lispLibs = with productionAsdfSystems; [
+      lispLibs = (with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
-        cl-cc-php
-        cl-cc-javascript
+      ]) ++ [
+        clCcPhp
+        clCcJs
       ];
     };
     "cl-cc-test/e2e" = sbcl.buildASDFSystem {
@@ -411,11 +435,14 @@ let
       version = "0.1.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc-test/e2e" ];
-      lispLibs = with productionAsdfSystems; [
+      lispLibs = (with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
+      ]) ++ [
+        clCcPhp
+        clCcJs
       ];
     };
   };
@@ -423,6 +450,7 @@ in
 {
   inherit productionAsdfSystems testAsdfSystems;
   inherit cl-cc-prolog-tools cl-cc-prolog-tools-test;
+  inherit clCcPhp clCcJs;
   sbclWithCLCC = sbcl.withPackages (_: lib.attrValues productionAsdfSystems);
   sbclWithTests = sbcl.withPackages (
     _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-test" ]

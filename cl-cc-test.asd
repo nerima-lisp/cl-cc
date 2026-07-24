@@ -114,81 +114,12 @@
      (:file "incremental-tests")
      (:file "cst-to-ast-tests")
      (:file "diagnostics-tests")))
-   (:module "php-tests"
-    :pathname "packages/php/tests"
-    :serial t
-    :components
-     ((:file "php-tests")
-      (:file "php-parser-test-support")
-      (:file "php-parser-tests")
-      (:file "php-parser-core-stmt-tests")
-      (:file "php-parser-expression-tests")
-      (:file "php-parser-control-array-tests")
-      (:file "php-parser-namespace-tests")
-      (:file "php-parser-type-class-tests")
-      (:file "php-e2e-test-support")
-      (:file "php-compile-tests")
-      (:file "php-compile-core-e2e-tests")
-      (:file "php-compile-object-e2e-tests")
-      (:file "php-compile-reference-e2e-tests")
-      (:file "php-compile-array-e2e-tests")
-      (:file "php-compile-builtins-e2e-tests")
-      (:file "php-grammar-tests")
-      (:file "php-grammar-stmt-tests")
-      (:file "php-traits-tests")
-      (:file "php-interfaces-tests")
-      (:file "php84-tests")
-      (:file "php84-tests-language")
-      (:file "php85-tests-language")
-      (:file "php85-tests-runtime-objects")
-      (:file "php85-tests-runtime-tokenizer")
-      (:file "php85-tests-runtime-behavior")))
-      ;; php85-tests-registration.lisp dropped: it meta-tested the removed
-      ;; homegrown *test-registry*/persist-* registration mechanism's own
-      ;; internals directly, which has no cl-weave equivalent to preserve.
-   (:module "javascript-tests"
-    :pathname "packages/javascript/tests"
-    :serial t
-    :components
-     ((:file "js-lexer-tests")
-      ;; js-parser-tests.lisp split into 2 focused files:
-      ;;   decl: helpers + variable/arrow/class declarations
-      ;;   stmt: if/while/for/switch/try/destructuring/generators/new/unary
-      (:file "js-parser-decl-tests")
-      (:file "js-parser-stmt-tests")
-      ;; js-e2e-tests.lisp split into 4 focused files:
-      ;;   core:     shared helpers + basic programs + destructuring + JSON/Math/operators
-      ;;   ast:      parse-only AST shape tests (FizzBuzz, Fibonacci, classes, generators…)
-      ;;   advanced: optional chaining, typeof, class features, for-in/of, Map/Set
-      ;;   modern:   ES2022 syntax + ES2023-2026 built-ins
-      (:file "js-e2e-core-tests")
-      (:file "js-e2e-ast-tests")
-      (:file "js-e2e-advanced-tests")
-      (:file "js-e2e-modern-tests")
-      ;; js-runtime-tests.lisp split into 10 focused files:
-      ;;   core:        typeof, coercion, equality, for-of/in, try-catch, bitwise
-      ;;   array:       Array + ES2023 non-mutating variants + TypedArray
-      ;;   string-num:  String + Math + Number methods + predicates + parse*
-      ;;   collections: Set + Map + Iterator + Promise + Generator + BigInt + URI
-      ;;   resolver:    Method dispatch, RegExp, Reflect, Object fallback, bound-method
-      ;;   date-json:   Temporal + Date.prototype + JSON stringify/parse
-      ;;   object-ops:  Object static methods + destructuring + bitwise/shift + BigInt extras
-      ;;   symbol:      Symbol primitive, Symbol.for/keyFor registry, well-known symbols
-      ;;   ta-methods:  TypedArray ES2023 non-mutating methods + iterators + hex/base64
-      ;;   misc:        Promise.race/allSettled/finally/withResolvers/try, global
-      ;;                isNaN/isFinite, structuredClone, timer stubs, Iterator.from,
-      ;;                Map.groupBy, Set-from-iterable, Proxy, Math.sumPrecise,
-      ;;                Error.isError, AggregateError, AbortController, URL, TA ctor
-      (:file "js-runtime-core-tests")
-      (:file "js-runtime-array-tests")
-      (:file "js-runtime-string-number-tests")
-      (:file "js-runtime-collections-tests")
-      (:file "js-runtime-resolver-tests")
-      (:file "js-runtime-date-json-tests")
-      (:file "js-runtime-object-ops-tests")
-      (:file "js-runtime-symbol-tests")
-      (:file "js-runtime-typed-array-methods-tests")
-      (:file "js-runtime-misc-tests")))
+   ;; php-tests + javascript-tests modules removed: the PHP and JavaScript
+   ;; frontends were extracted to the external nerima-lisp/cl-cc-php and
+   ;; nerima-lisp/cl-cc-javascript repos, where their unit/parser/runtime
+   ;; suites now run. cl-cc still :depends-on :cl-cc-php/:cl-cc-javascript so
+   ;; the plugins load (backend-bridge registration + the remaining cross-cutting
+   ;; pipeline/vm-bridge tests that drive PHP/JS compilation).
    (:module "expand-tests"
     :pathname "packages/expand/tests"
     :serial t

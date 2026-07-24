@@ -32,6 +32,38 @@
         "type": "github"
       }
     },
+    "cl-cc-javascript": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784861218,
+        "narHash": "sha256-ZiOmtvA1tdH0Pz+ZTYcsP4OhqEZQFuUGEAtK5UXfHLI=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-javascript",
+        "rev": "bb9da6e3518ab3abbb6208b8605f5427a432248b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-javascript",
+        "type": "github"
+      }
+    },
+    "cl-cc-php": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784861172,
+        "narHash": "sha256-q37S3q+o0Pbu7sP+Ni+a5q+iIJ85kqngTZ4OlfcRDho=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-php",
+        "rev": "66c9974d38f8dc0b8f7d62d57b4662fc33e9efaa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-php",
+        "type": "github"
+      }
+    },
     "cl-cc-type": {
       "flake": false,
       "locked": {
@@ -184,6 +216,8 @@
       "inputs": {
         "cl-boundary-kit": "cl-boundary-kit",
         "cl-cc-ast": "cl-cc-ast",
+        "cl-cc-javascript": "cl-cc-javascript",
+        "cl-cc-php": "cl-cc-php",
         "cl-cc-type": "cl-cc-type",
         "cl-cli": "cl-cli",
         "cl-dataflow": "cl-dataflow",

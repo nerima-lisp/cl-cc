@@ -32,8 +32,6 @@
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
       (ensure-system-asd :cl-cc-vm "packages/vm/cl-cc-vm.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
-       (ensure-system-asd :cl-cc-php "packages/php/cl-cc-php.asd" here)
-       (ensure-system-asd :cl-cc-javascript "packages/javascript/cl-cc-javascript.asd" here)
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
        (ensure-system-asd :cl-cc-selfhost "packages/selfhost/cl-cc-selfhost.asd" here)
         (ensure-system-asd :cl-cc-repl "packages/repl/cl-cc-repl.asd" here))))
@@ -47,7 +45,7 @@
                 :cl-cc-runtime :cl-cc-bytecode :cl-cc-ir :cl-cc-mir :cl-cc-target
                 :cl-cc-type :cl-cc-optimize :cl-cc-regalloc :cl-cc-emit :cl-cc-expand
                 :cl-cc-compile :cl-cc-cps :cl-cc-codegen :cl-cc-vm :cl-cc-stdlib
-                 :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl :cl-cc-php :cl-cc-javascript)
+                 :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl)
   :components
   ((:module "src"
     :pathname "packages/umbrella-src"

@@ -62,6 +62,20 @@
       url = "github:nerima-lisp/cl-cc-type";
       flake = false;
     };
+    # cl-cc-php and cl-cc-javascript are the language frontends, also extracted
+    # into their own nerima-lisp repos. Unlike ast/type they depend on the
+    # internal cl-cc bootstrap/parse/vm systems, so they cannot be built in this
+    # flake.nix scope (productionAsdfSystems is not visible here). Their source
+    # trees are threaded into nix/asdf-systems.nix, which builds them AFTER the
+    # productionAsdfSystems fixpoint (the same way cl-cc-prolog-tools is built).
+    cl-cc-php = {
+      url = "github:nerima-lisp/cl-cc-php";
+      flake = false;
+    };
+    cl-cc-javascript = {
+      url = "github:nerima-lisp/cl-cc-javascript";
+      flake = false;
+    };
   };
 
   outputs =
@@ -162,6 +176,8 @@
               clCcAst
               clCcType
               ;
+            clCcPhpSrc = inputs.cl-cc-php;
+            clCcJsSrc = inputs.cl-cc-javascript;
           };
           inherit (asdf)
             productionAsdfSystems
@@ -171,6 +187,8 @@
             sbclWithTests
             cl-cc-prolog-tools
             cl-cc-prolog-tools-test
+            clCcPhp
+            clCcJs
             ;
           binaryModule = import ./nix/binary.nix { inherit pkgs lib sbclWithCLCC; };
           testImage = import ./nix/sbcl-image.nix {
@@ -219,6 +237,11 @@
               # of productionAsdfSystems (they live in their own repos now).
               cl-cc-ast = clCcAst;
               cl-cc-type = clCcType;
+              # Externalized php/js frontends, built in nix/asdf-systems.nix on
+              # top of the internal cl-cc systems and exposed here as optional
+              # plugin package outputs.
+              cl-cc-php = clCcPhp;
+              cl-cc-javascript = clCcJs;
               test-image = testImage;
             };
           inherit (appsModule) apps;
