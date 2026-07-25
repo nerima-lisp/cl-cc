@@ -182,7 +182,7 @@
      5. Move invariant instructions to preheader
 
    This pass activates the dormant bb-loop-depth field computed by cfg.lisp.
-   It is FR-003 from docs/optimize-passes.md."
+   It is FR-003 from docs/notes/optimize-passes.md."
   (when (null instructions)
     (return-from opt-pass-licm instructions))
   (let ((cfg (cfg-build instructions)))

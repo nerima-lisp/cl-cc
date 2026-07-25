@@ -1,7 +1,7 @@
 (in-package :cl-cc/optimize)
 
 (defun %opt-backend-roadmap-evidence-profile (feature-id)
-  "Return audit-evidence anchors for a docs/optimize-backend.md FR.
+  "Return audit-evidence anchors for a docs/notes/optimize-backend.md FR.
 Backend FRs span compiler analysis, runtime modelling, native code generation,
 and tooling.  Status still comes from the roadmap heading: unmarked headings
 are tracked as planned evidence, not completed implementation."
@@ -20,7 +20,7 @@ are tracked as planned evidence, not completed implementation."
           (error "No optimize-backend evidence profile entry for ~A" feature-id)))))
 
 (defun make-opt-roadmap-evidence-for-feature
-    (feature &key (doc-module "docs/optimize-passes.md") profile-function)
+    (feature &key (doc-module "docs/notes/optimize-passes.md") profile-function)
   "Create subsystem-specific evidence for FEATURE."
   (let* ((feature-id (opt-roadmap-feature-id feature))
          (status (%opt-roadmap-evidence-status feature))
@@ -39,7 +39,7 @@ are tracked as planned evidence, not completed implementation."
                         feature-id status (opt-roadmap-feature-title feature))))))
 
 (defun optimize-roadmap-register-doc-evidence (&optional (pathname (%opt-roadmap-doc-pathname)))
-  "Populate `*opt-roadmap-evidence-registry*` from docs/optimize-passes.md."
+  "Populate `*opt-roadmap-evidence-registry*` from docs/notes/optimize-passes.md."
   (let ((registry (make-hash-table :test #'equal)))
     (dolist (feature (optimize-roadmap-doc-features pathname))
       (let ((evidence (make-opt-roadmap-evidence-for-feature feature)))
@@ -49,12 +49,12 @@ are tracked as planned evidence, not completed implementation."
 
 (defun optimize-backend-roadmap-register-doc-evidence
     (&optional (pathname (%opt-backend-roadmap-doc-pathname)))
-  "Populate `*opt-backend-roadmap-evidence-registry*` from docs/optimize-backend.md."
+  "Populate `*opt-backend-roadmap-evidence-registry*` from docs/notes/optimize-backend.md."
   (let ((registry (make-hash-table :test #'equal)))
     (dolist (feature (optimize-backend-roadmap-doc-features pathname))
       (let ((evidence (make-opt-roadmap-evidence-for-feature
                        feature
-                       :doc-module "docs/optimize-backend.md"
+                       :doc-module "docs/notes/optimize-backend.md"
                        :profile-function #'%opt-backend-roadmap-evidence-profile)))
         (setf (gethash (opt-roadmap-evidence-feature-id evidence) registry)
               evidence)))

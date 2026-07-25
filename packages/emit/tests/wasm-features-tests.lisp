@@ -1,7 +1,7 @@
 ;;;; wasm-features-tests.lisp — Feature flag and opcode validation tests
 ;;;;
 ;;;; Tests that all wasm feature flags, opcode constants, and
-;;;; WAT helpers from docs/wasm.md are properly defined.
+;;;; WAT helpers from docs/notes/wasm.md are properly defined.
 ;;;; Uses cl-cc/testing framework. assert-true takes exactly 1 argument.
 
 (in-package :cl-cc/test)
@@ -109,9 +109,9 @@
 
 ;; ── FR coverage check ──
 (deftest wasm-test-doc-fr-count
-  "Verify docs/wasm.md has exactly 130 FR headings."
+  "Verify docs/notes/wasm.md has exactly 130 FR headings."
   (let* ((repo-root (asdf:system-relative-pathname :cl-cc ""))
-         (wasm-md (merge-pathnames "docs/wasm.md" repo-root)))
+         (wasm-md (merge-pathnames "docs/notes/wasm.md" repo-root)))
     (when (probe-file wasm-md)
       (with-open-file (f wasm-md :direction :input)
         (let ((count 0))
@@ -160,9 +160,9 @@
 
 ;; ── All 130 FRs covered in wasm-features.lisp ──
 (deftest wasm-test-all-doc-frs-in-features
-  "Verify every FR in docs/wasm.md has a reference in wasm-features.lisp."
+  "Verify every FR in docs/notes/wasm.md has a reference in wasm-features.lisp."
   (let* ((repo-root (asdf:system-relative-pathname :cl-cc ""))
-         (wasm-md (merge-pathnames "docs/wasm.md" repo-root))
+         (wasm-md (merge-pathnames "docs/notes/wasm.md" repo-root))
          (features-file (merge-pathnames "packages/codegen/src/wasm-features.lisp" repo-root)))
     (when (and (probe-file wasm-md) (probe-file features-file))
       (let ((fr-ids nil))

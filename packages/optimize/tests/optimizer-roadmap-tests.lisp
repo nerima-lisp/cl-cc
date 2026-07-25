@@ -24,11 +24,11 @@
           (subseq line fr-pos end))))))
 
 (defun %optimizer-doc-fr-ids ()
-  "Return the ordered FR headings from docs/optimize-passes.md."
+  "Return the ordered FR headings from docs/notes/optimize-passes.md."
   (let ((ids nil))
     (dolist (line (uiop:split-string
                    (uiop:read-file-string
-                    (merge-pathnames #P"docs/optimize-passes.md" (uiop:getcwd)))
+                    (merge-pathnames #P"docs/notes/optimize-passes.md" (uiop:getcwd)))
                    :separator '(#\Newline))
              (nreverse ids))
       (let ((feature-id (%optimizer-doc-fr-id-from-line line)))
@@ -85,12 +85,12 @@ resets the current block (used by the backend doc which has ### section separato
 
 (defun %optimizer-doc-content ()
   "Return the current optimize roadmap document text."
-  (%doc-content #P"docs/optimize-passes.md"))
+  (%doc-content #P"docs/notes/optimize-passes.md"))
 
 (defun %optimizer-doc-completed-heading-contradictions ()
   "Return ✅ optimize roadmap headings whose body still says implementation is absent."
   (%doc-completed-heading-contradictions
-   #P"docs/optimize-passes.md"
+   #P"docs/notes/optimize-passes.md"
    (list "未実装" "未統合" "欠落" "未接続" "未対応" "未定義" "不可能" "なし")))
 
 (defun %optimizer-doc-fr-ids-from-line (line)

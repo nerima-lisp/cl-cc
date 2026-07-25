@@ -1,10 +1,19 @@
 # Changelog
 
-All notable changes to cl-cc will be documented in this file.
+All notable changes to cl-cc are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### External library adoption
+### Added
+
+- Three CLI commands generated from the cl-cli application spec:
+  `cl-cc completion <shell>` (bash, zsh, fish, powershell, nushell, elvish),
+  `cl-cc docs [markdown|man|json]`, and `cl-cc version`.
+
+### Changed
 
 Five further nerima-lisp toolkits are adopted the same way cl-prolog and
 cl-weave were — pulled in as plain source trees and built with cl-cc's own
@@ -14,9 +23,7 @@ layer over the external library:
 - **cl-cli** is now the CLI argument parser: `parse-args` runs
   `cl-cli:parse-argv` against an application spec generated from the CLI's own
   `*flag-spec*` / dispatch table, and still returns the legacy `parsed-args`
-  struct so every handler is unchanged. The generated spec also powers three
-  new commands — `cl-cc completion <shell>` (bash/zsh/fish/powershell/nushell/
-  elvish), `cl-cc docs [markdown|man|json]`, and `cl-cc version`.
+  struct so every handler is unchanged.
 - **cl-tty-kit** backs all terminal styling: the interactive REPL's banner,
   prompt, results, and errors are colored through `cl-tty-kit:ansi-sgr`
   (gated on an interactive TTY, so captured/piped output stays plain), and the
@@ -30,7 +37,7 @@ layer over the external library:
   (`sccp,cse,dce`) with a whitespace-tolerant tokenizer + `sep-by` combinator
   instead of a hand-rolled comma split.
 
-## [0.1.0] — 2026-07-11 — Initial Release
+## [0.1.0] - 2026-07-11
 
 ### Infrastructure
 

@@ -1,5 +1,5 @@
 ;;; ─── Runtime Stdlib-2 Completion ─────────────────────────────────────
-;;; Fills remaining gaps from docs/runtime-stdlib-2.md (Phases 138-175).
+;;; Fills remaining gaps from docs/notes/runtime-stdlib-2.md (Phases 138-175).
 ;;; Features already implemented elsewhere (primitives.lisp, macros-lazy.lisp,
 ;;; vm-clos.lisp, stream.lisp, etc.) are NOT duplicated here.
 

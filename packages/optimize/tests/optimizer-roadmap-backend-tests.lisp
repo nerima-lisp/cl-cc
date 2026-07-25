@@ -1,6 +1,6 @@
 ;;;; tests/unit/optimize/optimizer-roadmap-backend-tests.lisp
 ;;;; Unit tests for optimizer-pipeline-roadmap.lisp — runtime/support helpers
-;;;; and docs/optimize-backend.md evidence
+;;;; and docs/notes/optimize-backend.md evidence
 ;;;;
 ;;;; Covers: IC, lattice, profile, deopt, shape, and tiering helpers;
 ;;;;   optimize-backend-roadmap doc parsing and evidence coverage.
@@ -231,12 +231,12 @@
 
 (defun %optimize-backend-doc-content ()
   "Return the current optimize-backend roadmap document text."
-  (%doc-content #P"docs/optimize-backend.md"))
+  (%doc-content #P"docs/notes/optimize-backend.md"))
 
 (defun %optimize-backend-doc-completed-heading-contradictions ()
   "Return ✅ optimize-backend FR headings whose own section says implementation is absent."
   (%doc-completed-heading-contradictions
-   #P"docs/optimize-backend.md"
+   #P"docs/notes/optimize-backend.md"
    (list "未実装" "未着手" "未対応" "未完"
          "未統合" "未接続" "欠落" "未定義" "不可能"
          "回転命令なし" "検出なし" "エミッションなし" "分岐なし"
@@ -297,7 +297,7 @@
   (assert-null (%optimize-backend-doc-completed-heading-contradictions)))
 
 (deftest optimize-backend-roadmap-evidence-covers-doc-fr-list
-  "Every docs/optimize-backend.md FR id has status-aware audit evidence."
+  "Every docs/notes/optimize-backend.md FR id has status-aware audit evidence."
   (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))
          (ids (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features))
          (table (cl-cc/optimize:optimize-backend-roadmap-register-doc-evidence))
@@ -319,7 +319,7 @@
         (assert-eq evidence-status
                    (cl-cc/optimize::opt-roadmap-evidence-status evidence))
         (assert-true
-         (member "docs/optimize-backend.md"
+         (member "docs/notes/optimize-backend.md"
                  (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
                  :test #'string=))
          (when (eq evidence-status :implemented)

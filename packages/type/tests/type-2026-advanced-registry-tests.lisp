@@ -8,11 +8,11 @@
 (in-suite cl-cc-unit-suite)
 
 (defun %advanced-doc-fr-ids ()
-  "Return the ordered FR headings from docs/type-advanced.md."
+  "Return the ordered FR headings from docs/notes/type-advanced.md."
   (let ((ids nil))
     (dolist (line (uiop:split-string
                    (uiop:read-file-string
-                    (merge-pathnames #P"docs/type-advanced.md" (uiop:getcwd)))
+                    (merge-pathnames #P"docs/notes/type-advanced.md" (uiop:getcwd)))
                    :separator '(#\Newline))
               (nreverse ids))
       (let ((fr-pos (and (>= (length line) 7)
@@ -38,7 +38,7 @@
 (in-suite cl-cc-documentation-suite)
 
 (deftest advanced-feature-registry-covers-doc-fr-list
-  "The advanced feature registry covers every represented docs/type-advanced.md FR id."
+  "The advanced feature registry covers every represented docs/notes/type-advanced.md FR id."
   (let ((expected-ids (%advanced-doc-fr-ids))
         (actual-ids (cl-cc/type:list-type-advanced-feature-ids))
         (contract-count (hash-table-count cl-cc/type::*type-advanced-contract-registry*))

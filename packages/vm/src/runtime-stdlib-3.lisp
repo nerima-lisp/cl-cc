@@ -1,6 +1,6 @@
 ;;; runtime-stdlib-3.lisp — Missing Easy/Medium runtime stdlib-3 APIs
 ;;;
-;;; This file intentionally fills only true gaps from docs/runtime-stdlib-3.md.
+;;; This file intentionally fills only true gaps from docs/notes/runtime-stdlib-3.md.
 ;;; Implementations already present in topic files are reused and exported rather
 ;;; than duplicated.
 

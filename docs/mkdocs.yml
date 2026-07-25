@@ -1,0 +1,63 @@
+site_name: cl-cc
+site_description: A self-hosting Common Lisp compiler collection targeting bytecode, native x86-64/AArch64/WebAssembly, and PHP/JavaScript frontends.
+site_url: https://nerima-lisp.github.io/cl-cc/
+repo_url: https://github.com/nerima-lisp/cl-cc
+repo_name: nerima-lisp/cl-cc
+edit_uri: edit/main/docs/src/
+
+docs_dir: src
+
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+
+# Every page under docs/src/ must appear here: --strict fails the build on an
+# unlisted page. That is deliberate, so the nav cannot silently fall behind.
+#
+# Keep the top level shallow. Reference material that used to live in
+# root-level files (ARCHITECTURE.md, API.md, ROADMAP.md, RELEASING.md, ...)
+# belongs under the Reference and Project sections below.
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Guide:
+      - Core concepts: concepts.md
+      - Recipes: recipes.md
+  - Reference:
+      - CLI: api-reference.md
+      - Architecture: architecture.md
+      - Compatibility: compatibility.md
+
+not_in_nav: |
+  notes/

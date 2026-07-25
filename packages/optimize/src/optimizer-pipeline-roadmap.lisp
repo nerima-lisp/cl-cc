@@ -4,7 +4,7 @@
 ;;; ─── Optimize roadmap implementation evidence and speculative helpers ─────
 
 (defstruct (opt-roadmap-feature (:conc-name opt-roadmap-feature-))
-  "One FR heading parsed from docs/optimize-passes.md."
+  "One FR heading parsed from docs/notes/optimize-passes.md."
   (id "" :type string)
   (title "" :type string)
   (line 0 :type integer)
@@ -21,23 +21,23 @@
   (summary "" :type string))
 
 (defvar *opt-roadmap-evidence-registry* (make-hash-table :test #'equal)
-  "Maps docs/optimize-passes.md FR ids to implementation evidence.")
+  "Maps docs/notes/optimize-passes.md FR ids to implementation evidence.")
 
 (defvar *opt-backend-roadmap-evidence-registry* (make-hash-table :test #'equal)
-  "Maps docs/optimize-backend.md FR ids to implementation evidence.")
+  "Maps docs/notes/optimize-backend.md FR ids to implementation evidence.")
 
 (defun %opt-roadmap-doc-pathname ()
-  "Return the canonical docs/optimize-passes.md pathname when available."
-  (let ((checkout-path (merge-pathnames #P"docs/optimize-passes.md" (uiop:getcwd))))
+  "Return the canonical docs/notes/optimize-passes.md pathname when available."
+  (let ((checkout-path (merge-pathnames #P"docs/notes/optimize-passes.md" (uiop:getcwd))))
     (or (probe-file checkout-path)
-        (ignore-errors (asdf:system-relative-pathname :cl-cc "docs/optimize-passes.md"))
+        (ignore-errors (asdf:system-relative-pathname :cl-cc "docs/notes/optimize-passes.md"))
         checkout-path)))
 
 (defun %opt-backend-roadmap-doc-pathname ()
-  "Return the canonical docs/optimize-backend.md pathname when available."
-  (let ((checkout-path (merge-pathnames #P"docs/optimize-backend.md" (uiop:getcwd))))
+  "Return the canonical docs/notes/optimize-backend.md pathname when available."
+  (let ((checkout-path (merge-pathnames #P"docs/notes/optimize-backend.md" (uiop:getcwd))))
     (or (probe-file checkout-path)
-        (ignore-errors (asdf:system-relative-pathname :cl-cc "docs/optimize-backend.md"))
+        (ignore-errors (asdf:system-relative-pathname :cl-cc "docs/notes/optimize-backend.md"))
         checkout-path)))
 
 (defun %opt-roadmap-heading-p (line)
@@ -81,7 +81,7 @@
     (%opt-roadmap-trim-title (if start (subseq line start) line))))
 
 (defun optimize-roadmap-doc-features (&optional (pathname (%opt-roadmap-doc-pathname)))
-  "Parse docs/optimize-passes.md and return all FR features in document order."
+  "Parse docs/notes/optimize-passes.md and return all FR features in document order."
   (let ((features nil))
     (loop for line in (uiop:split-string (uiop:read-file-string pathname)
                                          :separator '(#\Newline))
@@ -104,7 +104,7 @@
 
 (defun optimize-backend-roadmap-doc-features
     (&optional (pathname (%opt-backend-roadmap-doc-pathname)))
-  "Parse docs/optimize-backend.md and return all FR features in document order."
+  "Parse docs/notes/optimize-backend.md and return all FR features in document order."
   (optimize-roadmap-doc-features pathname))
 
 (defun optimize-backend-roadmap-doc-fr-ids
@@ -115,7 +115,7 @@
 
 (defun optimize-backend-roadmap-status-summary
     (&optional (pathname (%opt-backend-roadmap-doc-pathname)))
-  "Return status counts for docs/optimize-backend.md FR headings.
+  "Return status counts for docs/notes/optimize-backend.md FR headings.
 
 Returned plist keys:
   :total        total FR heading count
