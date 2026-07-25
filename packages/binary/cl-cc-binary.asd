@@ -27,6 +27,7 @@
       (:file "patchable-entry")
        (:file "dwarf")
        (:file "dwarf-eh")
+       (:file "elf-serialize")
        (:file "elf-emit")
        (:file "dwarf-dwo")
       (:file "pe")
