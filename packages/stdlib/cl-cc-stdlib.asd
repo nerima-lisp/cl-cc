@@ -8,6 +8,7 @@
   :description "Standard library source data (string constants)"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap)
   :pathname "src"

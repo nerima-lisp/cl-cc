@@ -6,6 +6,7 @@
   :version "0.1.0"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :depends-on ("sb-posix" "cl-cc-runtime" "cl-cc-vm" "cl-cc-codegen" "cl-cc-compile")
   :serial t
   :components

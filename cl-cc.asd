@@ -44,6 +44,7 @@
   :description "CL-CC: Common Lisp Compiler Collection"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-binary
                 :cl-cc-runtime :cl-cc-bytecode :cl-cc-ir :cl-cc-mir :cl-cc-target

@@ -2,6 +2,7 @@
   :description "Per-target code generation: x86-64, AArch64, WASM backends"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-vm :cl-cc-mir :cl-cc-target
                :cl-cc-binary

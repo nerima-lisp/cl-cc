@@ -4,6 +4,7 @@
   :description "CL-CC Markdown API documentation generator"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on ()
   :pathname "src"
@@ -15,6 +16,7 @@
   :description "Tests for the CL-CC Markdown API documentation generator"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-docgen)
   :pathname "tests"

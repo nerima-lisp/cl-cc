@@ -11,6 +11,7 @@ map onto cl-weave's suite tree without requiring lexical restructuring of
 every test file)."
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.2.0"
   :depends-on (:cl-cc :cl-cc-php :cl-weave)
   :pathname "src"

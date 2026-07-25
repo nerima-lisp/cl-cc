@@ -2,6 +2,7 @@
   :description "Emit backend subsystem: regalloc, codegen"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-ast :cl-cc-mir :cl-cc-optimize :cl-cc-codegen)
   :pathname "src"

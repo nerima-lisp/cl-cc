@@ -2,6 +2,7 @@
   :description "Optimizer subsystem: CFG, SSA, E-graph, peephole, pipeline"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-prolog :cl-cc-type :cl-cc-ast :cl-parser-kit)
   :pathname "src"

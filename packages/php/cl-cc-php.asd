@@ -4,6 +4,7 @@
   :description "CL-CC PHP frontend: lexer, parser, and grammar"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-ast :cl-cc-bootstrap :cl-cc-parse :cl-cc-vm)
   :pathname "src"

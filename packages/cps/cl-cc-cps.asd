@@ -6,6 +6,7 @@
   :description "CPS form definitions and AST->CPS transformation"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-ast)
   :pathname "src"

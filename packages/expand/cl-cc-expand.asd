@@ -10,6 +10,7 @@
   :description "Macro expansion subsystem: macro-env, defmacro, macroexpand, lambda-list, LOOP"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-type :cl-cc-vm)
   :pathname "src"

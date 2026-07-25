@@ -11,6 +11,7 @@
   :description "Public compiler API: compile-string, run-string, our-eval"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-php :cl-cc-javascript
                 :cl-cc-type

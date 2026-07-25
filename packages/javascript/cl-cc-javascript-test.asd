@@ -4,6 +4,7 @@
   :description "Tests for the CL-CC JavaScript frontend"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-testing-framework :cl-cc-javascript)
   :pathname "tests"

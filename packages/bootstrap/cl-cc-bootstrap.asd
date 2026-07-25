@@ -10,6 +10,7 @@
   :description "cl-cc bootstrap: pre-interned symbols shared by cl-cc/optimize and cl-cc/compile"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on ()
   :pathname "src"

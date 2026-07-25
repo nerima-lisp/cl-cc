@@ -10,6 +10,7 @@
   :description "cl-cc type system — kinds, multiplicity, HM inference, type classes, effects"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-ast)
   :pathname "src"

@@ -11,6 +11,7 @@
   :description "Compilation engine: AST→VM instruction transformation"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-prolog :cl-cc-parse :cl-cc-type
                :cl-cc-optimize :cl-cc-vm :cl-cc-expand :cl-cc-cps :cl-cc-codegen

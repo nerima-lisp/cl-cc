@@ -9,6 +9,7 @@
   :description "Target descriptors (target-desc API; absorbs calling-convention.lisp callers in Phase 3)"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on ()
   :pathname "src"

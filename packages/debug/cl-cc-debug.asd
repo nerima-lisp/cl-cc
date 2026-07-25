@@ -4,6 +4,7 @@
   :description "Debugging support: minimal Swank protocol, object inspector, step debugger"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-vm)
   :pathname "src"
@@ -17,6 +18,7 @@
   :description "Tests for the CL-CC debugging subsystem"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-debug :cl-cc-testing-framework)
   :pathname "tests"

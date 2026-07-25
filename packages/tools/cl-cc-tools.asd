@@ -38,6 +38,7 @@
   :description "CL-CC protocol tools (LSP and DAP)"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc)
   :pathname "src"
@@ -50,6 +51,7 @@
   :description "Tests for CL-CC protocol tools"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-tools :cl-cc-testing-framework)
   :pathname "tests"

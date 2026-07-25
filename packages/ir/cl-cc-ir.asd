@@ -9,6 +9,7 @@
   :description "Compile-level SSA IR: basic blocks, CFG, dominators, phi nodes, printer"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on ()
   :pathname "src"

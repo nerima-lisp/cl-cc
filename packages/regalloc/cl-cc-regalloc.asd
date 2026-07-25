@@ -8,6 +8,7 @@
   :description "Register allocation passes (linear scan, spilling, live-range)"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-vm :cl-cc-mir :cl-cc-target :cl-cc-optimize)
   :pathname "src"

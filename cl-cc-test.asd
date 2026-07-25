@@ -8,6 +8,7 @@
   :description "CL-CC tests"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools
                :cl-cc-formatter)
@@ -645,6 +646,7 @@
   :description "CL-CC self-hosting end-to-end regression tests"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-test)
   :serial t

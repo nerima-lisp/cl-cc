@@ -20,6 +20,7 @@
   :description "Prolog-based call-graph analysis tools for cl-cc, built on the external cl-prolog engine"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-ast :cl-prolog)
   :pathname "src"
@@ -35,6 +36,7 @@
   :description "cl-weave test suite for cl-cc-prolog-tools"
   :author "takeokunn"
   :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
   :depends-on (:cl-cc-prolog-tools :cl-prolog :cl-weave)
   :pathname "tests"
