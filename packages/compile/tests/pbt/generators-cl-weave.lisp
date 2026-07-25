@@ -26,3 +26,14 @@
   (cl-weave:gen-map (lambda (n) (intern (format nil "~A-~D" prefix n) :keyword))
                     (cl-weave:gen-integer :min 0 :max 99999)
                     :name :pbt-keyword))
+
+(defun gen-pbt-single-float (&key (min -1000.0) (max 1000.0))
+  "Generate a SINGLE-FLOAT in [MIN, MAX] to two decimal places.
+cl-weave ships no float generator, so this scales GEN-INTEGER. Two decimal
+places is ample for the typed-AST properties, which only inspect the node's
+declared type, and keeping the draw integral means shrinking still works."
+  (let ((scale 100))
+    (cl-weave:gen-map
+     (lambda (n) (float (/ n scale) 1.0f0))
+     (cl-weave:gen-integer :min (round (* min scale)) :max (round (* max scale)))
+     :name :pbt-single-float)))

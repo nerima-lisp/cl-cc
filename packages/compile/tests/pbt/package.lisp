@@ -1,18 +1,22 @@
-;;;; tests/pbt/package.lisp - Property-Based Testing Framework Package
+;;;; tests/pbt/package.lisp - Property-Based Testing Package
 ;;;
-;;; This package provides a property-based testing framework for CL-CC,
-;;; inspired by QuickCheck and similar tools.
+;;; Home of CL-CC's property-based tests. Generation, shrinking and the
+;;; pass/fail verdict all belong to cl-weave's native property API
+;;; (CL-WEAVE:IT-PROPERTY plus the GEN-* combinators); the home-grown
+;;; QuickCheck-style framework this package used to carry is gone.
+;;;
+;;; No :EXPORT clause: every symbol here is consumed only by other files in this
+;;; same directory. The previous export list was ~80 names of framework surface
+;;; (DEFPROPERTY, the GEN-* constructors, the GENERATOR protocol, the typed-AST
+;;; accessors) and nothing outside packages/compile/tests/pbt/ ever referenced
+;;; any of it.
 
 (defpackage :cl-cc/pbt
   (:use :cl)
   (:import-from :cl-cc/test
-                 #:cl-cc-suite
                  #:cl-cc-integration-suite
-                 #:cl-cc-integration-serial-suite
                  #:defsuite
                  #:in-suite
-                 #:deftest
-                 #:%fail-test
                  #:assert-true
                  #:assert-false
                  #:assert-=
@@ -20,7 +24,6 @@
                  #:assert-equal
                  #:assert-null
                  #:assert-type
-                 #:assert-signals
                  #:run-string)
   (:import-from :cl-cc
                 :ast-node :ast-int :ast-var :ast-binop :ast-if :ast-progn :ast-print
@@ -57,28 +60,8 @@
                 :instruction->sexp :sexp->instruction :vm-dst :vm-src :vm-lhs :vm-rhs
                 :vm-value :vm-car-reg :vm-cdr-reg :vm-cons-reg :vm-val-reg
                 :vm-closure-reg :vm-closure-index)
-(:import-from :cl-prolog
-              :unify
-              :logic-substitute :logic-var-p)
-  (:export
-   #:defproperty
-   #:*test-count* #:*max-list-length* #:*max-string-length* #:*max-type-depth* #:*size* #:*pbt-rng-override*
-   #:gen-integer #:gen-boolean #:gen-symbol #:gen-list #:gen-string #:gen-float #:gen-character #:gen-cons #:gen-vector
-   #:gen-one-of #:gen-tuple #:gen-list-of #:gen-alist #:gen-map #:gen-bind #:gen-fmap #:gen-such-that #:gen-resize #:gen-scale
-   #:generator #:generate #:gen-fn #:shrink-value #:make-generator
-   #:gen-primitive-type #:gen-type-variable #:gen-simple-compound-type #:gen-values-type #:gen-fn-type-args #:gen-fn-type #:gen-array-type #:gen-cons-type #:gen-type-expr
-   #:typed-ast #:make-typed-ast-raw #:typed-ast-node-type #:typed-ast-source-node
-   #:typed-ast-int #:make-typed-ast-int-raw #:typed-ast-int-value
-   #:typed-ast-float #:make-typed-ast-float-raw #:typed-ast-float-value
-   #:typed-ast-string #:make-typed-ast-string-raw #:typed-ast-string-value
-   #:typed-ast-boolean #:make-typed-ast-boolean-raw #:typed-ast-boolean-value
-   #:typed-ast-var #:make-typed-ast-var-raw #:typed-ast-var-name
-   #:typed-ast-binop #:make-typed-ast-binop-raw #:typed-ast-binop-op #:typed-ast-binop-lhs #:typed-ast-binop-rhs
-   #:typed-ast-if #:make-typed-ast-if-raw #:typed-ast-if-cond #:typed-ast-if-then #:typed-ast-if-else
-   #:typed-ast-lambda #:make-typed-ast-lambda-raw #:typed-ast-lambda-params #:typed-ast-lambda-body
-   #:typed-ast-call #:make-typed-ast-call-raw #:typed-ast-call-func #:typed-ast-call-func-type #:typed-ast-call-args
-   #:typed-ast-let #:make-typed-ast-let-raw #:typed-ast-let-bindings #:typed-ast-let-body
-   #:gen-typed-primitive-value #:gen-typed-terminal #:gen-typed-binop #:gen-typed-if #:gen-typed-param #:gen-typed-lambda #:gen-typed-call #:gen-typed-let #:gen-typed-ast-node
-   #:typed-ast-to-sexp #:extract-type-from-ast))
+  (:import-from :cl-prolog
+                :unify
+                :logic-substitute :logic-var-p))
 
 (in-package :cl-cc/pbt)
