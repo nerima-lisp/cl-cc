@@ -1,12 +1,24 @@
-;;;; tests/pbt/macro-pbt-tests.lisp - Property-Based Tests for Macro Expansion (Wave 1)
+;;;; tests/pbt/macro-pbt-tests.lisp - Suite, generators and helpers for macro PBT
 ;;;
-;;; This file provides comprehensive property-based tests for the CL-CC macro system,
-;;; focusing on:
-;;; - Macro expansion correctness
-;;; - Macro hygiene (gensym usage)
-;;; - Nested macro expansion
-;;; - Edge cases (empty bodies, multiple clauses)
-;;; - Idempotency and termination properties
+;;; This file owns the macro-expansion PBT suite plus the domain generators and
+;;; predicates that the macro-pbt-*-tests.lisp files share. The properties
+;;; themselves live in macro-pbt-props-tests.lisp, macro-pbt-mv-tests.lisp,
+;;; macro-pbt-binding-tests.lisp, macro-pbt-hygiene-tests.lisp and
+;;; macro-pbt-advanced-tests.lisp.
+;;;
+;;; The generators are built from cl-weave 1.0.0's native combinators
+;;; (gen-one-of / gen-map / gen-tuple / gen-list / gen-integer / gen-boolean /
+;;; gen-string) rather than the home-grown cl-cc/pbt framework's. Two
+;;; translations are worth noting:
+;;;
+;;;   - The originals selected among sub-generators with GEN-BIND over an index
+;;;     into a list. That is precisely cl-weave's GEN-ONE-OF, which chooses
+;;;     among generators (as opposed to GEN-MEMBER, which chooses among values).
+;;;
+;;;   - GEN-FMAP becomes GEN-MAP, and the one dependent GEN-BIND (gen-cond-clause,
+;;;     which fed a generated test form into a closure building the clause) is a
+;;;     GEN-MAP over a GEN-TUPLE, since the test and the body were in fact
+;;;     independent.
 
 (in-package :cl-cc/pbt)
 
@@ -21,69 +33,56 @@
 
 ;;; Custom Generators for Macro Testing
 
-(defun gen-macro-name ()
-  "Generate one of the built-in macro names."
-  (gen-one-of '(when unless cond and or let* defun prog1 prog2 setf psetq
-                multiple-value-bind multiple-value-setq multiple-value-list)))
-
-(defun gen-simple-symbol ()
-  "Generate simple symbols for macro bodies."
-  (gen-symbol :prefix "SYM" :package nil))
-
 (defun gen-test-form ()
   "Generate a form suitable for use as a test condition."
-  (let ((sub-gens (list (gen-symbol :prefix "TEST" :package nil)
-                        (gen-integer :min -100 :max 100)
-                        (gen-boolean)
-                        (gen-fmap (lambda (x) `(= ,x 0))
-                                  (gen-integer :min -10 :max 10)))))
-    (gen-bind
-     (gen-integer :min 0 :max (1- (length sub-gens)))
-     (lambda (i) (nth i sub-gens)))))
+  (cl-weave:gen-one-of
+   (gen-pbt-symbol "TEST")
+   (cl-weave:gen-integer :min -100 :max 100)
+   (cl-weave:gen-boolean)
+   (cl-weave:gen-map (lambda (x) `(= ,x 0))
+                     (cl-weave:gen-integer :min -10 :max 10))))
 
 (defun gen-body-form ()
   "Generate a form suitable for use in a macro body."
-  (let ((sub-gens (list (gen-symbol :prefix "BODY" :package nil)
-                        (gen-integer :min -100 :max 100)
-                        (gen-string :max-length 10)
-                        (gen-fmap (lambda (x) `(print ,x))
-                                  (gen-integer :min -10 :max 10)))))
-    (gen-bind
-     (gen-integer :min 0 :max (1- (length sub-gens)))
-     (lambda (i) (nth i sub-gens)))))
+  (cl-weave:gen-one-of
+   (gen-pbt-symbol "BODY")
+   (cl-weave:gen-integer :min -100 :max 100)
+   (cl-weave:gen-string :max-length 10)
+   (cl-weave:gen-map (lambda (x) `(print ,x))
+                     (cl-weave:gen-integer :min -10 :max 10))))
 
 (defun gen-binding-pair ()
   "Generate a (symbol value) binding pair."
-  (gen-tuple (gen-symbol :prefix "VAR" :package nil)
-             (gen-integer :min -100 :max 100)))
+  (cl-weave:gen-tuple (gen-pbt-symbol "VAR")
+                      (cl-weave:gen-integer :min -100 :max 100)))
 
 (defun gen-binding-list (&key (min-length 0) (max-length 5))
   "Generate a list of binding pairs."
-  (gen-list-of (gen-binding-pair)
-               :min-length min-length
-               :max-length max-length))
+  (cl-weave:gen-list (gen-binding-pair)
+                     :min-length min-length
+                     :max-length max-length))
 
 (defun gen-cond-clause ()
-  "Generate a single COND clause."
-  (gen-bind (gen-test-form)
-            (lambda (test)
-              (gen-fmap (lambda (body)
-                          (cons test body))
-                        (gen-list-of (gen-body-form)
-                                     :min-length 0
-                                     :max-length 3)))))
+  "Generate a single COND clause: a test form consed onto a list of body forms."
+  (cl-weave:gen-map
+   (lambda (parts)
+     (destructuring-bind (test body) parts
+       (cons test body)))
+   (cl-weave:gen-tuple (gen-test-form)
+                       (cl-weave:gen-list (gen-body-form)
+                                          :min-length 0 :max-length 3))))
 
 (defun gen-cond-clauses (&key (min-length 0) (max-length 5))
   "Generate a list of COND clauses."
-  (gen-list-of (gen-cond-clause)
-               :min-length min-length
-               :max-length max-length))
+  (cl-weave:gen-list (gen-cond-clause)
+                     :min-length min-length
+                     :max-length max-length))
 
 (defun gen-variable-list (&key (min-length 0) (max-length 5))
   "Generate a list of variable symbols."
-  (gen-list-of (gen-symbol :prefix "VAR" :package nil)
-               :min-length min-length
-               :max-length max-length))
+  (cl-weave:gen-list (gen-pbt-symbol "VAR")
+                     :min-length min-length
+                     :max-length max-length))
 
 ;;; Helper Functions for Property Testing
 
@@ -116,45 +115,6 @@
 (defun form-contains-symbol-p (symbol form)
   "Check if FORM contains SYMBOL."
   (> (count-symbols-in-form symbol form) 0))
-
-(defun collect-introduced-symbols (form)
-  "Collect symbols that appear to be introduced (gensyms) in FORM."
-  (let ((symbols nil))
-    (labels ((collect (f)
-               (typecase f
-                 (symbol
-                  (let ((name (symbol-name f)))
-                    (when (or (and (> (length name) 1)
-                                   (string= (subseq name 0 1) "G"))
-                              (and (> (length name) 2)
-                                   (digit-char-p (char name (1- (length name))))))
-                      (pushnew f symbols))))
-                 (cons
-                  (collect (car f))
-                  (collect (cdr f))))))
-      (collect form)
-      symbols)))
-
-(defun expansion-is-if-form-p (form)
-  "Check if FORM is an IF expression or nested IF."
-  (and (consp form)
-       (eq (car form) 'if)))
-
-(defun expansion-is-let-form-p (form)
-  "Check if FORM is a LET expression."
-  (and (consp form)
-       (eq (car form) 'let)))
-
-(defun expansion-is-progn-form-p (form)
-  "Check if FORM is a PROGN expression."
-  (and (consp form)
-       (eq (car form) 'progn)))
-
-(defun expansion-is-properly-nested-p (form expected-outer expected-inner)
-  "Check if FORM has EXPECTED-OUTER wrapping EXPECTED-INNER."
-  (and (consp form)
-       (eq (car form) expected-outer)
-       (find expected-inner (cdr form) :key (lambda (x) (when (consp x) (car x))))))
 
 ;;; All macro expansion properties (WHEN, UNLESS, COND, AND, OR, LET*, etc.)
 ;;; are in macro-pbt-props-tests.lisp.

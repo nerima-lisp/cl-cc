@@ -1,235 +1,206 @@
 ;;;; tests/pbt/macro-pbt-binding-tests.lisp — PBT for LET*/PROG1/PROG2/SETF/PSETQ/MVB/MVS/MVL/DEFUN
+;;;
+;;; Expressed with cl-weave's NATIVE property API; bodies assert through
+;;; CL-WEAVE:EXPECT because IT-PROPERTY detects a signaled condition and
+;;; ignores the body's return value.
+;;;
+;;; Note: these properties duplicate macro-pbt-props-tests.lisp's LET*/PROG1/
+;;; PROG2 block and macro-pbt-mv-tests.lisp's SETF/PSETQ/MV/DEFUN block, with
+;;; a -binding-pbt name suffix. They are migrated as-is rather than deduplicated.
+
 (in-package :cl-cc/pbt)
 
 (in-suite macro-pbt-suite)
 
-(defproperty let-star-empty-is-progn-binding-pbt
-    (body (gen-list-of (gen-body-form) :min-length 1 :max-length 3))
-  "LET* with empty bindings is just PROGN."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(let* () ,@body))))
-    (and (consp expanded)
-         (eq (car expanded) 'progn)
-         (equal (cdr expanded) body))))
+(cl-weave:describe "LET* macro expansion properties (binding)"
 
-(defproperty let-star-single-is-let-binding-pbt
-    (binding (gen-binding-pair)
-     body (gen-body-form))
-  "LET* with single binding expands to LET."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(let* (,binding) ,body))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         (equal (second expanded) (list binding)))))
+  (cl-weave:it-property "let-star-empty-is-progn-binding-pbt"
+      ((body (cl-weave:gen-list (gen-body-form) :min-length 1 :max-length 3)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(let* () ,@body))))
+      (cl-weave:expect (car expanded) :to-be 'progn)
+      (cl-weave:expect (cdr expanded) :to-equal body)))
 
-(defproperty let-star-multiple-nested-binding-pbt
-    (bindings (gen-binding-list :min-length 2 :max-length 4)
-     body (gen-body-form))
-  "LET* with multiple bindings creates nested LETs."
-  (let ((expanded (cl-cc:our-macroexpand-all `(let* ,bindings ,body))))
-    (labels ((count-nested-lets (form depth)
-               (if (and (consp form) (eq (car form) 'let))
-                   (count-nested-lets (third form) (1+ depth))
-                   depth)))
-      (= (count-nested-lets expanded 0) (length bindings)))))
+  (cl-weave:it-property "let-star-single-is-let-binding-pbt"
+      ((binding (gen-binding-pair))
+       (body (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(let* (,binding) ,body))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      (cl-weave:expect (second expanded) :to-equal (list binding))))
 
-(defproperty let-star-preserves-binding-order-binding-pbt
-    (bindings (gen-binding-list :min-length 2 :max-length 3)
-     body (gen-body-form))
-  "LET* preserves binding order (first binding is outermost LET)."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(let* ,bindings ,body))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         (equal (caar (second expanded)) (caar bindings)))))
+  (cl-weave:it-property "let-star-multiple-nested-binding-pbt"
+      ((bindings (gen-binding-list :min-length 2 :max-length 4))
+       (body (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-all `(let* ,bindings ,body))))
+      (labels ((count-nested-lets (form depth)
+                 (if (and (consp form) (eq (car form) 'let))
+                     (count-nested-lets (third form) (1+ depth))
+                     depth)))
+        (cl-weave:expect (count-nested-lets expanded 0) :to-be (length bindings)))))
+
+  (cl-weave:it-property "let-star-preserves-binding-order-binding-pbt"
+      ((bindings (gen-binding-list :min-length 2 :max-length 3))
+       (body (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(let* ,bindings ,body))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      (cl-weave:expect (caar (second expanded)) :to-equal (caar bindings)))))
 
 ;;; Property: PROG1 and PROG2 Macro Expansion
 
-(defproperty prog1-introduces-result-variable-binding-pbt
-    (first-form (gen-body-form)
-     body (gen-list-of (gen-body-form) :min-length 0 :max-length 3))
-  "PROG1 introduces a result variable."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(prog1 ,first-form ,@body))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         (consp (second expanded))
-         (= (length (second expanded)) 1)
-         (symbolp (caar (second expanded))))))
+(cl-weave:describe "PROG1/PROG2 macro expansion properties (binding)"
 
-(defproperty prog1-returns-first-value-binding-pbt
-    (first-form (gen-body-form)
-     body (gen-list-of (gen-body-form) :min-length 0 :max-length 2))
-  "PROG1 expansion returns the saved result variable."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(prog1 ,first-form ,@body))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         (let ((result-var (caar (second expanded))))
-           (eq (car (last expanded)) result-var)))))
+  (cl-weave:it-property "prog1-introduces-result-variable-binding-pbt"
+      ((first-form (gen-body-form))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 0 :max-length 3)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(prog1 ,first-form ,@body))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      (cl-weave:expect (second expanded) :to-have-length 1)
+      (cl-weave:expect (caar (second expanded)) :to-satisfy #'symbolp)))
 
-(defproperty prog2-structure-binding-pbt
-    (first-form (gen-body-form)
-     second-form (gen-body-form)
-     body (gen-list-of (gen-body-form) :min-length 0 :max-length 2))
-  "PROG2 has correct structure: PROGN wrapping first form and LET."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(prog2 ,first-form ,second-form ,@body))))
-    (and (consp expanded)
-         (eq (car expanded) 'progn)
-         (equal (second expanded) first-form)
-         (consp (third expanded))
-         (eq (car (third expanded)) 'let))))
+  (cl-weave:it-property "prog1-returns-first-value-binding-pbt"
+      ((first-form (gen-body-form))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 0 :max-length 2)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(prog1 ,first-form ,@body))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      (cl-weave:expect (car (last expanded)) :to-be (caar (second expanded)))))
 
-(defproperty prog2-returns-second-value-binding-pbt
-    (first-form (gen-body-form)
-     second-form (gen-body-form)
-     body (gen-list-of (gen-body-form) :min-length 0 :max-length 2))
-  "PROG2 returns the result of the second form."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(prog2 ,first-form ,second-form ,@body))))
-    (let ((let-form (third expanded)))
-      (and (consp let-form)
-           (eq (car let-form) 'let)
-           (let ((result-var (caar (second let-form))))
-             (eq (car (last let-form)) result-var))))))
+  (cl-weave:it-property "prog2-structure-binding-pbt"
+      ((first-form (gen-body-form))
+       (second-form (gen-body-form))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 0 :max-length 2)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(prog2 ,first-form ,second-form ,@body))))
+      (cl-weave:expect (car expanded) :to-be 'progn)
+      (cl-weave:expect (second expanded) :to-equal first-form)
+      (cl-weave:expect (car (third expanded)) :to-be 'let)))
 
-;;; Property: SETF Macro Expansion
+  (cl-weave:it-property "prog2-returns-second-value-binding-pbt"
+      ((first-form (gen-body-form))
+       (second-form (gen-body-form))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 0 :max-length 2)))
+    (let ((let-form (third (cl-cc:our-macroexpand-1
+                            `(prog2 ,first-form ,second-form ,@body)))))
+      (cl-weave:expect (car let-form) :to-be 'let)
+      (cl-weave:expect (car (last let-form)) :to-be (caar (second let-form))))))
 
-(defproperty setf-symbol-is-setq-binding-pbt
-    (var (gen-symbol :prefix "VAR" :package nil)
-     val (gen-integer :min -100 :max 100))
-  "SETF with symbol place expands to SETQ."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(setf ,var ,val))))
-    (and (consp expanded)
-         (eq (car expanded) 'setq)
-         (equal (second expanded) var)
-         (equal (third expanded) val))))
+;;; Property: SETF and PSETQ Macro Expansion
 
-;;; Property: PSETQ Macro Expansion
+(cl-weave:describe "SETF/PSETQ macro expansion properties (binding)"
 
-(defproperty psetq-empty-is-nil-binding-pbt
-    ()
-  "Empty PSETQ returns NIL."
-  (null (cl-cc:our-macroexpand-1 '(psetq))))
+  (cl-weave:it-property "setf-symbol-is-setq-binding-pbt"
+      ((var (gen-pbt-symbol "VAR"))
+       (val (cl-weave:gen-integer :min -100 :max 100)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(setf ,var ,val))))
+      (cl-weave:expect (car expanded) :to-be 'setq)
+      (cl-weave:expect (second expanded) :to-equal var)
+      (cl-weave:expect (third expanded) :to-equal val)))
 
-(defproperty psetq-introduces-temps-binding-pbt
-    (pairs (gen-list-of (gen-binding-pair) :min-length 1 :max-length 4))
-  "PSETQ introduces temporary variables for parallel evaluation."
-  (let* ((flat-pairs (apply #'append pairs))
-         (expanded (cl-cc:our-macroexpand-1 `(psetq ,@flat-pairs))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         ;; Number of temp bindings should equal number of pairs
-         (= (length (second expanded)) (length pairs)))))
+  (cl-weave:it "psetq-empty-is-nil-binding-pbt"
+    (cl-weave:expect (cl-cc:our-macroexpand-1 '(psetq)) :to-be-null))
 
-(defproperty psetq-preserves-values-binding-pbt
-    (pairs (gen-list-of (gen-binding-pair) :min-length 1 :max-length 3))
-  "PSETQ expansion preserves all values in correct order."
-  (let* ((flat-pairs (apply #'append pairs))
-         (values (loop for (var val) on flat-pairs by #'cddr collect val))
-         (expanded (cl-cc:our-macroexpand-1 `(psetq ,@flat-pairs))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         (let ((bindings (second expanded)))
-           (equal (mapcar #'second bindings) values)))))
+  (cl-weave:it-property "psetq-introduces-temps-binding-pbt"
+      ((pairs (cl-weave:gen-list (gen-binding-pair) :min-length 1 :max-length 4)))
+    (let* ((flat-pairs (apply #'append pairs))
+           (expanded (cl-cc:our-macroexpand-1 `(psetq ,@flat-pairs))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      ;; Number of temp bindings should equal number of pairs
+      (cl-weave:expect (second expanded) :to-have-length (length pairs))))
 
-;;; Property: MULTIPLE-VALUE-BIND Macro Expansion
+  (cl-weave:it-property "psetq-preserves-values-binding-pbt"
+      ((pairs (cl-weave:gen-list (gen-binding-pair) :min-length 1 :max-length 3)))
+    (let* ((flat-pairs (apply #'append pairs))
+           (values (loop for (nil val) on flat-pairs by #'cddr collect val))
+           (expanded (cl-cc:our-macroexpand-1 `(psetq ,@flat-pairs))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      (cl-weave:expect (mapcar #'second (second expanded)) :to-equal values))))
 
-(defproperty mvb-uses-canonical-binding-form-binding-pbt
-    (vars (gen-variable-list :min-length 1 :max-length 5)
-     form (gen-body-form)
-     body (gen-list-of (gen-body-form) :min-length 0 :max-length 3))
-  "MULTIPLE-VALUE-BIND uses either direct LET* (for explicit VALUES) or values-list capture."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,@body))))
-    (and (consp expanded)
-         (member (car expanded) '(let let*)))))
+;;; Property: MULTIPLE-VALUE-BIND / -SETQ / -LIST Macro Expansion
 
-(defproperty mvb-preserves-variables-binding-pbt
-    (vars (gen-variable-list :min-length 1 :max-length 5)
-     form (gen-body-form)
-     body (gen-body-form))
-  "MULTIPLE-VALUE-BIND preserves binding arity across canonicalized expansions."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,body))))
-    (and (consp expanded)
-         (member (car expanded) '(let let*)))))
+(cl-weave:describe "MULTIPLE-VALUE-* macro expansion properties (binding)"
 
-(defproperty mvb-preserves-form-binding-pbt
-    (vars (gen-variable-list :min-length 1 :max-length 3)
-     form (gen-body-form))
-  "MULTIPLE-VALUE-BIND preserves the values form."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form))))
-    (progn expanded vars form t)))
+  (cl-weave:it-property "mvb-uses-canonical-binding-form-binding-pbt"
+      ((vars (gen-variable-list :min-length 1 :max-length 5))
+       (form (gen-body-form))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 0 :max-length 3)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,@body))))
+      (cl-weave:expect (car expanded) :to-be-one-of '(let let*))))
 
-;;; Property: MULTIPLE-VALUE-SETQ Macro Expansion
+  (cl-weave:it-property "mvb-preserves-variables-binding-pbt"
+      ((vars (gen-variable-list :min-length 1 :max-length 5))
+       (form (gen-body-form))
+       (body (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,body))))
+      (cl-weave:expect (car expanded) :to-be-one-of '(let let*))))
 
-(defproperty mvsq-uses-multiple-value-list-binding-pbt
-    (vars (gen-variable-list :min-length 1 :max-length 5)
-     form (gen-body-form))
-  "MULTIPLE-VALUE-SETQ uses MULTIPLE-VALUE-LIST."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-setq ,vars ,form))))
-    (and (consp expanded)
-         (eq (car expanded) 'let)
-         (let ((binding (car (second expanded))))
-           (and (consp binding)
-                (consp (second binding))
-                (eq (car (second binding)) 'multiple-value-list))))))
+  ;; Asserts nothing about the expansion: the original body was
+  ;; (progn expanded vars form t), a constant T referencing its bindings only
+  ;; to silence unused-variable warnings. Kept as a "does not signal" check
+  ;; rather than given an invented assertion.
+  (cl-weave:it-property "mvb-preserves-form-binding-pbt"
+      ((vars (gen-variable-list :min-length 1 :max-length 3))
+       (form (gen-body-form)))
+    (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form))
+    t)
 
-(defproperty mvsq-has-setq-for-each-var-binding-pbt
-    (vars (gen-variable-list :min-length 1 :max-length 4)
-     form (gen-body-form))
-  "MULTIPLE-VALUE-SETQ has SETQ for each variable."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-setq ,vars ,form))))
-    (let ((body (cddr expanded)))
-      (= (count-symbols-in-form 'setq body) (length vars)))))
+  (cl-weave:it-property "mvsq-uses-multiple-value-list-binding-pbt"
+      ((vars (gen-variable-list :min-length 1 :max-length 5))
+       (form (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-setq ,vars ,form))))
+      (cl-weave:expect (car expanded) :to-be 'let)
+      (let ((binding (car (second expanded))))
+        (cl-weave:expect (car (second binding)) :to-be 'multiple-value-list))))
 
-;;; Property: MULTIPLE-VALUE-LIST Macro Expansion
+  (cl-weave:it-property "mvsq-has-setq-for-each-var-binding-pbt"
+      ((vars (gen-variable-list :min-length 1 :max-length 4))
+       (form (gen-body-form)))
+    (let* ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-setq ,vars ,form)))
+           (body (cddr expanded)))
+      (cl-weave:expect (count-symbols-in-form 'setq body) :to-be (length vars))))
 
-(defproperty mvl-uses-multiple-value-call-binding-pbt
-    (form (gen-body-form))
-  "MULTIPLE-VALUE-LIST uses MULTIPLE-VALUE-CALL."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-list ,form))))
-    (or (form-contains-symbol-p 'multiple-value-call expanded)
-        (form-contains-symbol-p 'multiple-value-list expanded)
-        (eq (car expanded) 'list))))
+  (cl-weave:it-property "mvl-uses-multiple-value-call-binding-pbt"
+      ((form (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-list ,form))))
+      (cl-weave:expect (or (form-contains-symbol-p 'multiple-value-call expanded)
+                           (form-contains-symbol-p 'multiple-value-list expanded)
+                           (eq (car expanded) 'list))
+                       :to-be-truthy)))
 
-(defproperty mvl-accumulates-into-list-binding-pbt
-    (form (gen-body-form))
-  "MULTIPLE-VALUE-LIST accumulates results into a list via NREVERSE."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-list ,form))))
-    (form-contains-symbol-p 'nreverse expanded)))
+  (cl-weave:it-property "mvl-accumulates-into-list-binding-pbt"
+      ((form (gen-body-form)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-list ,form))))
+      (cl-weave:expect (form-contains-symbol-p 'nreverse expanded) :to-be-truthy))))
 
 ;;; Property: DEFUN Macro Expansion
 
-(defproperty defun-uses-setf-fdefinition-binding-pbt
-    (name (gen-symbol :prefix "FN" :package nil)
-     params (gen-variable-list :min-length 0 :max-length 4)
-     body (gen-list-of (gen-body-form) :min-length 1 :max-length 3))
-  "DEFUN uses SETF of FDEFINITION."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(defun ,name ,params ,@body))))
-    (and (consp expanded)
-         (eq (car expanded) 'setf)
-         (and (consp (second expanded))
-              (eq (car (second expanded)) 'fdefinition)))))
+(cl-weave:describe "DEFUN macro expansion properties (binding)"
 
-(defproperty defun-creates-lambda-binding-pbt
-    (name (gen-symbol :prefix "FN" :package nil)
-     params (gen-variable-list :min-length 0 :max-length 4)
-     body (gen-list-of (gen-body-form) :min-length 1 :max-length 3))
-  "DEFUN creates a LAMBDA with correct parameters."
-  (let ((expanded (cl-cc:our-macroexpand-1 `(defun ,name ,params ,@body))))
-    (let ((lambda-form (third expanded)))
-      (and (consp lambda-form)
-           (eq (car lambda-form) 'lambda)
-           (equal (second lambda-form) params)))))
+  (cl-weave:it-property "defun-uses-setf-fdefinition-binding-pbt"
+      ((name (gen-pbt-symbol "FN"))
+       (params (gen-variable-list :min-length 0 :max-length 4))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 1 :max-length 3)))
+    (let ((expanded (cl-cc:our-macroexpand-1 `(defun ,name ,params ,@body))))
+      (cl-weave:expect (car expanded) :to-be 'setf)
+      (cl-weave:expect (car (second expanded)) :to-be 'fdefinition)))
 
-(deftest defun-c-enforces-contracts-binding-pbt
-  "DEFUN/C expands with explicit pre/post contract checks."
-  (let ((expanded-1
-          (cl-cc:our-macroexpand-1
-           '(defun/c add1-positive-pbtb (x)
-              :requires (> x 0)
-              :ensures (= result (+ x 1))
-              (+ x 1)))))
-    (assert-eq 'defun (car expanded-1))
-    (assert-eq 'add1-positive-pbtb (cadr expanded-1))
-    (assert-equal '(x) (caddr expanded-1))
-    (assert-true
-     (some (lambda (form) (and (consp form) (eq (car form) 'unless)))
-           (cdddr expanded-1)))
-    (assert-true
-     (some (lambda (form) (and (consp form) (eq (car form) 'let)))
-           (cdddr expanded-1)))))
+  (cl-weave:it-property "defun-creates-lambda-binding-pbt"
+      ((name (gen-pbt-symbol "FN"))
+       (params (gen-variable-list :min-length 0 :max-length 4))
+       (body (cl-weave:gen-list (gen-body-form) :min-length 1 :max-length 3)))
+    (let ((lambda-form (third (cl-cc:our-macroexpand-1 `(defun ,name ,params ,@body)))))
+      (cl-weave:expect (car lambda-form) :to-be 'lambda)
+      (cl-weave:expect (second lambda-form) :to-equal params)))
+
+  (cl-weave:it "DEFUN/C expands with explicit pre/post contract checks."
+    (let ((expanded-1
+            (cl-cc:our-macroexpand-1
+             '(defun/c add1-positive-pbtb (x)
+                :requires (> x 0)
+                :ensures (= result (+ x 1))
+                (+ x 1)))))
+      (assert-eq 'defun (car expanded-1))
+      (assert-eq 'add1-positive-pbtb (cadr expanded-1))
+      (assert-equal '(x) (caddr expanded-1))
+      (assert-true
+       (some (lambda (form) (and (consp form) (eq (car form) 'unless)))
+             (cdddr expanded-1)))
+      (assert-true
+       (some (lambda (form) (and (consp form) (eq (car form) 'let)))
+             (cdddr expanded-1))))))
