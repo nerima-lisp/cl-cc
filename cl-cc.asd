@@ -2,11 +2,21 @@
 ;;;; CL-CC: Common Lisp Compiler Collection — umbrella ASDF system.
 ;;;;
 ;;;; All subsystems live in packages/**/. This file wires them together:
-;;;;   eval-when: pre-load 15 package .asd files + cl-cc-test.asd (16 total)
-;;;;   :cl-cc: umbrella package (src/package.lisp) + compile-pipeline
-;;;;   :cl-cc-cli: CLI tool
+;;;;   eval-when: pre-load the per-package .asd files
+;;;;   "cl-cc":           umbrella package (src/package.lisp) + compile pipeline
+;;;;   "cl-cc/test":      the canonical unit test suite
+;;;;   "cl-cc/test/e2e":  self-hosting end-to-end regression tests
 ;;;;
-;;;; Test systems (:cl-cc-test, :cl-cc-test/e2e) are in cl-cc-test.asd (loaded below).
+;;;; The test systems live in THIS file rather than a separate cl-cc-test.asd.
+;;;; That is not merely the org convention (PACKAGE_STANDARD.md, "exactly one
+;;;; <pkg>.asd at the root"): ASDF resolves a slash-qualified secondary system
+;;;; such as "cl-cc/test" by loading the .asd named after its PRIMARY system,
+;;;; i.e. cl-cc.asd. Defining it anywhere else would make
+;;;; (asdf:find-system "cl-cc/test") fail unless the other file happened to
+;;;; have been loaded first by hand.
+;;;;
+;;;; System name designators are strings, not keywords or uninterned symbols,
+;;;; so that reading this file does not depend on the reader's package state.
 
 (eval-when (:load-toplevel :execute)
   (require :asdf)
@@ -40,12 +50,15 @@
        (ensure-system-asd :cl-cc-selfhost "packages/selfhost/cl-cc-selfhost.asd" here)
         (ensure-system-asd :cl-cc-repl "packages/repl/cl-cc-repl.asd" here))))
 
-(asdf:defsystem :cl-cc
-  :description "CL-CC: Common Lisp Compiler Collection"
-  :author "takeokunn"
+(asdf:defsystem "cl-cc"
+  :description "Self-hosting Common Lisp compiler: reader and macroexpander through CPS, typed IR, and optimiser to bytecode, native x86-64/ARM64/WebAssembly, PHP, and JavaScript."
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.1.0"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
+  :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-binary
                 :cl-cc-runtime :cl-cc-bytecode :cl-cc-ir :cl-cc-mir :cl-cc-target
                 :cl-cc-type :cl-cc-optimize :cl-cc-regalloc :cl-cc-emit :cl-cc-expand
@@ -53,7 +66,7 @@
                  :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl :cl-cc-php :cl-cc-javascript)
   :components
   ((:module "src"
-    :pathname "packages/umbrella-src"
+    :pathname "src"
     :serial t
     :components
     ((:file "package")))
@@ -88,8 +101,674 @@
       ;; FR-320 minimal Lisp code formatter. Optional, like the other entries
       ;; in this block: probe-file guards so the production Nix derivation
       ;; succeeds without it.
-      (maybe-load-asd :cl-cc-formatter "packages/formatter/cl-cc-formatter.asd" here)
-      (maybe-load-asd :cl-cc-test "cl-cc-test.asd" here))))
+      (maybe-load-asd :cl-cc-formatter "packages/formatter/cl-cc-formatter.asd" here))))
 
 ;; :cl-cc-cli is defined in packages/cli/cl-cc-cli.asd.
-;; :cl-cc/tests-framework is defined in packages/testing-framework/cl-cc-testing-framework.asd.
+;; :cl-cc-testing-framework is defined in packages/testing-framework/cl-cc-testing-framework.asd.
+;; Both are loaded by the eval-when block above, which is why the test systems
+;; below can name them in :depends-on.
+
+(asdf:defsystem "cl-cc/test"
+  :description "Canonical unit test suite for cl-cc: per-subsystem specs plus the ANSI conformance and coverage-evidence suites."
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
+  :license "MIT"
+  :version "0.1.0"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
+  :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
+  :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools
+               :cl-cc-formatter)
+  :serial t
+  :components
+  (;; Unit tests — each module now lives in its workspace's tests/ dir
+   ;;
+   ;; testing-framework-tests (framework-runner-tests, framework-parallel-tests,
+   ;; persistent-tests, timing-tests, entrypoint-contract-tests, ...) tested the
+   ;; removed homegrown registry/TAP/parallel-worker/coverage runner's own
+   ;; internals directly; there is no equivalent to port them to now that
+   ;; cl-weave is the engine (cl-weave has its own 615-test self-suite covering
+   ;; the same ground for cl-weave's own internals).
+    (:module "cli-tests"
+     :pathname "packages/cli/tests"
+     :serial t
+     :components
+     ((:file "test-support")
+      (:file "args-tests")
+       (:file "cli-tests")
+       (:file "flamegraph-tests")
+       (:file "main-tests")
+      (:file "main-dump-tests")
+      (:file "main-utils-tests")))
+    (:module "vm-tests"
+    :pathname "packages/vm/tests"
+    :serial t
+    :components
+    ((:file "vm-instructions-tests")
+     (:file "list-tests")
+     (:file "list-alist-tests")
+     (:file "list-coerce-tests")
+     (:file "array-tests")
+     (:file "vm-execute-tests")
+     (:file "vm-execute-tests-2")
+      (:file "vm-call-tests")
+      (:file "primitives-tests")
+      (:file "primitives-typep-tests")
+      (:file "vm-bignum-tests")
+      (:file "vm-transcendental-tests")
+     (:file "vm-numeric-tests")
+     (:file "vm-extensions-tests")
+     (:file "vm-bitwise-tests")
+     (:file "vm-clos-tests")
+     (:file "vm-clos-execute-tests")
+     (:file "vm-run-tests")
+     (:file "vm-run-vm2-tests")
+     (:file "vm-run-fusion-tests")
+     (:file "vm-dispatch-tests")
+     (:file "vm-dispatch-gf-tests")
+     (:file "vm-dispatch-gf-multi-tests")
+     (:file "vm-bridge-tests")
+     (:file "vm-opcodes-tests")
+     (:file "vm-opcodes-defs-tests")
+     (:file "vm-tests")
+     (:file "package-tests")
+     (:file "vm-environment-tests")
+     (:file "conditions-tests")
+     (:file "hash-tests")
+     (:file "symbols-tests")
+     (:file "strings-tests")
+     (:file "vm-sequence-tests")
+     (:file "format-tests")
+      (:file "io-tests")
+      (:file "io-runners-tests")
+      (:file "string-builder-tests")
+      (:file "persistent-tests")
+      (:file "json-tests")
+      (:file "regex-tests")
+       (:file "runtime-stdlib-2-vm-tests")
+       (:file "runtime-stdlib-2-completion-tests")
+       (:file "runtime-stdlib-3-tests")
+       (:file "runtime-stdlib-3-numeric-tests")
+       (:file "runtime-stdlib-3-debug-tests")
+       (:file "runtime-stdlib-3-io-tests")
+       (:file "crash-report-tests")
+       (:file "vm-mop-tests")))
+    (:module "ast-tests"
+     :pathname "packages/ast/tests"
+     :serial t
+     :components
+     ((:file "ast-tests")
+      (:file "ast-analysis-tests")))
+    (:module "parse-tests"
+    :pathname "packages/parse/tests"
+    :serial t
+    :components
+    ((:file "cl-parser-tests")
+     (:file "cl-parser-error-tests")
+     (:file "cl-parser-ast-tests")
+     (:file "cl-parser-new-tests")
+     (:file "cl-parser-new-extended-tests")
+     (:module "cl"
+      :serial t
+      :components
+      ((:file "lower-tests")
+       (:file "lower-arithmetic-tests")
+       (:file "parser-roundtrip-tests")
+       (:file "grammar-tokenstream-tests")
+       (:file "grammar-parser-tests")))
+     (:file "cst-tests")
+     (:file "lexer-tests")
+     (:file "lexer-dispatch-tests")
+     (:file "grammar-tests")
+     (:file "grammar-special-form-tests")
+     (:file "pratt-tests")
+     (:file "pratt-pipeline-tests")
+     (:file "combinator-tests")
+     (:file "combinator-tests-2")
+     (:file "parser-combinator-tests")
+     (:file "incremental-tests")
+     (:file "cst-to-ast-tests")
+     (:file "diagnostics-tests")))
+   (:module "php-tests"
+    :pathname "packages/php/tests"
+    :serial t
+    :components
+     ((:file "php-tests")
+      (:file "php-parser-test-support")
+      (:file "php-parser-tests")
+      (:file "php-parser-core-stmt-tests")
+      (:file "php-parser-expression-tests")
+      (:file "php-parser-control-array-tests")
+      (:file "php-parser-namespace-tests")
+      (:file "php-parser-type-class-tests")
+      (:file "php-e2e-test-support")
+      (:file "php-compile-tests")
+      (:file "php-compile-core-e2e-tests")
+      (:file "php-compile-object-e2e-tests")
+      (:file "php-compile-reference-e2e-tests")
+      (:file "php-compile-array-e2e-tests")
+      (:file "php-compile-builtins-e2e-tests")
+      (:file "php-grammar-tests")
+      (:file "php-grammar-stmt-tests")
+      (:file "php-traits-tests")
+      (:file "php-interfaces-tests")
+      (:file "php84-tests")
+      (:file "php84-tests-language")
+      (:file "php85-tests-language")
+      (:file "php85-tests-runtime-objects")
+      (:file "php85-tests-runtime-tokenizer")
+      (:file "php85-tests-runtime-behavior")))
+      ;; php85-tests-registration.lisp dropped: it meta-tested the removed
+      ;; homegrown *test-registry*/persist-* registration mechanism's own
+      ;; internals directly, which has no cl-weave equivalent to preserve.
+   (:module "javascript-tests"
+    :pathname "packages/javascript/tests"
+    :serial t
+    :components
+     ((:file "js-lexer-tests")
+      ;; js-parser-tests.lisp split into 2 focused files:
+      ;;   decl: helpers + variable/arrow/class declarations
+      ;;   stmt: if/while/for/switch/try/destructuring/generators/new/unary
+      (:file "js-parser-decl-tests")
+      (:file "js-parser-stmt-tests")
+      ;; js-e2e-tests.lisp split into 4 focused files:
+      ;;   core:     shared helpers + basic programs + destructuring + JSON/Math/operators
+      ;;   ast:      parse-only AST shape tests (FizzBuzz, Fibonacci, classes, generators…)
+      ;;   advanced: optional chaining, typeof, class features, for-in/of, Map/Set
+      ;;   modern:   ES2022 syntax + ES2023-2026 built-ins
+      (:file "js-e2e-core-tests")
+      (:file "js-e2e-ast-tests")
+      (:file "js-e2e-advanced-tests")
+      (:file "js-e2e-modern-tests")
+      ;; js-runtime-tests.lisp split into 10 focused files:
+      ;;   core:        typeof, coercion, equality, for-of/in, try-catch, bitwise
+      ;;   array:       Array + ES2023 non-mutating variants + TypedArray
+      ;;   string-num:  String + Math + Number methods + predicates + parse*
+      ;;   collections: Set + Map + Iterator + Promise + Generator + BigInt + URI
+      ;;   resolver:    Method dispatch, RegExp, Reflect, Object fallback, bound-method
+      ;;   date-json:   Temporal + Date.prototype + JSON stringify/parse
+      ;;   object-ops:  Object static methods + destructuring + bitwise/shift + BigInt extras
+      ;;   symbol:      Symbol primitive, Symbol.for/keyFor registry, well-known symbols
+      ;;   ta-methods:  TypedArray ES2023 non-mutating methods + iterators + hex/base64
+      ;;   misc:        Promise.race/allSettled/finally/withResolvers/try, global
+      ;;                isNaN/isFinite, structuredClone, timer stubs, Iterator.from,
+      ;;                Map.groupBy, Set-from-iterable, Proxy, Math.sumPrecise,
+      ;;                Error.isError, AggregateError, AbortController, URL, TA ctor
+      (:file "js-runtime-core-tests")
+      (:file "js-runtime-array-tests")
+      (:file "js-runtime-string-number-tests")
+      (:file "js-runtime-collections-tests")
+      (:file "js-runtime-resolver-tests")
+      (:file "js-runtime-date-json-tests")
+      (:file "js-runtime-object-ops-tests")
+      (:file "js-runtime-symbol-tests")
+      (:file "js-runtime-typed-array-methods-tests")
+      (:file "js-runtime-misc-tests")))
+   (:module "expand-tests"
+    :pathname "packages/expand/tests"
+    :serial t
+    :components
+    ((:file "macro-tests")
+     (:file "macro-definition-tests")
+     (:file "macro-assignment-tests")
+     (:file "macro-multiple-value-tests")
+     (:file "macros-control-flow-tests")
+     (:file "macros-control-flow-loop-tests")
+     (:file "macro-lambda-list-tests")
+     (:file "expander-lambda-list-defaults-tests")
+     (:file "expander-core-tests")
+     (:file "expander-data-tests")
+     (:file "expander-test-support")
+     (:file "expander-basic-tests")
+     (:file "macros-basic-check-type-tests")
+     (:file "macros-basic-list-tests")
+     (:file "macros-basic-setf-tests")
+     (:file "expander-setf-tests")
+     (:file "expander-setf-places-tests")
+     (:file "expander-control-tests")
+     (:file "expander-array-tests")
+     (:file "expander-typed-tests")
+     (:file "expander-typed-params-tests")
+     (:file "expander-defclass-tests")
+     (:file "expander-binding-tests")
+     (:file "expander-control-helpers-tests")
+     (:file "expander-definitions-function-tests")
+     (:file "expander-definitions-forms-tests")
+     (:file "expander-definitions-type-tests")
+     (:file "expander-definitions-rounding-tests")
+     (:file "expander-definitions-constant-tests")
+     (:file "expander-definitions-tests")
+     (:file "expander-numeric-tests")
+     (:file "expander-comparison-tests")
+     (:file "expander-definitions-helpers-tests")
+     (:file "expander-helpers-tests")
+     (:file "expander-sequence-tests")
+     (:file "expander-setf-places-helpers-tests")
+     (:file "expander-tail-tests")
+     (:file "defstruct-tests")
+     (:file "expander-defstruct-typed-tests")
+     (:file "loop-tests")
+     (:file "loop-data-tests")
+     (:file "loop-parser-tests")
+     (:file "loop-emitters-tests")
+     (:file "macro-rotatef-tests")
+     (:file "macro-psetf-tests")
+     (:file "macro-shiftf-tests")
+     (:file "macro-ecase-tests")
+     (:file "macro-etypecase-tests")
+     (:file "macro-progv-tests")
+     (:file "macro-define-modify-macro-tests")
+     (:file "macros-cxr-tests")
+     (:file "macros-introspection-tests")
+     (:file "macros-list-utils-tests")
+     (:file "macros-restarts-tests")
+     (:file "macros-setops-tests")
+     (:file "macros-stdlib-core-tests")
+     (:file "macros-stdlib-tests")
+     (:file "macros-stdlib-bind-error-tests")
+     (:file "macros-stdlib-sequence-map-tests")
+     (:file "macros-stdlib-io-tests")
+     (:file "macros-stdlib-ansi-tests")
+     (:file "macros-stdlib-utils-tests")
+     (:file "macros-filesystem-tests")
+     (:file "array-predicate-expansion-tests")
+     (:file "macros-runtime-support-tests")
+     (:file "macros-clos-protocol-tests")
+     (:file "macros-plist-tests")
+     (:file "macros-sequence-helpers-tests")
+     (:file "macros-hof-tests")
+     (:file "macros-hof-search-tests")
+     (:file "macros-sequence-tests")
+     (:file "loop-macro-tests")
+     (:file "loop-macro-advanced-tests")
+     (:file "loop-macro-runtime-tests")
+     (:file "loop-macro-runtime-clauses-tests")
+     (:file "loop-macro-runtime-ext-tests")
+     (:file "loop-macro-runtime-edge-tests")
+     (:file "macros-basic-mvb-tests")
+     (:file "macros-mutation-tests")
+     (:file "macros-sequence-fold-tests")
+     (:file "macros-stdlib-list-set-tests")
+      (:file "fr-555-copy-structure-tests")
+       (:file "syntax-rules-tests")
+        (:file "runtime-stdlib-2-expand-tests")
+        (:file "runtime-stdlib-3-expander-tests")
+        (:file "runtime-stdlib-3-sequence-tests")))
+   (:module "type-tests"
+    :pathname "packages/type/tests"
+    :serial t
+    :components
+     ((:file "type-tests")
+      (:file "type-inference-tests")
+      (:file "type-effect-tests")
+      (:file "type-phase-tests")
+       (:file "type-2026-nodes-tests")
+       (:file "type-2026-advanced-registry-tests")
+       (:file "type-2026-advanced-semantic-tests")
+      (:file "kind-tests")
+     (:file "multiplicity-tests")
+     (:file "row-tests")
+     (:file "subtyping-tests")
+     (:file "subtyping-extended-tests")
+     (:file "effect-tests")
+     (:file "constraint-tests")
+     (:file "solver-tests")
+     (:file "solver-collect-tests")
+     (:file "representation-tests")
+     (:file "substitution-tests")
+     (:file "unification-tests")
+     (:file "type-children-tests")
+     (:file "types-extended-coverage-tests")
+     (:file "checker-tests")
+     (:file "typeclass-tests")
+     (:file "printer-tests")
+     (:file "parser-tests")
+     (:file "parser-arrow-quantifier-tests")
+     (:file "parser-typed-tests")
+     (:file "inference-tests")
+     (:file "inference-forms-tests")
+     (:file "inference-effect-tests")
+     (:file "exhaustiveness-tests")))
+   (:module "ir-tests"
+    :pathname "packages/ir/tests"
+    :serial t
+    :components
+    ((:file "ir-types-tests")
+     (:file "ir-block-tests")
+     (:file "ir-block-ssa-tests")
+     (:file "ir-ssa-advanced-tests")
+     (:file "ir-ssa-dominator-tests")
+     (:file "ir-printer-tests")))
+   (:module "compile-tests"
+    :pathname "packages/compile/tests"
+    :serial t
+    :components
+    ((:file "cps-tests")
+     (:file "cps-ast-tests")
+     (:file "cps-ast-semantic-tests")
+     (:file "cps-ast-transform-tests")
+     (:file "cps-ast-extended-tests")
+      (:file "cps-ast-functional-tests")
+      (:module "cps-package-tests"
+       :pathname "../../cps/tests"
+       :serial t
+       :components
+       ((:file "cps-coverage-matrix-tests")
+        (:file "cps-trmc-tests")))
+        (:file "builtin-registry-tests")
+       (:file "builtin-registry-data-tests")
+       (:file "fr-586-set-tests")
+       (:file "fr-316-benchmark-tests")
+       (:file "fr-318-compiler-warning-tests")
+      (:file "builtin-registry-data-ext-tests")
+     (:file "builtin-registry-stream-tests")
+     (:file "closure-tests")
+     (:file "closure-escape-tests")
+     (:file "context-tests")
+     (:file "codegen-tests")
+     (:file "codegen-fold-tests")
+     (:file "codegen-fold-eval-tests")
+     (:file "codegen-phase2-helpers")
+     (:file "codegen-core-tests")
+     (:file "codegen-core-helper-tests")
+     (:file "codegen-core-array-sink-tests")
+     (:file "codegen-type-predicate-tests")
+     (:file "codegen-core-let-tests")
+     (:file "codegen-functions-tests")
+     (:file "codegen-functions-callsite-tests")
+     (:file "codegen-functions-params-tests")
+     (:file "codegen-clos-tests")
+     (:file "codegen-clos-slot-tests")
+     (:file "codegen-control-tests")
+      (:file "codegen-calls-tests")
+      (:file "fr-009-pic-tests")
+      (:file "codegen-toplevel-cps-tests")
+     (:file "codegen-locals-tests")
+     (:file "codegen-numeric-hints-tests")
+     (:file "codegen-io-tests")
+     (:file "codegen-io-read-tests")
+     (:file "codegen-hash-table-tests")
+     (:file "codegen-slot-predicates-tests")
+     (:file "codegen-string-kwargs-tests")
+     (:file "phase2-handler-tests")
+     (:file "codegen-phase2-tests")
+     (:file "codegen-phase2-io-tests")
+     (:file "stdlib-source-tests")
+     (:file "pipeline-native-tests")
+     (:file "pipeline-native-io-tests")
+     (:file "pipeline-native-routing-tests")
+     (:file "compiler-selfhost-fixtures")
+     (:file "compiler-selfhost-fixtures-ext")
+     (:file "compiler-tests")
+     (:file "compiler-tests-pbt-tests")
+     (:file "compiler-tests-call-forms")
+     (:file "compiler-tests-stdlib")
+     (:file "compiler-tests-stdlib-io")
+     (:file "compiler-tests-extended")
+     (:file "compiler-tests-extended-stdlib")
+     (:file "compiler-tests-runtime")
+     (:file "compiler-tests-runtime-string-tests")
+     (:file "compiler-tests-runtime-hof-tests")
+     (:file "compiler-tests-runtime-selfhost")
+     (:file "compiler-tests-selfhost")
+     (:file "compiler-tests-selfhost-types")
+     (:file "call-conv-tests")
+     (:file "control-flow-tests")
+     (:file "clos-tests")
+     (:file "clos-compile-tests")
+     (:file "clos-dispatch-tests")
+     (:file "stream-tests")
+     (:file "predicate-tests")
+     (:file "codegen-runtime-tests")
+     (:file "pipeline-tests")
+     (:file "pipeline-eval-tests")
+     (:file "pipeline-repl-tests")
+     (:file "standalone-load-tests")
+     (:file "closure-pipeline-tests")
+     (:file "nan-boxing-tests")
+     (:module "pbt"
+      :serial t
+      :components
+      ((:file "package")
+       (:file "suite")
+       (:file "generators-cl-weave")
+       (:file "generators-types")
+       (:file "generators-typed-ast")
+       (:file "generators-macho")
+       (:file "generator-pbt-tests")
+       (:file "vm-pbt-tests")
+       (:file "cps-pbt-tests")
+       (:file "ast-pbt-tests")
+       (:file "ast-pbt-extended-tests")
+       (:file "macro-pbt-tests")
+       (:file "macro-pbt-props-tests")
+       (:file "macro-pbt-mv-tests")
+       (:file "macro-pbt-hygiene-tests")
+       (:file "macro-pbt-binding-tests")
+       (:file "macro-pbt-advanced-tests")
+       (:file "prolog-pbt-tests")
+       (:file "vm-heap-pbt-tests")))))
+   (:module "optimize-tests"
+    :pathname "packages/optimize/tests"
+    :serial t
+    :components
+    ((:file "optimizer-tables-tests")
+     (:file "optimizer-strength-tests")
+     (:file "optimizer-licm-tests")
+     (:file "optimizer-copyprop-tests")
+     (:file "optimizer-strength-ext-tests")
+     (:file "optimizer-cse-gvn-tests")
+      (:file "optimizer-dataflow-tests")
+      (:file "optimizer-memory-tests")
+      (:file "optimizer-memory-pass-tests")
+      (:file "optimizer-fr-tests")
+      (:file "optimizer-flow-tests")
+     (:file "optimizer-flow-block-tests")
+     (:file "optimizer-pipeline-tests")
+     (:file "optimizer-security-tests")
+     (:file "optimizer-concurrency-tests")
+     (:file "optimizer-roadmap-tests")
+     (:file "optimizer-roadmap-backend-tests")
+     (:file "optimizer-inline-tests")
+     (:file "optimizer-purity-tests")
+     (:file "optimizer-inline-pass-tests")
+     (:file "optimizer-inline-pass-tests-2")
+      (:file "optimizer-inline-pass-ext-tests")
+      (:file "optimizer-closure-tests")
+     (:file "effects-tests")
+     (:file "cfg-tests")
+     (:file "ssa-tests")
+     (:file "egraph-tests")
+     (:file "egraph-extraction-tests")
+     (:file "egraph-rules-tests")
+     (:file "egraph-negation-tests")
+     (:file "egraph-rules-bitwise-tests")
+     (:file "optimizer-prolog-peephole-tests")
+     (:file "optimizer-tests")
+     (:file "optimizer-e2e-tests")
+     (:file "optimizer-tests-lowlevel2")
+     (:file "optimizer-cfg-inline-tests")
+     (:file "optimizer-inlining-tests")
+     (:file "optimizer-lowlevel-tests")
+     (:file "optimizer-lowlevel-dce-tests")
+     (:file "optimizer-dataflow-passes-tests")
+      (:file "optimizer-store-analysis-tests")
+      (:file "native-advanced-optimizer-tests")
+      (:file "optimizer-strength-inline-tests")
+      (:file "optimizer-jump-threading-tests")
+      (:file "optimizer-loop-peel-tests")
+      (:file "optimizer-loop-rotate-tests")
+      (:file "optimizer-loop-unroll-tests")
+      (:file "optimizer-loop-unswitch-tests")
+      (:file "optimizer-dead-loop-tests")
+      (:file "optimizer-dae-tests")
+      (:file "optimizer-div-const-tests")
+      (:file "optimizer-strength-reduce-tests")
+      (:file "optimizer-idiom-tests")))
+   (:module "emit-tests"
+    :pathname "packages/emit/tests"
+    :serial t
+    :components
+    ((:file "mir-tests")
+     (:file "mir-target-tests")
+     (:file "mir-isel-tests")
+     (:file "regalloc-tests")
+     (:file "regalloc-lsa-tests")
+     (:file "regalloc-color-tests")
+     (:file "regalloc-spill-tests")
+     (:file "wasm-tests")
+      (:file "wasm-ir-tests")
+      (:file "wasm-types-tests")
+      (:file "wasm-opcodes-tests")
+      (:file "wasm-features-tests")
+      (:file "aarch64-codegen-tests")
+     (:file "aarch64-emit-tests")
+     (:file "aarch64-encoding-tests")
+     (:file "target-tests")
+     (:file "wasm-extract-tests")
+     (:file "wasm-trampoline-tests")
+     (:file "wasm-trampoline-build-tests")
+     (:file "x86-64-regs-tests")
+     (:file "x86-64-sequences-tests")
+     (:file "x86-64-codegen-tests")
+     (:file "x86-64-codegen-emitter-tests")
+      (:file "x86-64-codegen-insn-tests")
+      (:file "x86-64-encoding-tests")
+      (:file "x86-64-vm-emitter-tests")
+      (:file "x86-64-encoding-size-tests")
+       (:file "x86-64-emit-tests")
+       (:file "x86-64-emit-logical-tests")
+       (:file "x86-64-emit-ops-tests")
+         (:file "llvm-ir-tests")
+         (:file "mlir-tests")
+         (:file "native-advanced-bridge-tests")
+       (:file "security-hardening-tests")
+        (:file "ppc64-codegen-tests")
+       (:file "ebpf-tests")
+       (:file "riscv64-tests")
+      (:file "elf-tests")
+      (:file "elf-extended-tests")
+      (:file "macho-tests")
+      (:file "macho-builder-tests")))
+     (:module "binary-tests"
+       :pathname "packages/binary/tests"
+       :serial t
+       :components
+        ((:file "binary-buffer-tests")
+         (:file "macho-fat-tests")
+         (:file "binary-fr-tests")
+         (:file "binary-wxorx-tests")
+         (:file "binary-constpool-tests")
+         (:file "got-plt-tests")
+         (:file "patchable-entry-tests")))
+     (:module "pipeline-tests"
+      :pathname "packages/pipeline/tests"
+      :serial t
+      :components
+      ((:file "perfmap-tests")))
+     (:module "tools-tests"
+      :pathname "packages/tools/tests"
+      :serial t
+      :components
+      ((:file "lsp-server-tests")
+       (:file "dap-server-tests")))
+     (:module "formatter-tests"
+      :pathname "packages/formatter/tests"
+      :serial t
+      :components
+      ((:file "formatter-tests")))
+     (:module "docgen-tests"
+      :pathname "packages/docgen/tests"
+      :serial t
+      :components
+      ((:file "docgen-suite-tests")))
+     (:module "runtime-tests"
+      :pathname "packages/runtime/tests"
+      :serial t
+    :components
+    ((:file "runtime-tests")
+     (:file "runtime-tests-2")
+     (:file "runtime-strings-chars-tests")
+     (:file "runtime-clos-tests")
+     (:file "runtime-advanced-tests")
+      (:file "runtime-io-tests")
+      (:file "runtime-serialize-tests")
+      (:file "gc-tests")
+      (:file "gc-fr-tests")
+      (:file "gc-stats-tests")
+     (:file "gc-sweep-major-tests")
+     (:file "heap-tests")
+      (:file "heap-sanitizer-tests")
+     (:file "heap-gc-tests")
+     (:file "heap-trace-tests")
+      (:file "gc-write-barrier-tests")
+         (:file "runtime-subsystem-fr-tests")
+         (:file "runtime-stdlib-2-runtime-tests")
+         (:file "runtime-stdlib-3-os-tests")
+         (:file "runtime-stdlib-3-image-tests")
+        (:file "continuous-profile-tests")
+        (:file "deadlock-tests")
+       (:file "value-tests")
+       (:file "dynlib-tests")
+       (:file "frame-tests")))
+   (:module "bytecode-tests"
+    :pathname "packages/bytecode/tests"
+    :serial t
+    :components
+    ((:file "encode-tests")
+     (:file "encode-ops-objects-tests")
+     (:file "decode-tests")))
+    (:module "migration-safety"
+     :pathname "packages/umbrella-tests"
+     :components
+     ((:file "migration-safety-tests")))
+    (:module "coverage-tests"
+     :pathname "t"
+     :components
+     ((:file "runtime-stdlib-2-coverage-tests")))
+     (:module "native-advanced-evidence"
+      :pathname "t"
+      :serial t
+      :components
+      ((:file "native-advanced-evidence-tests")
+       (:file "tooling-advanced-1-evidence-tests")
+       (:file "tooling-advanced-2-evidence-tests")))
+    ;; --- ANSI Conformance Tests (expected-fail for known gaps) ---
+    (:module "conformance"
+     :pathname "t/conformance"
+     :serial t
+     :components
+     (      (:file "package-conformance-tests")
+      (:file "package-smoke-tests")
+      (:file "format-conformance-tests")
+      (:file "number-conformance-tests")
+      (:file "native-io-conformance-tests"))))
+   :perform (asdf:test-op (op c)
+               (declare (ignore op c))
+               (uiop:symbol-call :cl-cc/test 'run-tests)))
+
+(asdf:defsystem "cl-cc/test/e2e"
+  :description "End-to-end regression tests that compile cl-cc with itself and check the result against the host-compiled build."
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
+  :license "MIT"
+  :version "0.1.0"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
+  :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
+  :depends-on ("cl-cc/test")
+  :serial t
+  :components
+  ((:module "e2e"
+     :pathname "t/e2e"
+     :serial t
+     :components
+     ((:file "selfhost-test-support")
+      (:file "selfhost-tests")
+      (:file "selfhost-meta-tests"))))
+  :perform (asdf:test-op (op c)
+              (declare (ignore op c))
+              (uiop:symbol-call :cl-cc/test 'run-suite
+                                (uiop:find-symbol* '#:selfhost-suite :cl-cc/test)
+                                :parallel nil
+                                :random nil)))
