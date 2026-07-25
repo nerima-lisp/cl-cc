@@ -7,6 +7,14 @@
 ;; Expressed with cl-weave's NATIVE property API: a local data-table macro
 ;; (define-cps-shape-properties) emits one cl-weave:it-property per row, so the
 ;; table stays pure data while cl-weave owns generation/shrinking/running.
+;;
+;; Each emitted body asserts through CL-WEAVE:EXPECT with :TO-SATISFY.
+;; IT-PROPERTY decides pass/fail from a *signaled* condition — RUN-PROPERTY
+;; wraps the body in PROPERTY-FAILURE-CONDITION, which only catches ERROR — and
+;; discards the body's return value, so emitting a bare (funcall #'PREDICATE ...)
+;; would report PASS regardless of what the predicate returned. :TO-SATISFY is
+;; preferred over :TO-BE-TRUTHY on the predicate's result because it reports the
+;; offending CPS form itself rather than just "false".
 
 ;; ----------------------------------------------------------------------------
 ;; Test Helpers
@@ -49,6 +57,20 @@
   (and (cps-continuation-p cps-expr)
        (string= (symbol-name (get-continuation-name cps-expr)) "K")))
 
+(defun cps-find-continuation-application (form var)
+  "Find a (FUNCALL <symbol> VAR) subform of FORM, or NIL if there is none.
+Walks CAR and CDR separately so an improper subform cannot break the search."
+  (when (consp form)
+    (if (and (eq (car form) 'funcall)
+             (consp (cdr form))
+             (consp (cddr form))
+             (null (cdddr form))
+             (symbolp (second form))
+             (eq (third form) var))
+        form
+        (or (cps-find-continuation-application (car form) var)
+            (cps-find-continuation-application (cdr form) var)))))
+
 (defmacro define-cps-shape-properties (&rest specs)
   "Emit one cl-weave:it-property per (NAME (VAR GEN...) EXPR CHECK) row.
 The row is pure data: NAME labels the property, (VAR GEN...) is a flat
@@ -60,7 +82,7 @@ predicate the result must satisfy."
           (destructuring-bind (name bindings expr check) spec
             `(cl-weave:it-property ,(string-downcase (symbol-name name))
                  ,(loop for (var gen) on bindings by #'cddr collect (list var gen))
-               (funcall #',check (cps-transform ,expr)))))
+               (cl-weave:expect (cps-transform ,expr) :to-satisfy #',check))))
         specs)))
 
 (cl-weave:describe "CPS transformation shape properties"
@@ -134,11 +156,29 @@ predicate the result must satisfy."
         `(print ,val)
         cps-continuation-p))
 
-  ;; A simple variable CPS-transforms to a (funcall k var) body.
+  ;; A simple variable CPS-transforms to an application of the continuation to
+  ;; that variable.
+  ;;
+  ;; This assertion had to be rewritten, not merely made live. The original
+  ;; took (caddr cps-result) and required it to BE the (funcall k var) form.
+  ;; CPS-TRANSFORM wraps the continuation application in a tail-call
+  ;; trampoline, so a variable now transforms to
+  ;;
+  ;;   (lambda (k)
+  ;;     (labels ((cps-trampoline-run-internal (value) ...))
+  ;;       (cps-trampoline-run-internal (funcall k VAR))))
+  ;;
+  ;; making (caddr cps-result) the LABELS form for every possible input. The
+  ;; old assertion could therefore never hold — it was stale rather than
+  ;; merely unchecked, and only survived because the vacuous body discarded it.
+  ;; The invariant that actually holds is that the continuation parameter is
+  ;; applied to the variable *somewhere* in the body, which is also stronger
+  ;; than the original: it pins the callee to the lambda's own continuation
+  ;; parameter rather than accepting any FUNCALL.
   (cl-weave:it-property "cps-identity-for-simple-variable"
       ((sym (cl-weave:gen-symbol)))
     (let* ((cps-result (cps-transform sym))
-           (body (caddr cps-result)))
-      (and (consp body)
-           (eq (car body) 'funcall)
-           (eq (third body) sym)))))
+           (continuation (car (second cps-result)))
+           (application (cps-find-continuation-application cps-result sym)))
+      (cl-weave:expect application :to-be-truthy)
+      (cl-weave:expect (second application) :to-be continuation))))
