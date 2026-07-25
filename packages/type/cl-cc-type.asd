@@ -1,3 +1,27 @@
+;;;; ---------------------------- WARNING ----------------------------
+;;;; This system is DOUBLE-DEFINED.
+;;;;
+;;;; The name "cl-cc-type" is defined both here and in the standalone
+;;;; repository nerima-lisp/cl-cc-type, and the two definitions do not
+;;;; agree. Which one ASDF resolves depends on the order of the source
+;;;; registry, so the dependency graph of this repository is not currently
+;;;; well defined. flake.nix takes the standalone repository as an input;
+;;;; a plain `sbcl --load cl-cc.asd` from a checkout takes this file.
+;;;;
+;;;; Measured 2026-07-26 against the standalone repository's working tree
+;;;; (cl-cc-type/src vs packages/type/src):
+;;;;   59 source files here, 64 there
+;;;;   25 identical, 29 differing
+;;;;   5 only here, 11 only there
+;;;;   :depends-on — same single dependency, written :cl-cc-ast here vs "cl-cc-ast" there
+;;;;
+;;;; WHICH DEFINITION IS AUTHORITATIVE IS UNDECIDED. Do not assume an edit
+;;;; here reaches the build, and do not "fix" the divergence by copying one
+;;;; side over the other; the two have diverged in both directions. Resolving
+;;;; this is a design decision, tracked separately from the packaging
+;;;; migration that added this banner.
+;;;; -----------------------------------------------------------------
+
 ;;;; cl-cc-type.asd — independent ASDF system for the type system
 ;;;;
 ;;;; Phase 2 of the package-by-feature monorepo migration. Files live in the

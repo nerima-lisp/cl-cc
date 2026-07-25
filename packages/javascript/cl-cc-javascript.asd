@@ -1,3 +1,29 @@
+;;;; ---------------------------- WARNING ----------------------------
+;;;; This system is DOUBLE-DEFINED.
+;;;;
+;;;; The name "cl-cc-javascript" is defined both here and in the standalone
+;;;; repository nerima-lisp/cl-cc-javascript, and the two definitions do not
+;;;; agree. Which one ASDF resolves depends on the order of the source
+;;;; registry, so the dependency graph of this repository is not currently
+;;;; well defined. flake.nix does NOT list this system's standalone repository
+;;;; among its inputs, so the Nix build currently resolves to THIS file — but
+;;;; nothing enforces that, and any checkout with the standalone repository on
+;;;; its source registry may resolve the other way.
+;;;;
+;;;; Measured 2026-07-26 against the standalone repository's working tree
+;;;; (cl-cc-javascript/src vs packages/javascript/src):
+;;;;   89 source files here, 93 there
+;;;;   49 identical, 39 differing
+;;;;   1 only here, 6 only there
+;;;;   :depends-on — DIFFERENT: the standalone repo also depends on :cl-cc-vm
+;;;;
+;;;; WHICH DEFINITION IS AUTHORITATIVE IS UNDECIDED. Do not assume an edit
+;;;; here reaches the build, and do not "fix" the divergence by copying one
+;;;; side over the other; the two have diverged in both directions. Resolving
+;;;; this is a design decision, tracked separately from the packaging
+;;;; migration that added this banner.
+;;;; -----------------------------------------------------------------
+
 ;;;; cl-cc-javascript.asd — JavaScript frontend: lexer, parser, runtime helpers
 
 (asdf:defsystem :cl-cc-javascript
