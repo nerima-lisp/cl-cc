@@ -2,7 +2,7 @@
 
 ;;; ------------------------------------------------------------
 ;;; Internal state still used by the retained compatibility macros
-;;; (definvariant/defmetamorphic/defbenchmark/assert-snapshot). Everything
+;;; (definvariant/defmetamorphic/defbenchmark). Everything
 ;;; else that used to live here (test-failure/skip-condition/pending-
 ;;; condition/expected-fail-condition, *suite-registry*/*test-registry*/
 ;;; *current-suite*, *tap-mutex*, *coverage-reload-in-progress*) belonged to
@@ -12,9 +12,6 @@
 
 (defvar *invariant-registry* '()
   "List of invariant functions called after every test.")
-
-(defvar *snapshot-dir* "tests/snapshots/"
-  "Directory for snapshot files.")
 
 (defvar *metamorphic-relations* '()
   "List of metamorphic relation plists.")

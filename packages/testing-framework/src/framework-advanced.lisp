@@ -1,5 +1,5 @@
 ;;;; tests/framework-advanced.lisp — CL-CC Test Framework (Advanced Features)
-;;;; Parameterized tests, nesting, snapshots.
+;;;; Parameterized tests and nested sub-cases.
 
 (in-package :cl-cc/test)
 
@@ -9,9 +9,6 @@
 
 (defvar *testing-context* nil
   "Stack of nested testing labels, accumulated as a string path.")
-
-(defvar *update-snapshots* nil
-  "When t, overwrite snapshot files on assert-snapshot mismatch.")
 
 ;;; ------------------------------------------------------------
 ;;; FR-015 — testing: Nested Sub-Cases
@@ -26,56 +23,6 @@ Uses *testing-context* to accumulate nesting depth for diagnostics."
                           ,label))
             (*testing-context* ,ctx-var))
        ,@body)))
-
-;;; ------------------------------------------------------------
-;;; FR-016 — assert-snapshot: Snapshot Testing
-;;; ------------------------------------------------------------
-
-(defun %snapshot-path (name)
-  "Return the full path for snapshot NAME."
-  (concatenate 'string *snapshot-dir* name ".snap"))
-
-(defun %read-snapshot (path)
-  "Read and return the saved snapshot value from PATH, or return the
- symbol :snapshot-not-found if the file does not exist."
-  (handler-case
-      (with-open-file (stream path :direction :input)
-        (read stream))
-    (file-error () :snapshot-not-found)))
-
-(defun %write-snapshot (path value)
-  "Write VALUE to the snapshot file at PATH, creating directories as needed."
-  (ensure-directories-exist path)
-  (with-open-file (stream path
-                          :direction :output
-                          :if-exists :supersede
-                          :if-does-not-exist :create)
-    (write value :stream stream)))
-
-(defmacro assert-snapshot (name form)
-  "Assert that FORM evaluates to the same value as the saved snapshot NAME.
-On first run (no snapshot file), saves the result.
-When *update-snapshots* is t, overwrites the saved file with the current value."
-  (let ((actual-var  (gensym "ACTUAL"))
-        (path-var    (gensym "PATH"))
-        (saved-var   (gensym "SAVED")))
-    `(let* ((,actual-var ,form)
-            (,path-var   (%snapshot-path ,name))
-            (,saved-var  (%read-snapshot ,path-var)))
-       (cond
-         ;; First run: no snapshot yet — save and pass
-         ((eq ,saved-var :snapshot-not-found)
-          (%write-snapshot ,path-var ,actual-var)
-          t)
-         ;; Update mode: overwrite snapshot unconditionally
-         (*update-snapshots*
-          (%write-snapshot ,path-var ,actual-var)
-          t)
-          ;; Normal run: compare
-          ((not (equal ,saved-var ,actual-var))
-           (cl-weave:fail "assert-snapshot ~S mismatch (expected ~S, got ~S)"
-                          ,name ,saved-var ,actual-var))
-          (t t)))))
 
 ;;; ------------------------------------------------------------
 ;;; FR-014 — deftest-each: Parameterized Tests

@@ -45,7 +45,6 @@
           assert-bool
           assert-list-contains
           assert-bitfield
-          assert-snapshot
           assert-compiles-to
           assert-evaluates-to
           assert-macro-expands-to
