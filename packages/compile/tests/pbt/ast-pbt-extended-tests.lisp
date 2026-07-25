@@ -1,131 +1,133 @@
 ;;;; tests/pbt/ast-pbt-extended-tests.lisp — PBT: assignment, multiple-values, dynamic control, calls, types, nested
+;;;
+;;; Expressed with cl-weave's NATIVE property API (cl-weave:describe +
+;;; it-property + gen-integer/gen-member/gen-list) rather than the home-grown
+;;; cl-cc/pbt DEFTEST + FOR-ALL + GEN-FN combination.
+;;;
+;;; The bodies keep their cl-cc/test ASSERT-* calls. Those are backed by
+;;; CL-WEAVE:FAIL (see packages/testing-framework/src/framework-assertions.lisp),
+;;; so they signal on failure, which is what IT-PROPERTY detects — it decides
+;;; pass/fail from a signaled condition, not from the body's return value.
+
 (in-package :cl-cc/pbt)
 
 (in-suite cl-cc-pbt-suite)
-;;; ── Assignment ──────────────────────────────────────────────────────────────
 
-(deftest ast-setq-roundtrip
-  "Setq variable and value are preserved through sexp roundtrip."
-  (for-all ((var   (gen-fn (gen-symbol :package nil :prefix "VAR")))
-            (value (gen-fn (gen-integer :min -1000 :max 1000))))
+(cl-weave:describe "AST sexp roundtrip properties (extended)"
+
+  ;;; ── Assignment ────────────────────────────────────────────────────────────
+
+  (cl-weave:it-property "Setq variable and value are preserved through sexp roundtrip."
+      ((var (gen-pbt-symbol "VAR"))
+       (value (cl-weave:gen-integer :min -1000 :max 1000)))
     (let ((ast2 (%ast-roundtrip (make-ast-setq :var   var
                                                :value (make-ast-int :value value)))))
       (assert-type ast-setq ast2)
       (assert-eq   var   (ast-setq-var ast2))
       (assert-type ast-int (ast-setq-value ast2))
-      (assert-=    value  (ast-int-value (ast-setq-value ast2))))))
+      (assert-=    value  (ast-int-value (ast-setq-value ast2)))))
 
-;;; ── Multiple Values ─────────────────────────────────────────────────────────
+  ;;; ── Multiple Values ───────────────────────────────────────────────────────
 
-(deftest ast-multiple-value-call-roundtrip
-  "Multiple-value-call (func + one arg) is preserved through sexp roundtrip."
-  (for-all ((fn-name (gen-fn (gen-symbol :package nil :prefix "FN")))
-            (arg-val (gen-fn (gen-integer :min -100 :max 100))))
+  (cl-weave:it-property "Multiple-value-call (func + one arg) is preserved through sexp roundtrip."
+      ((fn-name (gen-pbt-symbol "FN"))
+       (arg-val (cl-weave:gen-integer :min -100 :max 100)))
     (let ((ast2 (%ast-roundtrip (make-ast-multiple-value-call
                                  :func (make-ast-var :name fn-name)
                                  :args (list (make-ast-int :value arg-val))))))
       (assert-type ast-multiple-value-call ast2)
       (assert-type ast-var (ast-mv-call-func ast2))
       (assert-eq   fn-name (ast-var-name (ast-mv-call-func ast2)))
-      (assert-=    1       (length (ast-mv-call-args ast2))))))
+      (assert-=    1       (length (ast-mv-call-args ast2)))))
 
-(deftest ast-multiple-value-prog1-roundtrip
-  "Multiple-value-prog1 (first + one form) is preserved through sexp roundtrip."
-  (for-all ((first-val (gen-fn (gen-integer :min -100 :max 100)))
-            (form-val  (gen-fn (gen-integer :min -100 :max 100))))
+  (cl-weave:it-property "Multiple-value-prog1 (first + one form) is preserved through sexp roundtrip."
+      ((first-val (cl-weave:gen-integer :min -100 :max 100))
+       (form-val  (cl-weave:gen-integer :min -100 :max 100)))
     (let ((ast2 (%ast-roundtrip (make-ast-multiple-value-prog1
                                  :first (make-ast-int :value first-val)
                                  :forms (list (make-ast-int :value form-val))))))
       (assert-type ast-multiple-value-prog1 ast2)
       (assert-type ast-int   (ast-mv-prog1-first ast2))
       (assert-=    first-val (ast-int-value (ast-mv-prog1-first ast2)))
-      (assert-=    1         (length (ast-mv-prog1-forms ast2))))))
+      (assert-=    1         (length (ast-mv-prog1-forms ast2)))))
 
-;;; ── Dynamic Control ─────────────────────────────────────────────────────────
+  ;;; ── Dynamic Control ───────────────────────────────────────────────────────
 
-(deftest ast-catch-roundtrip
-  "Catch (keyword tag + one body form) is preserved through sexp roundtrip."
-  (for-all ((tag      (gen-fn (gen-symbol :package :keyword :prefix "TAG")))
-            (body-val (gen-fn (gen-integer :min -100 :max 100))))
+  (cl-weave:it-property "Catch (keyword tag + one body form) is preserved through sexp roundtrip."
+      ((tag      (gen-pbt-keyword "TAG"))
+       (body-val (cl-weave:gen-integer :min -100 :max 100)))
     (let ((ast2 (%ast-roundtrip (make-ast-catch :tag  (make-ast-var :name tag)
                                                 :body (list (make-ast-int :value body-val))))))
       (assert-type ast-catch ast2)
       (assert-type ast-var   (ast-catch-tag ast2))
-      (assert-=    1         (length (ast-catch-body ast2))))))
+      (assert-=    1         (length (ast-catch-body ast2)))))
 
-(deftest ast-throw-roundtrip
-  "Throw (tag and value) is preserved through sexp roundtrip."
-  (for-all ((tag   (gen-fn (gen-symbol :package :keyword :prefix "TAG")))
-            (value (gen-fn (gen-integer :min -1000 :max 1000))))
+  (cl-weave:it-property "Throw (tag and value) is preserved through sexp roundtrip."
+      ((tag   (gen-pbt-keyword "TAG"))
+       (value (cl-weave:gen-integer :min -1000 :max 1000)))
     (let ((ast2 (%ast-roundtrip (make-ast-throw :tag   (make-ast-var :name tag)
                                                 :value (make-ast-int :value value)))))
       (assert-type ast-throw ast2)
       (assert-type ast-var   (ast-throw-tag ast2))
       (assert-type ast-int   (ast-throw-value ast2))
-      (assert-=    value     (ast-int-value (ast-throw-value ast2))))))
+      (assert-=    value     (ast-int-value (ast-throw-value ast2)))))
 
-(deftest ast-unwind-protect-roundtrip
-  "Unwind-protect (protected form + one cleanup form) is preserved through sexp roundtrip."
-  (for-all ((protected-val (gen-fn (gen-integer :min -100 :max 100)))
-            (cleanup-val   (gen-fn (gen-integer :min -100 :max 100))))
+  (cl-weave:it-property "Unwind-protect (protected form + one cleanup form) is preserved through sexp roundtrip."
+      ((protected-val (cl-weave:gen-integer :min -100 :max 100))
+       (cleanup-val   (cl-weave:gen-integer :min -100 :max 100)))
     (let ((ast2 (%ast-roundtrip (make-ast-unwind-protect
                                  :protected (make-ast-int :value protected-val)
                                  :cleanup   (list (make-ast-int :value cleanup-val))))))
       (assert-type ast-unwind-protect ast2)
       (assert-type ast-int       (ast-unwind-protected ast2))
       (assert-=    protected-val (ast-int-value (ast-unwind-protected ast2)))
-      (assert-=    1             (length (ast-unwind-cleanup ast2))))))
+      (assert-=    1             (length (ast-unwind-cleanup ast2)))))
 
-;;; ── Function Calls and References ───────────────────────────────────────────
+  ;;; ── Function Calls and References ─────────────────────────────────────────
 
-(deftest ast-call-roundtrip
-  "Function call (name + N integer args) is preserved through sexp roundtrip."
-  (for-all ((fn-name (gen-fn (gen-symbol :prefix "FN")))
-            (args    (gen-fn (gen-list-of (gen-integer :min -100 :max 100)
-                                          :min-length 1 :max-length 5))))
+  (cl-weave:it-property "Function call (name + N integer args) is preserved through sexp roundtrip."
+      ((fn-name (gen-pbt-symbol "FN"))
+       (args    (cl-weave:gen-list (cl-weave:gen-integer :min -100 :max 100)
+                                   :min-length 1 :max-length 5)))
     (let ((ast2 (%ast-roundtrip (make-ast-call :func fn-name
                                                :args (mapcar (lambda (v) (make-ast-int :value v))
                                                              args)))))
       (assert-type  ast-call ast2)
       (assert-=     (length args) (length (ast-call-args ast2)))
-      (assert-equal args (mapcar #'ast-int-value (ast-call-args ast2))))))
+      (assert-equal args (mapcar #'ast-int-value (ast-call-args ast2)))))
 
-(deftest ast-function-roundtrip
-  "Function reference with symbol name is preserved through sexp roundtrip."
-  (for-all ((name (gen-fn (gen-symbol :package nil :prefix "FN"))))
+  (cl-weave:it-property "Function reference with symbol name is preserved through sexp roundtrip."
+      ((name (gen-pbt-symbol "FN")))
     (let ((ast2 (%ast-roundtrip (make-ast-function :name name))))
       (assert-type ast-function ast2)
-      (assert-eq   name (ast-function-name ast2)))))
+      (assert-eq   name (ast-function-name ast2))))
 
-(deftest ast-function-setf-roundtrip
-  "Function reference with setf name is preserved through sexp roundtrip."
-  (let* ((name '(setf accessor))
-         (ast2 (%ast-roundtrip (make-ast-function :name name))))
-    (assert-type  ast-function ast2)
-    (assert-equal name (ast-function-name ast2))))
+  (cl-weave:it "Function reference with setf name is preserved through sexp roundtrip."
+    (let* ((name '(setf accessor))
+           (ast2 (%ast-roundtrip (make-ast-function :name name))))
+      (assert-type  ast-function ast2)
+      (assert-equal name (ast-function-name ast2))))
 
-;;; ── Type Declarations ───────────────────────────────────────────────────────
+  ;;; ── Type Declarations ─────────────────────────────────────────────────────
 
-(deftest ast-the-roundtrip
-  "The type declaration (type tag + integer value) is preserved through sexp roundtrip."
-  (for-all ((value (gen-fn (gen-integer :min -1000 :max 1000)))
-            (type  (gen-fn (gen-one-of '(integer fixnum number)))))
+  (cl-weave:it-property "The type declaration (type tag + integer value) is preserved through sexp roundtrip."
+      ((value (cl-weave:gen-integer :min -1000 :max 1000))
+       (type  (cl-weave:gen-member '(integer fixnum number))))
     (let ((ast2 (%ast-roundtrip (make-ast-the :type  type
                                               :value (make-ast-int :value value)))))
       (assert-type ast-the ast2)
       (assert-eq   type    (ast-the-type ast2))
       (assert-type ast-int (ast-the-value ast2))
-      (assert-=    value   (ast-int-value (ast-the-value ast2))))))
+      (assert-=    value   (ast-int-value (ast-the-value ast2)))))
 
-;;; ── Nested Structure ────────────────────────────────────────────────────────
+  ;;; ── Nested Structure ──────────────────────────────────────────────────────
 
-(deftest nested-if-roundtrip
-  "Nested if (outer/inner) preserves all five integer values through sexp roundtrip."
-  (for-all ((v1 (gen-fn (gen-integer :min 0 :max 1)))
-            (v2 (gen-fn (gen-integer :min 0 :max 1)))
-            (v3 (gen-fn (gen-integer :min -10 :max 10)))
-            (v4 (gen-fn (gen-integer :min -10 :max 10)))
-            (v5 (gen-fn (gen-integer :min -10 :max 10))))
+  (cl-weave:it-property "Nested if (outer/inner) preserves all five integer values through sexp roundtrip."
+      ((v1 (cl-weave:gen-integer :min 0 :max 1))
+       (v2 (cl-weave:gen-integer :min 0 :max 1))
+       (v3 (cl-weave:gen-integer :min -10 :max 10))
+       (v4 (cl-weave:gen-integer :min -10 :max 10))
+       (v5 (cl-weave:gen-integer :min -10 :max 10)))
     (let* ((inner-if (make-ast-if :cond (make-ast-int :value v2)
                                   :then (make-ast-int :value v3)
                                   :else (make-ast-int :value v4)))
@@ -138,13 +140,12 @@
       (assert-=    v2     (ast-int-value (ast-if-cond (ast-if-then ast2))))
       (assert-=    v3     (ast-int-value (ast-if-then (ast-if-then ast2))))
       (assert-=    v4     (ast-int-value (ast-if-else (ast-if-then ast2))))
-      (assert-=    v5     (ast-int-value (ast-if-else ast2))))))
+      (assert-=    v5     (ast-int-value (ast-if-else ast2)))))
 
-(deftest nested-binop-roundtrip
-  "Nested binop (* (+ v1 v2) v3) preserves op, nesting, and values through roundtrip."
-  (for-all ((v1 (gen-fn (gen-integer :min -10 :max 10)))
-            (v2 (gen-fn (gen-integer :min -10 :max 10)))
-            (v3 (gen-fn (gen-integer :min -10 :max 10))))
+  (cl-weave:it-property "Nested binop (* (+ v1 v2) v3) preserves op, nesting, and values through roundtrip."
+      ((v1 (cl-weave:gen-integer :min -10 :max 10))
+       (v2 (cl-weave:gen-integer :min -10 :max 10))
+       (v3 (cl-weave:gen-integer :min -10 :max 10)))
     (let* ((inner (make-ast-binop :op  '+
                                   :lhs (make-ast-int :value v1)
                                   :rhs (make-ast-int :value v2)))
@@ -157,14 +158,13 @@
       (assert-eq   '+       (ast-binop-op (ast-binop-lhs ast2)))
       (assert-=    v1       (ast-int-value (ast-binop-lhs (ast-binop-lhs ast2))))
       (assert-=    v2       (ast-int-value (ast-binop-rhs (ast-binop-lhs ast2))))
-      (assert-=    v3       (ast-int-value (ast-binop-rhs ast2))))))
+      (assert-=    v3       (ast-int-value (ast-binop-rhs ast2)))))
 
-(deftest nested-let-roundtrip
-  "Nested let (outer binds var1, inner binds var2) preserves both through sexp roundtrip."
-  (for-all ((var1 (gen-fn (gen-symbol :package nil :prefix "X")))
-            (var2 (gen-fn (gen-symbol :package nil :prefix "Y")))
-            (v1   (gen-fn (gen-integer :min -10 :max 10)))
-            (v2   (gen-fn (gen-integer :min -10 :max 10))))
+  (cl-weave:it-property "Nested let (outer binds var1, inner binds var2) preserves both through sexp roundtrip."
+      ((var1 (gen-pbt-symbol "X"))
+       (var2 (gen-pbt-symbol "Y"))
+       (v1   (cl-weave:gen-integer :min -10 :max 10))
+       (v2   (cl-weave:gen-integer :min -10 :max 10)))
     (let* ((inner-let (make-ast-let
                        :bindings (list (cons var2 (make-ast-int :value v2)))
                        :body     (list (make-ast-var :name var2))))

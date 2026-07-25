@@ -431,6 +431,7 @@
        (:file "generators-macho")
        (:file "generators-typed-ast")
        (:file "generators-typed-ast-utils")
+       (:file "generators-cl-weave")
        (:file "vm-pbt-tests")
        (:file "cps-pbt-tests")
        (:file "ast-pbt-tests")
