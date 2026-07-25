@@ -18,11 +18,21 @@ let
     fi
   '';
 
+  # Scales property-based testing down for CI. CLCC_PBT_COUNT governs the
+  # remaining home-grown cl-cc/pbt properties; CL_WEAVE_PROPERTY_TESTS governs
+  # the ones migrated to cl-weave's native it-property, whose own default is
+  # 100. Without the second knob the migrated properties silently ignore this
+  # scale-down and run 100 cases each, which is ~33x the configured budget and
+  # pushes tests already near *vm-eval-timeout-seconds* over their limit.
   pbtSanitize = ''
     case "''${CLCC_PBT_COUNT:-}" in
       ""|*[!0-9]*) CLCC_PBT_COUNT=3 ;;
     esac
     export CLCC_PBT_COUNT
+    case "''${CL_WEAVE_PROPERTY_TESTS:-}" in
+      ""|*[!0-9]*) CL_WEAVE_PROPERTY_TESTS="$CLCC_PBT_COUNT" ;;
+    esac
+    export CL_WEAVE_PROPERTY_TESTS
   '';
 
   faslCacheCleaner = ''
