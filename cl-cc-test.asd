@@ -425,7 +425,6 @@
       ((:file "package")
        (:file "framework")
        (:file "framework-dsl")
-       (:file "framework-ast-generators")
        (:file "generators")
        (:file "package-macho")
        (:file "generators-macho")

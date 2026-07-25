@@ -63,9 +63,8 @@
   (:export
    #:defproperty #:defgenerator #:for-all #:check
    #:*test-count* #:*max-list-length* #:*max-string-length* #:*max-type-depth* #:*size* #:*pbt-rng-override*
-   #:gen-integer #:gen-boolean #:gen-symbol #:gen-list #:gen-string #:gen-ast-node #:gen-expr #:gen-float #:gen-character #:gen-cons #:gen-vector
+   #:gen-integer #:gen-boolean #:gen-symbol #:gen-list #:gen-string #:gen-float #:gen-character #:gen-cons #:gen-vector
    #:gen-one-of #:gen-tuple #:gen-list-of #:gen-alist #:gen-map #:gen-bind #:gen-fmap #:gen-such-that #:gen-resize #:gen-scale
-   #:shrink #:shrink-integer #:shrink-list
    #:run-property-tests #:report-failure
    #:generator #:generate #:gen-fn #:shrink-value #:make-generator
    #:gen-primitive-type #:gen-type-variable #:gen-simple-compound-type #:gen-values-type #:gen-fn-type-args #:gen-fn-type #:gen-array-type #:gen-cons-type #:gen-type-expr

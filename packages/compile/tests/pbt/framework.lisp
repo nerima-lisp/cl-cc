@@ -251,6 +251,4 @@ Kept as a function so callers never capture a stale binding of the override."
      (let ((*size* (funcall scale-fn *size*)))
        (generate generator)))))
 
-;;; AST generators (gen-ast-node, gen-expr, init-ast-generators) and shrink
-;;; functions (shrink, shrink-integer, shrink-list) are in framework-ast-generators.lisp.
 
