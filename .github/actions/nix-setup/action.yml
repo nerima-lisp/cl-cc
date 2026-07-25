@@ -1,0 +1,74 @@
+name: Set up Nix
+description: >-
+  Install Nix (Determinate Systems installer) and, when a cache name is
+  provided, configure the Cachix binary cache. Pushes to the cache only on
+  non-pull_request events that carry an auth token; every other run, including
+  fork pull requests, is pull-only. Shared by the CI, docs, release, and
+  flake-update workflows so the installer and Cachix wiring lives in exactly
+  one place.
+
+# NOTE: `actions/checkout` intentionally lives in the caller, not here: a
+# local composite action cannot check the repository out, because its own
+# action.yml is not on disk until after checkout has run.
+
+inputs:
+  cachix-cache:
+    description: Cachix cache name. When empty, Cachix is not configured at all.
+    required: false
+    default: ""
+  cachix-auth-token:
+    description: >-
+      Cachix auth token (pass secrets.CACHIX_AUTH_TOKEN). When empty — or on
+      pull_request events — the cache is configured pull-only so untrusted runs
+      can never push.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+    # Decide push vs pull-only once, off the event name and token presence, so
+    # both Cachix steps share a single source of truth. `nix flake check` runs
+    # arbitrary code out of the pull request, so a pull request must never hold
+    # a token that can write to the org cache. The token is read from the
+    # environment rather than interpolated into the script body.
+    - name: Resolve Cachix mode
+      id: cachix-mode
+      shell: bash
+      env:
+        CACHIX_AUTH_TOKEN: ${{ inputs.cachix-auth-token }}
+        CACHIX_CACHE: ${{ inputs.cachix-cache }}
+        EVENT_NAME: ${{ github.event_name }}
+      run: |
+        set -euo pipefail
+        push=false
+        if [[ -n "$CACHIX_AUTH_TOKEN" && "$EVENT_NAME" != "pull_request" ]]; then
+          push=true
+        fi
+        printf 'push=%s\n' "$push" >> "$GITHUB_OUTPUT"
+        # A missing repo variable silently disables Cachix below (both
+        # "Configure Cachix" steps are gated on cachix-cache != ''), so every
+        # build falls back to a full local realisation with a green check and
+        # no other signal. Surface it loudly instead of letting "CI got slow"
+        # go uninvestigated for months.
+        if [[ -z "$CACHIX_CACHE" ]]; then
+          echo "::warning::CACHIX_CACHE is unset; building without a binary cache"
+        fi
+
+    - name: Configure Cachix (pull-only)
+      if: ${{ inputs.cachix-cache != '' && steps.cachix-mode.outputs.push != 'true' }}
+      uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+      with:
+        name: ${{ inputs.cachix-cache }}
+        extraPullNames: nix-community
+        skipPush: true
+
+    - name: Configure Cachix (push-enabled)
+      if: ${{ inputs.cachix-cache != '' && steps.cachix-mode.outputs.push == 'true' }}
+      uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+      with:
+        name: ${{ inputs.cachix-cache }}
+        authToken: ${{ inputs.cachix-auth-token }}
+        extraPullNames: nix-community

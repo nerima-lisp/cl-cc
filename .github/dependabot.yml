@@ -1,5 +1,12 @@
 version: 2
 updates:
+  # SUPPLY_CHAIN.md: Dependabot covers GitHub Actions (and Cargo, where that
+  # applies). Nix inputs are NOT listed here — flake-update.yml owns flake.lock.
+  #
+  # Every `uses:` in this repository is pinned to a 40-character commit SHA, so
+  # nothing here moves without this file. Dependabot rewrites the SHA and the
+  # trailing `# vX.Y.Z` comment together, which is what stops a pin from quietly
+  # rotting into an action that never picks up an upstream fix.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -7,5 +14,20 @@ updates:
     open-pull-requests-limit: 5
     groups:
       github-actions:
+        patterns:
+          - "*"
+
+  # A second entry, not a duplicate: `directory: "/"` only scans
+  # .github/workflows/. The `uses:` lines inside the nix-setup composite action
+  # — the single place the nix-installer and cachix-action SHAs are pinned for
+  # every workflow — live in .github/actions/nix-setup/action.yml and are
+  # invisible to the entry above. Without this they would never be updated.
+  - package-ecosystem: github-actions
+    directory: /.github/actions/nix-setup
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      nix-setup-action:
         patterns:
           - "*"

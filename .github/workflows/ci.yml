@@ -1,33 +1,51 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Supersede in-flight runs for the same PR; never cancel a push to the default
+# branch.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  flake-check:
-    name: Nix Flake Check
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-15]
-    runs-on: ${{ matrix.os }}
+  # One job on purpose. Granularity belongs in the flake's `checks.*`
+  # attributes, which `nix flake check` evaluates in parallel with build
+  # caching. Splitting these into separate GitHub jobs would duplicate that
+  # scheduling and lose cache sharing between them.
+  #
+  # Add a second job ONLY for work the Nix sandbox cannot do: network access,
+  # a real PTY/TTY, artifact upload, or a different runner OS.
+  check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Nix
-        uses: ./.github/actions/setup-nix
+      # persist-credentials: false — this job runs untrusted PR code via
+      # `nix flake check`, and never needs the token, so don't leave it in
+      # .git/config for that code to read.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Run nix flake check
+      # Runs the SBCL test suite (checks.default), the treefmt formatting gate
+      # (checks.formatting), and the mkdocs --strict build (checks.docs).
+      # Add `--all-systems` only when the flake declares more than one system.
+      - name: Check flake
         run: nix flake check --print-build-logs
+
+      # Catches stray conflict markers and whitespace errors that compile fine.
+      - name: Check diff hygiene
+        run: git diff --check
