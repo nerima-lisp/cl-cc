@@ -22,8 +22,7 @@ let
   # remaining home-grown cl-cc/pbt properties; CL_WEAVE_PROPERTY_TESTS governs
   # the ones migrated to cl-weave's native it-property, whose own default is
   # 100. Without the second knob the migrated properties silently ignore this
-  # scale-down and run 100 cases each, which is ~33x the configured budget and
-  # pushes tests already near *vm-eval-timeout-seconds* over their limit.
+  # scale-down and run 100 cases each, which is ~33x the configured budget.
   pbtSanitize = ''
     case "''${CLCC_PBT_COUNT:-}" in
       ""|*[!0-9]*) CLCC_PBT_COUNT=3 ;;

@@ -82,12 +82,25 @@ CONTAINS should be a quoted type symbol like 'vm-add."
                      :form     (list 'assert-compiles-to ,expr :contains ,contains)))
        t)))
 
-(defparameter *vm-eval-timeout-seconds* 8
+(defparameter *vm-eval-timeout-seconds* 30
   "Per-call timeout for assert-evaluates-to VM evaluations.
 Uses the VM's cooperative deadline mechanism (*vm-eval-deadline* in cl-cc/vm)
 which is checked at every VM safepoint. This avoids relying on sb-ext:with-timeout
 interrupt delivery (which can be swallowed by error handlers inside run-string).
-NIL disables the timeout.")
+NIL disables the timeout.
+
+This bounds *runaway* evaluations — a VM program that loops forever — and is
+deliberately not a performance budget. It must therefore sit well clear of how
+long the slowest legitimate evaluation takes, or it converts machine load into
+spurious failures.
+
+Raised from 8s to 30s: four copy-instance tests in VM-CLOS-EXECUTE-SUITE do
+around 8s of genuine VM work each, leaving under 1% headroom at the old value.
+They were observed passing at 7.6s and failing at 8.001-8.322s across otherwise
+identical full-suite runs, flipping purely on how loaded the machine was, and
+all 44 tests in that suite pass with the limit raised and nothing else changed.
+30s keeps a runaway loop bounded to a few seconds of wasted CI time while
+leaving roughly 3.5x margin over the slowest real evaluation.")
 
 (defmacro assert-evaluates-to (expr expected &key stdlib)
   "Assert that running EXPR via run-string returns a value EQUAL to EXPECTED.
@@ -95,7 +108,7 @@ NIL disables the timeout.")
 When :STDLIB is true, evaluate through `(run-string EXPR :stdlib t)` so callers
 can share the same high-level assertion for both plain and stdlib-backed cases.
 
-Every evaluation is bounded by *vm-eval-timeout-seconds* (default 8s) via the
+Every evaluation is bounded by *vm-eval-timeout-seconds* (default 30s) via the
 VM's cooperative safepoint deadline. VM evaluations that loop forever signal
 VM-EVAL-DEADLINE-EXCEEDED (a serious-condition, NOT a subclass of error) which
 cannot be swallowed by user-level (handler-case (error ...) ...) in VM programs."
