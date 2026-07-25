@@ -19,6 +19,8 @@
 
 (in-package :cl-cc/pbt)
 
+(in-suite cl-cc-pbt-suite)
+
 (cl-weave:describe "VM heap operation properties"
 
   ;; --- Cons cells (the VM uses native Lisp cons cells) ---

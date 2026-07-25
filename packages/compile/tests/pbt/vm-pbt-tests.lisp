@@ -12,9 +12,6 @@
 
 (in-package :cl-cc/pbt)
 
-;; Kept so the properties register under CL-CC-PBT-SUITE, and because
-;; cps-pbt-tests.lisp (loaded next) inherits this suite rather than setting
-;; its own.
 (in-suite cl-cc-pbt-suite)
 
 (defun %vm-binop-result (make-instruction a b)
