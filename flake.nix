@@ -43,6 +43,13 @@
       url = "github:nerima-lisp/cl-boundary-kit";
       flake = false;
     };
+    # cl-log-kit backs cl-boundary-kit's logging boundary as of 0.5.0 (split
+    # out of cl-boundary-kit itself); pulled in the same way as the other
+    # nerima-lisp toolkits above.
+    cl-log-kit = {
+      url = "github:nerima-lisp/cl-log-kit";
+      flake = false;
+    };
     cl-cli = {
       url = "github:nerima-lisp/cl-cli";
       flake = false;
@@ -86,52 +93,60 @@
           inherit (sbclModule) sbcl sbclBootstrap;
           clProlog = sbcl.buildASDFSystem {
             pname = "cl-prolog";
-            version = "0.6.0";
+            version = "0.8.0";
             src = inputs.cl-prolog;
             systems = [ "cl-prolog" ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
-            version = "0.8.0";
+            version = "1.0.0";
             src = inputs.cl-weave;
             systems = [ "cl-weave" ];
           };
-          # cl-parser-kit / cl-tty-kit / cl-boundary-kit are self-contained
-          # (tty-kit only pulls the SBCL-bundled sb-posix). cl-dataflow and
-          # cl-cli both depend on the external cl-prolog engine in production,
-          # so clProlog is threaded into their lispLibs and thereby reaches any
+          # cl-parser-kit is self-contained. cl-boundary-kit pulls the
+          # cl-log-kit toolkit above. cl-dataflow, cl-cli, and cl-tty-kit all
+          # depend on the external cl-prolog engine in production, so
+          # clProlog is threaded into their lispLibs and thereby reaches any
           # cl-cc package that consumes them transitively.
           clParserKit = sbcl.buildASDFSystem {
             pname = "cl-parser-kit";
-            version = "0.2.0";
+            version = "0.4.0";
             src = inputs.cl-parser-kit;
             systems = [ "cl-parser-kit" ];
           };
           clDataflow = sbcl.buildASDFSystem {
             pname = "cl-dataflow";
-            version = "0.2.0";
+            version = "0.4.0";
             src = inputs.cl-dataflow;
             systems = [ "cl-dataflow" ];
             lispLibs = [ clProlog ];
           };
+          clLogKit = sbcl.buildASDFSystem {
+            pname = "cl-log-kit";
+            version = "1.6.0";
+            src = inputs.cl-log-kit;
+            systems = [ "cl-log-kit" ];
+          };
           clBoundaryKit = sbcl.buildASDFSystem {
             pname = "cl-boundary-kit";
-            version = "0.4.0";
+            version = "0.5.0";
             src = inputs.cl-boundary-kit;
             systems = [ "cl-boundary-kit" ];
+            lispLibs = [ clLogKit ];
           };
           clCli = sbcl.buildASDFSystem {
             pname = "cl-cli";
-            version = "0.2.0";
+            version = "0.3.0";
             src = inputs.cl-cli;
             systems = [ "cl-cli" ];
             lispLibs = [ clProlog ];
           };
           clTtyKit = sbcl.buildASDFSystem {
             pname = "cl-tty-kit";
-            version = "0.3.0";
+            version = "0.6.0";
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
+            lispLibs = [ clProlog ];
           };
           # First subsystems split out of the monorepo. clCcAst is a
           # dependency-free leaf; clCcType depends on it. Injected into the

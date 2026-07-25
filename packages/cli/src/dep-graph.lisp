@@ -38,8 +38,11 @@
     edges))
 
 (defun %dep-node-name (name)
-  "Normalize an ASDF system/dependency designator to a lowercased node name."
-  (string-downcase (string name)))
+  "Normalize an ASDF system/dependency designator to a lowercased node name.
+Delegates to `%normalize-system-name' (handlers-ql.lisp) so that compound
+dependency-def forms such as `(:version name version)` are handled
+identically everywhere in the CLI rather than duplicating the logic here."
+  (%normalize-system-name name))
 
 (defun %build-dependency-graph ()
   "Build a cl-dataflow graph of registered ASDF systems: every system and

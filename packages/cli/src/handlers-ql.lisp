@@ -46,7 +46,18 @@
     registry))
 
 (defun %normalize-system-name (thing)
-  (string-downcase (string thing)))
+  "Normalize an ASDF dependency-def designator THING to a lowercased
+system-name string.  THING is usually a plain string/symbol designator, but
+per ASDF's dependency-def grammar it may also be one of the compound forms
+`(:version name version)`, `(:require name)`, or
+`(:feature feature-expression dependency-def)` — normalize those down to
+the underlying system name rather than erroring on a non-string designator."
+  (cond
+    ((and (consp thing) (member (car thing) '(:version :require)))
+     (%normalize-system-name (second thing)))
+    ((and (consp thing) (eq (car thing) :feature))
+     (%normalize-system-name (third thing)))
+    (t (string-downcase (string thing)))))
 
 (defun %read-asd-forms (path)
   (with-open-file (in path :direction :input)
