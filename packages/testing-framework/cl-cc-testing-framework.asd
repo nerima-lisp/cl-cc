@@ -30,6 +30,4 @@ every test file)."
    (:file "framework-advanced")
    (:file "framework-compiler-run-string")
    (:file "framework-compiler")
-   (:file "framework-pbt")
-   (:file "framework-meta")
-   (:file "framework-fuzz")))
+   (:file "framework-meta")))

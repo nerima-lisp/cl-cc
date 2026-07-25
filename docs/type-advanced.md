@@ -442,13 +442,13 @@ Safety-oriented types, development support, type-level programming, advanced typ
 
 ### ✅ FR-2101: 型指向テスト生成 (Type-Directed Test Generation)
 
-- **対象**: `packages/testing-framework/src/framework-fuzz.lisp`
+- **対象**: 外部 cl-weave (`gen-*` combinators / `it-property`)
 - **内容**: 型情報から自動的にテストデータを生成
   - **QuickCheck スタイル**: `(arbitrary :a)` — 型 `:a` の値を無作為生成。型クラスで各型に実装
   - `(deftest prop-reverse (xs : (list integer)) (= (reverse (reverse xs)) xs))` — 型から `xs` を生成
   - **型駆動 fuzzing**: 関数の引数型から有効な入力を大量生成してバグを探索
   - **カバレッジ誘導**: 型情報を使って未カバーの型ブランチへの入力を優先生成
-  - CL-CC の `packages/testing-framework/src/framework-fuzz.lisp` に型情報を組み込む
+  - CL-CC の型情報から cl-weave の `gen-*` generator を導出する
   - Claessen & Hughes (2000). QuickCheck: A Lightweight Tool for Random Testing.
 - **難易度**: Medium
 

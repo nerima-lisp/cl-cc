@@ -167,23 +167,22 @@ fell through to the default arm."
 
 ;;; Property-Based Differential Tests
 ;;;
-;;; ASSERT-PBT (framework-pbt.lisp) checks a property against many random
-;;; samples instead of a handful of fixed cases; these two exercise it against
-;;; the compiler's own arithmetic and CONS lowering, comparing RUN-STRING's
-;;; guest-side result to the equivalent host Lisp computation.
+;;; A property is checked against many generated samples instead of a handful
+;;; of fixed cases, comparing RUN-STRING's guest-side result to the equivalent
+;;; host Lisp computation. Expressed with cl-weave's NATIVE property API
+;;; (describe + it-property + gen-integer), so cl-weave owns generation,
+;;; shrinking, and the pass/fail verdict; an it-property body is simply a
+;;; boolean-valued property that must hold for every generated case.
 
-(deftest pbt-addition-matches-host-arithmetic
-  "Property: compiling and running (+ a b) matches host Lisp addition, for
-random small integers including negatives."
-  (assert-pbt (:trials 50 :threshold 1.0)
-      ((a (- (random 200) 100))
-       (b (- (random 200) 100)))
-    (= (+ a b) (run-string (format nil "(+ ~D ~D)" a b)))))
+(cl-weave:describe "compiler arithmetic differential properties"
 
-(deftest pbt-multiplication-matches-host-arithmetic
-  "Property: compiling and running (* a b) matches host Lisp multiplication,
-for random small integers including negatives."
-  (assert-pbt (:trials 50 :threshold 1.0)
-      ((a (- (random 40) 20))
-       (b (- (random 40) 20)))
+  (cl-weave:it-property "compiling and running (+ a b) matches host Lisp addition"
+      ((a (cl-weave:gen-integer :min -100 :max 100))
+       (b (cl-weave:gen-integer :min -100 :max 100)))
+    (= (+ a b) (run-string (format nil "(+ ~D ~D)" a b))))
+
+  (cl-weave:it-property "compiling and running (* a b) matches host Lisp multiplication"
+      ((a (cl-weave:gen-integer :min -20 :max 20))
+       (b (cl-weave:gen-integer :min -20 :max 20)))
     (= (* a b) (run-string (format nil "(* ~D ~D)" a b)))))
+

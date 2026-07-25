@@ -14,8 +14,9 @@
 - **php 逆依存**: `cl-cc-testing-framework` が `cl-cc-php` に依存
   （`package-imports-compile-parse.lisp` が `tokenize-php-source` /
   `parse-php-source` をテスト用に import）。← php 抽出のブロッカー。
-- 独自の重複機構: `framework-pbt`（cl-weave 0.8.0 の native property API と重複）、
-  `framework-fuzz`、`framework-meta`、`*suite-registry*`。
+- 独自の重複機構: `framework-meta`、`*suite-registry*`。
+  （`framework-pbt` / `framework-fuzz` は削除済み: 前者は cl-weave の native
+  property API、後者は native `it-fuzz` と重複していた。）
 
 ## 2. 移行を可能にする鍵
 
@@ -50,8 +51,10 @@ cl-weave に直接対応が無いものは **薄いヘルパ関数**（cl-weave 
 
 - `assert-run` / `assert-run-string`（compile+run して結果比較）→ ヘルパ関数化。
 - `assert-compiles-to`（コンパイル結果検査）→ ヘルパ関数化。
-- `assert-pbt`(2) → **cl-weave native property API へ書き換え**（重複解消・memory
-  の指摘）。`framework-pbt` は廃止。
+- ✅ `assert-pbt`(2) → **cl-weave native property API へ書き換え済み**（重複解消）。
+  `compiler-tests-runtime-hof-tests.lisp` の 2 箇所は
+  `cl-weave:describe` + `cl-weave:it-property` + `cl-weave:gen-integer` に移行し、
+  `framework-pbt` は削除。
 - `assert-faster` / `assert-no-consing` → cl-weave `benchmark` / `:to-allocate-under`。
 
 ## 4. suite 階層の扱い（設計判断）

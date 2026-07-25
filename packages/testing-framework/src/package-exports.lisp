@@ -47,8 +47,6 @@
           assert-bitfield
           assert-snapshot
           assert-compiles-to
-          assert-pbt
-          deftest-pbt
           assert-evaluates-to
           assert-macro-expands-to
           assert-infers-type
@@ -74,25 +72,6 @@
            pending
            expected-fail
            defexpected
-           deftest-fuzz
-           shrink
-           shrink-integer
-           shrink-list
-           shrink-string
-           minimize-failing-input
-           check-property-with-shrinking
-           register-type-generator
-           deftype-generator
-           generator-for-type
-           generate-for-type
-           generate-from-type-annotation
-           make-pbt-command
-           pbt-command-p
-           pbt-command-name
-           pbt-command-precondition
-           pbt-command-run
-           generate-stateful-command-sequence
-           run-stateful-command-sequence
            assert-no-crash
            assert-terminates
           defmetamorphic

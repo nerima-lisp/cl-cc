@@ -1,5 +1,5 @@
 ;;;; tests/framework-advanced.lisp — CL-CC Test Framework (Advanced Features)
-;;;; Parameterized tests, nesting, snapshots, pipeline testing, combinatorial, flaky.
+;;;; Parameterized tests, nesting, snapshots.
 
 (in-package :cl-cc/test)
 
@@ -143,28 +143,3 @@ parameterized tests from different files do not silently collide in the global r
                                 (let ,bindings
                                   ,@body-forms)))))
         `(progn ,@expansions)))))
-
-;;; ------------------------------------------------------------
-;;; Flaky Detection
-;;; ------------------------------------------------------------
-
-(defun %detect-flaky (all-run-results repeat)
-  "Given a list of repeat result-lists, find tests with inconsistent status."
-  (let ((by-name (make-hash-table)))
-    (dolist (run-results all-run-results)
-      (dolist (r run-results)
-        (let ((name (getf r :name))
-              (status (getf r :status)))
-          (push status (gethash name by-name)))))
-    (let ((flaky '()))
-      (maphash (lambda (name statuses)
-                 (let ((pass-count (count :pass statuses))
-                       (total (length statuses)))
-                   (when (and (< pass-count total) (> pass-count 0))
-                     (push (list name pass-count total) flaky))))
-               by-name)
-      (when flaky
-        (format t "# Flaky tests detected (inconsistent across ~A runs):~%" repeat)
-        (dolist (f flaky)
-          (format t "#   ~A: passed ~A/~A runs~%"
-                  (first f) (second f) (third f)))))))

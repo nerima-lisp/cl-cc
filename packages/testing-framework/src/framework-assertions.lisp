@@ -213,7 +213,7 @@ Each field-spec is (byte-position byte-width expected-value)."
        t)))
 
 ;;; ------------------------------------------------------------
-;;; assert-no-crash / assert-terminates (from framework-fuzz.lisp)
+;;; assert-no-crash / assert-terminates (FR-031)
 ;;; ------------------------------------------------------------
 
 (defmacro assert-no-crash (&body forms)

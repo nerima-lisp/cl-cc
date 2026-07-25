@@ -348,18 +348,18 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 
 #### ✅ FR-352: Mutation Testing (ミューテーションテスト)
 
-- **対象**: `packages/testing-framework/src/framework-fuzz.lisp`, 新規`src/tools/mutator.lisp`
-- **現状**: PBT（`framework-fuzz.lisp`）はランダム入力生成。プログラム変異によるテスト有効性検証なし
+- **対象**: 新規`src/tools/mutator.lisp`
+- **現状**: PBT（cl-weave native `it-property` / `it-fuzz`）はランダム入力生成。プログラム変異によるテスト有効性検証なし
 - **内容**: ソースASTへのミューテーション演算子適用（条件反転`not`、算術演算子交換`+→-`、定数変更）。各ミューテーントに対してテストスイートを実行し**殺傷率**（mutation score）を算出。Pitest (Java) / mutmut (Python) 相当
 - **根拠**: テストの質の定量指標。高カバレッジでも低mutation scoreならテストが弱い
 - **難易度**: Hard
 
 #### ⚠️ FR-353: Property-Based Testing Integration (PBT深化)
 
-- **対象**: `packages/testing-framework/src/framework-fuzz.lisp`
-- **現状**: `%gen-expr`（`framework-fuzz.lisp`）は文法ベース生成。`deftest-fuzz`マクロは実装済み
-- **内容**: **shrinking**: 失敗入力の最小化（バイナリサーチ型）。**stateful PBT**: コマンドシーケンス生成でVMステートマシンをテスト。**typeclass-based generators**: 型アノテーションから入力生成器を自動導出。QuickCheck-2.0 / Hypothesis スタイル
-- **根拠**: Hypothesis shrinking / Erlang QuickCheck stateful testing。現在のPBTにshrinkingがないため失敗デバッグが困難
+- **対象**: 外部 cl-weave (`gen-*` combinators)
+- **現状**: cl-weave の native `it-property` / `it-fuzz` が生成・shrinking・失敗最小化を担当（`framework-fuzz.lisp` の自前実装は重複のため削除済み）
+- **内容**: **stateful PBT**: コマンドシーケンス生成でVMステートマシンをテスト。**typeclass-based generators**: 型アノテーションから入力生成器を自動導出。QuickCheck-2.0 / Hypothesis スタイル
+- **根拠**: Erlang QuickCheck stateful testing。shrinking 自体は cl-weave 側で解決済み
 - **難易度**: Medium
 
 ---

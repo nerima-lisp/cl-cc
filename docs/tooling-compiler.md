@@ -189,9 +189,9 @@ Compiler frontend optimization, isolated infrastructure, binary/link/FFI, compil
 
 #### FR-206: Coverage-Guided Fuzzing
 
-- **対象**: `packages/testing-framework/src/framework-fuzz.lisp`
-- **現状**: 文法ベースのfuzzing（`%gen-expr`によるランダムCLプログラム生成）。カバレッジフィードバックなし
-- **内容**: `(deftest-fuzz)`にカバレッジ計測（基本ブロック到達率）を追加。未到達パスへの入力生成を優先するフィードバックループ。AFL/libFuzzer方式のミューテーション
+- **対象**: 外部 cl-weave (`it-fuzz`)
+- **現状**: cl-weave の native `it-fuzz` によるランダム入力生成。カバレッジフィードバックなし
+- **内容**: `cl-weave:it-fuzz`にカバレッジ計測（基本ブロック到達率）を追加。未到達パスへの入力生成を優先するフィードバックループ。AFL/libFuzzer方式のミューテーション
 - **根拠**: 既存PBT（72,000行）は充実しているがカバレッジ盲点あり。CSmith等のコンパイラfuzzerで発見される深いバグを検出
 - **難易度**: Medium
 
