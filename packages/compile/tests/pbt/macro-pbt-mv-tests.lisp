@@ -54,24 +54,31 @@
     (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,@body))))
       (cl-weave:expect (car expanded) :to-be-one-of '(let let*))))
 
-  ;; mvb-preserves-variables and mvb-preserves-form assert nothing about the
-  ;; expansion: their bodies were (progn expanded vars form body t), a constant
-  ;; T that merely referenced the bindings to silence unused-variable warnings.
-  ;; They are preserved as-is — checking only that expansion does not signal —
-  ;; rather than given invented assertions, since what they were meant to
-  ;; verify is not recoverable from the code.
+  ;; MULTIPLE-VALUE-BIND expands to a values capture wrapping a positional
+  ;; rebind:
+  ;;   (let ((#:mvb (multiple-value-list FORM)))
+  ;;     (let* ((V1 (nth 0 #:mvb)) (V2 (nth 1 #:mvb)) ...)
+  ;;       BODY))
+  ;; so both of the following are checkable against that shape. Their original
+  ;; bodies were (progn expanded vars form body t) — a constant T referencing
+  ;; the bindings only to silence unused-variable warnings — which asserted
+  ;; nothing despite the names claiming otherwise.
   (cl-weave:it-property "mvb-preserves-variables"
       ((vars (gen-variable-list :min-length 1 :max-length 5))
        (form (gen-body-form))
        (body (gen-body-form)))
-    (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,body))
-    t)
+    (let* ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,body)))
+           (inner-let (third expanded)))
+      (cl-weave:expect (car inner-let) :to-be 'let*)
+      (cl-weave:expect (mapcar #'car (second inner-let)) :to-equal vars)))
 
   (cl-weave:it-property "mvb-preserves-form"
       ((vars (gen-variable-list :min-length 1 :max-length 3))
        (form (gen-body-form)))
-    (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form))
-    t)
+    (let* ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form)))
+           (capture (second (car (second expanded)))))
+      (cl-weave:expect (car capture) :to-be 'multiple-value-list)
+      (cl-weave:expect (second capture) :to-equal form)))
 
   (cl-weave:it-property "mvsq-uses-multiple-value-list"
       ((vars (gen-variable-list :min-length 1 :max-length 5))

@@ -130,15 +130,16 @@
     (let ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form ,body))))
       (cl-weave:expect (car expanded) :to-be-one-of '(let let*))))
 
-  ;; Asserts nothing about the expansion: the original body was
-  ;; (progn expanded vars form t), a constant T referencing its bindings only
-  ;; to silence unused-variable warnings. Kept as a "does not signal" check
-  ;; rather than given an invented assertion.
+  ;; The values form is captured as the argument of MULTIPLE-VALUE-LIST in the
+  ;; outer LET's binding. The original body was (progn expanded vars form t),
+  ;; a constant T that asserted nothing despite the name.
   (cl-weave:it-property "mvb-preserves-form-binding-pbt"
       ((vars (gen-variable-list :min-length 1 :max-length 3))
        (form (gen-body-form)))
-    (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form))
-    t)
+    (let* ((expanded (cl-cc:our-macroexpand-1 `(multiple-value-bind ,vars ,form)))
+           (capture (second (car (second expanded)))))
+      (cl-weave:expect (car capture) :to-be 'multiple-value-list)
+      (cl-weave:expect (second capture) :to-equal form)))
 
   (cl-weave:it-property "mvsq-uses-multiple-value-list-binding-pbt"
       ((vars (gen-variable-list :min-length 1 :max-length 5))
