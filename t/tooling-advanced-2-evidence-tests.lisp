@@ -211,7 +211,7 @@
     ("FR-712" ("packages/compile/src/codegen.lisp" "packages/optimize/src/optimizer.lisp")         :hard)
     ("FR-713" ("packages/type/src/" "packages/compile/src/codegen.lisp")                           :hard)))
 
-;; ─── Extracted FR ID lists (from docs/tooling-advanced-2.md) ──────────────────────
+;; ─── Extracted FR ID lists (from docs/notes/tooling-advanced-2.md) ──────────────────────
 
 (defparameter *tooling-advanced-2-all-fr-ids*
   ;; Phase 104
@@ -271,7 +271,7 @@
 
 (deftest tooling-advanced-2-evidence-registry-covers-all-frs
   "Verify that *tooling-advanced-2-fr-table* contains exactly the 120 FR IDs
-   listed in docs/tooling-advanced-2.md and no extras."
+   listed in docs/notes/tooling-advanced-2.md and no extras."
   (let ((table-ids (mapcar #'car *tooling-advanced-2-fr-table*))
         (expected-ids *tooling-advanced-2-all-fr-ids*))
     ;; Every expected FR is present in the table.
@@ -305,7 +305,7 @@
     (assert-true (> checked 0))))
 
 (deftest tooling-advanced-2-both-files-correlate-counts
-  "Verify that the ✅ count in docs/tooling-advanced-2.md header correlates
+  "Verify that the ✅ count in docs/notes/tooling-advanced-2.md header correlates
    with the audit status.  This is an informational consistency check."
   ;; The header states: ✅ 120 / ✅ 0 / ✅ 0 — 120 FRs total. FULLY COMPLETE.
   ;; Audit verified: 120✅ in adv-2 (2026-05-27)

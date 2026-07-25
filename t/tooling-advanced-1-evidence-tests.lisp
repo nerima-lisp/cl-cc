@@ -196,7 +196,7 @@
     ("FR-545" ("packages/compile/src/codegen.lisp" "packages/binary/src/")                         :easy)
     ("FR-546" ("packages/compile/src/regalloc.lisp" "packages/optimize/src/optimizer.lisp")        :hard)))
 
-;; ─── Extracted FR ID lists (from docs/tooling-advanced-1.md) ──────────────────────
+;; ─── Extracted FR ID lists (from docs/notes/tooling-advanced-1.md) ──────────────────────
 
 (defparameter *tooling-advanced-1-all-fr-ids*
   ;; Phase 79
@@ -252,7 +252,7 @@
 
 (deftest tooling-advanced-1-evidence-registry-covers-all-frs
   "Verify that *tooling-advanced-1-fr-table* contains exactly the 136 FR IDs
-   listed in docs/tooling-advanced-1.md and no extras."
+   listed in docs/notes/tooling-advanced-1.md and no extras."
   (let ((table-ids (mapcar #'car *tooling-advanced-1-fr-table*))
         (expected-ids *tooling-advanced-1-all-fr-ids*))
     ;; Every expected FR is present in the table.
