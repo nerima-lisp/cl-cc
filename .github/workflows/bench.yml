@@ -1,0 +1,55 @@
+name: Bench
+
+# Diagnostic, not a gate. Deliberately off the pull_request and push paths so
+# a benchmark result can never decide whether a change merges.
+#
+# This replaces the old benchmark.yml, which ran on every push and pull request
+# and failed the build when any result exceeded 1.10x a baseline in
+# benchmark-baseline/. That directory has never existed in this repository, so
+# every comparison was skipped and the gate reported "No regressions detected"
+# unconditionally — it measured nothing while looking like it measured
+# everything. See PERFORMANCE_STANDARD.md, "回帰の判定基準": wall-clock time is
+# not a CI pass/fail signal, because GitHub's shared runners vary in CPU
+# generation and neighbour load between runs, and there is no self-hosted
+# runner on which a baseline and a measurement could share a machine.
+# Wall-clock regressions are found by A/B measurement on a developer machine
+# and argued in the pull request body. What CI may judge automatically is
+# allocation volume and complexity order, and those belong in the test suite,
+# not here.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # 06:00 UTC every Monday
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Run benchmarks
+        run: nix run .#bench --print-build-logs
+
+      # The results are the whole point of the run: publish them so a human can
+      # compare two scheduled runs, rather than asserting a threshold here.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+          if-no-files-found: warn
