@@ -1,102 +1,112 @@
 ;;;; tests/pbt/vm-pbt-tests.lisp - Property-Based Tests for VM
 ;;;
-;;; This module provides property-based tests for VM operations.
+;;; Property-based tests for VM instruction encoding and execution, expressed
+;;; with cl-weave's NATIVE property API (cl-weave:describe + it-property +
+;;; gen-integer/gen-member/gen-recursive) rather than the home-grown cl-cc/pbt
+;;; defproperty DSL.
+;;;
+;;; IT-PROPERTY decides pass/fail from a *signaled* condition, not from the
+;;; body's return value (see cl-weave's RUN-PROPERTY / PROPERTY-FAILURE-CONDITION),
+;;; so every body below asserts through CL-WEAVE:EXPECT. A bare boolean body
+;;; would report PASS even when the property is false.
 
 (in-package :cl-cc/pbt)
 
+;; Kept so the properties register under CL-CC-PBT-SUITE, and because
+;; cps-pbt-tests.lisp (loaded next) inherits this suite rather than setting
+;; its own.
 (in-suite cl-cc-pbt-suite)
+
+(defun %vm-binop-result (make-instruction a b)
+  "Load A and B into :R0/:R1, run MAKE-INSTRUCTION's opcode over them, return :R2."
+  (let ((state (make-instance 'vm-io-state)))
+    (execute-instruction (make-vm-const :dst :r0 :value a) state 0 (make-hash-table))
+    (execute-instruction (make-vm-const :dst :r1 :value b) state 1 (make-hash-table))
+    (execute-instruction (funcall make-instruction :dst :r2 :lhs :r0 :rhs :r1)
+                         state 2 (make-hash-table))
+    (vm-reg-get state :r2)))
+
+(defun gen-arith-sexp (&key (max-depth 3))
+  "Generator of bounded integer +/-/* s-expressions, fixnum-safe by construction.
+Reimplemented on cl-weave's GEN-RECURSIVE: the base case is a literal in
+[-9,9] and the recursive step is a binary (op lhs rhs) form, which GEN-TUPLE
+already produces as a three-element list. MAX-DEPTH bounds nesting exactly as
+the hand-rolled version's DEPTH argument did, and GEN-RECURSIVE takes the base
+case with the same 1-in-3 probability the original's (zerop (random 3)) did."
+  (cl-weave:gen-recursive
+   (cl-weave:gen-integer :min -9 :max 9)
+   (lambda (self)
+     (cl-weave:gen-tuple (cl-weave:gen-member '(+ - *)) self self))
+   :max-depth max-depth))
 
 ;; ----------------------------------------------------------------------------
 ;; VM Instruction Roundtrip Properties
 ;; ----------------------------------------------------------------------------
 
-(defproperty vm-const-roundtrip
-    (val (gen-integer :min -1000 :max 1000))
-  (let* ((original (make-vm-const :dst :r0 :value val))
-         (sexp (instruction->sexp original))
-         (restored (sexp->instruction sexp)))
-    (and (typep restored 'vm-const)
-         (eq (vm-dst restored) :r0)
-         (= (vm-value restored) val))))
+(cl-weave:describe "VM instruction sexp roundtrip properties"
 
-(defproperty vm-move-roundtrip
-    (dummy (gen-integer :min 0 :max 0))
-  (let* ((ignored-dummy dummy)
-         (original (make-vm-move :dst :r0 :src :r1))
-         (sexp (instruction->sexp original))
-         (restored (sexp->instruction sexp)))
-    (declare (ignore ignored-dummy))
-    (and (typep restored 'vm-move)
-         (eq (vm-dst restored) :r0)
-         (eq (vm-src restored) :r1))))
+  (cl-weave:it-property "vm-const-roundtrip"
+      ((val (cl-weave:gen-integer :min -1000 :max 1000)))
+    (let* ((original (make-vm-const :dst :r0 :value val))
+           (restored (sexp->instruction (instruction->sexp original))))
+      (cl-weave:expect restored :to-be-type-of 'vm-const)
+      (cl-weave:expect (vm-dst restored) :to-be :r0)
+      (cl-weave:expect (vm-value restored) :to-be val)))
 
-(defproperty vm-add-roundtrip
-    (dummy (gen-integer :min 0 :max 0))
-  (let* ((ignored-dummy dummy)
-         (original (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))
-         (sexp (instruction->sexp original))
-         (restored (sexp->instruction sexp)))
-    (declare (ignore ignored-dummy))
-    (and (typep restored 'vm-add)
-         (eq (vm-dst restored) :r0)
-         (eq (vm-lhs restored) :r1)
-         (eq (vm-rhs restored) :r2))))
+  ;; vm-move / vm-add carry no generated operands: the originals bound a
+  ;; throwaway (gen-integer :min 0 :max 0) purely to satisfy defproperty's
+  ;; required binding list. They are example tests, so they use IT.
+  (cl-weave:it "vm-move-roundtrip"
+    (let* ((original (make-vm-move :dst :r0 :src :r1))
+           (restored (sexp->instruction (instruction->sexp original))))
+      (cl-weave:expect restored :to-be-type-of 'vm-move)
+      (cl-weave:expect (vm-dst restored) :to-be :r0)
+      (cl-weave:expect (vm-src restored) :to-be :r1)))
+
+  (cl-weave:it "vm-add-roundtrip"
+    (let* ((original (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))
+           (restored (sexp->instruction (instruction->sexp original))))
+      (cl-weave:expect restored :to-be-type-of 'vm-add)
+      (cl-weave:expect (vm-dst restored) :to-be :r0)
+      (cl-weave:expect (vm-lhs restored) :to-be :r1)
+      (cl-weave:expect (vm-rhs restored) :to-be :r2))))
 
 ;; ----------------------------------------------------------------------------
 ;; VM Execution Properties
 ;; ----------------------------------------------------------------------------
 
-(defproperty vm-const-sets-register
-    (val (gen-integer :min -1000 :max 1000))
-  (let* ((state (make-instance 'vm-io-state))
-         (inst (make-vm-const :dst :r0 :value val)))
-    (execute-instruction inst state 0 (make-hash-table))
-    (= (vm-reg-get state :r0) val)))
+(cl-weave:describe "VM instruction execution properties"
 
-(defproperty vm-move-copies-value
-    (val (gen-integer :min -1000 :max 1000))
-  (let* ((state (make-instance 'vm-io-state))
-         (const-inst (make-vm-const :dst :r0 :value val))
-         (move-inst (make-vm-move :dst :r1 :src :r0)))
-    (execute-instruction const-inst state 0 (make-hash-table))
-    (execute-instruction move-inst state 1 (make-hash-table))
-    (= (vm-reg-get state :r1) val)))
+  (cl-weave:it-property "vm-const-sets-register"
+      ((val (cl-weave:gen-integer :min -1000 :max 1000)))
+    (let ((state (make-instance 'vm-io-state)))
+      (execute-instruction (make-vm-const :dst :r0 :value val)
+                           state 0 (make-hash-table))
+      (cl-weave:expect (vm-reg-get state :r0) :to-be val)))
 
-(defproperty vm-add-computes-sum
-    (a (gen-integer :min -500 :max 500)
-     b (gen-integer :min -500 :max 500))
-  (let* ((state (make-instance 'vm-io-state))
-         (inst-a (make-vm-const :dst :r0 :value a))
-         (inst-b (make-vm-const :dst :r1 :value b))
-         (inst-add (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
-    (execute-instruction inst-a state 0 (make-hash-table))
-    (execute-instruction inst-b state 1 (make-hash-table))
-    (execute-instruction inst-add state 2 (make-hash-table))
-    (= (vm-reg-get state :r2) (+ a b))))
+  (cl-weave:it-property "vm-move-copies-value"
+      ((val (cl-weave:gen-integer :min -1000 :max 1000)))
+    (let ((state (make-instance 'vm-io-state)))
+      (execute-instruction (make-vm-const :dst :r0 :value val)
+                           state 0 (make-hash-table))
+      (execute-instruction (make-vm-move :dst :r1 :src :r0)
+                           state 1 (make-hash-table))
+      (cl-weave:expect (vm-reg-get state :r1) :to-be val)))
 
-(defproperty vm-sub-computes-difference
-    (a (gen-integer :min -500 :max 500)
-     b (gen-integer :min -500 :max 500))
-  (let* ((state (make-instance 'vm-io-state))
-         (inst-a (make-vm-const :dst :r0 :value a))
-         (inst-b (make-vm-const :dst :r1 :value b))
-         (inst-sub (make-vm-sub :dst :r2 :lhs :r0 :rhs :r1)))
-    (execute-instruction inst-a state 0 (make-hash-table))
-    (execute-instruction inst-b state 1 (make-hash-table))
-    (execute-instruction inst-sub state 2 (make-hash-table))
-    (= (vm-reg-get state :r2) (- a b))))
+  (cl-weave:it-property "vm-add-computes-sum"
+      ((a (cl-weave:gen-integer :min -500 :max 500))
+       (b (cl-weave:gen-integer :min -500 :max 500)))
+    (cl-weave:expect (%vm-binop-result #'make-vm-add a b) :to-be (+ a b)))
 
-(defproperty vm-mul-computes-product
-    (a (gen-integer :min -100 :max 100)
-     b (gen-integer :min -100 :max 100))
-  (let* ((state (make-instance 'vm-io-state))
-         (inst-a (make-vm-const :dst :r0 :value a))
-         (inst-b (make-vm-const :dst :r1 :value b))
-         (inst-mul (make-vm-mul :dst :r2 :lhs :r0 :rhs :r1)))
-    (execute-instruction inst-a state 0 (make-hash-table))
-    (execute-instruction inst-b state 1 (make-hash-table))
-    (execute-instruction inst-mul state 2 (make-hash-table))
-    (= (vm-reg-get state :r2) (* a b))))
+  (cl-weave:it-property "vm-sub-computes-difference"
+      ((a (cl-weave:gen-integer :min -500 :max 500))
+       (b (cl-weave:gen-integer :min -500 :max 500)))
+    (cl-weave:expect (%vm-binop-result #'make-vm-sub a b) :to-be (- a b)))
+
+  (cl-weave:it-property "vm-mul-computes-product"
+      ((a (cl-weave:gen-integer :min -100 :max 100))
+       (b (cl-weave:gen-integer :min -100 :max 100)))
+    (cl-weave:expect (%vm-binop-result #'make-vm-mul a b) :to-be (* a b))))
 
 ;; ----------------------------------------------------------------------------
 ;; End-to-End Compile+Run Semantic Equivalence
@@ -111,33 +121,20 @@
 ;; Operand range [-9,9] and depth 3 keep every generated value a fixnum, so
 ;; CL-CC's result must be EQUAL to host CL's own EVAL of the same form: a true
 ;; invariant, not a statistical one (no bignum/overflow divergence to make it
-;; flaky). The `compiler-robustness' fuzz test only checks that random programs
-;; don't crash and terminate; it never checks the value is correct, which is
-;; exactly what these add.
+;; flaky).
 
-(defun %gen-arith-sexp (depth)
-  "Build a random +/-/* expression over integer literals in [-9,9].
-DEPTH bounds nesting; a fresh leaf is emitted at depth 0 or randomly earlier."
-  (if (or (<= depth 0) (zerop (random 3 (%pbt-rng))))
-      (- (random 19 (%pbt-rng)) 9)
-      (list (nth (random 3 (%pbt-rng)) '(+ - *))
-            (%gen-arith-sexp (1- depth))
-            (%gen-arith-sexp (1- depth)))))
+(cl-weave:describe "compile+run semantic equivalence properties"
 
-(defun gen-arith-sexp (&key (max-depth 3))
-  "Generator of bounded integer +/-/* s-expressions, fixnum-safe by construction."
-  (make-generator (lambda () (%gen-arith-sexp max-depth))))
+  (cl-weave:it-property "compile-run-matches-reference-arith"
+      ((expr (gen-arith-sexp :max-depth 3)))
+    ;; Full pipeline result must equal the host reference evaluation.
+    (cl-weave:expect (run-string (write-to-string expr))
+                     :to-equal (eval expr)))
 
-(defproperty compile-run-matches-reference-arith
-    (expr (gen-arith-sexp :max-depth 3))
-  ;; Full pipeline result must equal the host reference evaluation.
-  (equal (run-string (write-to-string expr))
-         (eval expr)))
-
-(defproperty compile-run-add-identity-preserved
-    (expr (gen-arith-sexp :max-depth 2))
-  ;; Metamorphic: the (+ e 0) algebraic identity must survive the whole
-  ;; compile+optimize+run pipeline, exercising algebraic simplification on
-  ;; random subexpressions rather than fixed examples.
-  (equal (run-string (write-to-string (list '+ expr 0)))
-         (run-string (write-to-string expr))))
+  (cl-weave:it-property "compile-run-add-identity-preserved"
+      ((expr (gen-arith-sexp :max-depth 2)))
+    ;; Metamorphic: the (+ e 0) algebraic identity must survive the whole
+    ;; compile+optimize+run pipeline, exercising algebraic simplification on
+    ;; random subexpressions rather than fixed examples.
+    (cl-weave:expect (run-string (write-to-string (list '+ expr 0)))
+                     :to-equal (run-string (write-to-string expr)))))
