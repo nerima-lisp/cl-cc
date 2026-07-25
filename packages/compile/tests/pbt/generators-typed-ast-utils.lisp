@@ -1,4 +1,34 @@
 ;;;; tests/pbt/generators-typed-ast-utils.lisp — Typed AST Utilities and Example Properties
+;;;
+;;; THE LAST CONSUMER OF THE HOME-GROWN PBT FRAMEWORK.
+;;;
+;;; Every other property test in this tree now uses cl-weave's native
+;;; IT-PROPERTY. The nine DEFPROPERTY forms below are what keep framework.lisp,
+;;; framework-dsl.lisp's DEFPROPERTY, generators.lisp, generators-typed-ast.lisp,
+;;; generators-macho.lisp and package-macho.lisp alive. Retiring that slice means
+;;; porting roughly thirty generators, which is a design task rather than a
+;;; mechanical substitution, for three reasons:
+;;;
+;;;   1. cl-weave has no GEN-BIND. These files use dependent generation 16 times.
+;;;      Most are "pick a branch, then generate from it" and collapse to
+;;;      GEN-ONE-OF, but GEN-TYPED-CALL and GEN-TYPED-LET are genuinely
+;;;      dependent — the arguments have to match the type of the lambda that was
+;;;      just generated. Those need restructuring into a GEN-MAP whose function
+;;;      derives the dependent part deterministically.
+;;;
+;;;   2. GEN-TYPE-EXPR and GEN-TYPED-AST-NODE randomize their own
+;;;      terminal-vs-compound shape inside the constructor. DEFPROPERTY
+;;;      re-evaluates the generator expression per iteration so this varies per
+;;;      case; IT-PROPERTY builds its generator list once, so a naive port would
+;;;      freeze the shape for a whole property. They need GEN-RECURSIVE.
+;;;
+;;;   3. generators-macho.lisp is 52 definitions — three defstructs and about
+;;;      forty Mach-O constants — behind only three of the nine properties.
+;;;
+;;; Deliberately deferred rather than rushed. Note also that these nine test the
+;;; *generators*, not cl-cc: cl-cc's real Mach-O emitter is covered separately by
+;;; packages/emit/tests/macho-tests.lisp, which has its own constants in the
+;;; cl-cc/binary package.
 
 (in-package :cl-cc/pbt)
 
