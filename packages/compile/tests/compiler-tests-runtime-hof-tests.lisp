@@ -171,18 +171,23 @@ fell through to the default arm."
 ;;; of fixed cases, comparing RUN-STRING's guest-side result to the equivalent
 ;;; host Lisp computation. Expressed with cl-weave's NATIVE property API
 ;;; (describe + it-property + gen-integer), so cl-weave owns generation,
-;;; shrinking, and the pass/fail verdict; an it-property body is simply a
-;;; boolean-valued property that must hold for every generated case.
+;;; shrinking, and the pass/fail verdict.
+;;;
+;;; The bodies assert through CL-WEAVE:EXPECT. IT-PROPERTY decides pass/fail
+;;; from a *signaled* condition — RUN-PROPERTY wraps the body in
+;;; PROPERTY-FAILURE-CONDITION, which only catches ERROR — and discards the
+;;; body's return value, so a body that merely evaluates to a boolean reports
+;;; PASS even when the property is false.
 
 (cl-weave:describe "compiler arithmetic differential properties"
 
   (cl-weave:it-property "compiling and running (+ a b) matches host Lisp addition"
       ((a (cl-weave:gen-integer :min -100 :max 100))
        (b (cl-weave:gen-integer :min -100 :max 100)))
-    (= (+ a b) (run-string (format nil "(+ ~D ~D)" a b))))
+    (cl-weave:expect (run-string (format nil "(+ ~D ~D)" a b)) :to-be (+ a b)))
 
   (cl-weave:it-property "compiling and running (* a b) matches host Lisp multiplication"
       ((a (cl-weave:gen-integer :min -20 :max 20))
        (b (cl-weave:gen-integer :min -20 :max 20)))
-    (= (* a b) (run-string (format nil "(* ~D ~D)" a b)))))
+    (cl-weave:expect (run-string (format nil "(* ~D ~D)" a b)) :to-be (* a b))))
 
