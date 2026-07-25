@@ -52,6 +52,10 @@ let
       lispPreLoadEvalForms ? [ ],
       lispPostLoadEvalForms ? [ ],
       loadAsdSystems ? [ ],
+      # Lisp source files to `--load`, relative to the project root. Used to
+      # keep a plan in a tracked .lisp file instead of inline Nix strings, so
+      # the same file is runnable with a bare `sbcl --script`.
+      loadFiles ? [ ],
       forceReload ? false,
       disableOutputTranslations ? false,
       loadProjectAsd ? true,
@@ -79,6 +83,7 @@ let
       loadSystemEvals = lib.concatMapStringsSep " " (
         sys: "--eval ${lib.escapeShellArg "(asdf:load-system ${sys}${forceFlag})"}"
       ) loadAsdSystems;
+      loadFileFlags = lib.concatMapStringsSep " " (f: "--load ${lib.escapeShellArg f}") loadFiles;
       disableTranslationsFlag = lib.optionalString disableOutputTranslations "--eval '(asdf:disable-output-translations)'";
       forwardArgsFlag = lib.optionalString forwardArgs ''
         \
@@ -105,7 +110,8 @@ let
           ${disableTranslationsFlag} \
           ${lib.optionalString loadProjectAsd "--load cl-cc.asd"} \
           ${loadSystemEvals} \
-          ${joinEvals lispPostLoadEvalForms}${forwardArgsFlag}
+          ${joinEvals lispPostLoadEvalForms} \
+          ${loadFileFlags}${forwardArgsFlag}
         ${trailingScript}
       '';
     in
@@ -121,9 +127,14 @@ let
     # `test` runs the canonical fast unit plan via `cl-weave:run-all`
     # (packages/testing-framework's DEFTEST/etc. macros register into
     # cl-weave's suite tree; see framework-definitions.lisp).
-    # `nix flake check` invokes this same program through `checks.tests`.
+    # `nix flake check` invokes this same program through `checks.default`.
     # Warm-cache reuse: the FASL cleaner is disabled by default so repeat
     # invocations stay fast. Manual cleanup: `rm -rf ~/.cache/common-lisp/`.
+    #
+    # The plan itself lives in the tracked ./run-tests.lisp rather than in Nix
+    # strings here. That file is the org-standard Lisp-level entry point and
+    # runs on its own with `sbcl --script run-tests.lisp`; keeping a single copy
+    # means the fast (core-image) path and the plain path cannot drift apart.
     test = mkSbclScript {
       name = "test";
       description = "Run the canonical fast unit test plan";
@@ -136,81 +147,19 @@ let
       # Load the pre-compiled core image (save-lisp-and-die snapshot).
       # The core has :cl-cc, :cl-cc-cli, :cl-cc-testing-framework pre-loaded and
       # warm-stdlib-cache pre-initialized, so the heavy ASDF loading is skipped.
-      # :cl-cc-test is NOT in the core (test-file top-level forms must not bake
-      # Nix sandbox paths into globals), so it is loaded fresh after CWD reset.
-      # Cap worker count to 4: ≥8 workers trigger GC safepoint contention on macOS 26 ARM64
-      # (SBCL 2.6.1). Concurrent SBCL compiler calls (from compiler-macro eval) are now
-      # serialised via *macro-eval-fn* mutex, so 4 workers are safe. Users may override
-      # upward via CL_CC_TEST_WORKERS=N nix run .#test.
+      # "cl-cc/test" is NOT in the core (test-file top-level forms must not bake
+      # Nix sandbox paths into globals); run-tests.lisp loads it fresh after the
+      # working-directory reset.
+      # Cap worker count to 4: 8 or more workers trigger GC safepoint contention on
+      # macOS 26 ARM64 (SBCL 2.6.1). Concurrent SBCL compiler calls (from compiler-macro
+      # eval) are now serialised via the *macro-eval-fn* mutex, so 4 workers are safe.
+      # Users may override upward via CL_CC_TEST_WORKERS=N nix run .#test.
       extraSbclFlags = [
         "--core"
         "${testImage}/cl-cc-test.core"
       ];
       extraEnv = ''export CL_CC_TEST_WORKERS="''${CL_CC_TEST_WORKERS:-4}"'';
-      lispPostLoadEvalForms = [
-        # *default-pathname-defaults* and uiop:*temporary-directory* are baked
-        # into the core at build-sandbox time; reset both to real runtime values.
-        # uiop:*temporary-directory* must be set via (uiop:temporary-directory) — NOT nil.
-        # Setting it to nil and then passing it as :defaults to make-pathname hangs SBCL
-        # 2.6.1 on macOS ARM64; (uiop:temporary-directory) reads TMPDIR from the runtime
-        # environment and caches the result in *temporary-directory*.
-        "(setf *default-pathname-defaults* (uiop:getcwd))"
-        "(setf uiop:*temporary-directory* (uiop:temporary-directory))"
-        # Load :cl-cc-test FASLs (pre-compiled via sbclWithTests) after CWD reset
-        # so any top-level path computations in test files see the correct CWD.
-        ''(format t "# loading :cl-cc-test~%")''
-        ''(handler-case (asdf:load-system :cl-cc-test) (error (e) (format *error-output* "~&FATAL: ~A~%" e) (uiop:quit 1)))''
-        # Reset *macro-eval-fn* to a mutex-wrapped #'eval so test bodies run under host CL,
-        # not the cl-cc VM.  pipeline-selfhost.lisp sets it to #'our-eval at
-        # load time; leaving it as our-eval causes sb-ext:with-timeout interrupts
-        # to be swallowed inside the VM loop, hanging test workers indefinitely.
-        # The mutex serialises concurrent SBCL compiler invocations: on macOS 26 ARM64
-        # SBCL 2.6.1, four or more parallel workers calling eval simultaneously
-        # (via compiler-macro expansion in invoke-registered-expander) deadlock on
-        # GC safepoints while the SBCL compiler holds internal locks.  The lock is
-        # captured by the closure; %with-isolated-macro-environment identity-rebinds
-        # *macro-eval-fn* so all threads share the same mutex.
-        ''(let ((lock (sb-thread:make-mutex :name "macro-eval-lock"))) (setf cl-cc/expand:*macro-eval-fn* (lambda (form) (sb-thread:with-mutex (lock) (eval form)))))''
-        # The core image is produced in a Nix build sandbox, so the baked stdlib
-        # disk-cache path may point under /nix/var/nix/builds. Rebase it to the
-        # caller's runtime HOME before the optional warm step.
-        ''(let ((home (uiop:getenv "HOME"))) (when home (setf cl-cc/pipeline::*stdlib-cache-directory* (merge-pathnames #P".cache/cl-cc/" (uiop:ensure-directory-pathname (pathname home))))))''
-        # Pre-warm BOTH stdlib caches in the main thread (single-threaded, safe).
-        # The core bakes *stdlib-expanded-cache-eval-fn* = #'our-eval and a
-        # *stdlib-vm-snapshot* compiled under our-eval.  After the *macro-eval-fn*
-        # reset above, both caches are stale.  Without pre-warming, all 4 parallel
-        # workers simultaneously see cache misses and race to rebuild unprotected
-        # globals (*stdlib-expanded-cache*, *stdlib-vm-snapshot*, etc.).  On macOS
-        # ARM64 SBCL, concurrent large allocations (857-line stdlib) during GC
-        # safepoint windows can deadlock threads waiting on watchdog-lock.
-        # warm-stdlib-cache rebuilds both caches under *macro-eval-fn* = #'eval
-        # so workers see cache HITs and bypass both rebuild paths entirely.
-        ''(format t "# starting fast test plan (unit)~%")''
-        ''
-          (let* ((args (uiop:command-line-arguments))
-                           (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
-                           (warm-stdlib (and (not (member "--no-warm-stdlib" args :test #'string=))
-                                             (not (and warm-env
-                                                       (member (string-downcase warm-env)
-                                                               '("0" "false" "no" "off")
-                                                               :test #'string=))))))
-                      (handler-case
-                          (progn
-                            (if warm-stdlib
-                                (progn
-                                  (format t "# warming stdlib cache~%")
-                                  (cl-cc:warm-stdlib-cache)
-                                  (format t "# stdlib cache ready~%"))
-                                (format t "# stdlib cache warm skipped~%"))
-                            ;; cl-weave is the test engine: registration/execution/
-                            ;; reporting/concurrency all delegate to it now (see
-                            ;; packages/testing-framework/src/framework-definitions.lisp).
-                            (uiop:quit (if (cl-weave:run-all :reporter :spec) 0 1)))
-                        (error (e)
-                          (format t "~&not ok - run-all fatal error: ~A~%" e)
-                          (format *error-output* "~&FATAL: ~A~%" e)
-                          (uiop:quit 1))))''
-      ];
+      loadFiles = [ "run-tests.lisp" ];
     };
 
     coverage = mkSbclScript {
@@ -231,11 +180,11 @@ let
         ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
       ];
       lispPostLoadEvalForms = [
-        ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
-        ''(format t "# reloading :cl-cc-test under sb-cover instrumentation~%")''
+        ''(load (merge-pathnames "cl-cc.asd" *default-pathname-defaults*))''
+        ''(format t "# reloading cl-cc/test under sb-cover instrumentation~%")''
         ''
           (handler-case
-                        (asdf:load-system :cl-cc-test :force t)
+                        (asdf:load-system "cl-cc/test" :force t)
                       (error (e)
                         (format *error-output* "~&FATAL: ~A~%" e)
                         (uiop:quit 1)))''
@@ -308,7 +257,7 @@ let
                         (format *error-output* "~&FATAL: ~A~%" e)
                         (uiop:quit 1)))''
         # :cl-cc-javascript-test depends only on :cl-cc/:cl-cc-testing-framework/
-        # :cl-cc-javascript (NOT the :cl-cc-test aggregate), so cl-weave's global
+        # :cl-cc-javascript (NOT the "cl-cc/test" aggregate), so cl-weave's global
         # suite tree in this process already contains nothing but the JS tests —
         # no extra suite/location scoping is needed.
         ''(format t "# starting coverage test plan (cl-weave + sb-cover, javascript)~%")''
@@ -337,8 +286,12 @@ let
       loadAsdSystems = [ ":cl-cc" ];
     };
 
-    benchmarks = mkSbclScript {
-      name = "benchmarks";
+    # Singular `bench`, per PERFORMANCE_STANDARD.md. Diagnostic only: there is
+    # deliberately no `checks.bench`, because `nix flake check` would then run
+    # benchmarks on every pull request and a shared GitHub runner's wall-clock
+    # variance would turn an unchanged commit red on re-run.
+    bench = mkSbclScript {
+      name = "bench";
       description = "Run all registered benchmarks and write JSON results to benchmark-results/";
       sbclVariant = "tests";
       enableDispatchSemFix = true;
@@ -350,10 +303,10 @@ let
       lispPostLoadEvalForms = [
         "(setf *default-pathname-defaults* (uiop:getcwd))"
         "(setf uiop:*temporary-directory* (uiop:temporary-directory))"
-        ''(load (merge-pathnames "cl-cc-test.asd" *default-pathname-defaults*))''
+        ''(load (merge-pathnames "cl-cc.asd" *default-pathname-defaults*))''
         # No :force — the FASLs ship pre-compiled in sbclWithTests; forcing a
         # recompile writes into the read-only Nix store and fails on CI.
-        "(asdf:load-system :cl-cc-test)"
+        "(asdf:load-system \"cl-cc/test\")"
         ''(format t "# running all benchmarks~%")''
         ''
           (handler-case

@@ -2,13 +2,14 @@
   pkgs,
   lib,
   sbclWithCLCC,
+  version,
 }:
 {
   # Standalone cl-cc binary (./result/bin/cl-cc). Built from packages/ alone —
-  # tests/ and cl-cc-test.asd are NOT bundled so the default build stays lean.
+  # t/ and run-tests.lisp are NOT bundled so the default build stays lean.
   default = pkgs.stdenvNoCC.mkDerivation {
     pname = "cl-cc";
-    version = "0.1.0";
+    inherit version;
     src = lib.fileset.toSource {
       root = ../.;
       fileset = lib.fileset.unions [

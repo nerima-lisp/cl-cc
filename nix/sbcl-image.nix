@@ -1,6 +1,6 @@
 # sbcl-image.nix — Pre-compiled SBCL core image for the test runner.
 #
-# Builds a heap snapshot (via save-lisp-and-die) with :cl-cc-test fully loaded
+# Builds a heap snapshot (via save-lisp-and-die) with cl-cc fully loaded
 # and warm-stdlib-cache pre-initialized in *stdlib-vm-snapshot*.  Loading this
 # core with `sbcl --core cl-cc-test.core` skips ASDF compilation entirely and
 # resumes the saved Lisp state directly, cutting cold-start time from 3-5 min
@@ -24,9 +24,9 @@ let
     root = ../.;
     fileset = lib.fileset.unions [
       (../. + "/packages")
-      (../. + "/tests")
+      (../. + "/t")
+      (../. + "/run-tests.lisp")
       (../. + "/cl-cc.asd")
-      (../. + "/cl-cc-test.asd")
     ];
   };
 
@@ -51,11 +51,11 @@ pkgs.stdenvNoCC.mkDerivation {
     runHook preBuild
     export HOME="$TMPDIR"
     ${dispatchEnv}
-    # Load production systems + testing framework (NOT :cl-cc-test).
-    # Excluding :cl-cc-test keeps test-file top-level forms out of the core;
+    # Load production systems + testing framework (NOT "cl-cc/test").
+    # Excluding "cl-cc/test" keeps test-file top-level forms out of the core;
     # those forms may compute paths relative to *default-pathname-defaults* at
     # load time, and we don't want Nix sandbox paths baked into the image.
-    # :cl-cc-test FASLs (pre-compiled via sbclWithTests) are loaded at runtime
+    # "cl-cc/test" FASLs (pre-compiled via sbclWithTests) are loaded at runtime
     # in apps.nix after *default-pathname-defaults* is reset to the user's CWD.
     ${sbclBin} --dynamic-space-size 8192 \
       --non-interactive \

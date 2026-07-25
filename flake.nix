@@ -1,169 +1,253 @@
 {
-  description = "CL-CC — self-hosting Common Lisp compiler";
+  description = "Self-hosting Common Lisp compiler targeting bytecode, native code, PHP, and JavaScript";
 
   inputs = {
+    # nixos-unstable, not nixpkgs-unstable: it advances only after the NixOS
+    # release tests pass, so it is less likely to land a broken build.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
-    treefmt-nix.url = "github:numtide/treefmt-nix";
-    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-    # cl-prolog and cl-weave back packages/prolog-tools (call-graph analysis
-    # built on the external cl-prolog engine, tested with cl-weave). Pulled
-    # in as plain (non-flake) source trees and built with cl-cc's own
-    # sbcl.buildASDFSystem below, the same way cl-cc builds its own internal
-    # packages — cl-prolog's own flake only declares Linux `systems`, so
-    # depending on its `packages.<system>` output would break this flake's
-    # aarch64-darwin support; evaluating cl-prolog/cl-weave as flakes at all
-    # would also drag in their own transitive inputs (paredit-cli, etc.) for
-    # no benefit, since only their source is needed here.
+
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Every sibling is pinned to an immutable ref — a release tag where one
+    # exists, a commit otherwise. A bare `github:nerima-lisp/cl-weave` follows
+    # that repository's default branch, so an upstream push to main would break
+    # this repository's CI with no change here and no warning.
+    #
+    # All of them are taken as PLAIN SOURCE TREES (`flake = false`) and built
+    # with cl-cc's own `sbcl.buildASDFSystem` below, exactly the way cl-cc
+    # builds its own packages/ subsystems. Two reasons, both still current:
+    # several of these flakes declare Linux-only `systems`, so consuming their
+    # `packages.<system>` output would break aarch64-darwin here; and evaluating
+    # them as flakes would drag in their transitive inputs (paredit-cli and so
+    # on) to obtain nothing but their source.
+    #
+    # PACKAGE_STANDARD.md requires `inputs.nixpkgs.follows` on every input. A
+    # `flake = false` input HAS no inputs, and Nix rejects an override for one,
+    # so the attribute is omitted here. The rule exists to stop each input from
+    # locking its own nixpkgs and inflating flake.lock; taking source trees
+    # achieves that outcome more completely, since no second nixpkgs enters the
+    # lock at all. treefmt-nix, the one real flake input, carries `follows`.
     cl-prolog = {
-      url = "github:nerima-lisp/cl-prolog";
+      url = "github:nerima-lisp/cl-prolog/v1.0.1";
       flake = false;
     };
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave";
+      url = "github:nerima-lisp/cl-weave/v1.0.0";
       flake = false;
     };
-    # Five further nerima-lisp toolkits are adopted the same way (plain source
-    # trees, built with cl-cc's own sbcl.buildASDFSystem): cl-parser-kit backs
-    # packages/parse's tokenizer/combinator/Pratt layer, cl-dataflow backs the
-    # packages/pipeline pass-graph orchestration, cl-boundary-kit provides the
-    # testable I/O boundaries used by packages/cli + packages/repl, cl-cli is
-    # the declarative argument parser behind packages/cli, and cl-tty-kit
-    # provides the ANSI/screen/input primitives for the interactive REPL.
+    # cl-parser-kit backs packages/parse's tokenizer/combinator/Pratt layer,
+    # cl-dataflow backs the packages/pipeline pass-graph orchestration,
+    # cl-boundary-kit provides the testable I/O boundaries used by
+    # packages/cli + packages/repl, cl-cli is the declarative argument parser
+    # behind packages/cli, and cl-tty-kit provides the ANSI/screen/input
+    # primitives for the interactive REPL.
     cl-parser-kit = {
-      url = "github:nerima-lisp/cl-parser-kit";
+      url = "github:nerima-lisp/cl-parser-kit/v1.0.0";
       flake = false;
     };
     cl-dataflow = {
-      url = "github:nerima-lisp/cl-dataflow";
+      url = "github:nerima-lisp/cl-dataflow/v1.0.0";
       flake = false;
     };
     cl-boundary-kit = {
-      url = "github:nerima-lisp/cl-boundary-kit";
+      url = "github:nerima-lisp/cl-boundary-kit/v0.6.0";
       flake = false;
     };
-    # cl-log-kit backs cl-boundary-kit's logging boundary as of 0.5.0 (split
-    # out of cl-boundary-kit itself); pulled in the same way as the other
-    # nerima-lisp toolkits above.
+    # cl-log-kit backs cl-boundary-kit's logging boundary (split out of
+    # cl-boundary-kit itself); pulled in the same way as the toolkits above.
     cl-log-kit = {
-      url = "github:nerima-lisp/cl-log-kit";
+      url = "github:nerima-lisp/cl-log-kit/v1.0.0";
       flake = false;
     };
     cl-cli = {
-      url = "github:nerima-lisp/cl-cli";
+      url = "github:nerima-lisp/cl-cli/v1.0.1";
       flake = false;
     };
     cl-tty-kit = {
-      url = "github:nerima-lisp/cl-tty-kit";
+      url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
-    # monorepo (see docs/repo-split-design.md). Adopted the same way as the
-    # toolkits above: plain source trees, built with cl-cc's own
-    # sbcl.buildASDFSystem and injected into the internal system graph under
-    # their original names, so every `deps = [ "cl-cc-ast" ... ]` resolves to
-    # the external derivation transparently. cl-cc-type depends on cl-cc-ast.
+    # repository. Injected into the internal system graph under their original
+    # names by nix/asdf-systems.nix, so every `deps = [ "cl-cc-ast" ... ]`
+    # resolves to the external derivation. cl-cc-type depends on cl-cc-ast.
+    #
+    # Pinned by commit, not tag: neither repository has cut a release yet.
+    # A commit is a stronger pin than a tag (a tag can be moved), so this
+    # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
+    # once those releases are tagged.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast";
+      url = "github:nerima-lisp/cl-cc-ast/5bb81120a1acf3a0c125dac655549582f3eb137e";
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type";
+      url = "github:nerima-lisp/cl-cc-type/d12c0aae69d1cdcca7bcc138b03db2bdeda13aab";
       flake = false;
     };
   };
 
+  # Plain `outputs` with `forAllSystems`, not flake-parts. The whole flake is
+  # visible in one file this way: `nix flake show` output maps directly onto the
+  # attribute names written below, with no module system deciding what appears.
   outputs =
-    inputs@{ self, flake-parts, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
+    inputs@{
+      self,
+      nixpkgs,
+      treefmt-nix,
+      ...
+    }:
+    let
+      # x86_64-linux is verified by CI; aarch64-darwin is verified by the
+      # development machine on every local `nix flake check`. aarch64-linux and
+      # x86_64-darwin are not declared because nothing runs them (ADR-0078).
+      # `ci.yml` deliberately omits --all-systems: the runner is x86_64-linux
+      # and would fail evaluating the darwin derivations.
       systems = [
-        "aarch64-darwin"
         "x86_64-linux"
+        "aarch64-darwin"
       ];
-      imports = [ inputs.treefmt-nix.flakeModule ];
-      flake.overlays.default = final: _prev: { cl-cc = self.packages.${final.system}.default; };
-      perSystem =
-        { pkgs, ... }:
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+
+      # Single source of truth for a package's version: the `:version` form in
+      # its .asd. Before this, the flake said 0.8.0, cl-cc.asd said 0.1.0 and
+      # the newest tag was v0.1.0 — three answers to one question, and nothing
+      # to say which was right. A release now edits one line.
+      #
+      # Nix regexes are whole-string anchored and `.` never spans newlines, so
+      # the version is extracted line-by-line rather than with a single
+      # multi-line match.
+      asdVersion =
+        asd:
         let
+          lines = nixpkgs.lib.splitString "\n" (builtins.readFile asd);
+          versionLine = builtins.head (
+            builtins.filter (line: builtins.match "[[:space:]]*:version \"[^\"]*\"" line != null) lines
+          );
+        in
+        builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
+
+      version = asdVersion ./cl-cc.asd;
+
+      # The same treatment for every sibling: read the version out of the source
+      # tree actually being built, rather than restating it here where it can
+      # (and did) fall behind the pinned ref.
+      siblingVersion = name: asdVersion "${inputs.${name}}/${name}.asd";
+
+      # treefmt drives `nix fmt` and the `checks.<system>.formatting` gate.
+      # Scope is Nix only. Prettier over *.md/*.yml used to be enabled here; it
+      # is not any more, because a YAML formatter rewrites the GitHub Actions
+      # `on:` key into the boolean `true`, and reformatting Markdown would churn
+      # every page under docs/ for no review value.
+      treefmtEval = forAllSystems (
+        system:
+        treefmt-nix.lib.evalModule nixpkgs.legacyPackages.${system} {
+          projectRootFile = "flake.nix";
+          programs.nixfmt.enable = true;
+          settings.global.excludes = [
+            "flake.lock"
+            "LICENSE*"
+          ];
+        }
+      );
+
+      # Everything system-dependent is assembled once per system here, and the
+      # top-level outputs below only project attributes out of it. Assembling it
+      # separately inside `packages`, `checks`, `apps` and `devShells` would
+      # re-evaluate the entire ASDF system graph four times.
+      perSystem = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
           inherit (pkgs) lib;
+
           dispatchModule = import ./nix/dispatch-sem-fix.nix { inherit pkgs lib; };
           dispatchSemFix = dispatchModule.dispatchSemFix or null;
           sbclModule = import ./nix/sbcl.nix { inherit pkgs; };
           inherit (sbclModule) sbcl sbclBootstrap;
+
+          # Sibling toolkits, built from the pinned source trees. The `version`
+          # of each mirrors the tag or commit its input is pinned to.
           clProlog = sbcl.buildASDFSystem {
             pname = "cl-prolog";
-            version = "0.8.0";
+            version = siblingVersion "cl-prolog";
             src = inputs.cl-prolog;
             systems = [ "cl-prolog" ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
-            version = "1.0.0";
+            version = siblingVersion "cl-weave";
             src = inputs.cl-weave;
             systems = [ "cl-weave" ];
           };
-          # cl-parser-kit is self-contained. cl-boundary-kit pulls the
-          # cl-log-kit toolkit above. cl-dataflow, cl-cli, and cl-tty-kit all
-          # depend on the external cl-prolog engine in production, so
-          # clProlog is threaded into their lispLibs and thereby reaches any
-          # cl-cc package that consumes them transitively.
+          # cl-parser-kit is self-contained. cl-boundary-kit pulls cl-log-kit.
+          # cl-dataflow, cl-cli and cl-tty-kit all depend on the external
+          # cl-prolog engine in production, so clProlog is threaded into their
+          # lispLibs and thereby reaches any cl-cc package consuming them.
           clParserKit = sbcl.buildASDFSystem {
             pname = "cl-parser-kit";
-            version = "0.4.0";
+            version = siblingVersion "cl-parser-kit";
             src = inputs.cl-parser-kit;
             systems = [ "cl-parser-kit" ];
           };
           clDataflow = sbcl.buildASDFSystem {
             pname = "cl-dataflow";
-            version = "0.4.0";
+            version = siblingVersion "cl-dataflow";
             src = inputs.cl-dataflow;
             systems = [ "cl-dataflow" ];
             lispLibs = [ clProlog ];
           };
           clLogKit = sbcl.buildASDFSystem {
             pname = "cl-log-kit";
-            version = "1.6.0";
+            version = siblingVersion "cl-log-kit";
             src = inputs.cl-log-kit;
             systems = [ "cl-log-kit" ];
           };
           clBoundaryKit = sbcl.buildASDFSystem {
             pname = "cl-boundary-kit";
-            version = "0.5.0";
+            version = siblingVersion "cl-boundary-kit";
             src = inputs.cl-boundary-kit;
             systems = [ "cl-boundary-kit" ];
             lispLibs = [ clLogKit ];
           };
           clCli = sbcl.buildASDFSystem {
             pname = "cl-cli";
-            version = "0.3.0";
+            version = siblingVersion "cl-cli";
             src = inputs.cl-cli;
             systems = [ "cl-cli" ];
             lispLibs = [ clProlog ];
           };
           clTtyKit = sbcl.buildASDFSystem {
             pname = "cl-tty-kit";
-            version = "0.6.0";
+            version = siblingVersion "cl-tty-kit";
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
             lispLibs = [ clProlog ];
           };
-          # First subsystems split out of the monorepo. clCcAst is a
-          # dependency-free leaf; clCcType depends on it. Injected into the
-          # internal system graph by name in nix/asdf-systems.nix.
+          # Subsystems split out of this repository. clCcAst is a
+          # dependency-free leaf; clCcType depends on it.
+          #
+          # WARNING: packages/ast/ and packages/type/ in THIS repository still
+          # define ASDF systems under these same names, and the two definitions
+          # have diverged. Which one ASDF sees depends on registry order. See
+          # the warning banner at the top of packages/ast/cl-cc-ast.asd for the
+          # measured divergence; the ambiguity is documented, not resolved.
           clCcAst = sbcl.buildASDFSystem {
             pname = "cl-cc-ast";
-            version = "0.1.0";
+            version = siblingVersion "cl-cc-ast";
             src = inputs.cl-cc-ast;
             systems = [ "cl-cc-ast" ];
           };
           clCcType = sbcl.buildASDFSystem {
             pname = "cl-cc-type";
-            version = "0.1.0";
+            version = siblingVersion "cl-cc-type";
             src = inputs.cl-cc-type;
             systems = [ "cl-cc-type" ];
             lispLibs = [ clCcAst ];
           };
+
           asdf = import ./nix/asdf-systems.nix {
             inherit
               pkgs
@@ -189,7 +273,15 @@
             cl-cc-prolog-tools
             cl-cc-prolog-tools-test
             ;
-          binaryModule = import ./nix/binary.nix { inherit pkgs lib sbclWithCLCC; };
+
+          binaryModule = import ./nix/binary.nix {
+            inherit
+              pkgs
+              lib
+              sbclWithCLCC
+              version
+              ;
+          };
           testImage = import ./nix/sbcl-image.nix {
             inherit
               pkgs
@@ -210,16 +302,45 @@
               testImage
               ;
           };
+
+          # Rendered documentation site (Material for MkDocs). Builds fully
+          # offline: Material bundles its assets, so the Nix sandbox needs no
+          # network. --strict promotes a broken link or a page missing from the
+          # nav into a build failure.
+          docs = pkgs.stdenvNoCC.mkDerivation {
+            pname = "cl-cc-docs";
+            inherit version;
+            src = lib.fileset.toSource {
+              root = ./docs;
+              fileset = lib.fileset.unions [
+                ./docs/mkdocs.yml
+                ./docs/src
+              ];
+            };
+            nativeBuildInputs = [ pkgs.python3Packages.mkdocs-material ];
+            buildPhase = ''
+              runHook preBuild
+              mkdocs build --strict --config-file mkdocs.yml --site-dir "$out"
+              runHook postBuild
+            '';
+            dontInstall = true;
+            meta = {
+              description = "Rendered MkDocs (Material) documentation for cl-cc";
+              homepage = "https://github.com/nerima-lisp/cl-cc";
+              license = lib.licenses.mit;
+            };
+          };
+
           checksModule = import ./nix/checks.nix {
             inherit
               pkgs
               lib
+              version
               sbclWithTests
               clProlog
               clWeave
               ;
             inherit (appsModule) apps;
-            packagesDefault = binaryModule.default;
           };
           devshellModule = import ./nix/devshell.nix { inherit pkgs lib sbclWithCLCC; };
         in
@@ -229,12 +350,54 @@
             // testAsdfSystems
             // {
               inherit (binaryModule) default;
-              inherit cl-cc-prolog-tools cl-cc-prolog-tools-test;
+              inherit cl-cc-prolog-tools cl-cc-prolog-tools-test docs;
               test-image = testImage;
             };
           inherit (appsModule) apps;
-          inherit (checksModule) checks;
-          inherit (devshellModule) devShells treefmt;
-        };
+          inherit (checksModule) testSuite prologToolsTests;
+          inherit (devshellModule) devShells;
+        }
+      );
+    in
+    {
+      packages = forAllSystems (system: perSystem.${system}.packages);
+
+      # Granularity lives HERE, not in extra GitHub Actions jobs: `nix flake
+      # check` evaluates each attribute below as its own derivation, in
+      # parallel, with build caching. Want the test suite, the formatter and the
+      # docs reported separately? That is what these three names are for. Adding
+      # a second job to ci.yml instead would re-implement the same scheduling
+      # and lose cache sharing between the pieces.
+      checks = forAllSystems (system: {
+        # The SBCL test suite, run through ./run-tests.lisp.
+        default = perSystem.${system}.testSuite;
+
+        # Fails `nix flake check` when any tracked Nix file is unformatted,
+        # which is what makes the formatter a gate rather than a suggestion.
+        formatting = treefmtEval.${system}.config.build.check self;
+
+        # `packages.docs` runs `mkdocs build --strict`, so a broken link or a
+        # page missing from the nav fails right here. Without this the docs are
+        # only ever built by docs.yml, which runs after the merge to main —
+        # a break would surface as a failed deploy rather than a failed pull
+        # request.
+        docs = perSystem.${system}.packages.docs;
+
+        # The standalone binary has to keep linking, not just the library.
+        build = perSystem.${system}.packages.default;
+
+        # packages/prolog-tools has its own cl-weave suite, driven by
+        # `asdf:test-system` rather than by cl-cc's runner.
+        cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
+      });
+
+      apps = forAllSystems (system: perSystem.${system}.apps);
+
+      devShells = forAllSystems (system: perSystem.${system}.devShells);
+
+      # `nix fmt` entry point.
+      formatter = forAllSystems (system: treefmtEval.${system}.config.build.wrapper);
+
+      overlays.default = final: _prev: { cl-cc = self.packages.${final.system}.default; };
     };
 }

@@ -264,11 +264,19 @@ let
   # cl-cc-cli depends on :cl-cc. cl-cc-testing-framework also depends on :cl-cc.
   derivedSpec = {
     cl-cc = {
+      # t/ and run-tests.lisp are shipped even though `systems = [ "cl-cc" ]`
+      # never compiles them. cl-cc.asd defines "cl-cc/test" as well as "cl-cc",
+      # and this derivation's $out puts that file on the source registry. If the
+      # tree it sits in lacks t/, anything that resolves "cl-cc/test" through
+      # THIS copy fails on a missing component instead of falling through to the
+      # test derivation. Shipping the sources costs a few hundred kilobytes and
+      # makes both copies of cl-cc.asd interchangeable.
       src = [
         (projectRoot + "/packages")
         (projectRoot + "/src")
+        (projectRoot + "/t")
+        (projectRoot + "/run-tests.lisp")
         (projectRoot + "/cl-cc.asd")
-        (projectRoot + "/cl-cc-test.asd")
       ];
       # leafNames no longer includes the externalised ast/type; add them
       # explicitly so the umbrella closure still pulls both external systems.
@@ -377,22 +385,49 @@ let
   # Test systems live in a separate attrset so Nix consumers can opt into
   # the heavier test FASLs only when needed. lispLibs flow from
   # productionAsdfSystems, never recursively from testAsdfSystems.
+  # cl-cc.asd carries the "cl-cc/test" and "cl-cc/test/e2e" secondary systems
+  # as well as "cl-cc" itself, so there is no second .asd to ship here.
   testSrc = [
     (projectRoot + "/packages")
-    (projectRoot + "/tests")
+    (projectRoot + "/t")
     (projectRoot + "/src")
+    (projectRoot + "/run-tests.lisp")
     (projectRoot + "/cl-cc.asd")
-    (projectRoot + "/cl-cc-test.asd")
   ];
 
   # Keep self-hosting E2E tests available as an explicit system; the canonical
   # fast test app does not auto-load it.
   testAsdfSystems = {
-    "cl-cc-test" = sbcl.buildASDFSystem {
+    "cl-cc/test" = sbcl.buildASDFSystem {
+      # pname stays hyphenated: it becomes a store path component, which cannot
+      # contain a slash. Only `systems` names the ASDF system.
       pname = "cl-cc-test";
       version = "0.1.0";
       src = pkgSrc testSrc;
-      systems = [ "cl-cc-test" ];
+      systems = [ "cl-cc/test" ];
+
+      # nix-cl's stock buildPhase appends `$src//` to the END of
+      # CL_SOURCE_REGISTRY, so the lispLibs win every name lookup. That was
+      # correct while the test system lived in its own cl-cc-test.asd. It is not
+      # any more: "cl-cc/test" is a SECONDARY system of "cl-cc", so ASDF looks
+      # for it in cl-cc.asd — and finds the read-only copy inside the cl-cc
+      # lispLib first. Its output translations map ${storeDir} to itself, so the
+      # build then dies with "Permission denied" writing a .fasl into that store
+      # path. Putting $src first makes every cl-cc-family system resolve out of
+      # this derivation's own tree, where the translations point at a writable
+      # build directory.
+      preBuild = ''
+        export CL_SOURCE_REGISTRY="$src//''${CL_SOURCE_REGISTRY:+:$CL_SOURCE_REGISTRY}"
+      '';
+
+      # nix-cl's installPhase deletes every .asd whose basename is not in
+      # `systems`. "cl-cc/test" has no cl-cc/test.asd to match, so the rule
+      # removes cl-cc.asd and leaves an output that defines nothing. Put the
+      # .asd files back.
+      postInstall = ''
+        find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
+      '';
+
       lispLibs = with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
@@ -415,11 +450,11 @@ let
         cl-cc-javascript
       ];
     };
-    "cl-cc-test/e2e" = sbcl.buildASDFSystem {
+    "cl-cc/test/e2e" = sbcl.buildASDFSystem {
       pname = "cl-cc-test-e2e";
       version = "0.1.0";
       src = pkgSrc testSrc;
-      systems = [ "cl-cc-test/e2e" ];
+      systems = [ "cl-cc/test/e2e" ];
       lispLibs = with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
@@ -433,8 +468,13 @@ in
   inherit productionAsdfSystems testAsdfSystems;
   inherit cl-cc-prolog-tools cl-cc-prolog-tools-test;
   sbclWithCLCC = sbcl.withPackages (_: lib.attrValues productionAsdfSystems);
+  # The test derivation goes FIRST: both it and productionAsdfSystems.cl-cc ship
+  # a cl-cc.asd, and only the test one has pre-built FASLs for the test
+  # components. ASDF takes the first match on the registry, so ordering here is
+  # the difference between loading those FASLs and recompiling the whole suite
+  # on every run.
   sbclWithTests = sbcl.withPackages (
-    _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-test" ]
+    _: [ testAsdfSystems."cl-cc/test" ] ++ (lib.attrValues productionAsdfSystems)
   );
   sbclWithJavascriptTests = sbcl.withPackages (
     _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-javascript-test" ]
