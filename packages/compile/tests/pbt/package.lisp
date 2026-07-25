@@ -61,11 +61,10 @@
               :unify
               :logic-substitute :logic-var-p)
   (:export
-   #:defproperty #:defgenerator #:for-all #:check
+   #:defproperty
    #:*test-count* #:*max-list-length* #:*max-string-length* #:*max-type-depth* #:*size* #:*pbt-rng-override*
    #:gen-integer #:gen-boolean #:gen-symbol #:gen-list #:gen-string #:gen-float #:gen-character #:gen-cons #:gen-vector
    #:gen-one-of #:gen-tuple #:gen-list-of #:gen-alist #:gen-map #:gen-bind #:gen-fmap #:gen-such-that #:gen-resize #:gen-scale
-   #:run-property-tests #:report-failure
    #:generator #:generate #:gen-fn #:shrink-value #:make-generator
    #:gen-primitive-type #:gen-type-variable #:gen-simple-compound-type #:gen-values-type #:gen-fn-type-args #:gen-fn-type #:gen-array-type #:gen-cons-type #:gen-type-expr
    #:typed-ast #:make-typed-ast-raw #:typed-ast-node-type #:typed-ast-source-node

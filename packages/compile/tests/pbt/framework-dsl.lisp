@@ -1,7 +1,15 @@
-;;;; tests/pbt/framework-dsl.lisp — PBT property macros, utilities, suite, and examples
+;;;; tests/pbt/framework-dsl.lisp — PBT property macro and suite definition
+;;;
+;;; What survives of the home-grown property DSL. cl-weave's native
+;;; IT-PROPERTY has replaced it everywhere except generators-typed-ast-utils.lisp,
+;;; whose 9 properties still drive the type-expression, typed-AST and Mach-O
+;;; generators in generators.lisp / generators-typed-ast.lisp /
+;;; generators-macho.lisp. DEFPROPERTY is kept solely for those; do not add new
+;;; uses — write CL-WEAVE:IT-PROPERTY instead.
+
 (in-package :cl-cc/pbt)
 
-;;; Property Definition Macros
+;;; Property Definition Macro
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun extract-generators (args)
@@ -20,12 +28,7 @@
   (defun generate-binding-forms (gen-bindings)
     "Generate LET binding forms from generator bindings."
     (loop for (var gen) in gen-bindings
-          collect (list var `(generate ,gen))))
-
-  (defun format-args (args)
-    "Format argument list for display in error messages."
-    (loop for (var gen) in (extract-generators args)
-          collect (list var (string-downcase (symbol-name (type-of gen)))))))
+          collect (list var `(generate ,gen)))))
 
 (defmacro defproperty (name args &body body)
   "Define a property-based test with automatic test generation.
@@ -33,6 +36,12 @@
    NAME is the test name (symbol).
    ARGS is a list of (variable generator) pairs.
    BODY is the property to test.
+
+   Note: the generator expression is re-evaluated on every iteration, so a
+   generator constructor that randomizes its own shape (as GEN-TYPE-EXPR does)
+   varies per case here. CL-WEAVE:IT-PROPERTY builds its generator list once,
+   which is why porting such a generator needs GEN-RECURSIVE rather than a
+   mechanical substitution.
 
    Example:
      (defproperty addition-commutativity (a (gen-integer) b (gen-integer))
@@ -67,135 +76,11 @@
                  (%fail-test (format nil "Property ~S raised error ~A on iteration ~D with args ~S"
                                      ',name error iteration args))))))))))
 
-(defmacro for-all (args &body body)
-  "Run property tests inline without defining a named test.
-
-   ARGS is a list of (variable generator) pairs.
-   BODY is the property to test.
-
-   Returns T if all tests pass. On failure, fails the enclosing test immediately.
-
-   Example:
-     (for-all (a (gen-integer) b (gen-integer))
-       (= (+ a b) (+ b a)))"
-  (let ((gen-bindings (extract-generators args))
-        (test-count-var (gensym "COUNT"))
-        (iteration-var (gensym "I"))
-        (success-var (gensym "SUCCESS"))
-        (args-var (gensym "ARGS")))
-    `(let ((,test-count-var *test-count*)
-           (,success-var t)
-           (,args-var nil))
-       (loop for ,iteration-var from 1 to ,test-count-var
-             do (let* ,(generate-binding-forms gen-bindings)
-                  (setf ,args-var (list ,@(mapcar #'car gen-bindings)))
-                  (handler-case
-                      (unless (progn ,@body)
-                        (%fail-test (format nil "Property failed on iteration ~D with args ~S"
-                                            ,iteration-var ,args-var)))
-                    (error (e)
-                      (%fail-test (format nil "Property raised error ~A on iteration ~D with args ~S"
-                                          e ,iteration-var ,args-var))))))
-       ,success-var)))
-
-(defun check (property-fn &key (count *test-count*) (seed nil))
-  "Run a property function COUNT times with optional SEED for reproducibility.
-
-   PROPERTY-FN is a function of no arguments that returns T or NIL.
-   COUNT is the number of test cases to run.
-   SEED is an optional random seed for reproducibility."
-  (let* ((*random-state* (if seed
-                             (make-random-state t)
-                             (make-random-state t)))
-         (*test-count* count)
-         (failures nil))
-    (when seed
-      (setf *random-state* (sb-ext:seed-random-state seed)))
-    (loop for i from 1 to count
-          do (handler-case
-                 (unless (funcall property-fn)
-                   (push i failures))
-               (error (e)
-                 (declare (ignore e))
-                 (push i failures))))
-    (if failures
-        (values nil (nreverse failures))
-        (values t nil))))
-
-;;; Custom Generator Definition
-
-(defmacro defgenerator (name args &body body)
-  "Define a custom generator function.
-
-   NAME is the generator name (will be available as gen-NAME).
-   ARGS are the generator arguments.
-   BODY should return a generator object.
-
-   Example:
-     (defgenerator point ()
-       (gen-tuple (gen-integer) (gen-integer)))"
-  (let ((generator-name (intern (format nil "GEN-~A" (symbol-name name)))))
-    `(defun ,generator-name ,args
-       ,@body)))
-
-;;; Test Utilities
-
-(defun run-property-tests ()
-  "Run all property-based tests."
-  (cl-weave:run 'cl-cc-pbt-suite :reporter :spec))
-
-(defun report-failure (test-name iteration args &optional (error nil))
-  "Report a property test failure in a standardized format."
-  (format t "~&~%=== Property Test Failure ===~%")
-  (format t "Test: ~S~%" test-name)
-  (format t "Iteration: ~D~%" iteration)
-  (format t "Arguments: ~S~%" args)
-  (when error
-    (format t "Error: ~A~%" error))
-  (format t "----------------------------~%~%")
-  nil)
-
 ;;; Test Suite Definition
+;;;
+;;; Lives here because MACRO-PBT-SUITE (macro-pbt-tests.lisp) declares this as
+;;; its :parent and this file is loaded first.
 
 (defsuite cl-cc-pbt-suite
   :description "Property-Based Testing suite for CL-CC"
   :parent cl-cc-integration-suite)
-
-;;; Example Properties
-
-(in-suite cl-cc-pbt-suite)
-
-(defproperty integer-addition-commutativity
-    (a (gen-integer :min -1000 :max 1000)
-       b (gen-integer :min -1000 :max 1000))
-  (= (+ a b) (+ b a)))
-
-(defproperty integer-multiplication-commutativity
-    (a (gen-integer :min -100 :max 100)
-       b (gen-integer :min -100 :max 100))
-  (= (* a b) (* b a)))
-
-(defproperty list-length-positive
-    (lst (gen-list :element-gen (gen-integer)
-                   :min-length 0 :max-length 100))
-  (>= (length lst) 0))
-
-(defproperty string-length-positive
-    (s (gen-string :min-length 0 :max-length 100))
-  (>= (length s) 0))
-
-(defproperty reverse-involution
-    (lst (gen-list :element-gen (gen-integer)
-                   :min-length 0 :max-length 20))
-  (equal lst (reverse (reverse lst))))
-
-(defproperty append-associativity
-    (a (gen-list :element-gen (gen-integer) :max-length 10)
-       b (gen-list :element-gen (gen-integer) :max-length 10)
-       c (gen-list :element-gen (gen-integer) :max-length 10))
-  (equal (append (append a b) c)
-         (append a (append b c))))
-
-;; defproperty-error-path-fails-test dropped: it asserted on the removed
-;; homegrown runner's internal %run-single-test :status/:detail plist shape
-;; directly, which has no cl-weave equivalent to preserve.
