@@ -386,8 +386,16 @@ VM primitives that need protocol hooks without introducing new instructions."
                                            (append (list class-ht) initarg-values))
                      (%vm-raw-allocate-instance class-ht initarg-regs state))))
     (when initialize-gf
+      ;; Dispatch on the instance alone. Method lookup keys on the class of every
+      ;; argument, so appending the initargs made the key (class-of obj) plus one
+      ;; class per initarg — and an INITIALIZE-INSTANCE method, which by ANSI
+      ;; specialises only its first parameter, was registered under a one-element
+      ;; key. It could therefore never be found once any initarg was supplied:
+      ;; (make-instance 'c) ran the method and (make-instance 'c :x 1) did not.
+      ;; The initargs have already been applied to the slots by
+      ;; %VM-RAW-ALLOCATE-INSTANCE, so nothing needs them here.
       (%vm-call-generic-sync initialize-gf state
-                             (append (list obj-ht) initarg-values)
+                             (list obj-ht)
                              :default (lambda () obj-ht)))
     obj-ht))
 
@@ -555,7 +563,14 @@ VM primitives that need protocol hooks without introducing new instructions."
 (defmethod execute-instruction ((inst vm-make-obj) state pc labels)
   (declare (ignore labels))
   (let* ((class-ht (vm-reg-get state (vm-class-reg inst)))
-         (obj-ht (if (%vm-class-nonstandard-metaclass-p class-ht state)
+         ;; The initialization protocol also has to run for a *standard* class
+         ;; once the program defines INITIALIZE-INSTANCE methods: ANSI calls
+         ;; INITIALIZE-INSTANCE on every new instance, not only on those of a
+         ;; custom metaclass. Gating on the generic function's existence — one
+         ;; GETHASH — keeps the raw fast path for the overwhelmingly common case
+         ;; of a program that defines none.
+         (obj-ht (if (or (%vm-class-nonstandard-metaclass-p class-ht state)
+                         (%vm-global-generic-function state 'initialize-instance))
                      (%vm-call-allocation-protocol class-ht (vm-initarg-regs inst) state)
                      (%vm-raw-allocate-instance class-ht (vm-initarg-regs inst) state))))
     (vm-reg-set state (vm-dst inst) obj-ht)
