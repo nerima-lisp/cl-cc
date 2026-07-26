@@ -233,12 +233,28 @@ captured lambdas/local forms."
               body-forms name (length (ast-lambda-params expr))))
          expr)))
 
+(defun %ast-make-instance-custom-metaclass-p (expr ctx)
+  "Return T when EXPR constructs a class DEFCLASSed with an explicit :METACLASS."
+  (let* ((class-ast (%ast-transparent-designator-node (ast-make-instance-class expr)))
+         (class-name (cond
+                       ((typep class-ast 'ast-quote) (ast-quote-value class-ast))
+                       ((symbolp class-ast) class-ast))))
+    (and class-name
+         (nth-value 1 (gethash class-name (ctx-custom-metaclass-classes ctx)))
+         t)))
+
 (defun %let-noescape-instance-slots (name expr mutated captured body-forms ctx)
   "Return compiled slot alist when the binding can skip heap allocation, else NIL."
   (setf expr (%ast-transparent-designator-node expr))
   (if (and (typep expr 'ast-make-instance)
            (not (%member-eq-p name mutated))
-           (not (%member-eq-p name captured)))
+           (not (%member-eq-p name captured))
+           ;; Scalarizing replaces VM-MAKE-OBJ and VM-SLOT-READ with plain
+           ;; register moves, so the MOP hooks those instructions dispatch —
+           ;; INITIALIZE-INSTANCE and SLOT-VALUE-USING-CLASS — never run. For a
+           ;; standard metaclass there are no such hooks and the rewrite is
+           ;; sound; for a custom one it drops observable side effects.
+           (not (%ast-make-instance-custom-metaclass-p expr ctx)))
       (let ((slot-names (loop for entry in (ast-make-instance-initargs expr)
                               collect (symbol-name (car entry)))))
         (when (%instance-binding-static-slot-only-p body-forms name slot-names)

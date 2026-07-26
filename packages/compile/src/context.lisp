@@ -28,6 +28,15 @@
                       :documentation "Function-local alist mapping cached global variable names to temporary registers.")
    (global-classes :initform (make-hash-table :test #'eq) :accessor ctx-global-classes
                    :documentation "Hash table mapping class names to their class descriptor registers")
+   (custom-metaclass-classes :initform (make-hash-table :test #'eq)
+                             :accessor ctx-custom-metaclass-classes
+                             :documentation
+                             "Names of classes DEFCLASSed with an explicit :METACLASS.
+
+Instances of these must not be scalarized into registers: a custom metaclass can
+carry SLOT-VALUE-USING-CLASS and INITIALIZE-INSTANCE methods whose side effects
+the scalarized form would elide, since it emits no VM-MAKE-OBJ and no
+VM-SLOT-READ for the protocol hooks to run from.")
     (global-generics :initform (make-hash-table :test #'eq) :accessor ctx-global-generics
                      :documentation "Hash table mapping generic function names to their GF registers")
     (global-generic-params :initform (make-hash-table :test #'eq) :accessor ctx-global-generic-params

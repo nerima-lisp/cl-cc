@@ -186,6 +186,39 @@
              (run-string "(defgeneric describe-combo (x))
                            (generic-function-method-combination #'describe-combo)")))
 
+(defun %clos-vm-instruction-types (source)
+  "Return the VM instruction type names SOURCE compiles to.
+
+Compiles for :VM explicitly rather than going through ASSERT-COMPILES-TO, which
+uses the default :X86_64 target — its assembly backend raises on instructions it
+has no emitter for, and the helper's IGNORE-ERRORS then reports every instruction
+as absent."
+  (mapcar #'type-of
+          (cl-cc/vm::vm-program-instructions
+           (cl-cc/compile:compilation-result-program
+            (cl-cc/compile:compile-string source :target :vm)))))
+
+(deftest clos-custom-metaclass-instance-is-not-scalarized
+  "An instance of a class with a custom metaclass keeps its allocation and slot reads.
+
+A non-escaping LET-bound instance is normally scalarized into registers, which
+replaces VM-MAKE-OBJ and VM-SLOT-READ with plain moves. That is sound for a
+standard metaclass — there are no protocol hooks to run — but a custom metaclass
+can carry INITIALIZE-INSTANCE and SLOT-VALUE-USING-CLASS methods, and those
+instructions are what dispatch them. Scalarizing dropped their side effects."
+  (let ((types (%clos-vm-instruction-types
+                "(defclass scalarize-meta () ())
+                 (defclass scalarize-obj () ((x :initarg :x))
+                   (:metaclass scalarize-meta))
+                 (let ((o (make-instance 'scalarize-obj :x 1))) (slot-value o 'x))")))
+    (assert-true (member 'cl-cc/vm:vm-make-obj types :test #'eq))
+    (assert-true (member 'cl-cc/vm:vm-slot-read types :test #'eq)))
+  ;; A standard metaclass still gets scalarized: no hooks can observe the reads.
+  (let ((types (%clos-vm-instruction-types
+                "(defclass scalarize-plain () ((x :initarg :x)))
+                 (let ((o (make-instance 'scalarize-plain :x 1))) (slot-value o 'x))")))
+    (assert-false (member 'cl-cc/vm:vm-slot-read types :test #'eq))))
+
 (deftest-each clos-custom-metaclass-overrides
   "Custom metaclasses affect class-of, slot-value-using-class, and make-instance initialization hooks."
   :cases

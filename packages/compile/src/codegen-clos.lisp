@@ -75,6 +75,10 @@
             (loop for entry in (ast-defclass-default-initargs node)
                   collect (cons (car entry) (compile-ast (cdr entry) ctx))))
       (when (ast-defclass-metaclass node)
+        ;; Remember the class so %LET-NOESCAPE-INSTANCE-SLOTS will not scalarize
+        ;; its instances: a custom metaclass may carry protocol methods whose
+        ;; effects a register-only instance would silently drop.
+        (setf (gethash name (ctx-custom-metaclass-classes ctx)) t)
         (setq metaclass-reg (compile-ast (ast-defclass-metaclass node) ctx)))
       (emit ctx (make-vm-class-def
                  :dst dst
