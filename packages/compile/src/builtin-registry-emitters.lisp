@@ -22,6 +22,29 @@
     (emit ctx (funcall (be-ctor entry) :dst result-reg :src arg-reg))
     result-reg))
 
+(defun emit-builtin-unary-predicate (entry args result-reg ctx)
+  "Unary emitter for type predicates, converting the VM's 1/0 into T/NIL.
+
+The instructions behind these predicates answer the VM's internal boolean, and
+that value leaks all the way out to user code: (consp 1) evaluated to 0 through
+a register. 0 is false to IF, AND and VM-FALSEP, so most uses looked right --
+but NOT and NULL follow ANSI and read numeric zero as *true*, so the ordinary
+Common Lisp idiom inverted. (tree-equal '(1 2) '(1 2)) returned NIL for exactly
+that reason: its leaf test is (and (not (consp y)) ...).
+
+Constant folding hid the split. The optimizer folds these instructions with the
+host's own predicate, so (consp 1) at top level answered NIL while the identical
+call inside a function answered 0.
+
+Only predicates ANSI defines as returning T or NIL belong here. DIGIT-CHAR-P
+returns a weight and STRING-LESSP a mismatch index; their non-NIL value is data,
+and forcing it to T would lose it."
+  (let ((arg-reg (compile-ast (first args) ctx))
+        (predicate-reg (make-register ctx)))
+    (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
+    (%emit-vm-branch-boolean-as-cl-boolean ctx predicate-reg result-reg
+                                           (string-downcase (be-name-str entry)))))
+
 (defun emit-builtin-binary (entry args result-reg ctx)
   (let* ((lhs-reg (compile-ast (first args) ctx))
          (rhs-reg (%compile-operand-protecting (second args) ctx (list lhs-reg))))

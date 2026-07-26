@@ -20,17 +20,7 @@
     (nstring-downcase . make-vm-nstring-downcase)
     (nstring-capitalize . make-vm-nstring-capitalize)
     ;; Type predicates
-     (symbolp          . make-vm-symbol-p)
-     (numberp          . make-vm-number-p)
-     (integerp         . make-vm-integer-p)
-     (bignump          . make-vm-bignump)
-     (floatp           . make-vm-floatp)
-     (rationalp        . make-vm-rationalp)
-     (realp            . make-vm-realp)
-     (complexp         . make-vm-complexp)
-     (consp            . make-vm-cons-p)
     (null             . make-vm-null-p)
-    (functionp        . make-vm-function-p)
     ;; List operations
     (car              . make-vm-car)
     (cdr              . make-vm-cdr)
@@ -52,15 +42,12 @@
     (nreverse         . make-vm-nreverse)
     (butlast          . make-vm-butlast)
     (nbutlast         . make-vm-nbutlast)
-    (endp             . make-vm-endp)
     ;; FR-597: higher-order function combinators
     (identity         . make-vm-identity)
     (constantly       . make-vm-constantly)
     (complement       . make-vm-complement)
     ;; Arithmetic
     (abs              . make-vm-abs)
-    (evenp            . make-vm-evenp)
-    (oddp             . make-vm-oddp)
     ;; Bitwise
     (bswap            . make-vm-bswap)
     (lognot           . make-vm-lognot)
@@ -91,8 +78,6 @@
     (decode-float     . make-vm-decode-float)
     (integer-decode-float . make-vm-integer-decode-float)
     ;; Binding predicates
-    (boundp           . make-vm-boundp)
-    (fboundp          . make-vm-fboundp)
     (makunbound       . make-vm-makunbound)
     (fdefinition      . make-vm-fdefinition)
     (symbol-function  . make-vm-fdefinition)
@@ -109,31 +94,19 @@
     (conjugate        . make-vm-conjugate)
     (phase            . make-vm-phase)
     ;; Hash table
-    (hash-table-p     . make-vm-hash-table-p)
     ;; Stream predicates
-    (streamp           . make-vm-streamp)
-    (input-stream-p    . make-vm-input-stream-p)
-    (output-stream-p   . make-vm-output-stream-p)
-    (open-stream-p     . make-vm-open-stream-p)
-    (interactive-stream-p . make-vm-interactive-stream-p)
     (stream-element-type . make-vm-stream-element-type-inst)
     ;; Pathnames
-    (pathnamep         . make-vm-pathnamep)
     (pathname-name     . make-vm-pathname-name)
     (pathname-type     . make-vm-pathname-type)
     (namestring        . make-vm-namestring)
     ;; Array/vector
-    (vectorp          . make-vm-vectorp)
-    (simple-vector-p  . make-vm-simple-vector-p)
     (array-length     . make-vm-array-length)
     (array-rank       . make-vm-array-rank)
     (array-total-size . make-vm-array-total-size)
     (array-dimensions . make-vm-array-dimensions)
     (array-element-type . make-vm-array-element-type)
     (fill-pointer     . make-vm-fill-pointer-inst)
-    (array-has-fill-pointer-p . make-vm-array-has-fill-pointer-p)
-    (array-adjustable-p . make-vm-array-adjustable-p)
-    (adjustable-array-p . make-vm-adjustable-array-p)
     (vector-pop       . make-vm-vector-pop)
     (array-displacement . make-vm-array-displacement)
     ;; Bit array
@@ -142,31 +115,21 @@
     (symbol-name      . make-vm-symbol-name)
     (make-symbol      . make-vm-make-symbol)
     (find-package     . make-vm-find-package)
-    (keywordp         . make-vm-keywordp)
     (symbol-plist     . make-vm-symbol-plist)
     (package-name     . make-vm-package-name-inst)
     ;; Time / system
     (sleep               . make-vm-sleep-inst)
     (decode-universal-time . make-vm-decode-universal-time)
     ;; Character predicates and operations
-    (both-case-p      . make-vm-both-case-p)
-    (graphic-char-p   . make-vm-graphic-char-p)
-    (standard-char-p  . make-vm-standard-char-p)
     (digit-char       . make-vm-digit-char)
     (char-name        . make-vm-char-name)
     (name-char        . make-vm-name-char)
     (char-int         . make-vm-char-code)
     (digit-char-p     . make-vm-digit-char-p)
-    (alpha-char-p     . make-vm-alpha-char-p)
-    (alphanumericp    . make-vm-alphanumericp)
-    (upper-case-p     . make-vm-upper-case-p)
-    (lower-case-p     . make-vm-lower-case-p)
     (char-upcase      . make-vm-char-upcase)
     (char-downcase    . make-vm-char-downcase)
     (char-code        . make-vm-char-code)
     (code-char        . make-vm-code-char)
-    (stringp          . make-vm-stringp)
-    (characterp       . make-vm-characterp)
     (parse-integer    . make-vm-parse-integer)
     ;; Coercion
     (coerce-to-string . make-vm-coerce-to-string)
@@ -175,8 +138,6 @@
     (string           . make-vm-string-coerce)
     ;; List utilities
     (list-length      . make-vm-list-length)
-    (listp            . make-vm-listp)
-    (atom             . make-vm-atom)
     (copy-list        . make-vm-copy-list)
     (copy-tree        . make-vm-copy-tree)
     ;; Type
@@ -206,6 +167,57 @@
     ;; Load
     (load             . make-vm-load-file))
   "Alist of (cl-symbol . vm-constructor) for unary builtins: (fn arg) → (:dst :src).")
+
+(defparameter *builtin-unary-predicate-entries*
+  '((symbolp                   . make-vm-symbol-p)
+    (numberp                   . make-vm-number-p)
+    (integerp                  . make-vm-integer-p)
+    (bignump                   . make-vm-bignump)
+    (floatp                    . make-vm-floatp)
+    (rationalp                 . make-vm-rationalp)
+    (realp                     . make-vm-realp)
+    (complexp                  . make-vm-complexp)
+    (consp                     . make-vm-cons-p)
+    (functionp                 . make-vm-function-p)
+    (endp                      . make-vm-endp)
+    (evenp                     . make-vm-evenp)
+    (oddp                      . make-vm-oddp)
+    (boundp                    . make-vm-boundp)
+    (fboundp                   . make-vm-fboundp)
+    (hash-table-p              . make-vm-hash-table-p)
+    (streamp                   . make-vm-streamp)
+    (input-stream-p            . make-vm-input-stream-p)
+    (output-stream-p           . make-vm-output-stream-p)
+    (open-stream-p             . make-vm-open-stream-p)
+    (interactive-stream-p      . make-vm-interactive-stream-p)
+    (pathnamep                 . make-vm-pathnamep)
+    (vectorp                   . make-vm-vectorp)
+    (simple-vector-p           . make-vm-simple-vector-p)
+    (array-has-fill-pointer-p  . make-vm-array-has-fill-pointer-p)
+    (array-adjustable-p        . make-vm-array-adjustable-p)
+    (adjustable-array-p        . make-vm-adjustable-array-p)
+    (keywordp                  . make-vm-keywordp)
+    (both-case-p               . make-vm-both-case-p)
+    (graphic-char-p            . make-vm-graphic-char-p)
+    (standard-char-p           . make-vm-standard-char-p)
+    (alpha-char-p              . make-vm-alpha-char-p)
+    (alphanumericp             . make-vm-alphanumericp)
+    (upper-case-p              . make-vm-upper-case-p)
+    (lower-case-p              . make-vm-lower-case-p)
+    (stringp                   . make-vm-stringp)
+    (characterp                . make-vm-characterp)
+    (listp                     . make-vm-listp)
+    (atom                      . make-vm-atom))
+  "Alist of (cl-symbol . vm-constructor) for unary type predicates.
+
+Same shape as *BUILTIN-UNARY-ENTRIES* -- (fn arg) with :dst and :src -- but
+emitted through a convention that converts the VM's 1/0 result into T/NIL.
+See EMIT-BUILTIN-UNARY-PREDICATE for why that conversion is not optional.
+
+Membership is decided by the return value ANSI specifies, not by the name.
+DIGIT-CHAR-P returns a weight and NAME-CHAR a character, so they stay under
+:UNARY; NULL and NOT never reach the registry at all, since
+%TRY-COMPILE-COMMON-LISP-NOT claims them first.")
 
 (defparameter *builtin-binary-entries*
   '(;; Arithmetic

@@ -111,18 +111,26 @@ instruction produces, which is no longer what reaches the caller."
 
 (deftest-each compile-hash-table-numeric
   "Hash table operations return the expected numeric values; gethash returns nil when missing with no default."
-  :cases (("hash-table-p"   1  "(let ((ht (make-hash-table))) (hash-table-p ht))")
-          ("gethash-get"    42 "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
+  :cases (("gethash-get"    42 "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
           ("gethash-the-binding" 42 "(let ((ht (the hash-table (make-hash-table)))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
           ("gethash-default" 99 "(let ((ht (make-hash-table))) (gethash 'missing ht 99))")
           ("count"           2 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (hash-table-count ht))")
           ("remhash"         1 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (remhash 'a ht) (hash-table-count ht))")
-          ("hash-table-p-no" 0 "(hash-table-p 42)")
           ("setf-returns"  100 "(let ((ht (make-hash-table))) (setf (gethash 'k ht) 100))")
           ("overwrite"      20 "(let ((ht (make-hash-table))) (setf (gethash 'k ht) 10) (setf (gethash 'k ht) 20) (gethash 'k ht))"))
   (expected form)
   (assert-= expected (run-string form))
   (assert-true (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))"))))
+
+(deftest-each compile-hash-table-p
+  "hash-table-p answers T for a hash table and NIL for anything else."
+  ;; Split out of COMPILE-HASH-TABLE-NUMERIC, whose body is ASSERT-=: the
+  ;; predicate used to answer the VM's 1/0 and now answers a Common Lisp boolean,
+  ;; which ASSERT-= cannot compare.
+  :cases (("hash-table" t "(let ((ht (make-hash-table))) (hash-table-p ht))")
+          ("other"      nil "(hash-table-p 42)"))
+  (expected form)
+  (assert-equal expected (run-string form)))
 
 ;;; Defmacro Compilation Tests
 

@@ -431,6 +431,40 @@ same call through a register answered 0."
         (when handler
           (funcall handler args result-reg ctx))))))
 
+(defun %if-condition-unary-predicate-entry (cond-ast ctx)
+  "Return the :UNARY-PREDICATE registry entry when COND-AST is a one-argument
+call to such a predicate and nothing shadows the name."
+  (when (and (typep cond-ast 'ast-call)
+             (= 1 (length (ast-call-args cond-ast))))
+    (let* ((callable (%callable-designator-node (ast-call-func cond-ast)))
+           (sym (cond ((symbolp callable) callable)
+                      ((typep callable 'ast-var) (ast-var-name callable))
+                      (t nil))))
+      (when (and sym (not (%ast-var-function-value-p sym ctx)))
+        (let ((entry (gethash (symbol-name sym) *builtin-registry*)))
+          (when (and entry (eq (be-convention entry) :unary-predicate))
+            entry))))))
+
+(defun %compile-if-condition (cond-ast ctx)
+  "Compile an IF condition, keeping a type predicate's raw VM boolean.
+
+VM-JUMP-ZERO decides with VM-FALSEP, which reads numeric 0 and NIL alike, so a
+predicate whose value only feeds the branch does not need its 1/0 turned into
+T/NIL first. That conversion is two constants, two labels and two jumps, and it
+would land on (if (consp x) ...) -- among the most common shapes there is. The
+predicate still materialises a proper Common Lisp boolean everywhere the value
+can escape the branch; this is the one position where it provably cannot.
+
+Nothing earlier in %TRY-COMPILE-CALL-FAST-PATHS claims a plain one-argument
+predicate call, so going straight to the constructor skips no other lowering."
+  (let ((entry (%if-condition-unary-predicate-entry cond-ast ctx)))
+    (if entry
+        (let ((arg-reg (compile-ast (first (ast-call-args cond-ast)) ctx))
+              (predicate-reg (make-register ctx)))
+          (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
+          predicate-reg)
+        (compile-ast cond-ast ctx))))
+
 (defun %compile-normal-call (func-expr func-sym args result-reg tail ctx)
   "Emit a normal (non-special-cased) function call."
   (let* ((local-func-name (and (typep func-expr 'ast-var) (ast-var-name func-expr)))

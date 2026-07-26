@@ -17,6 +17,7 @@
 (defparameter *builtin-emitter-table*
   (let ((ht (make-hash-table :test #'eq)))
     (dolist (pair '((:unary              . emit-builtin-unary)
+                    (:unary-predicate    . emit-builtin-unary-predicate)
                     (:binary             . emit-builtin-binary)
                     (:string-cmp         . emit-builtin-string-cmp)
                     (:char-cmp           . emit-builtin-char-cmp)
@@ -49,6 +50,7 @@
 
 (defparameter *convention-arity*
   '((:unary          1 . 1)  (:binary          2 . 2)  (:binary-custom    2 . 2)
+    (:unary-predicate 1 . 1)
     (:string-cmp     2 . 2)  (:char-cmp        2 . 2)  (:table-query      1 . 1)
     (:handle-input   1 . 1)  (:side-effect     1 . 1)  (:void-side-eff    0 . 0)
     (:nullary        0 . 0)  (:string-trim     2 . 2)  (:handle-effect    1 . 1)

@@ -231,12 +231,14 @@
   (assert-equal expected (run-string form)))
 
 (deftest-each builtin-alphanumericp
-  "alphanumericp returns truthy for alphanumeric chars and 0 for punctuation."
+  "alphanumericp returns T for alphanumeric chars and NIL for punctuation."
   :cases (("alpha" "(alphanumericp #\\a)" t)
           ("digit" "(alphanumericp #\\5)" t)
           ("punct" "(alphanumericp #\\!)" nil))
   (form expected)
-  (assert-equal expected (not (zerop (run-string form)))))
+  ;; Was (not (zerop ...)): the predicate answered the VM's 1/0 and ZEROP would
+  ;; now be handed T. The value is a Common Lisp boolean, so compare it directly.
+  (assert-equal expected (run-string form)))
 
 (deftest-each builtin-print-to-string
   "prin1-to-string and princ-to-string both return strings."

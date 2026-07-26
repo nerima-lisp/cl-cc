@@ -33,10 +33,11 @@
           ("alist-acons"         42 "(cdr (car (acons 'x 42 nil)))")
           ("alist-nconc-len"      4 "(length (nconc (list 1 2) (list 3 4)))")
           ("alist-copy-list-len"  3 "(length (copy-list (list 1 2 3)))")
-          ("alist-listp-list"     1 "(listp (list 1 2))")
-          ("alist-listp-nil"      1 "(listp nil)")
-          ("alist-atom-true"      1 "(atom 42)")
-          ("alist-atom-false"     0 "(atom (cons 1 2))"))
+          ;; LISTP and ATOM answer T/NIL like every other ANSI type predicate.
+          ("alist-listp-list"     t "(listp (list 1 2))")
+          ("alist-listp-nil"      t "(listp nil)")
+          ("alist-atom-true"      t "(atom 42)")
+          ("alist-atom-false"     nil "(atom (cons 1 2))"))
   )
 
 (deftest-compile compile-equal-ops
@@ -67,12 +68,15 @@
   :cases (("char-code"      65 "(char-code #\\A)")
           ("char=-true"      1 "(char= #\\a #\\a)")
           ("digit-char-p"    5 "(digit-char-p #\\5)")
-          ("alpha-char-p"    1 "(alpha-char-p #\\z)")
-          ("upper-case-p"    1 "(upper-case-p #\\A)")
-          ("lower-case-p"    1 "(lower-case-p #\\a)")
+          ("alpha-char-p"    t "(alpha-char-p #\\z)")
+          ("upper-case-p"    t "(upper-case-p #\\A)")
+          ("lower-case-p"    t "(lower-case-p #\\a)")
           ("stringp-true"    t "(stringp \"hello\")")
           ("stringp-false"   nil "(stringp 42)")
-          ("characterp-true" 1 "(characterp #\\a)"))
+          ;; CHAR= keeps its 1: it is a comparison under the :CHAR-CMP
+          ;; convention, not a type predicate, so it still answers the VM's
+          ;; boolean. DIGIT-CHAR-P keeps its 5 because ANSI returns the weight.
+          ("characterp-true" t "(characterp #\\a)"))
   )
 
 (deftest-compile compile-string-char-utils
@@ -207,14 +211,27 @@
   )
 
 (deftest-compile compile-vectorp
-  "vectorp answers the VM's numeric boolean: 1 for a vector, 0 for anything else.
+  "vectorp answers T for a vector and NIL for anything else.
 
-Asserted directly rather than through (not (null ...)) / (eql 0 ...). Type
-predicates lower to VM instructions documented as returning 1/0 (see
-packages/vm/src/array.lisp), whereas NOT follows ANSI and reads numeric zero as
-true, so the CL idiom does not compose with them and said nothing about VECTORP."
-  :cases (("vector"  1 "(vectorp (make-array 3))")
-          ("non-vec" 0 "(vectorp 42)")))
+It used to answer the VM's internal 1/0, which read as true to IF but as *false*
+to NOT -- so (not (vectorp 42)) was NIL. Type predicates now convert to a
+Common Lisp boolean at the call site; see EMIT-BUILTIN-UNARY-PREDICATE."
+  :cases (("vector"  t "(vectorp (make-array 3))")
+          ("non-vec" nil "(vectorp 42)")))
+
+(deftest-compile compile-type-predicates-compose-with-not
+  "Type predicates compose with NOT and NULL through a register, not just folded."
+  ;; The predicates answered the VM's internal 1/0, and 0 is false to IF but
+  ;; *true* to NOT, which follows ANSI. Every one of these inverted. Constant
+  ;; folding hid it: the optimizer folds the instruction with the host's own
+  ;; predicate, so the same call answered NIL at top level and 0 through a
+  ;; register -- hence the LAMBDA, which keeps the value in a register.
+  :cases (("not-consp"   t "((lambda (x) (not (consp x))) 1)")
+          ("not-numberp" t "((lambda (x) (not (numberp x))) \"s\")")
+          ("not-stringp" nil "((lambda (x) (not (stringp x))) \"s\")")
+          ("and-chain"   t "((lambda (x y) (and (not (consp y)) (eql x y))) 1 1)")
+          ("tree-equal"  t "(tree-equal '(1 (2 3)) '(1 (2 3)))"))
+  )
 
 ;;; Sort Tests
 

@@ -48,8 +48,8 @@
 
 (deftest-compile compile-keywordp-and-list-macros
   "keywordp, push/pop/incf/decf/nth/nthcdr/nreverse return the expected numeric values."
-  :cases (("keyword"     1  "(keywordp :foo)")
-          ("non-keyword" 0  "(keywordp 'foo)")
+  :cases (("keyword"     t  "(keywordp :foo)")
+          ("non-keyword" nil "(keywordp 'foo)")
           ("push-front"  3  "(let ((lst nil)) (push 1 lst) (push 2 lst) (push 3 lst) (car lst))")
           ("pop"         1  "(let ((lst (list 1 2 3))) (pop lst))")
           ("incf"        5  "(let ((x 3)) (incf x 2) x)")

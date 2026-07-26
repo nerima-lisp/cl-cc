@@ -193,11 +193,7 @@
   ;; "#\\!" is what puts #\! into the compiled source. Written singly the string
   ;; reader eats the backslash and cl-cc's lexer receives "#!", which is not a
   ;; dispatch character and aborts the whole assertion.
-  ;; (1 t), not (t t): FUNCTIONP is a type predicate, and those answer the VM's
-  ;; numeric boolean — see the docstring of the VECTORP case in
-  ;; compiler-tests-stdlib-io.lisp. NON-TERMINATING-P comes straight from
-  ;; GET-MACRO-CHARACTER's second value and is a real T.
-  (assert-equal '(1 t)
+  (assert-equal '(t t)
                 (run-string "(let ((rt (copy-readtable)))
                                (set-macro-character #\\! (lambda (stream char)
                                                           (declare (ignore stream char))
@@ -324,13 +320,9 @@
 ;;; ─── FR-605: bignum predicate helper ────────────────────────────────────────
 
 (deftest compile-bignump
-  "bignump answers the VM's numeric boolean: truthy for integers outside the fixnum
-range and 0 for a fixnum.
-
-ASSERT-FALSE demanded NIL, but a type predicate that lowers to a VM instruction
-answers 0, which is false to the VM (VM-FALSEP) and to IF. Pin the value."
+  "bignump answers T for integers outside the fixnum range and NIL for a fixnum."
   (assert-true (run-string "(bignump (expt 2 100))" :stdlib t))
-  (assert-= 0 (run-string "(bignump 42)" :stdlib t)))
+  (assert-true (null (run-string "(bignump 42)" :stdlib t))))
 
 ;;; ─── FR-361/363/396: declaim inline policy + optimize quality handling ─────
 

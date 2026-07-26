@@ -458,7 +458,7 @@ Emits a move from the branch result into DST; optionally emits a jump to JUMP-LA
          (guard-var  (first guard-info))
          (guard-type (second guard-info))
          (cond-reg   (%with-no-tail-position ctx
-                       (compile-ast cond-ast ctx)))
+                       (%compile-if-condition cond-ast ctx)))
          (dst        (make-register ctx))
          (else-label (make-label ctx "else"))
          (end-label  (make-label ctx "ifend")))

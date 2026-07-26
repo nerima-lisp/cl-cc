@@ -132,6 +132,7 @@ but it is asserted for inspection the same way it always has been.")
 ;; Avoid SYMBOL-VALUE here: during strict selfhost bootstrap, quoted-symbol
 ;; runtime lookup is weaker than ordinary global variable references.
 (%register-builtins *builtin-unary-entries* :unary)
+(%register-builtins *builtin-unary-predicate-entries* :unary-predicate)
 (%register-builtins *builtin-binary-entries* :binary)
 (%register-builtins *builtin-string-cmp-entries* :string-cmp)
 (%register-builtins *builtin-char-cmp-entries* :char-cmp)
