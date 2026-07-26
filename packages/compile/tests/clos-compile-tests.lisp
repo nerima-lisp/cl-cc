@@ -283,3 +283,28 @@ instructions are what dispatch them. Scalarizing dropped their side effects."
               (slot-value p 'a))"))
   (expected form)
   (assert-= expected (run-string form)))
+
+(deftest-each clos-builtin-class-precedence-dispatch
+  "A method on a built-in superclass applies to its subclasses.
+
+Dispatch compared the specializer against VM-CLASSIFY-ARG's answer with EQ, so
+only an exact class name matched and there was no ancestry at all:
+(defmethod f ((x number))) reported no applicable method for 42. A float was
+worse off still -- the classifier named only INTEGER, STRING and SYMBOL, so
+nothing could specialise on one."
+  :cases (("number-matches-integer"
+           "NUM"  "(defmethod cpl-a ((x number)) 'num) (symbol-name (cpl-a 42))")
+          ("real-matches-integer"
+           "REAL" "(defmethod cpl-b ((x real)) 'real) (symbol-name (cpl-b 42))")
+          ("number-matches-float"
+           "NUM"  "(defmethod cpl-c ((x number)) 'num) (symbol-name (cpl-c 1.5))")
+          ("float-is-named"
+           "FLT"  "(defmethod cpl-d ((x float)) 'flt) (symbol-name (cpl-d 1.5))")
+          ("list-matches-cons"
+           "LST"  "(defmethod cpl-e ((x list)) 'lst) (symbol-name (cpl-e (cons 1 2)))")
+          ("exact-class-still-wins-over-ancestor"
+           "INT"  "(defmethod cpl-f ((x number)) 'num)
+                   (defmethod cpl-f ((x integer)) 'int)
+                   (symbol-name (cpl-f 42))"))
+  (expected source)
+  (assert-string= expected (run-string source)))

@@ -48,12 +48,21 @@
 ;;; ─── vm-classify-arg ────────────────────────────────────────────────────────
 
 (deftest-each vm-execute-vm-classify-arg
-  "vm-classify-arg identifies CL primitive types; returns T for unknown/composite values."
+  "vm-classify-arg names the ANSI built-in class of an argument.
+
+LIST and FLOAT used to answer T because only INTEGER, STRING and SYMBOL were
+named, which is why (defmethod f ((x number))) had no applicable method for 42:
+nothing could specialise on a class the classifier never produced.
+
+HASH-TABLE still answers T, and that one is deliberate. A class object is a hash
+table carrying :__NAME__, and the MOP dispatch for INITIALIZE-INSTANCE and
+SLOT-VALUE-USING-CLASS relies on a standard-metaclass class object classifying as
+the catch-all."
   :cases (("integer"    42              'integer)
           ("string"     "hello"         'string)
           ("symbol"     'foo            'symbol)
-          ("list"       '(a b c)        't)
-          ("float"      3.14            't)
+          ("list"       '(a b c)        'cons)
+          ("float"      3.14            'float)
           ("hash-table" (make-hash-table) 't))
   (arg expected)
   (let ((s (make-test-vm)))
