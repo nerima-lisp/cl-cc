@@ -560,14 +560,26 @@ ast/type のときと同じ「宣言済みだが一度もビルドされてい�
 - 読み込みは通っている（`cl-cc/php:%php-array` が read error にならない）ので
   **シンボルは export されている**。にもかかわらず実行時に unbound。
 
-したがって最有力は **「export は残したまま関数側をリネームした」** 系のリファクタ
-が upstream で進んでおり、cl-cc 側の呼び出しが旧名を指していること。ast/type の
-`SERIALIZE-ENTRY-POINT` → `SERIALIZE-ENTRY-POINT-COMMAND` と同種で、規模が大きい版。
+**リネーム説は実測で否定された**（2026-07-27）。upstream を直接確認した結果:
 
-**次にやること**: 上位シンボルから順に upstream での新名称を突き止め、cl-cc 側の
-呼び出しを追随させる（または upstream に別名を復活させる）。42 + 19 + 11 + 11 で
-上位 4 つだけで 83、全体の 38% を占めるので、数個潰すごとに大きく減るはず。
-javascript は未測定。
+- `%php-array` は `src/runtime-helpers-array.lisp:121` に `(defun %php-array ...)`
+  として存在し、`in-package :cl-cc/php`、`package.lisp:195` で export 済み。
+- `src/*.lisp` のうち `.asd` の components に入っていないファイルは **0 個**。
+  つまり全ファイルがコンパイルされる。
+
+定義があり、export されており、コンパイルもされる。それでも実行時に unbound。
+したがって**シンボルのドリフトではない**。
+
+**残る仮説**: これらは VM host bridge 経由で呼ばれる関数であり、失敗しているのは
+関数定義ではなく **bridge 登録**のほう。upstream は
+`register-backend-bridge-provider`（`src/runtime-bridge-provider.lisp`）で登録する
+が、それが走るには cl-cc-php が *load* されている必要がある。テストイメージでの
+ロード順序 / `%register-php-runtime-bridges` の呼ばれる時点との関係を疑うべき。
+
+**次にやること**: 217 のうち 1 つを取り、`cl-cc/bootstrap:*backend-bridge-providers*`
+がテストイメージ内で非 nil かどうかを見る。非 nil なら登録は走っているので
+`vm-register-host-bridge` 側、nil ならロード順序。symbol 追跡ではなく
+**登録が走っているかどうか**の 1 点を先に確定させること。javascript は未測定。
 
 cl-cc 側の受け入れ準備は完了しているので、残りは upstream 2 リポジトリの
 parity 作業のみ。
