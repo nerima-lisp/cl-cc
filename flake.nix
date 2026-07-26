@@ -116,7 +116,11 @@
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/47d8dadec0f48d9e2733b181f6fa55d02713dae9";
+      url = "github:nerima-lisp/cl-cc-optimize/f26060c1cb6e0aecdf664a5894665265a9990747";
+      flake = false;
+    };
+    cl-cc-codegen-native = {
+      url = "github:nerima-lisp/cl-cc-codegen-native/ca82ba30a874e51e00dcc3a603ab024e341a81f0";
       flake = false;
     };
     cl-cc-runtime = {
@@ -379,6 +383,49 @@
               clParserKit
             ];
           };
+          # One source tree, three systems -- the repository holds them
+          # together because the boundaries between them move. Each is built as
+          # its own derivation so dependents keep naming the system they use.
+          clCcRegalloc = sbcl.buildASDFSystem {
+            pname = "cl-cc-regalloc";
+            version = siblingVersion "cl-cc-codegen-native";
+            src = inputs.cl-cc-codegen-native;
+            systems = [ "cl-cc-regalloc" ];
+            lispLibs = [
+              clCcVm
+              clCcMir
+              clCcTarget
+              clCcOptimize
+            ];
+          };
+          clCcCodegen = sbcl.buildASDFSystem {
+            pname = "cl-cc-codegen";
+            version = siblingVersion "cl-cc-codegen-native";
+            src = inputs.cl-cc-codegen-native;
+            systems = [ "cl-cc-codegen" ];
+            lispLibs = [
+              clCcBootstrap
+              clCcVm
+              clCcMir
+              clCcTarget
+              clCcBinary
+              clCcOptimize
+              clCcRegalloc
+            ];
+          };
+          clCcEmit = sbcl.buildASDFSystem {
+            pname = "cl-cc-emit";
+            version = siblingVersion "cl-cc-codegen-native";
+            src = inputs.cl-cc-codegen-native;
+            systems = [ "cl-cc-emit" ];
+            lispLibs = [
+              clCcVm
+              clCcAst
+              clCcMir
+              clCcOptimize
+              clCcCodegen
+            ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -410,6 +457,9 @@
               clCcTarget
               clCcBytecode
               clCcOptimize
+              clCcRegalloc
+              clCcCodegen
+              clCcEmit
               ;
           };
           inherit (asdf)

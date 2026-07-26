@@ -23,6 +23,9 @@
   clCcTarget,
   clCcBytecode,
   clCcOptimize,
+  clCcRegalloc,
+  clCcCodegen,
+  clCcEmit,
   ...
 }:
 let
@@ -106,16 +109,6 @@ let
         clParserKit
       ];
     };
-    cl-cc-regalloc = {
-      src = "packages/regalloc";
-      deps = [
-        "cl-cc-vm"
-        "cl-cc-mir"
-        "cl-cc-target"
-        "cl-cc-binary"
-        "cl-cc-optimize"
-      ];
-    };
     cl-cc-expand = {
       src = "packages/expand";
       deps = [
@@ -129,26 +122,6 @@ let
       deps = [
         "cl-cc-bootstrap"
         "cl-cc-ast"
-      ];
-    };
-    cl-cc-codegen = {
-      src = "packages/codegen";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-vm"
-        "cl-cc-mir"
-        "cl-cc-target"
-        "cl-cc-optimize"
-        "cl-cc-regalloc"
-      ];
-    };
-    cl-cc-emit = {
-      src = "packages/emit";
-      deps = [
-        "cl-cc-vm"
-        "cl-cc-mir"
-        "cl-cc-optimize"
-        "cl-cc-codegen"
       ];
     };
     cl-cc-compile = {
@@ -269,6 +242,9 @@ let
         "cl-cc-target"
         "cl-cc-bytecode"
         "cl-cc-optimize"
+        "cl-cc-regalloc"
+        "cl-cc-codegen"
+        "cl-cc-emit"
       ];
     };
     cl-cc-cli = {
@@ -321,6 +297,9 @@ let
     cl-cc-target = clCcTarget;
     cl-cc-bytecode = clCcBytecode;
     cl-cc-optimize = clCcOptimize;
+    cl-cc-regalloc = clCcRegalloc;
+    cl-cc-codegen = clCcCodegen;
+    cl-cc-emit = clCcEmit;
   };
 
   productionAsdfSystems = lib.fix (

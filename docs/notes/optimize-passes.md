@@ -150,7 +150,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-034: If-Conversion (分岐→条件移動) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`
 - **内容**:
   - `vm-select` を `CMOV` 命令(x86-64) / `CSEL`(AArch64) に変換
   - VM/バックエンド段での branchless selection を提供
@@ -168,7 +168,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-036: Hot/Cold Code Layout (基本ブロック並べ替え) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/aarch64.lisp`
 - **内容**:
   - 頻繁に実行される基本ブロックを連続したアドレスに配置
   - fall-through条件（JZ/JNZ → fall-through is hot path）をヒューリスティックで決定
@@ -392,7 +392,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-083: Inline Bump Pointer Allocation ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/runtime/src/heap.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**: `rt-gc-alloc` 関数呼び出しを除去し、`young-free` の増分比較をコールサイトにインライン展開
 - **根拠**: 現状は割り当てのたびに関数呼び出しが発生
 - **難易度**: Medium
@@ -405,24 +405,24 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-092: EFLAGS Reuse After CMP (x86-64) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`
 - **内容**: CMP命令後のEFLAGSを直接分岐に使用し、bool値のレジスタ化+タグチェックを省略
 - **難易度**: Medium
 
 #### FR-093: Jump Table for Dense Integer Case ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`
 - **内容**: 密なinteger `case`/`ecase` を `JMP [rax*8+table]` の間接ジャンプに変換
 - **難易度**: Medium
 
 #### FR-094: Wasm `br_table` for User `case` ✅
 
-- **対象**: `packages/codegen/src/wasm-trampoline.lisp` (インフラ既存)
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `codegen/src/wasm-trampoline.lisp` (インフラ既存)
 - **内容**: ユーザレベルの `case`/`etypecase` に `br_table` を適用
 - **根拠**: trampolineで既に `br_table` を使用、ユーザ向けへの拡張が自然
 - **難易度**: Low
 
-- **関連実装**: `packages/codegen/src/wasm-trampoline.lisp` の PC-dispatch trampoline が `br_table` を用いて全 basic block の再ディスパッチを行い、user-level `case` / `etypecase` 由来の分岐も trampoline 接続経由で `br_table` dispatch に到達する基本実装済み。専用 lowering による直接 `br_table` 生成は将来拡張。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `codegen/src/wasm-trampoline.lisp` の PC-dispatch trampoline が `br_table` を用いて全 basic block の再ディスパッチを行い、user-level `case` / `etypecase` 由来の分岐も trampoline 接続経由で `br_table` dispatch に到達する基本実装済み。専用 lowering による直接 `br_table` 生成は将来拡張。
 
 #### FR-095: Binary Search for Sparse Case ✅
 
@@ -833,7 +833,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-328: Native CALL/RET Instruction Emission (ネイティブCALL/RET命令エミッション) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`
 - **現状**: `*x86-64-instruction-sizes*`で`vm-closure`=0、`vm-call`=0（`x86-64-codegen.lisp:909-911`）。ネイティブバックエンドに関数呼び出しエミッションが完全欠落。`calling-convention.lisp:8-24`の呼び出し規約インフラはレジスタ割り当てのみで使用
 - **内容**: x86-64 `CALL rel32`命令エミッション。スタックフレームセットアップ（push return address, callee-saved regs）。`vm-ret`→`RET`命令+フレーム解体。FR-294（x86-64命令補完）の上位機能
 - **根拠**: 全ネイティブコンパイラの基本機能。関数呼び出しなしではネイティブ実行が成立しない
@@ -841,7 +841,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-329: Callee-Saved Register Usage Analysis (使用済みCallee-Savedレジスタ解析) ✅
 
-- **対象**: `packages/codegen/src/x86-64-codegen.lisp`, `packages/codegen/src/x86-64-codegen-dispatch.lisp`, `packages/regalloc/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `codegen/src/x86-64-codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `codegen/src/x86-64-codegen-dispatch.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `regalloc/src/regalloc.lisp`
 - **現状**: `compile-to-x86-64-stream` が `*current-regalloc*` から `x86-64-used-callee-saved-regs` を呼び、ABI 順に「実際に割り当てで使われた callee-saved」だけを `PUSH` / `POP` する。`compute-live-intervals` は call-site を跨ぐ live interval を記録し、レジスタ割り当て結果が codegen に引き渡される
 - **内容**: 実装済み。割り当て済み物理レジスタ集合から used callee-saved subset を抽出し、leaf / red-zone 判定と併用して不要な保存・復元を省略する
 - **根拠**: GCC/LLVM/SBCL全実装。FR-072（Shrink-Wrapping）・FR-177（Callee-Save Elimination）の前提となる基本分析
@@ -1043,7 +1043,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-532: Out-of-SSA / Phi Node Coalescing (SSA破壊・Phi合体) ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp`, `packages/emit/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/regalloc.lisp`
 - **現状**: SSA構築（`ssa.lisp`）は完備。SSA破壊（Phi→コピー命令への変換）なし。レジスタ割り当て（`regalloc.lisp`）との接続なし
 - **内容**: SSA破壊3ステップ: (1) 各 Phi をその引数の数だけのコピー命令に展開。(2) Phi-coalescing — 干渉しないコピーを同一物理変数に統合してコピー命令を消去。(3) Parallel copy sequentialization — 同一基本ブロック内の並行コピー群を Swap-based/一時変数方式でシーケンシャル化。Sreedhar et al. (1999) または Boissinot et al. (2009) のアルゴリズム
 - **根拠**: SSAベース RA の標準最終ステップ。cl-cc では SSA→RA の橋渡しが欠如
@@ -1051,7 +1051,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-533: Parallel Copy Sequentialization (並行コピー逐次化) ✅
 
-- **対象**: `packages/emit/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/regalloc.lisp`
 - **現状**: SSA破壊後の並行コピー（`{r1←r2, r2←r1}` のような循環依存）を正しく逐次化する機構なし
 - **内容**: 依存グラフ（DAG）を構築。非循環部分はトポロジカル順にコピー生成。循環部分は XOR-swap または一時レジスタで解消。`vm-move` 命令列への展開
 - **根拠**: Boissinot et al. (2009) / GCC out-of-SSA。正当性に関わる基礎コンポーネント
@@ -1354,7 +1354,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-231: Stack Map Construction (スタックマップ構築) ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/emit/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/regalloc.lisp`
 - **現状**: MIRに`:safepoint`キーワード定義済み（`mir.lisp:13,158`）だがスタックマップデータ構造なし。GCルートの位置情報を機械語アドレスに紐づける仕組みがない
 - **内容**: 各safepoint位置でのGCルートマップ（どのレジスタ/スタックスロットがGCトレース可能な参照を保持するか）を構築。`.llvm_stackmaps`互換のコンパクトなバイナリエンコーディング
 - **根拠**: LLVM StackMaps / HotSpot OopMap / GraalVM ReferenceMap。正確なGC（FR-190）とdeopt（FR-155）の前提条件
@@ -1370,7 +1370,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-233: Safepoint Polling Mechanism (セーフポイントポーリング) ✅
 
-- **対象**: `packages/runtime/src/gc.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm.lisp`, `packages/emit/src/x86-64-codegen.lisp`
+- **対象**: `packages/runtime/src/gc.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`
 - **現状**: STW GC（`gc.lisp:200-263,331-392`）にスレッド停止要求メカニズムなし。VMインタプリタループにポーリングポイントなし
 - **内容**: 関数エントリ・ループバックエッジ・アロケーションサイトにポーリングチェック挿入。ポーリングページ方式（メモリページの保護属性変更でシグナルトラップ）またはフラグチェック方式。FR-090/FR-091のsafepoint最適化の前提
 - **根拠**: HotSpot polling page / Go runtime preemption / Chez Scheme interrupt check。並行GC（FR-190）の基盤
@@ -1572,7 +1572,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-291: Auto-Vectorization / SLP Vectorizer (SLPベクトル化) ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/aarch64.lisp`
 - **現状**: SIMD命令生成なし。数値ループは1要素ずつスカラー処理
 - **内容**: **SLP（Superword Level Parallelism）ベクトル化**: 隣接メモリアクセス＋同種演算のスカラー命令群を SSE2/AVX2/NEON 128〜256bit SIMD 命令に置換。`(loop for i below n do (setf (aref out i) (+ (aref a i) (aref b i))))` → `VADDPS ymm0, ymm1, ymm2`。型情報（floatベクトル・fixnum配列）が必要。アライメントチェック付き
 - **根拠**: LLVM SLP Vectorizer / GCC auto-vectorization / ARM NEON。数値計算で4〜16x高速化。Common Lisp の `simple-array` 操作が主なターゲット
@@ -1584,7 +1584,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-292: Hot/Cold Code Splitting (ホット/コールドコード分離) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, `packages/pipeline/pipeline.lisp`
 - **現状**: 関数内の全基本ブロックが隣接配置。頻繁に実行されないエラー処理パスがホットパスのI$を汚染
 - **内容**: プロファイルデータ（FR-104）で実行頻度の低い基本ブロック（エラーハンドラ・rare-branch）を関数末尾または別セクションに移動。ホットパスのブロックを直線的に配置してI$ミス削減。`unlikely` アノテーション（Common LispのCMU CLスタイル）で静的ヒントも受け付ける
 - **根拠**: HotSpot `-XX:+ProfileCompiledMethods` / LLVM `-fprofile-use` cold section / V8 hot/cold block layout。I$利用率15〜30%改善
@@ -1614,7 +1614,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-295: Instruction Scheduling (命令スケジューリング) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/aarch64.lisp`
 - **現状**: 命令はMIRの順序通りに発行。レイテンシ隠蔽・アウトオブオーダー活用なし
 - **内容**: 依存グラフ（Def-Use チェーン）を構築し、クリティカルパスを短縮するようにリスト型スケジューラで命令を並び替え。x86-64: Alder Lake / Zen 4 のレイテンシテーブルを参照。ロードレイテンシ隠蔽（load→use の間に無関係命令を挿入）が主目的
 - **根拠**: GCC `-fschedule-insns` / LLVM MachineScheduler / SBCL vop scheduling。スーパースカラーCPUでの IPC 向上
@@ -1622,7 +1622,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-296: Register Pressure Reduction via Rematerialization (再実体化によるレジスタ圧力削減) ✅
 
-- **対象**: `packages/emit/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/regalloc.lisp`
 - **現状**: レジスタ枯渇時はすべてスタックにスピル（load/store）。再計算コストの低い値もスピル対象
 - **内容**: スピル候補が「定数」「単純な算術式」「pure関数呼び出し（副作用なし）」のとき、レジスタに再ロードする代わりに命令を再発行（rematerialize）。スピル/リロードのメモリ帯域使用を削減。コスト関数：rematerialize cost < load + store cost の場合に採用
 - **根拠**: LLVM Rematerialization / GCC REG_DEAD / Briggs et al. (1994)。スピル回数の10〜30%削減
@@ -1658,7 +1658,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-299: Spectre/Meltdown Mitigations in JIT (JITコードのSpectre対策) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: JIT生成コードにSpectre v1（境界チェックバイパス）対策なし。JIT-to-JIT の間接ジャンプにretpoline未適用
 - **内容**: (1) 配列境界チェックの前に `LFENCE` を挿入して投機的実行をバリア。(2) 間接呼び出し（`vm-generic-call`、クロージャディスパッチ）を retpoline シーケンス（`call thunk; jmp` パターン）に置換。(3) JITコード領域を W^X（書き込みと実行の排他）で管理 — コード生成時はmprotect RW、実行時はRX
 - **根拠**: V8 Spectre mitigations (2018) / Firefox SpiderMonkey retpoline / Chrome site isolation。サンドボックス実行環境（Wasm実行等）での必須要件
@@ -1668,7 +1668,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-300: JIT Code Region Isolation (JITコード領域隔離) ✅
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/runtime/src/runtime.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, `packages/runtime/src/runtime.lisp`
 - **現状**: JIT生成コードのメモリ管理（mmap/mprotect）なし。コードバッファの書き込み可能性が実行中も残る
 - **内容**: JITコード専用のメモリプール（`jit-code-arena`）を `mmap(PROT_READ|PROT_EXEC)` で確保。コード書き込み時のみ `mprotect` で一時的に RW に変更し、書き込み完了後即 RX に戻す。`icache_invalidate` （Apple Silicon: `sys_icache_invalidate` / Linux: `__builtin___clear_cache`）を忘れずに呼び出す。コードキャッシュ上限設定とLRU退避
 - **根拠**: V8 CodePageAllocator / JavaScriptCore JITWriteSeparation / Apple PAC signed JIT。W^X の実施はmacOS 14+ / iOS では必須
@@ -1680,7 +1680,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-301: Tiered Wasm Compilation (段階的Wasmコンパイル) ✅
 
-- **対象**: `packages/emit/src/wasm.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/wasm.lisp`, `packages/pipeline/pipeline.lisp`
 - **現状**: Wasm バックエンドは1段階のAOTコンパイルのみ（FR-080）
 - **内容**: **Tier-0**: Wasm バイトコードを直接インタプリタ実行（低レイテンシ起動）。**Tier-1**: ホット関数を Cranelift / LLVM-MC ベースの Baseline JIT でコンパイル（最適化なし、1ms以下）。**Tier-2**: 実行頻度上位5%をオプティマイジングJIT（FR-105ベースPGO適用）でコンパイル。WasmGC（reference types, structs, arrays）に対応したGC統合
 - **根拠**: V8 Liftoff→TurboFan / Firefox Baseline→Ion / Wasmtime Cranelift。Wasm 起動時間をAOTコンパイル待ちなしで提供
@@ -1688,7 +1688,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-302: Wasm SIMD Code Generation (Wasm SIMD命令生成) ✅
 
-- **対象**: `packages/emit/src/wasm.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/wasm.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`
 - **現状**: Wasm バックエンドはスカラー命令のみ。Wasm SIMD 128 仕様（2022年標準化）未対応
 - **内容**: MIR のベクトル値型（FR-291で追加するvec128）をWasm `v128.load` / `f32x4.add` 等の SIMD 命令にマップ。x86-64はSSE2経由、AArch64はNEON経由でWasm runtimeがSIMDを実行。ホストが SIMD 非対応の場合はスカラーフォールバック
 - **根拠**: Wasm SIMD proposal (Phase 4, 2022) / Emscripten SIMD / V8 Wasm SIMD。数値ワークロードで4〜8x高速化

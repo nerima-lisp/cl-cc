@@ -41,12 +41,9 @@
       ;; packages/{ast,type}/tests stay: those are cl-cc's own integration tests
       ;; over whichever system provides the packages, and they are not duplicated
       ;; by the repositories' own t/ suites, which test module boundaries.
-      (ensure-system-asd :cl-cc-regalloc "packages/regalloc/cl-cc-regalloc.asd" here)
       (ensure-system-asd :cl-cc-parse "packages/parse/cl-cc-parse.asd" here)
       (ensure-system-asd :cl-cc-expand "packages/expand/cl-cc-expand.asd" here)
       (ensure-system-asd :cl-cc-cps "packages/cps/cl-cc-cps.asd" here)
-      (ensure-system-asd :cl-cc-codegen "packages/codegen/cl-cc-codegen.asd" here)
-      (ensure-system-asd :cl-cc-emit "packages/emit/cl-cc-emit.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
        (ensure-system-asd :cl-cc-php "packages/php/cl-cc-php.asd" here)
