@@ -172,7 +172,9 @@ Accepted STATUS keywords: :implemented, :partial, :planned, :unknown."
   '(("packages/ast/"     . :cl-cc-ast)
     ("packages/type/"    . :cl-cc-type)
     ("packages/binary/"  . :cl-cc-binary)
-    ("packages/runtime/" . :cl-cc-runtime))
+    ("packages/runtime/" . :cl-cc-runtime)
+    ("packages/vm/"      . :cl-cc-vm)
+    ("packages/bootstrap/" . :cl-cc-bootstrap))
   "Roadmap evidence prefixes for packages that now live in their own repository.
 
 Evidence strings still name the logical module -- packages/type/src/inference.lisp

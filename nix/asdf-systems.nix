@@ -17,6 +17,7 @@
   clCcBinary,
   clCcRuntime,
   clCcBootstrap,
+  clCcVm,
   ...
 }:
 let
@@ -76,13 +77,6 @@ let
       deps = [
         "cl-cc-ast"
         "cl-cc-bootstrap"
-      ];
-    };
-    cl-cc-vm = {
-      src = "packages/vm";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-runtime"
       ];
     };
     cl-cc-docgen = {
@@ -320,6 +314,7 @@ let
     cl-cc-binary = clCcBinary;
     cl-cc-runtime = clCcRuntime;
     cl-cc-bootstrap = clCcBootstrap;
+    cl-cc-vm = clCcVm;
   };
 
   productionAsdfSystems = lib.fix (

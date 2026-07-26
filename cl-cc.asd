@@ -25,8 +25,8 @@
              (load (merge-pathnames relative-asd here)))))
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
-      ;; cl-cc-bootstrap, cl-cc-ast, cl-cc-type, cl-cc-binary and cl-cc-runtime
-      ;; are deliberately absent. They live in the standalone repositories of the same name under
+      ;; cl-cc-bootstrap, cl-cc-vm, cl-cc-ast, cl-cc-type, cl-cc-binary and
+      ;; cl-cc-runtime are deliberately absent. They live in the standalone repositories of the same name under
       ;; nerima-lisp and reach this build as flake.nix inputs.
       ;;
       ;; They used to be defined in packages/{ast,type} as well. Because
@@ -52,7 +52,6 @@
       (ensure-system-asd :cl-cc-codegen "packages/codegen/cl-cc-codegen.asd" here)
       (ensure-system-asd :cl-cc-emit "packages/emit/cl-cc-emit.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
-      (ensure-system-asd :cl-cc-vm "packages/vm/cl-cc-vm.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
        (ensure-system-asd :cl-cc-php "packages/php/cl-cc-php.asd" here)
        (ensure-system-asd :cl-cc-javascript "packages/javascript/cl-cc-javascript.asd" here)

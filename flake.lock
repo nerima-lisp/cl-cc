@@ -102,6 +102,23 @@
         "type": "github"
       }
     },
+    "cl-cc-vm": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785088433,
+        "narHash": "sha256-4UHrL+R5pSUkL6H+sodXT7aO64ipMhaalpmG/jj91eo=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-vm",
+        "rev": "58ec79300c7818eadeddf8c4d79cdf9cd4639958",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-vm",
+        "rev": "58ec79300c7818eadeddf8c4d79cdf9cd4639958",
+        "type": "github"
+      }
+    },
     "cl-cli": {
       "flake": false,
       "locked": {
@@ -279,6 +296,7 @@
         "cl-cc-bootstrap": "cl-cc-bootstrap",
         "cl-cc-runtime": "cl-cc-runtime",
         "cl-cc-type": "cl-cc-type",
+        "cl-cc-vm": "cl-cc-vm",
         "cl-cli": "cl-cli",
         "cl-dataflow": "cl-dataflow",
         "cl-json-kit": "cl-json-kit",
