@@ -127,6 +127,10 @@
       url = "github:nerima-lisp/cl-cc-parse/7316dd82137290082fa1fe03300d3aa388d84117";
       flake = false;
     };
+    cl-cc-php = {
+      url = "github:nerima-lisp/cl-cc-php/f7ee5d7d09a1f24da7ad630be6ddcd0178342f06";
+      flake = false;
+    };
     cl-cc-runtime = {
       url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
       flake = false;
@@ -440,6 +444,18 @@
               clCcBootstrap
             ];
           };
+          clCcPhp = sbcl.buildASDFSystem {
+            pname = "cl-cc-php";
+            version = siblingVersion "cl-cc-php";
+            src = inputs.cl-cc-php;
+            systems = [ "cl-cc-php" ];
+            lispLibs = [
+              clCcAst
+              clCcBootstrap
+              clCcParse
+              clCcVm
+            ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -475,6 +491,7 @@
               clCcCodegen
               clCcEmit
               clCcParse
+              clCcPhp
               ;
           };
           inherit (asdf)

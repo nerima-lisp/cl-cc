@@ -24,6 +24,7 @@
   clCcBytecode,
   clCcOptimize,
   clCcParse,
+  clCcPhp,
   clCcRegalloc,
   clCcCodegen,
   clCcEmit,
@@ -73,21 +74,13 @@ let
       src = "packages/docgen";
       deps = [ ];
     };
-    cl-cc-php = {
-      src = "packages/php";
-      deps = [
-        "cl-cc-ast"
-        "cl-cc-bootstrap"
-        "cl-cc-parse"
-        "cl-cc-vm"
-      ];
-    };
     cl-cc-javascript = {
       src = "packages/javascript";
       deps = [
         "cl-cc-ast"
         "cl-cc-bootstrap"
         "cl-cc-parse"
+        "cl-cc-php"
       ];
     };
     cl-cc-optimize = {
@@ -293,6 +286,7 @@ let
     cl-cc-bytecode = clCcBytecode;
     cl-cc-optimize = clCcOptimize;
     cl-cc-parse = clCcParse;
+    cl-cc-php = clCcPhp;
     cl-cc-regalloc = clCcRegalloc;
     cl-cc-codegen = clCcCodegen;
     cl-cc-emit = clCcEmit;

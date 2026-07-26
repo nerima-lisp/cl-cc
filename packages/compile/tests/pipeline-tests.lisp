@@ -312,11 +312,24 @@ asserting the new path reproduces it has to still hold the old one."
           (cl-cc/backend-protocol:registered-backend language)))
         #'string< :key #'symbol-name))
 
-(deftest-each backend-protocol-registers-each-language
-  "Both backends register themselves, so the pipeline never names their packages."
-  :cases (("php" :php) ("javascript" :javascript))
-  (language)
-  (assert-true (cl-cc/backend-protocol:registered-backend language)))
+(deftest backend-protocol-registers-javascript
+  "JavaScript registers itself, so the pipeline never names its package."
+  (assert-true (cl-cc/backend-protocol:registered-backend :javascript)))
+
+(deftest backend-bootstrap-registry-carries-php
+  "PHP registers through the cl-cc/bootstrap registry instead.
+
+§5-1 was implemented twice, and the standalone cl-cc-php -- which is what this
+build compiles -- uses the older, wider one in cl-cc/bootstrap. The pipeline
+drains both, so which registry a backend chose is its own business; what has to
+hold is that its helpers arrive."
+  (let ((entries (cl-cc/bootstrap:backend-bridge-providers)))
+    (assert-true (plusp (length entries)))
+    (assert-true (find-if (lambda (entry)
+                            (let ((name (symbol-name (car entry))))
+                              (and (>= (length name) 5)
+                                   (string= "%PHP-" name :end2 5))))
+                          entries))))
 
 (deftest-each backend-protocol-bridge-sets-match-the-old-package-scans
   "Moving the %PHP-*/%JS-* scans into the backends changes which symbols get bridged: none.
@@ -326,8 +339,9 @@ convention, so the orchestrator would stop depending on a backend's package name
 -- the coupling that blocked moving either to its own repository. Same
 predicate, same package, evaluated from the other side of the boundary, so each
 bridged set has to be identical or the move was not behaviour-preserving."
-  :cases (("php" :php :cl-cc/php "%PHP-")
-          ("javascript" :javascript :cl-cc/javascript "%JS-"))
+  ;; JavaScript only. PHP's scan lives in the standalone cl-cc-php and reaches
+  ;; the VM through the cl-cc/bootstrap registry, covered above.
+  :cases (("javascript" :javascript :cl-cc/javascript "%JS-"))
   (language package-name prefix)
   (let ((scan (%package-prefixed-function-symbols package-name prefix))
         (protocol (%sorted-backend-bridge-symbols language)))

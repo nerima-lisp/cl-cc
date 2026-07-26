@@ -45,7 +45,6 @@
       (ensure-system-asd :cl-cc-cps "packages/cps/cl-cc-cps.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
-       (ensure-system-asd :cl-cc-php "packages/php/cl-cc-php.asd" here)
        (ensure-system-asd :cl-cc-javascript "packages/javascript/cl-cc-javascript.asd" here)
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
        (ensure-system-asd :cl-cc-selfhost "packages/selfhost/cl-cc-selfhost.asd" here)
