@@ -32,6 +32,16 @@
 (define-expander-for backquote (form)
   (compiler-macroexpand-all (%expand-quasiquote (second form))))
 
+;; quasiquote — the same construct under the name the reader actually emits.
+;; LEX-READ-DISPATCH builds (CL-CC/PARSE::QUASIQUOTE template), so registering
+;; only BACKQUOTE left every read backquote unexpanded: COMPILER-MACROEXPAND-ALL
+;; returned the template as-is and the CL-CC/BOOTSTRAP:UNQUOTE inside it survived
+;; into the stored macro expander, where it was finally called as a function.
+;; COMPILER-MACROEXPAND-ALL matches head symbols by name across packages, so this
+;; registration covers the reader's symbol as well as this one.
+(define-expander-for quasiquote (form)
+  (compiler-macroexpand-all (%expand-quasiquote (second form))))
+
 (defun %quoted-function-designator-symbol (designator)
   "Return the symbol named by a quoted function DESIGNATOR, or NIL."
   (and (consp designator)
