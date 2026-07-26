@@ -220,20 +220,27 @@ Returns (values handler-found-p handler-info) or signals error."
         (progn (error condition) (values (1+ pc) nil nil)))))
 
 (defmethod execute-instruction ((inst vm-cerror) state pc labels)
-  ;; Create a continue restart and signal the condition
-  ;; The restart allows continuing after the error
-  (let* ((condition (vm-reg-get state (vm-condition-reg inst)))
-         (handler   (vm-find-handler state condition)))
+  ;; Signal a continuable error: offer it to the guest handlers, and fall through
+  ;; to the next instruction — the CONTINUE restart — when none takes it.
+  (let ((condition (vm-reg-get state (vm-condition-reg inst))))
     (%vm-maybe-break-on-signal condition state labels)
-    ;; Add a continue restart
     (vm-add-restart state 'continue
                     (list :label nil
                           :continue-message (vm-continue-message inst)))
-    ;; Signal the condition
-    (if handler
-        (%vm-jump-to-handler state labels condition handler)
-        ;; If no handler, return to next instruction (continue restart)
-        (values (1+ pc) nil nil))))
+    ;; The zero-cost exception table has to be consulted before VM-FIND-HANDLER,
+    ;; which only walks the handler stack. HANDLER-CASE registers PC ranges in
+    ;; the table, so looking at the stack alone meant no HANDLER-CASE ever saw a
+    ;; continuable error: (handler-case (progn (assert (= 1 2)) :no)
+    ;; (error () :caught)) fell straight through to :NO, and ASSERT's
+    ;; STORE-VALUE protocol never got a chance to run.
+    (multiple-value-bind (next-pc handled-p)
+        (vm-dispatch-exception-table state labels pc condition :error-p nil)
+      (if next-pc
+          (values next-pc handled-p nil)
+          (let ((handler (vm-find-handler state condition)))
+            (if handler
+                (%vm-jump-to-handler state labels condition handler)
+                (values (1+ pc) nil nil)))))))
 
 (defmethod execute-instruction ((inst vm-warn) state pc labels)
   (let ((condition (vm-reg-get state (vm-condition-reg inst))))

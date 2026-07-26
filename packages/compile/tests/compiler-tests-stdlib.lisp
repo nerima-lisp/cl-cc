@@ -227,6 +227,23 @@
   (expected form)
   (assert-= expected (run-string form :stdlib t)))
 
+(deftest compile-cerror-is-caught-by-handler-case
+  "A continuable error reaches an enclosing handler-case.
+
+VM-CERROR used to resolve handlers with VM-FIND-HANDLER, which walks only the
+handler stack. HANDLER-CASE registers PC ranges in the zero-cost exception table
+instead, so no HANDLER-CASE ever saw a continuable error and this form fell
+through to :NO."
+  (assert-eq :caught
+             (run-string "(handler-case (progn (assert (= 1 2)) :no)
+                            (error () :caught))"
+                         :stdlib t)))
+
+(deftest compile-cerror-continues-when-unhandled
+  "An unhandled continuable error returns, so execution proceeds past it."
+  (assert-eq :after
+             (run-string "(progn (assert (= 1 2)) :after)" :stdlib t)))
+
 (deftest compile-assert-place-restarts
   "assert uses STORE-VALUE restarts to update listed places and re-check the test."
   (let ((result
