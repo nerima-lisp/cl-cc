@@ -276,7 +276,11 @@ Returns the expanded BODY wrapped in PROGN."
                    (macro-body  (cddr b)))
                (push (cons name (lookup-macro name)) saved)
                (register-macro name (make-host-macro-expander lambda-list macro-body))))
-           (compiler-macroexpand-all (cons 'progn body)))
+           ;; A MACROLET body is a declaration scope, so collapse through the
+           ;; helper: PROGN would leave any leading declarations where only
+           ;; forms are read. Identical to (cons 'progn body) when there are
+           ;; none.
+           (compiler-macroexpand-all (%collapse-empty-binding-body body)))
       (dolist (s saved)
         (if (cdr s)
             (register-macro (car s) (cdr s))
@@ -291,7 +295,8 @@ Each binding is (symbol expansion). Returns the expanded BODY wrapped in PROGN."
             (expansion (second b)))
         (push (cons name (gethash name *symbol-macro-table*)) saved)
         (setf (gethash name *symbol-macro-table*) expansion)))
-    (let ((result (compiler-macroexpand-all (cons 'progn body))))
+    ;; SYMBOL-MACROLET's body is a declaration scope too; see EXPAND-MACROLET-FORM.
+    (let ((result (compiler-macroexpand-all (%collapse-empty-binding-body body))))
       (dolist (s saved)
         (if (cdr s)
             (setf (gethash (car s) *symbol-macro-table*) (cdr s))

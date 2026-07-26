@@ -442,11 +442,22 @@ or any handle allocated by vm-allocate-file-handle."
                (vm-string-streams state)))
     found))
 
+(defvar *vm-coerced-input-stream-origins*
+  (make-hash-table :test #'eq :weakness :key)
+  "Host input stream -> the VM string-input-stream %VM-INPUT-STREAM-TO-HOST built
+it from. ANSI requires the compound-stream accessors to return the very object
+that was passed to the constructor, so the coercion has to be reversible; without
+this, (eq in (two-way-stream-input-stream (make-two-way-stream in out))) is false.
+Weak on the key so a collected host stream does not pin its origin.")
+
 (defun %vm-bridge-stream-result (stream)
-  "Convert host STREAM back to its VM handle when one exists."
-  (if *vm-current-state*
-      (or (%vm-stream-handle-for-stream *vm-current-state* stream) stream)
-      stream))
+  "Convert host STREAM back to its VM handle or pre-coercion origin when one exists."
+  (let ((origin (gethash stream *vm-coerced-input-stream-origins*)))
+    (cond
+      (origin origin)
+      (*vm-current-state*
+       (or (%vm-stream-handle-for-stream *vm-current-state* stream) stream))
+      (t stream))))
 
 (defun %vm-bridge-symbol-stream-value (symbol)
   "Return SYMBOL's current stream value, preferring the active VM global store."
@@ -471,7 +482,11 @@ the VM bridge resolves the current VM symbol value to its underlying stream."
   (apply #'make-broadcast-stream (mapcar #'%vm-bridge-stream-arg streams)))
 
 (defun %vm-bridge-make-two-way-stream (input-stream output-stream)
-  (make-two-way-stream (%vm-bridge-stream-arg input-stream)
+  ;; Same coercion the echo- and concatenated-stream bridges do: the input side
+  ;; may be a cl-cc vm-string-input-stream, which host MAKE-TWO-WAY-STREAM
+  ;; rejects because it is a struct rather than a CL:STREAM. The output side is
+  ;; already a host stream.
+  (make-two-way-stream (%vm-input-stream-to-host input-stream)
                        (%vm-bridge-stream-arg output-stream)))
 
 (defun %vm-bridge-make-echo-stream (input-stream output-stream)
@@ -490,9 +505,13 @@ its current position) so host stream constructors accept it. Other values pass
 through after the usual bridge handle resolution."
   (let ((resolved (%vm-bridge-stream-arg value)))
     (if (vm-string-input-stream-p resolved)
-        (make-string-input-stream
-         (subseq (vm-string-input-stream-contents resolved)
-                 (vm-string-input-stream-position resolved)))
+        (let ((host (make-string-input-stream
+                     (subseq (vm-string-input-stream-contents resolved)
+                             (vm-string-input-stream-position resolved)))))
+          ;; Remember what this was made from, so the compound-stream accessors
+          ;; can hand back the original object as ANSI requires.
+          (setf (gethash host *vm-coerced-input-stream-origins*) resolved)
+          host)
         resolved)))
 
 (defun %vm-bridge-make-concatenated-stream (&rest streams)

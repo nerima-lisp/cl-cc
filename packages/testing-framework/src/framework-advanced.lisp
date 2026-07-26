@@ -85,8 +85,13 @@ parameterized tests from different files do not silently collide in the global r
                                               (symbol-name base-name)
                                               case-label))
                      for bindings = (mapcar #'list checked-vars case-vals)
+                     ;; The reporter prints the docstring, not the test symbol,
+                     ;; so a shared docstring makes every case of one
+                     ;; DEFTEST-EACH report under the same line — a failure then
+                     ;; names the group without saying which case produced it.
+                     for case-docstring = (format nil "~A [~A]" docstring case-label)
                      collect `(deftest ,test-name
-                                ,docstring
+                                ,case-docstring
                                 (let ,bindings
                                   ,@body-forms)))))
         `(progn ,@expansions)))))

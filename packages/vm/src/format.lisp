@@ -272,7 +272,14 @@
   (declare (ignore labels))
   (let* ((handle (vm-reg-get state (vm-src inst)))
          (stream (vm-get-stream state handle))
-         (line (read-line stream nil nil))
+         ;; VM-GET-STREAM yields either a host stream or a VM-STRING-INPUT-STREAM
+         ;; struct, which is not a CL:STREAM — VM-READ-CHAR and VM-READ-LINE both
+         ;; dispatch on that, and this instruction has to as well or READ on a
+         ;; string stream signals a type error instead of reading.
+         (line (if (vm-string-input-stream-p stream)
+                   (let ((read (vm-string-input-stream-read-line stream)))
+                     (unless (eq read +eof-value+) read))
+                   (read-line stream nil nil)))
          (value (when line
                   (let ((*read-eval* (%vm-read-eval-enabled-p state))
                         (*readtable* (or (%vm-host-readtable-for-state state)

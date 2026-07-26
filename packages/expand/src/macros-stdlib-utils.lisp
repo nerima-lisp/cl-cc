@@ -400,9 +400,31 @@
   "Return character for integer CODE."
   `(cl:code-char ,code))
 
-(our-defmacro digit-char-p (char &optional (radix 10))
+(our-defmacro digit-char-p (char &optional radix)
   "Return digit weight of CHAR in RADIX or nil."
-  `(cl:digit-char-p ,char ,radix))
+  ;; The builtin registry maps DIGIT-CHAR-P to the *unary* VM-DIGIT-CHAR-P, so
+  ;; emitting the radix unconditionally — as a (radix 10) default did — never
+  ;; matched it and fell through to a call of an undefined function. Emit the
+  ;; one-argument form for the default radix, and compute the weight inline when
+  ;; a radix is given, since no VM instruction takes one.
+  (if (null radix)
+      `(cl:digit-char-p ,char)
+      (let ((char-var (gensym "CHAR"))
+            (radix-var (gensym "RADIX"))
+            (code-var (gensym "CODE"))
+            (weight-var (gensym "WEIGHT")))
+        `(let* ((,char-var ,char)
+                (,radix-var ,radix)
+                (,code-var (char-code ,char-var))
+                (,weight-var
+                  (cond ((and (>= ,code-var 48) (<= ,code-var 57))
+                         (- ,code-var 48))
+                        ((and (>= ,code-var 65) (<= ,code-var 90))
+                         (+ (- ,code-var 65) 10))
+                        ((and (>= ,code-var 97) (<= ,code-var 122))
+                         (+ (- ,code-var 97) 10))
+                        (t nil))))
+           (if (and ,weight-var (< ,weight-var ,radix-var)) ,weight-var nil)))))
 
 (our-defmacro alpha-char-p (char) `(cl:alpha-char-p ,char))
 (our-defmacro alphanumericp  (char) `(cl:alphanumericp ,char))

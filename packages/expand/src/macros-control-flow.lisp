@@ -120,7 +120,12 @@ Records which condition toggled the decision."
     (let ((bindings (second form))
           (body (cddr form)))
       (if (null bindings)
-          (cons 'progn body)
+          ;; The recursion peels one binding per step and always bottoms out
+          ;; here, so this is where a LET* body's declarations end up. PROGN is
+          ;; not a declaration scope: collapsing to it turns (declare (ignore
+          ;; k v)) into a call of DECLARE on a call of IGNORE. Keep an empty
+          ;; LET when the body carries declarations.
+          (%collapse-empty-binding-body body)
           (let ((binding (car bindings)))
             (list 'let (list binding)
                   (cons 'let* (cons (cdr bindings) body))))))))
