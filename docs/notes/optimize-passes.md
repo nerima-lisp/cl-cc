@@ -482,7 +482,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-160: Lambda Lifting ✅
 
-- **対象**: `packages/ast/src/closure.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-ast` の `src/closure.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: `find-free-variables`（`closure.lisp:48-81`）で自由変数を解析するが、内部関数を外部に持ち上げる変換なし。すべての内部`lambda`がクロージャ割り当てを発生
 - **内容**: 自由変数が少ない（≤4）内部関数をトップレベルに持ち上げ、自由変数を追加引数として渡す。クロージャ割り当てをゼロにする
 - **根拠**: `codegen.lisp:581-582`が空キャプチャでも常に`make-vm-closure`を生成。MLton/SML#はlambda liftingで大半のクロージャを除去
@@ -658,14 +658,14 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-031: One-Shot Lambda / Cardinality Analysis ✅
 
-- **対象**: `packages/ast/src/closure.lisp` + `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-ast` の `src/closure.lisp` + `packages/compile/src/codegen.lisp`
 - **内容**:
   - クロージャが正確に一度しか呼ばれない場合、ヒープにクロージャオブジェクトを割り当てない
   - CPS変換後の継続ラッパーの大半は one-shot
   - スタックフレームに直接格納することでGCプレッシャー削減
 - **難易度**: Medium
 
-- **関連実装**: `packages/ast/src/closure.lisp` に `binding-direct-call-count-in-body` / `binding-one-shot-p` を追加済み。現状は局所関数束縛が「非エスケープかつ direct call 1 回だけ」かを判定する分析 helper 層のみで、実際の closure allocation 省略や stack storage への codegen 統合は未実装。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-ast` の `src/closure.lisp` に `binding-direct-call-count-in-body` / `binding-one-shot-p` を追加済み。現状は局所関数束縛が「非エスケープかつ direct call 1 回だけ」かを判定する分析 helper 層のみで、実際の closure allocation 省略や stack storage への codegen 統合は未実装。
 
 ---
 
@@ -849,13 +849,13 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-330: Closure Capture Deduplication (クロージャキャプチャ重複排除) ✅
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/ast/src/closure.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-ast` の `src/closure.lisp`
 - **現状**: `codegen.lisp:333-335`（flet）・`codegen.lisp:405-408`（labels）で各クロージャが独立に捕捉変数リストを持つ。同スコープの兄弟クロージャ間でのキャプチャスロット共有なし
 - **内容**: 同スコープの複数クロージャが同じ変数を捕捉する場合、共有環境レコードを割り当て各クロージャからそれを参照。割り当て削減とキャッシュ局所性向上。FR-043（環境フラット化）・FR-132（キャプチャトリミング）と相補的
 - **根拠**: V8 shared function info / Chez Scheme shared environments。兄弟クロージャの環境共有
 - **難易度**: Medium
 
-- **関連実装**: `packages/ast/src/closure.lisp` に `closure-capture-key` / `group-shared-sibling-captures` を追加済み。sibling closure 群の capture 集合を canonical key でグループ化し、重複 capture を dedup する基本分析を提供する。共有環境レコード割り当てや codegen 統合の完全版は将来拡張。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-ast` の `src/closure.lisp` に `closure-capture-key` / `group-shared-sibling-captures` を追加済み。sibling closure 群の capture 集合を canonical key でグループ化し、重複 capture を dedup する基本分析を提供する。共有環境レコード割り当てや codegen 統合の完全版は将来拡張。
 
 - **完了済みFR**: FR-326, FR-327, FR-329
 

@@ -678,7 +678,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: SBCL `typecase` compilation / GCC `switch` with jump table。CLOS dispatch の内部でも型チェックチェーンを置き換え可能
 - **難易度**: Medium
 
-- **関連実装**: `packages/expand/src/macros-control-flow.lisp` の `%prune-typecase-clauses` により、先行節に包含される後続節は展開前に削除される。さらに `packages/type/src/exhaustiveness.lisp` に `check-typecase-exhaustiveness` / `check-etypecase-completeness` / `useful-typecase-arms` があり、型 case の冗長節・網羅性解析基盤を提供する。
+- **関連実装**: `packages/expand/src/macros-control-flow.lisp` の `%prune-typecase-clauses` により、先行節に包含される後続節は展開前に削除される。さらに 外部リポジトリ `nerima-lisp/cl-cc-type` の `src/exhaustiveness.lisp` に `check-typecase-exhaustiveness` / `check-etypecase-completeness` / `useful-typecase-arms` があり、型 case の冗長節・網羅性解析基盤を提供する。
 
 ---
 

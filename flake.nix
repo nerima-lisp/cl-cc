@@ -84,7 +84,7 @@
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type/d12c0aae69d1cdcca7bcc138b03db2bdeda13aab";
+      url = "github:nerima-lisp/cl-cc-type/324b1c06b86a382f6561019d087d845667cf4606";
       flake = false;
     };
   };
@@ -229,11 +229,13 @@
           # Subsystems split out of this repository. clCcAst is a
           # dependency-free leaf; clCcType depends on it.
           #
-          # WARNING: packages/ast/ and packages/type/ in THIS repository still
-          # define ASDF systems under these same names, and the two definitions
-          # have diverged. Which one ASDF sees depends on registry order. See
-          # the warning banner at the top of packages/ast/cl-cc-ast.asd for the
-          # measured divergence; the ambiguity is documented, not resolved.
+          # These are now the only definitions of those two systems. packages/
+          # {ast,type} used to define them as well, and because ASDF resolved
+          # whichever the registry reached first -- always the in-tree copy,
+          # since this tree is scanned ahead of the injected derivations -- the
+          # repositories were never actually compiled and the two sides drifted.
+          # The in-tree copies have been removed; packages/{ast,type}/tests
+          # remain and now exercise these derivations.
           clCcAst = sbcl.buildASDFSystem {
             pname = "cl-cc-ast";
             version = siblingVersion "cl-cc-ast";
@@ -339,6 +341,7 @@
               sbclWithTests
               clProlog
               clWeave
+              clCcAst
               ;
             inherit (appsModule) apps;
           };

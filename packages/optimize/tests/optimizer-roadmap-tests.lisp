@@ -109,7 +109,14 @@ resets the current block (used by the backend doc which has ### section separato
     (nreverse ids)))
 
 (defun %optimizer-doc-path-token-p (token)
-  "Return T when TOKEN is a repository-relative doc/code path."
+  "Return T when TOKEN is a repository-relative doc/code path.
+
+Only `packages/` and `docs/` prefixes count, and that is what keeps this check
+sound: it verifies the paths this checkout can be asked about. Code that has
+moved to a standalone repository -- ast and type so far -- is written as the
+repository name plus a path relative to it, so neither backtick token looks like
+a checkout path. PROBE-FILE could not answer for those anyway: they reach the
+build as a Nix store path, not a sibling directory."
   (or (and (>= (length token) 9)
            (string= "packages/" token :end2 9))
       (and (>= (length token) 5)

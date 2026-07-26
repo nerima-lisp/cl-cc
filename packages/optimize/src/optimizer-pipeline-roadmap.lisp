@@ -168,11 +168,34 @@ Accepted STATUS keywords: :implemented, :partial, :planned, :unknown."
         (push (opt-roadmap-feature-id feature) ids)))
     (nreverse ids)))
 
+(defparameter *opt-roadmap-extracted-package-systems*
+  '(("packages/ast/"  . :cl-cc-ast)
+    ("packages/type/" . :cl-cc-type))
+  "Roadmap evidence prefixes for packages that now live in their own repository.
+
+Evidence strings still name the logical module -- packages/type/src/inference.lisp
+is where that code belonged when the entry was written, and renaming every entry
+would lose the continuity the roadmap is for. The source moved to a standalone
+repository, so the prefix is stripped and the remainder resolved against that
+system instead of this checkout. The check stays a real file-existence check
+rather than being weakened to a pattern match.")
+
+(defun %opt-roadmap-extracted-module-pathname (path)
+  "Resolve PATH against the standalone system that now owns it, or NIL."
+  (loop for (prefix . system) in *opt-roadmap-extracted-package-systems*
+        when (and (>= (length path) (length prefix))
+                  (string= prefix path :end2 (length prefix)))
+          return (ignore-errors
+                   (probe-file
+                    (asdf:system-relative-pathname
+                     system (subseq path (length prefix)))))))
+
 (defun %opt-roadmap-module-present-p (path)
   "Return T when PATH identifies a checkout file."
   (labels ((present-p (candidate)
              (or (ignore-errors (probe-file (asdf:system-relative-pathname :cl-cc candidate)))
-                 (probe-file (merge-pathnames candidate (uiop:getcwd))))))
+                 (probe-file (merge-pathnames candidate (uiop:getcwd)))
+                 (%opt-roadmap-extracted-module-pathname candidate))))
     (and (stringp path)
          (or (present-p path)
              (and (string= path "packages/optimize/src/optimizer-speculative-ic.lisp")

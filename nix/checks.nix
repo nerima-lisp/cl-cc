@@ -11,6 +11,7 @@
   apps,
   clProlog,
   clWeave,
+  clCcAst,
 }:
 {
   # The canonical fast unit test suite, published as `checks.default`.
@@ -59,7 +60,6 @@
           root = ../.;
           fileset = lib.fileset.unions [
             ../packages/prolog-tools
-            ../packages/ast
           ];
         };
       }
@@ -70,10 +70,12 @@
         export HOME="$TMPDIR/home"
         export XDG_CACHE_HOME="$TMPDIR/cache"
         mkdir -p "$HOME" "$XDG_CACHE_HOME"
-        export CL_SOURCE_REGISTRY="${clProlog}//:${clWeave}//:$PWD//:"
+        # cl-cc-prolog-tools :depends-on :cl-cc-ast, which used to be satisfied
+        # by packages/ast in this tree. That copy is gone and the standalone
+        # repository is authoritative, so the derivation supplies it.
+        export CL_SOURCE_REGISTRY="${clProlog}//:${clWeave}//:${clCcAst}//:$PWD//:"
         sbcl --non-interactive \
           --eval '(require :asdf)' \
-          --eval '(asdf:load-asd (truename "packages/ast/cl-cc-ast.asd"))' \
           --eval '(asdf:load-asd (truename "packages/prolog-tools/cl-cc-prolog-tools.asd"))' \
           --eval '(asdf:test-system :cl-cc-prolog-tools)'
         touch $out

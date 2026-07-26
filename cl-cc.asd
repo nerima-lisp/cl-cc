@@ -26,14 +26,27 @@
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
       (ensure-system-asd :cl-cc-bootstrap "packages/bootstrap/cl-cc-bootstrap.asd" here)
-      (ensure-system-asd :cl-cc-ast "packages/ast/cl-cc-ast.asd" here)
+      ;; cl-cc-ast and cl-cc-type are deliberately absent. They live in the
+      ;; standalone repositories nerima-lisp/cl-cc-ast and nerima-lisp/cl-cc-type
+      ;; and reach this build as flake.nix inputs.
+      ;;
+      ;; They used to be defined in packages/{ast,type} as well. Because
+      ;; ENSURE-SYSTEM-ASD only loads a file when FIND-SYSTEM misses, and the
+      ;; cl-cc source tree is scanned ahead of the injected derivations, the
+      ;; in-tree copies won in *both* Nix and a bare checkout -- so the
+      ;; repositories were never compiled, and the two definitions had drifted
+      ;; apart in the meantime. Removing the in-tree copies is what makes the
+      ;; resolution unambiguous.
+      ;;
+      ;; packages/{ast,type}/tests stay: those are cl-cc's own integration tests
+      ;; over whichever system provides the packages, and they are not duplicated
+      ;; by the repositories' own t/ suites, which test module boundaries.
       (ensure-system-asd :cl-cc-binary "packages/binary/cl-cc-binary.asd" here)
       (ensure-system-asd :cl-cc-runtime "packages/runtime/cl-cc-runtime.asd" here)
       (ensure-system-asd :cl-cc-bytecode "packages/bytecode/cl-cc-bytecode.asd" here)
       (ensure-system-asd :cl-cc-ir "packages/ir/cl-cc-ir.asd" here)
       (ensure-system-asd :cl-cc-mir "packages/mir/cl-cc-mir.asd" here)
       (ensure-system-asd :cl-cc-target "packages/target/cl-cc-target.asd" here)
-      (ensure-system-asd :cl-cc-type "packages/type/cl-cc-type.asd" here)
       (ensure-system-asd :cl-cc-optimize "packages/optimize/cl-cc-optimize.asd" here)
       (ensure-system-asd :cl-cc-regalloc "packages/regalloc/cl-cc-regalloc.asd" here)
       (ensure-system-asd :cl-cc-parse "packages/parse/cl-cc-parse.asd" here)
