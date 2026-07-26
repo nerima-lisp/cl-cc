@@ -43,11 +43,27 @@ Values stored as lists are spliced in; scalar values are wrapped in a list."
                    (hash-table-p metaclass))
               (gethash :__name__ metaclass)
               (gethash :__name__ class-ht)))
-        (typecase arg
-          (integer 'integer)
-          (string 'string)
-          (symbol 'symbol)
-          (t t)))))
+        ;; A *class object* has no :__CLASS__ of its own and so used to classify
+        ;; as T. The MOP hands the class itself as the first argument to
+        ;; SLOT-VALUE-USING-CLASS and friends, and a method specialising that
+        ;; parameter on a custom metaclass must match — otherwise it is registered
+        ;; under (meta-b t t) while dispatch computes (t t symbol) and the hook
+        ;; never fires. Only a custom metaclass is named here; a standard class
+        ;; keeps answering T, which is what everything downstream expects.
+        (let ((metaclass (and (hash-table-p arg)
+                              (nth-value 1 (gethash :__name__ arg))
+                              state
+                              (fboundp '%vm-class-effective-metaclass)
+                              (funcall #'%vm-class-effective-metaclass arg state))))
+          (if (and (hash-table-p metaclass)
+                   (fboundp '%vm-standard-metaclass-p)
+                   (not (funcall #'%vm-standard-metaclass-p metaclass)))
+              (gethash :__name__ metaclass)
+              (typecase arg
+                (integer 'integer)
+                (string 'string)
+                (symbol 'symbol)
+                (t t)))))))
 
 (defun %eql-specializer-p (key)
   "Return T if KEY is an eql specializer form (eql value)."

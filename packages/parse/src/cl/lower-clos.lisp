@@ -115,9 +115,18 @@
       :qualifier qualifier
       :specializers (nreverse specializers)
       :params       (nreverse param-names)
-      :body         (list (lower-sexp-to-ast (list* 'block 
-                                                     (if (listp name) (second name) name)
-                                                     body-forms)))
+      ;; A method body's declarations belong to the method's lambda, ahead of the
+      ;; implicit block. Wrapping them inside (block name ...) put them where only
+      ;; forms are read, so (declare (ignore x)) compiled as a call of DECLARE on
+      ;; a call of IGNORE. cl-cc does not use method declarations for anything, so
+      ;; drop them rather than hoist them.
+      :body         (list (lower-sexp-to-ast
+                           (multiple-value-bind (declarations stripped)
+                               (%extract-leading-declarations body-forms)
+                             (declare (ignore declarations))
+                             (list* 'block
+                                    (if (listp name) (second name) name)
+                                    stripped))))
       :source-file sf :source-line sl :source-column sc)))
 
 ;;; ── Make-instance ────────────────────────────────────────────────────────────

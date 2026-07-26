@@ -230,16 +230,20 @@ instructions are what dispatch them. Scalarizing dropped their side effects."
     "(defclass meta-a () ())
      (defclass object-a () () (:metaclass meta-a))
      (symbol-name (class-name (class-of (make-instance 'object-a))))")
+   ;; The counter has to be read *after* the slot access: the hook fires on the
+   ;; read, and (list *count* (slot-value ...)) evaluates left to right, so the
+   ;; original form sampled the counter before anything could increment it.
    ("slot-value-using-class-before-method-runs"
-    '(1 42)
+    '(42 1)
     "(defclass meta-b () ())
      (defclass object-b () ((x :initarg :x)) (:metaclass meta-b))
      (defvar *slot-hook-count* 0)
      (defmethod slot-value-using-class :before ((class meta-b) object slot-name)
        (declare (ignore class object slot-name))
        (setq *slot-hook-count* (+ *slot-hook-count* 1)))
-     (let ((obj (make-instance 'object-b :x 42)))
-       (list *slot-hook-count* (slot-value obj 'x)))")
+     (let* ((obj (make-instance 'object-b :x 42))
+            (value (slot-value obj 'x)))
+       (list value *slot-hook-count*))")
    ("initialize-instance-after-method-runs"
     '(1 9)
     "(defclass meta-c () ())

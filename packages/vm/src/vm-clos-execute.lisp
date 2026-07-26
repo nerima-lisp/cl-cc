@@ -213,6 +213,25 @@ descriptor already carries its effective inherited initforms."
   "Return T when CLASS-HT has a custom metaclass."
   (not (%vm-standard-metaclass-p (%vm-class-effective-metaclass class-ht state))))
 
+(defun %vm-same-name-global-generic-function (state name)
+  "Return a generic function stored under any same-named symbol in STATE.
+
+The VM looks protocol generic functions up with symbols read in :CL-CC/VM, while
+guest source is read in :CL-CC — so DEFMETHOD registered
+CL-CC::SLOT-VALUE-USING-CLASS while VM-SLOT-READ asked for
+CL-CC/VM::SLOT-VALUE-USING-CLASS and found nothing. Match on the symbol name."
+  (let ((target (and (symbolp name) (symbol-name name)))
+        (found nil))
+    (when target
+      (maphash (lambda (key value)
+                 (when (and (null found)
+                            (symbolp key)
+                            (string= (symbol-name key) target)
+                            (vm-generic-function-p value))
+                   (setf found value)))
+               (vm-global-vars state)))
+    found))
+
 (defun %vm-global-generic-function (state name)
   "Return global generic function NAME, or NIL if it is not available."
   (let ((value (or (gethash name (vm-global-vars state))
@@ -223,8 +242,9 @@ descriptor already carries its effective inherited initforms."
                                     (setf matched candidate)))
                                 (vm-global-vars state))
                        matched)))))
-    (when (vm-generic-function-p value)
-      value)))
+    (if (vm-generic-function-p value)
+        value
+        (%vm-same-name-global-generic-function state name))))
 
 (defun %vm-call-generic-sync (gf-ht state args &key default)
   "Synchronously call GF-HT with ARGS using the standard method combination.
