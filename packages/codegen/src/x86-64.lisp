@@ -159,6 +159,81 @@ register state, and jumps to this label."
     (format stream "  mov ~A, ~A~%" dst lhs)
     (format stream "  imul ~A, ~A~%" dst rhs)))
 
+;;; Floating point.
+;;;
+;;; VM-FLOAT-ADD/SUB/MUL are subclasses of VM-ADD/SUB/MUL, so with no methods of
+;;; their own they inherited the integer emitters above and printed `add rax, rbx`
+;;; for a double addition. VM-FLOAT-DIV descends from VM-CL-DIV, which had no
+;;; method at all, so it reached the VM-INSTRUCTION catch-all and turned every
+;;; float division into a hard compile error instead. The byte encoder in
+;;; x86-64-emit-ops.lisp has carried the whole SSE family all along; only this
+;;; textual emitter was missing it.
+
+(defparameter *fallback-fp-register-pool*
+  '((:r0 . "xmm0") (:r1 . "xmm1") (:r2 . "xmm2") (:r3 . "xmm3")
+    (:r4 . "xmm4") (:r5 . "xmm5") (:r6 . "xmm6") (:r7 . "xmm7"))
+  "Naive virtual->XMM mapping used when no FP register has been allocated.")
+
+(defparameter *phys-fp-reg-to-asm-string*
+  (loop for i from 0 below 16
+        collect (cons (intern (format nil "XMM~D" i) :keyword)
+                      (format nil "xmm~D" i)))
+  "Mapping from physical FP register keywords to assembly strings.")
+
+(defun target-fp-register (target virtual-register)
+  "Name the XMM register holding VIRTUAL-REGISTER's unboxed double.
+
+Register allocation may hand a float-valued vreg a general-purpose register --
+it is free to keep the boxed value there -- and such an assignment has no XMM
+name. Fall back to the naive pool in that case rather than erroring, so the
+assembly stays readable for the same programs the byte encoder can already
+compile."
+  (let* ((ra (target-regalloc target))
+         (phys (and ra (gethash virtual-register (regalloc-assignment ra))))
+         (entry (and phys (assoc phys *phys-fp-reg-to-asm-string*))))
+    (cond
+      (entry (cdr entry))
+      ((assoc virtual-register *fallback-fp-register-pool*)
+       (cdr (assoc virtual-register *fallback-fp-register-pool*)))
+      (t (error "Virtual register ~A has no XMM mapping" virtual-register)))))
+
+(macrolet ((define-float-binop-emitter (class mnemonic)
+             `(defmethod emit-instruction ((target x86-64-target) (inst ,class) stream)
+                (let ((dst (target-fp-register target (vm-dst inst)))
+                      (lhs (target-fp-register target (vm-lhs inst)))
+                      (rhs (target-fp-register target (vm-rhs inst))))
+                  (unless (string= dst lhs)
+                    (format stream "  movsd ~A, ~A~%" dst lhs))
+                  (format stream "  ~A ~A, ~A~%" ,mnemonic dst rhs)))))
+  (define-float-binop-emitter vm-float-add "addsd")
+  (define-float-binop-emitter vm-float-sub "subsd")
+  (define-float-binop-emitter vm-float-mul "mulsd")
+  (define-float-binop-emitter vm-float-div "divsd"))
+
+;;; Division and the truncating/rounding family.
+;;;
+;;; None of these is a single machine instruction under CL semantics: (/ 10 4)
+;;; must yield the rational 5/2, and FLOOR and friends return two values. They
+;;; go out as runtime calls, the same way the CLOS instructions below do. Every
+;;; one of them reached the catch-all before this, which is why (/ 10 4) and
+;;; (floor 10 4) both failed to compile for x86-64 -- and why (/ 10.0 4.0) still
+;;; would even with the DIVSD above, since its deoptimisation slow path emits a
+;;; VM-CL-DIV.
+
+(macrolet ((define-division-runtime-call (class callee)
+             `(defmethod emit-instruction ((target x86-64-target) (inst ,class) stream)
+                (%x86-64-emit-runtime-call target stream ,callee
+                                           (list (vm-lhs inst) (vm-rhs inst))
+                                           (vm-dst inst)))))
+  (define-division-runtime-call vm-cl-div       "rt-cl-div")
+  (define-division-runtime-call vm-div          "rt-floor-div")
+  (define-division-runtime-call vm-mod          "rt-mod")
+  (define-division-runtime-call vm-rem          "rt-rem")
+  (define-division-runtime-call vm-truncate     "rt-truncate")
+  (define-division-runtime-call vm-floor-inst   "rt-floor")
+  (define-division-runtime-call vm-ceiling-inst "rt-ceiling")
+  (define-division-runtime-call vm-round-inst   "rt-round"))
+
 (defmethod emit-instruction ((target x86-64-target) (inst vm-label) stream)
   (declare (ignore target))
   (format stream "  .align 4~%")

@@ -238,6 +238,20 @@
   (assert-compiles-to "(* 3.0 4.0)" :contains 'vm-float-mul)
   (assert-compiles-to "(/ 10.0 4.0)" :contains 'vm-float-div))
 
+(deftest x86-64-assembly-covers-the-division-family
+  "Every CL division form reaches x86-64 assembly instead of the unsupported-instruction error."
+  ;; ASSERT-COMPILES-TO wraps COMPILE-STRING in IGNORE-ERRORS, so an emitter gap
+  ;; is indistinguishable from a missing instruction there. Call it directly.
+  (dolist (code '("(/ 10.0 4.0)" "(/ 10 4)" "(mod 10 4)" "(rem 10 4)"
+                  "(truncate 10 4)" "(floor 10 4)" "(ceiling 10 4)" "(round 10 4)"))
+    (assert-true (plusp (length (%compiled-assembly code :x86_64)))))
+  ;; VM-FLOAT-DIV is the only one of the four float binops that does not inherit
+  ;; an integer emitter, and its deopt slow path emits a VM-CL-DIV, so both the
+  ;; SSE instruction and the runtime call have to be present.
+  (let ((asm (%compiled-assembly "(/ 10.0 4.0)" :x86_64)))
+    (assert-true (search "divsd" asm))
+    (assert-true (search "rt-cl-div" asm))))
+
 (deftest float-unboxing-via-the
   "Float arithmetic with explicit THE type annotation selects float ops."
   (assert-run= 3.0 "(the float (+ 1.0 2.0))")
