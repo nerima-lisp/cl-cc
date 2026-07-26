@@ -142,8 +142,21 @@
              v)))))
 
 ;;; FR-592: (setf (readtable-case readtable) case) → stdlib compatibility setter
-(%register-setf-place-handler
- 'readtable-case
+;;;
+;;; Registered under every READTABLE-CASE symbol the reader can hand us, not
+;;; just the one this file's package resolves. *SETF-COMPOUND-PLACE-HANDLERS*
+;;; is an EQ table; compiled cl-cc source is read into :CL-CC, where
+;;; READTABLE-CASE is CL-CC/VM:READTABLE-CASE, while the bare symbol here reads
+;;; as CL:READTABLE-CASE. Registering only the latter made
+;;; (setf (readtable-case rt) :downcase) miss the table and expand into a form
+;;; that silently left the readtable alone.
+(%register-shared-setf-place-handler
+ (remove nil
+         (remove-duplicates
+          (list 'readtable-case
+                (let ((vm-package (find-package "CL-CC/VM")))
+                  (and vm-package (find-symbol "READTABLE-CASE" vm-package))))
+          :test #'eq))
  (lambda (place value)
    (let ((setter (or (find-symbol "SET-READTABLE-CASE" :cl-cc)
                      (intern "SET-READTABLE-CASE" :cl-cc))))
