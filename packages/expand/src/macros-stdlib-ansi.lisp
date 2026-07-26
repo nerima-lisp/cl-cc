@@ -113,9 +113,22 @@
 (our-defmacro assert (test &optional places datum &rest args)
   "Signal a continuable error if TEST is false."
   (labels ((failure-form ()
-             (if datum
-                 `(cerror "Continue." ,datum ,@args)
-                 `(cerror "Continue." "Assertion failed: ~S" ',test))))
+             ;; SIGNAL first, then CERROR. SIGNAL walks *%CONDITION-HANDLERS* in
+             ;; guest code, so a HANDLER-BIND handler that answers by calling
+             ;; STORE-VALUE throws to this ASSERT's RESTART-CASE tag from the
+             ;; guest stack, where the throw unwinds normally. Letting the VM
+             ;; invoke the handler instead runs it inside %VM-CALL-CLOSURE-SYNC,
+             ;; which a throw cannot cross — the restart was never reached and the
+             ;; STORE-VALUE protocol could not work. A handler that declines
+             ;; returns, and CERROR then signals as before.
+             (let ((message-var (gensym "ASSERT-CONDITION")))
+               `(let ((,message-var ,(if datum
+                                         (if args
+                                             `(format nil ,datum ,@args)
+                                             datum)
+                                         `(format nil "Assertion failed: ~S" ',test))))
+                  (signal ,message-var)
+                  (cerror "Continue." ,message-var)))))
     (if (null places)
         `(unless ,test
            ,(failure-form))

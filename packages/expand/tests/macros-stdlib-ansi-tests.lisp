@@ -40,19 +40,35 @@
     (assert-eq 'unless (car result))
     (assert-equal '(= x 1) (second result))))
 
+(defun %find-call-in-form (head form)
+  "Return the first (HEAD ...) subform of FORM, searching depth-first.
+
+The searches below have to recurse: ASSERT's failure branch is now
+(let ((c ...)) (signal c) (cerror \"Continue.\" c)), so the CERROR call sits a
+level down and its datum is the LET variable rather than the literal. The SIGNAL
+runs HANDLER-BIND's handlers on the guest stack, where an INVOKE-RESTART from one
+of them can throw to this ASSERT's own RESTART-CASE."
+  (cond
+    ((not (consp form)) nil)
+    ((eq (car form) head) form)
+    (t (some (lambda (sub) (%find-call-in-form head sub)) form))))
+
 (deftest assert-failure-body-contains-cerror
   "ASSERT failure body contains a CERROR call for interactive restart."
-  (let* ((result (our-macroexpand-1 '(assert (zerop n))))
-         (body   (cddr result)))
-    (assert-true (some (lambda (f) (and (consp f) (eq (car f) 'cerror))) body))))
+  (let ((result (our-macroexpand-1 '(assert (zerop n)))))
+    (assert-true (%find-call-in-form 'cerror (cddr result)))))
+
+(deftest assert-failure-body-signals-before-cerror
+  "ASSERT offers the condition to HANDLER-BIND handlers before signalling it."
+  (let ((result (our-macroexpand-1 '(assert (zerop n)))))
+    (assert-true (%find-call-in-form 'signal (cddr result)))))
 
 (deftest assert-datum-forwarded-to-cerror
-  "ASSERT forwards datum and format args to CERROR in the failure branch."
+  "ASSERT forwards datum and format args to the condition it signals."
   (let* ((result (our-macroexpand-1 '(assert test nil "msg ~A" x)))
-         (body   (cddr result))
-         (cerror (find 'cerror body :key #'car)))
-    (assert-true cerror)
-    (assert-equal "msg ~A" (third cerror))))
+         (format-call (%find-call-in-form 'format (cddr result))))
+    (assert-true format-call)
+    (assert-equal "msg ~A" (third format-call))))
 
 (deftest assert-with-places-wraps-store-value-restart
   "ASSERT with PLACES establishes a STORE-VALUE restart inside a LOOP retry form."

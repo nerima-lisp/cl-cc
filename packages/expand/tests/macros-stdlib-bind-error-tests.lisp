@@ -38,9 +38,15 @@
          (custom (our-macroexpand-1 '(assert test () "bad input"))))
     (assert-eq    (car  basic)          'unless)
     (assert-equal (cadr basic)          'test)
-    (assert-eq    (car (caddr basic))   'cerror)
-    (assert-eq    (car (caddr custom))  'cerror)
-    (assert-equal (caddr (caddr custom)) "bad input")))
+    ;; The failure branch is now (let ((c ...)) (signal c) (cerror "Continue." c)),
+    ;; so CERROR is nested and its datum is the LET variable. SIGNAL ahead of it
+    ;; is what lets a HANDLER-BIND handler reach ASSERT's RESTART-CASE.
+    (assert-eq    (car (caddr basic))   'let)
+    (assert-true  (%find-call-in-form 'cerror (caddr basic)))
+    (assert-true  (%find-call-in-form 'signal (caddr basic)))
+    (assert-true  (%find-call-in-form 'cerror (caddr custom)))
+    (assert-equal "bad input"
+                  (second (first (second (caddr custom)))))))
 
 (deftest ignore-errors-expansion
   "IGNORE-ERRORS wraps in HANDLER-CASE with an ERROR handler clause."
