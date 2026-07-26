@@ -41,7 +41,6 @@
       ;; packages/{ast,type}/tests stay: those are cl-cc's own integration tests
       ;; over whichever system provides the packages, and they are not duplicated
       ;; by the repositories' own t/ suites, which test module boundaries.
-      (ensure-system-asd :cl-cc-parse "packages/parse/cl-cc-parse.asd" here)
       (ensure-system-asd :cl-cc-expand "packages/expand/cl-cc-expand.asd" here)
       (ensure-system-asd :cl-cc-cps "packages/cps/cl-cc-cps.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)

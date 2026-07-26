@@ -123,6 +123,10 @@
       url = "github:nerima-lisp/cl-cc-codegen-native/ca82ba30a874e51e00dcc3a603ab024e341a81f0";
       flake = false;
     };
+    cl-cc-parse = {
+      url = "github:nerima-lisp/cl-cc-parse/7316dd82137290082fa1fe03300d3aa388d84117";
+      flake = false;
+    };
     cl-cc-runtime = {
       url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
       flake = false;
@@ -426,6 +430,16 @@
               clCcCodegen
             ];
           };
+          clCcParse = sbcl.buildASDFSystem {
+            pname = "cl-cc-parse";
+            version = siblingVersion "cl-cc-parse";
+            src = inputs.cl-cc-parse;
+            systems = [ "cl-cc-parse" ];
+            lispLibs = [
+              clCcAst
+              clCcBootstrap
+            ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -460,6 +474,7 @@
               clCcRegalloc
               clCcCodegen
               clCcEmit
+              clCcParse
               ;
           };
           inherit (asdf)

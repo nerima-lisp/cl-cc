@@ -23,6 +23,7 @@
   clCcTarget,
   clCcBytecode,
   clCcOptimize,
+  clCcParse,
   clCcRegalloc,
   clCcCodegen,
   clCcEmit,
@@ -68,13 +69,6 @@ let
   # Leaf systems built from packages/. cl-cc-ast and cl-cc-type used to live
   # here but are now external (externalCcSystems, overlaid into the fixpoint).
   leafSpec = {
-    cl-cc-parse = {
-      src = "packages/parse";
-      deps = [
-        "cl-cc-ast"
-        "cl-cc-bootstrap"
-      ];
-    };
     cl-cc-docgen = {
       src = "packages/docgen";
       deps = [ ];
@@ -132,6 +126,7 @@ let
         "cl-cc-parse"
         "cl-cc-type"
         "cl-cc-optimize"
+        "cl-cc-parse"
         "cl-cc-vm"
         "cl-cc-expand"
         "cl-cc-cps"
@@ -297,6 +292,7 @@ let
     cl-cc-target = clCcTarget;
     cl-cc-bytecode = clCcBytecode;
     cl-cc-optimize = clCcOptimize;
+    cl-cc-parse = clCcParse;
     cl-cc-regalloc = clCcRegalloc;
     cl-cc-codegen = clCcCodegen;
     cl-cc-emit = clCcEmit;
