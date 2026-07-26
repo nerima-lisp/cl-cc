@@ -378,7 +378,14 @@ cl-cc-php = { url = "github:nerima-lisp/cl-cc-php"; flake = false; };
 - [x] Terraform 仮実装（`private-terraform` の `repos_nerima_lisp_cl_cc.tf`, 5 repo）
 - [x] 葉パッケージ 4 個の外部化（ast / type / binary / runtime）— `nix flake check` 緑
 - [x] §5-1 登録プロトコル（php / javascript 両方）— `cl-cc/backend-protocol`
-- [ ] vm 公開シンボルの棚卸しと `::` 禁止 lint の PoC（フェーズ C の前提）
+- [x] vm 内部参照の棚卸し + ratchet lint（`packages/vm/tests/vm-public-api-lint-tests.lisp`）
+      — 106 個中 37 個は既に export 済みで `::` を惰性で書いていただけだったため `:` に修正。
+      残りの distinct 数は optimize 16 / codegen 34 / compile 6 / pipeline 7 / expand 7、
+      regalloc・emit・mir・parse は 0。lint は「増やせない」だけを保証する
+      （減らすのが作業本体、天井の置き去りも別テストで検出）。
+- [ ] vm 公開契約そのものの決定（フェーズ C の前提）— 残りの大半は命令型と
+      そのスロットアクセサで、§5-2 が「export すべき」と言っている当のもの。
+      外部 repo のパスがどこまで依存してよいかの判断が要る。
 - [ ] **§6 手順 4（php/js の repo 移設）の意味を決める** — 下記 §10 参照
 
 ## 10. 実測で判明した制約（2026-07-27 追記）
