@@ -168,8 +168,10 @@
 
 (deftest-each macho-command-serialization-sizes
   "Serialized command sizes: entry-point=24, symtab=24, section=80 bytes."
+  ;; SERIALIZE-ENTRY-POINT-COMMAND, not SERIALIZE-ENTRY-POINT: the standalone
+  ;; cl-cc-binary renamed it to match its SERIALIZE-SYMTAB-COMMAND sibling.
   :cases (("entry-point" 24 (cl-cc/binary::make-entry-point-command)
-                            #'cl-cc/binary::serialize-entry-point)
+                            #'cl-cc/binary::serialize-entry-point-command)
           ("symtab"      24 (cl-cc/binary::make-symtab-command)
                             #'cl-cc/binary::serialize-symtab-command)
           ("section"     80 (cl-cc/binary::make-section :sectname "__text" :segname "__TEXT")

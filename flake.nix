@@ -87,6 +87,10 @@
       url = "github:nerima-lisp/cl-cc-type/324b1c06b86a382f6561019d087d845667cf4606";
       flake = false;
     };
+    cl-cc-binary = {
+      url = "github:nerima-lisp/cl-cc-binary/3c81059218b0d99838d04dff7dbbb3dd8821a8ad";
+      flake = false;
+    };
   };
 
   # Plain `outputs` with `forAllSystems`, not flake-parts. The whole flake is
@@ -249,6 +253,16 @@
             systems = [ "cl-cc-type" ];
             lispLibs = [ clCcAst ];
           };
+          # The standalone cl-cc-binary took a dependency on cl-log-kit that the
+          # in-tree copy did not have; clLogKit is already an input for
+          # cl-boundary-kit, so it is threaded in here rather than added.
+          clCcBinary = sbcl.buildASDFSystem {
+            pname = "cl-cc-binary";
+            version = siblingVersion "cl-cc-binary";
+            src = inputs.cl-cc-binary;
+            systems = [ "cl-cc-binary" ];
+            lispLibs = [ clLogKit ];
+          };
 
           asdf = import ./nix/asdf-systems.nix {
             inherit
@@ -264,6 +278,7 @@
               clTtyKit
               clCcAst
               clCcType
+              clCcBinary
               ;
           };
           inherit (asdf)

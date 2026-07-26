@@ -14,6 +14,7 @@
   # every `deps = [ "cl-cc-ast" ... ]` keeps resolving without change.
   clCcAst,
   clCcType,
+  clCcBinary,
   ...
 }:
 let
@@ -58,10 +59,6 @@ let
   leafSpec = {
     cl-cc-bootstrap = {
       src = "packages/bootstrap";
-      deps = [ ];
-    };
-    cl-cc-binary = {
-      src = "packages/binary";
       deps = [ ];
     };
     cl-cc-runtime = {
@@ -326,6 +323,7 @@ let
   externalCcSystems = {
     cl-cc-ast = clCcAst;
     cl-cc-type = clCcType;
+    cl-cc-binary = clCcBinary;
   };
 
   productionAsdfSystems = lib.fix (
