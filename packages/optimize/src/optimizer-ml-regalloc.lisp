@@ -36,25 +36,33 @@ Returns a list of pressure values (same length as INSTRUCTIONS)."
           collect (min 10 (floor (* 10 (aref pressure i)) max-regs)))))
 
 (defun %instruction-uses (inst)
-  "Return list of register symbols USED (read) by INST."
+  "Return list of register symbols USED (read) by INST.
+
+VM-BINOP's operand slots are LHS and RHS. This asked for SRC and SRC2, which
+VM-BINOP has never had, so SLOT-BOUNDP signalled SLOT-MISSING on every binop and
+this returned nothing usable -- register pressure was computed from call
+arguments alone. Reading through the exported VM-LHS / VM-RHS makes the slot
+names cl-cc/vm's business rather than this pass's, which is also what §5-2 wants:
+an out-of-tree pass cannot name another package's internal slots."
   (let ((uses nil))
     (when (typep inst 'cl-cc/vm:vm-binop)
-      (when (slot-boundp inst 'cl-cc/vm::src)
-        (push (cl-cc/vm::src inst) uses))
-      (when (slot-boundp inst 'cl-cc/vm::src2)
-        (push (cl-cc/vm::src2 inst) uses)))
+      (let ((lhs (cl-cc/vm:vm-lhs inst))
+            (rhs (cl-cc/vm:vm-rhs inst)))
+        (when (symbolp lhs) (push lhs uses))
+        (when (symbolp rhs) (push rhs uses))))
     (when (typep inst 'cl-cc/vm:vm-call)
-      (let ((args (ignore-errors
-                    (funcall (find-symbol "VM-CALL-ARGS" :cl-cc/vm) inst))))
-        (loop for arg in (or args '())
-              when (symbolp arg) do (push arg uses))))
+      (dolist (arg (or (cl-cc/vm:vm-args inst) '()))
+        (when (symbolp arg) (push arg uses))))
     uses))
 
 (defun %instruction-defs (inst)
-  "Return list of register symbols DEFINED (written) by INST."
+  "Return list of register symbols DEFINED (written) by INST.
+
+Same correction as %INSTRUCTION-USES: the accessor is VM-DST. Calling the slot
+name DST as a function was an undefined-function error on every binop."
   (when (typep inst 'cl-cc/vm:vm-binop)
-    (when (slot-boundp inst 'cl-cc/vm::dst)
-      (list (cl-cc/vm::dst inst)))))
+    (let ((dst (cl-cc/vm:vm-dst inst)))
+      (when (symbolp dst) (list dst)))))
 
 (defun opt-pass-ml-regalloc (instructions)
   "FR-581: Compute register pressure hints for INSTRUCTIONS.

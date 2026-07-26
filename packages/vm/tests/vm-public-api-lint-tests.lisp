@@ -17,7 +17,7 @@
 (in-suite cl-cc-unit-suite)
 
 (defparameter *vm-internal-reference-budget*
-  '(("optimize" . 3)
+  '(("optimize" . 0)
     ("codegen"  . 0)
     ("compile"  . 3)
     ("pipeline" . 5)
@@ -28,27 +28,30 @@
     ("parse"    . 0))
   "Per-package ceiling on distinct CL-CC/VM internal symbols referenced.
 
-Measured 2026-07-27, after two passes. First, 37 of the original 106 named a
-symbol that was already exported and had been written with `::` out of habit --
-never contract gaps, only noise. Second, cl-cc/vm now exports the IR contract
-§5-2 called for: instruction types, their slot accessors, the exception-table
-record, atomics and fences. That took codegen from 34 to 0 and optimize from 16
-to 3, which is the Phase C precondition for those two.
+§5-2 is satisfied for the two Phase C extraction candidates: optimize and
+codegen are both at zero, down from 16 and 34. Neither names a cl-cc/vm internal
+any more, which is the property an out-of-tree pass needs -- a separate
+repository cannot reach one.
 
-What is left is deliberately not IR, and each package's residue is a different
-thing:
+Getting there took three passes. 37 of the original 106 already named an
+exported symbol and were written with `::` out of habit. cl-cc/vm then exported
+the IR contract §5-2 called for: instruction types, slot accessors, the
+exception-table record, atomics and fences. What was left in optimize was not
+IR at all but two mistakes -- a pass reading VM-BINOP slots that do not exist,
+and a slot compared as a package-qualified literal where its name would do.
 
-  optimize   DST / SRC / SRC2 -- slot *names*, used with SLOT-BOUNDP for
-             reflective access in the register-rewriting and ML-regalloc passes.
-             Closing this means giving cl-cc/vm a reflective slot API rather
-             than exporting a slot namespace, which is a design decision, not a
-             sweep. The only residue that blocks an extraction.
+The rest is deliberately not IR, and each package's residue is a different thing:
+
   compile    %REGISTER-DOCUMENTATION and the CLOS emulation internals
              (CLASS-DIRECT-SLOTS, METHOD-SPECIALIZERS).
   pipeline   %VM-CALL-CLOSURE-SYNC / %VM-CLOSURE-OBJECT-P and friends, which the
              backend-protocol VM integration is built from, plus one tuning
-             constant. Core reaching into core; no extraction depends on it.
-  expand     The package-lock and sequence-protocol emulation.")
+             constant. Core reaching into core.
+  expand     The package-lock and sequence-protocol emulation.
+
+None of the three is an extraction candidate, so none blocks anything. They stay
+non-zero on purpose: a ceiling of 0 everywhere would be a claim this file cannot
+back.")
 
 (defun %vm-internal-references (package-name)
   "Return the distinct CL-CC/VM internal symbol names referenced under packages/NAME/src."

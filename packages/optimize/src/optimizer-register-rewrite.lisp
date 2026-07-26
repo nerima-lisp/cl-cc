@@ -40,7 +40,12 @@ Single destination slots are preserved to match the historical sexp rewrite."
   (let ((changed-p nil)
         (dst (opt-inst-dst inst)))
     (dolist (slot slots)
-      (unless (and dst (eq slot 'cl-cc/vm::dst))
+      ;; By name, not by a package-qualified literal. DEFOPT-REGISTER-SLOTS
+      ;; already interns these slot symbols from their names, and spelling one
+      ;; out as a cl-cc/vm internal here was the last place this pass reached
+      ;; into another package's internals -- the thing §5-2 has to be free of
+      ;; before optimize can move to its own repository.
+      (unless (and dst (string= (symbol-name slot) "DST"))
         (let ((value (slot-value inst slot)))
           (multiple-value-bind (new-value slot-changed-p)
               (%opt-rewrite-register-tree! value copies)
