@@ -30,19 +30,33 @@ Uninterned symbols (gensyms) are canonicalized so alpha-variant forms share a ke
        (symbolp (car form))
        (string= (symbol-name (car form)) "DECLARE")))
 
-(defun %ignore-form-env-declaration-p (form)
-  (and (%declaration-form-p form)
-       (consp (second form))
-       (= (length (second form)) 3)
-       (let ((decl (second form)))
-         (and (symbolp (first decl)) (string= (symbol-name (first decl)) "IGNORE")
-              (symbolp (second decl)) (string= (symbol-name (second decl)) "FORM")
-              (symbolp (third decl)) (string= (symbol-name (third decl)) "ENV")))))
-
 (defun %expand-let-body-form (form)
-  (if (%ignore-form-env-declaration-p form)
+  ;; A declaration is not a form, so macroexpanding into one is meaningless and
+  ;; can be destructive: declaration identifiers and their arguments live in the
+  ;; same namespace as functions and macros, so (declare (optimize (speed 3)))
+  ;; would be walked as a call to DECLARE whose argument is a call to OPTIMIZE.
+  ;; Pass every DECLARE through untouched, not just the (ignore form env) shape.
+  (if (%declaration-form-p form)
       form
       (compiler-macroexpand-all form)))
+
+(defun %leading-declaration-forms (body)
+  "Return the leading (DECLARE ...) forms of BODY, in order."
+  (loop for form in body
+        while (%declaration-form-p form)
+        collect form))
+
+(defun %collapse-empty-binding-body (body)
+  "Collapse the body of a binding form whose binding list is empty.
+
+Yields (PROGN . BODY) when BODY has no leading declarations. When it does, those
+are free declarations scoped to the body, and PROGN is not a declaration scope —
+leaving them there puts them where only forms are read, so (declare (optimize
+ (speed 3))) compiles as a call to DECLARE on a call to SPEED. Keep an empty LET,
+which is a declaration scope, in that case."
+  (if (%leading-declaration-forms body)
+      (list* 'let nil body)
+      (cons 'progn body)))
 
 (defun expand-let-binding (b)
   "Macro-expand the value in a LET binding, leaving the binding name untouched."
@@ -129,7 +143,7 @@ Uninterned symbols (gensyms) are canonicalized so alpha-variant forms share a ke
   "Expand LET forms, preserving destructuring semantics and body expansion."
   (cond
     ((and (>= (length form) 2) (listp (second form)) (null (second form)))
-     (cons 'progn (mapcar #'%expand-let-body-form (cddr form))))
+     (%collapse-empty-binding-body (mapcar #'%expand-let-body-form (cddr form))))
     ((and (>= (length form) 2) (listp (second form))
           (%any-destructuring-let-binding-p (second form)))
      (loop for b in (second form)
@@ -143,7 +157,7 @@ Uninterned symbols (gensyms) are canonicalized so alpha-variant forms share a ke
                         (list* 'let
                                (mapcar #'expand-let-binding simple)
                                (cddr form))
-                        (cons 'progn (cddr form)))))
+                        (%collapse-empty-binding-body (cddr form)))))
          (dolist (d (reverse destructuring))
            (setf inner (list 'destructuring-bind (first d) (second d) inner)))
          inner))))
@@ -158,11 +172,12 @@ Uninterned symbols (gensyms) are canonicalized so alpha-variant forms share a ke
   "Expand FLET/LABELS bodies while preserving binding structure."
   (if (and (>= (length form) 3) (listp (second form)))
       (if (null (second form))
-          (cons 'progn (mapcar #'compiler-macroexpand-all (cddr form)))
+          (%collapse-empty-binding-body
+           (mapcar #'%expand-let-body-form (cddr form)))
           (let* ((bindings (second form))
                  (names (%flet-labels-binding-names bindings))
                  (body-expander (lambda ()
-                                  (mapcar #'compiler-macroexpand-all (cddr form))))
+                                  (mapcar #'%expand-let-body-form (cddr form))))
                  (binding-expander (lambda ()
                                      (mapcar #'expand-flet-labels-binding bindings))))
             (list* head

@@ -366,9 +366,14 @@
 
 ;;; ─── values-list / copy-tree / char-* (ANSI CL) ─────────────────────────────
 
-(our-defmacro values-list (list)
-  "Return the elements of LIST as multiple values."
-  `(apply #'values ,list))
+;;; VALUES-LIST is deliberately NOT a macro here. It is in the builtin registry
+;;; (builtin-registry-data.lisp, `values-list . make-vm-spread-values'), and
+;;; VM-SPREAD-VALUES is exactly its semantics: store the list in the values
+;;; buffer and leave the first element in the destination register. A macro
+;;; expanding to (apply #'values LIST) shadowed that instruction and compiled to
+;;; a call of VALUES as an ordinary function, which the VM does not provide — so
+;;; VALUES-LIST, and the CPS lowering of (the (values ...) ...) that emits it,
+;;; both died with "The function COMMON-LISP:VALUES is undefined".
 
 (our-defmacro copy-tree (tree)
   "Return a copy of TREE with fresh cons cells but the same atoms."

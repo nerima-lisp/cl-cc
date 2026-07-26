@@ -169,9 +169,9 @@
   (setf (gethash :a h) 1 (gethash :b h) 2)
   (with-hash-table-iterator (next h)
     (loop (multiple-value-bind (more k v) (next)
+            (declare (ignore k v))
             (unless more (return count))
-            (incf count)
-            (declare (ignore k v))))))")))
+            (incf count)))))")))
     (assert-= 2 r)))
 
 ;;; ─── FR-617/FR-608: stream read forms ────────────────────────────────────────

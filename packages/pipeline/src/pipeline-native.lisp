@@ -89,11 +89,17 @@ and return OUTPUT-PATH."
   output-path)
 
 (defun %write-native-output (code-bytes reloc-entries output-path
-                             &key format arch compress bss-size type
-                               needed-libraries subsystem exports)
+                             &key format arch compress (bss-size 0) (type :exec)
+                               needed-libraries (subsystem :console) exports)
   "Dispatch native binary output to the appropriate format writer.
 FORMAT is :MACH-O, :ELF, or :PE. CODE-BYTES and RELOC-ENTRIES are the compiled
-code and relocation data from the backend. OUTPUT-PATH is the target file path."
+code and relocation data from the backend. OUTPUT-PATH is the target file path.
+
+BSS-SIZE, TYPE and SUBSYSTEM repeat the defaults of the writers this dispatches
+to. They cannot be left to default in the callee: this function forwards them
+unconditionally, so a NIL here overrides the callee's default rather than
+falling back to it — TYPE NIL reaching COMPILE-TO-ELF64-EXEC drops out of its
+ECASE, and BSS-SIZE NIL fails the PLUSP guard just past it."
   (ecase format
     (:mach-o
      (let* ((builder (cl-cc/binary:make-mach-o-builder arch)))

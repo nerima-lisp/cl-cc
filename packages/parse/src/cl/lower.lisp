@@ -116,7 +116,11 @@
   (unless (>= (length node) 3)
     (error "let requires bindings and body"))
   (let ((bindings (second node)))
-    (if (symbolp bindings)
+    ;; NIL is a symbol as well as the empty list, so a bare (SYMBOLP BINDINGS)
+    ;; test claims ANSI's (let () ...) — and every macro that expands into it,
+    ;; such as LOCALLY with declarations — for the Scheme-style named-LET
+    ;; extension. Require a non-NIL name.
+    (if (and bindings (symbolp bindings))
         (%lower-named-let node sf sl sc)
         (progn
           (unless (listp bindings)
