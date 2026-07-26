@@ -51,21 +51,34 @@
        (string-downcase
         (string-trim '(#\Space #\Tab #\Newline #\Return) answer))))
 
+(defun %vm-query-io-stream ()
+  "Return the stream *QUERY-IO* is bound to, as the running program sees it.
+
+Host bridges execute outside the VM's variable environment: a compiled program
+that binds *QUERY-IO* puts the binding in the VM global store, while the host
+special still holds the terminal. Reading the host value made Y-OR-N-P take its
+answer from the wrong stream — EOF, hence NIL — and write its prompt somewhere
+the program could not observe."
+  (if *vm-current-state*
+      (%vm-bridge-symbol-stream-value '*query-io*)
+      *query-io*))
+
 (defun %vm-query-answer (yes-answers no-answers invalid-help
                          &optional format-string args)
   "Prompt on *QUERY-IO* until a YES/NO answer or EOF is received."
-  (loop
-    (when format-string
-      (apply #'format *query-io* format-string args)
-      (finish-output *query-io*))
-    (let ((answer (%normalize-query-answer (read-line *query-io* nil nil))))
-      (cond
-        ((null answer) (return nil))
-        ((member answer yes-answers :test #'string=) (return t))
-        ((member answer no-answers :test #'string=) (return nil))
-        (t
-         (format *query-io* "~&Please answer ~A.~%" invalid-help)
-         (finish-output *query-io*))))))
+  (let ((stream (%vm-query-io-stream)))
+    (loop
+      (when format-string
+        (apply #'format stream format-string args)
+        (finish-output stream))
+      (let ((answer (%normalize-query-answer (read-line stream nil nil))))
+        (cond
+          ((null answer) (return nil))
+          ((member answer yes-answers :test #'string=) (return t))
+          ((member answer no-answers :test #'string=) (return nil))
+          (t
+           (format stream "~&Please answer ~A.~%" invalid-help)
+           (finish-output stream)))))))
 
 (defun %vm-y-or-n-p (&optional format-string &rest args)
   "Read a y/n style answer from *QUERY-IO* without host interactivity."

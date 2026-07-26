@@ -64,7 +64,10 @@ Each handler is a lambda (node source-file source-line source-column)."
     (sbit             rt-bit-set         2)
     (char             rt-string-set      2)
     (schar            rt-string-set      2)
-    (elt              aset               2)
+    ;; ELT is deliberately absent: it is defined on every sequence, so its store
+    ;; has to dispatch on the sequence type and %LOWER-SETF-PLACE handles it as a
+    ;; complex place. Listing it here as ASET made (setf (elt <list> i) v) an
+    ;; array store, which signals "not of type VECTOR".
     (nth              %set-nth           2))
   "Alist mapping setf place heads to (runtime-fn num-place-args).
 Simple places: the rewrite is (runtime-fn place-arg-1 ... place-arg-N value-form).

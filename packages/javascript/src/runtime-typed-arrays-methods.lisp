@@ -79,7 +79,10 @@
          (n (js-ta-length ta))
          (start (%js-array-relative-start from-index n)))
     (loop for i from start below n
-          when (= (aref (js-ta-buffer ta) i) target) return i
+          ;; Strict equality, not (=): indexOf must never match NaN, and a bare
+          ;; (=) against one raises FLOATING-POINT-INVALID-OPERATION where the
+          ;; :INVALID trap is enabled — SBCL's default on x86-64.
+          when (%js-strict-eq (aref (js-ta-buffer ta) i) target) return i
           finally (return -1))))
 
 (defun %js-ta-includes (ta search-element &optional (from-index 0))

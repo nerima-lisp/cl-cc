@@ -124,7 +124,10 @@
     (if (< end 0)
         -1.0d0
         (loop for i from end downto 0
-              when (= (aref (js-ta-buffer ta) i) target)
+              ;; Strict equality, not (=): lastIndexOf must never match NaN, and
+              ;; a bare (=) against one raises FLOATING-POINT-INVALID-OPERATION
+              ;; where the :INVALID trap is enabled — SBCL's default on x86-64.
+              when (%js-strict-eq (aref (js-ta-buffer ta) i) target)
                 return (coerce i 'double-float)
               finally (return -1.0d0)))))
 

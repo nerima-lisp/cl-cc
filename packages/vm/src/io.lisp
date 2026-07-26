@@ -509,8 +509,11 @@ through after the usual bridge handle resolution."
                      (subseq (vm-string-input-stream-contents resolved)
                              (vm-string-input-stream-position resolved)))))
           ;; Remember what this was made from, so the compound-stream accessors
-          ;; can hand back the original object as ANSI requires.
-          (setf (gethash host *vm-coerced-input-stream-origins*) resolved)
+          ;; can hand back the original object as ANSI requires. Record VALUE,
+          ;; not RESOLVED: the program holds whatever it passed in — usually a VM
+          ;; stream handle — and an accessor returning the struct the handle
+          ;; resolves to still fails (eq in (two-way-stream-input-stream s)).
+          (setf (gethash host *vm-coerced-input-stream-origins*) value)
           host)
         resolved)))
 

@@ -154,18 +154,30 @@
                   (run-string "(multiple-value-prog1 42 (print 99))"))))
     (assert-true (search "99" output))))
 
-(deftest-each codegen-exception-form-emits-establish-handler
-  "Both unwind-protect and handler-case emit vm-establish-handler."
-  :cases (("unwind-protect" (cl-cc/ast:make-ast-unwind-protect
-                              :protected (make-ast-int :value 42)
-                              :cleanup (list (make-ast-int :value 0))))
-          ("handler-case"   (cl-cc/ast:make-ast-handler-case
-                              :form (make-ast-int :value 42)
-                              :clauses (list (list 'error 'e (make-ast-int :value 0))))))
-  (ast)
+(deftest codegen-unwind-protect-emits-establish-handler
+  "unwind-protect establishes its cleanup with a vm-establish-handler instruction."
   (let ((ctx (make-codegen-ctx)))
-    (compile-ast ast ctx)
+    (compile-ast (cl-cc/ast:make-ast-unwind-protect
+                   :protected (make-ast-int :value 42)
+                   :cleanup (list (make-ast-int :value 0)))
+                 ctx)
     (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler))))
+
+(deftest codegen-handler-case-records-an-exception-table-entry
+  "handler-case protects its form with a PC->handler table entry, not an instruction.
+
+It used to emit vm-establish-handler alongside unwind-protect. compile-ast for
+ast-handler-case now records the protected instruction range in
+*pending-exception-table-entries* instead — zero-cost when no condition is
+signalled — so asserting on the instruction stream tested the old design."
+  (let ((ctx (make-codegen-ctx))
+        (cl-cc/compile::*pending-exception-table-entries* nil))
+    (compile-ast (cl-cc/ast:make-ast-handler-case
+                   :form (make-ast-int :value 42)
+                   :clauses (list (list 'error 'e (make-ast-int :value 0))))
+                 ctx)
+    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler))
+    (assert-true (plusp (length cl-cc/compile::*pending-exception-table-entries*)))))
 
 (deftest-each codegen-exception-form-returns-register
   "Both unwind-protect and handler-case compilation return a register keyword."

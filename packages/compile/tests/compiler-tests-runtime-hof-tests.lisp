@@ -134,7 +134,11 @@ bridge -> \"Undefined function\"); the portable fallback then exposed a deeper
 leak where copy-list/copy-seq returned a VM-COW-LIST/VM-COW-VECTOR wrapper that
 printed as #S(VM-COW-LIST ...).  Now the print path materializes COW wrappers."
   :cases (("list"   '(1 2 3) "(copy-seq '(1 2 3))")
-          ("symbols" '(a b c) "(copy-seq '(a b c))")
+          ;; RUN-STRING reads its source with *PACKAGE* bound to :CL-CC, so the
+          ;; symbols come back interned there. Reading the expectation in this
+          ;; file's own package would compare CL-CC/TEST::A against CL-CC::A,
+          ;; which are different symbols no matter what COPY-SEQ does.
+          ("symbols" '(cl-cc::a cl-cc::b cl-cc::c) "(copy-seq '(a b c))")
           ("string" "hello"  "(copy-seq \"hello\")")
           ("copy-list" '(1 2 3) "(copy-list '(1 2 3))"))
   (expected form)

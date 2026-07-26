@@ -79,6 +79,22 @@ Simple places dispatch via *setf-place-simple-rewrites*; complex places
                (used-args (subseq place-args 0 n-args)))
           (lower-sexp-to-ast (append (list fn-sym) used-args (list value-form))))
         (case head
+          (elt
+           ;; ELT reads and writes every sequence type, so the store dispatches:
+           ;; ASET is an array store and signals "not of type VECTOR" on a list.
+           ;; Nested LETs rather than LET*, which has no lowerer here, keep each
+           ;; subform to a single evaluation.
+           (unless (= (length place-args) 2)
+             (error "ELT setf place requires two arguments"))
+           (let ((seq (gensym "SEQ")) (idx (gensym "IDX")) (val (gensym "VAL")))
+             (lower-sexp-to-ast
+              (list 'let (list (list seq (first place-args)))
+                    (list 'let (list (list idx (second place-args)))
+                          (list 'let (list (list val value-form))
+                                (list 'if (list 'listp seq)
+                                      (list 'rplaca (list 'nthcdr idx seq) val)
+                                      (list 'aset seq idx val))
+                                val))))))
           ((second third fourth fifth sixth seventh eighth ninth tenth)
            (unless (= (length place-args) 1)
              (error "~S setf place requires one argument" head))

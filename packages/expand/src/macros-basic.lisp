@@ -78,10 +78,23 @@
                     (%bootstrap-setf-nth-list-accessor-index (car place)))
                   ,v)
           ,v)))
-     ((and (consp place) (member (car place) '(aref elt)))
+     ((and (consp place) (eq (car place) 'aref))
       (let ((v (gensym "V")))
         `(let ((,v ,value))
            (aset ,(second place) ,(third place) ,v)
+           ,v)))
+     ((and (consp place) (eq (car place) 'elt))
+      ;; ELT is defined on every sequence, so its store has to dispatch: ASET is
+      ;; an array store and signals "not of type VECTOR" on a list. Sharing the
+      ;; AREF clause is what made (replace <list> <vector>) fail — REPLACE's
+      ;; non-vector branch stores through (setf (elt ...)).
+      (let ((v (gensym "V")) (seq (gensym "SEQ")) (idx (gensym "IDX")))
+        `(let* ((,seq ,(second place))
+                (,idx ,(third place))
+                (,v ,value))
+           (if (listp ,seq)
+               (rplaca (nthcdr ,idx ,seq) ,v)
+               (aset ,seq ,idx ,v))
            ,v)))
      ((and (consp place) (eq (car place) 'fill-pointer))
       (let ((v (gensym "V")))
