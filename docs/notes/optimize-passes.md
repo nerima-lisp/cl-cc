@@ -88,7 +88,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - LICM拡張: SCEVで不変と証明できる計算を巻き上げ
   - LLVM の ScalarEvolution パスに相当
 
-- **関連実装**: `packages/optimize/src/optimizer-memory-ranges.lisp` に `opt-compute-simple-inductions` / `opt-induction-trip-count` を実装済み。
+- **関連実装**: `packages/optimize/src/optimizer-induction.lisp` に `opt-compute-simple-inductions` / `opt-induction-trip-count` を実装済み。
   - 対象: `i = i + c` / `i = i - c` の affine update に加え、幾何級数的な帰納変数更新と複数帰納変数を保守的に検出。
   - 出力: `opt-induction-var`（init/step/update-inst）と保守的 trip-count 推定。multi-var loop でも後続の強度低減・範囲解析へ渡せる。
   - 制限: 完全な一般SCEV（多項式再帰、複合条件、nested loop の閉形式）は将来拡張。
@@ -205,7 +205,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - HotSpot C2・LLVM `CorrelatedValuePropagationPass` と同等
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-memory-ranges.lisp` に `opt-compute-value-ranges` を実装済み。
+- **関連実装**: `packages/optimize/src/optimizer-value-ranges.lisp` に `opt-compute-value-ranges` を実装済み。
   - 整数定数・move・単項/二項算術（add/sub/mul/neg/abs/inc/dec）で interval を前向き伝播。
   - `packages/optimize/tests/optimizer-memory-tests.lisp` の `value-ranges-*` で挙動を検証。
   - 制限: 比較分岐由来の述語感度（path-sensitive range narrowing）や一般ループ閉形式推論は未実装。
@@ -219,7 +219,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - ループ内の `aref` が最も恩恵を受ける
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-memory-ranges.lisp` に `opt-array-bounds-check-eliminable-p` を実装済み。
+- **関連実装**: `packages/optimize/src/optimizer-value-ranges.lisp` に `opt-array-bounds-check-eliminable-p` を実装済み。
   - `opt-compute-value-ranges` の interval を使って `0 <= idx < len` を保守的に証明。
   - x86-64 backend では証明済み access に対する guard 省略/軽量化を接続し、Wasm backend には BCE 適用箇所を示す marker を渡す基本実装済み。path-sensitive narrowing と一般ループ閉形式推論は将来拡張。
 

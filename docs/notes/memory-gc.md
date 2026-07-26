@@ -108,7 +108,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-90: ✅: Safepoint Dominance Pruning
 
-- **対象**: `packages/optimize/src/optimizer-memory-ranges.lisp`
+- **対象**: `packages/optimize/src/optimizer-memory-interval.lisp`
 - **実装**: `opt-prune-dominated-safepoints`
 - **内容**: 同一ルートセットを持つ支配されたsafepointを除去
 - **根拠**: MIRに `:safepoint` ノードが存在するが冗長性解析なし
@@ -116,7 +116,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-91: ✅: Safepoint Hoisting to Loop Back-Edges
 
-- **対象**: `packages/optimize/src/optimizer-memory-ranges.lisp`
+- **対象**: `packages/optimize/src/optimizer-memory-interval.lisp`
 - **実装**: `opt-hoist-safepoints-to-back-edges`
 - **内容**: ループボディのsafepointをバックエッジにのみ移動、ポーリング頻度削減
 - **難易度**: Medium

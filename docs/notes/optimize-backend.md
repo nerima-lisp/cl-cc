@@ -46,7 +46,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 #### FR-216: Store-to-Load Forwarding (ストア→ロード転送) ✅
 
-- **対象**: `packages/optimize/src/optimizer-memory-alias.lisp`, `packages/optimize/src/optimizer-memory-interval.lisp`, `packages/optimize/src/optimizer-memory-ranges.lisp`, `packages/optimize/src/optimizer-pipeline.lisp`
+- **対象**: `packages/optimize/src/optimizer-memory-alias.lisp`, `packages/optimize/src/optimizer-memory-interval.lisp`, `packages/optimize/src/optimizer-value-ranges.lisp`, `packages/optimize/src/optimizer-pipeline.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
 - **内容**: `vm-set-global` → `vm-get-global` の同一変数パターンでロードをストア値に置換。`vm-slot-write` → `vm-slot-read` の同一オブジェクト・同一スロットパターンも対象。alias analysis（FR-017）と連携
 - **根拠**: LLVM MemorySSA-based store-to-load forwarding / GCC tree-ssa-forwprop。ローカル変数の冗長なロード除去
@@ -531,7 +531,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: LLVM TBAA / GCC `-fstrict-aliasing`。Common Lisp は型タグ付きなのでTBAA適用範囲が広い
 - **難易度**: Hard
 
-- **関連実装**: `packages/optimize/src/optimizer-memory-ranges.lisp` に `opt-compute-heap-kinds` / `opt-may-alias-by-type-p` を追加済み。`opt-compute-heap-aliases` の fresh heap root と `:cons` / `:array` / `:closure` の heap kind を組み合わせ、両 root と kind が既知で異なる場合だけ non-alias と判定し、不明時は conservative に may-alias とする。`packages/optimize/tests/optimizer-lowlevel-tests.lisp` の `heap-kind-helper-distinguishes-object-classes` と `packages/optimize/tests/optimizer-memory-pass-tests.lisp` の heap kind table integrity test が直接検証する。
+- **関連実装**: `packages/optimize/src/optimizer-memory-alias-basic.lisp` に `opt-compute-heap-kinds` / `opt-may-alias-by-type-p` を追加済み。`opt-compute-heap-aliases` の fresh heap root と `:cons` / `:array` / `:closure` の heap kind を組み合わせ、両 root と kind が既知で異なる場合だけ non-alias と判定し、不明時は conservative に may-alias とする。`packages/optimize/tests/optimizer-lowlevel-tests.lisp` の `heap-kind-helper-distinguishes-object-classes` と `packages/optimize/tests/optimizer-memory-pass-tests.lisp` の heap kind table integrity test が直接検証する。
 
 #### FR-018: Flow-Sensitive Pointer Analysis ✅
 
@@ -1121,7 +1121,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 #### FR-352: Bit-Width Analysis (ビット幅解析) ✅
 
-- **対象**: `packages/optimize/src/optimizer-memory-ssa.lisp`, `packages/optimize/src/optimizer-memory-ranges.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/optimize/src/optimizer-memory-ssa.lisp`, `packages/optimize/src/optimizer-value-ranges.lisp`, `packages/optimize/src/optimizer.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
 - **内容**: 整数演算の結果の有効ビット幅を追跡。`(logand x #xFF)` の結果は 8 ビットと確定。8-bit 値同士の加算は最大 9-bit。ビット幅が 63 bit 未満であればオーバーフローチェック (FR-303) を省略可能。`(= (logand x 1) 0)` → `(evenp x)` の認識
 - **根拠**: LLVM `computeKnownBits` / GCC VRP。ビット幅解析はオーバーフロー除去・型チェック除去・強度低減の精度向上に貢献

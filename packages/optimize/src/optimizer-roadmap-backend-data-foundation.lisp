@@ -41,7 +41,7 @@
           optimize-roadmap-runtime-helpers-have-concrete-behavior))
     (17 17
          ("packages/optimize/src/optimizer-memory-alias.lisp"
-          "packages/optimize/src/optimizer-memory-ranges.lisp"
+          "packages/optimize/src/optimizer-memory-alias-basic.lisp"
           "packages/optimize/tests/optimizer-lowlevel-tests.lisp"
           "packages/optimize/tests/optimizer-memory-pass-tests.lisp")
          (opt-compute-heap-aliases opt-compute-heap-kinds opt-may-alias-by-type-p)
@@ -71,7 +71,7 @@
     (216 216
           ("packages/optimize/src/optimizer-memory-alias.lisp"
            "packages/optimize/src/optimizer-memory-forward.lisp"
-          "packages/optimize/src/optimizer-memory-ranges.lisp"
+           "packages/optimize/src/optimizer-memory-alias-basic.lisp"
            "packages/optimize/src/optimizer-pipeline.lisp"
            "packages/optimize/tests/optimizer-memory-pass-tests.lisp")
           (opt-pass-store-to-load-forward opt-compute-heap-aliases opt-must-alias-p)

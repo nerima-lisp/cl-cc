@@ -44,7 +44,7 @@
           opt-apply-algebraic-action-move-lhs))
     (352 352
           ("packages/optimize/src/optimizer-memory-alias.lisp"
-           "packages/optimize/src/optimizer-memory-ranges.lisp"
+           "packages/optimize/src/optimizer-memory-interval.lisp"
            "packages/optimize/src/optimizer.lisp"
            "packages/optimize/tests/optimizer-memory-tests.lisp"
            "packages/optimize/tests/optimizer-memory-pass-tests.lisp")

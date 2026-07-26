@@ -265,7 +265,7 @@ Evidence anchors include functions and special variables."
       opt-profile-record-value)
      (optimizer-roadmap-pic-evidence-is-runtime-backed))
     (38 38
-     ("packages/optimize/src/optimizer-memory-ranges.lisp"
+     ("packages/optimize/src/optimizer-value-ranges.lisp"
       "packages/optimize/src/optimizer-memory-interval.lisp"
       "packages/optimize/tests/optimizer-memory-tests.lisp")
      (opt-compute-path-sensitive-ranges
@@ -305,7 +305,7 @@ Evidence anchors include functions and special variables."
       "packages/optimize/src/optimizer-licm.lisp"
       "packages/optimize/src/optimizer-pre.lisp"
       "packages/optimize/src/optimizer-dataflow.lisp"
-      "packages/optimize/src/optimizer-memory-ranges.lisp"
+      "packages/optimize/src/optimizer-induction.lisp"
       "packages/optimize/tests/optimizer-tests.lisp"
       "packages/optimize/tests/optimizer-memory-tests.lisp")
      (opt-pass-fold opt-pass-licm opt-pass-pre opt-pass-sccp
@@ -314,7 +314,7 @@ Evidence anchors include functions and special variables."
     (24 56
      ("packages/optimize/src/optimizer-inline.lisp"
       "packages/optimize/src/optimizer-inline-pass.lisp"
-      "packages/optimize/src/optimizer-memory-ranges.lisp"
+      "packages/optimize/src/optimizer-value-ranges.lisp"
       "packages/optimize/src/optimizer-recognition.lisp"
       "packages/optimize/tests/optimizer-inline-tests.lisp"
       "packages/optimize/tests/optimizer-strength-tests.lisp")

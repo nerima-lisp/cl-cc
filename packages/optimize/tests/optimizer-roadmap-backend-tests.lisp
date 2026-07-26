@@ -603,7 +603,7 @@
    "FR-352"
    :implemented
    '("packages/optimize/src/optimizer-memory-alias.lisp"
-     "packages/optimize/src/optimizer-memory-ranges.lisp"
+     "packages/optimize/src/optimizer-memory-interval.lisp"
      "packages/optimize/src/optimizer.lisp"
      "packages/optimize/tests/optimizer-memory-tests.lisp"
      "packages/optimize/tests/optimizer-memory-pass-tests.lisp")
