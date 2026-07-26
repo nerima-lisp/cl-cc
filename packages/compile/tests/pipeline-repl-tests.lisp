@@ -26,7 +26,7 @@
         (seen-compile-language nil)
         (orig-parse (symbol-function 'cl-cc/parse:parse-source-for-language))
         (orig-compile (symbol-function 'cl-cc::compile-string))
-        (orig-run (symbol-function 'cl-cc::%run-form-repl-impl)))
+        (orig-run (symbol-function 'cl-cc/repl::%run-form-repl-impl)))
     (unwind-protect
          (progn
            (sb-ext:without-package-locks
@@ -40,7 +40,7 @@
                      (declare (ignore source target args))
                      (setf seen-compile-language language)
                      :compiled))
-             (setf (symbol-function 'cl-cc::%run-form-repl-impl)
+             (setf (symbol-function 'cl-cc/repl::%run-form-repl-impl)
                    (lambda (&rest args)
                      (declare (ignore args))
                      123)))
@@ -50,7 +50,7 @@
       (sb-ext:without-package-locks
         (setf (symbol-function 'cl-cc/parse:parse-source-for-language) orig-parse
               (symbol-function 'cl-cc::compile-string) orig-compile
-              (symbol-function 'cl-cc::%run-form-repl-impl) orig-run)))))
+              (symbol-function 'cl-cc/repl::%run-form-repl-impl) orig-run)))))
 
 (deftest-each pipeline-repl-persistence
   "run-string-repl persists defun and defvar definitions across REPL calls."

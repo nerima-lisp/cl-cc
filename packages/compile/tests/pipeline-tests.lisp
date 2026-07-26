@@ -53,9 +53,11 @@
   (let* ((forms     '((defvar *top* 1) (setq *top* 2)))
          (opts      (cl-cc::%make-pipeline-opts :target :vm))
          (rewritten (cl-cc::%maybe-cps-toplevel-forms forms opts)))
-    (assert-false (equal (first forms) (first rewritten)))
+    ;; DEFVAR is a definition form, so it must come back untouched — the previous
+    ;; ASSERT-FALSE here demanded the opposite and contradicted this test's own
+    ;; description. Only the SETQ is expected to become a CPS entry form.
+    (assert-equal (first forms) (first rewritten))
     (assert-false (equal (second forms) (second rewritten)))
-    (assert-true (consp (first rewritten)))
     (assert-true (consp (second rewritten)))))
 
 (deftest pipeline-compile-expression-vm-program-uses-raw-stream
@@ -126,8 +128,8 @@
                :declarations '((optimize (speed 3)))
                :documentation nil
                :body (list (make-ast-var :name 'x)))))
-    (cl-cc::%pipeline-maybe-bump-opts-speed-from-ast opts ast)
-    (assert-= 3 (cl-cc::pipeline-opts-speed opts))))
+    (cl-cc/pipeline::%pipeline-maybe-bump-opts-speed-from-ast opts ast)
+    (assert-= 3 (cl-cc/pipeline::pipeline-opts-speed opts))))
 
 (deftest pipeline-maybe-bump-opts-speed-from-ast-does-not-lower-existing-speed
   "%pipeline-maybe-bump-opts-speed-from-ast keeps higher existing speed when local speed is lower."
@@ -141,8 +143,8 @@
                :declarations '((optimize (speed 1)))
                :documentation nil
                :body (list (make-ast-var :name 'x)))))
-    (cl-cc::%pipeline-maybe-bump-opts-speed-from-ast opts ast)
-    (assert-= 3 (cl-cc::pipeline-opts-speed opts))))
+    (cl-cc/pipeline::%pipeline-maybe-bump-opts-speed-from-ast opts ast)
+    (assert-= 3 (cl-cc/pipeline::pipeline-opts-speed opts))))
 
 (deftest-each pipeline-compile-toplevel-forms-defvar-type-env
   "compile-toplevel-forms infers fixnum type for defvar regardless of type-check flag."
