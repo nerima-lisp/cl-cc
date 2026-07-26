@@ -1,25 +1,48 @@
 ;;;; ---------------------------- WARNING ----------------------------
-;;;; This system is DOUBLE-DEFINED.
+;;;; This system is DOUBLE-DEFINED, and THIS FILE is the one that builds.
 ;;;;
-;;;; The name "cl-cc-ast" is defined both here and in the standalone
-;;;; repository nerima-lisp/cl-cc-ast, and the two definitions do not
-;;;; agree. Which one ASDF resolves depends on the order of the source
-;;;; registry, so the dependency graph of this repository is not currently
-;;;; well defined. flake.nix takes the standalone repository as an input;
-;;;; a plain `sbcl --load cl-cc.asd` from a checkout takes this file.
+;;;; The name "cl-cc-ast" is also defined in the standalone repository
+;;;; nerima-lisp/cl-cc-ast, which flake.nix takes as an input and
+;;;; nix/asdf-systems.nix injects into the internal system graph. The earlier
+;;;; version of this banner said that made the standalone repository win under
+;;;; Nix and this file win under a bare `sbcl --load cl-cc.asd`, and left which
+;;;; one is authoritative undecided.
 ;;;;
-;;;; Measured 2026-07-26 against the standalone repository's working tree
-;;;; (cl-cc-ast/src vs packages/ast/src):
-;;;;   5 source files here, 5 there
-;;;;   0 identical, 5 differing
-;;;;   0 only here, 1 only there
-;;;;   :depends-on — identical (both empty)
+;;;; Measured 2026-07-26: BOTH resolve to this file. `ensure-system-asd` in
+;;;; cl-cc.asd only loads a per-package .asd when FIND-SYSTEM misses, and the
+;;;; cl-cc source tree is scanned ahead of the injected derivations, so the
+;;;; in-tree definition is found first in either environment. The standalone
+;;;; repository has therefore never been compiled by this build.
 ;;;;
-;;;; WHICH DEFINITION IS AUTHORITATIVE IS UNDECIDED. Do not assume an edit
-;;;; here reaches the build, and do not "fix" the divergence by copying one
-;;;; side over the other; the two have diverged in both directions. Resolving
-;;;; this is a design decision, tracked separately from the packaging
-;;;; migration that added this banner.
+;;;; The evidence is a test, not a reading of the wiring. It comes from the
+;;;; sibling system cl-cc-type, which is resolved by the same ENSURE-SYSTEM-ASD
+;;;; mechanism and therefore settles the order for this one too:
+;;;; `infer-with-constraints` is defined only in packages/type/src (it was
+;;;; deleted from the standalone repository by its module reorganisation, the
+;;;; very commit flake.nix pins). The test "infer of a self-applying lambda
+;;;; resolves the constraint and returns a fixnum result type" calls it
+;;;; unconditionally and PASSES in CI.
+;;;;
+;;;; Reproducible locally: add the sibling checkouts to the source registry
+;;;; alongside this tree and the suite still passes 12192/12192, because these
+;;;; files are still what gets compiled. Delete them and the two failures below
+;;;; appear.
+;;;;
+;;;; So this file is authoritative and the standalone repositories are the ones
+;;;; that drifted. Building against them today costs exactly two failures,
+;;;; measured by pointing the source registry at the sibling checkouts:
+;;;;   - cl-cc-type is missing `infer-with-constraints` (an 8-line wrapper over
+;;;;     collect-constraints / solve-constraints / zonk).
+;;;;   - cl-cc-ast disables no-escape instance scalarization: the standard
+;;;;     metaclass case of "An instance of a class with a custom metaclass
+;;;;     keeps its allocation and slot reads" stops scalarizing, so VM-SLOT-READ
+;;;;     survives where it should not. Suspect the closure.lisp rewrite that
+;;;;     merged the AST-LAMBDA and AST-DEFUN clauses into AST-CALLABLE.
+;;;;
+;;;; Do not delete this file expecting the standalone repository to take over
+;;;; silently; it will, and the build will regress. Close those two gaps, pin
+;;;; the fixed commits in flake.nix, and confirm the switch actually happened
+;;;; before removing anything.
 ;;;; -----------------------------------------------------------------
 
 ;;;; cl-cc-ast.asd — independent ASDF system for the AST node types
