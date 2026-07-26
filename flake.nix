@@ -91,6 +91,10 @@
       url = "github:nerima-lisp/cl-cc-binary/3c81059218b0d99838d04dff7dbbb3dd8821a8ad";
       flake = false;
     };
+    cl-cc-bootstrap = {
+      url = "github:nerima-lisp/cl-cc-bootstrap/b1ff1defbba014ba7b312c882ee8a5e7cabb5cc3";
+      flake = false;
+    };
     cl-cc-runtime = {
       url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
       flake = false;
@@ -298,6 +302,12 @@
               clJsonKit
             ];
           };
+          clCcBootstrap = sbcl.buildASDFSystem {
+            pname = "cl-cc-bootstrap";
+            version = siblingVersion "cl-cc-bootstrap";
+            src = inputs.cl-cc-bootstrap;
+            systems = [ "cl-cc-bootstrap" ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -322,6 +332,7 @@
               clCcType
               clCcBinary
               clCcRuntime
+              clCcBootstrap
               ;
           };
           inherit (asdf)

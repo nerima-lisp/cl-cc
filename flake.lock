@@ -51,6 +51,23 @@
         "type": "github"
       }
     },
+    "cl-cc-bootstrap": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785088000,
+        "narHash": "sha256-1LqtYLulsEZ0TU9IVMfPA59s5x6J3pmq7/ShQJNCbFg=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-bootstrap",
+        "rev": "b1ff1defbba014ba7b312c882ee8a5e7cabb5cc3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-bootstrap",
+        "rev": "b1ff1defbba014ba7b312c882ee8a5e7cabb5cc3",
+        "type": "github"
+      }
+    },
     "cl-cc-runtime": {
       "flake": false,
       "locked": {
@@ -259,6 +276,7 @@
         "cl-boundary-kit": "cl-boundary-kit",
         "cl-cc-ast": "cl-cc-ast",
         "cl-cc-binary": "cl-cc-binary",
+        "cl-cc-bootstrap": "cl-cc-bootstrap",
         "cl-cc-runtime": "cl-cc-runtime",
         "cl-cc-type": "cl-cc-type",
         "cl-cli": "cl-cli",

@@ -16,6 +16,7 @@
   clCcType,
   clCcBinary,
   clCcRuntime,
+  clCcBootstrap,
   ...
 }:
 let
@@ -58,10 +59,6 @@ let
   # Leaf systems built from packages/. cl-cc-ast and cl-cc-type used to live
   # here but are now external (externalCcSystems, overlaid into the fixpoint).
   leafSpec = {
-    cl-cc-bootstrap = {
-      src = "packages/bootstrap";
-      deps = [ ];
-    };
     cl-cc-bytecode = {
       src = "packages/bytecode";
       deps = [ ];
@@ -322,6 +319,7 @@ let
     cl-cc-type = clCcType;
     cl-cc-binary = clCcBinary;
     cl-cc-runtime = clCcRuntime;
+    cl-cc-bootstrap = clCcBootstrap;
   };
 
   productionAsdfSystems = lib.fix (
