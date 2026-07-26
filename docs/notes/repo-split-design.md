@@ -525,3 +525,32 @@ php/js の残作業は「設計を決める」ではなく:
 `runtime-bridge-provider.lisp`（A 方式）と**二重登録**になり CI が落ちる。
 2026-07-27 に実際に落として revert した（cl-cc-php `c2cf5c1`）。ファイル数の差
 （92 対 75）は設計の分岐ではなく、A への移行が upstream だけ先行しているため。
+
+### 10-6. php の flake input 化を試した結果（2026-07-27, 測定値）
+
+§10-5 の手順 1・2 は完了した:
+
+- 手順 1（ブランチ取り込み）は**不要**だった。A の API は既に `cl-cc-bootstrap`
+  リポジトリに入っており、main のビルドから使える。ブランチ自体は 543 files /
+  ±50k 行で cl-weave テスト移行を丸ごと含み、しかも今夜の 11 パッケージ抽出より
+  前の main から分岐しているため、マージは現実的でない。
+- 手順 2 完了（cl-cc `3bee060e`）。pipeline は A と B の両レジストリを drain する
+  ようになったので、**どちらの方式で登録する backend も拾える**。
+
+手順 3（php を flake input 化）は**実測して差し戻した**:
+
+```
+11990 passed, 7 failed, 217 errored / 12214
+```
+
+つまり upstream の cl-cc-php と `packages/php` の乖離は 217 テスト分ある。
+ast/type のときと同じ「宣言済みだが一度もビルドされていない」状態が php でも
+起きていたということ（[[cl-cc-ast-type-split-not-live]] の罠）。ファイル数の差
+20 個は表層で、実体はこの 217。
+
+**次にやること**: 217 errored の内訳を取り、ast/type と同じ手順で潰す
+（片方でしか通らないテストを走らせて、どちらが authoritative かを測る）。
+javascript も同じ手順が要るはずで、未測定。
+
+cl-cc 側の受け入れ準備は完了しているので、残りは upstream 2 リポジトリの
+parity 作業のみ。
