@@ -388,9 +388,17 @@ argument into a fresh register before compiling the mutating sibling."
           (%emit-vm-branch-boolean-as-cl-boolean ctx predicate-reg result-reg "equality_bool"))))))
 
 (defun %try-compile-common-lisp-not (func-sym args result-reg ctx)
-  "Lower Common Lisp NOT with generalized boolean semantics.
-NOT tests exactly for NIL; numeric zero is truthy under Common Lisp semantics."
-  (when (and (eq func-sym 'not) (= (length args) 1))
+  "Lower Common Lisp NOT and NULL with generalized boolean semantics.
+Both test exactly for NIL; numeric zero is truthy under Common Lisp semantics.
+
+ANSI defines NULL and NOT as the same function, and both must answer T or NIL.
+NULL used to reach the builtin table instead and compile to a bare VM-NULL-P,
+whose result is the VM's internal 1/0 rather than a CL boolean — so (null 4)
+evaluated to 0, and (not (null x)) to NIL for every non-NIL x, because NOT then
+correctly read that 0 as true. Only constant folding hid it: the optimizer folds
+VM-NULL-P with CL's own NULL, so (null 4) at top level answered NIL while the
+same call through a register answered 0."
+  (when (and (member func-sym '(not null)) (= (length args) 1))
     (let ((arg-reg (compile-ast (first args) ctx)))
       (let ((nil-p-reg (make-register ctx))
             (false-label (make-label ctx "not_false"))
