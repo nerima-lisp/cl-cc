@@ -55,6 +55,29 @@ expansion, leaving a bare call to an undefined REMOVE-IF function."
   (assert-eq t (run-string "
 (let ((cleaned nil)) (handler-case (unwind-protect (error \"boom\") (setf cleaned t)) (error (e) cleaned)))")))
 
+(deftest unwind-protect-cleanup-runs-on-the-error-path
+  "The cleanup of an unwind-protect runs when the protected form signals.
+
+HANDLER-CASE registers PC ranges in the zero-cost exception table while
+UNWIND-PROTECT pushes onto the handler stack, and the signal path consulted the
+table first regardless of nesting — so an error inside
+(handler-case (unwind-protect ...) ...) went straight to the outer HANDLER-CASE
+and the cleanup was skipped entirely."
+  (assert-= 5 (run-string
+               "(let ((x 0))
+                  (handler-case (unwind-protect (error \"e\") (setq x 5)) (error () nil))
+                  x)"))
+  ;; The protected form's own effects up to the error survive the unwind too.
+  (assert-= 5 (run-string
+               "(let ((x 0))
+                  (handler-case (unwind-protect (progn (setq x 1) (error \"e\")) (setq x 5))
+                    (error () nil))
+                  x)")))
+
+(deftest unwind-protect-cleanup-runs-on-the-normal-path
+  "The cleanup still runs, once, when the protected form returns normally."
+  (assert-eq t (run-string "(let ((x nil)) (unwind-protect 1 (setq x t)) x)")))
+
 (deftest handler-case-as-sole-top-level-form
   "A handler-case that is the ONLY top-level form catches a signalled condition.
 Regression: the single-expression compile path (taken only for a 1-form program)

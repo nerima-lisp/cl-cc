@@ -106,9 +106,9 @@ Signals a VM-level error (catchable by handler-case/ignore-errors) if undefined.
               (progn
                 (dotimes (i (1+ handlers-to-skip)) (pop (vm-handler-stack state)))
                 (destructuring-bind (handler-label result-reg _type saved-call-stack saved-regs
-                                     &optional saved-method-call-stack)
+                                     &optional saved-method-call-stack established-pc)
                     matching-handler
-                  (declare (ignore _type))
+                  (declare (ignore _type established-pc))
                   (%vm-unwind-to-handler state labels handler-label result-reg
                                          saved-call-stack saved-regs saved-method-call-stack
                                          error-value)))

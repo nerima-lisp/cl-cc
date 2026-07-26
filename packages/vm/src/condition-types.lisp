@@ -418,13 +418,40 @@ this models dynamic propagation without a runtime handler stack."
         (setf (gethash labels *vm-label-exception-tables*) exception-table)))
     labels))
 
+(defun %vm-stack-handler-nested-inside-table-p (state labels pc error-value)
+  "Return T when a matching handler-stack entry is nested inside the exception
+table entry that would otherwise take this condition.
+
+cl-cc has two handler mechanisms: HANDLER-CASE registers PC ranges in the
+zero-cost exception table, while UNWIND-PROTECT pushes onto the handler stack
+(VM-ESTABLISH-HANDLER is emitted only by COMPILE-AST for AST-UNWIND-PROTECT).
+Consulting the table first regardless of nesting sent every error inside
+(handler-case (unwind-protect ... cleanup) ...) straight to the outer
+HANDLER-CASE, so the cleanup never ran — the one thing UNWIND-PROTECT exists to
+guarantee. A stack handler established at a PC within the table entry's protected
+range is the inner one and must win."
+  (let ((entry (and (%vm-exception-table-for-labels labels)
+                    (vm-find-exception-table-entry labels pc error-value))))
+    (when entry
+      (let ((start (vm-exception-entry-start-pc entry))
+            (end   (vm-exception-entry-end-pc entry)))
+        (dolist (handler (vm-handler-stack state) nil)
+          (let ((established-pc (seventh handler)))
+            (when (and (vm-error-type-matches-p error-value (third handler))
+                       (integerp established-pc)
+                       (<= start established-pc)
+                       (<= established-pc end))
+              (return t))))))))
+
 (defun %vm-signal-condition (state labels pc error-value)
   "Route ERROR-VALUE through the zero-cost exception table, then the legacy
 handler stack.  Returns EXECUTE-INSTRUCTION values transferring control to the
 matching guest handler.  When no handler matches, prints a VM backtrace and
 raises, exactly as the VM-SIGNAL-ERROR opcode has always done."
   (multiple-value-bind (next-pc handled-p value)
-      (vm-dispatch-exception-table state labels pc error-value :error-p nil)
+      (if (%vm-stack-handler-nested-inside-table-p state labels pc error-value)
+          (values nil nil nil)
+          (vm-dispatch-exception-table state labels pc error-value :error-p nil))
     (declare (ignore value))
     (if next-pc
         (values next-pc handled-p nil)
@@ -438,9 +465,9 @@ raises, exactly as the VM-SIGNAL-ERROR opcode has always done."
               (progn
                 (dotimes (i (1+ handlers-to-skip)) (pop (vm-handler-stack state)))
                 (destructuring-bind (handler-label result-reg _type saved-call-stack saved-regs
-                                     &optional saved-method-call-stack)
+                                     &optional saved-method-call-stack established-pc)
                     matching-handler
-                  (declare (ignore _type))
+                  (declare (ignore _type established-pc))
                   (%vm-unwind-to-handler state labels handler-label result-reg
                                          saved-call-stack saved-regs saved-method-call-stack
                                          error-value)))

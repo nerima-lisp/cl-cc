@@ -111,7 +111,12 @@ so user-level (handler-case (error ...) ...) in VM programs cannot swallow it."
                 (vm-error-type inst)
                 (vm-call-stack state)
                 saved-regs
-                (vm-method-call-stack state))
+                (vm-method-call-stack state)
+                ;; The PC this handler was established at. %VM-SIGNAL-CONDITION
+                ;; needs it to tell whether a stack handler sits *inside* an
+                ;; exception-table entry's protected range, i.e. which of the two
+                ;; handler mechanisms is nested more deeply.
+                pc)
           (vm-handler-stack state)))
   (values (1+ pc) nil nil))
 
@@ -164,9 +169,9 @@ Used by both vm-signal-error and vm-throw."
         (progn
           (dotimes (i (1+ handlers-to-skip)) (pop (vm-handler-stack state)))
           (destructuring-bind (handler-label result-reg _type saved-call-stack saved-regs
-                               &optional saved-method-call-stack)
+                               &optional saved-method-call-stack established-pc)
               matching-handler
-            (declare (ignore _type))
+            (declare (ignore _type established-pc))
             (%vm-unwind-to-handler state labels handler-label result-reg
                                    saved-call-stack saved-regs saved-method-call-stack
                                    error-value)))
