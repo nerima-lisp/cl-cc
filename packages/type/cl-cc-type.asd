@@ -29,8 +29,9 @@
 ;;;; So this file is authoritative and the standalone repositories are the ones
 ;;;; that drifted. Building against them today costs exactly two failures,
 ;;;; measured by pointing the source registry at the sibling checkouts:
-;;;;   - cl-cc-type is missing `infer-with-constraints` (an 8-line wrapper over
-;;;;     collect-constraints / solve-constraints / zonk).
+;;;;   - cl-cc-type was missing `infer-with-constraints` (an 8-line wrapper over
+;;;;     collect-constraints / solve-constraints / zonk). FIXED upstream in
+;;;;     cl-cc-type bab7375; flake.nix still pins the commit before it.
 ;;;;   - cl-cc-ast disables no-escape instance scalarization: the standard
 ;;;;     metaclass case of "An instance of a class with a custom metaclass
 ;;;;     keeps its allocation and slot reads" stops scalarizing, so VM-SLOT-READ

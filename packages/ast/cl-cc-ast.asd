@@ -36,8 +36,26 @@
 ;;;;   - cl-cc-ast disables no-escape instance scalarization: the standard
 ;;;;     metaclass case of "An instance of a class with a custom metaclass
 ;;;;     keeps its allocation and slot reads" stops scalarizing, so VM-SLOT-READ
-;;;;     survives where it should not. Suspect the closure.lisp rewrite that
-;;;;     merged the AST-LAMBDA and AST-DEFUN clauses into AST-CALLABLE.
+;;;;     survives where it should not. DIAGNOSED, and the repository is not the
+;;;;     party at fault. It fixes AST-CHILDREN for AST-MAKE-INSTANCE:
+;;;;
+;;;;       here  (loop for (k v) on initargs by #'cddr collect v)
+;;;;       there (mapcar #'cdr initargs)
+;;;;
+;;;;     INITARGS is an alist, so the in-tree form walks it as a plist and
+;;;;     yields (NIL) -- the initarg value expressions are invisible to every
+;;;;     generic AST walker. With them visible, some pass between lowering and
+;;;;     the let-emit pass rewrites the binding: %LET-NOESCAPE-INSTANCE-SLOTS
+;;;;     receives an AST-VAR where it used to receive the AST-MAKE-INSTANCE, so
+;;;;     its first gate fails and scalarization is skipped. Traced in-source;
+;;;;     the other four gates are identical under both definitions, and raw
+;;;;     LOWER-SEXP-TO-AST output is identical too, so the rewrite happens in a
+;;;;     pass, not in lowering.
+;;;;
+;;;;     Closing this means deciding whether that rewrite is correct and the
+;;;;     test's expectation should move, or whether the pass has a latent bug
+;;;;     that only an accurate AST-CHILDREN exposes. Do not "fix" it by
+;;;;     restoring the plist walk: that reinstates a data-layer bug.
 ;;;;
 ;;;; Do not delete this file expecting the standalone repository to take over
 ;;;; silently; it will, and the build will regress. Close those two gaps, pin
