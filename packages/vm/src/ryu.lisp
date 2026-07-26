@@ -3,10 +3,18 @@
 ;;; FR-1088 — pure-Lisp float-to-string backend with Ryu-compatible contract.
 
 (defun %vm-float-nan-p (x)
-  (and (floatp x) (not (= x x))))
+  ;; By bit pattern, not by comparison: comparing a NaN raises
+  ;; FLOATING-POINT-INVALID-OPERATION wherever the :INVALID trap is enabled,
+  ;; which is SBCL's default on x86-64. ARM64 does not take the trap, so the
+  ;; self-comparison idiom reads as correct on macOS and errors on Linux.
+  (and (floatp x) (sb-ext:float-nan-p x)))
 
 (defun %vm-float-infinity-p (x)
-  (and (floatp x) (not (zerop x)) (= x (+ x x))))
+  ;; (= x (+ x x)) is both a comparison and an addition on a possibly-NaN
+  ;; value, either of which traps. See %VM-FLOAT-NAN-P.
+  (and (floatp x)
+       (not (sb-ext:float-nan-p x))
+       (sb-ext:float-infinity-p x)))
 
 (defun %vm-normalize-float-exponent (string)
   (substitute #\e #\d (substitute #\e #\D string)))

@@ -61,7 +61,9 @@
     (cond
       ((zerop x)
        (ash sign-bit 63))
-      ((not (= x x))
+      ;; Bit pattern, not (= x x): comparing a NaN traps where :INVALID is
+      ;; enabled, SBCL's default on x86-64.
+      ((sb-ext:float-nan-p x)
        ;; Quiet NaN with a minimal payload.
        (logior (ash sign-bit 63)
                (ash #x7ff 52)

@@ -56,10 +56,13 @@ on macOS and turns every NaN-valued JS test into an error on Linux CI."
   (and (floatp x) (sb-ext:float-nan-p x)))
 
 (defun %js-float-infinity-p (x)
-  "Portable infinity test against the largest finite double magnitudes."
+  "Infinity test that inspects the bit pattern rather than comparing.
+
+The magnitude comparison traps on a NaN argument for the reason given in
+%JS-FLOAT-NAN-P, and callers do reach here with NaN."
   (and (floatp x)
-       (or (> x most-positive-double-float)
-           (< x most-negative-double-float))))
+       (not (sb-ext:float-nan-p x))
+       (sb-ext:float-infinity-p x)))
 
 (defun %js-nan-p (x)
   (or (eq x :js-nan)
@@ -196,7 +199,11 @@ type symbol cannot be named at read time — resolve it by name at runtime."
 (defun %js-strict-eq (a b)
   "JS === strict equality, no coercion."
   (cond
-    ((and (%js-nan-p a) (%js-nan-p b)) nil)  ; NaN !== NaN
+    ;; Either operand being NaN makes === false, and neither may reach (=):
+    ;; comparing a NaN raises FLOATING-POINT-INVALID-OPERATION where the
+    ;; :INVALID trap is enabled. Testing for both operands being NaN is not
+    ;; enough — (= NaN 5d0) traps exactly as (= NaN NaN) does.
+    ((or (%js-nan-p a) (%js-nan-p b)) nil)  ; NaN !== anything, itself included
     ((and (numberp a) (numberp b)) (= a b))
     (t (equal a b))))
 
@@ -204,6 +211,9 @@ type symbol cannot be named at read time — resolve it by name at runtime."
   "ECMAScript SameValueZero equality for Map/Set-style key matching."
   (cond
     ((and (%js-nan-p a) (%js-nan-p b)) t)
+    ;; Exactly one NaN: not the same value, and (=) must not see it. See
+    ;; %JS-STRICT-EQ.
+    ((or (%js-nan-p a) (%js-nan-p b)) nil)
     ((and (numberp a) (numberp b)) (= a b))
     (t (%js-strict-eq a b))))
 

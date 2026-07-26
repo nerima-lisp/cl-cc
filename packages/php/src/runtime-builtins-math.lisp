@@ -203,19 +203,39 @@ as PHP does — its 64-bit two's-complement representation."
   (* (coerce (%php-numeric radians) 'double-float) (/ 180 pi)))
 
 (defun %php-is-finite (x)
-  "PHP is_finite: true when X is a finite float (not INF or NAN)."
+  "PHP is_finite: true when X is a finite float (not INF or NAN).
+
+The NaN guard reads the bit pattern rather than comparing: (= v v) on a NaN
+raises FLOATING-POINT-INVALID-OPERATION wherever the :INVALID trap is enabled,
+which is SBCL's default on x86-64. ARM64 does not take the trap, so the
+comparison idiom looks correct on macOS and errors on Linux CI."
   (let ((v (%php-numeric x)))
-    (if (and (floatp v) (= v v) (< (abs v) most-positive-double-float)) t nil)))
+    (if (and (floatp v)
+             (not (sb-ext:float-nan-p v))
+             (not (sb-ext:float-infinity-p v))
+             ;; %PHP-FDIV yields MOST-POSITIVE/NEGATIVE-DOUBLE-FLOAT as its
+             ;; stand-in for infinity, so those magnitudes count as infinite
+             ;; here too. The NaN guard above is what keeps this comparison
+             ;; from reaching a NaN.
+             (< (abs v) most-positive-double-float))
+        t nil)))
 
 (defun %php-is-infinite (x)
-  "PHP is_infinite: true when X is the INF approximation used elsewhere."
+  "PHP is_infinite: true when X is an infinity. See %PHP-IS-FINITE on why the
+NaN case is tested by bit pattern instead of by comparison."
   (let ((v (%php-numeric x)))
-    (if (and (floatp v) (= v v) (>= (abs v) most-positive-double-float)) t nil)))
+    (if (and (floatp v)
+             (not (sb-ext:float-nan-p v))
+             (or (sb-ext:float-infinity-p v)
+                 ;; The %PHP-FDIV stand-in; see %PHP-IS-FINITE.
+                 (>= (abs v) most-positive-double-float)))
+        t nil)))
 
 (defun %php-is-nan (x)
-  "PHP is_nan: true when X is a floating-point NaN."
+  "PHP is_nan: true when X is a floating-point NaN. See %PHP-IS-FINITE on why
+this reads the bit pattern instead of comparing the value with itself."
   (let ((v (%php-numeric x)))
-    (and (floatp v) (not (= v v)))))
+    (and (floatp v) (sb-ext:float-nan-p v))))
 
 (defun %php-srand (&optional seed)
   "PHP srand: seed the shared random state.

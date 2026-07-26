@@ -16,8 +16,10 @@
          (expt 5 (- k (1- (length %ryu-pow5-table)))))))
 
 (defun %ryu-special-p (d)
-  (cond ((not (= d d)) :nan)
-        ((not (<= (abs d) most-positive-double-float))
+  ;; NaN is detected by bit pattern: reaching either comparison with a NaN
+  ;; raises FLOATING-POINT-INVALID-OPERATION where the :INVALID trap is on.
+  (cond ((sb-ext:float-nan-p d) :nan)
+        ((sb-ext:float-infinity-p d)
          (if (minusp d) :neg-inf :inf))
         (t nil)))
 
