@@ -68,6 +68,57 @@
         "type": "github"
       }
     },
+    "cl-cc-bytecode": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785091961,
+        "narHash": "sha256-L0d8Y+kPfDVJ0kv/S2YS3bbDAiv9rxzy+YXbzH0QnVI=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-bytecode",
+        "rev": "24db21897a34c5c7874bd1f1da8b151b78c694d4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-bytecode",
+        "rev": "24db21897a34c5c7874bd1f1da8b151b78c694d4",
+        "type": "github"
+      }
+    },
+    "cl-cc-ir": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785091764,
+        "narHash": "sha256-3TYwRRH5vUBIniRKVllKBH84Z36at/IR5/2koOmLhKI=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-ir",
+        "rev": "7b7d388bc8504b3aa9ac14e9e3521792011140ec",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-ir",
+        "rev": "7b7d388bc8504b3aa9ac14e9e3521792011140ec",
+        "type": "github"
+      }
+    },
+    "cl-cc-mir": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785091823,
+        "narHash": "sha256-Y8DxZhu0ZzLbL/323rqo+xp3KjneNc7RscuNlaUKCvE=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-mir",
+        "rev": "96034e6bb8629e9a30636bb92204d3dc20d69efd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-mir",
+        "rev": "96034e6bb8629e9a30636bb92204d3dc20d69efd",
+        "type": "github"
+      }
+    },
     "cl-cc-runtime": {
       "flake": false,
       "locked": {
@@ -82,6 +133,23 @@
         "owner": "nerima-lisp",
         "repo": "cl-cc-runtime",
         "rev": "095a8649254650dd7fc2f697473101bf21418ba6",
+        "type": "github"
+      }
+    },
+    "cl-cc-target": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785091875,
+        "narHash": "sha256-toU9HKXkljw2jFPwYyHuCk1T0dsXlRL2vLuZHsxIBVI=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-target",
+        "rev": "e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-target",
+        "rev": "e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1",
         "type": "github"
       }
     },
@@ -294,7 +362,11 @@
         "cl-cc-ast": "cl-cc-ast",
         "cl-cc-binary": "cl-cc-binary",
         "cl-cc-bootstrap": "cl-cc-bootstrap",
+        "cl-cc-bytecode": "cl-cc-bytecode",
+        "cl-cc-ir": "cl-cc-ir",
+        "cl-cc-mir": "cl-cc-mir",
         "cl-cc-runtime": "cl-cc-runtime",
+        "cl-cc-target": "cl-cc-target",
         "cl-cc-type": "cl-cc-type",
         "cl-cc-vm": "cl-cc-vm",
         "cl-cli": "cl-cli",

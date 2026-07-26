@@ -25,8 +25,9 @@
              (load (merge-pathnames relative-asd here)))))
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
-      ;; cl-cc-bootstrap, cl-cc-vm, cl-cc-ast, cl-cc-type, cl-cc-binary and
-      ;; cl-cc-runtime are deliberately absent. They live in the standalone repositories of the same name under
+      ;; cl-cc-bootstrap, cl-cc-vm, cl-cc-ast, cl-cc-type, cl-cc-binary,
+      ;; cl-cc-runtime, cl-cc-ir, cl-cc-mir, cl-cc-target and cl-cc-bytecode
+      ;; are deliberately absent. They live in the standalone repositories of the same name under
       ;; nerima-lisp and reach this build as flake.nix inputs.
       ;;
       ;; They used to be defined in packages/{ast,type} as well. Because
@@ -40,10 +41,6 @@
       ;; packages/{ast,type}/tests stay: those are cl-cc's own integration tests
       ;; over whichever system provides the packages, and they are not duplicated
       ;; by the repositories' own t/ suites, which test module boundaries.
-      (ensure-system-asd :cl-cc-bytecode "packages/bytecode/cl-cc-bytecode.asd" here)
-      (ensure-system-asd :cl-cc-ir "packages/ir/cl-cc-ir.asd" here)
-      (ensure-system-asd :cl-cc-mir "packages/mir/cl-cc-mir.asd" here)
-      (ensure-system-asd :cl-cc-target "packages/target/cl-cc-target.asd" here)
       (ensure-system-asd :cl-cc-optimize "packages/optimize/cl-cc-optimize.asd" here)
       (ensure-system-asd :cl-cc-regalloc "packages/regalloc/cl-cc-regalloc.asd" here)
       (ensure-system-asd :cl-cc-parse "packages/parse/cl-cc-parse.asd" here)

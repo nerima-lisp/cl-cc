@@ -889,7 +889,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-369: SSA-CPS等価性ブリッジ (SSA-CPS Equivalence Bridge) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`, `packages/compile/src/cps.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/cps.lisp`, `packages/optimize/src/optimizer.lisp`
 - **現状**: MIR層（`mir.lisp`）はBraunアルゴリズムでSSA構築。CPS（`cps.lisp`）は独立IR。数学的等価（Kelsey 1995）だが相互変換・解析共有なし
 - **内容**: CPS↔SSA双方向変換レイヤー構築。CPS単一呼び出し継続→SSA基本ブロックパラメータ、CPS合流点→SSAφノード。オプティマイザパスをIR横断で共有可能にする
 - **根拠**: Kelsey (1995) "A Correspondence between CPS and SSA"
@@ -1023,7 +1023,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-530: Sea of Nodes IR (スケジュール自由IR) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: MIR層はCFGベースのSSA（Braunアルゴリズムでφ挿入）。制御フローとデータフローが分離されていない従来型表現
 - **内容**: Cliff Click (1995) の Sea of Nodes IR。制御ノードとデータノードを統一グラフに混在させ、命令順序を遅延してコード生成時に決定。φノードを Region/Phi ノードペアに置換。Loop/Start/End ノードで自然ループを表現。スケジューリングの自由度が高く、GVN・型推論・インライン化を単一パスで実行可能
 - **根拠**: V8 TurboFan / GraalVM Graal compiler。HotSpot C2 も同系統。スケジュール独立性により GVN 精度が大幅向上
@@ -1031,7 +1031,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-531: Schedule-Early / Schedule-Late (命令スケジューリング戦略) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`
 - **現状**: MIRに固定の命令順序
 - **内容**: Sea of Nodes (FR-530) 上の2段階スケジューリング: (1) Schedule-Early — dominance最小ノード（支配木上で最も浅い位置）に命令を置く。(2) Schedule-Late — 使用箇所に最も近い位置に命令を置く。実際のスケジューリングは Early と Late の間の「最適位置」（最も外側のループかつ liveness 考慮）を選択
 - **根拠**: Cliff Click (1995) "Global Code Motion / Global Value Numbering"。SSAベース GVN とコードモーションの統一手法
@@ -1179,25 +1179,25 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-547: Effect System in IR (IRエフェクトシステム) ✅
 
-- **対象**: `packages/optimize/src/effects.lisp`, `packages/mir/src/mir.lisp`, `packages/compile/src/codegen.lisp`
-- **現状**: `effects.lisp` に命令別副作用分類が存在し、`packages/mir/src/mir.lisp` に MIR op → effect-kind 分類と `miri-meta` の `:effect-kind` override を追加済み。MIR `:div` / `:mod` は raise 可能命令として `:control` 扱いにして未使用DCE対象から外している。codegen/CPS ノード全体への注釈伝播は要継続
+- **対象**: `packages/optimize/src/effects.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/codegen.lisp`
+- **現状**: `effects.lisp` に命令別副作用分類が存在し、外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp` に MIR op → effect-kind 分類と `miri-meta` の `:effect-kind` override を追加済み。MIR `:div` / `:mod` は raise 可能命令として `:control` 扱いにして未使用DCE対象から外している。codegen/CPS ノード全体への注釈伝播は要継続
 - **内容**: 各 IR 命令に `{read-heap, write-heap, alloc, io, raise}` のエフェクトセットを付与。エフェクトベースのコードモーション判定（純粋命令のみ hoist/sink）。エフェクト推論（関数シグネチャにエフェクトを伝播）。Koka / OCaml 5 の effect inference に相当
 - **根拠**: エフェクト情報で最適化の保守性を排除。現行 `opt-inst-pure-p` が未完全な純粋性チェックをしているが、エフェクトシステムで完全化
 - **難易度**: Hard
-- **関連実装**: `packages/mir/src/mir.lisp` に `mir-op-effect-kind` / `mir-inst-effect-kind` / `mir-inst-pure-p` / `mir-inst-dce-eligible-p` を追加し、`packages/emit/tests/mir-tests.lisp` で純粋演算・raise 可能算術・load/store・alloc・control・call、metadata override、不正metadata fallback を検証する。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp` に `mir-op-effect-kind` / `mir-inst-effect-kind` / `mir-inst-pure-p` / `mir-inst-dce-eligible-p` を追加し、`packages/emit/tests/mir-tests.lisp` で純粋演算・raise 可能算術・load/store・alloc・control・call、metadata override、不正metadata fallback を検証する。
 
 #### FR-548: Typed SSA / Bidirectional Type Checking in IR (型付きSSA・双方向型検査) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`, `packages/type/src/checker.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/type/src/checker.lisp`
 - **現状**: MIR value/instruction の `type` slot を使い、`mir-propagate-types` で `:const` / 算術 / 比較 / `:phi` の保守的な固定点型伝播を追加済み。型チェック（`checker.lisp`）からの双方向検査接続は要継続
 - **内容**: MIR 命令の各引数と結果に ML 風型を付与。Phi 命令には合流型（join type）を付与。型伝播で SSA use-def 鎖に沿って型情報を伝播。双方向型検査（synthesis mode + checking mode）を `check/synth` モードで実装。不要な型チェック命令（`vm-integer-p` 等）を型証明で消去
 - **根拠**: LLVM typed IR / Typed Assembly Language (TAL)。型情報を IR に保持することで型ベース最適化の精度向上
 - **難易度**: Hard
-- **関連実装**: `packages/mir/src/mir.lisp` に `mir-operand-type` / `mir-join-types` / `mir-infer-inst-type` / `mir-propagate-inst-type` / `mir-propagate-types` を追加し、`packages/emit/tests/mir-tests.lisp` で直線ブロックの算術・比較型伝播、phi join の保守的挙動、後続producerによりphi型が更新される固定点伝播を検証する。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp` に `mir-operand-type` / `mir-join-types` / `mir-infer-inst-type` / `mir-propagate-inst-type` / `mir-propagate-types` を追加し、`packages/emit/tests/mir-tests.lisp` で直線ブロックの算術・比較型伝播、phi join の保守的挙動、後続producerによりphi型が更新される固定点伝播を検証する。
 
 #### FR-549: Multi-Level IR / Progressive Lowering (マルチレベルIR・段階的降下) ✅
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/mir/src/mir.lisp`
+- **対象**: `packages/pipeline/pipeline.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`
 - **現状**: コンパイルパイプラインは `parse → expand → CPS → codegen → VM命令 → [MIR] → native` の不連続なステージ。各ステージ間の変換が大きすぎてデバッグが困難
 - **内容**: MLIR スタイルの段階的降下: High-level IR（defun/let/if 等） → Mid-level IR（関数呼び出し・クロージャ展開済み） → Low-level IR（レジスタ・メモリ明示） → Machine IR（ターゲット命令）。各レベルで独立した検証・最適化が可能
 - **根拠**: MLIR (Lattner et al. 2020) / LLVM-IR → SelectionDAG → MachineIR。コンパイラの保守性・拡張性を大幅改善
@@ -1354,7 +1354,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-231: Stack Map Construction (スタックマップ構築) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`, `packages/emit/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/emit/src/regalloc.lisp`
 - **現状**: MIRに`:safepoint`キーワード定義済み（`mir.lisp:13,158`）だがスタックマップデータ構造なし。GCルートの位置情報を機械語アドレスに紐づける仕組みがない
 - **内容**: 各safepoint位置でのGCルートマップ（どのレジスタ/スタックスロットがGCトレース可能な参照を保持するか）を構築。`.llvm_stackmaps`互換のコンパクトなバイナリエンコーディング
 - **根拠**: LLVM StackMaps / HotSpot OopMap / GraalVM ReferenceMap。正確なGC（FR-190）とdeopt（FR-155）の前提条件
@@ -1362,7 +1362,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-232: Uncommon Trap Instructions (アンコモントラップ命令) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: 型ガード（`extract-type-guard` in `inference.lisp:231`）は型推論層のみ。コード生成に投機的型チェック＋失敗時の脱出パスなし
 - **内容**: `vm-guard-type`/`vm-guard-fixnum`等のガード命令を追加。ガード失敗時にuncommon trapハンドラへジャンプし、FR-155のdeoptimization経路に接続。投機的型仮定の「賭け」と「保険」の分離
 - **根拠**: HotSpot uncommon_trap / V8 deopt_reason / GraalVM SpeculationLog。投機的最適化の安全ネット
@@ -1572,7 +1572,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-291: Auto-Vectorization / SLP Vectorizer (SLPベクトル化) ✅
 
-- **対象**: `packages/mir/src/mir.lisp`, `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64.lisp`
 - **現状**: SIMD命令生成なし。数値ループは1要素ずつスカラー処理
 - **内容**: **SLP（Superword Level Parallelism）ベクトル化**: 隣接メモリアクセス＋同種演算のスカラー命令群を SSE2/AVX2/NEON 128〜256bit SIMD 命令に置換。`(loop for i below n do (setf (aref out i) (+ (aref a i) (aref b i))))` → `VADDPS ymm0, ymm1, ymm2`。型情報（floatベクトル・fixnum配列）が必要。アライメントチェック付き
 - **根拠**: LLVM SLP Vectorizer / GCC auto-vectorization / ARM NEON。数値計算で4〜16x高速化。Common Lisp の `simple-array` 操作が主なターゲット
@@ -1688,7 +1688,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-302: Wasm SIMD Code Generation (Wasm SIMD命令生成) ✅
 
-- **対象**: `packages/emit/src/wasm.lisp`, `packages/mir/src/mir.lisp`
+- **対象**: `packages/emit/src/wasm.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`
 - **現状**: Wasm バックエンドはスカラー命令のみ。Wasm SIMD 128 仕様（2022年標準化）未対応
 - **内容**: MIR のベクトル値型（FR-291で追加するvec128）をWasm `v128.load` / `f32x4.add` 等の SIMD 命令にマップ。x86-64はSSE2経由、AArch64はNEON経由でWasm runtimeがSIMDを実行。ホストが SIMD 非対応の場合はスカラーフォールバック
 - **根拠**: Wasm SIMD proposal (Phase 4, 2022) / Emscripten SIMD / V8 Wasm SIMD。数値ワークロードで4〜8x高速化

@@ -18,6 +18,10 @@
   clCcRuntime,
   clCcBootstrap,
   clCcVm,
+  clCcIr,
+  clCcMir,
+  clCcTarget,
+  clCcBytecode,
   ...
 }:
 let
@@ -60,18 +64,6 @@ let
   # Leaf systems built from packages/. cl-cc-ast and cl-cc-type used to live
   # here but are now external (externalCcSystems, overlaid into the fixpoint).
   leafSpec = {
-    cl-cc-bytecode = {
-      src = "packages/bytecode";
-      deps = [ ];
-    };
-    cl-cc-ir = {
-      src = "packages/ir";
-      deps = [ ];
-    };
-    cl-cc-mir = {
-      src = "packages/mir";
-      deps = [ ];
-    };
     cl-cc-parse = {
       src = "packages/parse";
       deps = [
@@ -112,10 +104,6 @@ let
         clProlog
         clParserKit
       ];
-    };
-    cl-cc-target = {
-      src = "packages/target";
-      deps = [ ];
     };
     cl-cc-regalloc = {
       src = "packages/regalloc";
@@ -263,11 +251,22 @@ let
         (projectRoot + "/run-tests.lisp")
         (projectRoot + "/cl-cc.asd")
       ];
-      # leafNames no longer includes the externalised ast/type; add them
-      # explicitly so the umbrella closure still pulls both external systems.
+      # leafNames covers only what is still built from packages/. Every system
+      # that has moved to its own repository is listed here instead, so the
+      # umbrella closure still pulls it. Most would arrive transitively through
+      # a dependent that stayed, but not all -- cl-cc-bytecode has none, and
+      # dropping it out of leafSpec silently removed it from the closure.
       deps = leafNames ++ [
         "cl-cc-ast"
         "cl-cc-type"
+        "cl-cc-bootstrap"
+        "cl-cc-vm"
+        "cl-cc-binary"
+        "cl-cc-runtime"
+        "cl-cc-ir"
+        "cl-cc-mir"
+        "cl-cc-target"
+        "cl-cc-bytecode"
       ];
     };
     cl-cc-cli = {
@@ -315,6 +314,10 @@ let
     cl-cc-runtime = clCcRuntime;
     cl-cc-bootstrap = clCcBootstrap;
     cl-cc-vm = clCcVm;
+    cl-cc-ir = clCcIr;
+    cl-cc-mir = clCcMir;
+    cl-cc-target = clCcTarget;
+    cl-cc-bytecode = clCcBytecode;
   };
 
   productionAsdfSystems = lib.fix (

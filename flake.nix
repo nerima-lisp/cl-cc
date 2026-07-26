@@ -99,6 +99,22 @@
       url = "github:nerima-lisp/cl-cc-vm/e1ea6bc28b80366cd814afa4a375f438604037ce";
       flake = false;
     };
+    cl-cc-ir = {
+      url = "github:nerima-lisp/cl-cc-ir/7b7d388bc8504b3aa9ac14e9e3521792011140ec";
+      flake = false;
+    };
+    cl-cc-mir = {
+      url = "github:nerima-lisp/cl-cc-mir/96034e6bb8629e9a30636bb92204d3dc20d69efd";
+      flake = false;
+    };
+    cl-cc-target = {
+      url = "github:nerima-lisp/cl-cc-target/e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1";
+      flake = false;
+    };
+    cl-cc-bytecode = {
+      url = "github:nerima-lisp/cl-cc-bytecode/24db21897a34c5c7874bd1f1da8b151b78c694d4";
+      flake = false;
+    };
     cl-cc-runtime = {
       url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
       flake = false;
@@ -322,6 +338,30 @@
               clCcRuntime
             ];
           };
+          clCcIr = sbcl.buildASDFSystem {
+            pname = "cl-cc-ir";
+            version = siblingVersion "cl-cc-ir";
+            src = inputs.cl-cc-ir;
+            systems = [ "cl-cc-ir" ];
+          };
+          clCcMir = sbcl.buildASDFSystem {
+            pname = "cl-cc-mir";
+            version = siblingVersion "cl-cc-mir";
+            src = inputs.cl-cc-mir;
+            systems = [ "cl-cc-mir" ];
+          };
+          clCcTarget = sbcl.buildASDFSystem {
+            pname = "cl-cc-target";
+            version = siblingVersion "cl-cc-target";
+            src = inputs.cl-cc-target;
+            systems = [ "cl-cc-target" ];
+          };
+          clCcBytecode = sbcl.buildASDFSystem {
+            pname = "cl-cc-bytecode";
+            version = siblingVersion "cl-cc-bytecode";
+            src = inputs.cl-cc-bytecode;
+            systems = [ "cl-cc-bytecode" ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -348,6 +388,10 @@
               clCcRuntime
               clCcBootstrap
               clCcVm
+              clCcIr
+              clCcMir
+              clCcTarget
+              clCcBytecode
               ;
           };
           inherit (asdf)
