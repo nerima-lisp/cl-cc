@@ -216,6 +216,24 @@ predecessors to agree on the same slot fact."
                                                          (cl-cc/vm::vm-slot-write-slot-name inst)
                                                          alias-roots)
                               inst))
+        ;; FR-342. An array read cannot be shown to miss a pending store: the
+        ;; index is a register, so two different index registers may still hold
+        ;; the same value at run time. Flush every pending store rather than the
+        ;; matching key alone.
+        ((or vm-aref vm-aref-multi)
+         (let ((dst (opt-inst-dst inst)))
+           (when dst (%mps-flush-if-src-overwritten state dst)))
+         (%mps-flush-all state)
+         (%mps-emit state inst))
+        (vm-aset
+         ;; Keyed on the array *and* index registers together, so a later store
+         ;; kills an earlier one only when both are literally the same register —
+         ;; distinct index registers may denote the same index, and killing
+         ;; across them would drop a live store.
+         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm::vm-array-reg inst)
+                                                        (cl-cc/vm::vm-index-reg inst)
+                                                        alias-roots)
+                              inst))
         (t
          (let ((dst (opt-inst-dst inst)))
            (when dst (%mps-flush-if-src-overwritten state dst)))
