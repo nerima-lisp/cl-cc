@@ -65,16 +65,21 @@
 ;;; List Operation Builtin Tests
 
 (deftest-compile compile-list-ops
-  "cons/car/cdr, list/length, first/rest, eq/eql return the expected numeric values."
+  "cons/car/cdr, list/length and first/rest return numbers; eq/eql return CL booleans.
+
+EQ, EQL and EQUAL are lowered by %TRY-COMPILE-EQUALITY-PREDICATE, which routes the
+VM's 1/0 comparison result through %EMIT-VM-BRANCH-BOOLEAN-AS-CL-BOOLEAN
+(packages/compile/src/codegen-calls.lisp). These cases expected the raw 1/0 the VM
+instruction produces, which is no longer what reaches the caller."
   :cases (("car"         1 "(car (cons 1 2))")
           ("cdr"         2 "(cdr (cons 1 2))")
           ("length-3"    3 "(length (list 1 2 3))")
           ("length-0"    0 "(length (list))")
           ("first"      10 "(first (list 10 20 30))")
           ("rest-len"    2 "(length (rest (list 10 20 30)))")
-          ("eq-true"     1 "(eq 1 1)")
-          ("eq-false"    0 "(eq 1 2)")
-          ("eql-true"    1 "(eql 42 42)"))
+          ("eq-true"     t "(eq 1 1)")
+          ("eq-false"  nil "(eq 1 2)")
+          ("eql-true"    t "(eql 42 42)"))
   )
 
 (deftest-compile compile-list-builtins

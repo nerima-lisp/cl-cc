@@ -309,9 +309,13 @@
 ;;; ─── FR-605: bignum predicate helper ────────────────────────────────────────
 
 (deftest compile-bignump
-  "bignump recognizes integers outside the fixnum range via the VM numeric tower."
+  "bignump answers the VM's numeric boolean: truthy for integers outside the fixnum
+range and 0 for a fixnum.
+
+ASSERT-FALSE demanded NIL, but a type predicate that lowers to a VM instruction
+answers 0, which is false to the VM (VM-FALSEP) and to IF. Pin the value."
   (assert-true (run-string "(bignump (expt 2 100))" :stdlib t))
-  (assert-false (run-string "(bignump 42)" :stdlib t)))
+  (assert-= 0 (run-string "(bignump 42)" :stdlib t)))
 
 ;;; ─── FR-361/363/396: declaim inline policy + optimize quality handling ─────
 

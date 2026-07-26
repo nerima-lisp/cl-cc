@@ -10,9 +10,10 @@
 (in-suite macros-stdlib-list-set-suite)
 
 (deftest concatenate-list-expands-to-append
-  "CONCATENATE 'list expands to (append ...sequences)."
+  "CONCATENATE 'list expands to APPEND over each argument coerced to a list, so a
+vector or string argument concatenates instead of being spliced in as an atom."
   (assert-equal (our-macroexpand-1 '(concatenate 'list '(1 2) '(3 4)))
-                '(append '(1 2) '(3 4))))
+                '(append (coerce '(1 2) 'list) (coerce '(3 4) 'list))))
 
 (deftest-each concatenate-vector-types-expand-to-coerce-to-vector
   "CONCATENATE 'vector and 'simple-vector both use the coerce-to-vector path."

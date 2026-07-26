@@ -207,9 +207,14 @@
   )
 
 (deftest-compile compile-vectorp
-  "vectorp returns truthy for vectors and 0 for non-vectors."
-  :cases (("vector"  t "(not (null (vectorp (make-array 3))))")
-          ("non-vec" 1 "(eql 0 (vectorp 42))")))
+  "vectorp answers the VM's numeric boolean: 1 for a vector, 0 for anything else.
+
+Asserted directly rather than through (not (null ...)) / (eql 0 ...). Type
+predicates lower to VM instructions documented as returning 1/0 (see
+packages/vm/src/array.lisp), whereas NOT follows ANSI and reads numeric zero as
+true, so the CL idiom does not compose with them and said nothing about VECTORP."
+  :cases (("vector"  1 "(vectorp (make-array 3))")
+          ("non-vec" 0 "(vectorp 42)")))
 
 ;;; Sort Tests
 
