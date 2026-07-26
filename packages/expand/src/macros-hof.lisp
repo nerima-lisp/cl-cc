@@ -214,12 +214,27 @@ emit a runtime TYPECASE with an OTHERWISE coercion to list."
 (our-defmacro notevery (pred list &rest more-lists)
   `(not (every ,pred ,list ,@more-lists)))
 
-;; COMPLEMENT: invert a predicate by wrapping it in NOT/APPLY.
+;; COMPLEMENT: invert a predicate by branching on APPLY's result.
+;;
+;; This deliberately does NOT expand to (not (apply fn args)). cl-cc has two
+;; boolean representations in play: a direct call such as (oddp 4) is lowered by
+;; codegen into a CL boolean, but the same predicate reached as a function value
+;; — which is exactly what COMPLEMENT receives — is a VM builtin that answers 1
+;; or 0. NOT follows ANSI and treats numeric zero as true (see
+;; %TRY-COMPILE-COMMON-LISP-NOT in packages/compile/src/codegen-calls.lisp), so
+;; (not (apply #'oddp '(4))) was (not 0), i.e. NIL, and every complemented
+;; predicate answered false for every input. That is what made FIND-IF-NOT,
+;; POSITION-IF-NOT, COUNT-IF-NOT, MEMBER-IF-NOT and ASSOC-IF-NOT — all of which
+;; delegate through COMPLEMENT — report "no match" unconditionally.
+;;
+;; IF uses the VM's own truthiness (VM-FALSEP: NIL and numeric zero are false),
+;; so branching on the result is correct for both representations: 0 and NIL
+;; invert to T, 1 and T invert to NIL.
 (our-defmacro complement (fn)
   (let ((fn-var (gensym "FN")))
     `(let ((,fn-var ,fn))
        (lambda (&rest args)
-         (not (apply ,fn-var args))))))
+         (if (apply ,fn-var args) nil t)))))
 
 ;; REMOVE-IF: keep elements for which pred is false (with optional :key)
 (our-defmacro remove-if (pred list &key key)

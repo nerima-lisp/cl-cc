@@ -8,6 +8,35 @@
 
 (in-suite predicate-suite)
 
+;;; ─── Sequence-dispatch aware expansion accessors ────────────────────────
+;;;
+;;; The sequence predicates no longer expand straight into a list loop. When the
+;;; sequence argument is not a literal, %SEQUENCE-DISPATCH-EXPAND (see
+;;; packages/expand/src/macros-hof.lisp) wraps the four per-type bodies in
+;;;
+;;;   (let ((#:seq <sequence>)) (typecase #:seq (list ...) (string ...)
+;;;                                             (vector ...) (otherwise ...)))
+;;;
+;;; so that these functions accept strings and vectors as ANSI requires, not
+;;; just lists. The tests below still care about the shape of the *list* body,
+;;; so they reach it through these two helpers instead of asserting on a raw
+;;; CADDR that now names the dispatch form.
+
+(defun predicate-expansion-list-body (form)
+  "Return the list-sequence body of FORM's one-step macro expansion.
+
+Peels the %SEQUENCE-DISPATCH-EXPAND wrapper when it is present, and returns the
+expansion unchanged when the sequence argument was a literal and the macro
+therefore selected a path at expansion time. Returns the body itself, so callers
+assert on the same form they used to get before the dispatch wrapper existed."
+  (let ((expansion (our-macroexpand-1 form)))
+    (if (and (consp expansion)
+             (eq (car expansion) 'let)
+             (consp (caddr expansion))
+             (eq (car (caddr expansion)) 'typecase))
+        (second (assoc 'list (cddr (caddr expansion))))
+        expansion)))
+
 (deftest-each predicate-not-delegates-via-complement
   "Each -NOT predicate expands to the base form with (complement pred) as the first arg."
   :cases (("find-if-not"     'find-if     '(find-if-not pred lst))
@@ -28,10 +57,11 @@
   (assert-equal expected (run-string form)))
 
 (deftest position-if-expansion-structure
-  "POSITION-IF expands to LET; body is BLOCK NIL for early RETURN."
-  (let* ((result (our-macroexpand-1 '(position-if pred lst)))
-         (body   (caddr result)))
-    (assert-eq 'let   (car result))
+  "POSITION-IF's list path binds the predicate in a LET whose body is BLOCK NIL,
+so a match can RETURN without scanning the rest of the sequence."
+  (let* ((list-body (predicate-expansion-list-body '(position-if pred lst)))
+         (body      (caddr list-body)))
+    (assert-eq 'let   (car list-body))
     (assert-eq 'block (car body))
     (assert-eq nil    (second body))))
 
@@ -59,13 +89,14 @@
   (assert-= expected (run-string form)))
 
 (deftest-each remove-if-key-expansion
-  "REMOVE-IF and REMOVE-IF-NOT with :key both expand to a multi-binding LET form."
+  "REMOVE-IF and REMOVE-IF-NOT with :key bind the predicate, the key function and
+the accumulator separately, so the key form is evaluated once rather than per element."
   :cases (("remove-if"     '(remove-if #'oddp lst :key #'car))
           ("remove-if-not" '(remove-if-not #'evenp lst :key #'car)))
   (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq 'let (car result))
-    (assert-true (> (length (cadr result)) 1))))
+  (let ((list-body (predicate-expansion-list-body form)))
+    (assert-eq 'let (car list-body))
+    (assert-true (> (length (cadr list-body)) 1))))
 
 (deftest find-if-not-with-key
   "FIND-IF-NOT with :key delegates to FIND-IF with complement."
@@ -73,10 +104,11 @@
     (assert-eq (car result) 'find-if)))
 
 (deftest position-if-with-key
-  "POSITION-IF with :key applies key before predicate."
-  (let ((result (our-macroexpand-1 '(position-if #'oddp lst :key #'car))))
-    (assert-eq (car result) 'let)
-    (assert-true (> (length (cadr result)) 2))))
+  "POSITION-IF with :key binds the predicate, the key function and the index
+separately, so the key form is evaluated once rather than per element."
+  (let ((list-body (predicate-expansion-list-body '(position-if #'oddp lst :key #'car))))
+    (assert-eq (car list-body) 'let)
+    (assert-true (> (length (cadr list-body)) 2))))
 
 (deftest count-if-not-with-key
   "COUNT-IF-NOT with :key delegates to COUNT-IF with complement."
@@ -119,9 +151,9 @@
 
 
 (deftest assoc-if-body-is-dolist
-  "ASSOC-IF body is a DOLIST (linear scan)."
-  (let* ((result (our-macroexpand-1 '(assoc-if pred alist)))
-         (body   (caddr result)))
+  "ASSOC-IF scans an alist with a DOLIST (linear scan), not an index loop."
+  (let* ((list-body (predicate-expansion-list-body '(assoc-if pred alist)))
+         (body      (caddr list-body)))
     (assert-eq (car body) 'dolist)))
 
 
@@ -140,10 +172,12 @@
   (assert-equal expected (run-string form)))
 
 (deftest-each complement-expansion-structure
-  "COMPLEMENT expands to LET+lambda; the lambda body applies NOT to the pred via APPLY."
+  "COMPLEMENT expands to LET+lambda whose body branches on APPLY with IF, so the
+inversion follows the VM's truthiness instead of NOT's ANSI test for NIL — a
+predicate reached as a function value answers 1/0, which NOT would read as true."
   :cases (("top-is-let"    'let    (lambda (r) (car r)))
           ("inner-lambda"  'lambda (lambda (r) (car (caddr r))))
-          ("body-not-head" 'not    (lambda (r) (car (caddr (caddr r)))))
-          ("apply-in-not"  'apply  (lambda (r) (caadr (caddr (caddr r))))))
+          ("body-if-head"  'if     (lambda (r) (car (caddr (caddr r)))))
+          ("apply-in-if"   'apply  (lambda (r) (car (cadr (caddr (caddr r)))))))
   (expected accessor)
   (assert-eq expected (funcall accessor (our-macroexpand-1 '(complement pred)))))

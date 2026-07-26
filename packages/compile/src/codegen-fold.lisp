@@ -120,7 +120,11 @@ filling those fields from NODE."
       (reg '<= (lambda (args) (values (if (apply #'<= args) t nil) t)))
       (reg '> (lambda (args) (values (if (apply #'> args) t nil) t)))
       (reg '>= (lambda (args) (values (if (apply #'>= args) t nil) t)))
-      ;; Unary predicates
+      ;; Unary predicates.
+      ;; NOT folds with host CL's NOT on purpose: source-level NOT is lowered by
+      ;; %TRY-COMPILE-COMMON-LISP-NOT (packages/compile/src/codegen-calls.lisp),
+      ;; which tests exactly for NIL and treats numeric zero as true, so this
+      ;; table has to agree with that and not with VM-FALSEP.
       (reg 'not (lambda (args) (values (not (car args)) t)))
       (reg 'zerop (lambda (args) (values (zerop (car args)) t)))
       (reg 'plusp (lambda (args) (values (plusp (car args)) t)))
