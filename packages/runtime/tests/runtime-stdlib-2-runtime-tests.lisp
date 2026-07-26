@@ -14,14 +14,21 @@
 (deftest runtime-structured-logging-json-and-context
   "FR-791: structured JSON logging includes level, message, context, attrs, and time."
   :timeout 5
+  ;; The standalone cl-cc-runtime delegates logging to cl-log-kit and re-exports
+  ;; its API, so the bespoke *LOG-LEVEL* / *LOG-OUTPUT* / *LOG-JSON-OUTPUT*
+  ;; specials are gone: the level belongs to the logger, and JSON-versus-text is
+  ;; a choice of handler. Same assertions, expressed against that API.
   (let ((stream (make-string-output-stream)))
-    (let ((cl-cc/runtime:*log-level* cl-cc/runtime:+log-level-trace+)
-          (cl-cc/runtime:*log-output* stream)
-          (cl-cc/runtime:*log-json-output* t))
-      (cl-cc/runtime:with-log-context ((:request-id "r1"))
-        (cl-cc/runtime:log-info "hello" :component "test")))
+    (let ((logger (cl-cc/runtime:make-logger
+                   :name "test"
+                   :handler (cl-cc/runtime:make-json-handler :stream stream)
+                   :level cl-cc/runtime:+level-debug+)))
+      (cl-cc/runtime:with-default-logger (logger)
+        (cl-cc/runtime:with-log-context (:request-id "r1")
+          (cl-cc/runtime:log-default-info "hello" :component "test"))))
     (let ((line (get-output-stream-string stream)))
-      (assert-true (search "\"level\":\"info\"" line))
+      ;; Uppercase: cl-log-kit's LEVEL-NAME renders +LEVEL-INFO+ as "INFO".
+      (assert-true (search "\"level\":\"INFO\"" line))
       (assert-true (search "\"message\":\"hello\"" line))
       (assert-true (search "\"request-id\":\"r1\"" line))
       (assert-true (search "\"component\":\"test\"" line))

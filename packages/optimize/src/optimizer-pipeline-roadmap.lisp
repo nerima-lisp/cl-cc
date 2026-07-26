@@ -169,8 +169,10 @@ Accepted STATUS keywords: :implemented, :partial, :planned, :unknown."
     (nreverse ids)))
 
 (defparameter *opt-roadmap-extracted-package-systems*
-  '(("packages/ast/"  . :cl-cc-ast)
-    ("packages/type/" . :cl-cc-type))
+  '(("packages/ast/"     . :cl-cc-ast)
+    ("packages/type/"    . :cl-cc-type)
+    ("packages/binary/"  . :cl-cc-binary)
+    ("packages/runtime/" . :cl-cc-runtime))
   "Roadmap evidence prefixes for packages that now live in their own repository.
 
 Evidence strings still name the logical module -- packages/type/src/inference.lisp

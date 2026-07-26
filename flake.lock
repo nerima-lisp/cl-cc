@@ -51,6 +51,23 @@
         "type": "github"
       }
     },
+    "cl-cc-runtime": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785080164,
+        "narHash": "sha256-PJA/17J2zn/tPZggHfIT4ceh0s9GR3HX8YhzpSN+tcM=",
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-runtime",
+        "rev": "095a8649254650dd7fc2f697473101bf21418ba6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-cc-runtime",
+        "rev": "095a8649254650dd7fc2f697473101bf21418ba6",
+        "type": "github"
+      }
+    },
     "cl-cc-type": {
       "flake": false,
       "locked": {
@@ -102,6 +119,23 @@
         "type": "github"
       }
     },
+    "cl-json-kit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784983583,
+        "narHash": "sha256-e2Y1Ajgtbqnv4xBCtTUdL0gCxlyJyNb3XQzyJsuyR0I=",
+        "owner": "nerima-lisp",
+        "repo": "cl-json-kit",
+        "rev": "62a3164ab812badf7dcbf94f4b4e4eda2ecd5fb1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "ref": "v1.0.0",
+        "repo": "cl-json-kit",
+        "type": "github"
+      }
+    },
     "cl-log-kit": {
       "flake": false,
       "locked": {
@@ -133,6 +167,23 @@
         "owner": "nerima-lisp",
         "ref": "v1.0.0",
         "repo": "cl-parser-kit",
+        "type": "github"
+      }
+    },
+    "cl-process-kit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785012035,
+        "narHash": "sha256-6vy6K+ZUYt9zcu3IUSohRjYNT1jMX/xtXJX3CewsUpA=",
+        "owner": "nerima-lisp",
+        "repo": "cl-process-kit",
+        "rev": "359d127e84d1e876e253419953253a34db033070",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "ref": "v1.0.1",
+        "repo": "cl-process-kit",
         "type": "github"
       }
     },
@@ -208,11 +259,14 @@
         "cl-boundary-kit": "cl-boundary-kit",
         "cl-cc-ast": "cl-cc-ast",
         "cl-cc-binary": "cl-cc-binary",
+        "cl-cc-runtime": "cl-cc-runtime",
         "cl-cc-type": "cl-cc-type",
         "cl-cli": "cl-cli",
         "cl-dataflow": "cl-dataflow",
+        "cl-json-kit": "cl-json-kit",
         "cl-log-kit": "cl-log-kit",
         "cl-parser-kit": "cl-parser-kit",
+        "cl-process-kit": "cl-process-kit",
         "cl-prolog": "cl-prolog",
         "cl-tty-kit": "cl-tty-kit",
         "cl-weave": "cl-weave",

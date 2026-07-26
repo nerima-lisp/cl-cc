@@ -26,8 +26,8 @@
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
       (ensure-system-asd :cl-cc-bootstrap "packages/bootstrap/cl-cc-bootstrap.asd" here)
-      ;; cl-cc-ast, cl-cc-type and cl-cc-binary are deliberately absent. They
-      ;; live in the standalone repositories of the same name under
+      ;; cl-cc-ast, cl-cc-type, cl-cc-binary and cl-cc-runtime are deliberately
+      ;; absent. They live in the standalone repositories of the same name under
       ;; nerima-lisp and reach this build as flake.nix inputs.
       ;;
       ;; They used to be defined in packages/{ast,type} as well. Because
@@ -41,7 +41,6 @@
       ;; packages/{ast,type}/tests stay: those are cl-cc's own integration tests
       ;; over whichever system provides the packages, and they are not duplicated
       ;; by the repositories' own t/ suites, which test module boundaries.
-      (ensure-system-asd :cl-cc-runtime "packages/runtime/cl-cc-runtime.asd" here)
       (ensure-system-asd :cl-cc-bytecode "packages/bytecode/cl-cc-bytecode.asd" here)
       (ensure-system-asd :cl-cc-ir "packages/ir/cl-cc-ir.asd" here)
       (ensure-system-asd :cl-cc-mir "packages/mir/cl-cc-mir.asd" here)

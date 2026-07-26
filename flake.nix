@@ -91,6 +91,21 @@
       url = "github:nerima-lisp/cl-cc-binary/3c81059218b0d99838d04dff7dbbb3dd8821a8ad";
       flake = false;
     };
+    cl-cc-runtime = {
+      url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
+      flake = false;
+    };
+    # Pulled in by the standalone cl-cc-runtime, which took dependencies the
+    # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
+    # cl-log-kit, both already above; cl-json-kit is self-contained.
+    cl-process-kit = {
+      url = "github:nerima-lisp/cl-process-kit/v1.0.1";
+      flake = false;
+    };
+    cl-json-kit = {
+      url = "github:nerima-lisp/cl-json-kit/v1.0.0";
+      flake = false;
+    };
   };
 
   # Plain `outputs` with `forAllSystems`, not flake-parts. The whole flake is
@@ -256,6 +271,33 @@
           # The standalone cl-cc-binary took a dependency on cl-log-kit that the
           # in-tree copy did not have; clLogKit is already an input for
           # cl-boundary-kit, so it is threaded in here rather than added.
+          clProcessKit = sbcl.buildASDFSystem {
+            pname = "cl-process-kit";
+            version = siblingVersion "cl-process-kit";
+            src = inputs.cl-process-kit;
+            systems = [ "cl-process-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clLogKit
+            ];
+          };
+          clJsonKit = sbcl.buildASDFSystem {
+            pname = "cl-json-kit";
+            version = siblingVersion "cl-json-kit";
+            src = inputs.cl-json-kit;
+            systems = [ "cl-json-kit" ];
+          };
+          clCcRuntime = sbcl.buildASDFSystem {
+            pname = "cl-cc-runtime";
+            version = siblingVersion "cl-cc-runtime";
+            src = inputs.cl-cc-runtime;
+            systems = [ "cl-cc-runtime" ];
+            lispLibs = [
+              clLogKit
+              clProcessKit
+              clJsonKit
+            ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -279,6 +321,7 @@
               clCcAst
               clCcType
               clCcBinary
+              clCcRuntime
               ;
           };
           inherit (asdf)

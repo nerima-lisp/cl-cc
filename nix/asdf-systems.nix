@@ -15,6 +15,7 @@
   clCcAst,
   clCcType,
   clCcBinary,
+  clCcRuntime,
   ...
 }:
 let
@@ -59,10 +60,6 @@ let
   leafSpec = {
     cl-cc-bootstrap = {
       src = "packages/bootstrap";
-      deps = [ ];
-    };
-    cl-cc-runtime = {
-      src = "packages/runtime";
       deps = [ ];
     };
     cl-cc-bytecode = {
@@ -324,6 +321,7 @@ let
     cl-cc-ast = clCcAst;
     cl-cc-type = clCcType;
     cl-cc-binary = clCcBinary;
+    cl-cc-runtime = clCcRuntime;
   };
 
   productionAsdfSystems = lib.fix (
