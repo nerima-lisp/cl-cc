@@ -426,3 +426,43 @@ cl-cc がこれらを自分のビルドから外すこと**を意味する — `
 > 参考: 会話中に検討した `cl-cc-runtime-concurrent`（並行ランタイム26ファイル/
 > ~3.1k loc）は「compiler と target runtime の分離」という別軸の候補。runtime
 > 単一パッケージの分割とオーファン判定が前提のため、本設計の 5 repo とは別トラック。
+
+### 10-3. 核＝分割不可 という前提は実測で否定された（2026-07-27）
+
+§1-0 は「核はセルフホストの自己参照ウェブ」「`cl-cc/vm::` 跨ぎ参照 301」を根拠に
+vm を分割対象外としていた。**この根拠は方向を取り違えている。** 301 は
+*他パッケージが vm の内部に手を突っ込んでいる数* であって、vm が何かに依存して
+いる数ではない。前者は公開 API の問題であり、§5-2 の作業そのものである
+（optimize / codegen は既に 0 に到達済み）。
+
+実測: `(asdf:load-system :cl-cc-vm)` は cl-cc ツリー単独で成功し、その時点で
+`cl-cc/expand` `cl-cc/compile` `cl-cc/optimize` `cl-cc/parse` `cl-cc/ast`
+`cl-cc/type` はいずれも **未ロード**。存在するのは `cl-cc/bootstrap` と
+`cl-cc/runtime`（＝既に外部化済み）だけ。`vm-bridge-io-docs.lisp` の
+`cl-cc/expand` 参照は `find-package` による実行時ルックアップで、不在なら NIL に
+落ちるだけ。残りは docstring / コメント。
+
+したがって **vm は葉である**。依存は `bootstrap`(283 loc, 依存ゼロ) と
+`runtime`(外部化済み) のみ。
+
+**これが「cl-cc を小さくする」唯一の実効レバー。** vm の背後に積み上がっている量:
+
+```
+vm          26,897        ← bootstrap(283) の上の葉
+optimize    25,092  ┐
+codegen     19,468  │
+php         19,251  ├ すべて vm 依存。vm が外部化されない限り
+javascript  15,220  │ cl-cc 側が input に取ると循環になる（§10-2）
+emit         2,808  │
+regalloc     1,608  ┘
+                    合計 ≈ 110,000 / 全体約 300,000
+```
+
+つまり順序は **bootstrap → vm → 残り全部**。vm を出さない限り大物は 1 つも
+出せず、出せば約 1/3 が一度に外に出る。逆に、依存ゼロの小物
+（ir 523 / mir 697 / target 302 / bytecode 1,073 / docgen 134 / formatter 101 /
+prolog-tools 288）は今すぐ出せるが、合計 3.1k loc で本体はほとんど小さくならない。
+
+**未着手の理由**: `cl-cc-bootstrap` と `cl-cc-vm` の GitHub repo が未作成
+（Terraform が用意したのは type/php/javascript/optimize/codegen-native の 5 個）。
+repo 作成は outward な操作なので判断を残している。
