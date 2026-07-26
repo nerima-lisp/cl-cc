@@ -206,9 +206,17 @@ This is a conservative FR-168 style pass: when every predecessor edge into a
 block carries the same vm-jump-zero fact over a foldable predicate, repeated
 tests of the same predicate on the same source register inside the successor
 block are replaced with vm-const 1/0."
-  (let ((cfg (cfg-build instructions)))
+  (let* ((cfg (cfg-build instructions))
+         ;; Collect every block's fact before rewriting any of them. A fact is
+         ;; derived from the predicate instruction that feeds a predecessor's
+         ;; VM-JUMP-ZERO, and rewriting replaces exactly those instructions with
+         ;; VM-CONST — so folding a block first destroyed the evidence its
+         ;; successors needed. A join whose predecessors agree lost its fact
+         ;; whenever one of them happened to be processed earlier.
+         (facts (map 'vector #'%opt-branch-predicate-fact-for-block (cfg-blocks cfg))))
     (loop for block across (cfg-blocks cfg)
-          do (let ((fact (%opt-branch-predicate-fact-for-block block)))
+          for fact across facts
+          do (progn
                (when fact
                  (let ((live-fact fact)
                        (new-insts nil))
