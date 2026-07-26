@@ -245,8 +245,17 @@ abort count and retry under table lock fallback path."
 
 (setf (gethash :make-hash-table *instruction-constructors*)
       (lambda (sexp)
+        ;; The optional TEST operand is recognised by ruling out the plist keys,
+        ;; not by KEYWORDP. TEST normally holds a register, and registers are
+        ;; keywords (:R6), so KEYWORDP classified every register-valued test as
+        ;; "no test given" and then read the register itself as the head of the
+        ;; plist — GETF on (:R6) signalled "malformed property list". That broke
+        ;; the sexp round-trip INSTRUCTION->SEXP performs in the Prolog rewrite
+        ;; pass for any (make-hash-table :test ...).
         (let* ((third-arg (third sexp))
-               (test (unless (keywordp third-arg) third-arg))
+               (test (unless (member third-arg
+                                     '(:size :rehash-size :rehash-threshold :weakness))
+                       third-arg))
                (plist (if test (nthcdr 3 sexp) (nthcdr 2 sexp))))
            (make-vm-make-hash-table :dst (second sexp)
                                     :test test
