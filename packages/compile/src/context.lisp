@@ -513,6 +513,8 @@ clobbered. Returns ARG's result register."
     cl-cc/ast:ast-go
     cl-cc/ast:ast-defvar
     cl-cc/ast:ast-defclass
+    cl-cc/ast:ast-make-instance
+    cl-cc/ast:ast-slot-value
     cl-cc/ast:ast-set-slot-value
     cl-cc/ast:ast-call
     cl-cc/ast:ast-lambda
@@ -526,7 +528,24 @@ clobbered. Returns ARG's result register."
     cl-cc/ast:ast-labels)
   "AST node types excluded from CPS compilation.
 Definition forms, non-local control flow, and dynamic control must run on the
-direct compile path until the VM CPS route proves semantically equivalent.")
+direct compile path until the VM CPS route proves semantically equivalent.
+
+The CLOS entries are the allocation and slot accessors as a set --
+AST-MAKE-INSTANCE and AST-SLOT-VALUE alongside AST-DEFCLASS and
+AST-SET-SLOT-VALUE, which were already here. Codegen decides several things
+about a CLOS instance that the CPS route does not preserve: whether a
+non-escaping LET-bound instance may be scalarized into registers, and whether
+its metaclass is custom and therefore carries INITIALIZE-INSTANCE and
+SLOT-VALUE-USING-CLASS hooks that VM-MAKE-OBJ and VM-SLOT-READ are what
+dispatch. CPS rebinds the instance to a temporary, so those analyses see an
+AST-VAR and silently do nothing.
+
+Excluding only the write side was not a deliberate line: with AST-CHILDREN
+returning (NIL) for AST-MAKE-INSTANCE -- it walked the initarg alist as a
+plist -- %CPS-COMPILE-SAFE-AST-P's (TYPEP AST 'AST-NODE) guard rejected every
+program containing one, so the read side never reached CPS and its absence
+here never showed. Fixing AST-CHILDREN alone would have routed CLOS programs
+through CPS and quietly dropped both analyses.")
 
 (defparameter *cps-native-compile-unsupported-ast-types*
   '(cl-cc/ast:ast-node)

@@ -76,17 +76,29 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
            ("defun-key" '(defun cps-safe-key-fn (&key x) x))
            ("defclass" '(defclass cps-safe-class () ((slot :initarg :slot))))
            ("defmethod" '(defmethod cps-safe-generic ((x integer)) x))
-           ("set-slot-value" '(setf (slot-value obj 'slot) 1)))
+           ;; The CLOS allocation and slot accessors go together. Codegen decides
+           ;; whether a non-escaping instance may be scalarized and whether its
+           ;; metaclass carries INITIALIZE-INSTANCE / SLOT-VALUE-USING-CLASS
+           ;; hooks; CPS rebinds the instance to a temporary, so both analyses
+           ;; see an AST-VAR and do nothing.
+           ("set-slot-value" '(setf (slot-value obj 'slot) 1))
+           ("make-instance" '(make-instance 'cps-safe-class))
+           ("make-instance-initargs" '(make-instance 'cps-safe-class :slot 1))
+           ("slot-value" '(slot-value obj 'slot)))
   (form)
   (let* ((expanded (cl-cc/expand:compiler-macroexpand-all form))
          (ast (cl-cc/compile::%lower-toplevel-form-to-ast expanded)))
     (assert-false (cl-cc/compile:%cps-vm-compile-safe-ast-p ast))))
 
 (deftest-each codegen-toplevel-safe-subset-still-allows-simple-clos-forms
-  "Simple top-level CLOS helper forms remain inside the current VM CPS-safe subset."
-  :cases (("defgeneric" '(defgeneric cps-safe-generic (x)))
-           ("make-instance" '(make-instance 'cps-safe-class))
-           ("slot-value" '(slot-value obj 'slot)))
+  "DEFGENERIC alone stays inside the VM CPS-safe subset.
+
+MAKE-INSTANCE and SLOT-VALUE used to be asserted here. The line they sat on was
+an artifact rather than a decision: AST-CHILDREN walked MAKE-INSTANCE's initarg
+alist as a plist and produced (NIL), and %CPS-COMPILE-SAFE-AST-P rejects a
+non-AST-NODE child, so (make-instance 'c) counted as safe while
+(make-instance 'c :x 1) counted as unsafe. They are excluded together now."
+  :cases (("defgeneric" '(defgeneric cps-safe-generic (x))))
   (form)
   (let* ((expanded (cl-cc/expand:compiler-macroexpand-all form))
          (ast (cl-cc/compile::%lower-toplevel-form-to-ast expanded)))
