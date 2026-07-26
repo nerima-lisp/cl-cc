@@ -413,10 +413,13 @@ answers 0, which is false to the VM (VM-FALSEP) and to IF. Pin the value."
 
 (deftest compile-proclaim-records-global-declaration
   "proclaim returns its declaration spec and records inline declarations globally."
+  ;; CL-CC::, not this file's package: RUN-STRING reads its source with *PACKAGE*
+  ;; bound to :CL-CC, so the proclaimed name comes back interned there.
   (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
-    (assert-equal '(inline proclaimed-fn)
+    (assert-equal '(inline cl-cc::proclaimed-fn)
                   (run-string "(proclaim '(inline proclaimed-fn))" :stdlib t))
-    (assert-eq :inline (gethash 'proclaimed-fn cl-cc/expand:*declaim-inline-registry*))))
+    (assert-eq :inline
+               (gethash 'cl-cc::proclaimed-fn cl-cc/expand:*declaim-inline-registry*))))
 
 (deftest compile-with-compilation-unit-evaluates-body
   "with-compilation-unit acts as a minimal compilation-unit wrapper around its body."

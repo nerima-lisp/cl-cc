@@ -127,6 +127,25 @@ than a fresh uninterned symbol."
           (intern (string name) package)
           (make-symbol (string name)))))
 
+(defun %lex-intern-qualified (name package-name)
+  "Intern NAME for a PACKAGE-NAME:NAME reference, preferring a real home package.
+
+The runtime package layer answers first so guest-defined packages resolve to the
+symbols the guest interned. But when it does not know PACKAGE-NAME it hands back
+a *homeless* symbol, and a homeless symbol can never match anything: the stdlib's
+own (cl-cc/expand::%record-declaim-inline-clause ...) — the way PROCLAIM reaches
+a host function — read as #:%RECORD-DECLAIM-INLINE-CLAUSE and failed as an
+undefined function. Fall through to the host package in that case, and only then
+to *PACKAGE*, which keeps a genuinely unknown package matching an unqualified
+use rather than fabricating a \"P1::F\" literal."
+  (let* ((runtime-package (%lex-find-package package-name))
+         (runtime-symbol (when runtime-package
+                           (%lex-runtime-intern name runtime-package))))
+    (cond
+      ((and runtime-symbol (symbol-package runtime-symbol)) runtime-symbol)
+      ((find-package package-name) (intern name (find-package package-name)))
+      (t (intern name)))))
+
 (defun lex-read-symbol-or-number (state)
   "Read a symbol, keyword, or number from the current position."
   (let ((start (lexer-state-pos state)))
@@ -155,15 +174,8 @@ than a fresh uninterned symbol."
          (lex-make-token state :T-DOT nil start))
         (t
           (let ((symbol (if pkg-name
-                            (let ((pkg (%lex-find-package (string-upcase pkg-name))))
-                              (if pkg
-                                  (%lex-runtime-intern sym-name pkg)
-                                  ;; Package genuinely unknown: intern the bare
-                                  ;; symbol name in the current package so the
-                                  ;; reference still matches an unqualified use,
-                                  ;; instead of fabricating a "P1::F" literal.
-                                  (intern sym-name)))
-                             (intern sym-name))))
+                            (%lex-intern-qualified sym-name (string-upcase pkg-name))
+                            (intern sym-name))))
             (lex-make-token state :T-IDENT symbol start)))))))
 
 (defun lex-read-keyword (state)

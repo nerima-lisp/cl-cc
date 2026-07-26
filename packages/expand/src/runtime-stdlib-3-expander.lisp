@@ -48,3 +48,25 @@
     nil))
 
 (export '(*global-proclamations*))
+
+;;; ── Host bridges for PROCLAIM ────────────────────────────────────────────────
+;;;
+;;; The stdlib defines PROCLAIM as guest code that calls these recorders by
+;;; package-qualified name (see stdlib-source.lisp). The VM can only call a host
+;;; function that has been registered as a bridge, so without this PROCLAIM
+;;; compiled to a call of an undefined function. Registration lives here rather
+;;; than in the VM's own bridge table because cl-cc-vm loads before this system
+;;; and cannot name these functions.
+(eval-when (:load-toplevel :execute)
+  (when (fboundp 'cl-cc/vm:vm-register-host-bridge)
+    (dolist (entry (list (cons '%record-declaim-inline-clause
+                               #'%record-declaim-inline-clause)
+                         (cons '%record-declaim-optimize-clause
+                               #'%record-declaim-optimize-clause)
+                         (cons '%record-declaim-type-clause
+                               #'%record-declaim-type-clause)
+                         (cons '%record-declaim-ftype-clause
+                               #'%record-declaim-ftype-clause)
+                         (cons '%record-declaim-special-clause
+                               #'%record-declaim-special-clause)))
+      (cl-cc/vm:vm-register-host-bridge (car entry) (cdr entry)))))
