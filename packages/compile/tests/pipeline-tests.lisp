@@ -284,3 +284,42 @@
          (laid-out (cl-cc:autofdo-apply-layout-decisions instructions profile-data)))
     (assert-true (< (%label-position laid-out "hot-fn")
                     (%label-position laid-out "cold-fn")))))
+
+;;; ─── Backend registration protocol (§5-1 of the repo-split design) ──────────
+
+(defun %php-package-scan-bridge-symbols ()
+  "The package scan the pipeline used to perform, kept as the reference set.
+
+Written out rather than called, deliberately: it is the *old* behaviour, and a
+test that asserts the new path reproduces it has to hold the old one still."
+  (let ((pkg (find-package :cl-cc/php))
+        (acc '()))
+    (when pkg
+      (do-symbols (sym pkg)
+        (when (and (eq (symbol-package sym) pkg)
+                   (fboundp sym)
+                   (not (macro-function sym))
+                   (not (special-operator-p sym))
+                   (let ((name (symbol-name sym)))
+                     (and (>= (length name) 5) (string= "%PHP-" name :end2 5))))
+          (push sym acc))))
+    (sort (remove-duplicates acc) #'string< :key #'symbol-name)))
+
+(deftest backend-protocol-registers-php-under-its-language
+  "The PHP backend registers itself, so the pipeline never names cl-cc/php."
+  (assert-true (cl-cc/backend-protocol:registered-backend :php)))
+
+(deftest backend-protocol-bridge-set-matches-the-old-package-scan
+  "Moving the %PHP-* scan into the backend changes which symbols get bridged: none.
+
+The scan moved from the pipeline into cl-cc/php so the orchestrator would stop
+depending on a backend's package name and naming convention -- the coupling that
+blocked moving php to its own repository. Same predicate, same package,
+evaluated from the other side of the boundary, so the bridged set has to be
+identical or the move was not behaviour-preserving."
+  (let ((protocol (sort (remove-duplicates
+                         (cl-cc/pipeline::%register-backend-protocol-bridges))
+                        #'string< :key #'symbol-name))
+        (scan (%php-package-scan-bridge-symbols)))
+    (assert-true (plusp (length scan)))
+    (assert-equal scan protocol)))

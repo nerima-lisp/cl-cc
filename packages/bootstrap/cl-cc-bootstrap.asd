@@ -15,4 +15,5 @@
   :depends-on ()
   :pathname "src"
   :serial t
-  :components ((:file "package")))
+  :components ((:file "package")
+               (:file "backend-protocol")))

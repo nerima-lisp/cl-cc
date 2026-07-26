@@ -114,4 +114,5 @@
     (:file "php84-features")
     (:file "unsupported")
     (:file "grammar")
-   (:file "grammar-stmt")))
+   (:file "grammar-stmt")
+   (:file "backend")))

@@ -1,64 +1,35 @@
 ;;;; pipeline-runtime-bridges.lisp - Language runtime bridge registration
 (in-package :cl-cc/pipeline)
 
-(defparameter *php-runtime-bridge-entries*
-  '((cl-cc/php::%php-array           . cl-cc/php:%php-array)
-    (cl-cc/php::%php-array-ref       . cl-cc/php:%php-array-ref)
-    (cl-cc/php::%php-array-set       . cl-cc/php:%php-array-set)
-    (cl-cc/php::%php-array-unset     . cl-cc/php:%php-array-unset)
-    (cl-cc/php::%php-count           . cl-cc/php:%php-count)
-    (cl-cc/php::%php-strlen          . cl-cc/php:%php-strlen)
-    (cl-cc/php::%php-strtolower      . cl-cc/php:%php-strtolower)
-    (cl-cc/php::%php-strtoupper      . cl-cc/php:%php-strtoupper)
-    (cl-cc/php::%php-stringify       . cl-cc/php:%php-stringify)
-    (cl-cc/php::%php-concat          . cl-cc/php:%php-concat)
-    (cl-cc/php::%php-modulo          . cl-cc/php:%php-modulo)
-    (cl-cc/php::%php-shift-left      . cl-cc/php:%php-shift-left)
-    (cl-cc/php::%php-shift-right     . cl-cc/php:%php-shift-right)
-    (cl-cc/php::%php-spaceship       . cl-cc/php:%php-spaceship)
-    (cl-cc/php::%php-bitwise-and     . cl-cc/php:%php-bitwise-and)
-    (cl-cc/php::%php-bitwise-or      . cl-cc/php:%php-bitwise-or)
-    (cl-cc/php::%php-bitwise-xor     . cl-cc/php:%php-bitwise-xor)
-    (cl-cc/php::%php-bitwise-not     . cl-cc/php:%php-bitwise-not)
-    (cl-cc/php::%php-isset           . cl-cc/php:%php-isset)
-    (cl-cc/php::%php-array-key-exists . cl-cc/php:%php-array-key-exists)
-    (cl-cc/php::%php-yield           . cl-cc/php:%php-yield)
-    (cl-cc/php::%php-yield-from      . cl-cc/php:%php-yield-from)
-    (cl-cc/php::%php-throw           . cl-cc/php:%php-throw)
-    (cl-cc/php::%php-make-exception  . cl-cc/php:%php-make-exception)
-    (cl-cc/php::%php-exception-object-p . cl-cc/php:%php-exception-object-p)
-    (cl-cc/php::%php-exception-value . cl-cc/php:%php-exception-value)
-    (cl-cc/php::%php-exception-matches-p . cl-cc/php:%php-exception-matches-p)
-    (cl-cc/php::%php-enum-make-case  . cl-cc/php:%php-enum-make-case)
-    (cl-cc/php::%php-enum-cases      . cl-cc/php:%php-enum-cases)
-    (cl-cc/php::%php-enum-from       . cl-cc/php:%php-enum-from)
-    (cl-cc/php::%php-enum-try-from   . cl-cc/php:%php-enum-try-from)
-    (cl-cc/php::%php-enum-case-value . cl-cc/php:%php-enum-case-value))
-  "Alist of bridge-symbol -> implementation-symbol pairs for PHP runtime helpers.")
+(defun %register-backend-protocol-bridges ()
+  "Register every registered backend's bridge symbols with the VM.
+
+The pipeline used to name cl-cc/php and cl-cc/javascript directly and scan them
+for their %PHP-/%JS- helpers, which made the orchestrator depend on each
+backend's package name and internal naming convention -- and made either
+backend impossible to move to its own repository, since a dependent cannot name
+an external package's internal symbols. Each backend now answers for itself
+through cl-cc/backend-protocol, and the only thing that stays here is the part
+that needs the VM: calling VM-REGISTER-HOST-BRIDGE.
+
+Returns the symbols registered, which is what the migration was checked
+against: the set has to be identical to what the old package scan produced."
+  (let ((registered '()))
+    (dolist (entry cl-cc/backend-protocol:*registered-backends* (nreverse registered))
+      (dolist (sym (cl-cc/backend-protocol:backend-bridge-symbols (cdr entry)))
+        (when (and (fboundp sym)
+                   (not (macro-function sym))
+                   (not (special-operator-p sym)))
+          (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))
+          (push sym registered))))))
 
 (defun %register-php-runtime-bridges ()
   "Register PHP runtime helpers as VM host bridge functions.
 
-The PHP frontend lowers builtins to calls on cl-cc/php::%php-* helpers, but the
-VM host bridge is a whitelist - only registered symbols are callable from
-compiled code. The hand-maintained *php-runtime-bridge-entries* alist had
-drifted behind the lowering, so derive the whitelist from the package itself:
-register every fbound, non-macro %PHP-* function whose home package is
-:cl-cc/php. The explicit alias entries still run first for any non-%php-
-aliases."
-  (dolist (entry *php-runtime-bridge-entries*)
-    (cl-cc/vm:vm-register-host-bridge (car entry) (fdefinition (cdr entry))))
-  (let ((pkg (find-package :cl-cc/php)))
-    (when pkg
-      (do-symbols (sym pkg)
-        (when (and (eq (symbol-package sym) pkg)
-                   (fboundp sym)
-                   (not (macro-function sym))
-                   (not (special-operator-p sym))
-                   (let ((name (symbol-name sym)))
-                     (and (>= (length name) 5)
-                          (string= "%PHP-" name :end2 5))))
-          (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym)))))))
+Kept as a name because the pipeline calls it at a specific point in start-up;
+the work is now the backend protocol's, and this registers whatever backends
+have registered themselves, PHP among them."
+  (%register-backend-protocol-bridges))
 
 (defvar *js-runtime-bridge-symbols-cache* nil)
 (defvar *js-runtime-global-symbols-cache* nil)
