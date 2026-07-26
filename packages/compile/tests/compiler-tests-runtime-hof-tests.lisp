@@ -144,8 +144,12 @@ printed as #S(VM-COW-LIST ...).  Now the print path materializes COW wrappers."
 
 (deftest copy-seq-nested-wrapper-prints
   "A list containing a copy-seq'd vector prints the inner vector, not its wrapper."
-  (assert-equal '(#(1 2) 9)
-                (run-string "(list (copy-seq (vector 1 2)) 9)")))
+  ;; Compared as printed text, which is what this test actually claims.
+  ;; ASSERT-EQUAL uses EQUAL, and EQUAL does not descend into vectors, so the
+  ;; old assertion could only ever fail: it reported "expected (#(1 2) 9), got
+  ;; (#(1 2) 9)" no matter what COPY-SEQ returned.
+  (assert-string= "(#(1 2) 9)"
+                  (prin1-to-string (run-string "(list (copy-seq (vector 1 2)) 9)"))))
 
 ;;; TYPECASE Dispatch Tests
 

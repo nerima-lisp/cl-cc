@@ -189,11 +189,14 @@
 (deftest-each clos-custom-metaclass-overrides
   "Custom metaclasses affect class-of, slot-value-using-class, and make-instance initialization hooks."
   :cases
+  ;; Compared by name. RUN-STRING reads its source into :CL-CC, so the symbol it
+  ;; returns is CL-CC::META-A while a bare 'META-A here is CL-CC/TEST::META-A;
+  ;; ASSERT-EQUAL on the symbols compared packages, not class names.
   (("class-of-instance-returns-metaclass"
-    'meta-a
+    "META-A"
     "(defclass meta-a () ())
      (defclass object-a () () (:metaclass meta-a))
-     (class-name (class-of (make-instance 'object-a)))")
+     (symbol-name (class-name (class-of (make-instance 'object-a))))")
    ("slot-value-using-class-before-method-runs"
     '(1 42)
     "(defclass meta-b () ())
