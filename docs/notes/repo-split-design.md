@@ -548,9 +548,26 @@ ast/type のときと同じ「宣言済みだが一度もビルドされてい�
 起きていたということ（[[cl-cc-ast-type-split-not-live]] の罠）。ファイル数の差
 20 個は表層で、実体はこの 217。
 
-**次にやること**: 217 errored の内訳を取り、ast/type と同じ手順で潰す
-（片方でしか通らないテストを走らせて、どちらが authoritative かを測る）。
-javascript も同じ手順が要るはずで、未測定。
+**217 の内訳（実測済み）**: すべて同一カテゴリで、`%PHP-*` 関数が
+*undefined function* になる。上位は `%php-array` 42 / `%php-set-error-handler` 19 /
+`%php-function-exists` 11 / `%php-concat` 11。
+
+重要なのは、これが「upstream に無い」ではないこと:
+
+- upstream の `.asd` は **131 コンポーネント**、in-tree は **75**。upstream のほうが
+  多い。
+- `%php-array` は両方に `defun` がある。
+- 読み込みは通っている（`cl-cc/php:%php-array` が read error にならない）ので
+  **シンボルは export されている**。にもかかわらず実行時に unbound。
+
+したがって最有力は **「export は残したまま関数側をリネームした」** 系のリファクタ
+が upstream で進んでおり、cl-cc 側の呼び出しが旧名を指していること。ast/type の
+`SERIALIZE-ENTRY-POINT` → `SERIALIZE-ENTRY-POINT-COMMAND` と同種で、規模が大きい版。
+
+**次にやること**: 上位シンボルから順に upstream での新名称を突き止め、cl-cc 側の
+呼び出しを追随させる（または upstream に別名を復活させる）。42 + 19 + 11 + 11 で
+上位 4 つだけで 83、全体の 38% を占めるので、数個潰すごとに大きく減るはず。
+javascript は未測定。
 
 cl-cc 側の受け入れ準備は完了しているので、残りは upstream 2 リポジトリの
 parity 作業のみ。
