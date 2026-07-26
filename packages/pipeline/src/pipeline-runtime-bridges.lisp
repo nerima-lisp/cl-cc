@@ -15,6 +15,18 @@ that needs the VM: calling VM-REGISTER-HOST-BRIDGE.
 Returns the symbols registered, which is what the migration was checked
 against: the set has to be identical to what the old package scan produced."
   (let ((registered '()))
+    ;; Two registries, because §5-1 was implemented twice. The one in
+    ;; cl-cc/bootstrap is the older and wider of the pair -- it also carries
+    ;; parser registration -- and the standalone cl-cc-php and
+    ;; cl-cc-javascript repositories have already migrated to it. Draining it
+    ;; here is what lets those repositories be used unchanged, without a
+    ;; backend having to register through both.
+    (dolist (entry (cl-cc/bootstrap:backend-bridge-providers))
+      (let ((sym (car entry))
+            (fn (cdr entry)))
+        (when (and (symbolp sym) (functionp fn))
+          (cl-cc/vm:vm-register-host-bridge sym fn)
+          (push sym registered))))
     (dolist (entry cl-cc/backend-protocol:*registered-backends* (nreverse registered))
       (dolist (sym (cl-cc/backend-protocol:backend-bridge-symbols (cdr entry)))
         (when (and (fboundp sym)
@@ -64,6 +76,11 @@ Backends whose host runtime never re-enters the VM inherit the protocol's no-op
 method and are unaffected; JavaScript's runtime does, because a host array
 method can be handed a compiled-JS callback."
   (let ((integration (%backend-vm-integration)))
+    ;; Installers registered through cl-cc/bootstrap take no argument: a
+    ;; backend that registers there installs its own integration and does not
+    ;; need capabilities handed to it.
+    (dolist (thunk (cl-cc/bootstrap:backend-vm-integration-installers))
+      (funcall thunk))
     (dolist (entry cl-cc/backend-protocol:*registered-backends*)
       (cl-cc/backend-protocol:install-backend-vm-integration (cdr entry) integration))))
 
@@ -86,6 +103,8 @@ Each such reference compiles to a VM-GET-GLOBAL, so without seeding every JS
 program fails at run time with an unbound global. Which specials those are is
 the backend's answer, through BACKEND-GLOBAL-SYMBOLS."
   (when state
+    (dolist (seeder (cl-cc/bootstrap:backend-global-seeders))
+      (funcall seeder state))
     (dolist (entry cl-cc/backend-protocol:*registered-backends*)
       (dolist (sym (cl-cc/backend-protocol:backend-global-symbols (cdr entry)))
         (when (boundp sym)
