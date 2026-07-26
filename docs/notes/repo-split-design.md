@@ -421,7 +421,34 @@ cl-cc がこれらを自分のビルドから外すこと**を意味する — `
 
 §5-1（この判断の前提として設計が挙げていた作業）は完了しており、
 `cl-cc/pipeline` はもう両バックエンドの内部シンボルを一切名指ししていない。
-判断が「外す」に倒れた時点で、機械的な移設として実行できる状態にある。
+
+### 10-4. 訂正: php/js は製品判断を要しない（2026-07-27）
+
+上の §10-2 は「php/js を切り出す＝cl-cc がこれらを落とす」と書いたが、**これは
+不正確**。循環の原因は php/js が `cl-cc` を input に取っていることであり、
+その理由は依存 4 つのうち `cl-cc-parse` だけが monorepo に残っていたからである。
+
+```
+php/js の :depends-on  = (cl-cc-ast  cl-cc-bootstrap  cl-cc-parse  cl-cc-vm)
+                           ↑外部化済   ↑外部化済        ↑monorepo    ↑外部化済
+cl-cc-parse の :depends-on = (cl-cc-ast cl-cc-bootstrap)  ← 両方とも外部化済み
+```
+
+つまり **parse を切り出せば php/js の依存は 4 つとも外部になり、`cl-cc` への依存が
+消える**。そうなれば cl-cc は php/js を input に取れ、`:language :php` /
+`:javascript` を保ったまま両者を外部リポジトリから引ける。「cl-cc とは何か」を
+変える必要はない。
+
+手順:
+
+1. `cl-cc-parse` を切り出す（3,531 loc、依存は外部化済みの 2 つのみ）。
+2. `cl-cc-php` / `cl-cc-javascript` の flake input を `cl-cc` から
+   `cl-cc-{ast,bootstrap,parse,vm}` の粒度に置き換える。ASDF 側の
+   `:depends-on` は既にその 4 つなので変更不要。
+3. cl-cc が php/js を input として取る。
+
+残る唯一の製品判断は「php/js を **落としたい** か」であって、「落とさないと
+切り出せない」ではない。
 
 > 参考: 会話中に検討した `cl-cc-runtime-concurrent`（並行ランタイム26ファイル/
 > ~3.1k loc）は「compiler と target runtime の分離」という別軸の候補。runtime
