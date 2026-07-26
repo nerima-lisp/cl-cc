@@ -22,6 +22,33 @@
   "Run FORM-STRING through cl-cc pipeline and return result."
   (cl-cc:run-string form-string))
 
+(defun io-scratch-directory ()
+  "Return a scratch directory private to this test process, creating it if
+needed.
+
+The file tests below deliberately touch the real filesystem: exercising OPEN,
+LOAD, DIRECTORY and friends against real files is the whole point of a native
+I/O conformance suite, and TEST_STANDARD.md allows real FS access for exactly
+this case. What it does not allow is a fixed shared path. These tests used to
+write to hard-coded /tmp/cl-cc-*.txt names, so a developer running the suite
+directly and the `nix build` user running it afterwards collided on files
+owned by the other account and every OPEN failed with EACCES. Deriving the
+directory from TMPDIR and the process id makes each run self-contained, which
+also stops the suite from leaving litter in /tmp."
+  (let ((directory (merge-pathnames
+                    (format nil "cl-cc-io-conformance-~D/" (sb-unix:unix-getpid))
+                    (uiop:temporary-directory))))
+    (ensure-directories-exist directory)
+    directory))
+
+(defun io-scratch-path (name)
+  "Namestring for NAME inside IO-SCRATCH-DIRECTORY.
+
+Returned as a string because callers splice it into the cl-cc source text they
+hand to IO-RUN, where a #P literal would have to survive another round of
+reader escaping."
+  (namestring (merge-pathnames name (io-scratch-directory))))
+
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; String Streams
 ;;; ──────────────────────────────────────────────────────────────────────
@@ -160,28 +187,33 @@
   :timeout 30
   :tags '(:io :open :close :file :native :e2e)
   (let ((result (io-run
-                 "(let ((s (open \"/tmp/cl-cc-conformance-test.txt\"
+                 (format nil
+                         "(let ((s (open \"~A\"
                                  :direction :output
                                  :if-exists :supersede
                                  :if-does-not-exist :create)))
                     (write-line \"test\" s)
                     (close s)
-                    :ok)")))
+                    :ok)"
+                         (io-scratch-path "open-close.txt")))))
     (assert-equal :ok result)))
 
 (deftest io-with-open-file
   "with-open-file should handle file open/close automatically."
   :timeout 30
   :tags '(:io :with-open-file :native :e2e)
-  (let ((result (io-run
-                 "(with-open-file (s \"/tmp/cl-cc-conformance-test2.txt\"
+  (let* ((path (io-scratch-path "with-open-file.txt"))
+         (result (io-run
+                  (format nil
+                          "(with-open-file (s \"~A\"
                                      :direction :output
                                      :if-exists :supersede
                                      :if-does-not-exist :create)
                     (write-line \"hello\" s))
-                  (with-open-file (s \"/tmp/cl-cc-conformance-test2.txt\"
+                  (with-open-file (s \"~:*~A\"
                                      :direction :input)
-                    (read-line s))")))
+                    (read-line s))"
+                          path))))
     (assert-equal "hello" result)))
 
 (deftest io-file-position-length
@@ -189,14 +221,16 @@
   :timeout 30
   :tags '(:io :file-position :file-length :native :e2e)
   (let ((result (io-run
-                 "(with-open-file (s \"/tmp/cl-cc-conformance-test3.txt\"
+                 (format nil
+                         "(with-open-file (s \"~A\"
                                      :direction :output
                                      :if-exists :supersede
                                      :if-does-not-exist :create)
                     (write-string \"abcdef\" s)
                     (file-position s 3)
                     (write-string \"XYZ\" s)
-                    (file-length s))")))
+                    (file-length s))"
+                         (io-scratch-path "file-position.txt")))))
     (assert-= 6 result)))
 
 ;;; ──────────────────────────────────────────────────────────────────────
@@ -261,15 +295,17 @@
   :timeout 30
   :tags '(:io :probe-file :pathname :native :e2e)
   (let ((result (io-run
-                 "(progn
-                    (with-open-file (s \"/tmp/cl-cc-probe-test.txt\"
+                 (format nil
+                         "(progn
+                    (with-open-file (s \"~A\"
                                         :direction :output
                                         :if-exists :supersede
                                         :if-does-not-exist :create)
                       (write-string \"data\" s))
-                    (if (probe-file \"/tmp/cl-cc-probe-test.txt\")
+                    (if (probe-file \"~:*~A\")
                         :exists
-                        :not-found))")))
+                        :not-found))"
+                         (io-scratch-path "probe.txt")))))
     (assert-equal :exists result)))
 
 (deftest io-delete-file
@@ -277,16 +313,18 @@
   :timeout 30
   :tags '(:io :delete-file :pathname :native :e2e)
   (let ((result (io-run
-                 "(progn
-                    (with-open-file (s \"/tmp/cl-cc-delete-test.txt\"
+                 (format nil
+                         "(progn
+                    (with-open-file (s \"~A\"
                                         :direction :output
                                         :if-exists :supersede
                                         :if-does-not-exist :create)
                       (write-string \"x\" s))
-                    (delete-file \"/tmp/cl-cc-delete-test.txt\")
-                    (if (probe-file \"/tmp/cl-cc-delete-test.txt\")
+                    (delete-file \"~:*~A\")
+                    (if (probe-file \"~:*~A\")
                         :still-there
-                        :deleted))")))
+                        :deleted))"
+                         (io-scratch-path "delete.txt")))))
     (assert-equal :deleted result)))
 
 ;;; ──────────────────────────────────────────────────────────────────────
@@ -298,13 +336,16 @@
   :timeout 30
   :tags '(:io :directory :pathname :native :e2e)
   (let ((result (io-run
-                 "(progn
-                    (with-open-file (s \"/tmp/cl-cc-dir-test-a.txt\"
+                 (format nil
+                         "(progn
+                    (with-open-file (s \"~A\"
                                         :direction :output
                                         :if-exists :supersede
                                         :if-does-not-exist :create)
                       (write-string \"a\" s))
-                    (length (directory \"/tmp/cl-cc-dir-test-*.txt\")))")))
+                    (length (directory \"~A\")))"
+                         (io-scratch-path "dir-test-a.txt")
+                         (io-scratch-path "dir-test-*.txt")))))
     (assert-true (>= result 1))))
 
 (deftest io-ensure-directories-exist
@@ -312,9 +353,11 @@
   :timeout 30
   :tags '(:io :ensure-directories-exist :pathname :native :e2e)
   (let ((result (io-run
-                 "(let ((dir \"/tmp/cl-cc-ensure-dir-test/\"))
+                 (format nil
+                         "(let ((dir \"~A\"))
                     (ensure-directories-exist dir)
-                    (probe-file dir))")))
+                    (probe-file dir))"
+                         (io-scratch-path "ensure-dir-test/")))))
     (assert-true result)))
 
 ;;; ──────────────────────────────────────────────────────────────────────
@@ -327,14 +370,16 @@
   :tags '(:io :load :native :e2e)
   ;; Write a file, then load it
   (let ((result (io-run
-                 "(progn
-                    (with-open-file (s \"/tmp/cl-cc-load-test.lisp\"
+                 (format nil
+                         "(progn
+                    (with-open-file (s \"~A\"
                                         :direction :output
                                         :if-exists :supersede
                                         :if-does-not-exist :create)
                       (write-string \"(defparameter *load-test-var* 42)\" s))
-                    (load \"/tmp/cl-cc-load-test.lisp\")
-                    *load-test-var*)")))
+                    (load \"~:*~A\")
+                    *load-test-var*)"
+                         (io-scratch-path "load-test.lisp")))))
     (assert-= 42 result)))
 
 ;;; ──────────────────────────────────────────────────────────────────────
