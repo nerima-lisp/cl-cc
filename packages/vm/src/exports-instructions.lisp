@@ -211,6 +211,20 @@
    vm-number-p
    vm-integer-p
    vm-function-p
+   ;; The optimizer's rule tables name instruction types as bare symbols read in
+   ;; :CL-CC/OPTIMIZE and compare them with EQ against TYPE-OF. An unexported
+   ;; type is therefore a *different* symbol there and can never match, which
+   ;; silently disabled the FR-344 producer rules for LISTP/STRINGP/VECTORP and
+   ;; the COERCE-TO-* producers. Any instruction type a pass names must be
+   ;; exported.
+   vm-listp
+   vm-stringp
+   vm-vectorp
+   vm-simple-vector-p
+   vm-string-coerce
+   vm-coerce-to-string
+   vm-coerce-to-vector
+   vm-coerce-to-list
     vm-apply
      vm-add-package-local-nickname
      vm-remove-package-local-nickname
