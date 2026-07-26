@@ -22,7 +22,10 @@ expansion, leaving a bare call to an undefined REMOVE-IF function."
   :cases (("remove-if"        '(1 3) "(remove-if #'evenp '(1 2 3 4))")
           ("remove-if-not"    '(2 4) "(remove-if-not #'evenp '(1 2 3 4))")
           ("remove-if-not-key" '(1 3) "(remove-if-not #'evenp '(1 2 3 4) :key #'1+)")
-          ("remove-if-empty"  nil    "(remove-if #'plusp '(-1 -2))"))
+          ;; The predicate has to hold for every element for the result to be
+          ;; empty: REMOVE-IF drops what satisfies it, so #'plusp over (-1 -2)
+          ;; removes nothing and returns the list unchanged.
+          ("remove-if-empty"  nil    "(remove-if #'minusp '(-1 -2))"))
   (expected form)
   (assert-equal expected (run-string form)))
 

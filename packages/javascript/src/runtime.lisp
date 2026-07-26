@@ -47,8 +47,13 @@
   (hash-table-p x))
 
 (defun %js-float-nan-p (x)
-  "Portable NaN test: NaN is the only float not numerically equal to itself."
-  (and (floatp x) (/= x x)))
+  "NaN test that inspects the bit pattern rather than comparing.
+
+The self-comparison idiom is not portable here: comparing a NaN raises
+FLOATING-POINT-INVALID-OPERATION wherever the :INVALID trap is enabled, which is
+SBCL's default on x86-64. ARM64 does not take the trap, so (/= x x) looks correct
+on macOS and turns every NaN-valued JS test into an error on Linux CI."
+  (and (floatp x) (sb-ext:float-nan-p x)))
 
 (defun %js-float-infinity-p (x)
   "Portable infinity test against the largest finite double magnitudes."

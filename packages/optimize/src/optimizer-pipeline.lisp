@@ -187,7 +187,6 @@
      :defunctionalize
      :escape-analysis
         :branch-weights
-        :path-profiling
         :dce
        :fma-recognition
        :optimization-remarks
@@ -197,7 +196,17 @@
   "Default convergence pipeline keys.
 `:egraph` remains available as an explicit pass, but the default rewrite stage is
 `:prolog-rewrite`, which already composes both the Prolog peephole backend and
-the e-graph engine.")
+the e-graph engine.
+
+`:path-profiling` is deliberately absent. It is instrumentation, not an
+optimization: it appends a VM-CONST/VM-ADD pair per edge plus an
+OPT-VM-PATH-PROFILE-RECORD at every exit and backedge, and since the record
+instruction mutates a counter table, DCE cannot remove it again. In the default
+pipeline that left every compiled program carrying a path-sum accumulator — the
+residual VM-ADD is what made the constant-folding and inlining tests report
+instructions they had asked to see eliminated. It stays available as an explicit
+pass (`opt-pass-path-profiling`, `:path-profiling` in `pass-pipeline`) for
+profile-guided builds.")
 
 (defparameter *opt-convergence-passes*
   (mapcar (lambda (k) (gethash k *opt-pass-registry*))

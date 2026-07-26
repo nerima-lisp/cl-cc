@@ -165,6 +165,21 @@ Unknown or malformed optimize specs are ignored conservatively."
           (list 'error (cons 'format (cons nil (cons datum args))))
           form))))
 
+;; CERROR is registered as a *binary* void builtin (continue-message + condition),
+;; so a format control plus arguments — which is what ASSERT expands to — never
+;; matched it and fell through to a call of an undefined function. Fold the
+;; arguments into the datum the same way ERROR does, leaving two operands.
+(register-macro 'cerror
+  (lambda (form env)
+    (declare (ignore env))
+    (let ((continue-message (second form))
+          (datum (third form))
+          (args (cdddr form)))
+      (if (and args (stringp datum))
+          (list 'cerror continue-message
+                (cons 'format (cons nil (cons datum args))))
+          form))))
+
 (register-macro 'warn
   (lambda (form env)
     (declare (ignore env))
