@@ -493,3 +493,35 @@ prolog-tools 288）は今すぐ出せるが、合計 3.1k loc で本体はほと
 **未着手の理由**: `cl-cc-bootstrap` と `cl-cc-vm` の GitHub repo が未作成
 （Terraform が用意したのは type/php/javascript/optimize/codegen-native の 5 個）。
 repo 作成は outward な操作なので判断を残している。
+
+### 10-5. 訂正: §5-1 は二重に実装されている（2026-07-27）
+
+§5-1 は **2 系統が併存**している。判断が要るのはどちらを残すかであって、
+設計を新たに決めることではない。
+
+| | 場所 | 扱える範囲 |
+|---|---|---|
+| A | `split/php-backend-protocol` ブランチ（**main 未マージ**）| bridge / VM integration / global seeder / **parser** の 4 経路 |
+| B | main の `cl-cc/backend-protocol` | bridge / VM integration / global seeder の 3 経路 |
+
+A は `cl-cc/bootstrap` に `register-backend-bridge-provider` /
+`register-backend-vm-integration-installer` / `register-backend-global-seeder` /
+`register-backend-parser` を置く設計で、**upstream の cl-cc-php /
+cl-cc-javascript は既にこちらに移行済み**（`src/runtime-bridge-provider.lisp`）。
+B はこのセッションで main 上に書いたもの。
+
+**A のほうが射程が広い**（parser 登録まで含む）。したがって採るべきは A で、
+B は畳むのが素直。なお A の API は既に `cl-cc-bootstrap` リポジトリに入っている
+——抽出時に `packages/bootstrap/src/package.lisp` ごと持って行ったため。
+
+php/js の残作業は「設計を決める」ではなく:
+
+1. `split/php-backend-protocol` を main に取り込み、B を畳む。
+2. cl-cc の pipeline が A のレジストリ（`backend-bridge-providers` 等）を
+   drain するようにする。
+3. php/js を flake input 化し、`packages/{php,javascript}` を削除する。
+
+**注意**: cl-cc-php に `backend.lisp`（B 方式）を足すと
+`runtime-bridge-provider.lisp`（A 方式）と**二重登録**になり CI が落ちる。
+2026-07-27 に実際に落として revert した（cl-cc-php `c2cf5c1`）。ファイル数の差
+（92 対 75）は設計の分岐ではなく、A への移行が upstream だけ先行しているため。
