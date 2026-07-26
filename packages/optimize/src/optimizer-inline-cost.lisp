@@ -134,13 +134,22 @@ the adaptive cost threshold so LTO inlining stays bounded across modules.")
   "Translate ML inline score into a small threshold bonus."
   (if (and *opt-enable-ml-inline-score*
            (fboundp 'opt-ml-inline-score-plan))
-      (let* ((plan (opt-ml-inline-score-plan
-                    :features (%opt-inline-score-features def)
-                    :model-version *opt-inline-ml-model-version*))
-             (score (or (getf plan :score) 0)))
-        (cond ((>= score 16) 6)
-              ((>= score 12) 3)
-              (t 0)))
+      (let ((features (%opt-inline-score-features def)))
+        ;; OPT-ML-INLINE-SCORE-PLAN scores by feature *count*, without regard to
+        ;; what each feature means. A body tagged :CALL-HEAVY therefore outscored
+        ;; a small cheap one and earned a threshold bonus for being a poor inline
+        ;; candidate — enough to push a call-heavy body back over the base
+        ;; threshold that %OPT-INLINE-SIZE-ADJUSTMENT had just pulled it under.
+        ;; Only the favourable tags may raise the threshold.
+        (if (intersection '(:call-heavy :large-body) features)
+            0
+            (let* ((plan (opt-ml-inline-score-plan
+                          :features features
+                          :model-version *opt-inline-ml-model-version*))
+                   (score (or (getf plan :score) 0)))
+              (cond ((>= score 16) 6)
+                    ((>= score 12) 3)
+                    (t 0)))))
       0))
 
 (defun opt-inline-inst-cost (inst)
@@ -152,9 +161,18 @@ instead of relying on raw instruction count."
                        (opt-learned-codegen-cost-plan
                         :opcode-features (list (vm-inst-to-enode-op inst))
                         :target *opt-learned-cost-target*)))
-         (predicted (or (and learned (getf learned :predicted-cost)) 10))
-         (normalized (max 1 (ceiling predicted 4))))
-    (+ base normalized)))
+         (predicted (and learned (getf learned :predicted-cost))))
+    ;; The learned adjustment applies only where the shared model charges
+    ;; something. OPT-LEARNED-CODEGEN-COST-PLAN is opcode-blind — it answers
+    ;; (+ arch-base feature-count) — so adding it unconditionally put a floor of
+    ;; (max 1 (ceiling 11 4)) = 3 under every instruction. A VM-CONST the e-graph
+    ;; table prices at 0 then cost as much as three adds, flattening the very
+    ;; model this function exists to reuse: a body of 17 constants scored 51 and
+    ;; was refused at a threshold of 15. Free instructions stay free; the
+    ;; target-specific difference stays visible on the rest.
+    (if (and predicted (plusp base))
+        (+ base (max 1 (ceiling predicted 4)))
+        base)))
 
 (defun opt-inline-body-cost (body)
   "Return the total inline cost of BODY, excluding the final vm-ret."
