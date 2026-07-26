@@ -146,6 +146,14 @@
            cl-cc:make-vm-simd-vector-op
           cl-cc:make-vm-register-function cl-cc:make-vm-select
           cl-cc:make-vm-program cl-cc:make-vm-signal-error cl-cc:make-vm-slot-write
+          ;; Type-predicate, string and tail-call constructors used unqualified by
+          ;; packages/optimize/tests. Without these the reader interns fresh
+          ;; CL-CC/TEST::MAKE-VM-* symbols, so the tests only fail at run time with
+          ;; "undefined function" instead of at compile time.
+          cl-cc:make-vm-listp cl-cc:make-vm-stringp cl-cc:make-vm-vectorp
+          cl-cc:make-vm-coerce-to-vector
+          cl-cc:make-vm-string-length
+          cl-cc:make-vm-tail-call cl-cc:make-vm-trampoline
           ;; VM Heap operations
           cl-cc:vm-cons
           cl-cc:vm-car
