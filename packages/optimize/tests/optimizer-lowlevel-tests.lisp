@@ -24,10 +24,15 @@
 
 (deftest-each fold-type-pred
   "Type predicate and vm-not instructions fold at compile time against a known constant."
+  ;; The folded value must equal what EXECUTE-INSTRUCTION would have produced for
+  ;; the same instruction. VM-NOT is defined over VM-FALSEP, and the language
+  ;; treats numeric zero as false, so (vm-not 0) is T. This case previously
+  ;; expected NIL, matching host CL's NOT rather than the VM's, which is how the
+  ;; fold table's disagreement with the interpreter went unnoticed.
   :cases (("number-p" 42  (cl-cc:make-vm-number-p :dst :R1 :src :R0) 1)
           ("symbol-p" 42  (cl-cc:make-vm-symbol-p :dst :R1 :src :R0) 0)
           ("not-nil"  nil (cl-cc:make-vm-not       :dst :R1 :src :R0) t)
-          ("not-zero" 0   (cl-cc:make-vm-not       :dst :R1 :src :R0) nil))
+          ("not-zero" 0   (cl-cc:make-vm-not       :dst :R1 :src :R0) t))
   (const-val pred-inst expected)
   (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val) pred-inst))
          (out (cl-cc/optimize::opt-pass-fold instrs))

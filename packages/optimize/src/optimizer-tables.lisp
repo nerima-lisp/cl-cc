@@ -175,7 +175,13 @@ ret, set-global, slot-write, etc.) or for unrecognised types."
       (vm-cdr         . ,#'cdr)
       (vm-string-upcase . ,#'string-upcase)
       (vm-string-downcase . ,#'string-downcase)
-      (vm-not         . ,#'not)))
+      ;; NOT host CL's NOT. VM-NOT executes as (if (vm-falsep src) t nil) and
+      ;; the language treats numeric zero as false, so #'not folded (not 0) to
+      ;; NIL while the same instruction interpreted at run time yields T. Any
+      ;; constant reaching a VM-NOT was therefore miscompiled — most visibly
+      ;; through COMPLEMENT, whose (not (apply pred args)) body made every
+      ;; -IF-NOT sequence function report "nothing matched".
+      (vm-not         . ,(lambda (value) (if (opt-falsep value) t nil)))))
   "Maps unary VM instruction types to their CL fold functions.")
 
 (defparameter *opt-type-pred-fold-table*
