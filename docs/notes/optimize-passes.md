@@ -6,7 +6,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 - `✅` = 実装済み（完全実装 または 設計証跡/helper層まで完了）
 - `🔶` = 部分実装（現在使用なし。全項目を ✅ に格上げ済み）
-  `packages/optimize/src/optimizer-pipeline.lisp` の roadmap evidence registry は、この状態区分と公開API・テストアンカーの対応を検証する。
+  外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-pipeline.lisp` の roadmap evidence registry は、この状態区分と公開API・テストアンカーの対応を検証する。
 
 ---
 
@@ -31,7 +31,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-002: 葉関数最適化 (Leaf Function Optimization) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **検出基準**: 命令列中に `vm-call` / `vm-generic-call` が存在しない関数
 - **最適化内容**:
   - セーブ/リストア不要なレジスタの省略
@@ -40,7 +40,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-003: Loop Invariant Code Motion (LICM) ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp` + `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **前提**: `loop-depth` フィールドが `cfg.lisp` に存在するが未使用
 - **実装手順**:
   1. バックエッジ検出 (逆ポストオーダーでの祖先へのエッジ)
@@ -51,7 +51,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-010: Sparse Conditional Constant Propagation (SCCP) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: Constant Folding はある (`opt-pass-fold`) が、条件分岐を跨いだ伝播がない
 - **内容**:
   - 到達可能な実行パスのみを解析対象とする (条件分岐の定数化による枝刈り)
@@ -60,7 +60,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-011: Global Value Numbering (GVN) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: CSE (`opt-pass-cse`) はローカルな値番号付け
 - **内容**:
   - CFGを跨いだグローバルな値番号付け
@@ -69,7 +69,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-012: Partial Redundancy Elimination (PRE) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: LICM + CSE の一般化
   - ループ不変コード移動と共通部分式除去を統一フレームワークで扱う
   - 「一部のパスでのみ冗長」な計算を最適化 (LICMで扱えないケースを補完)
@@ -81,14 +81,14 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 #### FR-021: Scalar Evolution (SCEV) / 帰納変数解析 ✅
 
 - **依存**: FR-003 (LICM)
-- **対象**: `packages/optimize/src/cfg.lisp` + `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - ループ内の帰納変数 (`i = i + 1` パターン) を認識・特性記述
   - 強度低減の拡張: ループカウンタを使った演算をシフト・加算に置き換え
   - LICM拡張: SCEVで不変と証明できる計算を巻き上げ
   - LLVM の ScalarEvolution パスに相当
 
-- **関連実装**: `packages/optimize/src/optimizer-induction.lisp` に `opt-compute-simple-inductions` / `opt-induction-trip-count` を実装済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-induction.lisp` に `opt-compute-simple-inductions` / `opt-induction-trip-count` を実装済み。
   - 対象: `i = i + c` / `i = i - c` の affine update に加え、幾何級数的な帰納変数更新と複数帰納変数を保守的に検出。
   - 出力: `opt-induction-var`（init/step/update-inst）と保守的 trip-count 推定。multi-var loop でも後続の強度低減・範囲解析へ渡せる。
   - 制限: 完全な一般SCEV（多項式再帰、複合条件、nested loop の閉形式）は将来拡張。
@@ -102,7 +102,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - 不明な場合は剰余エピローグ付き部分展開
   - 効果: ILP露出、分岐オーバーヘッド削減
 
-- **関連実装**: `packages/optimize/src/optimizer-flow-loop.lisp` に `opt-pass-loop-unrolling`、`packages/optimize/src/optimizer-pipeline.lisp` に `opt-pass-loop-unrolling-adaptive`（hotness と call-count で閾値調整）を実装済み。`*opt-pass-table*` に `:loop-unrolling` として登録され、`*opt-default-convergence-pass-keys*` でデフォルトパイプラインに組み込み済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-loop.lisp` に `opt-pass-loop-unrolling`、外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-pipeline.lisp` に `opt-pass-loop-unrolling-adaptive`（hotness と call-count で閾値調整）を実装済み。`*opt-pass-table*` に `:loop-unrolling` として登録され、`*opt-default-convergence-pass-keys*` でデフォルトパイプラインに組み込み済み。
   - 対象: `vm-lt + vm-jump-zero + backedge jump` の単純 counted loop 形。
   - 条件: ループ変数/上限/step がコンパイル時計算可能かつ小trip-count（上限あり）→ 完全展開（full unroll）。上限逾えても _opt-loop-unroll-factor_ に基づき guarded partial copy を生成。
   - 検証: `optimizer-flow-tests.lisp` に6テスト（full unroll、generalized comparisons、partial unroll、unknown-trip with remainder、additional comparison predicates、partial keeps remainder loop）。`optimizer-pipeline-tests.lisp` に adaptive factor テスト。
@@ -118,7 +118,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - V8・SpiderMonkeyの3段階IC階層と同等
   - 効果: 多相的呼び出し箇所でのディスパッチ高速化
 
-- **関連実装**: `packages/optimize/src/optimizer-pipeline.lisp` に `opt-ic-site` 構造体と `opt-ic-transition` 関数を実装済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-pipeline.lisp` に `opt-ic-site` 構造体と `opt-ic-transition` 関数を実装済み。
   - `opt-ic-site`: `:monomorphic` → `:polymorphic` → `:megamorphic` の3段階状態遷移を管理するICサイト。
   - `opt-ic-transition`: ヒット時は既存エントリを返し、ミス時は `receiver-key → target` を線形リストへ追加。エントリ数が `max-polymorphic-entries` を超えると `:megamorphic` へ遷移し、fallback に全エントリをコピー。
   - 検証: `packages/optimize/tests/optimizer-pipeline-tests.lisp` が状態遷移とエントリ管理を検証。
@@ -129,7 +129,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-032: Jump Threading ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp` + `packages/optimize/src/cfg.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
 - **内容**:
   - CFGエッジを跨いで既知の条件を伝播し、冗長な分岐を除去
   - `typecase`/`etypecase`/`cond` の型チェック連鎖に特に有効
@@ -137,7 +137,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - LLVM `JumpThreadingPass` に相当
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer.lisp` / `optimizer-flow-passes.lisp` の jump threading 系パスは jump-chain threading、直後 fall-through への不要 jump 除去、CFG edge を跨いだ値・predicate fact 伝播による後続分岐の定数化を実装済み。合流点で fact が不一致な高度ケースは将来拡張。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` / `optimizer-flow-passes.lisp` の jump threading 系パスは jump-chain threading、直後 fall-through への不要 jump 除去、CFG edge を跨いだ値・predicate fact 伝播による後続分岐の定数化を実装済み。合流点で fact が不一致な高度ケースは将来拡張。
 
 #### FR-033: Case-of-Case ✅
 
@@ -159,7 +159,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-035: Hot/Cold Splitting ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp` + バックエンド
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` + バックエンド
 - **内容**:
   - エラー処理・型エラー・条件シグナル等の「コールドパス」をホット関数の末尾/別セクションへ移動
   - ホット関数のI-キャッシュ占有を削減
@@ -179,14 +179,14 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-037: Call Site Splitting ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - 特定の分岐アームでのみ引数型が確定している間接呼び出しを、その分岐内でインライン化/特化
   - `(funcall fn x)` で fn が型判明している分岐アームでは直接呼び出しへ変換
   - LLVM `CallSiteSplittingPass` に相当
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-inline.lisp` に `opt-pass-call-site-splitting` を実装済み。`jump -> join-label -> vm-call` の単純join形に限定し、前任ブロック内でcallee registerが既知 `vm-func-ref` / `vm-closure` / 登録済みsymbolに解決できる場合、前任側へcallを複製してfresh after-labelへジャンプさせる。default pipelineでは `:devirtualize` と `:inline` の前に `:call-site-splitting` を走らせるため、分岐アーム別の既知calleeを後続passが直接参照として扱える。`packages/optimize/tests/optimizer-inline-tests.lisp` が既知callee predecessorのcall複製、unknown callee no-op、multi-join labels、vm-apply、vm-tail-callの5テストを検証する。一般CFG（複数joinの合流）・型推論に基づく高度な分岐特化は将来の拡張予定。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-inline.lisp` に `opt-pass-call-site-splitting` を実装済み。`jump -> join-label -> vm-call` の単純join形に限定し、前任ブロック内でcallee registerが既知 `vm-func-ref` / `vm-closure` / 登録済みsymbolに解決できる場合、前任側へcallを複製してfresh after-labelへジャンプさせる。default pipelineでは `:devirtualize` と `:inline` の前に `:call-site-splitting` を走らせるため、分岐アーム別の既知calleeを後続passが直接参照として扱える。`packages/optimize/tests/optimizer-inline-tests.lisp` が既知callee predecessorのcall複製、unknown callee no-op、multi-join labels、vm-apply、vm-tail-callの5テストを検証する。一般CFG（複数joinの合流）・型推論に基づく高度な分岐特化は将来の拡張予定。
 
 - **完了済みFR**: FR-033, FR-035, FR-037
 - **部分実装FR**: FR-032, FR-034, FR-036
@@ -197,7 +197,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-038: Value Range / Interval Analysis ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp` + `packages/type/src/inference.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` + `packages/type/src/inference.lisp`
 - **内容**:
   - 整数変数の値域 (`[lo, hi]`) をCFGを通じて伝播
   - SCCP (FR-010) が定数を伝播するのと同様に範囲を伝播
@@ -205,7 +205,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - HotSpot C2・LLVM `CorrelatedValuePropagationPass` と同等
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-value-ranges.lisp` に `opt-compute-value-ranges` を実装済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-value-ranges.lisp` に `opt-compute-value-ranges` を実装済み。
   - 整数定数・move・単項/二項算術（add/sub/mul/neg/abs/inc/dec）で interval を前向き伝播。
   - `packages/optimize/tests/optimizer-memory-tests.lisp` の `value-ranges-*` で挙動を検証。
   - 制限: 比較分岐由来の述語感度（path-sensitive range narrowing）や一般ループ閉形式推論は未実装。
@@ -213,19 +213,19 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 #### FR-039: Array Bounds Check Elimination (BCE) ✅
 
 - **依存**: FR-038 (範囲解析) or FR-021 (SCEV)
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - `(aref v i)` のインデックス `i` が `0 <= i < (length v)` と証明可能な場合、境界検査命令を除去
   - ループ内の `aref` が最も恩恵を受ける
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-value-ranges.lisp` に `opt-array-bounds-check-eliminable-p` を実装済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-value-ranges.lisp` に `opt-array-bounds-check-eliminable-p` を実装済み。
   - `opt-compute-value-ranges` の interval を使って `0 <= idx < len` を保守的に証明。
   - x86-64 backend では証明済み access に対する guard 省略/軽量化を接続し、Wasm backend には BCE 適用箇所を示す marker を渡す基本実装済み。path-sensitive narrowing と一般ループ閉形式推論は将来拡張。
 
 #### FR-040: Nil Check Elimination ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - nil チェック後の支配されたブロックで同じ値への再チェックを除去
   - `(if x ...)` の truthy ブランチでは `x` が non-nil と確定
@@ -234,7 +234,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-041: Tag/Type Check Elimination (支配木ベース) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - 型チェック命令 (`vm-integer-p`, `vm-cons-p` 等) が、同じ値に対して支配ブロックで既に実行済みの場合は除去
   - DCE/GVNでは除去できない「条件分岐後の冗長チェック」を対象
@@ -247,7 +247,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-050: Interprocedural SCCP (IPSCCP) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp` + コール グラフ解析
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` + コール グラフ解析
 - **内容**:
   - 関数境界を跨いだSparse Conditional Constant Propagation
   - 呼び出し元で引数が定数の場合、呼び出し先で定数として伝播
@@ -257,7 +257,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-051: Called Value Propagation / Devirtualization ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
 - **内容**:
   - 間接呼び出し (`funcall`/`apply`) の呼び出し先を静的に絞り込む
   - 単一の呼び出し先と証明された場合は直接呼び出しへ変換
@@ -265,11 +265,11 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - Lispの `funcall` は全てこの最適化の対象
 - **難易度**: Hard
 
-- **関連実装**: `packages/optimize/src/optimizer-inline.lisp` に `opt-known-callee-labels` と `opt-pass-devirtualize` を追加済み。`vm-closure` / `vm-func-ref` / `vm-const` / `vm-move` を追跡して関数 designator レジスタの既知 label を解決し、`vm-call` / `vm-tail-call` / `vm-apply` の直前に直接 `vm-func-ref` を挿入して既存 inline pass が扱える直接参照形へ寄せる。`packages/optimize/tests/optimizer-inline-tests.lisp` が既知callee、move伝播、overwrite kill、idempotenceを検証する。call命令自体を専用の直接呼び出し命令へ置換すること、CLOS generic method dispatch の単一メソッド化、`apply` の完全な直接化は未実装。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-inline.lisp` に `opt-known-callee-labels` と `opt-pass-devirtualize` を追加済み。`vm-closure` / `vm-func-ref` / `vm-const` / `vm-move` を追跡して関数 designator レジスタの既知 label を解決し、`vm-call` / `vm-tail-call` / `vm-apply` の直前に直接 `vm-func-ref` を挿入して既存 inline pass が扱える直接参照形へ寄せる。`packages/optimize/tests/optimizer-inline-tests.lisp` が既知callee、move伝播、overwrite kill、idempotenceを検証する。call命令自体を専用の直接呼び出し命令へ置換すること、CLOS generic method dispatch の単一メソッド化、`apply` の完全な直接化は未実装。
 
 #### FR-052: Global DCE (Dead Function/Method Elimination) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp` + コンパイルパイプライン
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` + コンパイルパイプライン
 - **内容**:
   - 到達不能な関数・メソッドをリンク時に除去
   - `defun` で定義されたが一切呼ばれない関数を除去
@@ -280,7 +280,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 #### FR-053: Partial Inlining (ホットパスのみインライン) ✅
 
 - **依存**: FR-013 (型特化インライン展開)
-- **対象**: `packages/optimize/src/optimizer.lisp:729-820`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp:729-820`
 - **内容**:
   - 現状のインライン化は関数全体を展開 (≤15命令)
   - 早期リターンパスだけをインライン展開し、残りは元の呼び出しへフォールスルー
@@ -294,7 +294,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-054: Stream Fusion / Deforestation ✅
 
-- **対象**: `packages/expand/src/macro.lisp` or `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/expand/src/macro.lisp` or 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - `(mapcar f (remove-if g xs))` → 中間リストを生成しない単一走査に変換
   - コンパイラ自身が `mapcar`/`remove-if`/`reduce` チェーンを多用しているため効果大
@@ -304,7 +304,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-055: Loop Idiom Recognition ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - `(fill vec 0)` → memset相当命令
   - `(copy-seq vec)` → memcpy相当命令
@@ -312,11 +312,11 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - LLVM `LoopIdiomRecognizePass` に相当
 - **難易度**: Medium
 
-- **関連実装**: ✅（基本実装済み、完全版は将来拡張）外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/array.lisp` に `vm-fill` を追加し、`packages/optimize/src/optimizer-recognition.lisp` に `opt-pass-fill-recognition` を追加済み。`array-length` に基づくゼロ開始・1増分・private label の単純な `vm-aset` full-vector fill ループを `vm-fill` へ置換し、copy/copy-seq 系 idiom も memcpy 相当へ接続するための認識層を持つ。`packages/optimize/tests/optimizer-strength-tests.lisp` が canonical fill loop の認識と外部target付きexitのno-opを検証し、`packages/vm/tests/array-tests.lisp` が `vm-fill` 実行を検証する。部分範囲fill、多次元配列、一般CFG上のloop idiom recognitionは将来拡張。
+- **関連実装**: ✅（基本実装済み、完全版は将来拡張）外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/array.lisp` に `vm-fill` を追加し、外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-recognition.lisp` に `opt-pass-fill-recognition` を追加済み。`array-length` に基づくゼロ開始・1増分・private label の単純な `vm-aset` full-vector fill ループを `vm-fill` へ置換し、copy/copy-seq 系 idiom も memcpy 相当へ接続するための認識層を持つ。`packages/optimize/tests/optimizer-strength-tests.lisp` が canonical fill loop の認識と外部target付きexitのno-opを検証し、`packages/vm/tests/array-tests.lisp` が `vm-fill` 実行を検証する。部分範囲fill、多次元配列、一般CFG上のloop idiom recognitionは将来拡張。
 
 #### FR-056: Worker/Wrapper Transformation (部分適用) ✅
 
-- **対象**: `packages/compile/src/codegen.lisp` + `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/codegen.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - 再帰関数を「ラッパー (boxing/unboxing担当)」と「ワーカー (unboxed値で再帰)」に分割
   - 再帰呼び出し間でfloat/fixnumをunboxedのまま引き回す
@@ -330,14 +330,14 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-074: Function Outlining ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: 複数関数間の繰り返し命令列を共有サブルーチンに抽出 (インライン化の逆)
 - **根拠**: CLOSディスパッチ列は構造的に類似したものが多い
 - **難易度**: Medium
 
 #### FR-075: Tail Merging ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: 複数基本ブロック末尾の同一命令列を単一共有ブロックに統合
 - **難易度**: Medium
 
@@ -349,13 +349,13 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-077: Dead Basic Block Elimination ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp` + `packages/optimize/src/cfg.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
 - **内容**: jump threading後も残存した到達不能ブロックの除去
 - **難易度**: Easy
 
 #### FR-078: Block Merging ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: 単一後継ブロックを持つブロックの統合でラベルオーバーヘッド削減
 - **難易度**: Easy
 
@@ -365,7 +365,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **内容**: コードが同一で環境のみ異なるクロージャを単一コード+環境ポインタに統合
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-closure.lisp` に `opt-pass-closure-thunk-sharing` を実装済み。同 entry-label + capture set の sibling closure を検出し、先頭 closure のみ割り当てて後続を vm-move に置換する。`packages/optimize/tests/optimizer-closure-tests.lisp` が安全な統合、register overwrite のブロック、CFG境界でのno-opを検証する。より高度な共有環境レコードは将来の拡張予定。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-closure.lisp` に `opt-pass-closure-thunk-sharing` を実装済み。同 entry-label + capture set の sibling closure を検出し、先頭 closure のみ割り当てて後続を vm-move に置換する。`packages/optimize/tests/optimizer-closure-tests.lisp` が安全な統合、register overwrite のブロック、CFG境界でのno-opを検証する。より高度な共有環境レコードは将来の拡張予定。
 
 #### FR-080: Car/Cdr/Cons Inlining ✅
 
@@ -374,7 +374,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **根拠**: 現状は `define-simple-instruction` で毎回 `execute-instruction` ディスパッチが発生
 - **難易度**: Medium
 
-- **関連実装**: VM側は 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/list.lisp` と 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-opcodes-defs.lisp` に `cons` / `car` / `cdr` の直接opcodeを持つ。optimizer側では `packages/optimize/src/optimizer-tables.lisp` と `packages/optimize/src/optimizer.lisp` が定数cons/nilに対する `vm-car` / `vm-cdr` foldingを扱い、`packages/optimize/src/optimizer-memory-dse.lisp` の `opt-pass-cons-slot-forward` がfresh `vm-cons` 直後の `vm-car` / `vm-cdr` を元slot registerからの `vm-move` へ置換する。source overwrite、control-flow、call/unknown effect、`rplaca` などの破壊的更新は保守的にfactを破棄する。`optimizer-roadmap-backend-data.lisp` の範囲14に5件のテストアンカーを登録済み。`packages/optimize/tests/optimizer-tables-tests.lisp` / `optimizer-tests.lisp` / `optimizer-memory-tests.lisp` / `optimizer-memory-pass-tests.lisp` がfolding、alias経由forwarding、source overwrite、破壊的更新、source上書きconsのno-opを検証する。
+- **関連実装**: VM側は 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/list.lisp` と 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-opcodes-defs.lisp` に `cons` / `car` / `cdr` の直接opcodeを持つ。optimizer側では 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-tables.lisp` と 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` が定数cons/nilに対する `vm-car` / `vm-cdr` foldingを扱い、外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-memory-dse.lisp` の `opt-pass-cons-slot-forward` がfresh `vm-cons` 直後の `vm-car` / `vm-cdr` を元slot registerからの `vm-move` へ置換する。source overwrite、control-flow、call/unknown effect、`rplaca` などの破壊的更新は保守的にfactを破棄する。`optimizer-roadmap-backend-data.lisp` の範囲14に5件のテストアンカーを登録済み。`packages/optimize/tests/optimizer-tables-tests.lisp` / `optimizer-tests.lisp` / `optimizer-memory-tests.lisp` / `optimizer-memory-pass-tests.lisp` がfolding、alias経由forwarding、source overwrite、破壊的更新、source上書きconsのno-opを検証する。
 
 #### FR-081: Macro Expansion Memoization ✅
 
@@ -432,7 +432,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-096: Power-of-2 Divisor Strength Reduction ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/primitives.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/primitives.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: コンパイル時定数が2の冪の `floor`/`mod` を算術シフト/ビットANDに変換
 - **難易度**: Low
 
@@ -442,7 +442,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-148: Fixnum演算整数範囲追跡 (VM全体) ✅
 
-- **対象**: `packages/type/src/inference.lisp`, `packages/optimize/src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: `packages/type/src/inference.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: `type-int` は存在するが範囲情報なし。`infer-type` が `ast-int → type-int` を返すのみで区間情報ゼロ
 - **内容**: 型表現に `(integer lo hi)` 区間を追加。定数折り畳みで演算結果の区間を伝播し、オーバーフローしない演算を確認してタグチェックを省略
 - **根拠**: `packages/type/src/inference.lisp:74-100` — 整数リテラルに区間なし。SBCL の `sb-c:interval` に相当する機能が欠如
@@ -460,13 +460,13 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-150: Adaptive Optimization Thresholds ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: インライン閾値=15固定（`optimizer.lisp:1018`）、最大反復=20固定（`optimizer.lisp:1015`）
 - **内容**: 実行時プロファイルカウンタ（呼び出し頻度・ループ深度）に基づいてインライン閾値とパス反復回数を動的調整。ホット関数には閾値を緩和（最大50命令）、コールドパスには反復を削減
 - **根拠**: モダンコンパイラ（V8のTurboFan、GraalVM）はすべてフィードバック駆動の動的閾値を持つ
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-inline-cost.lisp` に `opt-adaptive-inline-threshold` を実装済み。body cost と cheap-instruction 比率、call-heavy かどうか、呼び出し回数・ループ深度・関数サイズに基づいて inline threshold を 8..50 の範囲で調整する。`opt-pass-inline-iterative` はこの adaptive threshold をパイプラインで使用。`packages/optimize/tests/optimizer-strength-inline-tests.lisp` / `optimizer-inline-tests.lisp` / `optimizer-inline-pass-tests-2.lisp` が閾値選択・PGO scale・ML bonusを検証する。実行時プロファイルフィードバックによる完全な feedback-driven thresholding は将来の拡張予定。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-inline-cost.lisp` に `opt-adaptive-inline-threshold` を実装済み。body cost と cheap-instruction 比率、call-heavy かどうか、呼び出し回数・ループ深度・関数サイズに基づいて inline threshold を 8..50 の範囲で調整する。`opt-pass-inline-iterative` はこの adaptive threshold をパイプラインで使用。`packages/optimize/tests/optimizer-strength-inline-tests.lisp` / `optimizer-inline-tests.lisp` / `optimizer-inline-pass-tests-2.lisp` が閾値選択・PGO scale・ML bonusを検証する。実行時プロファイルフィードバックによる完全な feedback-driven thresholding は将来の拡張予定。
 
 ---
 
@@ -490,7 +490,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-161: Arity Raising / Uncurrying ✅
 
-- **対象**: `packages/compile/src/cps.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/cps.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: CPS変換後のカリー化された関数適用がそのまま複数回の`vm-call`に展開される。連続適用をバッチ化する機構なし
 - **内容**: `(f a b)`が`((f a) b)`とCPS展開される場合、呼び出しサイトのarity解析でバッチ引数渡しに変換。中間クロージャ生成を除去
 - **根拠**: GHCのarity analysis / MLtonのuncurrying。CPS形式で特に顕著な最適化
@@ -498,7 +498,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-162: Known Continuation Optimization ✅
 
-- **対象**: `packages/compile/src/cps.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/cps.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: すべての継続を汎用的に扱う（`cps.lisp:160-167`）。継続が1回だけ呼ばれるか、常に同じ継続が渡されるかを追跡しない
 - **内容**: 継続の使用回数と呼び出しパターンを解析。線形継続（1回呼び出し）はインライン展開、非エスケープ継続はジャンプに変換（FR-028 contificationの前提解析）
 - **根拠**: GHCのdemand analysis on continuations。cl-ccでは全継続がfirst-classクロージャとして生存
@@ -510,19 +510,19 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-163: Code Sinking (逆LICM) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/optimize/src/cfg.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
 - **現状**: `optimizer.lisp`に"sink"/"hoist"関連の処理なし（grep 0マッチ）
 - **内容**: 命令を定義位置から使用位置の直前まで移動。レジスタ圧力を削減し、使用されない分岐パスの命令を除去可能にする。LICM（FR-003）の逆操作
 - **根拠**: LLVMの`MachineSink`パス。特に分岐の片方でのみ使われる値の移動に効果大
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-flow-loop.lisp` に `opt-pass-code-sinking` を実装済み。`*opt-pass-table*` に `:code-sinking` として登録。`vm-const` / `vm-move` / 算術命令（定数オペランド） / `vm-cons` / `vm-random` に対応。単一 read 値を jump 先へ移動（const のみ conditional jump の両 successor へ複製可）。副作用命令（impure）は sink 禁止。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-loop.lisp` に `opt-pass-code-sinking` を実装済み。`*opt-pass-table*` に `:code-sinking` として登録。`vm-const` / `vm-move` / 算術命令（定数オペランド） / `vm-cons` / `vm-random` に対応。単一 read 値を jump 先へ移動（const のみ conditional jump の両 successor へ複製可）。副作用命令（impure）は sink 禁止。
   - 検証: `optimizer-flow-tests.lisp` に8テスト（const、cons、carith/move、impure random、conditional duplication、multi-read no-op）。
   - 制限: 制御依存を伴う高度な sinking は将来の拡張予定。
 
 #### FR-164: Partial Dead Code Elimination (PDCE) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: `opt-pass-dce`（`optimizer.lisp:494-513`）は全パスで未使用の命令のみ除去。一部パスでのみ使用される命令は残存
 - **内容**: 一部の実行パスでのみ生存する値を検出し、不要パスの計算を除去またはsink。FR-165のpost-dominator解析が前提
 - **根拠**: LLVMの`PartialDCE`。現行DCEでは`if`の片方でのみ使われる計算が両方のパスで実行される
@@ -530,8 +530,8 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-165: Post-Dominator Analysis ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp`
-- **現状**: `packages/optimize/src/cfg-analysis.lisp` に `cfg-compute-post-dominators` / `cfg-post-dominates-p` を実装済み。`basic-block` は `bb-post-idom` / `bb-post-children` を保持。
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
+- **現状**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg-analysis.lisp` に `cfg-compute-post-dominators` / `cfg-post-dominates-p` を実装済み。`basic-block` は `bb-post-idom` / `bb-post-children` を保持。
 - **内容**: CFG exit から逆CFGをたどる Cooper 系反復で immediate post-dominator tree を構築。制御依存グラフ (CDG) の基盤。
 - **根拠**: PDCE（FR-164）・code sinking（FR-163）・制御依存解析の前提インフラ
 - **難易度**: Easy
@@ -540,7 +540,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-166: Constant Hoisting ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: `opt-pass-fold`は定義位置で定数を畳み込むが、ループ内の高コスト定数を関数入口に移動しない
 - **内容**: ループ内で繰り返し使用される高コスト定数（大きな整数リテラル、浮動小数点定数、シンボルルックアップ）を関数入口のプレヘッダに移動
 - **根拠**: LLVMの`ConstantHoisting`パス。LICM（FR-003）とは別に定数専用のhoistingが効率的
@@ -548,26 +548,26 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-167: Tail Duplication ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: `opt-pass-tail-duplication` が小さい shared tail block を保守的に複製する
 - **内容**: 複数の先行ブロックから分岐するブロックの末尾を各先行ブロックに複製。分岐予測改善とジャンプスレッディング機会拡大
 - **根拠**: LLVMの`TailDuplication`。cl-ccのジャンプスレッディング（FR-001のpeephole、`opt-pass-jump`）の効果を増幅
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-flow-passes.lisp` に `opt-pass-tail-duplication` を追加済み（保守的サブセット）。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-passes.lisp` に `opt-pass-tail-duplication` を追加済み（保守的サブセット）。
   - 条件: shared tail block が小さい（命令数上限あり）かつ predecessor 終端が `vm-jump` で該当 tail を指す場合のみ複製。
   - 目的: 分岐オーバーヘッド削減と後続の jump/threading・merge 機会の増加。
   - 今後の拡張: プロファイル誘導、複雑CFG、大ブロック複製。
 
 #### FR-168: Branch Correlation ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: `opt-pass-branch-correlation` が predecessor edge fact を使い、同一 predicate の再評価を定数化する
 - **内容**: 値述語を支配木に沿って伝播し、先行分岐で確定した条件を後続分岐で定数化。`(if (integerp x) ... (if (integerp x) ...)` → 2回目を定数`t`に
 - **根拠**: LLVMの`CorrelatedValuePropagation`。型チェック分岐が頻出するLispコードで特に効果大
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-flow-passes.lisp` の `opt-pass-branch-correlation` を実装済み。現状は「各 predecessor edge の `vm-jump-zero` 由来 fact が全て一致する」ケース（単一 predecessor を含む）に限定し、後続ブロック内の同一 predicate 再評価を `vm-const` へ置換する保守的実装。`vm-jump` だけを持つ trivial forwarder block（jump-only中継）を 1 段以上挟む場合にも edge fact を遡及伝播する。今後の拡張範囲は fact が不一致な合流点や非述語条件の相関伝播。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-passes.lisp` の `opt-pass-branch-correlation` を実装済み。現状は「各 predecessor edge の `vm-jump-zero` 由来 fact が全て一致する」ケース（単一 predecessor を含む）に限定し、後続ブロック内の同一 predicate 再評価を `vm-const` へ置換する保守的実装。`vm-jump` だけを持つ trivial forwarder block（jump-only中継）を 1 段以上挟む場合にも edge fact を遡及伝播する。今後の拡張範囲は fact が不一致な合流点や非述語条件の相関伝播。
 
 ---
 
@@ -575,26 +575,26 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-169: Loop Rotation ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
 - **現状**: `opt-pass-loop-rotation` が単純 while 形を guard + do-while 形へ回転する
 - **内容**: `while(cond) { body }` を `if(cond) { do { body } while(cond) }` に変換。ループ末尾にバックエッジを配置してCPUのループ分岐予測を改善
 - **根拠**: LLVMの`LoopRotate`パス。cl-ccのLICM（FR-003）とloop unrolling（FR-022）の効果を最大化する前提変換
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-flow-core.lisp` に `opt-pass-loop-rotation` を追加済み（保守的サブセット）。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-core.lisp` に `opt-pass-loop-rotation` を追加済み（保守的サブセット）。
   - 対象: `Lh: cond; jump-zero Lexit; body; jump Lh; Lexit:` の単純 while 形のみ。
   - 変換: 先頭を guard へ分離して guard+do-while 形に回転。
   - 今後の拡張: 一般CFG（複数header/ネスト/複合分岐）への対応。
 
 #### FR-170: Loop Peeling ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/optimize/src/cfg.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
 - **現状**: `opt-pass-loop-peeling` が単純 while 形の初回反復をループ前へ複製する
 - **内容**: ループの最初のN回（通常1回）を剥離してループ外にコピー。初回の型チェックや初期化コストをループ外に追い出す
 - **根拠**: LLVMの`LoopPeel`。`(dolist (x list) ...)`の初回nil チェック除去に有効
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-flow-core.lisp` に `opt-pass-loop-peeling` を追加済み（保守的サブセット）。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-core.lisp` に `opt-pass-loop-peeling` を追加済み（保守的サブセット）。
   - 対象: `Lh: cond; jump-zero Lexit; body; jump Lh; Lexit:` の単純 while 形のみ。
   - 変換: 初回反復（cond + body）をループ前に 1 回複製。
   - 今後の拡張: 一般CFG・多重ループ・プロファイル誘導 peeling。
@@ -605,7 +605,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-026: Eta Reduction ✅
 
-- **対象**: `packages/compile/src/cps.lisp` + `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/cps.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - `(lambda (x) (f x))` → `f` へのCPS変換後の冗長ラッパー除去
   - CPS変換が生成する多くの継続ラッパーはeta-reducible
@@ -614,7 +614,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-027: CPS Beta Reduction / Continuation Sharing ✅
 
-- **対象**: `packages/compile/src/cps.lisp` + `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/cps.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - 継続が一度しか使われない場合、その場でインライン展開 (beta-reduce)
   - クロージャ割り当てと呼び出しオーバーヘッドを完全除去
@@ -623,7 +623,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-028: Contification ✅
 
-- **対象**: `packages/compile/src/codegen.lisp` + `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/codegen.lisp` + 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**:
   - `labels` で束縛された関数が常に末尾位置から呼ばれる場合、クロージャではなくローカルラベル(JMP先)に変換
   - クロージャ割り当て・環境設定のオーバーヘッドを完全除去
@@ -697,43 +697,43 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-112: Critical Edge Splitting ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`
 - **内容**: 後継が複数のブロックから前継が複数のブロックへのエッジに空のランディングパッドブロックを挿入
 - **根拠**: PRE・コード移動・SSA破壊の正確性に必要な前提条件。約30行で実装可能
 - **難易度**: Easy
 
 #### FR-113: Loop-Closed SSA (LCSSA) ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp`, `packages/optimize/src/ssa.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp`
 - **内容**: ループ内で定義されループ外で使用される全SSA値に対してループ出口ブロックにPhiノードを挿入
 - **根拠**: `basic-block`に`loop-depth`フィールドは存在するが未使用
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/ssa.lisp` に `ssa-place-lcssa-phis` を追加し、`ssa-construct` から呼び出すよう接続済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp` に `ssa-place-lcssa-phis` を追加し、`ssa-construct` から呼び出すよう接続済み。
   - 変換: loop外ブロックで read される loop内定義レジスタについて、出口側に LCSSA phi stub を補完。
   - 検証: `packages/optimize/tests/ssa-tests.lisp` の `ssa-lcssa-inserts-exit-phi-for-loop-defined-value`。
   - 制限: 完全LCSSA（厳密 loop-exit/use-def 解析に基づく最小Phi）ではなく保守的補完。
 
 #### FR-114: Pruned / Semi-Pruned SSA ✅
 
-- **対象**: `packages/optimize/src/ssa.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp`
 - **内容**: ブロックローカル変数へのPhi挿入を省略。完全Cytronアルゴリズムの冗長Phi削減
 - **根拠**: `ssa-place-phis`が実際の活性チェックなしでPhiを挿入している (`ssa.lisp` 参照)
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/ssa.lisp` の `ssa-place-phis` に semi-pruned 条件を追加済み。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp` の `ssa-place-phis` に semi-pruned 条件を追加済み。
   - 変換: 全体で一度も read されないレジスタについては Phi 生成をスキップ。
   - 検証: `packages/optimize/tests/ssa-tests.lisp` の `ssa-phi-placement-prunes-never-read-reg`。
   - 制限: ブロック境界の厳密 live-in 解析（完全 pruned SSA）は未実装。
 
 #### FR-115: May-Alias / Must-Alias Oracle ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: 既存のcopy-prop `reg-track` を拡張してヒープポインタのエイリアス関係を軽量追跡
 - **根拠**: `opt-pass-copy-prop`がスカラコピーのみ追跡、ヒープ参照は未追跡
 - **難易度**: Easy-Medium
 
-- **関連実装**: `packages/optimize/src/optimizer.lisp` に `opt-compute-heap-aliases` / `opt-must-alias-p` / `opt-may-alias-p` を追加済み。現状は `vm-cons` / `vm-make-array` / `vm-closure` / `vm-make-closure` を fresh root として扱い、`vm-move` による must-alias 伝播を行う軽量 oracle で、slot store-to-load forwarding と dead-store elimination は moved-alias 越しの同一オブジェクトも扱える。より広い alias consumer への統合は未実装。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp` に `opt-compute-heap-aliases` / `opt-must-alias-p` / `opt-may-alias-p` を追加済み。現状は `vm-cons` / `vm-make-array` / `vm-closure` / `vm-make-closure` を fresh root として扱い、`vm-move` による must-alias 伝播を行う軽量 oracle で、slot store-to-load forwarding と dead-store elimination は moved-alias 越しの同一オブジェクトも扱える。より広い alias consumer への統合は未実装。
 
 #### FR-116: Flow-Sensitive Type Narrowing ✅
 
@@ -763,7 +763,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-271: Trivial Phi Elimination (自明Phi除去) ✅
 
-- **対象**: `packages/optimize/src/ssa-phi-elim.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa-phi-elim.lisp`
 - **現状**: `ssa-phi-elim.lisp` — `ssa-eliminate-trivial-phis`完備。3パス (1) 全引数同一のPhiを単一値に置換、(2) Phi-of-Phi連鎖の短絡 (3パス伝搬)、(3) 未使用Phiの除去。`ssa-construct`内で自動実行。6件の試験で全動作確認済み
 - **内容**: Phi最適化3パス: (1) 全引数同一のPhiを単一値に置換、(2) Phi-of-Phi連鎖の短絡、(3) 未使用Phiの除去。FR-114（Pruned SSA）と相補的。FR-147（SSA統合）後に適用
 - **根拠**: Cytron et al. (1991) Section 5。SSA構築直後の標準クリーンアップ。GVN/SCCPの精度向上に寄与
@@ -785,7 +785,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **根拠**: SBCL rational arithmetic / GMP mpq。数値計算の精度保証パス
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-tables.lisp` の fold table に `vm-rational` / `vm-rationalize` / `vm-numerator` / `vm-denominator` / `vm-gcd` / `vm-lcm` / `vm-div` / `vm-cl-div` を追加済み。`packages/optimize/tests/optimizer-tests.lisp` は `vm-cl-div` が `3/4` へ、`vm-div` がfloor商へ畳み込まれることを検証する。runtime 側は 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/primitives.lisp` の `vm-cl-div` に fixnum/fixnum、fixnum-rational、mixed fixnum/rational の fast path を追加し、`packages/vm/tests/primitives-tests.lisp` が path 選択と結果を検証する。外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-execute.lisp` に rational p/q add/sub/mul の fixnum num/den fast paths を追加済み。完全な GMP/mpq 連携や全演算網羅は将来拡張。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-tables.lisp` の fold table に `vm-rational` / `vm-rationalize` / `vm-numerator` / `vm-denominator` / `vm-gcd` / `vm-lcm` / `vm-div` / `vm-cl-div` を追加済み。`packages/optimize/tests/optimizer-tests.lisp` は `vm-cl-div` が `3/4` へ、`vm-div` がfloor商へ畳み込まれることを検証する。runtime 側は 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/primitives.lisp` の `vm-cl-div` に fixnum/fixnum、fixnum-rational、mixed fixnum/rational の fast path を追加し、`packages/vm/tests/primitives-tests.lisp` が path 選択と結果を検証する。外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-execute.lisp` に rational p/q add/sub/mul の fixnum num/den fast paths を追加済み。完全な GMP/mpq 連携や全演算網羅は将来拡張。
 
 #### FR-274: Extensible Sequences Protocol (拡張可能シーケンスプロトコル) ✅
 
@@ -889,7 +889,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-369: SSA-CPS等価性ブリッジ (SSA-CPS Equivalence Bridge) ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/cps.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/cps.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: MIR層（`mir.lisp`）はBraunアルゴリズムでSSA構築。CPS（`cps.lisp`）は独立IR。数学的等価（Kelsey 1995）だが相互変換・解析共有なし
 - **内容**: CPS↔SSA双方向変換レイヤー構築。CPS単一呼び出し継続→SSA基本ブロックパラメータ、CPS合流点→SSAφノード。オプティマイザパスをIR横断で共有可能にする
 - **根拠**: Kelsey (1995) "A Correspondence between CPS and SSA"
@@ -977,7 +977,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-459: Superinstruction / Opcode Fusion (スーパー命令/オペコード融合) ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-run.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-run.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: CLOSインタプリタもdefopcodeエンジンも命令融合なし。頻出シーケンス（const+jump-zero, move+ret, const+add等）を個別ディスパッチ
 - **内容**: 頻出命令ペア/トリプルのプロファイリング。融合スーパー命令の定義と最適化パスでの置換
 - **根拠**: CPython 3.12 superinstructions, LuaJIT
@@ -1043,7 +1043,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-532: Out-of-SSA / Phi Node Coalescing (SSA破壊・Phi合体) ✅
 
-- **対象**: `packages/optimize/src/ssa.lisp`, `packages/emit/src/regalloc.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp`, `packages/emit/src/regalloc.lisp`
 - **現状**: SSA構築（`ssa.lisp`）は完備。SSA破壊（Phi→コピー命令への変換）なし。レジスタ割り当て（`regalloc.lisp`）との接続なし
 - **内容**: SSA破壊3ステップ: (1) 各 Phi をその引数の数だけのコピー命令に展開。(2) Phi-coalescing — 干渉しないコピーを同一物理変数に統合してコピー命令を消去。(3) Parallel copy sequentialization — 同一基本ブロック内の並行コピー群を Swap-based/一時変数方式でシーケンシャル化。Sreedhar et al. (1999) または Boissinot et al. (2009) のアルゴリズム
 - **根拠**: SSAベース RA の標準最終ステップ。cl-cc では SSA→RA の橋渡しが欠如
@@ -1059,7 +1059,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-534: Interprocedural SSA / Function Summaries (手続き間SSA・関数サマリー) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/pipeline/pipeline.lisp`
 - **現状**: SSAは関数内のみ。関数境界を越えたSSA値の追跡なし
 - **内容**: 関数ごとに「入力条件 → 出力特性」のサマリー（副作用集合・戻り値型・純粋性フラグ）を構築。サマリーを用いた手続き間定数伝播・エイリアス解析。IPSCCP（FR-050）の基盤
 - **根拠**: LLVM GlobalsModRef / Inliner function attrs。手続き間最適化の標準インフラ
@@ -1067,7 +1067,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-535: Gated SSA / E-SSA (述語付きSSA) ✅
 
-- **対象**: `packages/optimize/src/ssa.lisp`, `packages/type/src/inference.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/ssa.lisp`, `packages/type/src/inference.lisp`
 - **現状**: SSAの Phi ノードに値条件の述語情報なし。分岐条件と Phi の関係が失われる
 - **内容**: Gated SSA (Tu & Padua 1995): `γ-node`（条件付き Phi）と `μ-node`（ループ帰納 Phi）を区別。E-SSA: Phi 引数に述語コンテキスト（`x > 0` のような条件）を付与。Flow-sensitive type narrowing（FR-116）の精度向上。配列範囲解析（FR-039）の基盤
 - **根拠**: LLVM LazyValueInfo / GCC VRP の述語追跡。Bourdoncle widening operator
@@ -1179,7 +1179,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-547: Effect System in IR (IRエフェクトシステム) ✅
 
-- **対象**: `packages/optimize/src/effects.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/effects.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: `effects.lisp` に命令別副作用分類が存在し、外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp` に MIR op → effect-kind 分類と `miri-meta` の `:effect-kind` override を追加済み。MIR `:div` / `:mod` は raise 可能命令として `:control` 扱いにして未使用DCE対象から外している。codegen/CPS ノード全体への注釈伝播は要継続
 - **内容**: 各 IR 命令に `{read-heap, write-heap, alloc, io, raise}` のエフェクトセットを付与。エフェクトベースのコードモーション判定（純粋命令のみ hoist/sink）。エフェクト推論（関数シグネチャにエフェクトを伝播）。Koka / OCaml 5 の effect inference に相当
 - **根拠**: エフェクト情報で最適化の保守性を排除。現行 `opt-inst-pure-p` が未完全な純粋性チェックをしているが、エフェクトシステムで完全化
@@ -1225,7 +1225,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-552: Speculative Monomorphization (投機的モノモーフィゼーション) ✅
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: ジェネリック関数は常に多態ディスパッチ（`vm-generic-call`）。型フィードバック情報があっても特化コードを生成しない
 - **内容**: IC 型プロファイル（FR-058）から最頻出型を取得し、その型に特化したモノモーフィックな関数クローンを生成。実行時型ガード（FR-232）を先頭に置き、ガード成功時は特化版へ、失敗時は汎用版にフォールバック。`(defgeneric +)` の `(fixnum, fixnum) → fixnum` 特化が代表例
 - **根拠**: GraalVM SpeculativeMonomorphization / V8 Maglev モノモーフィック IC 最適化。CLOS パフォーマンスの主要ボトルネック解消
@@ -1245,7 +1245,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-554: Tail Modulo Cons (TMC — 末尾Cons変換) ✅
 
-- **対象**: `packages/compile/src/cps.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/cps.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: TCO（`vm-tail-call`）は末尾位置の関数呼び出しのみ対象。`(cons x (f rest))` のような「末尾Consセル構築」はスタックを消費し続ける
 - **内容**: `(cons head (f tail))` パターンを検出し、アキュムレータセルへの「後置き」に変換。具体的には事前にConsセルを確保してCDRスロットをホールとして残し、再帰呼び出しをそのスロットへの書き込み先として渡す。末尾再帰版 `map`/`filter`/`append` が定数スタックで動作するようになる
 - **根拠**: OCaml 4.14 `[@tail_mod_cons]` annotation / GHC `-O2` の `build/foldr` fusion。Lisp のリスト処理関数群を完全末尾再帰化する唯一の手段
@@ -1261,7 +1261,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-556: Incremental SSA Maintenance (増分SSA更新) ✅
 
-- **対象**: `packages/compile/src/ssa.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/ssa.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: 最適化パス（インライン展開、定数畳み込み等）がIRを変更するたびに `ssa-transform` を再実行して完全再構築。変更点が局所的でも全関数を再処理
 - **内容**: φ関数の追加・削除・書き換えを追跡する差分ログを維持。各最適化パスが「変更されたCFGエッジ」を報告し、影響を受けるφ関数のみを再計算。Braun et al. (2013) の増分アルゴリズム（本プロジェクトのSSA基盤と同系統）を拡張して差分更新対応
 - **根拠**: LLVM `SSAUpdater` / GCC `update_ssa()`。大規模インライン展開後の再SSA化コストを O(変更量) に抑制
@@ -1287,13 +1287,13 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-104: PGO Edge Profiling Instrumentation ✅
 
-- **対象**: `packages/optimize/src/cfg.lisp` + バックエンド
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/cfg.lisp` + バックエンド
 - **内容**: CFGエッジにカウンタを挿入して実行頻度プロファイルを収集
 - **難易度**: Medium
 
 #### FR-105: Profile-Guided Inlining Thresholds ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp:729-820`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp:729-820`
 - **内容**: プロファイルデータに基づいてcall-site毎にインライン化コスト閾値を調整
 - **依存**: FR-104
 - **難易度**: Low (FR-104完了後)
@@ -1313,7 +1313,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-108: Work-List Driven Optimizer Pass Scheduling ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **内容**: 前パスで変更された命令のみを次パスで処理するwork-list方式
 - **根拠**: 現状は全命令を複数回フルスキャン
 - **難易度**: Medium
@@ -1342,7 +1342,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-225: Allocation Elimination via Escape Analysis (エスケープ解析による割り当て完全除去) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: FR-007でエスケープ解析、FR-018でスタック割り当て、FR-020でallocation sinkingを定義。しかし「割り当て自体の完全除去」（スカラー置換による）は明示的に定義されていない
 - **内容**: エスケープ解析でローカルにのみ使用される`cons`/`list`/`vector`を検出し、SROA（FR-014）と組み合わせて個別レジスタに分解。割り当て命令・GCルート登録・ヒープアクセスを完全除去
 - **根拠**: GraalVM partial escape analysis / HotSpot C2 scalar replacement。FR-007/FR-014/FR-018の統合による最大効果
@@ -1392,7 +1392,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-245: Basic Block Versioning (基本ブロックバージョニング) ✅
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: 型に基づくコード特殊化なし。FR-232（Uncommon Trap）はガードベースの投機だがブロック複製による多型対応なし
 - **内容**: 基本ブロックの型コンテキスト（各変数の推論型の組み合わせ）毎に特殊化コピーを生成。`(if (fixnump x) (+ x 1) ...)` の真分岐ではx:fixnum版のブロックを、偽分岐では汎用版を使用。型コンテキストの爆発をN個（例: 4）に制限
 - **根拠**: Chevalier-Boisvert & Feeley (2015)。ガードベース投機の代替として、静的コンパイルでも多型対応が可能
@@ -1404,10 +1404,10 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-261: Value Profiling (値プロファイリング) ✅
 
-- **対象**: `packages/optimize/src/optimizer-speculative-ic.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-speculative-ic.lisp`
 - **現状**: `opt-profile-data` が site ごとの値ヒストグラム、`value-limit` による bounded Top-K、numeric `opt-profile-value-range` を保持する conservative helper layer になった
 - **内容**: `opt-profile-record-value` は site 単位で頻出値を保持し、`opt-profile-top-values` で頻度順に参照できる。numeric 値は pruning と分離して min/max を蓄積し、定数特殊化や範囲解析へ受け渡せる
-- **関連実装**: `packages/optimize/src/optimizer-speculative-ic.lisp` の `opt-profile-record-value` / `opt-profile-top-values` / `opt-profile-value-range`
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-speculative-ic.lisp` の `opt-profile-record-value` / `opt-profile-top-values` / `opt-profile-value-range`
 - **検証**: `packages/optimize/tests/optimizer-roadmap-backend-tests.lisp` の `optimizer-roadmap-value-profiling-top-k-and-range-behavior`
 - **根拠**: V8 value profiling / HotSpot -XX:+ProfileReturnOnly。型プロファイリングの精密化
 - **難易度**: Medium
@@ -1451,7 +1451,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-265: Class Hierarchy Analysis for CLOS (CHA — クラス階層解析) ✅
 
-- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-clos.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-clos.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: `vm-generic-call` は常に実行時ディスパッチ（MOP `find-method` 相当）。メソッドが1つしか存在しない場合でも多態ディスパッチを経由する
 - **内容**: コンパイル時にクラス階層グラフを構築し、`(defgeneric f)` に対して「クラス C のサブクラスが存在しない」「メソッド特化が1つだけ」の条件を静的に検証。条件成立時は `vm-generic-call` を直接呼び出し（`vm-call`）に降格。`sealed` クラスや `final` メソッドの宣言で CHA 精度向上。クラス追加時はCHA結果を無効化して再解析
 - **根拠**: Java CHA (Dean et al. 1995) / GraalVM CLOS 最適化 / SBCL `(declare (optimize (safety 0)))` 下のディスパッチ除去。CLOSの主要な性能ボトルネック解消
@@ -1459,7 +1459,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-266: Speculative Inlining with Type Guard (型ガード付き投機的インライン展開) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: インライン展開（FR-040）は静的に確定した callee のみ対象。`vm-generic-call` や高階関数はインライン不可
 - **内容**: IC 型プロファイル（FR-058/FR-261）から最頻出 callee クロージャを特定し、「このオブジェクトが型 T なら callee = F である」という型ガードを挿入してインライン展開。ガード失敗時は uncommon trap（FR-159）経由でインタプリタへのデオプティマイズ。ガードが頻繁に失敗する場合は megemorphic（多態）パスへ降格
 - **根拠**: V8 TurboFan speculative inlining / HotSpot `-XX:+InlineVirtualCalls`。`(mapcar fn list)` で fn が毎回同じクロージャなら完全インライン可能
@@ -1495,10 +1495,10 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-283: Speculation Log (投機ログ) ✅
 
-- **対象**: `packages/optimize/src/optimizer-speculative-ic.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-speculative-ic.lisp`
 - **現状**: `*opt-speculation-log*` が process-global default log として動作し、`opt-speculation-allowed-p` / `opt-clear-speculation-log` / `opt-save-speculation-log` / `opt-load-speculation-log` で gating と `.prof` 永続化を扱える
 - **内容**: 失敗実績は既存の `opt-record-speculation-failure` と `opt-speculation-failed-p` で更新・参照し、再コンパイル側は allowed predicate で同一投機を抑制できる。保存形式は単純 S 式で、プロセス間 replay に使える
-- **関連実装**: `packages/optimize/src/optimizer-speculative-ic.lisp` の `*opt-speculation-log*` / `opt-speculation-allowed-p` / `opt-save-speculation-log` / `opt-load-speculation-log`
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-speculative-ic.lisp` の `*opt-speculation-log*` / `opt-speculation-allowed-p` / `opt-save-speculation-log` / `opt-load-speculation-log`
 - **検証**: `packages/optimize/tests/optimizer-roadmap-backend-tests.lisp` の `optimizer-roadmap-speculation-log-gating-and-persistence-behavior`
 - **根拠**: GraalVM SpeculationLog / HotSpot replay compile。同一の有害な投機を繰り返すコンパイル・デコンパイルループ（deopt storm）を防ぐ
 - **難易度**: Medium
@@ -1525,7 +1525,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-286: Tagged Integer Range Analysis (タグ付き整数範囲解析) ✅
 
-- **対象**: `packages/type/src/inference.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/type/src/inference.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: 型システム（packages/type/src/）は fixnum/float/cons の区別はするが、整数の値範囲（0≤n<256等）を追跡しない
 - **内容**: SSA値に整数範囲アノテーション `[lo, hi]` を付与し、CFG上で前向き伝播。`(the (integer 0 255) x)` → `x ∈ [0,255]`。範囲が fixnum に収まると証明できればオーバーフローガード不要。ループインダクション変数の範囲をループ境界から導出（FR-038と統合）
 - **根拠**: LLVM ScalarEvolution / V8 TurboFan range analysis / HotSpot C2 range check elimination。配列境界チェック除去の前提条件
@@ -1537,8 +1537,8 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-287: Loop Invariant Code Motion (LICM — ループ不変コード移動) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/compile/src/cfg.lisp`
-- **現状**: `packages/optimize/src/optimizer-licm.lisp` に CFG ベースの `opt-pass-licm` を実装済み。
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/compile/src/cfg.lisp`
+- **現状**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-licm.lisp` に CFG ベースの `opt-pass-licm` を実装済み。
 - **内容**: ループ検出（back-edge + dominator tree）→ループ不変命令の検出（全オペランドがループ外で定義）→プリヘッダブロックへのホイスト。副作用のある命令（ヒープ書き込み・IO）はホイスト禁止。
 - **根拠**: 全主要コンパイラの基本最適化。`(loop for i from 0 to n sum (length fixed-list))` で `length`計算をループ外に移動
 - **難易度**: Medium
@@ -1548,7 +1548,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-288: Loop Unrolling (ループ展開) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: ループ展開なし。小ループでもバックエッジジャンプのオーバーヘッドが残る
 - **内容**: 反復回数が静的に判明するループ（`dotimes` + 定数）を N 倍展開してバックエッジ削減。反復回数不明でも `unroll-factor=4` でピーリング（残余処理）を追加した部分展開。展開後に冗長コピー命令をDCEで除去
 - **根拠**: GCC -funroll-loops / LLVM LoopUnroll / SBCL。ループ本体が小さいときレジスタ使用率とILP改善
@@ -1556,7 +1556,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-289: Loop Fusion (ループ融合) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: 隣接するループ（`(dotimes (i n) ...)` が2つ連続）は独立に実行。キャッシュ効率が悪い
 - **内容**: 同一反復範囲・副作用が独立な隣接ループを1つのループにマージ。依存チェック（読み書きエイリアス解析）を経てバリアフリーなループのみ融合。メモリアクセスのlocality向上でキャッシュミス削減
 - **根拠**: GCC -floop-interchange / Polly / LLVM LoopFusion。メモリ帯域律速なワークロードで1.5〜3x高速化
@@ -1564,7 +1564,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-290: Loop Peeling (ループピーリング) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: ループ先頭に条件チェックがある場合、毎反復でチェックを実行
 - **内容**: ループ本体の最初の1〜2回分を「ピーリング」（ループ外に複製）。ループ先頭の境界チェック・NULL チェック・型チェックが定数畳み込みで除去できる場合に適用。残余ループは無条件で実行可能に
 - **根拠**: LLVM LoopPeel / HotSpot C2。`(car (first list))` のnullチェックをピーリングで除去
@@ -1600,7 +1600,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-294: Function Outlining (関数アウトライン化) ✅
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: インライン展開（FR-040）の逆操作未実装。コードサイズが増大しI$を圧迫
 - **内容**: 複数箇所に重複する共通コード（エラー処理・型チェック列）を切り出して共有関数化（インライン展開の逆）。コードサイズ閾値（デフォルト32バイト）以上の重複コードを検出し `_outlined_func_N` として分離。`-Os` 相当のコードサイズ最適化モード
 - **根拠**: LLVM MachineOutliner / Apple LLVM outliner (iOS バイナリサイズ削減)。I$フットプリント削減で間接的に性能改善
@@ -1636,7 +1636,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-297: ML-Guided Inlining (機械学習誘導インライン展開) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/pipeline/pipeline.lisp`
 - **現状**: インライン化判定はヒューリスティック（コード行数・呼び出し深度・FR-105プロファイル閾値）。最適な閾値の設定はブラックアート
 - **内容**: 関数ペア（呼び出し元・callee）の特徴量ベクトル（命令数、ループ深度、型特殊化度、呼び出し頻度、引数パターン）を入力に、インライン化の利益を予測する小規模 MLP モデル（隠れ層256次元、パラメータ数〜50K）。推論は `./cl-cc compile` 実行中に数μsで完了。モデルは cl-cc 自身の selfhost プロファイルで事前学習
 - **根拠**: Google MLGO (2021) / Meta Inliner ML / ARM NN-guided compiler。ヒューリスティックより10〜15%コードサイズ削減＋性能向上。2024〜2026年のLLVM/GCC本流に統合済み
@@ -1700,7 +1700,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 #### FR-303: Guard Strength Reduction (ガード弱体化) ✅
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: FR-232（Uncommon Trap）・FR-266（型ガード付きインライン）が生成するガードはすべて同コスト（型チェック命令）。失敗率が極低くても high-cost なガードのまま
 - **内容**: Speculation Log（FR-283）の失敗カウンタを参照し、ガードが N 回実行されて一度も失敗していない場合により安価な形式に降格。降格の段階: `full-type-check` → `tag-bit-test`（タグビット1命令）→ `shape-id-compare`（FR-284, 整数比較1命令）→ `nop`（完全除去、クラス階層変化時に再挿入）。ガード除去後のクラス変更・メソッド再定義時は IC 無効化（FR-265 と同メカニズム）でガードを復元
 - **根拠**: V8 `--stress-compaction` guard weakening / GraalVM SpeculationLog confidence score。ホットループ内の型ガードを nop まで落とせれば数%の命令数削減

@@ -22,6 +22,7 @@
   clCcMir,
   clCcTarget,
   clCcBytecode,
+  clCcOptimize,
   ...
 }:
 let
@@ -267,6 +268,7 @@ let
         "cl-cc-mir"
         "cl-cc-target"
         "cl-cc-bytecode"
+        "cl-cc-optimize"
       ];
     };
     cl-cc-cli = {
@@ -318,6 +320,7 @@ let
     cl-cc-mir = clCcMir;
     cl-cc-target = clCcTarget;
     cl-cc-bytecode = clCcBytecode;
+    cl-cc-optimize = clCcOptimize;
   };
 
   productionAsdfSystems = lib.fix (

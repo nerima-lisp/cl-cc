@@ -115,6 +115,10 @@
       url = "github:nerima-lisp/cl-cc-bytecode/24db21897a34c5c7874bd1f1da8b151b78c694d4";
       flake = false;
     };
+    cl-cc-optimize = {
+      url = "github:nerima-lisp/cl-cc-optimize/47d8dadec0f48d9e2733b181f6fa55d02713dae9";
+      flake = false;
+    };
     cl-cc-runtime = {
       url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
       flake = false;
@@ -362,6 +366,19 @@
             src = inputs.cl-cc-bytecode;
             systems = [ "cl-cc-bytecode" ];
           };
+          clCcOptimize = sbcl.buildASDFSystem {
+            pname = "cl-cc-optimize";
+            version = siblingVersion "cl-cc-optimize";
+            src = inputs.cl-cc-optimize;
+            systems = [ "cl-cc-optimize" ];
+            lispLibs = [
+              clCcVm
+              clCcType
+              clCcAst
+              clProlog
+              clParserKit
+            ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -392,6 +409,7 @@
               clCcMir
               clCcTarget
               clCcBytecode
+              clCcOptimize
               ;
           };
           inherit (asdf)
