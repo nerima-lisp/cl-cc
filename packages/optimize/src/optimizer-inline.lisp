@@ -285,7 +285,7 @@
     (vm-apply (make-vm-apply :dst (vm-dst call)
                              :func (vm-func-reg call)
                              :args (copy-list (vm-args call))
-                             :tail-p (cl-cc/vm::vm-tail-p call)))))
+                             :tail-p (cl-cc/vm:vm-tail-p call)))))
 
 (defun %opt-call-site-split-join-labels (instructions call-index)
   "Return all consecutive labels immediately preceding CALL-INDEX."
@@ -614,7 +614,7 @@ uses the standard method combination, and has no EQL-specializer ambiguity."
     (dolist (inst instructions)
       (when (typep inst 'vm-class-def)
         (setf (gethash (vm-class-name-sym inst) class-sealed)
-              (and (cl-cc/vm::vm-sealed-p inst) t))))
+              (and (cl-cc/vm:vm-sealed-p inst) t))))
     (dolist (inst instructions (nreverse result))
       (typecase inst
         ((or vm-call vm-tail-call vm-apply)

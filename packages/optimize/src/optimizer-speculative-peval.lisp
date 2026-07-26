@@ -596,6 +596,6 @@ the plan as a cache hit instead of requesting a new clone."
      (make-vm-apply :dst (vm-dst inst)
                     :func func-reg
                     :args args
-                    :tail-p (cl-cc/vm::vm-tail-p inst)))
+                    :tail-p (cl-cc/vm:vm-tail-p inst)))
     (t
      (make-vm-call :dst (vm-dst inst) :func func-reg :args args))))

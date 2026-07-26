@@ -13,13 +13,13 @@
     (loop for inst in instructions
           for pc from 0
           do (when (typep inst 'cl-cc/vm:vm-label)
-               (setf (gethash (cl-cc/vm::vm-name inst) table) pc)))
+               (setf (gethash (cl-cc/vm:vm-name inst) table) pc)))
     table))
 
 (defun %pgo-block-start-pc (block instructions label->pc)
   "Resolve BLOCK's start PC in INSTRUCTIONS, preferring explicit labels."
   (or (let ((label (cl-cc/optimize:bb-label block)))
-        (and label (gethash (cl-cc/vm::vm-name label) label->pc)))
+        (and label (gethash (cl-cc/vm:vm-name label) label->pc)))
       (let ((first-inst (car (cl-cc/optimize:bb-instructions block))))
         (and first-inst
              (position first-inst instructions :test #'eq)))

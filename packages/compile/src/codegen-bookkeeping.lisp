@@ -77,10 +77,10 @@ RESOLVE-FORWARD-REFERENCES once NAME is defined."
   "Resolve all pending forward references using RESOLVER."
   (when (and (null resolver)
              (zerop (hash-table-count *forward-reference-patch-table*))
-             (boundp 'cl-cc/vm::*vm-current-state*)
-             cl-cc/vm::*vm-current-state*)
+             (boundp 'cl-cc/vm:*vm-current-state*)
+             cl-cc/vm:*vm-current-state*)
     (return-from %resolve-forward-references
-      (cl-cc/vm:vm-resolve-forward-references cl-cc/vm::*vm-current-state*)))
+      (cl-cc/vm:vm-resolve-forward-references cl-cc/vm:*vm-current-state*)))
   (let ((unresolved nil)
         (resolved nil))
     (maphash
@@ -122,7 +122,7 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
   "Record FORM for load-time execution and return its cell id."
   (let* ((id (prog1 *next-load-time-value-cell-id*
                (incf *next-load-time-value-cell-id*)))
-         (cell (cl-cc/vm::make-vm-load-time-value-cell
+         (cell (cl-cc/vm:make-vm-load-time-value-cell
                 :id id
                 :form form
                 :read-only-p read-only-p)))
@@ -185,12 +185,12 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
   (let ((pending (nreverse (copy-list *pending-exception-table-entries*))))
     (when pending
       (let ((pc-index (%instruction-pc-index instructions))
-            (labels   (cl-cc/vm::build-label-table instructions))
+            (labels   (cl-cc/vm:build-label-table instructions))
             (entries  nil))
         (dolist (entry pending)
           (let* ((start-pc (gethash (compile-exception-entry-start-inst entry) pc-index))
                  (last-pc  (gethash (compile-exception-entry-end-inst entry) pc-index))
-                 (handler-pc (cl-cc/vm::vm-label-table-lookup
+                 (handler-pc (cl-cc/vm:vm-label-table-lookup
                               labels (compile-exception-entry-handler-label entry))))
             (when (and start-pc last-pc handler-pc (<= start-pc last-pc))
               (push (cl-cc/vm::make-vm-exception-entry
@@ -206,15 +206,15 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
 (defun %insert-osr-entry-markers (instructions)
   "Insert lightweight OSR markers immediately before loop back-edge jumps."
   (if cl-cc/vm:*osr-enabled*
-      (let ((labels (cl-cc/vm::build-label-table instructions))
+      (let ((labels (cl-cc/vm:build-label-table instructions))
             (marked nil))
         (loop for inst in instructions
               for pc from 0
               do (when (typep inst 'vm-jump)
                    (let* ((label (vm-label-name inst))
-                          (target-pc (cl-cc/vm::vm-label-table-lookup labels label)))
+                          (target-pc (cl-cc/vm:vm-label-table-lookup labels label)))
                      (when (and target-pc (<= target-pc pc))
-                       (push (cl-cc/vm::make-vm-osr-entry
+                       (push (cl-cc/vm:make-vm-osr-entry
                               :label label
                               :id (list :loop-header label :back-edge-pc pc))
                              marked))))
@@ -230,30 +230,30 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
       (loop for inst in instructions
             for pc from 0
             do (cond
-                 ((typep inst 'cl-cc/vm::vm-type-check)
+                 ((typep inst 'cl-cc/vm:vm-type-check)
                   (setf (gethash pc table)
-                        (cl-cc/vm::make-vm-deopt-info
+                        (cl-cc/vm:make-vm-deopt-info
                          :pc pc
-                         :label (cl-cc/vm::vm-type-check-deopt-label inst)
+                         :label (cl-cc/vm:vm-type-check-deopt-label inst)
                          :live-regs (list (vm-src inst))
                          :vreg->preg (list (cons (vm-src inst) :p0))
                          :description (list :type-check (cl-cc/vm::vm-type-name inst)
-                                            :id (cl-cc/vm::vm-type-check-deopt-id inst)))))
-                 ((typep inst 'cl-cc/vm::vm-deopt)
+                                            :id (cl-cc/vm:vm-type-check-deopt-id inst)))))
+                 ((typep inst 'cl-cc/vm:vm-deopt)
                   (setf (gethash pc table)
-                        (cl-cc/vm::make-vm-deopt-info
+                        (cl-cc/vm:make-vm-deopt-info
                          :pc pc
-                         :label (cl-cc/vm::vm-deopt-label inst)
+                         :label (cl-cc/vm:vm-deopt-label inst)
                          :vreg->preg nil
                          :inline-stack nil
-                         :description (list :deopt (cl-cc/vm::vm-deopt-reason inst)
-                                            :id (cl-cc/vm::vm-deopt-id inst))))))))
+                         :description (list :deopt (cl-cc/vm:vm-deopt-reason inst)
+                                            :id (cl-cc/vm:vm-deopt-id inst))))))))
     (when cl-cc/vm:*osr-enabled*
       (loop for inst in instructions
             for pc from 0
-            do (when (typep inst 'cl-cc/vm::vm-osr-entry)
+            do (when (typep inst 'cl-cc/vm:vm-osr-entry)
                  (push (list :pc pc
-                             :label (cl-cc/vm::vm-osr-label inst)
-                             :id (cl-cc/vm::vm-osr-id inst))
+                             :label (cl-cc/vm:vm-osr-label inst)
+                             :id (cl-cc/vm:vm-osr-id inst))
                        osr))))
     (values table (nreverse osr))))

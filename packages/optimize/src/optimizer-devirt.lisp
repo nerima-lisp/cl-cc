@@ -27,7 +27,7 @@
         (vm-class-def
          (let ((name (vm-class-name-sym inst)))
            (setf (gethash name classes) inst)
-           (when (cl-cc/vm::vm-sealed-p inst) (setf (gethash name sealed) t))
+           (when (cl-cc/vm:vm-sealed-p inst) (setf (gethash name sealed) t))
            (dolist (super (vm-superclasses inst))
              (pushnew name (gethash super subclasses) :test #'eq))))
         (vm-const
@@ -91,9 +91,9 @@
 
 (defun %opt-cha-note-gf-definition (inst reg-symbol reg-gf-name)
   (when (and (typep inst 'vm-register-function)
-             (gethash (cl-cc/vm::vm-src inst) reg-symbol))
-    (setf (gethash (cl-cc/vm::vm-src inst) reg-gf-name)
-          (cl-cc/vm::vm-func-name inst))))
+             (gethash (cl-cc/vm:vm-src inst) reg-symbol))
+    (setf (gethash (cl-cc/vm:vm-src inst) reg-gf-name)
+          (cl-cc/vm:vm-func-name inst))))
 
 (defun %opt-cha-pass (instructions)
   (let ((cha (opt-build-class-hierarchy-analysis instructions))

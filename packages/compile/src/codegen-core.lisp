@@ -358,14 +358,14 @@ failing at compile time."
                 (slow-label (make-label ctx "deopt_binop_slow"))
                 (done-label (make-label ctx "deopt_binop_done"))
                 (deopt-id (make-label ctx "deopt_guard")))
-            (emit ctx (cl-cc/vm::make-vm-type-check
+            (emit ctx (cl-cc/vm:make-vm-type-check
                        :src lhs-reg :type-name guard-type :label deopt-label :id deopt-id))
-            (emit ctx (cl-cc/vm::make-vm-type-check
+            (emit ctx (cl-cc/vm:make-vm-type-check
                        :src rhs-reg :type-name guard-type :label deopt-label :id deopt-id))
             (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg))
             (emit ctx (make-vm-jump :label done-label))
             (emit ctx (make-vm-label :name deopt-label))
-            (emit ctx (cl-cc/vm::make-vm-deopt
+            (emit ctx (cl-cc/vm:make-vm-deopt
                        :label slow-label :id deopt-id :reason (list :type-check guard-type)))
             (emit ctx (make-vm-label :name slow-label))
             (emit ctx (funcall (binop-ctor op) :dst result-reg :lhs lhs-reg :rhs rhs-reg))

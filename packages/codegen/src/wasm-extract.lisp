@@ -47,7 +47,7 @@ through extracted standalone functions."
                (when (and car-label (or (and cdr-const-p (null cdr-value)) cdr-labels))
                  (setf (gethash (vm-dst inst) list-labels)
                        (cons car-label cdr-labels))))))
-          ((typep inst 'cl-cc/vm::vm-coerce-to-vector)
+          ((typep inst 'cl-cc/vm:vm-coerce-to-vector)
            (let ((labels (gethash (vm-src inst) list-labels)))
              (when labels
                (setf (gethash (vm-dst inst) vector-labels) labels))))

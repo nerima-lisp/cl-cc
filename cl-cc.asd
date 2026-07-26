@@ -182,6 +182,7 @@
      (:file "vm-opcodes-tests")
      (:file "vm-opcodes-defs-tests")
      (:file "vm-tests")
+     (:file "vm-public-api-lint-tests")
      (:file "package-tests")
      (:file "vm-environment-tests")
      (:file "conditions-tests")

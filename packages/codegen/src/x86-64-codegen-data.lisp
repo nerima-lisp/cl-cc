@@ -48,9 +48,9 @@ virtual registers."
 
 ;;; Two-Pass Code Generation (Labels + Jumps)
 
-;;; ============================================================
+;;; ────────────────────────────────────────────────────────────
 ;;; x86-64 Instruction Size Table — Data / Logic Separation
-;;; ============================================================
+;;; ────────────────────────────────────────────────────────────
 ;;;
 ;;; Encoding DATA is declared in *X86-64-INSTRUCTION-SIZE-SPECS*.
 ;;; The LOGIC that populates the hash table is in POPULATE-SIZE-TABLE.
@@ -145,12 +145,12 @@ virtual registers."
     ;; FR-318 staged path: non-local control instructions use conditional
     ;; shadow-stack marker sequences (enabled=6 bytes / disabled=2 bytes).
     ((cl-cc/vm::vm-push-handler cl-cc/vm::vm-pop-handler
-      cl-cc/vm::vm-bind-restart cl-cc/vm::vm-invoke-restart
+      cl-cc/vm::vm-bind-restart cl-cc/vm:vm-invoke-restart
       cl-cc/vm::vm-signal cl-cc/vm::vm-error-instruction
       cl-cc/vm::vm-cerror cl-cc/vm::vm-warn
-      cl-cc/vm::vm-establish-handler cl-cc/vm::vm-remove-handler
-      cl-cc/vm::vm-sync-handler-regs cl-cc/vm::vm-signal-error
-      cl-cc/vm::vm-establish-catch cl-cc/vm::vm-throw) 2))
+      cl-cc/vm:vm-establish-handler cl-cc/vm:vm-remove-handler
+      cl-cc/vm:vm-sync-handler-regs cl-cc/vm:vm-signal-error
+      cl-cc/vm:vm-establish-catch cl-cc/vm:vm-throw) 2))
   "Declarative spec: VM instruction types → x86-64 encoded byte sizes.
    Each entry is (type-spec size) where type-spec is a symbol or list of symbols.")
 

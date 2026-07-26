@@ -188,11 +188,11 @@
                                       (apply (function ,operator) results)))
                                `(lambda (results)
                                   (apply (function ,operator) results))))
-                    cl-cc/vm::*method-combination-operators*
+                    cl-cc/vm:*method-combination-operators*
                     :key #'car :test #'eq))
         `(eval-when (:load-toplevel :execute)
            (pushnew (cons ',name (lambda (results) (car (last results))))
-                    cl-cc/vm::*method-combination-operators*
+                    cl-cc/vm:*method-combination-operators*
                     :key #'car :test #'eq)))))
 
 (defun %method-comb-register-long-form (name lambda-list method-group-specs body-forms)
@@ -230,7 +230,7 @@
          (setf (fdefinition ',fname) fn)
          (import ',fname (find-package :cl-cc/vm))
          (pushnew (cons ',name (cons :long-form fn))
-                  cl-cc/vm::*method-combination-operators*
+                  cl-cc/vm:*method-combination-operators*
                   :key #'car :test #'eq)))))
 
 (register-macro 'define-method-combination

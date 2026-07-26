@@ -52,7 +52,7 @@
                (%wasm-note-case-value (wasm-case-dispatch-env-list-labels env)
                                       (vm-dst inst)
                                       (cons car-label cdr-labels))))))
-        ((typep inst 'cl-cc/vm::vm-coerce-to-vector)
+        ((typep inst 'cl-cc/vm:vm-coerce-to-vector)
          (let ((labels (gethash (vm-src inst)
                                 (wasm-case-dispatch-env-list-labels env))))
            (when labels

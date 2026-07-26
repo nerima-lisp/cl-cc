@@ -230,8 +230,8 @@ predecessors to agree on the same slot fact."
          ;; kills an earlier one only when both are literally the same register —
          ;; distinct index registers may denote the same index, and killing
          ;; across them would drop a live store.
-         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm::vm-array-reg inst)
-                                                        (cl-cc/vm::vm-index-reg inst)
+         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm:vm-array-reg inst)
+                                                        (cl-cc/vm:vm-index-reg inst)
                                                         alias-roots)
                               inst))
         (t

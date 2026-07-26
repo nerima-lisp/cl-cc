@@ -146,9 +146,9 @@
                         0)))
         index)))
 
-;;; ============================================================
+;;; ────────────────────────────────────────────────────────────
 ;;; AArch64 Instruction Encoding — Data / Logic Separation
-;;; ============================================================
+;;; ────────────────────────────────────────────────────────────
 ;;;
 ;;; The DEFENC macro separates encoding DATA (base opcode, field layout)
 ;;; from encoding LOGIC (logior + ash + logand packing).

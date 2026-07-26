@@ -291,7 +291,7 @@ blocks after hot/unknown blocks while preserving each block's internal order."
                  (cold-block-p (lambda (block)
                                  (let ((head (first block)))
                                    (and (typep head 'cl-cc/vm:vm-label)
-                                        (member (princ-to-string (cl-cc/vm::vm-name head)) cold
+                                        (member (princ-to-string (cl-cc/vm:vm-name head)) cold
                                                 :test #'string=))))))
             (append (mapcan #'copy-list (remove-if cold-block-p ordered))
                     (mapcan #'copy-list (remove-if-not cold-block-p ordered))))))))

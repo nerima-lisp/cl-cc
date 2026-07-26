@@ -296,7 +296,7 @@ Returns two values: the compilation result and whether the CPS-native path was u
   (let ((table (make-hash-table :test #'equal)))
     (dolist (inst instructions table)
       (when (typep inst 'vm-func-ref)
-        (let ((tag (cl-cc/vm::vm-func-ref-dispatch-tag inst)))
+        (let ((tag (cl-cc/vm:vm-func-ref-dispatch-tag inst)))
           (when (and (consp tag) (eq (car tag) :known-function))
             (setf (gethash (vm-label-name inst) table) (cdr tag))))))))
 
