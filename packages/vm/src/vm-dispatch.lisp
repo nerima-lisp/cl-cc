@@ -110,7 +110,12 @@ Saves and restores call stack around the sub-invocation."
            (error "Unresolved forward reference: ~S" value)))
       ((%vm-callable-registry-entry-p entry)
        entry)
-      (t (error "Undefined function: ~S" value)))))
+      ;; UNDEFINED-FUNCTION, not a bare simple-error: CLHS 5.3 makes calling an
+      ;; undefined function signal UNDEFINED-FUNCTION, and compiled programs
+      ;; handle it by type — (handler-case ... (undefined-function () ...)) is
+      ;; how :copier nil, :predicate nil and friends are probed. A SIMPLE-ERROR
+      ;; is invisible to those handlers, so the call escaped as a raw error.
+      (t (error 'undefined-function :name value)))))
 
 (defun vm-resolve-function (state value)
   "Resolve VALUE to a closure, generic function, or host bridge function.
