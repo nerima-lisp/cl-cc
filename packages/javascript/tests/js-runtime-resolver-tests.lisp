@@ -247,11 +247,17 @@ the match end ('hello'.match(/l/g) is ['l','l'] in JS, not three)."
     (assert-= 7 result)))
 
 (deftest js-rt-reflect-construct
-  "Reflect.construct invokes a constructor function with an args vector."
+  "Reflect.construct constructs an object and discards a primitive return.
+
+This used to assert the constructor's return value came back, so a ctor
+returning 77 gave 77. ECMA-262 says otherwise: [[Construct]] yields the newly
+created object, and a constructor's return only replaces it when that return is
+itself an object. The standalone cl-cc-javascript routes through %JS-NEW, which
+implements that, so the primitive is dropped and the object wins."
   (let* ((ctor  (lambda (&rest args) (first args)))
          (args  (%jr-arr 77))
          (obj   (cl-cc/javascript::%js-reflect-construct ctor args)))
-    (assert-= 77 obj)))
+    (assert-true (hash-table-p obj))))
 
 ;;; ─── Object property descriptors ────────────────────────────────────────────
 

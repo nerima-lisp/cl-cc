@@ -131,6 +131,10 @@
       url = "github:nerima-lisp/cl-cc-php/f7ee5d7d09a1f24da7ad630be6ddcd0178342f06";
       flake = false;
     };
+    cl-cc-javascript = {
+      url = "github:nerima-lisp/cl-cc-javascript/7ab09451e4b540ab9d43d7cb56d72245b22a768c";
+      flake = false;
+    };
     cl-cc-runtime = {
       url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
       flake = false;
@@ -456,6 +460,18 @@
               clCcVm
             ];
           };
+          clCcJavascript = sbcl.buildASDFSystem {
+            pname = "cl-cc-javascript";
+            version = siblingVersion "cl-cc-javascript";
+            src = inputs.cl-cc-javascript;
+            systems = [ "cl-cc-javascript" ];
+            lispLibs = [
+              clCcAst
+              clCcBootstrap
+              clCcParse
+              clCcVm
+            ];
+          };
           clCcBinary = sbcl.buildASDFSystem {
             pname = "cl-cc-binary";
             version = siblingVersion "cl-cc-binary";
@@ -492,6 +508,7 @@
               clCcEmit
               clCcParse
               clCcPhp
+              clCcJavascript
               ;
           };
           inherit (asdf)

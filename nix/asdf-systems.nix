@@ -25,6 +25,7 @@
   clCcOptimize,
   clCcParse,
   clCcPhp,
+  clCcJavascript,
   clCcRegalloc,
   clCcCodegen,
   clCcEmit,
@@ -73,15 +74,6 @@ let
     cl-cc-docgen = {
       src = "packages/docgen";
       deps = [ ];
-    };
-    cl-cc-javascript = {
-      src = "packages/javascript";
-      deps = [
-        "cl-cc-ast"
-        "cl-cc-bootstrap"
-        "cl-cc-parse"
-        "cl-cc-php"
-      ];
     };
     cl-cc-optimize = {
       src = "packages/optimize";
@@ -140,6 +132,7 @@ let
         "cl-cc-ast"
         "cl-cc-parse"
         "cl-cc-php"
+        "cl-cc-javascript"
         "cl-cc-javascript"
         "cl-cc-type"
         "cl-cc-optimize"
@@ -287,6 +280,7 @@ let
     cl-cc-optimize = clCcOptimize;
     cl-cc-parse = clCcParse;
     cl-cc-php = clCcPhp;
+    cl-cc-javascript = clCcJavascript;
     cl-cc-regalloc = clCcRegalloc;
     cl-cc-codegen = clCcCodegen;
     cl-cc-emit = clCcEmit;

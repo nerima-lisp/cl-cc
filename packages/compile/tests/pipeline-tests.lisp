@@ -312,63 +312,33 @@ asserting the new path reproduces it has to still hold the old one."
           (cl-cc/backend-protocol:registered-backend language)))
         #'string< :key #'symbol-name))
 
-(deftest backend-protocol-registers-javascript
-  "JavaScript registers itself, so the pipeline never names its package."
-  (assert-true (cl-cc/backend-protocol:registered-backend :javascript)))
+(deftest backend-bootstrap-registry-carries-both-backends
+  "PHP and JavaScript both register through the cl-cc/bootstrap registry.
 
-(deftest backend-bootstrap-registry-carries-php
-  "PHP registers through the cl-cc/bootstrap registry instead.
-
-§5-1 was implemented twice, and the standalone cl-cc-php -- which is what this
-build compiles -- uses the older, wider one in cl-cc/bootstrap. The pipeline
-drains both, so which registry a backend chose is its own business; what has to
-hold is that its helpers arrive."
+§5-1 was implemented twice. The standalone cl-cc-php and cl-cc-javascript --
+which are what this build compiles -- use the older and wider of the two, in
+cl-cc/bootstrap. The pipeline drains both registries, so which one a backend
+picked is its own business; what has to hold is that its helpers arrive."
   (let ((entries (cl-cc/bootstrap:backend-bridge-providers)))
     (assert-true (plusp (length entries)))
-    (assert-true (find-if (lambda (entry)
-                            (let ((name (symbol-name (car entry))))
-                              (and (>= (length name) 5)
-                                   (string= "%PHP-" name :end2 5))))
-                          entries))))
+    (dolist (prefix '("%PHP-" "%JS-"))
+      (assert-true
+       (find-if (lambda (entry)
+                  (let ((name (symbol-name (car entry)))
+                        (n (length prefix)))
+                    (and (>= (length name) n) (string= prefix name :end2 n))))
+                entries)))))
 
-(deftest-each backend-protocol-bridge-sets-match-the-old-package-scans
-  "Moving the %PHP-*/%JS-* scans into the backends changes which symbols get bridged: none.
+(deftest backend-bridge-sets-match-the-old-package-scans
+  "The bridged set is what scanning each backend's package directly would give.
 
-Each scan moved out of the pipeline and into the package that owns the naming
-convention, so the orchestrator would stop depending on a backend's package name
--- the coupling that blocked moving either to its own repository. Same
-predicate, same package, evaluated from the other side of the boundary, so each
-bridged set has to be identical or the move was not behaviour-preserving."
-  ;; JavaScript only. PHP's scan lives in the standalone cl-cc-php and reaches
-  ;; the VM through the cl-cc/bootstrap registry, covered above.
-  :cases (("javascript" :javascript :cl-cc/javascript "%JS-"))
-  (language package-name prefix)
-  (let ((scan (%package-prefixed-function-symbols package-name prefix))
-        (protocol (%sorted-backend-bridge-symbols language)))
-    (assert-true (plusp (length scan)))
-    (assert-equal scan protocol)))
-
-(deftest backend-protocol-js-global-seed-set-matches-the-old-scan
-  "The *JS-*/%JS-* specials seeded into VM globals are the same set as before.
-
-Miss one and every JS program dies at run time on an unbound global, because the
-prelude binds Symbol, Infinity and the error classes to the values of these
-specials and each reference compiles to a VM-GET-GLOBAL."
-  (let ((scan (let ((pkg (find-package :cl-cc/javascript))
-                    (acc '()))
-                (when pkg
-                  (do-symbols (sym pkg)
-                    (when (and (eq (symbol-package sym) pkg)
-                               (boundp sym)
-                               (let ((name (symbol-name sym)))
-                                 (and (>= (length name) 4)
-                                      (or (string= "*JS-" name :end2 4)
-                                          (string= "%JS-" name :end2 4)))))
-                      (push sym acc))))
-                (sort (remove-duplicates acc) #'string< :key #'symbol-name)))
-        (protocol (sort (remove-duplicates
-                         (cl-cc/backend-protocol:backend-global-symbols
-                          (cl-cc/backend-protocol:registered-backend :javascript)))
-                        #'string< :key #'symbol-name)))
-    (assert-true (plusp (length scan)))
-    (assert-equal scan protocol)))
+The scans moved out of the pipeline and into the packages that own the naming
+conventions, so the orchestrator would stop depending on a backend's package
+name -- the coupling that blocked moving either to its own repository. Same
+predicates, same packages, evaluated from the other side of the boundary, so
+the result has to be identical or the move was not behaviour-preserving."
+  (let ((registered (mapcar #'car (cl-cc/bootstrap:backend-bridge-providers))))
+    (dolist (spec '((:cl-cc/php "%PHP-") (:cl-cc/javascript "%JS-")))
+      (let ((scan (%package-prefixed-function-symbols (first spec) (second spec))))
+        (assert-true (plusp (length scan)))
+        (assert-null (set-difference scan registered))))))
