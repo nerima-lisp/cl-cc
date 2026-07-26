@@ -301,6 +301,28 @@ the program could not observe."
                   (generic-function-methods . ,#'generic-function-methods)
                   (generic-function-method-combination . ,#'generic-function-method-combination)
                   (rt-plist-put . ,#'rt-plist-put)
+                  ;; FR-254 region API. WITH-REGION expands into
+                  ;; CL-CC/RUNTIME:RT-MAKE-REGION and RT-CLOSE-REGION, and
+                  ;; compiled code reaches the rest by package-qualified name, so
+                  ;; without these bridges the macro compiled to a call of an
+                  ;; undefined function. Regions are opaque to the VM: it only
+                  ;; passes the tokens back to these functions.
+                  (,(find-symbol "RT-MAKE-REGION" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-MAKE-REGION" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-CLOSE-REGION" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-CLOSE-REGION" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-REGION-ACTIVE-P" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-REGION-ACTIVE-P" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-REGION-ALLOC" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-REGION-ALLOC" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-REGION-REF-VALID-P" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-REGION-REF-VALID-P" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-REGION-DEREF" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-REGION-DEREF" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-REGION-CAPACITY" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-REGION-CAPACITY" "CL-CC/RUNTIME")))
+                  (,(find-symbol "RT-REGION-USED" "CL-CC/RUNTIME")
+                   . ,(fdefinition (find-symbol "RT-REGION-USED" "CL-CC/RUNTIME")))
                   (%register-documentation . ,#'%register-documentation)
                   (%get-documentation . ,#'%get-documentation)))
   (vm-register-host-bridge (car entry) (cdr entry)))

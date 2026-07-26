@@ -155,7 +155,20 @@
           (result (make-hash-table :test #'equal)))
       (dolist (inst instructions)
         (when (typep inst '(or vm-closure vm-func-ref))
-          (setf (gethash (vm-label-name inst) label-to-closure) inst)))
+          (let* ((label (vm-label-name inst))
+                 (existing (gethash label label-to-closure)))
+            ;; Keep the reference that carries the parameter list. It is also the
+            ;; one carrying the capture list and lambda-list metadata that
+            ;; OPT-INLINE-ELIGIBLE-P reads off :CLOSURE. Taking the last
+            ;; reference instead let a bare VM-FUNC-REF naming the same label
+            ;; overwrite the VM-CLOSURE, so the function looked parameterless:
+            ;; its own parameters then read as global registers and
+            ;; OPT-BODY-HAS-GLOBAL-REFS-P rejected it, silently disabling
+            ;; inlining for every function referenced that way.
+            (when (or (null existing)
+                      (and (vm-closure-params inst)
+                           (null (vm-closure-params existing))))
+              (setf (gethash label label-to-closure) inst)))))
       (maphash (lambda (lbl params)
                  (let ((body    (gethash lbl label-to-body))
                        (closure (gethash lbl label-to-closure)))
