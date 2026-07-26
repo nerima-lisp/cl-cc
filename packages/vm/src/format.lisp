@@ -258,9 +258,16 @@
     ;; Use CL's read-from-string to get both the value and the end position (FR-617)
     (multiple-value-bind (value end-pos)
         (if (stringp str)
+            ;; CL:*READTABLE*, not *READTABLE*: this package shadows the symbol
+            ;; (see the :SHADOW list in facade-package-defpackage.lisp), so
+            ;; binding the unqualified name bound CL-CC/VM::*READTABLE* and left
+            ;; CL:READ-FROM-STRING reading under the host default. The readtable
+            ;; %VM-HOST-READTABLE-FOR-STATE builds — carrying the guest's
+            ;; READTABLE-CASE — was constructed and then ignored, so (setf
+            ;; (readtable-case *readtable*) :downcase) had no effect on READ.
             (let ((*read-eval* (%vm-read-eval-enabled-p state))
-                  (*readtable* (or (%vm-host-readtable-for-state state)
-                                   *readtable*)))
+                  (cl:*readtable* (or (%vm-host-readtable-for-state state)
+                                      cl:*readtable*)))
               (cl:read-from-string str nil nil))
             (values nil 0))
       (vm-reg-set state (vm-dst inst) value)
@@ -281,9 +288,11 @@
                      (unless (eq read +eof-value+) read))
                    (read-line stream nil nil)))
          (value (when line
+                  ;; CL:*READTABLE* — see VM-READ-FROM-STRING-INST above; the
+                  ;; unqualified symbol is shadowed by this package.
                   (let ((*read-eval* (%vm-read-eval-enabled-p state))
-                        (*readtable* (or (%vm-host-readtable-for-state state)
-                                         *readtable*)))
+                        (cl:*readtable* (or (%vm-host-readtable-for-state state)
+                                            cl:*readtable*)))
                     (if *vm-parse-forms-hook*
                         (first (funcall *vm-parse-forms-hook* line))
                         (cl:read-from-string line nil nil))))))

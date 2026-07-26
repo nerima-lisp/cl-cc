@@ -177,31 +177,46 @@
                              (setf (readtable-case rt) :downcase)
                              (readtable-case rt))"
                           :stdlib t))
+  ;; Restore the case before returning: RUN-STRING calls share one global
+  ;; readtable object, and a dynamic (let ((*readtable* ...)) ...) does not reach
+  ;; the reader — %VM-HOST-READTABLE-FOR-STATE resolves *READTABLE* from the VM
+  ;; global store, not from the binding stack. Leaving :DOWNCASE set made the
+  ;; next assertion's source lex as "unknown dispatch character #!".
   (assert-string= "abc"
                  (run-string "(progn
                                 (setf (readtable-case *readtable*) :downcase)
-                                (symbol-name (read-from-string \"ABC\")))"
+                                (let ((name (symbol-name (read-from-string \"ABC\"))))
+                                  (setf (readtable-case *readtable*) :upcase)
+                                  name))"
                              :stdlib t))
-  (assert-equal '(t t)
+  ;; The character literals need a doubled backslash: these are Lisp strings, so
+  ;; "#\\!" is what puts #\! into the compiled source. Written singly the string
+  ;; reader eats the backslash and cl-cc's lexer receives "#!", which is not a
+  ;; dispatch character and aborts the whole assertion.
+  ;; (1 t), not (t t): FUNCTIONP is a type predicate, and those answer the VM's
+  ;; numeric boolean — see the docstring of the VECTORP case in
+  ;; compiler-tests-stdlib-io.lisp. NON-TERMINATING-P comes straight from
+  ;; GET-MACRO-CHARACTER's second value and is a real T.
+  (assert-equal '(1 t)
                 (run-string "(let ((rt (copy-readtable)))
-                               (set-macro-character #\! (lambda (stream char)
+                               (set-macro-character #\\! (lambda (stream char)
                                                           (declare (ignore stream char))
                                                           :ok)
                                                     t rt)
-                               (set-syntax-from-char #\? #\! rt rt)
+                               (set-syntax-from-char #\\? #\\! rt rt)
                                (multiple-value-bind (fn non-terminating-p)
-                                   (get-macro-character #\? rt)
+                                   (get-macro-character #\\? rt)
                                  (list (functionp fn) non-terminating-p)))"
                             :stdlib t))
   (assert-true
    (run-string "(let ((rt (copy-readtable)))
-                  (make-dispatch-macro-character #\# nil rt)
-                  (set-dispatch-macro-character #\# #\q
+                  (make-dispatch-macro-character #\\# nil rt)
+                  (set-dispatch-macro-character #\\# #\\q
                                                 (lambda (stream char arg)
                                                   (declare (ignore stream char arg))
                                                   :q)
                                                 rt)
-                  (functionp (get-dispatch-macro-character #\# #\q rt)))"
+                  (functionp (get-dispatch-macro-character #\\# #\\q rt)))"
                :stdlib t)))
 
 ;;; ─── FR-641: union/intersection/set-difference with :test ────────────────────
