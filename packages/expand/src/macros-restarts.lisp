@@ -7,6 +7,18 @@
 ;; Handlers are called in the dynamic context of the signaler (no stack unwind).
 ;; If a handler returns normally it "declines" and the next handler is tried.
 ;; Handlers can transfer control via invoke-restart, throw, or return-from.
+(defun %condition-handlers-symbol ()
+  "Return the symbol HANDLER-BIND and SIGNAL should name the handler list with.
+
+The variable is defvar\'d by the stdlib, whose source the guest reader reads into
+:CL-CC, and pre-seeded in *VM-INITIAL-GLOBALS* — while a bare
+*%CONDITION-HANDLERS* written in this file is CL-CC/EXPAND::*%CONDITION-HANDLERS*.
+Three different symbols, so HANDLER-BIND\'s PROGV wrote one binding and guest code
+read another: the list always looked empty and no handler ever ran, for SIGNAL as
+well as for ERROR. Emit the guest-visible symbol."
+  (or (find-symbol "*%CONDITION-HANDLERS*" :cl-cc)
+      '*%condition-handlers*))
+
 (register-macro 'handler-bind
   (lambda (form env)
     (declare (ignore env))
@@ -15,11 +27,12 @@
       (if (null bindings)
           `(progn ,@body)
           (let ((new-handlers-var (gensym "HANDLERS"))
+                (handlers-sym (%condition-handlers-symbol))
                 (entries (mapcar (lambda (b)
                                   `(list ',(first b) ,(second b)))
                                 bindings)))
-            `(let ((,new-handlers-var (append (list ,@entries) *%condition-handlers*)))
-               (progv '(*%condition-handlers*) (list ,new-handlers-var)
+            `(let ((,new-handlers-var (append (list ,@entries) ,handlers-sym)))
+               (progv '(,handlers-sym) (list ,new-handlers-var)
                  ,@body)))))))
 
 ;; SIGNAL (FR-201) — walk handler-bind registry without unwinding.
@@ -32,10 +45,17 @@
         (fn-var (gensym "FN"))
         (kind-var (gensym "KIND")))
     `(let ((,cond-var ,condition))
-        (dolist (,entry-var *%condition-handlers*)
+        (dolist (,entry-var ,(%condition-handlers-symbol))
           (let ((,type-var (first ,entry-var))
                 (,fn-var (second ,entry-var)))
             (when (or (typep ,cond-var ,type-var)
+                      ;; A VM-signalled string condition matches the supertypes,
+                      ;; exactly as VM-ERROR-TYPE-MATCHES-P treats it on the
+                      ;; unwinding path. Without this (signal "e") found no
+                      ;; handler even with one bound for ERROR.
+                      (and (stringp ,cond-var)
+                           (member ,type-var
+                                   (list 'error 'condition 'serious-condition t)))
                       (and (consp ,cond-var)
                            (let ((,kind-var (first ,cond-var)))
                              (or (eq ,kind-var ,type-var)

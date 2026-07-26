@@ -443,11 +443,45 @@ range is the inner one and must win."
                        (<= established-pc end))
               (return t))))))))
 
+(defun %vm-run-handler-bind-handlers (state error-value)
+  "Offer ERROR-VALUE to the guest's HANDLER-BIND handlers before unwinding.
+
+HANDLER-BIND pushes (type function) entries onto the guest special
+*%CONDITION-HANDLERS*, and only the SIGNAL macro walked that list — so a
+HANDLER-BIND handler never ran for an ERROR, which is most of what ANSI uses
+HANDLER-BIND for, and is why ASSERT's STORE-VALUE protocol could not work: the
+handler that calls STORE-VALUE was never entered.
+
+A handler that returns declines and we fall through to the usual dispatch; one
+that transfers control (INVOKE-RESTART, THROW, RETURN-FROM) never comes back. The
+list is read by symbol *name*: it is bound under a :CL-CC symbol while this code
+names it from :CL-CC/VM."
+  (let ((handlers nil))
+    ;; Several same-named symbols can be present — the pre-seeded
+    ;; *VM-INITIAL-GLOBALS* entry, the stdlib DEFVAR, and whichever one PROGV
+    ;; actually bound — and only one of them holds the live list. Take the first
+    ;; non-empty one rather than the first match, which is hash-order dependent.
+    (maphash (lambda (key value)
+               (when (and (null handlers)
+                          (symbolp key)
+                          (string= (symbol-name key) "*%CONDITION-HANDLERS*")
+                          (consp value))
+                 (setf handlers value)))
+             (vm-global-vars state))
+    (when (listp handlers)
+      (dolist (entry handlers)
+        (when (and (consp entry) (consp (cdr entry)))
+          (let ((type (first entry))
+                (function (second entry)))
+            (when (and function (vm-error-type-matches-p error-value type))
+              (%vm-call-closure-sync function state (list error-value)))))))))
+
 (defun %vm-signal-condition (state labels pc error-value)
   "Route ERROR-VALUE through the zero-cost exception table, then the legacy
 handler stack.  Returns EXECUTE-INSTRUCTION values transferring control to the
 matching guest handler.  When no handler matches, prints a VM backtrace and
 raises, exactly as the VM-SIGNAL-ERROR opcode has always done."
+  (%vm-run-handler-bind-handlers state error-value)
   (multiple-value-bind (next-pc handled-p value)
       (if (%vm-stack-handler-nested-inside-table-p state labels pc error-value)
           (values nil nil nil)

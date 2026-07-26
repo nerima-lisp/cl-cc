@@ -227,6 +227,32 @@
   (expected form)
   (assert-= expected (run-string form :stdlib t)))
 
+(deftest compile-handler-bind-handler-runs-for-signal
+  "A handler-bind handler runs when the body signals.
+
+HANDLER-BIND pushes its handlers onto *%CONDITION-HANDLERS*, but the macro named
+that variable with a :CL-CC/EXPAND symbol while the stdlib DEFVARs a :CL-CC one
+and *VM-INITIAL-GLOBALS* seeds a :CL-CC/VM one — three distinct symbols, so PROGV
+bound one binding and every reader looked at another. The list always read empty
+and no handler ever ran."
+  (assert-= 1 (run-string
+               "(let ((n 0)) (handler-bind ((error (lambda (c) (setq n 1))))
+                               (signal \"e\"))
+                  n)"
+               :stdlib t)))
+
+(deftest compile-handler-bind-handler-runs-for-error
+  "A handler-bind handler runs when the body signals with ERROR, not just SIGNAL.
+
+Only the SIGNAL macro walked *%CONDITION-HANDLERS*; ERROR lowers to
+VM-SIGNAL-ERROR, which consults the exception table and the handler stack. ANSI
+uses HANDLER-BIND mostly with ERROR, so the whole facility was inert there."
+  (assert-= 1 (run-string
+               "(let ((n 0)) (handler-bind ((error (lambda (c) (setq n 1))))
+                               (ignore-errors (error \"e\")))
+                  n)"
+               :stdlib t)))
+
 (deftest compile-cerror-is-caught-by-handler-case
   "A continuable error reaches an enclosing handler-case.
 
