@@ -59,6 +59,24 @@
 
 ;;; ── EQL Specializer Tests ──────────────────────────────────────────────────
 
+(deftest clos-eql-specializer-value-shared-with-method-body
+  "An EQL specializer still matches when the method body returns the same literal.
+
+The literal constant pool shared one register between the specializer value and
+the body's, and its validity token is a static count of barriers — so a literal
+pooled inside a method body and one at a call site could carry the same count
+while sitting in unrelated control-flow regions. Dispatch then read a register
+the body only writes when it runs, and found no applicable method."
+  (assert-= 42 (run-string "(defgeneric coin-same (x))
+                            (defmethod coin-same ((x (eql 42))) 42)
+                            (coin-same 42)"
+                           :stdlib t))
+  ;; A different body value never aliased, and must keep working.
+  (assert-= 7 (run-string "(defgeneric coin-diff (x))
+                           (defmethod coin-diff ((x (eql 42))) 7)
+                           (coin-diff 42)"
+                          :stdlib t)))
+
 (deftest-each clos-eql-specializer
   "EQL specializers dispatch on specific values, fall back to class, and match symbols."
   :cases (("penny"        1   "(defgeneric coin-value (c))

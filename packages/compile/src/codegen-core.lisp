@@ -57,11 +57,26 @@
         (if (stringp value) (copy-seq value) value)))
 
 (defun %literal-pool-call-barrier-p (inst)
-  "Return T when INST may clobber caller-visible temporary registers."
+  "Return T when INST ends the region a pooled literal's register is valid in.
+
+Calls clobber caller-visible temporaries, and labels and closure headers end
+straight-line control flow. The latter matter because the pool's validity token
+is a *static* count of barriers emitted so far: without them, a literal pooled
+inside a method body and one at a call site could carry the same count while
+sitting in unrelated control-flow regions, so the call site would reuse a
+register the body only ever writes when it runs. That is how
+
+  (defmethod h ((x (eql 42))) 42) (h 42)
+
+dispatched on a stale register and found no applicable method, while the same
+method with any other body value dispatched correctly."
   (or (typep inst 'vm-call)
       (typep inst 'vm-tail-call)
       (typep inst 'vm-generic-call)
-      (typep inst 'vm-apply)))
+      (typep inst 'vm-apply)
+      (typep inst 'vm-label)
+      (typep inst 'vm-closure)
+      (typep inst 'vm-func-ref)))
 
 (defun %literal-pool-barrier-count (ctx)
   "Return the number of call-like barriers emitted in CTX so far."
