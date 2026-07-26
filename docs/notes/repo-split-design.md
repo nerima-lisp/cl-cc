@@ -199,7 +199,15 @@ vm が安定インタフェース（IR/MIR/命令構築子/条件・アトミッ
 
 ## 5. インタフェース設計（脱結合の要点）
 
-### 5-1. バックエンド登録プロトコル（フェーズ B の前提作業）
+### 5-1. バックエンド登録プロトコル（フェーズ B の前提作業）— **完了 2026-07-27**
+
+> 実装済み: `cl-cc/backend-protocol`（`packages/bootstrap/src/backend-protocol.lisp`）。
+> php は `packages/php/src/backend.lisp`、js は `packages/javascript/src/backend.lisp`
+> で自己登録する。js の双方向結合（`*js-apply-fn*` 等への VM クロージャ注入）は
+> `vm-integration` 構造体で反転済み — pipeline が capability を渡し、policy は
+> backend 側に残る。登録シンボル集合の同一性はテストで固定し、加えて
+> Array.map の compiled-JS コールバック / メソッド内 `this` / ネスト時の
+> レシーバ復元を e2e で確認済み。以下は当時の記述。
 
 **現状の実結合**（`packages/pipeline/src/pipeline-runtime-bridges.lisp`, 173 行）:
 
@@ -368,9 +376,45 @@ cl-cc-php = { url = "github:nerima-lisp/cl-cc-php"; flake = false; };
 ## 9. 次アクション（この設計を承認後）
 
 - [x] Terraform 仮実装（`private-terraform` の `repos_nerima_lisp_cl_cc.tf`, 5 repo）
-- [ ] `cl-cc-type` 抽出 PoC（最もクリーン → 配管の実証に最適）
-- [ ] §5-1 登録プロトコルの詳細設計 + `pipeline-runtime-bridges.lisp` の棚卸し
+- [x] 葉パッケージ 4 個の外部化（ast / type / binary / runtime）— `nix flake check` 緑
+- [x] §5-1 登録プロトコル（php / javascript 両方）— `cl-cc/backend-protocol`
 - [ ] vm 公開シンボルの棚卸しと `::` 禁止 lint の PoC（フェーズ C の前提）
+- [ ] **§6 手順 4（php/js の repo 移設）の意味を決める** — 下記 §10 参照
+
+## 10. 実測で判明した制約（2026-07-27 追記）
+
+### 10-1. 「input として宣言済み」は「実際にビルドされている」ではない
+
+ast / type は `flake.nix` の input として宣言され `nix/asdf-systems.nix` で
+注入されていたにもかかわらず、**一度もコンパイルされていなかった**。
+`cl-cc.asd` の `ensure-system-asd` は `find-system` が *外した時だけ* per-package
+`.asd` を読むが、cl-cc のソースツリーは注入された derivation より先に走査される。
+結果、Nix でもローカルでも in-tree のコピーが勝ち続け、両者は数か月ドリフトした。
+
+検出は配管を読むのではなく **片方でしか通らないテストを走らせる**こと。
+`infer-with-constraints` は `packages/type/src` にしか無いのに CI では緑だった。
+
+4 個すべてでこの手順を実行済み: input + derivation + `externalCcSystems` 追加 →
+`packages/X/{src,*.asd}` 削除 → `ensure-system-asd` の行を削除 →
+`nix flake check` で出たものを潰す。ハードコードされた `packages/X/src/...`
+文字列に注意（optimizer roadmap と `nix/checks.nix` にあった）。
+
+### 10-2. php/js は葉と同じ手順では切り出せない（依存が逆）
+
+`cl-cc-php` / `cl-cc-javascript` は **`cl-cc` を flake input に取っている**。
+ASDF 上も `:cl-cc-vm` `:cl-cc-parse`（＝核）に依存する。したがって cl-cc 側が
+これらを input に取ると**循環**になり、flake では表現できない。
+
+§4 が「プラグイン repo」と書いていたのはこの意味であり、**「php/js の外部化」は
+cl-cc がこれらを自分のビルドから外すこと**を意味する — `:language :php` /
+`:language :javascript` を pipeline から落とし、対応するテスト群を各 repo へ
+移すということ。これは配管作業ではなく「cl-cc とは何か」を決める製品判断であり、
+`cl-cc.asd` の system description が両バックエンドを明示している以上、
+設計の承認とは別に判断が要る。
+
+§5-1（この判断の前提として設計が挙げていた作業）は完了しており、
+`cl-cc/pipeline` はもう両バックエンドの内部シンボルを一切名指ししていない。
+判断が「外す」に倒れた時点で、機械的な移設として実行できる状態にある。
 
 > 参考: 会話中に検討した `cl-cc-runtime-concurrent`（並行ランタイム26ファイル/
 > ~3.1k loc）は「compiler と target runtime の分離」という別軸の候補。runtime
