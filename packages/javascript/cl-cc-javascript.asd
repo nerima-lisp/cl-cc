@@ -128,4 +128,5 @@
    (:file "runtime-method-resolver")
    (:file "runtime-method-resolver-core")
    (:file "runtime-method-resolver-tables")
-   (:file "runtime-method-resolver-dispatch")))
+   (:file "runtime-method-resolver-dispatch")
+   (:file "backend")))

@@ -29,7 +29,15 @@
            #:register-backend
            #:registered-backend
            #:backend-bridge-symbols
-           #:backend-global-symbols))
+           #:backend-global-symbols
+           #:vm-integration #:make-vm-integration #:vm-integration-p
+           #:vm-integration-closure-p
+           #:vm-integration-call-closure
+           #:vm-integration-global-bound-p
+           #:vm-integration-global-value
+           #:vm-integration-set-global
+           #:vm-integration-remove-global
+           #:install-backend-vm-integration))
 
 (in-package :cl-cc/backend-protocol)
 
@@ -66,3 +74,43 @@ knowing its own naming convention is the one thing it is certain to know.")
 Only backends whose prelude reads host specials through VM-GET-GLOBAL need
 this; the default is none.")
   (:method (backend) (declare (ignore backend)) '()))
+
+;;; ── VM integration ──────────────────────────────────────────────────────────
+;;;
+;;; Bridging runs both ways for a backend whose host runtime can be handed a
+;;; compiled closure -- JavaScript's Array.map takes a callback that may be
+;;; compiled JS, so the host runtime has to be able to re-enter the VM. The
+;;; pipeline used to install that by SETF-ing cl-cc/javascript's special
+;;; variables directly, which is the inbound half of the same coupling
+;;; BACKEND-BRIDGE-SYMBOLS removes on the outbound side.
+;;;
+;;; VM-INTEGRATION carries the VM primitives a backend might need, with no VM
+;;; types in its signature -- just closures. The split is deliberate: the
+;;; pipeline supplies capability (how to recognise and call a VM closure, how to
+;;; read and write a VM global), and the backend supplies policy (what its
+;;; callable values are, which of its specials hold the receiver, how a nested
+;;; call restores the previous one). Neither needs the other's internals.
+
+(defstruct (vm-integration (:conc-name vm-integration-))
+  "VM capabilities offered to a backend. Every slot is a closure; a backend that
+needs none of them simply does not implement INSTALL-BACKEND-VM-INTEGRATION.
+
+Each closure reads the current VM state when called rather than closing over one,
+so an integration installed once stays correct across VM invocations."
+  (closure-p       (constantly nil) :type function)
+  (call-closure    (constantly nil) :type function)
+  (global-bound-p  (constantly nil) :type function)
+  (global-value    (constantly nil) :type function)
+  (set-global      (constantly nil) :type function)
+  (remove-global   (constantly nil) :type function))
+
+(defgeneric install-backend-vm-integration (backend integration)
+  (:documentation
+   "Give BACKEND the VM capabilities in INTEGRATION.
+
+Called once, after the backend's host runtime is loaded and before compiled code
+runs. Backends whose runtime never calls back into the VM need no method; the
+default does nothing.")
+  (:method (backend integration)
+    (declare (ignore backend integration))
+    nil))

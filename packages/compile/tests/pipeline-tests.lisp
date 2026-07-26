@@ -287,12 +287,12 @@
 
 ;;; ─── Backend registration protocol (§5-1 of the repo-split design) ──────────
 
-(defun %php-package-scan-bridge-symbols ()
+(defun %package-prefixed-function-symbols (package-name prefix)
   "The package scan the pipeline used to perform, kept as the reference set.
 
-Written out rather than called, deliberately: it is the *old* behaviour, and a
-test that asserts the new path reproduces it has to hold the old one still."
-  (let ((pkg (find-package :cl-cc/php))
+Written out here rather than called: it is the *old* behaviour, and a test
+asserting the new path reproduces it has to still hold the old one."
+  (let ((pkg (find-package package-name))
         (acc '()))
     (when pkg
       (do-symbols (sym pkg)
@@ -300,26 +300,61 @@ test that asserts the new path reproduces it has to hold the old one still."
                    (fboundp sym)
                    (not (macro-function sym))
                    (not (special-operator-p sym))
-                   (let ((name (symbol-name sym)))
-                     (and (>= (length name) 5) (string= "%PHP-" name :end2 5))))
+                   (let ((name (symbol-name sym))
+                         (n (length prefix)))
+                     (and (>= (length name) n) (string= prefix name :end2 n))))
           (push sym acc))))
     (sort (remove-duplicates acc) #'string< :key #'symbol-name)))
 
-(deftest backend-protocol-registers-php-under-its-language
-  "The PHP backend registers itself, so the pipeline never names cl-cc/php."
-  (assert-true (cl-cc/backend-protocol:registered-backend :php)))
+(defun %sorted-backend-bridge-symbols (language)
+  (sort (remove-duplicates
+         (cl-cc/backend-protocol:backend-bridge-symbols
+          (cl-cc/backend-protocol:registered-backend language)))
+        #'string< :key #'symbol-name))
 
-(deftest backend-protocol-bridge-set-matches-the-old-package-scan
-  "Moving the %PHP-* scan into the backend changes which symbols get bridged: none.
+(deftest-each backend-protocol-registers-each-language
+  "Both backends register themselves, so the pipeline never names their packages."
+  :cases (("php" :php) ("javascript" :javascript))
+  (language)
+  (assert-true (cl-cc/backend-protocol:registered-backend language)))
 
-The scan moved from the pipeline into cl-cc/php so the orchestrator would stop
-depending on a backend's package name and naming convention -- the coupling that
-blocked moving php to its own repository. Same predicate, same package,
-evaluated from the other side of the boundary, so the bridged set has to be
-identical or the move was not behaviour-preserving."
-  (let ((protocol (sort (remove-duplicates
-                         (cl-cc/pipeline::%register-backend-protocol-bridges))
-                        #'string< :key #'symbol-name))
-        (scan (%php-package-scan-bridge-symbols)))
+(deftest-each backend-protocol-bridge-sets-match-the-old-package-scans
+  "Moving the %PHP-*/%JS-* scans into the backends changes which symbols get bridged: none.
+
+Each scan moved out of the pipeline and into the package that owns the naming
+convention, so the orchestrator would stop depending on a backend's package name
+-- the coupling that blocked moving either to its own repository. Same
+predicate, same package, evaluated from the other side of the boundary, so each
+bridged set has to be identical or the move was not behaviour-preserving."
+  :cases (("php" :php :cl-cc/php "%PHP-")
+          ("javascript" :javascript :cl-cc/javascript "%JS-"))
+  (language package-name prefix)
+  (let ((scan (%package-prefixed-function-symbols package-name prefix))
+        (protocol (%sorted-backend-bridge-symbols language)))
+    (assert-true (plusp (length scan)))
+    (assert-equal scan protocol)))
+
+(deftest backend-protocol-js-global-seed-set-matches-the-old-scan
+  "The *JS-*/%JS-* specials seeded into VM globals are the same set as before.
+
+Miss one and every JS program dies at run time on an unbound global, because the
+prelude binds Symbol, Infinity and the error classes to the values of these
+specials and each reference compiles to a VM-GET-GLOBAL."
+  (let ((scan (let ((pkg (find-package :cl-cc/javascript))
+                    (acc '()))
+                (when pkg
+                  (do-symbols (sym pkg)
+                    (when (and (eq (symbol-package sym) pkg)
+                               (boundp sym)
+                               (let ((name (symbol-name sym)))
+                                 (and (>= (length name) 4)
+                                      (or (string= "*JS-" name :end2 4)
+                                          (string= "%JS-" name :end2 4)))))
+                      (push sym acc))))
+                (sort (remove-duplicates acc) #'string< :key #'symbol-name)))
+        (protocol (sort (remove-duplicates
+                         (cl-cc/backend-protocol:backend-global-symbols
+                          (cl-cc/backend-protocol:registered-backend :javascript)))
+                        #'string< :key #'symbol-name)))
     (assert-true (plusp (length scan)))
     (assert-equal scan protocol)))

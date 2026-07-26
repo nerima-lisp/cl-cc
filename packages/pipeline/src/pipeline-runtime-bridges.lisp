@@ -31,114 +31,63 @@ the work is now the backend protocol's, and this registers whatever backends
 have registered themselves, PHP among them."
   (%register-backend-protocol-bridges))
 
-(defvar *js-runtime-bridge-symbols-cache* nil)
-(defvar *js-runtime-global-symbols-cache* nil)
+(defun %backend-vm-integration ()
+  "Build the VM capabilities handed to every registered backend.
 
-(defun %js-runtime-bridge-symbols ()
-  (or *js-runtime-bridge-symbols-cache*
-      (let ((pkg (find-package :cl-cc/javascript)))
-        (when pkg
-          (setf *js-runtime-bridge-symbols-cache*
-                (let (symbols)
-                  (do-symbols (sym pkg)
-                    (when (and (eq (symbol-package sym) pkg)
-                               (fboundp sym)
-                               (not (macro-function sym))
-                               (not (special-operator-p sym))
-                               (let ((name (symbol-name sym)))
-                                 (and (>= (length name) 4)
-                                      (string= "%JS-" name :end2 4))))
-                      (push sym symbols)))
-                  (nreverse symbols)))))))
+Every closure reads CL-CC/VM:*VM-STATE* when called rather than closing over
+one, so a single install stays correct across VM invocations -- the JS `this'
+binding in particular runs inside whichever state is current at call time."
+  (flet ((globals ()
+           (let ((state cl-cc/vm:*vm-state*))
+             (and state (cl-cc/vm:vm-global-vars state)))))
+    (cl-cc/backend-protocol:make-vm-integration
+     :closure-p (lambda (value) (cl-cc/vm::%vm-closure-object-p value))
+     :call-closure (lambda (closure args)
+                     (cl-cc/vm::%vm-call-closure-sync closure cl-cc/vm:*vm-state* args))
+     :global-bound-p (lambda (symbol)
+                       (let ((gv (globals)))
+                         (and gv (nth-value 1 (gethash symbol gv)))))
+     :global-value (lambda (symbol)
+                     (let ((gv (globals)))
+                       (and gv (gethash symbol gv))))
+     :set-global (lambda (symbol value)
+                   (let ((gv (globals)))
+                     (when gv (setf (gethash symbol gv) value))))
+     :remove-global (lambda (symbol)
+                      (let ((gv (globals)))
+                        (when gv (remhash symbol gv)))))))
 
-(defun %js-runtime-global-symbols ()
-  (or *js-runtime-global-symbols-cache*
-      (let ((pkg (find-package :cl-cc/javascript)))
-        (when pkg
-          (setf *js-runtime-global-symbols-cache*
-                (let (symbols)
-                  (do-symbols (sym pkg)
-                    (when (and (eq (symbol-package sym) pkg)
-                               (boundp sym)
-                               (let ((name (symbol-name sym)))
-                                 (and (>= (length name) 4)
-                                      ;; *JS-* specials (Symbol/Infinity/error classes/...) and
-                                      ;; %JS-* special vars like %js-this (so `this' at top
-                                      ;; level resolves to undefined rather than erroring; a
-                                      ;; method call overrides it with the receiver).
-                                      (or (string= "*JS-" name :end2 4)
-                                          (string= "%JS-" name :end2 4)))))
-                      (push sym symbols)))
-                  (nreverse symbols)))))))
+(defun %install-backend-vm-integrations ()
+  "Offer the VM capabilities to every registered backend.
+
+Backends whose host runtime never re-enters the VM inherit the protocol's no-op
+method and are unaffected; JavaScript's runtime does, because a host array
+method can be handed a compiled-JS callback."
+  (let ((integration (%backend-vm-integration)))
+    (dolist (entry cl-cc/backend-protocol:*registered-backends*)
+      (cl-cc/backend-protocol:install-backend-vm-integration (cdr entry) integration))))
 
 (defun %register-js-runtime-bridges ()
-  "Register JavaScript runtime helpers as VM host bridge functions.
+  "Register JavaScript runtime helpers and install its VM integration.
 
-The JS frontend lowers operators, member access, and builtins to calls on
-cl-cc/javascript::%js-* helpers (%js-get-prop, %js-make-array, %js-console-log,
-%js-make-console, ...). Register every fbound, non-macro %JS-* function whose
-home package is :cl-cc/javascript so compiled JS can call them through the VM
-host bridge - the same package-derived whitelist used for PHP."
-  (when (find-package :cl-cc/javascript)
-    (dolist (sym (%js-runtime-bridge-symbols))
-      (when (and (fboundp sym)
-                 (not (macro-function sym))
-                 (not (special-operator-p sym)))
-        (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))))
-      ;; Route JS callbacks (Array.map/filter/reduce/sort) back through the VM
-      ;; when the callback is a compiled-JS closure; host functions still go via
-      ;; APPLY. Host array methods call (%js-funcall fn ...) -> *js-apply-fn*; this
-      ;; is the controlled inverse bridge (host runtime -> VM closure) using the
-      ;; *vm-state* dynamically bound around VM execution.
-      (setf cl-cc/javascript::*js-apply-fn*
-            (labels ((invoke (fn args)
-                       (cond
-                         ((cl-cc/vm::%vm-closure-object-p fn)
-                          (cl-cc/vm::%vm-call-closure-sync fn cl-cc/vm:*vm-state* args))
-                         ;; A callable JS object (e.g. `super', Intl/Symbol stubs)
-                         ;; carries its implementation under __call__.
-                         ((and (hash-table-p fn) (gethash "__call__" fn))
-                          (invoke (gethash "__call__" fn) args))
-                         (t (apply fn args)))))
-              #'invoke))
-      ;; Teach prototype method lookup to recognize a compiled-JS method (a
-      ;; vm-closure) as callable, so obj.method resolves to a bound method.
-      (setf cl-cc/javascript::*js-callable-p*
-            (lambda (x) (or (functionp x) (cl-cc/vm::%vm-closure-object-p x))))
-      ;; Bind `this' for a method/constructor call in BOTH the host special and
-      ;; the VM-global %js-this: a compiled-JS method body reads `this' via
-      ;; vm-get-global, so the host dynamic binding alone is invisible to it.
-      ;; Save/restore around the call so nested method calls (a.m() calling b.n())
-      ;; restore the outer receiver.
-      (setf cl-cc/javascript::*js-apply-with-this-fn*
-            (lambda (this fn args)
-              (let ((state cl-cc/vm:*vm-state*))
-                (if state
-                    (let* ((gv   (cl-cc/vm:vm-global-vars state))
-                           (had  (nth-value 1 (gethash 'cl-cc/javascript::%js-this gv)))
-                           (prev (gethash 'cl-cc/javascript::%js-this gv)))
-                      (setf (gethash 'cl-cc/javascript::%js-this gv) this)
-                      (unwind-protect
-                           (let ((cl-cc/javascript::%js-this this))
-                             (funcall cl-cc/javascript::*js-apply-fn* fn args))
-                        (if had
-                            (setf (gethash 'cl-cc/javascript::%js-this gv) prev)
-                            (remhash 'cl-cc/javascript::%js-this gv))))
-                    (let ((cl-cc/javascript::%js-this this))
-                      (funcall cl-cc/javascript::*js-apply-fn* fn args))))))))
+Both halves used to live here and both named cl-cc/javascript internals: the
+outbound scan for %JS-* helpers, and the inbound SETF of that package's
+*JS-APPLY-FN* / *JS-CALLABLE-P* / *JS-APPLY-WITH-THIS-FN*. The backend answers
+for both now; what stays is the part that needs the VM."
+  (%register-backend-protocol-bridges)
+  (%install-backend-vm-integrations))
 
 (defun seed-js-runtime-globals (state)
-  "Seed JavaScript runtime special variables into STATE's VM globals.
+  "Seed backend runtime specials into STATE's VM globals.
 
-The JS prelude (js-program-forms) binds standard globals to the VALUES of host
-specials - e.g. Symbol to *js-symbol-global*, Infinity to *js-inf-float*, the
-error classes to *js-error-class* etc. Each such reference compiles to a
-vm-get-global, so without seeding EVERY JS program fails at runtime with
-'Unbound global variable: *JS-...*'. Mirror the package-derived function-bridge
-whitelist: copy every bound *JS-...* special in :cl-cc/javascript into STATE's
-globals so the prelude resolves."
-  (when (and (find-package :cl-cc/javascript) state)
-    (dolist (sym (%js-runtime-global-symbols))
-      (when (boundp sym)
-        (setf (gethash sym (cl-cc/vm:vm-global-vars state))
-              (symbol-value sym))))))
+The JS prelude binds standard globals to the VALUES of host specials -- Symbol
+to *js-symbol-global*, Infinity to *js-inf-float*, the error classes and so on.
+Each such reference compiles to a VM-GET-GLOBAL, so without seeding every JS
+program fails at run time with an unbound global. Which specials those are is
+the backend's answer, through BACKEND-GLOBAL-SYMBOLS."
+  (when state
+    (dolist (entry cl-cc/backend-protocol:*registered-backends*)
+      (dolist (sym (cl-cc/backend-protocol:backend-global-symbols (cdr entry)))
+        (when (boundp sym)
+          (setf (gethash sym (cl-cc/vm:vm-global-vars state))
+                (symbol-value sym)))))))
