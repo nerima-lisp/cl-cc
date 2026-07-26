@@ -43,8 +43,8 @@
 (defun %opt-escape-value-regs-stored-by-inst (inst)
   "Return registers whose values are stored by INST."
   (cond
-    ((typep inst 'vm-set-global) (list (cl-cc/vm::vm-set-global-src inst)))
-    ((typep inst 'vm-slot-write) (list (cl-cc/vm::vm-slot-write-value-reg inst)))
+    ((typep inst 'vm-set-global) (list (cl-cc/vm:vm-set-global-src inst)))
+    ((typep inst 'vm-slot-write) (list (cl-cc/vm:vm-slot-write-value-reg inst)))
     ((typep inst 'vm-aset) (list (vm-val-reg inst)))
     ((typep inst 'vm-register-function) (opt-inst-read-regs inst))
     ((typep inst '(or vm-rplaca vm-rplacd)) (list (vm-val-reg inst)))
@@ -53,7 +53,7 @@
 (defun %opt-escape-container-reg (inst)
   "Return the heap container register written by INST, or NIL for global stores."
   (cond
-    ((typep inst 'vm-slot-write) (cl-cc/vm::vm-slot-write-obj-reg inst))
+    ((typep inst 'vm-slot-write) (cl-cc/vm:vm-slot-write-obj-reg inst))
     ((typep inst 'vm-aset) (vm-array-reg inst))
     ((typep inst '(or vm-rplaca vm-rplacd)) (vm-cons-reg inst))
     (t nil)))

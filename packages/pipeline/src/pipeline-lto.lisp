@@ -220,6 +220,6 @@ unknown labels are preserved."
     (multiple-value-bind (instructions graph)
         (lto-optimize-modules (list module))
       (declare (ignore graph))
-      (let ((new-program (cl-cc/vm::copy-vm-program program)))
+      (let ((new-program (cl-cc/vm:copy-vm-program program)))
         (setf (cl-cc/vm:vm-program-instructions new-program) instructions)
         new-program))))

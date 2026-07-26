@@ -4,7 +4,7 @@
 ;;; FR-203/FR-256/FR-327: Atomic and fence instruction emitters
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
-(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm::vm-atomic-cas) stream)
+(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm:vm-atomic-cas) stream)
   "Lower VM CAS to Wasm atomic.rmw.cmpxchg."
   (with-wasm-atomic-threads (inst)
     (let* ((reg-map (wasm-target-reg-map target))
@@ -15,13 +15,13 @@
                              (wasm-atomic-result-box-wat
                               (wasm-atomic-rmw-cmpxchg-wat
                                reg-map
-                               (cl-cc/vm::vm-acas-addr inst)
-                               (cl-cc/vm::vm-acas-expected inst)
-                               (cl-cc/vm::vm-acas-newval inst)
+                               (cl-cc/vm:vm-acas-addr inst)
+                               (cl-cc/vm:vm-acas-expected inst)
+                               (cl-cc/vm:vm-acas-newval inst)
                                :width width)
                               :width width))))))
 
-(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm::vm-atomic-load) stream)
+(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm:vm-atomic-load) stream)
   "Lower VM atomic load to i32/i64.atomic.load."
   (with-wasm-atomic-threads (inst)
     (let* ((reg-map (wasm-target-reg-map target))
@@ -31,11 +31,11 @@
               (reg-local-set reg-map (vm-dst inst)
                              (wasm-atomic-result-box-wat
                               (wasm-atomic-load-wat reg-map
-                                                    (cl-cc/vm::vm-aload-addr inst)
+                                                    (cl-cc/vm:vm-aload-addr inst)
                                                     :width width)
                               :width width))))))
 
-(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm::vm-atomic-store) stream)
+(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm:vm-atomic-store) stream)
   "Lower VM atomic store to i32/i64.atomic.store."
   (with-wasm-atomic-threads (inst)
     (let* ((reg-map (wasm-target-reg-map target))
@@ -43,11 +43,11 @@
       (format stream "~%    ;; FR-203 atomic store width=~D" width)
       (format stream "~%    ~A"
               (wasm-atomic-store-wat reg-map
-                                     (cl-cc/vm::vm-astore-addr inst)
-                                     (cl-cc/vm::vm-astore-val inst)
+                                     (cl-cc/vm:vm-astore-addr inst)
+                                     (cl-cc/vm:vm-astore-val inst)
                                      :width width)))))
 
-(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm::vm-atomic-incf) stream)
+(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm:vm-atomic-incf) stream)
   "Lower VM atomic increment/fetch-add to Wasm atomic.rmw.add."
   (with-wasm-atomic-threads (inst)
     (let* ((reg-map (wasm-target-reg-map target))
@@ -58,12 +58,12 @@
                              (wasm-atomic-result-box-wat
                               (wasm-atomic-rmw-add-wat
                                reg-map
-                               (cl-cc/vm::vm-aincf-addr inst)
-                               (cl-cc/vm::vm-aincf-delta inst)
+                               (cl-cc/vm:vm-aincf-addr inst)
+                               (cl-cc/vm:vm-aincf-delta inst)
                                :width width)
                               :width width))))))
 
-(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm::vm-atomic-swap) stream)
+(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm:vm-atomic-swap) stream)
   "Reject VM atomic swap until a true Wasm atomic.rmw.xchg lowering exists."
   (declare (ignore target stream))
   (wasm-unsupported-atomic-swap inst))
@@ -84,9 +84,9 @@
                classes)))
 
 (define-wasm-fence-emitters
-  cl-cc/vm::vm-memory-barrier
-  cl-cc/vm::vm-load-fence
-  cl-cc/vm::vm-store-fence)
+  cl-cc/vm:vm-memory-barrier
+  cl-cc/vm:vm-load-fence
+  cl-cc/vm:vm-store-fence)
 
 (eval-when (:load-toplevel :execute)
   ;; Optional future VM classes requested by the Wasm threads feature plan.  The

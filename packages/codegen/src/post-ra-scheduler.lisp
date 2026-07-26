@@ -125,7 +125,7 @@ dependency is known well enough for reordering."
           '(vm-label vm-jump vm-jump-zero vm-ret vm-halt
             vm-call vm-tail-call vm-apply vm-generic-call
             vm-slot-write vm-set-global vm-signal vm-signal-error
-            cl-cc/vm::vm-error-instruction cl-cc/vm::vm-cerror cl-cc/vm::vm-warn)
+            cl-cc/vm:vm-error-instruction cl-cc/vm:vm-cerror cl-cc/vm:vm-warn)
           :test #'eq))
 
 (defun %post-ra-scheduler-barrier-p (inst ra)

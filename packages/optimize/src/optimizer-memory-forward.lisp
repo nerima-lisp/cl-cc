@@ -16,11 +16,11 @@ single-block instruction streams so existing behavior stays intact."
          (%mps-flush-all state)
          (%mps-emit state inst))
         (vm-get-global
-         (let* ((key   (list :global (cl-cc/vm::vm-get-global-name inst)))
+         (let* ((key   (list :global (cl-cc/vm:vm-get-global-name inst)))
                 (store (%mps-pending-store state key))
-                (dst   (cl-cc/vm::vm-get-global-dst inst)))
+                (dst   (cl-cc/vm:vm-get-global-dst inst)))
            (if store
-               (progn (%mps-emit state (make-vm-move :dst dst :src (cl-cc/vm::vm-set-global-src store)))
+               (progn (%mps-emit state (make-vm-move :dst dst :src (cl-cc/vm:vm-set-global-src store)))
                       (when dst
                         (%mps-flush-dependent-on-reg state dst :exclude-key key)))
                (progn (when dst
@@ -28,13 +28,13 @@ single-block instruction streams so existing behavior stays intact."
                       (%mps-flush-one state key)
                       (%mps-emit state inst)))))
         (vm-slot-read
-         (let* ((key   (opt-slot-alias-key (cl-cc/vm::vm-slot-read-obj-reg inst)
-                                           (cl-cc/vm::vm-slot-read-slot-name inst)
+         (let* ((key   (opt-slot-alias-key (cl-cc/vm:vm-slot-read-obj-reg inst)
+                                           (cl-cc/vm:vm-slot-read-slot-name inst)
                                            alias-roots))
                 (store (%mps-pending-store state key))
-                (dst   (cl-cc/vm::vm-slot-read-dst inst)))
+                (dst   (cl-cc/vm:vm-slot-read-dst inst)))
            (if store
-               (progn (%mps-emit state (make-vm-move :dst dst :src (cl-cc/vm::vm-slot-write-value-reg store)))
+               (progn (%mps-emit state (make-vm-move :dst dst :src (cl-cc/vm:vm-slot-write-value-reg store)))
                       (when dst
                         (%mps-flush-dependent-on-reg state dst :exclude-key key)))
                (progn (when dst
@@ -42,10 +42,10 @@ single-block instruction streams so existing behavior stays intact."
                       (%mps-flush-one state key)
                       (%mps-emit state inst)))))
         (vm-set-global
-         (%mps-remember-store state (list :global (cl-cc/vm::vm-set-global-name inst)) inst))
+         (%mps-remember-store state (list :global (cl-cc/vm:vm-set-global-name inst)) inst))
         (vm-slot-write
-         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm::vm-slot-write-obj-reg inst)
-                                                         (cl-cc/vm::vm-slot-write-slot-name inst)
+         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm:vm-slot-write-obj-reg inst)
+                                                         (cl-cc/vm:vm-slot-write-slot-name inst)
                                                          alias-roots)
                               inst))
         (t
@@ -107,17 +107,17 @@ CFG-aware forwarding models globals and slot accesses keyed by alias roots."
   (typecase inst
     ((or vm-set-global vm-get-global)
      (list :global (typecase inst
-                     (vm-set-global (cl-cc/vm::vm-set-global-name inst))
-                     (vm-get-global (cl-cc/vm::vm-get-global-name inst)))))
+                     (vm-set-global (cl-cc/vm:vm-set-global-name inst))
+                     (vm-get-global (cl-cc/vm:vm-get-global-name inst)))))
     ((or vm-slot-write vm-slot-read)
      (typecase inst
        (vm-slot-write
-        (opt-slot-alias-key (cl-cc/vm::vm-slot-write-obj-reg inst)
-                            (cl-cc/vm::vm-slot-write-slot-name inst)
+        (opt-slot-alias-key (cl-cc/vm:vm-slot-write-obj-reg inst)
+                            (cl-cc/vm:vm-slot-write-slot-name inst)
                             alias-roots))
        (vm-slot-read
-        (opt-slot-alias-key (cl-cc/vm::vm-slot-read-obj-reg inst)
-                            (cl-cc/vm::vm-slot-read-slot-name inst)
+        (opt-slot-alias-key (cl-cc/vm:vm-slot-read-obj-reg inst)
+                            (cl-cc/vm:vm-slot-read-slot-name inst)
                             alias-roots))))
     (t nil)))
 
@@ -159,14 +159,14 @@ CFG-aware forwarding models globals and slot accesses keyed by alias roots."
         (vm-get-global
          (let* ((key   (%available-store-location-key inst alias-roots))
                 (store (and key (gethash key state)))
-                (dst   (cl-cc/vm::vm-get-global-dst inst)))
+                (dst   (cl-cc/vm:vm-get-global-dst inst)))
            (if store
                (%available-store-kill-dependent-on-reg state dst :exclude-key key)
                (%available-store-kill-dependent-on-reg state dst))))
         (vm-slot-read
          (let* ((key   (%available-store-location-key inst alias-roots))
                 (store (and key (gethash key state)))
-                (dst   (cl-cc/vm::vm-slot-read-dst inst)))
+                (dst   (cl-cc/vm:vm-slot-read-dst inst)))
            (if store
                (%available-store-kill-dependent-on-reg state dst :exclude-key key)
                (%available-store-kill-dependent-on-reg state dst))))
@@ -184,12 +184,12 @@ CFG-aware forwarding models globals and slot accesses keyed by alias roots."
   (typecase inst
     (vm-get-global
      (when (typep store 'vm-set-global)
-       (make-vm-move :dst (cl-cc/vm::vm-get-global-dst inst)
-                     :src (cl-cc/vm::vm-set-global-src store))))
+       (make-vm-move :dst (cl-cc/vm:vm-get-global-dst inst)
+                     :src (cl-cc/vm:vm-set-global-src store))))
     (vm-slot-read
      (when (typep store 'vm-slot-write)
-       (make-vm-move :dst (cl-cc/vm::vm-slot-read-dst inst)
-                     :src (cl-cc/vm::vm-slot-write-value-reg store))))))
+       (make-vm-move :dst (cl-cc/vm:vm-slot-read-dst inst)
+                     :src (cl-cc/vm:vm-slot-write-value-reg store))))))
 
 (defun %available-store-const-value-before-terminator (block reg)
   "Return constant integer value of REG at BLOCK terminator when provable, else NIL.
@@ -280,7 +280,7 @@ loads in-place."
          (let* ((key         (%available-store-location-key inst alias-roots))
                 (store       (and key (gethash key state)))
                 (replacement (and store (%available-store-forwarded-load inst store)))
-                (dst         (cl-cc/vm::vm-get-global-dst inst)))
+                (dst         (cl-cc/vm:vm-get-global-dst inst)))
            (if replacement
                (progn
                  (setf (gethash inst rewrites) replacement)
@@ -290,7 +290,7 @@ loads in-place."
          (let* ((key         (%available-store-location-key inst alias-roots))
                 (store       (and key (gethash key state)))
                 (replacement (and store (%available-store-forwarded-load inst store)))
-                (dst         (cl-cc/vm::vm-slot-read-dst inst)))
+                (dst         (cl-cc/vm:vm-slot-read-dst inst)))
            (if replacement
                (progn
                  (setf (gethash inst rewrites) replacement)

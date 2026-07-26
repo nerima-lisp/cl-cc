@@ -182,8 +182,8 @@ materializes explicit CET SS instructions under the shadow-stack gate:
   (if *x86-64-shadow-stack-enabled*
       (cond
         ;; handler/restart push-like sites => SAVEPREVSSP (4B) + NOP2 (2B) = 6B
-        ((or (typep inst 'cl-cc/vm::vm-push-handler)
-             (typep inst 'cl-cc/vm::vm-bind-restart)
+        ((or (typep inst 'cl-cc/vm:vm-push-handler)
+             (typep inst 'cl-cc/vm:vm-bind-restart)
              (typep inst 'cl-cc/vm:vm-establish-handler)
              (typep inst 'cl-cc/vm:vm-establish-catch))
          ;; F3 0F 01 EA = SAVEPREVSSP
@@ -194,7 +194,7 @@ materializes explicit CET SS instructions under the shadow-stack gate:
          (emit-byte #x66 stream)
          (emit-byte #x90 stream))
         ;; pop/invoke restart sites => RSTORSSP [RAX] (4B) + NOP2 (2B) = 6B
-        ((or (typep inst 'cl-cc/vm::vm-pop-handler)
+        ((or (typep inst 'cl-cc/vm:vm-pop-handler)
              (typep inst 'cl-cc/vm:vm-invoke-restart)
              (typep inst 'cl-cc/vm:vm-remove-handler))
          ;; F3 0F 01 /5, ModRM 00 101 000 = 0x28 => RSTORSSP [RAX]
@@ -455,14 +455,14 @@ materializes explicit CET SS instructions under the shadow-stack gate:
     (vm-symbol-p     . emit-vm-false-pred)
     (vm-function-p   . emit-vm-false-pred)
     ;; Non-local control flow (FR-318 integration safety path)
-    (cl-cc/vm::vm-push-handler   . emit-vm-shadow-stack-control-inst)
-    (cl-cc/vm::vm-pop-handler    . emit-vm-shadow-stack-control-inst)
-    (cl-cc/vm::vm-bind-restart   . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-push-handler   . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-pop-handler    . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-bind-restart   . emit-vm-shadow-stack-control-inst)
     (cl-cc/vm:vm-invoke-restart . emit-vm-shadow-stack-control-inst)
-    (cl-cc/vm::vm-signal         . emit-vm-shadow-stack-control-inst)
-    (cl-cc/vm::vm-error-instruction . emit-vm-shadow-stack-control-inst)
-    (cl-cc/vm::vm-cerror         . emit-vm-shadow-stack-control-inst)
-    (cl-cc/vm::vm-warn           . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-signal         . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-error-instruction . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-cerror         . emit-vm-shadow-stack-control-inst)
+    (cl-cc/vm:vm-warn           . emit-vm-shadow-stack-control-inst)
     ;; VM non-local control ops from vm-run.lisp
     (cl-cc/vm:vm-establish-handler . emit-vm-shadow-stack-control-inst)
     (cl-cc/vm:vm-remove-handler    . emit-vm-shadow-stack-control-inst)

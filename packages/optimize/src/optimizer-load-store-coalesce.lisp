@@ -52,15 +52,15 @@ alignment must be proven locally."
        (when (integerp offset)
          (values :store :array (vm-array-reg inst) offset (vm-val-reg inst) inst))))
     (vm-slot-read
-     (let ((offset (cl-cc/vm::vm-slot-read-slot-name inst)))
+     (let ((offset (cl-cc/vm:vm-slot-read-slot-name inst)))
        (when (integerp offset)
-         (values :load :slot (cl-cc/vm::vm-slot-read-obj-reg inst) offset
-                 (cl-cc/vm::vm-slot-read-dst inst) inst))))
+         (values :load :slot (cl-cc/vm:vm-slot-read-obj-reg inst) offset
+                 (cl-cc/vm:vm-slot-read-dst inst) inst))))
     (vm-slot-write
-     (let ((offset (cl-cc/vm::vm-slot-write-slot-name inst)))
+     (let ((offset (cl-cc/vm:vm-slot-write-slot-name inst)))
        (when (integerp offset)
-         (values :store :slot (cl-cc/vm::vm-slot-write-obj-reg inst) offset
-                 (cl-cc/vm::vm-slot-write-value-reg inst) inst))))))
+         (values :store :slot (cl-cc/vm:vm-slot-write-obj-reg inst) offset
+                 (cl-cc/vm:vm-slot-write-value-reg inst) inst))))))
 
 (defun %opt-lsc-compatible-access-p (first next kind family expected-offset alias-roots)
   "Return T when NEXT extends FIRST's adjacent memory access group."

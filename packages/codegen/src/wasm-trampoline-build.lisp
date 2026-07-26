@@ -89,7 +89,7 @@ match or the br_table helper declines the dispatch."
   (let ((svref (nth index instructions))
         (move (nth (1+ index) instructions))
         (call (nth (+ index 2) instructions)))
-    (when (and (typep svref 'cl-cc/vm::vm-svref)
+    (when (and (typep svref 'cl-cc/vm:vm-svref)
                (typep move 'vm-move)
                (typep call 'vm-call)
                (null (vm-args call))

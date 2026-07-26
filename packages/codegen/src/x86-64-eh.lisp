@@ -205,41 +205,41 @@ libunwind consumers."
 
 (defun x86-64-eh-site-instruction-p (inst)
   "Return T when INST establishes a handler-case/restart-case landing site."
-  (or (typep inst 'cl-cc/vm::vm-push-handler)
+  (or (typep inst 'cl-cc/vm:vm-push-handler)
       (typep inst 'cl-cc/vm:vm-establish-handler)
-      (typep inst 'cl-cc/vm::vm-bind-restart)))
+      (typep inst 'cl-cc/vm:vm-bind-restart)))
 
 (defun x86-64-eh-site-kind (inst)
   "Classify a handler/restart site instruction."
   (cond
-    ((typep inst 'cl-cc/vm::vm-bind-restart) :restart)
+    ((typep inst 'cl-cc/vm:vm-bind-restart) :restart)
     (t :handler)))
 
 (defun x86-64-eh-site-handler-type (inst)
   "Return the condition/restart type associated with INST, if known."
   (cond
-    ((typep inst 'cl-cc/vm::vm-push-handler)
-     (cl-cc/vm::vm-push-handler-type inst))
+    ((typep inst 'cl-cc/vm:vm-push-handler)
+     (cl-cc/vm:vm-push-handler-type inst))
     ((typep inst 'cl-cc/vm:vm-establish-handler)
      'condition)
-    ((typep inst 'cl-cc/vm::vm-bind-restart)
-     (cl-cc/vm::vm-restart-name-inst inst))
+    ((typep inst 'cl-cc/vm:vm-bind-restart)
+     (cl-cc/vm:vm-restart-name-inst inst))
     (t t)))
 
 (defun x86-64-eh-site-handler-label (inst)
   "Return the VM label associated with INST's handler/restart path, if known."
   (cond
-    ((or (typep inst 'cl-cc/vm::vm-push-handler)
+    ((or (typep inst 'cl-cc/vm:vm-push-handler)
          (typep inst 'cl-cc/vm:vm-establish-handler))
      (cl-cc/vm:vm-handler-label inst))
-    ((typep inst 'cl-cc/vm::vm-bind-restart)
-     (cl-cc/vm::vm-restart-label inst))
+    ((typep inst 'cl-cc/vm:vm-bind-restart)
+     (cl-cc/vm:vm-restart-label inst))
     (t nil)))
 
 (defun x86-64-eh-site-result-register (inst)
   "Return the result register populated when control enters the handler."
   (cond
-    ((or (typep inst 'cl-cc/vm::vm-push-handler)
+    ((or (typep inst 'cl-cc/vm:vm-push-handler)
          (typep inst 'cl-cc/vm:vm-establish-handler))
      (cl-cc/vm:vm-handler-result-reg inst))
     (t nil)))

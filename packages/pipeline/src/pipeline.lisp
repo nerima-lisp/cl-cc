@@ -405,7 +405,7 @@ The runtime keys map logical plan IDs onto VM profile keys:
             for pc from 0
             for key = (cdr (assoc pc dominant :test #'eql))
             when (and key (typep inst 'cl-cc/vm:vm-generic-call))
-              do (setf (cl-cc/vm::vm-pgo-specializer inst) key))))
+              do (setf (cl-cc/vm:vm-pgo-specializer inst) key))))
   instructions)
 
 (defun %pgo-apply-type-feedback-to-result (result opts)

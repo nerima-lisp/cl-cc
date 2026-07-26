@@ -343,4 +343,52 @@
     vm-closure-rest-param
     vm-closure-key-params
     vm-closure-inst-dispatch-tag
-    vm-func-ref-dispatch-tag))
+    vm-func-ref-dispatch-tag
+
+    ;; ── The IR contract for out-of-tree passes (§5-2) ──────────────────────
+    ;;
+    ;; An optimizer pass or a codegen backend has to be able to name an
+    ;; instruction and read its slots -- that is what an IR is for. While these
+    ;; were internal, every such pass reached them through CL-CC/VM::, which is
+    ;; not something a separate repository can do, and which is why §5-2 makes
+    ;; this surface the precondition for extracting optimize and native codegen.
+    ;;
+    ;; Instruction types and slot accessors only. The VM's own helpers stay
+    ;; internal: anything %-prefixed, the CLOS and package emulation, and the
+    ;; bare slot names.
+
+    ;; Non-local control and conditions
+    vm-push-handler vm-push-handler-type
+    vm-pop-handler
+    vm-bind-restart vm-restart-name-inst vm-restart-label
+    vm-signal vm-error-instruction vm-cerror vm-warn
+
+    ;; Exception tables (zero-cost handler-case)
+    make-vm-exception-entry
+    vm-exception-entry-start-pc vm-exception-entry-end-pc
+    vm-exception-entry-handler-pc vm-exception-entry-condition-type
+    vm-exception-entry-result-reg
+    vm-register-program-exception-table *vm-program-exception-tables*
+
+    ;; Atomics and fences
+    vm-atomic-load vm-aload-addr
+    vm-atomic-store vm-astore-addr vm-astore-val
+    vm-atomic-cas vm-acas-addr vm-acas-expected vm-acas-newval
+    vm-atomic-incf vm-aincf-addr vm-aincf-delta
+    vm-atomic-swap
+    vm-memory-barrier vm-load-fence vm-store-fence
+
+    ;; Globals
+    vm-get-global-dst vm-get-global-name
+    vm-set-global-name vm-set-global-src
+
+    ;; CLOS slot access
+    vm-slot-read-dst vm-slot-read-obj-reg vm-slot-read-slot-name
+    vm-slot-write-obj-reg vm-slot-write-slot-name vm-slot-write-value-reg
+
+    ;; Speculation metadata the optimizer reads and rewrites
+    vm-generic-call-metadata vm-ic-type-counters vm-pgo-specializer
+
+    ;; Misc instruction surface
+    vm-svref vm-float-sign vm-type-name
+    copy-vm-program))

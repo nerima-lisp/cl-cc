@@ -262,7 +262,7 @@ tree emission on NIL."
                                                (wasm-fixnum-box "(i64.const 0)")
                                                (wasm-fixnum-box (format nil "(i64.sub (i64.const 64) (i64.clz ~A))" src)))))
         t))
-    (cl-cc/vm::vm-float-sign
+    (cl-cc/vm:vm-float-sign
      (let ((src (format nil "(struct.get $float_t 0 (ref.cast (ref $float_t) ~A))"
                         (reg-local-ref reg-map (vm-src inst)))))
        (format stream "~%      ~A"
@@ -419,7 +419,7 @@ tree emission on NIL."
                                   (vm-src-array-reg inst)
                                   (vm-len-reg inst)))
       t)
-    (cl-cc/vm::vm-atomic-cas
+    (cl-cc/vm:vm-atomic-cas
      (with-wasm-atomic-threads (inst)
        (let ((width (wasm-atomic-width-for-inst inst 64)))
          (format stream "~%      ;; FR-203/FR-327 atomic CAS width=~D" width)
@@ -427,33 +427,33 @@ tree emission on NIL."
                  (reg-local-set reg-map (vm-dst inst)
                                 (wasm-atomic-result-box-wat
                                  (wasm-atomic-rmw-cmpxchg-wat
-                                  reg-map (cl-cc/vm::vm-acas-addr inst)
-                                  (cl-cc/vm::vm-acas-expected inst)
-                                  (cl-cc/vm::vm-acas-newval inst)
+                                  reg-map (cl-cc/vm:vm-acas-addr inst)
+                                  (cl-cc/vm:vm-acas-expected inst)
+                                  (cl-cc/vm:vm-acas-newval inst)
                                   :width width)
                                  :width width)))))
      t)
-    (cl-cc/vm::vm-atomic-load
+    (cl-cc/vm:vm-atomic-load
      (with-wasm-atomic-threads (inst)
        (let ((width (wasm-atomic-width-for-inst inst 64)))
          (format stream "~%      ;; FR-203 atomic load width=~D" width)
          (format stream "~%      ~A"
                  (reg-local-set reg-map (vm-dst inst)
                                 (wasm-atomic-result-box-wat
-                                 (wasm-atomic-load-wat reg-map (cl-cc/vm::vm-aload-addr inst)
+                                 (wasm-atomic-load-wat reg-map (cl-cc/vm:vm-aload-addr inst)
                                                        :width width)
                                  :width width)))))
      t)
-    (cl-cc/vm::vm-atomic-store
+    (cl-cc/vm:vm-atomic-store
      (with-wasm-atomic-threads (inst)
        (let ((width (wasm-atomic-width-for-inst inst 64)))
          (format stream "~%      ;; FR-203 atomic store width=~D" width)
          (format stream "~%      ~A"
-                 (wasm-atomic-store-wat reg-map (cl-cc/vm::vm-astore-addr inst)
-                                        (cl-cc/vm::vm-astore-val inst)
+                 (wasm-atomic-store-wat reg-map (cl-cc/vm:vm-astore-addr inst)
+                                        (cl-cc/vm:vm-astore-val inst)
                                         :width width))))
      t)
-    (cl-cc/vm::vm-atomic-incf
+    (cl-cc/vm:vm-atomic-incf
      (with-wasm-atomic-threads (inst)
        (let ((width (wasm-atomic-width-for-inst inst 64)))
          (format stream "~%      ;; FR-203/FR-327 atomic fetch-add width=~D" width)
@@ -461,15 +461,15 @@ tree emission on NIL."
                  (reg-local-set reg-map (vm-dst inst)
                                 (wasm-atomic-result-box-wat
                                  (wasm-atomic-rmw-add-wat
-                                  reg-map (cl-cc/vm::vm-aincf-addr inst)
-                                  (cl-cc/vm::vm-aincf-delta inst)
+                                  reg-map (cl-cc/vm:vm-aincf-addr inst)
+                                  (cl-cc/vm:vm-aincf-delta inst)
                                   :width width)
                                  :width width)))))
      t)
-    (cl-cc/vm::vm-atomic-swap
+    (cl-cc/vm:vm-atomic-swap
      (wasm-unsupported-atomic-swap inst)
      t)
-    ((or cl-cc/vm::vm-memory-barrier cl-cc/vm::vm-load-fence cl-cc/vm::vm-store-fence)
+    ((or cl-cc/vm:vm-memory-barrier cl-cc/vm:vm-load-fence cl-cc/vm:vm-store-fence)
      (with-wasm-atomic-threads (inst)
        (format stream "~%      atomic.fence"))
      t)

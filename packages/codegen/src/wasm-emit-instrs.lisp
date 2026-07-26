@@ -532,7 +532,7 @@ Arguments are marshaled through the standard wasm calling-convention globals
                                     (wasm-fixnum-box
                                       (format nil "(i64.sub (i64.const 64) (i64.clz ~A))" src)))))))
 
-(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm::vm-float-sign) stream)
+(defmethod emit-instruction ((target wasm-target) (inst cl-cc/vm:vm-float-sign) stream)
   "Emit FLOAT-SIGN using f64.copysign rather than abs/conditional branching."
   (let* ((reg-map (wasm-target-reg-map target))
          (src (format nil "(struct.get $float_t 0 (ref.cast (ref $float_t) ~A))"
@@ -649,7 +649,7 @@ emission structurally aware without changing the VM instruction definition."
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; FR-323: MVP Bit Operations — integer-length uses i64.clz directly
-;;; (FR-324 f64.copysign is handled by the cl-cc/vm::vm-float-sign method above)
+;;; (FR-324 f64.copysign is handled by the cl-cc/vm:vm-float-sign method above)
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
 ;;; ─────────────────────────────────────────────────────────────────────────────

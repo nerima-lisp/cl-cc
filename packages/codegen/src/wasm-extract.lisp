@@ -61,7 +61,7 @@ through extracted standalone functions."
              (let ((value (gethash (vm-src inst) table)))
                (when value
                  (setf (gethash (vm-dst inst) table) value)))))
-          ((typep inst 'cl-cc/vm::vm-svref)
+          ((typep inst 'cl-cc/vm:vm-svref)
            (when (gethash (vm-rhs inst) index-info)
              (remember (gethash (vm-lhs inst) vector-labels)))))))))
 
@@ -201,22 +201,22 @@ through extracted standalone functions."
         (entries nil))
     (when exception-table
       (loop for entry across exception-table
-            for start-inst = (nth (cl-cc/vm::vm-exception-entry-start-pc entry)
+            for start-inst = (nth (cl-cc/vm:vm-exception-entry-start-pc entry)
                                   full-instructions)
-            for end-inst = (nth (1- (cl-cc/vm::vm-exception-entry-end-pc entry))
+            for end-inst = (nth (1- (cl-cc/vm:vm-exception-entry-end-pc entry))
                                 full-instructions)
             for start-local = (and start-inst (gethash start-inst local-index))
             for end-local = (and end-inst (gethash end-inst local-index))
             for handler-label = (%wasm-label-at-pc
                                  full-instructions
-                                 (cl-cc/vm::vm-exception-entry-handler-pc entry))
+                                 (cl-cc/vm:vm-exception-entry-handler-pc entry))
             when (and start-local end-local handler-label)
               do (push (list :kind :handler
                              :start-pc start-local
                              :end-pc (1+ end-local)
                              :handler-label handler-label
-                             :result-reg (cl-cc/vm::vm-exception-entry-result-reg entry)
-                             :condition-type (cl-cc/vm::vm-exception-entry-condition-type entry))
+                             :result-reg (cl-cc/vm:vm-exception-entry-result-reg entry)
+                             :condition-type (cl-cc/vm:vm-exception-entry-condition-type entry))
                        entries)))
     (nreverse entries)))
 
@@ -232,7 +232,7 @@ through extracted standalone functions."
          (entry-labels (collect-entry-labels instructions))
          (segments (segment-instructions instructions entry-labels))
           (module (make-empty-wasm-module))
-          (exception-table (gethash program cl-cc/vm::*vm-program-exception-tables*))
+          (exception-table (gethash program cl-cc/vm:*vm-program-exception-tables*))
           (func-index 0)
           (toplevel-instructions nil))
     (setf (wasm-module-exception-table module) exception-table)

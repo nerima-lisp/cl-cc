@@ -71,9 +71,9 @@ metadata without requiring cross-package instruction-shape changes."
 (defun %mps-pending-uses-reg-p (pending reg)
   "Return T if PENDING store instruction reads REG."
   (typecase pending
-    (vm-set-global (eq (cl-cc/vm::vm-set-global-src pending) reg))
-    (vm-slot-write (or (eq (cl-cc/vm::vm-slot-write-obj-reg pending) reg)
-                       (eq (cl-cc/vm::vm-slot-write-value-reg pending) reg)))))
+    (vm-set-global (eq (cl-cc/vm:vm-set-global-src pending) reg))
+    (vm-slot-write (or (eq (cl-cc/vm:vm-slot-write-obj-reg pending) reg)
+                       (eq (cl-cc/vm:vm-slot-write-value-reg pending) reg)))))
 
 (defun %mps-flush-if-src-overwritten (state dst)
   "Flush pending stores that read DST (i.e., their source register is DST)."
@@ -198,22 +198,22 @@ predecessors to agree on the same slot fact."
          (%mps-flush-all state)
          (%mps-emit state inst))
         (vm-get-global
-         (let ((dst (cl-cc/vm::vm-get-global-dst inst)))
+         (let ((dst (cl-cc/vm:vm-get-global-dst inst)))
            (when dst (%mps-flush-if-src-overwritten state dst)))
-         (%mps-flush-one state (cl-cc/vm::vm-get-global-name inst))
+         (%mps-flush-one state (cl-cc/vm:vm-get-global-name inst))
          (%mps-emit state inst))
         (vm-slot-read
-         (let ((dst (cl-cc/vm::vm-slot-read-dst inst)))
+         (let ((dst (cl-cc/vm:vm-slot-read-dst inst)))
            (when dst (%mps-flush-if-src-overwritten state dst)))
-         (%mps-flush-one state (opt-slot-alias-key (cl-cc/vm::vm-slot-read-obj-reg inst)
-                                                    (cl-cc/vm::vm-slot-read-slot-name inst)
+         (%mps-flush-one state (opt-slot-alias-key (cl-cc/vm:vm-slot-read-obj-reg inst)
+                                                    (cl-cc/vm:vm-slot-read-slot-name inst)
                                                     alias-roots))
          (%mps-emit state inst))
         (vm-set-global
-         (%mps-remember-store state (cl-cc/vm::vm-set-global-name inst) inst))
+         (%mps-remember-store state (cl-cc/vm:vm-set-global-name inst) inst))
         (vm-slot-write
-         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm::vm-slot-write-obj-reg inst)
-                                                         (cl-cc/vm::vm-slot-write-slot-name inst)
+         (%mps-remember-store state (opt-slot-alias-key (cl-cc/vm:vm-slot-write-obj-reg inst)
+                                                         (cl-cc/vm:vm-slot-write-slot-name inst)
                                                          alias-roots)
                               inst))
         ;; FR-342. An array read cannot be shown to miss a pending store: the

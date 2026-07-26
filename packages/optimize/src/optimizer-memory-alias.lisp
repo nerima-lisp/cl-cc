@@ -35,10 +35,10 @@ vm-move propagates the source root. Any other destination write kills the root f
                    (setf (gethash dst roots) root)
                    (remhash dst roots))))))
         (vm-get-global
-         (let ((dst (cl-cc/vm::vm-get-global-dst inst)))
+         (let ((dst (cl-cc/vm:vm-get-global-dst inst)))
            (when dst (remhash dst roots))))
         (vm-slot-read
-         (let ((dst (cl-cc/vm::vm-slot-read-dst inst)))
+         (let ((dst (cl-cc/vm:vm-slot-read-dst inst)))
            (when dst (remhash dst roots))))
         (t
          (let ((dst (opt-inst-dst inst)))
@@ -121,13 +121,13 @@ field-sensitive object graphs remain out of scope for this helper."
 (defun %opt-memory-location-key (inst alias-roots)
   "Return a canonical memory location key for INST, or NIL when not modeled."
   (typecase inst
-    (vm-set-global (list :global (cl-cc/vm::vm-set-global-name inst)))
-    (vm-get-global (list :global (cl-cc/vm::vm-get-global-name inst)))
-    (vm-slot-write (opt-slot-alias-key (cl-cc/vm::vm-slot-write-obj-reg inst)
-                                       (cl-cc/vm::vm-slot-write-slot-name inst)
+    (vm-set-global (list :global (cl-cc/vm:vm-set-global-name inst)))
+    (vm-get-global (list :global (cl-cc/vm:vm-get-global-name inst)))
+    (vm-slot-write (opt-slot-alias-key (cl-cc/vm:vm-slot-write-obj-reg inst)
+                                       (cl-cc/vm:vm-slot-write-slot-name inst)
                                        alias-roots))
-    (vm-slot-read (opt-slot-alias-key (cl-cc/vm::vm-slot-read-obj-reg inst)
-                                      (cl-cc/vm::vm-slot-read-slot-name inst)
+    (vm-slot-read (opt-slot-alias-key (cl-cc/vm:vm-slot-read-obj-reg inst)
+                                      (cl-cc/vm:vm-slot-read-slot-name inst)
                                       alias-roots))
     (vm-cons (list :alloc (vm-dst inst)))
     (t nil)))
@@ -180,14 +180,14 @@ non-aliasing while unknown roots remain conservative."
     ((opt-memory-unknown-write-inst-p write-inst) t)
     ((and (typep read-inst 'vm-get-global)
           (typep write-inst 'vm-set-global))
-     (eql (cl-cc/vm::vm-get-global-name read-inst)
-          (cl-cc/vm::vm-set-global-name write-inst)))
+     (eql (cl-cc/vm:vm-get-global-name read-inst)
+          (cl-cc/vm:vm-set-global-name write-inst)))
     ((and (typep read-inst 'vm-slot-read)
           (typep write-inst 'vm-slot-write))
-     (and (eql (cl-cc/vm::vm-slot-read-slot-name read-inst)
-               (cl-cc/vm::vm-slot-write-slot-name write-inst))
-          (opt-may-alias-p (cl-cc/vm::vm-slot-read-obj-reg read-inst)
-                           (cl-cc/vm::vm-slot-write-obj-reg write-inst)
+     (and (eql (cl-cc/vm:vm-slot-read-slot-name read-inst)
+               (cl-cc/vm:vm-slot-write-slot-name write-inst))
+          (opt-may-alias-p (cl-cc/vm:vm-slot-read-obj-reg read-inst)
+                           (cl-cc/vm:vm-slot-write-obj-reg write-inst)
                            alias-roots
                            type-facts)))
     ;; Cons field readers can be invalidated by rplaca/rplacd on the same object.

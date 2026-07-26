@@ -193,7 +193,7 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
                  (handler-pc (cl-cc/vm:vm-label-table-lookup
                               labels (compile-exception-entry-handler-label entry))))
             (when (and start-pc last-pc handler-pc (<= start-pc last-pc))
-              (push (cl-cc/vm::make-vm-exception-entry
+              (push (cl-cc/vm:make-vm-exception-entry
                      start-pc
                      (1+ last-pc)
                      handler-pc
@@ -237,7 +237,7 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
                          :label (cl-cc/vm:vm-type-check-deopt-label inst)
                          :live-regs (list (vm-src inst))
                          :vreg->preg (list (cons (vm-src inst) :p0))
-                         :description (list :type-check (cl-cc/vm::vm-type-name inst)
+                         :description (list :type-check (cl-cc/vm:vm-type-name inst)
                                             :id (cl-cc/vm:vm-type-check-deopt-id inst)))))
                  ((typep inst 'cl-cc/vm:vm-deopt)
                   (setf (gethash pc table)

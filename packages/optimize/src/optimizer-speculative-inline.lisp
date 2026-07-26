@@ -29,7 +29,7 @@ when multiple receiver types have similar frequency."
   "Return dominant IC key for INST when FR-523 speculation is profitable."
   (and (typep inst 'cl-cc/vm:vm-generic-call)
        (multiple-value-bind (key count total ratio)
-           (opt-ic-dominant-type (cl-cc/vm::vm-ic-type-counters inst))
+           (opt-ic-dominant-type (cl-cc/vm:vm-ic-type-counters inst))
          (declare (ignore count total ratio))
          key)))
 
@@ -40,8 +40,8 @@ The VM's IC fast path already emits the runtime type guard by comparing the
 current specializer key to VM-PGO-SPECIALIZER and directly calling the cached
 method on success; guard failure falls back to the normal IC slow path, which is
 also a safe FR-522 deopt/fallback boundary."
-  (setf (cl-cc/vm::vm-pgo-specializer inst) key)
-  (setf (getf (cl-cc/vm::vm-generic-call-metadata inst) :speculative-inline)
+  (setf (cl-cc/vm:vm-pgo-specializer inst) key)
+  (setf (getf (cl-cc/vm:vm-generic-call-metadata inst) :speculative-inline)
         (list :pc pc
               :dominant-type key
               :guard :typep-equivalent-specializer-key

@@ -562,7 +562,7 @@ Returns :internal when all conventions are :internal; :external otherwise."
                                     :osr-entry-points osr-entry-points
                                     :load-time-value-cells (nreverse (copy-list *load-time-value-cells*))
                                     :compilation-tier compilation-tier))
-    (cl-cc/vm::vm-register-program-exception-table
+    (cl-cc/vm:vm-register-program-exception-table
      program
      (%build-exception-table (vm-program-instructions program)))
     (%build-toplevel-compilation-result ctx target program instructions optimized
