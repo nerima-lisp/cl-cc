@@ -77,6 +77,22 @@
        (values (car entry) t))
       (t (values nil nil)))))
 
+(defun %literal-pool-invalidate-register (pool register)
+  "Drop every POOL entry whose cached register is REGISTER.
+
+A caller-supplied DST overwrites that register with a new value, so any literal
+still recorded as living there is stale. Without this, emitting T into R5 on one
+branch and NIL into R5 on the other left the pool claiming T was in R5; a later
+request for T then compiled to a move from R5 — which by then held NIL. That is
+how (not (null 4)) evaluated to NIL."
+  (when (and pool register)
+    (let ((dead nil))
+      (maphash (lambda (key entry)
+                 (when (and (consp entry) (eq (car entry) register))
+                   (push key dead)))
+               pool)
+      (dolist (key dead) (remhash key pool)))))
+
 (defun %emit-constant (ctx value &key dst)
   "Return a register containing VALUE.
 Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table."
@@ -88,9 +104,12 @@ Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table.
         (if present-p
             (progn
               (when (and dst (not (eq dst existing)))
+                (%literal-pool-invalidate-register *string-literal-pool* dst)
                 (emit ctx (make-vm-move :dst dst :src existing)))
               (or dst existing))
             (let ((target-reg (or dst (make-register ctx))))
+              (when dst
+                (%literal-pool-invalidate-register *string-literal-pool* dst))
               (emit ctx (make-vm-const :dst target-reg :value value))
               (setf (gethash key *string-literal-pool*) (cons target-reg barrier))
               target-reg))))
