@@ -51,7 +51,7 @@
   (let ((class (test-instance-class instance)))
     (if (hash-table-p instance)
         (gethash slot-name instance)
-        (aref instance (test-slot-index class slot-name)))))
+        (cl-cc/vm::slot-value-by-index instance (test-slot-index class slot-name)))))
 
 (defun test-instance-slot-bound-p (instance slot-name)
   "Return whether SLOT-NAME is bound in INSTANCE using VM raw slot logic."

@@ -213,16 +213,43 @@ turn into clean test failures rather than blocking the parallel worker thread."
                                (class-slots (class-of (make-instance 'mop-layout-index))))))
         (if (every (lambda (x) (and (integerp x) (>= x 0))) locations) :ok :bad)))"))
 
-(it-sequential "mop-shape-layout-class-redefinition-shape-change"
-  (assert-mop-red-ok
-   "(progn
-      (defclass mop-shape-change () ((x :initarg :x)))
-      (defparameter *mop-shape-object* (make-instance 'mop-shape-change :x 1))
-      (defclass mop-shape-change () ((x :initarg :x) (y :initform 2)))
-      (if (and (= (slot-value *mop-shape-object* 'x) 1)
-               (= (slot-value *mop-shape-object* 'y) 2))
-          :ok
-          :bad))"))
+(progn
+  (it-sequential "mop-shape-layout-class-redefinition-shape-change"
+    (assert-mop-red-ok
+     "(progn
+        (defclass mop-shape-change () ((x :initarg :x)))
+        (defparameter *mop-shape-object* (make-instance (quote mop-shape-change) :x 1))
+        (defclass mop-shape-change () ((x :initarg :x) (y :initform 2)))
+        (if (and (= (slot-value *mop-shape-object* (quote x)) 1)
+                 (= (slot-value *mop-shape-object* (quote y)) 2))
+            :ok
+            :bad))"))
+  (it-sequential "mop-shape-layout-class-redefinition-preserves-identity-across-migrations"
+    (assert-mop-red-ok
+     "(progn
+        (defclass mop-shape-multiple () ((x :initarg :x)))
+        (let* ((object (make-instance (quote mop-shape-multiple) :x 11))
+               (identity object))
+          (defclass mop-shape-multiple ()
+            ((x :initarg :x) (y :initform 22)))
+          (let ((first-migration
+                  (and (eq object identity)
+                       (= (slot-value object (quote x)) 11)
+                       (= (slot-value object (quote y)) 22)
+                       (slot-boundp object (quote y)))))
+            (slot-makunbound object (quote y))
+            (let ((unbound-after-migration (not (slot-boundp object (quote y)))))
+              (setf (slot-value object (quote y)) 23)
+              (defclass mop-shape-multiple ()
+                ((x :initarg :x) (y :initform 24) (z :initform 33)))
+              (if (and first-migration
+                       unbound-after-migration
+                       (eq object identity)
+                       (= (slot-value object (quote x)) 11)
+                       (= (slot-value object (quote y)) 23)
+                       (= (slot-value object (quote z)) 33))
+                  :ok
+                  :bad)))))")))
 
 (it-sequential "mop-shape-layout-slot-indexes-consistent"
   (assert-mop-red-ok
