@@ -779,6 +779,6 @@
       (quote ("packages/emit/src/fpga.lisp" "packages/emit/tests/fpga-tests.lisp"))
       (quote (("CL-CC/EMIT" . "LOWER-FPGA-HLS") ("CL-CC/EMIT" . "EMIT-FPGA-VERILOG")))
       (quote
-        (fpga-hls-lowers-if-to-mux-and-emits-pipeline-constraints
+        (fpga-hls-builds-a-timed-resource-shared-pipeline
           fpga-hls-lowers-case-to-fsm-ir
           fpga-hls-rejects-impure-and-unsupported-forms)))))
