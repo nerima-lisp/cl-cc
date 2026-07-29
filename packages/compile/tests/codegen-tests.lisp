@@ -520,14 +520,36 @@ stable, isolated context."
   (let ((ctx (make-codegen-ctx))
         (cl-cc/compile::*load-time-value-cells* nil)
         (cl-cc/compile::*next-load-time-value-cell-id* 0))
-    (compile-ast (make-ast-call :func '%load-time-value
-                                :args (list (make-ast-call :func '+
-                                                          :args (list (make-ast-int :value 1)
-                                                                      (make-ast-int :value 2)))
-                                            (make-ast-var :name nil)))
-                 ctx)
+    (let ((node (make-ast-call :func '%load-time-value
+                           :args (list (make-ast-call :func '+
+                                                     :args (list (make-ast-int :value 1)
+                                                                 (make-ast-int :value 2)))
+                                       (make-ast-var :name nil)))))
+      (compile-ast node ctx)
+      (compile-ast node ctx)
+      (expect (= 1 (length cl-cc/compile::*load-time-value-cells*)) :to-be-truthy))
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-load-time-value)))
       (expect inst :to-be-truthy)
       (expect (= 0 (cl-cc/vm::vm-load-time-value-cell-id inst)) :to-be-truthy)
-      (expect (cl-cc/vm::vm-load-time-value-cell-form
-                     (first cl-cc/compile::*load-time-value-cells*)) :to-equal '(+ 1 2)))))
+      (progn
+        (expect (cl-cc/vm::vm-load-time-value-cell-form
+                 (first cl-cc/compile::*load-time-value-cells*))
+                :to-equal '(+ 1 2))
+        (let* ((cell-id (cl-cc/compile::%record-load-time-value-cell '(quote (1 2 3)) t))
+               (cell (find cell-id cl-cc/compile::*load-time-value-cells*
+                           :key #'cl-cc/vm::vm-load-time-value-cell-id)))
+          (expect (cl-cc/vm::vm-load-time-value-cell-resolved-p cell) :to-be-truthy)
+          (expect (cl-cc/vm::vm-load-time-value-cell-value cell) :to-equal '(1 2 3))))))
+  (let ((*load-time-value-hit* 0))
+    (let* ((result (cl-cc/compile:compile-toplevel-forms
+                    '((load-time-value
+                        (progn
+                          (incf *load-time-value-hit*)
+                          *load-time-value-hit*)))
+                    :target :vm))
+           (program (cl-cc/compile:compilation-result-program result)))
+      (expect (= 0 *load-time-value-hit*) :to-be-truthy)
+      (expect (= 1 (cl-cc:run-compiled program)) :to-be-truthy)
+      (expect (= 1 *load-time-value-hit*) :to-be-truthy)
+      (expect (= 1 (cl-cc:run-compiled program)) :to-be-truthy)
+      (expect (= 1 *load-time-value-hit*) :to-be-truthy))))

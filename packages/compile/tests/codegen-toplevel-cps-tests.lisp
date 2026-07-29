@@ -18,15 +18,18 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
     (expect (getf opts :print-pass-timings) :to-be-null)
     (expect (getf opts :timing-stream) :to-be-null)
     (expect (getf opts :opt-remarks-mode) :to-be :all)
-    (expect (getf opts :trace-json-stream) :to-be-null)))
+    (expect (getf opts :trace-json-stream) :to-be-null)
+    (expect (getf opts :tsan) :to-be-null)))
 
 (it-sequential "codegen-make-compile-opts-explicit-values"
   (let ((opts (cl-cc/compile::%make-compile-opts :pass-pipeline '(:fold :dce)
                                                  :opt-remarks-mode :pass
-                                                 :print-pass-stats t)))
+                                                 :print-pass-stats t
+                                                 :tsan t)))
     (expect (getf opts :pass-pipeline) :to-equal '(:fold :dce))
     (expect (getf opts :opt-remarks-mode) :to-be :pass)
-    (expect (getf opts :print-pass-stats) :to-be-truthy)))
+    (expect (getf opts :print-pass-stats) :to-be-truthy)
+    (expect (getf opts :tsan) :to-be-truthy)))
 
 ;;; ─── %result-vm-instructions-without-halt ────────────────────────────────
 

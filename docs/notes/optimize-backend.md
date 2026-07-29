@@ -202,7 +202,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **関連実装**: `packages/vm/src/list.lisp` に `*vm-hash-cons-table*` / `vm-hash-cons` / `vm-clear-hash-cons-table` と明示命令 `vm-hash-cons` を実装済み。`*vm-hash-cons-table*` は SBCL で `:weakness :value` を使う。`packages/vm/src/list-execute.lisp` は `vm-hash-cons` だけを intern table 経由で実行し、`vm-cons` は ANSI CL の fresh cons セマンティクスを維持する。`packages/compile/src/builtin-registry-data-ext.lisp` と `packages/expand/src/expander-data.lisp` により `(hash-cons a b)` は builtin として VM 命令へ lower される。`packages/vm/tests/list-tests.lisp` と `packages/compile/tests/pipeline-eval-tests.lisp` が helper・命令・compiled builtin 経路を検証する
 
-#### FR-256: Pure Function Auto-Memoization (純関数自動メモ化) 🔶
+#### FR-256: Pure Function Auto-Memoization (純関数自動メモ化) ✅
 
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/optimize/src/effects.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
@@ -210,7 +210,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: GHC `{-# RULES "memo" #-}` / Mathematica automatic memoization。再帰的数値計算で指数的高速化
 - **難易度**: Medium
 
-- **関連実装**: `packages/optimize/src/optimizer-inline-pass.lisp` に `opt-make-pure-function-memo-table` / `opt-pure-function-memo-get` / `opt-pure-function-memo-put` を追加済み。memo helper は `:max-size` 指定時に LRU eviction（容量超過で最古エントリ除去、hit時touchで最近使用化）を実装。`packages/optimize/src/optimizer-purity.lisp` の `opt-pass-pure-call-optimization` は transitive purity 推論後、同一 pure direct call を straight-line region 内で `vm-move` に置換し、未使用の known-pure direct call を除去する。さらに pass 内部 memo を `opt-make-pure-function-memo-table` へ接続し、`opt-pure-function-memo-get/put` を介して pure direct call の再利用情報を管理するよう更新した（`*opt-pure-call-memo-max-size*` で容量上限を制御可能）。`packages/optimize/src/optimizer-pipeline.lisp` には policy gate `*opt-enable-pure-call-optimization*` と `opt-configure-optimization-policy` を追加し、`:pure-call-optimization` pass をフラグおよび `optimize-instructions :speed` で有効/無効切替できるようにした（`speed >= 3` で有効）。さらに `packages/pipeline/src/pipeline-data.lisp` / `packages/pipeline/src/pipeline.lisp` / `packages/compile/src/codegen.lisp` で `:speed` を optimizer へ配線し、`compile-expression`/`compile-toplevel-forms` 経路で local `declare (optimize (speed ...))` を反映できるようにした。`packages/optimize/tests/optimizer-inline-pass-tests.lisp` と `packages/optimize/tests/optimizer-purity-tests.lisp`、`packages/optimize/tests/optimizer-pipeline-tests.lisp`、`packages/compile/tests/codegen-tests.lisp`、`packages/compile/tests/pipeline-tests.lisp` が memo helper・LRU・pure call reuse・dead pure call elimination・pipeline keyword selection・policy gate・speed閾値連動・frontend連動を検証する。
+- **関連実装**: optimize 入力の `src/optimizer-inline-pass.lisp` に `opt-make-pure-function-runtime-memoizer` を追加済み。複数値を保持する runtime wrapper、hit 時 touch を含む容量制限付き LRU eviction、pure-function 判定と `speed >= 3` policy gate を一体で提供する。既存の compile-time memo helper と pure-call optimization に加え、実呼び出し境界での miss/hit・複数値・LRU を `packages/optimize/tests/optimizer-inline-pass-tests.lisp` が検証する。
 
 ---
 
@@ -524,14 +524,15 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **関連実装**: `packages/optimize/src/optimizer-memory-dse.lisp` に `opt-pass-dead-store-elim` を実装済み。straight-line な global/slot store 上書き除去を対象とし、`opt-compute-heap-aliases` で保守的な slot alias を扱う。`packages/optimize/tests/optimizer-memory-pass-tests.lisp` と `packages/optimize/tests/optimizer-store-analysis-tests.lisp` に回帰テストがある。
 
-#### FR-017: Alias Analysis (型ベース別名解析, TBAA) 🔶
+#### FR-017: Alias Analysis (型ベース別名解析, TBAA) ✅
 
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/compile/src/codegen.lisp`
+- **現状**: ✅ 完了 — TBAA メタデータを生成し、scheduler と DSE が同じ保守的 may-alias 契約を消費する。
 - **内容**: 型情報に基づいてメモリ操作の別名関係を推論。`vm-get-slot` で整数スロットとシンボルスロットは別名なし。異なるクラスのインスタンス間はスロット別名なし。TBAA メタデータを VM 命令に付与し、命令スケジューリング・DSE の精度向上
 - **根拠**: LLVM TBAA / GCC `-fstrict-aliasing`。Common Lisp は型タグ付きなのでTBAA適用範囲が広い
 - **難易度**: Hard
 
-- **関連実装**: `packages/optimize/src/optimizer-memory-alias-basic.lisp` に `opt-compute-heap-kinds` / `opt-may-alias-by-type-p` を追加済み。`opt-compute-heap-aliases` の fresh heap root と `:cons` / `:array` / `:closure` の heap kind を組み合わせ、両 root と kind が既知で異なる場合だけ non-alias と判定し、不明時は conservative に may-alias とする。`packages/optimize/tests/optimizer-lowlevel-tests.lisp` の `heap-kind-helper-distinguishes-object-classes` と `packages/optimize/tests/optimizer-memory-pass-tests.lisp` の heap kind table integrity test が直接検証する。
+- **関連実装**: optimize 入力の `src/optimizer-memory-alias.lisp` に `opt-build-memory-tbaa-metadata` / `opt-memory-accesses-may-alias-p` を実装し、fresh heap root と `:cons` / `:array` / `:closure` の型 fact を命令単位の read/write metadata に変換する。`src/optimizer-scheduler.lisp` は依存 edge、`src/optimizer-memory-dse.lisp` は介在 read による pending store の flush 判定でこの metadata を消費する。両 root と kind が既知で異なる場合だけ non-alias、不明時と同種型は may-alias とする。`packages/optimize/tests/optimizer-licm-tests.lisp`、`packages/optimize/tests/optimizer-scheduler-tests.lisp`、`packages/optimize/tests/optimizer-memory-pass-tests.lisp` が異種型の最適化と未知 alias の保守性を検証する。
 
 #### FR-018: Flow-Sensitive Pointer Analysis ✅
 
@@ -808,12 +809,15 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **関連実装**: `packages/optimize/src/optimizer-speculative-passes.lisp` の PGO layout helper 群が profile edge count に基づく hot-chain / loop rotation 計画を提供し、`packages/optimize/tests/optimizer-pipeline-tests.lisp` の `optimize-pgo-build-hot-chain-prefers-hottest-successors` と `optimize-pgo-rotate-loop-places-preferred-exit-at-bottom` が回帰を検証する。
 
-#### FR-298: AutoFDO (Sampling-based Profile) 🔶
+#### FR-298: AutoFDO (Sampling-based Profile) ✅
 
 - **対象**: コンパイルパイプライン
+- **現状**: ✅ 完了 — perf/dtrace の sample 行と branch 行を profile metadata に取り込み、IR の source PC と基本ブロックへ反映する。
 - **内容**: `perf record` / `dtrace` のサンプリングプロファイルを直接 PGO 入力として使用。計装不要のため本番ワークロードのプロファイルが得られる。サンプルを IR レベルの基本ブロックにマッピングするデバッグ情報 (FR-330) が前提
 - **根拠**: AutoFDO (Google 2014) / LLVM `SampleProfileLoader`。計装なしで実プロダクション負荷のプロファイルを活用
 - **難易度**: Very Hard
+
+- **関連実装**: `packages/pipeline/src/pipeline-autofdo.lisp` の `read-autofdo-profile` は `perf` / `dtrace` sample 行に加え、`branch PC TAKEN TOTAL` / `dtrace-branch PC TAKEN TOTAL` を `%autofdo-branch-from-line` で確率へ変換し、`:branch-probabilities` として保持する。既存の `autofdo-map-samples-to-ir` / `autofdo-apply-branch-probabilities` が FR-330 の source PC metadata を介して基本ブロック hotness と分岐確率へ反映する。`packages/compile/tests/pipeline-native-io-tests.lisp` が両入力形式と不正 count の拒否を検証する。
 
 ---
 
@@ -840,7 +844,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 ### Phase 63 — JIT & 動的コンパイル（実装済み）
 
-#### FR-310: Tiered Compilation (多段 JIT) 🔶
+#### FR-310: Tiered Compilation (多段 JIT) ✅
 
 - **対象**: `packages/cli/src/main.lisp`, `packages/pipeline/pipeline.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
@@ -848,7 +852,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: V8 Ignition/Maglev/TurboFan / JVM C1/C2。起動時間とピーク性能のトレードオフを解決する現代的アプローチ
 - **難易度**: Very Hard
 
-- **関連実装**: `packages/optimize/tests/optimizer-pipeline-tests.lisp` の `optimize-adaptive-compilation-threshold-reacts-to-warmup-pressure-and-failures` と `optimize-tier-transition-promotes-through-runtime-tiers` が閾値調整と tier 遷移ロジックを検証する。
+- **関連実装**: optimize 入力の `src/optimizer-speculative-concurrency.lisp` に `opt-tier-runtime-state` と `opt-tier-record-runtime-event` を実装し、call/backedge counter、warmup pressure、失敗履歴から Tier 0 → Tier 1 → Tier 2 の昇格を管理する。`packages/optimize/tests/optimizer-concurrency-tests.lisp` と `packages/optimize/tests/optimizer-pipeline-tests.lisp` が runtime event、適応閾値、tier 遷移を検証する。
 
 #### FR-311: On-Stack Replacement (OSR) ✅
 
@@ -1074,10 +1078,11 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 ### Phase 69 — コンパイラ自体の品質・保守性（実装済み）
 
-#### FR-345: Compiler Correctness Testing (正確性テスト) 🔶
+#### FR-345: Compiler Correctness Testing (正確性テスト) ✅
 
 - **対象**: `tests/` 全体
-- **内容**: (1) Differential Testing: 同一プログラムを最適化あり/なしでコンパイルして出力を比較、(2) Translation Validation: コンパイル前後の IR が意味的に等価であることを SMT ソルバーで検証 (ALIVE2 方式)、(3) Property-Based Testing: ランダム CL プログラム生成 → SBCL と比較
+- **内容**: (1) Differential Testing: ランダム IR を最適化前後で実行して結果を比較、(2) Translation Validation: 対応 opcode の bounded symbolic execution により observable result / side effect を比較し、非対応命令・step bound 超過は安全側に reject、(3) Property-Based Testing: 生成した算術式について compile/run・tier 間・参照評価器の結果を比較
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-trans-validate.lisp` に `translation-validation-equivalent-p` / `validate-optimizer-translation` を実装し、`t/optimize-boundary-test.lisp` の `translation validation symbolic executor` が unsupported opcode、step bound、halt 値、print side effect の保守的判定を検証する。親リポジトリの `packages/optimize/tests/optimizer-roadmap-backend-tests.lisp` の `optimize-differential-fuzzing-deterministic-smoke` と `packages/compile/tests/pbt/vm-pbt-tests.lisp` の `compile-run-matches-reference-arith` / `tier-0-and-tier-1-match-reference-arith` が differential / property-based 経路を検証する。
 - **根拠**: ALIVE2 (LLVM IR transformation validator) / CompCert (certified compiler)。最適化バグは発見困難で生産環境での障害原因になる
 - **難易度**: Hard
 
@@ -1226,14 +1231,16 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: ANSI CL 3.1.2.1.1 / SBCL constant inlining。定数の実行時ルックアップをゼロに
 - **難易度**: Easy
 
-#### FR-366: `load-time-value` 最適化 🔶
+#### FR-366: `load-time-value` 最適化 ✅
 
 - **対象**: `packages/compile/src/codegen.lisp`, `packages/pipeline/pipeline.lisp`
-- **内容**: `(load-time-value expr)` はロード時に 1 回だけ `expr` を評価してキャッシュする。コンパイル時に `expr` が副作用なし・定数と判明する場合は `defconstant` 相当にフォールバック。ロード時評価のスロットを `.fasl` に記録し重複評価を防止
+- **現状**: ✅ 完了 — expansion は式を評価せず `%load-time-value` フォームとして保持し、program load/実行時に VM の load-time-value cell を一度だけ解決する。FASL wire data は未解決/解決済み状態を保存・復元する。
+- **内容**: `(load-time-value expr)` の式と read-only 属性を expansion から VM へ保持し、program load/実行時の cell 解決で一回評価する。FASL round-trip 後も cell ID、式、read-only 属性、解決状態と値を維持する。
+- **関連実装**: `packages/expand/src/macros-runtime-support.lisp` の展開処理はフォームを評価せず保持する。`*load-time-value-cache*` は legacy compatibility 用であり、展開時評価のキャッシュではない。固定 VM source `packages/vm/src/vm-dsl.lisp` の `vm-program-load-time-value-cells` / `vm-load-time-values`、`packages/vm/src/vm-serialize.lisp` の `vm-write-to-fasl` / `vm-read-from-fasl`。回帰テスト: `packages/expand/tests/macros-stdlib-io-tests.lisp` の `load-time-value-expansion-preserves-form-without-evaluation`、固定 VM source `packages/vm/t/vm-boundary-test.lisp` の `round-trips-programs-and-load-time-value-cells-through-explicit-wire-data`。
 - **根拠**: ANSI CL 3.2.2.2 / SBCL `load-time-value` compilation。正規表現コンパイル・ハッシュテーブル初期化のイディオムで使用
 - **難易度**: Medium
 
-#### FR-367: `declare (ignore/ignorable)` と DCE 統合 🔶
+#### FR-367: `declare (ignore/ignorable)` と DCE 統合 ✅
 
 - **対象**: `packages/compile/src/codegen-core-let.lisp`, `packages/compile/src/codegen-core-let-emit.lisp`
 - **内容**: `(declare (ignore x))` で変数 `x` が意図的に未使用と宣言される場合だけ、`let` バインディングの余分な move を省略し、純粋な初期化式は後段 DCE で除去可能にする。`(declare (ignorable x))` は警告抑制のみ（コード生成に影響なし）。
@@ -1666,12 +1673,15 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: Intel AMX-BF16 / ARM BF16 拡張 (v8.6-A)。LLM 推論の数値演算コアに必要
 - **難易度**: Hard
 
-#### FR-433: Posit 数システム 🔶
+#### FR-433: Posit 数システム ✅
 
-- **対象**: `packages/vm/src/vm-numeric.lisp`
+- **対象**: `cl-cc-vm/src/vm-numeric.lisp`
+- **現状**: ✅ 完了 — 任意の `nbits` / `es` に対応する Posit の encode/decode、四則演算、および正確な Quire 累積を実装・検証済み。
 - **内容**: IEEE 754 の代替数値形式 Posit (Gustafson 2017) のサポート。Posit の特徴: (1) NaN / Inf なし（例外なし演算）、(2) ゼロ近傍で高精度・大数で低精度（動的精度）、(3) Quire（512-bit 累積器）による正確な内積計算。数値計算・科学シミュレーションでの IEEE 754 代替として 2024 年に HPC で採用増
 - **根拠**: Posit arithmetic standard (posithub.org) / SoftPosit ライブラリ
 - **難易度**: Hard
+
+- **関連実装**: `cl-cc-vm@f927147` の `src/vm-numeric.lisp` に NaR / zero、最近接 ties-to-even 丸め、加減乗除と Quire の exact accumulation / single rounding を実装。`t/vm-boundary-test.lisp` が round-trip、丸め境界、算術、Quire、NaR 伝播を検証する。親 flake の `cl-cc-vm` 入力も同コミットに固定する。
 
 #### FR-434: 10 進浮動小数点 (IEEE 754-2008 Decimal) ✅
 
@@ -1726,10 +1736,12 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: LLVM `-polly-parallel` / GCC `-ftree-parallelize-loops`
 - **難易度**: Hard
 
-#### FR-442: FPGA 高レベル合成 (HLS) 🔶
+#### FR-442: FPGA 高レベル合成 (HLS) ✅
 
 - **対象**: 新規 `packages/emit/src/fpga.lisp`
 - **内容**: 純粋関数（副作用なし）を FPGA 回路（Verilog/VHDL）に合成。パイプライン挿入・リソース共有・タイミング制約の最適化。Xilinx Vitis HLS / Intel oneAPI 相当の CL フロントエンド。DSP・信号処理・暗号アルゴリズムの FPGA 実装に適用
+- **現状**: ✅ 完了 — 純粋な整数式を fail-closed で検証し、`if`/`case` を Mux/FSM HLS IR に変換する。演算遅延とクロック周期から stage を割り当てた公開 schedule IR を生成し、資源上限に従う演算器 unit 共有、クロック付き pipeline register、Verilog/VHDL 出力を実装。
+- **検証**: `packages/emit/tests/fpga-tests.lisp` で Mux/FSM 変換、並列 `let` の外側環境参照、複数 stage、stage 内タイミング制約、乗算器共有、Verilog/VHDL の pipeline register とストリーム出力、副作用・未対応フォームの拒否を検証
 - **根拠**: LLVM CIRCT / Catapult HLS。FPGA は AI 推論・HFT (High-Frequency Trading) で普及
 - **難易度**: Very Hard
 
@@ -1791,7 +1803,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **関連実装**: `packages/optimize/tests/optimizer-pipeline-tests.lisp` の `optimize-build-async-state-machine-builds-linear-transitions` が await→state transition 生成を検証する。
 
-#### FR-450: Coroutine Lowering — Stackful vs Stackless 🔶
+#### FR-450: Coroutine Lowering — Stackful vs Stackless ✅
 
 - **対象**: `packages/compile/src/codegen.lisp`, `packages/runtime/src/`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
@@ -1799,9 +1811,9 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: Stackful: Lua coroutines / Go goroutines。Stackless: Python generators / Rust async
 - **難易度**: Hard
 
-- **関連実装**: `packages/optimize/tests/optimizer-pipeline-tests.lisp` の `optimize-choose-coroutine-lowering-strategy-prefers-stackful-when-needed` が戦略選択の分岐を検証する。
+- **関連実装**: `packages/optimize/tests/optimizer-concurrency-tests.lisp` の `optimize-choose-coroutine-lowering-strategy-prefers-stackful-when-needed` が戦略選択を検証する。`cl-cc-runtime@9395e67` の `src/async-generators.lisp` に `rt-lower-coroutine` / `rt-coroutine-resume` を実装し、`t/async-generators-test.lisp` で stackful / stackless の実行契約を検証する。親 flake の `cl-cc-runtime` 入力も同コミットに固定する。
 
-#### FR-451: Channel / CSP 操作の最適化 🔶
+#### FR-451: Channel / CSP 操作の最適化 ✅
 
 - **対象**: `packages/optimize/src/optimizer-speculative-passes.lisp`, `packages/optimize/tests/optimizer-pipeline-tests.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
@@ -1809,9 +1821,9 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: Go runtime channel implementation / Erlang BEAM scheduler
 - **難易度**: Very Hard
 
-- **関連実装**: `packages/optimize/tests/optimizer-pipeline-tests.lisp` の `optimize-channel-select-path-classifies-buffered-sync-and-contended-cases` と `optimize-channel-jump-table-select-threshold` が、経路選択と select 閾値判定の回帰を検証する。
+- **関連実装**: `packages/optimize/tests/optimizer-concurrency-tests.lisp` の channel/select テストが経路選択と select 閾値を検証する。`cl-cc-runtime@9395e67` の `src/channel.lisp` にゼロ容量 rendezvous と select receiver の登録・取消を実装し、`t/channel-test.lisp` で競合 select が一度だけ commit されることを含めて検証する。親 flake の `cl-cc-runtime` 入力も同コミットに固定する。
 
-#### FR-452: STM（Software Transactional Memory）コンパイル 🔶
+#### FR-452: STM（Software Transactional Memory）コンパイル ✅
 
 - **対象**: `packages/optimize/src/optimizer-speculative-passes.lisp`, `packages/optimize/tests/optimizer-pipeline-tests.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
@@ -1819,7 +1831,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: GHC STM / Clojure refs + dosync。cl-stm ライブラリの基盤
 - **難易度**: Very Hard
 
-- **関連実装**: `packages/optimize/tests/optimizer-pipeline-tests.lisp` の `optimize-stm-plan-skips-log-for-pure-block` / `optimize-stm-plan-enables-log-for-impure-read-write` が、pure ブロック省略と impure ログ有効化を検証する。
+- **関連実装**: `packages/optimize/tests/optimizer-concurrency-tests.lisp` の STM テストが pure ブロック省略と impure ログ有効化を検証する。`cl-cc-runtime@9395e67` の `src/stm.lisp` にホットセルキャッシュ、effect 記録、pure lowering を含む `opt-pass-stm` を実装し、`t/stm-test.lisp` で各経路を検証する。親 flake の `cl-cc-runtime` 入力も同コミットに固定する。
 
 #### FR-453: Lock-Free データ構造のコンパイル支援 ✅
 
@@ -2089,12 +2101,13 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: Stepanov et al. "MemorySanitizer" (CGO 2015) / LLVM MSan
 - **難易度**: Hard
 
-#### FR-491: ThreadSanitizer (TSan) 🔶
+#### FR-491: ThreadSanitizer (TSan) ✅
 
 - **対象**: `packages/compile/src/codegen.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**: データ競合（2 スレッドが同期なしで同一メモリを読み書き）を検出。Shadow State Machine: 各メモリロケーションに最近のアクセス履歴（スレッド ID・タイムスタンプ・read/write フラグ）を格納。全メモリアクセスをフックして競合検出。`./cl-cc compile --tsan` で有効化
 - **根拠**: Serebryany & Iskhodzhanov "ThreadSanitizer" (WBIA 2009) / LLVM TSan
 - **難易度**: Hard
+- **実装証跡**: `packages/compile/src/codegen.lisp` で `:tsan` を最適化・ランタイム計装へ伝播し、CLI の `--tsan` から有効化。`cl-cc-runtime@b2a6c213` で vector clock による read/write 競合検出、mutex/condition の happens-before 同期、host thread ID 追跡を実装し、非同期 read/write・write/write、read/read 許容、mutex 同期をテスト
 
 #### FR-492: UndefinedBehaviorSanitizer (UBSan) ✅
 

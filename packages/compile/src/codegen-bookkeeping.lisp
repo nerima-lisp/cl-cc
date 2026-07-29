@@ -118,16 +118,44 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
           (otherwise nil))))
     (%resolve-forward-references resolver errorp)))
 
+(defun %pure-load-time-value (form)
+  "Return FORM's value when it is safe to constantize without EVAL."
+  (cond
+    ((or (numberp form) (characterp form) (stringp form)
+         (keywordp form) (null form) (eq form t))
+     (values form t))
+    ((and (consp form)
+          (eq (first form) 'quote)
+          (consp (rest form))
+          (null (cddr form)))
+     (values (second form) t))
+    (t (values nil nil))))
+
 (defun %record-load-time-value-cell (form read-only-p)
-  "Record FORM for load-time execution and return its cell id."
-  (let* ((id (prog1 *next-load-time-value-cell-id*
-               (incf *next-load-time-value-cell-id*)))
-         (cell (cl-cc/vm:make-vm-load-time-value-cell
-                :id id
-                :form form
-                :read-only-p read-only-p)))
-    (push cell *load-time-value-cells*)
-    id))
+  "Record FORM for load-time execution and return its shared cell id."
+  (let ((existing
+          (find-if (lambda (cell)
+                     (and (equal form
+                                 (cl-cc/vm::vm-load-time-value-cell-form cell))
+                          (eql read-only-p
+                               (cl-cc/vm::vm-load-time-value-cell-read-only-p cell))))
+                   *load-time-value-cells*)))
+    (if existing
+        (cl-cc/vm::vm-load-time-value-cell-id existing)
+        (multiple-value-bind (value constantp)
+            (if read-only-p
+                (%pure-load-time-value form)
+                (values nil nil))
+          (let* ((id (prog1 *next-load-time-value-cell-id*
+                       (incf *next-load-time-value-cell-id*)))
+                 (cell (cl-cc/vm:make-vm-load-time-value-cell
+                        :id id
+                        :form form
+                        :read-only-p read-only-p
+                        :resolved-p constantp
+                        :value value)))
+            (push cell *load-time-value-cells*)
+            id)))))
 
 (defun %compile-load-time-value-call (args result-reg ctx)
   "Compile (LOAD-TIME-VALUE form &optional read-only-p) as a constant cell load."

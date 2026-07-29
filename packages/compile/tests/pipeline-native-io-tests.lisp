@@ -471,7 +471,7 @@
   (let ((insts (list (cl-cc:make-vm-jump-zero :reg :r0 :label :target))))
     (expect (cl-cc/pipeline::autofdo-apply-branch-probabilities insts nil) :to-be insts)))
 
-(it-sequential "autofdo-apply-branch-probabilities-weights-jump-zero"
+progn (it-sequential "autofdo-apply-branch-probabilities-weights-jump-zero"
   (let* ((jz (cl-cc:make-vm-jump-zero :reg :r0 :label :target))
          (profile-data (list :branch-probabilities (list (cons 0 0.9))))
          (result (cl-cc/pipeline::autofdo-apply-branch-probabilities
@@ -479,3 +479,12 @@
          (weighted (first result)))
     (expect (typep weighted 'cl-cc/optimize::vm-branch-weighted-jump-zero) :to-be-truthy)
     (expect (cl-cc/optimize::vm-branch-weighted-jump-zero-branch-weight weighted) :to-be :likely-taken)))
+(it-sequential "autofdo-branch-from-line-perf-and-dtrace-rows"
+  (expect (cl-cc/pipeline::%autofdo-branch-from-line "branch 0x1000 7 10")
+          :to-equal (cons 4096 0.7))
+  (expect (cl-cc/pipeline::%autofdo-branch-from-line "dtrace-branch 0x2000 1 4")
+          :to-equal (cons 8192 0.25)))
+
+(it-sequential "autofdo-branch-from-line-rejects-invalid-counts"
+  (expect (cl-cc/pipeline::%autofdo-branch-from-line "branch 0x1000 1 0") :to-be-null)
+  (expect (cl-cc/pipeline::%autofdo-branch-from-line "branch 0x1000 11 10") :to-be-null))

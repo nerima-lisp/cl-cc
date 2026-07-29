@@ -71,7 +71,26 @@
     (expect (cl-cc/optimize::opt-lockfree-select-reclamation
               :aba-risk-p aba-p :contention contention) :to-be expected)))
 
+progn
 (it-sequential "lockfree-reclamation-cases aba-high"
   (destructuring-bind (aba-p contention expected) (list t 6 :epoch)
     (expect (cl-cc/optimize::opt-lockfree-select-reclamation
               :aba-risk-p aba-p :contention contention) :to-be expected)))
+
+(it-sequential "fr-450 coroutine lowering keeps call/cc stackful with deep yield"
+  (expect (cl-cc/optimize::opt-choose-coroutine-lowering-strategy
+            :supports-call/cc t :deep-yield-p t) :to-be :stackful))
+
+(it-sequential "fr-451 synchronous rendezvous wins for a wide select"
+  (let ((site (cl-cc/optimize::make-opt-channel-site
+               :buffer-size 0 :queue-depth 0 :contention 0 :select-arity 8)))
+    (expect (cl-cc/optimize::opt-channel-select-path site)
+            :to-be :synchronous-rendezvous)
+    (expect (cl-cc/optimize::opt-channel-should-jump-table-select-p site :threshold 4)
+            :to-be-truthy)))
+
+(it-sequential "fr-452 pure stm lowering omits logs even with declared writes"
+  (let ((plan (cl-cc/optimize::opt-stm-build-plan
+               :reads (quote (:hot-cell)) :writes (quote (:result)) :pure-p t)))
+    (expect (cl-cc/optimize::opt-stm-needs-log-p plan) :to-be-falsy)
+    (expect (cl-cc/optimize::opt-stm-plan-inline-log-p plan) :to-be-falsy)))

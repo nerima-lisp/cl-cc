@@ -60,15 +60,7 @@
                 :cl-cc-compile :cl-cc-cps :cl-cc-codegen :cl-cc-vm :cl-cc-stdlib
                  :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl :cl-cc-php :cl-cc-javascript)
   :components
-  ((:module "src"
-    :pathname "src"
-    :serial t
-    :components
-    ((:file "package")))
-   (:module "ffi-dynlib"
-    :pathname "src/ffi/"
-    :components
-    ((:file "dynlib")))))
+  ((:module "src" :pathname "src" :serial t :components ((:file "package"))) (:module "ffi-dynlib" :pathname "src/ffi/" :components ((:file "dynlib"))) (:module "fpga-hls" :pathname "packages/emit/src" :serial t :components ((:file "fpga")))))
 
 (eval-when (:load-toplevel :execute)
   (require :asdf)
@@ -489,7 +481,7 @@
      (:file "regalloc-lsa-tests")
      (:file "regalloc-color-tests")
      (:file "regalloc-spill-tests")
-     (:file "wasm-tests")
+     (:file "wasm-tests") (:file "wasm-binary-tests")
       (:file "wasm-ir-tests")
       (:file "wasm-types-tests")
       (:file "wasm-opcodes-tests")
@@ -522,7 +514,7 @@
       (:file "elf-tests")
       (:file "elf-extended-tests")
       (:file "macho-tests")
-      (:file "macho-builder-tests")))
+      (:file "macho-builder-tests") (:file "fpga-tests")))
      (:module "binary-tests"
        :pathname "packages/binary/tests"
        :serial t
@@ -535,10 +527,11 @@
          (:file "got-plt-tests")
          (:file "patchable-entry-tests")))
      (:module "pipeline-tests"
-      :pathname "packages/pipeline/tests"
-      :serial t
-      :components
-      ((:file "perfmap-tests")))
+       :pathname "packages/pipeline/tests"
+       :serial t
+       :components
+       ((:file "perfmap-tests")
+        (:file "pipeline-incremental-hot-parallel-tests")))
      (:module "tools-tests"
       :pathname "packages/tools/tests"
       :serial t

@@ -317,12 +317,14 @@
          (planned (getf summary :planned 0))
          (unknown (getf summary :unknown 0)))
     (expect (= 232 total) :to-be-truthy)
+    (expect (= 232 implemented) :to-be-truthy)
     (expect (= total (+ implemented partial planned unknown)) :to-be-truthy)
-    (expect (>= partial 0) :to-be-truthy)
-    (expect (>= unknown 0) :to-be-truthy)))
+    (expect (= partial 0) :to-be-truthy)
+    (expect (= planned 0) :to-be-truthy)
+    (expect (= unknown 0) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-all-fr-complete-gate-is-strict"
-  (expect (cl-cc/optimize:optimize-backend-roadmap-all-fr-complete-p) :to-be-falsy))
+  (expect (cl-cc/optimize:optimize-backend-roadmap-all-fr-complete-p) :to-be-truthy))
 
 (it-sequential "optimize-backend-roadmap-fr-ids-by-status-partitions-document"
   (let* ((implemented (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented))
@@ -333,8 +335,9 @@
          (all-doc (cl-cc/optimize:optimize-backend-roadmap-doc-fr-ids)))
     (expect (= (length all-doc) (length all)) :to-be-truthy)
     (expect (= (length all-doc) (length (remove-duplicates all :test #'string=))) :to-be-truthy)
-    (expect (>= (length partial) 0) :to-be-truthy)
-    (expect (>= (length unknown) 0) :to-be-truthy)
+    (expect partial :to-be-null)
+    (expect planned :to-be-null)
+    (expect unknown :to-be-null)
     (expect (every (lambda (id) (member id all-doc :test #'string=)) all) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-analysis-evidence-is-loaded"
@@ -596,7 +599,7 @@
     (dolist (case '(("FR-303" :implemented)
                     ("FR-352" :implemented)
                     ("FR-360" :implemented)
-                    ("FR-366" :partial)
+                    ("FR-366" :implemented)
                     ("FR-370" :implemented)
                     ("FR-374" :implemented)
                     ("FR-376" :implemented)
@@ -624,10 +627,7 @@
                     "packages/compile/src/codegen-core-control.lisp"
                     ("CL-CC/COMPILE" . "%COMPILE-IF-BRANCH")
                     codegen-the-with-declared-integer-type-emits-typep)
-                   ("FR-366" :partial
-                   "packages/expand/src/macros-runtime-support.lisp"
-                   ("CL-CC/EXPAND" . "*LOAD-TIME-VALUE-CACHE*")
-                   load-time-value-is-memoized-during-expansion)
+                   ("FR-366" :implemented "packages/expand/src/macros-runtime-support.lisp" ("CL-CC/EXPAND" . "*LOAD-TIME-VALUE-CACHE*") load-time-value-expansion-preserves-form-without-evaluation)
                   ("FR-370" :implemented
                    "packages/compile/src/context.lisp"
                    ("CL-CC/COMPILE" . "*BUILTIN-SPECIAL-VARIABLES*")
@@ -734,3 +734,51 @@
      cli-do-compile-dump-ir-annotate-source-macro-forms-preserve-real-file-location
      cli-dump-ir-phase-phase-table-covers-all-recognized-phases
      cli-dump-ir-phase-invalid-signals-error)))
+
+(progn
+  (it-sequential
+    "optimize-backend-roadmap-fr-345-fr-366-fr-367-integrated-evidence-resolves"
+    (let ((table (make-hash-table :test #'equal)))
+      (dolist (feature (cl-cc/optimize:optimize-backend-roadmap-doc-features))
+        (setf (gethash (cl-cc/optimize::opt-roadmap-feature-id feature) table) (cl-cc/optimize::opt-roadmap-feature-status feature)))
+      (dolist (feature-id '("FR-345" "FR-366" "FR-367"))
+        (expect (gethash feature-id table) :to-be :implemented)))
+    (dolist (module
+        '("packages/optimize/src/optimizer-trans-validate.lisp"
+          "packages/optimize/t/optimize-boundary-test.lisp"
+          "packages/vm/src/vm-dsl.lisp"
+          "packages/vm/src/vm-serialize.lisp"
+          "packages/vm/t/vm-boundary-test.lisp"
+          "packages/compile/src/codegen-core-let.lisp"
+          "packages/compile/src/codegen-core-let-emit-pass.lisp"))
+      (expect (cl-cc/optimize::%opt-roadmap-module-present-p module) :to-be-truthy))
+    (dolist (api-symbol
+        '(("CL-CC/OPTIMIZE" . "TRANSLATION-VALIDATION-EQUIVALENT-P")
+          ("CL-CC/OPTIMIZE" . "VALIDATE-OPTIMIZER-TRANSLATION")
+          ("CL-CC/VM" . "VM-WRITE-TO-FASL")
+          ("CL-CC/VM" . "VM-READ-FROM-FASL")
+          ("CL-CC/COMPILE" . "%AST-LET-BINDING-IGNORED-P")))
+      (expect
+        (cl-cc/optimize::%opt-roadmap-api-entry-fbound-p api-symbol)
+        :to-be-truthy))
+    (dolist (test-anchor
+        '(optimize-differential-fuzzing-deterministic-smoke
+          compile-run-matches-reference-arith
+          tier-0-and-tier-1-match-reference-arith
+          load-time-value-expansion-preserves-form-without-evaluation
+          ast-let-binding-ignored-p
+          codegen-let-ignore-binding-enables-dce-of-unused-initializer))
+      (expect
+        (cl-cc/optimize::%opt-roadmap-test-anchor-registered-p test-anchor)
+        :to-be-truthy)))
+  (it-sequential
+    "optimize-backend-roadmap-fr-442-has-specific-evidence"
+    (%optimize-backend-assert-evidence-case
+      "FR-442"
+      :implemented
+      (quote ("packages/emit/src/fpga.lisp" "packages/emit/tests/fpga-tests.lisp"))
+      (quote (("CL-CC/EMIT" . "LOWER-FPGA-HLS") ("CL-CC/EMIT" . "EMIT-FPGA-VERILOG")))
+      (quote
+        (fpga-hls-lowers-if-to-mux-and-emits-pipeline-constraints
+          fpga-hls-lowers-case-to-fsm-ir
+          fpga-hls-rejects-impure-and-unsupported-forms)))))

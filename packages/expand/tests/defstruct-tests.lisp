@@ -152,8 +152,7 @@
 ;; the broken framework assert-signals masked (it always passed vacuously);
 ;; correct cl-weave (signals) exposes it. Needs a test-isolation fix, not a
 ;; source fix. See memory cl-cc-cl-weave-fixtures.
-(it-todo "ds-read-only-accessor-setf-signals-error"
-  "test-isolation fragility: read-only guard is correct in isolation but suppressed by accumulated global state in the full file run")
+(it-sequential "ds-read-only-accessor-setf-signals-error" (cl-cc/expand:with-fresh-defstruct-registries (ds-expand '(defstruct packet (id 0 :read-only t) payload)) (signals error (cl-cc/expand::expand-setf-accessor '(packet-id packet) 10))))
 
 (it-sequential "ds-empty-struct-has-zero-slots"
   (cl-cc/expand:with-fresh-defstruct-registries

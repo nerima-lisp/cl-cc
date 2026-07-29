@@ -96,7 +96,7 @@
       flake = false;
     };
     cl-cc-vm = {
-      url = "github:nerima-lisp/cl-cc-vm/d68bccc0ca8b6241bf75ced5c118a26b2db8a246";
+      url = "github:nerima-lisp/cl-cc-vm/f92714797cc3d0ce5f65d2559c2a219d5630d653";
       flake = false;
     };
     cl-cc-ir = {
@@ -116,7 +116,7 @@
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/bf496e9173007c241eebf58e831fd296cfa48b25";
+    url = "github:nerima-lisp/cl-cc-optimize/8b236e6d609b75ff9bf22e140a74e1b5e163e5ee";
       flake = false;
     };
     cl-cc-codegen-native = {
@@ -136,7 +136,7 @@
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/095a8649254650dd7fc2f697473101bf21418ba6";
+      url = "github:nerima-lisp/cl-cc-runtime/d1f85bdfa15e6ba48c2d09c30baaefeda1d96f9e";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the

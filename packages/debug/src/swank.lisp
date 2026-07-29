@@ -164,3 +164,42 @@ line, returning one printed plist per line."
   (when (swank-server-socket server)
     (ignore-errors (sb-bsd-sockets:socket-close (swank-server-socket server))))
   server)
+
+(defvar *step-breakpoints* (make-hash-table :test #'eql))
+
+(defvar *step-mode* nil)
+
+(define-condition step-condition (condition)
+  ((pc :initarg :pc :reader step-condition-pc)
+    (instruction :initarg :instruction :reader step-condition-instruction)
+    (state :initarg :state :reader step-condition-state)
+    (mode :initarg :mode :reader step-condition-mode)))
+
+(defun add-step-breakpoint (pc)
+  (check-type pc (integer 0 *))
+  (setf (gethash pc *step-breakpoints*) t)
+  pc)
+
+(defun clear-step-breakpoints ()
+  (clrhash *step-breakpoints*)
+  nil)
+
+(defmacro step (&body body)
+  `(let ((*step-mode* :into))
+    ,@body))
+
+(defmethod cl-cc/vm::execute-instruction :before (instruction state pc labels)
+  (declare (ignore labels))
+  (when (or (eq *step-mode* :into) (gethash pc *step-breakpoints*))
+    (signal
+      (make-condition
+        (quote step-condition)
+        :pc
+        pc
+        :instruction
+        instruction
+        :state
+        state
+        :mode
+        (if (eq *step-mode* :into) :into
+          :breakpoint)))))

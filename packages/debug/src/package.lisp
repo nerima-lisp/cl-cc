@@ -1,8 +1,7 @@
 ;;;; packages/debug/src/package.lisp -- Debugging package facade.
-
 (defpackage :cl-cc/debug
   (:use :cl :cl-cc/bootstrap)
-  (:shadow #:inspect)
+  (:shadow #:inspect #:step)
   (:import-from :cl-cc/vm
                 #:vm-closure-object
                 #:vm-closure-captured-regs
@@ -27,6 +26,16 @@
     ;; FR-688: object inspector
     #:*inspected-objects*
     #:inspect
+    ;; FR-689: VM step debugger
+    #:*step-breakpoints*
+    #:step-condition
+    #:step-condition-pc
+    #:step-condition-instruction
+    #:step-condition-state
+    #:step-condition-mode
+    #:add-step-breakpoint
+    #:clear-step-breakpoints
+    #:step
     ;; FR-314: VM watchpoints
     #:*vm-watchpoints*
     #:vm-watchpoint-condition

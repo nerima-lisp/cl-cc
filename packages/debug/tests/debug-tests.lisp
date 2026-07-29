@@ -39,17 +39,40 @@
          (parts (getf (cl-cc/debug:inspect object) :parts)))
     (expect (find 'name parts :key (lambda (part) (getf part :slot))) :to-be-truthy)
     (expect (find 'count parts :key (lambda (part) (getf part :slot))) :to-be-truthy)))
+(it-sequential "step-debugger-signals-at-breakpoints"
+  (let ((program
+        (cl-cc:make-vm-program
+          :instructions
+          (list (cl-cc:make-vm-const :dst :r0 :value 10)
 
-;; The step-breakpoint API (add-step-breakpoint / clear-step-breakpoints /
-;; step-condition / step-condition-pc) these two tests use is not defined in any
-;; package — the feature was removed from the base and the tests were never
-;; updated. Marked it-todo until the step-debugger API is restored or the tests
-;; are rewritten.
-(it-todo "step-debugger-signals-at-breakpoints"
-  "removed base API: add-step-breakpoint / step-condition / step-condition-pc are undefined")
+(cl-cc:make-vm-halt :reg :r0))
+          :result-register
+          :r0))
+        (seen nil))
+    (cl-cc/debug:clear-step-breakpoints)
+    (unwind-protect (progn
+        (cl-cc/debug:add-step-breakpoint 1)
+        (handler-bind ((cl-cc/debug:step-condition
+              (lambda (condition)
+                (push (cl-cc/debug:step-condition-pc condition) seen))))
+          (expect (= 10 (cl-cc:run-compiled program)) :to-be-truthy)))
+      (cl-cc/debug:clear-step-breakpoints))
+    (expect (nreverse seen) :to-equal (quote (1)))))
 
-(it-todo "step-macro-enables-step-into-mode"
-  "removed base API: step-condition is undefined")
+(it-sequential "step-macro-enables-step-into-mode"
+  (let ((program
+        (cl-cc:make-vm-program
+          :instructions
+          (list (cl-cc:make-vm-const :dst :r0 :value 10) (cl-cc:make-vm-halt :reg :r0))
+          :result-register
+          :r0))
+        (seen nil))
+    (cl-cc/debug:clear-step-breakpoints)
+    (handler-bind ((cl-cc/debug:step-condition
+          (lambda (condition)
+            (push (cl-cc/debug:step-condition-pc condition) seen))))
+      (expect (= 10 (cl-cc/debug:step (cl-cc:run-compiled program))) :to-be-truthy))
+    (expect (nreverse seen) :to-equal (quote (0 1)))))
 
 (it-sequential "watchpoint-detects-register-write"
   (let* ((program (cl-cc:make-vm-program

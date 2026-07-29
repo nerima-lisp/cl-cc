@@ -39,18 +39,19 @@
     (expect (car body-form) :to-be 'unwind-protect)
     (expect (car cleanup) :to-be 'close)))
 
-(it-sequential "load-time-value-expands-to-quote"
-  (let ((result (our-macroexpand-1 '(load-time-value (+ 1 2)))))
-    (expect 'quote :to-be (car result))
-    (expect (= (second result) 3) :to-be-truthy)))
+(it-sequential "load-time-value-expansion-preserves-form-without-evaluation"
+  (let ((evaluations 0)
+        (cl-cc/expand:*macro-eval-fn*
+          (lambda (form)
+            (declare (ignore form))
+            (incf evaluations))))
+    (expect (our-macroexpand-1 '(load-time-value (+ 1 2) t))
+            :to-equal '(cl-cc/expand::%load-time-value (+ 1 2) t))
+    (expect (= 0 evaluations) :to-be-truthy)))
 
-;; load-time-value memoization relies on the *macro-eval-fn* = #'eval fixture and
-;; a clean *load-time-value-cache*; under the full-suite run the memo count no
-;; longer resolves to 1. Conversion-exposed test-isolation sensitivity (the
-;; broken framework assert path did not exercise this the same way); needs a
-;; test-isolation review rather than a source fix.
-(it-todo "load-time-value-is-memoized-during-expansion"
-  "test-isolation sensitivity: memoization hit-count assertion unstable under full-suite run")
+(it-sequential "load-time-value-expansion-preserves-default-read-only-argument"
+  (expect (our-macroexpand-1 '(load-time-value (list 1 2)))
+          :to-equal '(cl-cc/expand::%load-time-value (list 1 2))))
 
 (it-sequential "provide-require-expansion-structure provide"
   (destructuring-bind (form expected-inner-op) (list '(provide :my-lib) 'pushnew)

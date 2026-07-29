@@ -127,10 +127,40 @@ case with the same 1-in-3 probability the original's (zerop (random 3)) did."
     (cl-weave:expect (run-string (write-to-string expr))
                      :to-equal (eval expr)))
 
+  (cl-weave:it-property "tier-0-and-tier-1-match-reference-arith"
+      ((expr (gen-arith-sexp :max-depth 3)))
+    (labels ((condition-category (condition)
+               (cond
+                 ((typep condition (quote undefined-function)) :undefined-function)
+                 ((or (typep condition (quote arithmetic-error))
+                      (typep condition (quote type-error)))
+                  :arithmetic-type-error)
+                 ((let ((name (string-upcase (princ-to-string (type-of condition)))))
+                    (or (search "VM-" name) (search "TRAP" name)))
+                  :vm-trap)
+                 (t :other-error)))
+             (capture (thunk)
+               (handler-case
+                   (list :value (funcall thunk))
+                 (error (condition)
+                   (list :condition (condition-category condition)))))
+             (run-tier (tier)
+               (let* ((result (cl-cc:compile-string
+                               (write-to-string expr)
+                               :target :vm
+                               :compilation-tier tier))
+                      (program (cl-cc/compile:compilation-result-program result)))
+                 (cl-cc:run-compiled program))))
+      (let ((tier-0 (capture (lambda () (run-tier 0))))
+            (tier-1 (capture (lambda () (run-tier 1))))
+            (reference (capture (lambda () (eval expr)))))
+        (cl-weave:expect tier-0 :to-equal reference)
+        (cl-weave:expect tier-1 :to-equal reference))))
+
   (cl-weave:it-property "compile-run-add-identity-preserved"
       ((expr (gen-arith-sexp :max-depth 2)))
     ;; Metamorphic: the (+ e 0) algebraic identity must survive the whole
     ;; compile+optimize+run pipeline, exercising algebraic simplification on
     ;; random subexpressions rather than fixed examples.
-    (cl-weave:expect (run-string (write-to-string (list '+ expr 0)))
+    (cl-weave:expect (run-string (write-to-string (list (quote +) expr 0)))
                      :to-equal (run-string (write-to-string expr)))))

@@ -27,11 +27,9 @@
 ;; baseline): REDUCE over an empty list with :initial-value, and over a
 ;; single-element list, error in the compile→VM run-string pipeline. Base bug,
 ;; unrelated to the cl-weave migration; needs a runtime/stdlib fix.
-(it-todo "reduce-basic-operations empty-iv"
-  "pre-existing base failure: (reduce #'+ '() :initial-value 0) errors in run-string pipeline")
+(it-sequential "reduce-basic-operations empty-iv" (expect (= 0 (run-string "(reduce #'+ '() :initial-value 0)")) :to-be-truthy))
 
-(it-todo "reduce-basic-operations single"
-  "pre-existing base failure: (reduce #'+ '(42)) errors in run-string pipeline")
+(it-sequential "reduce-basic-operations single" (expect (= 42 (run-string "(reduce #'+ '(42))")) :to-be-truthy))
 
 (it-sequential "reduce-basic-operations max"
   (destructuring-bind (form expected) (list "(reduce #'max '(3 1 4 1 5 9 2 6))" 9)

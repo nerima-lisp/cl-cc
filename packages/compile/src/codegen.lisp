@@ -216,7 +216,7 @@ Returns the inferred type, or NIL on failure (structured warning recorded unless
                                     opt-bisect-limit
                                     print-pass-timings timing-stream
                                     print-opt-remarks opt-remarks-stream (opt-remarks-mode :all)
-                                    print-pass-stats stats-stream trace-json-stream werror werror-categories)
+                                    print-pass-stats stats-stream trace-json-stream tsan werror werror-categories)
   "Build a compilation options plist suitable for APPLYing to compile-*/optimize-* functions."
   (let ((resolved-speed (or speed (%global-optimize-quality 'speed))))
   (list :pass-pipeline       pass-pipeline
@@ -235,6 +235,7 @@ Returns the inferred type, or NIL on failure (structured warning recorded unless
         :print-pass-stats    print-pass-stats
         :stats-stream        stats-stream
         :trace-json-stream   trace-json-stream
+        :tsan                tsan
         :werror              werror
         :werror-categories   werror-categories)))
 
@@ -618,13 +619,13 @@ load-time-value accumulators bound there stay live through finalization."
                                           pass-pipeline print-pass-timings timing-stream coverage
                                           print-opt-remarks opt-remarks-stream (opt-remarks-mode :all)
                                           print-pass-stats stats-stream trace-json-stream
-                                          verify-transforms werror werror-categories (compilation-tier 1)
+                                          verify-transforms tsan werror werror-categories (compilation-tier 1)
                                           &allow-other-keys)
   "Compile a list of top-level forms (e.g., from a source file).
 Handles defun, defvar, and expression forms.
 Returns a compilation-result struct with program, assembly, and globals.
-Security-mitigation keywords (:retpoline :spectre-mitigations :stack-protector
-:shadow-stack :asan :msan :tsan :ubsan :hwasan) are accepted via &allow-other-keys and ignored."
+Security-mitigation keywords other than :tsan are accepted via &allow-other-keys and ignored.
+The :tsan option is propagated to the optimizer and runtime instrumentation pipeline."
   (declare (ignore coverage verify-transforms))
   (let ((ctx           (make-instance 'compiler-context :safety safety :target target))
         (*string-literal-pool* (make-hash-table :test #'equal))
@@ -641,6 +642,7 @@ Security-mitigation keywords (:retpoline :spectre-mitigations :stack-protector
                                            :print-pass-stats print-pass-stats
                                            :stats-stream stats-stream
                                            :trace-json-stream trace-json-stream
+                                           :tsan tsan
                                            :werror werror
                                            :werror-categories werror-categories)))
     (%with-toplevel-compilation-dynamic-env (werror werror-categories)

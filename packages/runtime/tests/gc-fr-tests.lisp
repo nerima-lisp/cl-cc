@@ -404,17 +404,17 @@
                                      nil 0))
   (expect (cl-cc/runtime:try-enable-huge-pages) :to-be-falsy)
   (expect (cl-cc/runtime:huge-pages-enabled-p) :to-be-falsy))
-
-;; Pre-existing test bug exposed by correct (signals) conversion: the test asserts
-;; RT-XOM-EFFECTIVE-PROT signals on an unsupported platform, but that function
-;; never signals — it returns a read+exec fallback mask; the explicit
-;; unsupported-platform error lives in RT-FINALIZE-XOM-CODE-MEMORY. The original
-;; also used a local FLET that cannot influence the global RT-XOM-SUPPORTED-P
-;; call. Both mean the assertion only passed vacuously under the broken framework
-;; assert-signals. Needs a domain rewrite (test the finalize path) not a
-;; mechanical fix.
-(it-todo "fr-772-xom-requires-native-support"
-  "pre-existing test bug: RT-XOM-EFFECTIVE-PROT never signals (returns a fallback mask); the unsupported-platform error is in RT-FINALIZE-XOM-CODE-MEMORY")
+(it-sequential
+  "fr-772-xom-requires-native-support"
+  (let ((cl-cc/runtime::*xom-enabled* t))
+    (if (cl-cc/runtime::rt-xom-supported-p) (expect
+        (cl-cc/runtime::rt-xom-effective-prot)
+        :to-equal
+        cl-cc/runtime::+rt-prot-exec+)
+      (expect
+        (cl-cc/runtime::rt-xom-effective-prot)
+        :to-equal
+        (logior cl-cc/runtime::+rt-prot-read+ cl-cc/runtime::+rt-prot-exec+)))))
 
 ;;; ------------------------------------------------------------
 ;;; FR-377: Immortal / Permanent Objects (⚠️ Pure CL interface)

@@ -493,3 +493,24 @@
     (cl-cc/optimize::%mps-flush-dependent-on-reg state :r0 :exclude-key 'g)
     (expect (cl-cc/optimize::%mps-pending-store state 'g) :to-be-truthy)
     (expect (cl-cc/optimize::mps-result state) :to-be-null)))
+
+(it-sequential "dead-store-elim-tbaa-disjoint-read-does-not-observe-slot-store"
+  (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
+                  (list (make-vm-const :dst :n :value 4)
+                        (make-vm-cons :dst :obj :car-src :r0 :cdr-src :r1)
+                        (make-vm-make-array :dst :arr :size-reg :n
+                                            :initial-element nil :fill-pointer nil
+                                            :adjustable nil :element-type nil)
+                        (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r2)
+                        (make-vm-slot-read :dst :v :obj-reg :arr :slot-name 'x)
+                        (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r3)
+                        (make-vm-ret :reg :v)))))
+    (expect (= 1 (%count-insts-of-type result #'vm-slot-write-p)) :to-be-truthy)))
+
+(it-sequential "dead-store-elim-unknown-alias-read-observes-slot-store"
+  (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
+                  (list (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r1)
+                        (make-vm-slot-read :dst :v :obj-reg :b :slot-name 'x)
+                        (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r2)
+                        (make-vm-ret :reg :v)))))
+    (expect (= 2 (%count-insts-of-type result #'vm-slot-write-p)) :to-be-truthy)))

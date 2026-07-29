@@ -55,8 +55,7 @@
 ;; baseline): with (:copier nil) the COPY-POINT reference fails at compile time
 ;; in run-string, so the program's runtime handler-case never catches it. Base
 ;; compiler/error-handling behavior, unrelated to the cl-weave migration.
-(it-todo "fr-446-copier-nil-suppressed"
-  "pre-existing base failure: (:copier nil) COPY-POINT is a compile-time undefined, not caught by runtime handler-case")
+(it-sequential "fr-446-copier-nil-suppressed" (signals error (run-string "(progn (defstruct (point (:copier nil)) x y) (copy-point (make-point :x 1 :y 2)))")))
 
 (it-sequential "fr-446-copier-custom-name"
   (expect (= 42 (run-string

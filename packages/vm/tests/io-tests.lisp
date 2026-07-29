@@ -311,13 +311,14 @@
     (expect (= 0 (hash-table-count dst)) :to-be-truthy)))
 
 ;;; ─── clone-vm-state ───────────────────────────────────────────────────────
-
-;; Pre-existing base failure (errors identically on the pre-migration deftest
-;; baseline): (make-vm-state) leaves vm-global-vars NIL rather than an empty
-;; hash-table, so (setf (gethash "x" (vm-global-vars source)) 42) errors. Base
-;; struct-init issue, unrelated to the cl-weave migration.
-(it-todo "clone-vm-state-copies-global-vars"
-  "pre-existing base failure: (make-vm-state) vm-global-vars is NIL, not a hash-table")
+(it-sequential "clone-vm-state-copies-global-vars"
+  (let ((source (cl-cc:make-vm-state)))
+    (setf (cl-cc/vm::vm-global-vars source) (make-hash-table :test (function equal)))
+    (setf (gethash "x" (cl-cc/vm::vm-global-vars source)) 42)
+    (let ((clone (cl-cc/vm::clone-vm-state source)))
+      (expect (gethash "x" (cl-cc/vm::vm-global-vars clone)) :to-equal 42)
+      (setf (gethash "x" (cl-cc/vm::vm-global-vars clone)) 99)
+      (expect (gethash "x" (cl-cc/vm::vm-global-vars source)) :to-equal 42))))
 
 ;;; ─── FR-868: file-position / file-length / with-binary-file ───────────────
 
@@ -445,52 +446,66 @@
 ;;; ─── FR-851/852/853/869: networking, DNS, TLS, mmap ───────────────────────
 
 (it-sequential "io-fr851-tcp-localhost-roundtrip"
-  (let ((listener nil) (client nil) (accepted nil))
-    (unwind-protect
-         (progn
-           (setf listener (cl-cc/vm:make-tcp-socket :reuse-address t :tcp-nodelay t :keepalive t))
-           (cl-cc/vm:socket-bind listener "127.0.0.1" 0)
-           (cl-cc/vm:socket-listen listener 1)
-           (multiple-value-bind (host port) (cl-cc/vm:socket-local-address listener)
-             (expect host :to-equal "127.0.0.1")
-             (setf client (cl-cc/vm:make-tcp-socket :tcp-nodelay t))
-             (cl-cc/vm:socket-connect client "127.0.0.1" port)
-             (setf accepted (cl-cc/vm:socket-accept listener))
-             (expect (= 4 (cl-cc/vm:socket-send client #(112 105 110 103))) :to-be-truthy)
-             (multiple-value-bind (payload count) (cl-cc/vm:socket-receive accepted :size 4 :stringp t)
-               (expect (= 4 count) :to-be-truthy)
-               (expect payload :to-equal "ping"))))
-      (when accepted (cl-cc/vm:socket-close accepted))
-      (when client (cl-cc/vm:socket-close client))
-      (when listener (cl-cc/vm:socket-close listener)))))
+  (sb-ext:with-timeout 5
+    (let ((listener nil) (client nil) (accepted nil))
+      (unwind-protect
+           (progn
+             (setf listener (cl-cc/vm:make-tcp-socket :reuse-address t :tcp-nodelay t :keepalive t))
+             (cl-cc/vm:socket-bind listener "127.0.0.1" 0)
+             (cl-cc/vm:socket-listen listener 1)
+             (multiple-value-bind (host port) (cl-cc/vm:socket-local-address listener)
+               (expect host :to-equal "127.0.0.1")
+               (setf client (cl-cc/vm:make-tcp-socket :tcp-nodelay t))
+               (cl-cc/vm:socket-connect client "127.0.0.1" port)
+               (setf accepted (cl-cc/vm:socket-accept listener))
+               (expect (= 4 (cl-cc/vm:socket-send client #(112 105 110 103))) :to-be-truthy)
+               (multiple-value-bind (payload count) (cl-cc/vm:socket-receive accepted :size 4 :stringp t)
+                 (expect (= 4 count) :to-be-truthy)
+                 (expect payload :to-equal "ping"))))
+        (when accepted (cl-cc/vm:socket-close accepted))
+        (when client (cl-cc/vm:socket-close client))
+        (when listener (cl-cc/vm:socket-close listener))))))
 
 (it-sequential "io-fr851-udp-localhost-roundtrip"
-  (let ((receiver nil) (sender nil))
-    (unwind-protect
-         (progn
-           (setf receiver (cl-cc/vm:make-udp-socket :reuse-address t))
-           (cl-cc/vm:socket-bind receiver "127.0.0.1" 0)
-           (multiple-value-bind (_host port) (cl-cc/vm:socket-local-address receiver)
-             (declare (ignore _host))
-             (setf sender (cl-cc/vm:make-udp-socket))
-             (cl-cc/vm:socket-connect sender "127.0.0.1" port)
-             (expect (= 3 (cl-cc/vm:socket-send sender #(117 100 112))) :to-be-truthy)
-             (multiple-value-bind (payload count) (cl-cc/vm:socket-receive receiver :size 3 :stringp t)
-               (expect (= 3 count) :to-be-truthy)
-               (expect payload :to-equal "udp"))))
-      (when sender (cl-cc/vm:socket-close sender))
-      (when receiver (cl-cc/vm:socket-close receiver)))))
+  (sb-ext:with-timeout 5
+    (let ((receiver nil) (sender nil))
+      (unwind-protect
+           (progn
+             (setf receiver (cl-cc/vm:make-udp-socket :reuse-address t))
+             (cl-cc/vm:socket-bind receiver "127.0.0.1" 0)
+             (multiple-value-bind (_host port) (cl-cc/vm:socket-local-address receiver)
+               (declare (ignore _host))
+               (setf sender (cl-cc/vm:make-udp-socket))
+               (cl-cc/vm:socket-connect sender "127.0.0.1" port)
+               (expect (= 3 (cl-cc/vm:socket-send sender #(117 100 112))) :to-be-truthy)
+               (multiple-value-bind (payload count) (cl-cc/vm:socket-receive receiver :size 3 :stringp t)
+                 (expect (= 3 count) :to-be-truthy)
+                 (expect payload :to-equal "udp"))))
+        (when sender (cl-cc/vm:socket-close sender))
+        (when receiver (cl-cc/vm:socket-close receiver))))))
 
 (it-sequential "io-fr852-dns-localhost-cache-and-async"
-  (let ((addresses (cl-cc/vm:dns-resolve "localhost" :ttl 60)))
-    (expect (member "127.0.0.1" addresses :test #'string=) :to-be-truthy)
-    (expect (plusp (length (cl-cc/vm:getaddrinfo "localhost" :service 80))) :to-be-truthy)
-    (let ((async (cl-cc/vm:dns-resolve-async "localhost")))
-      (sb-thread:join-thread (cl-cc/vm::dns-async-result-thread async))
-      (expect (cl-cc/vm:dns-async-result-done-p async) :to-be-truthy)
-      (expect (cl-cc/vm:dns-async-result-error async) :to-equal nil)
-      (expect (member "127.0.0.1" (cl-cc/vm:dns-async-result-result async)
-                           :test #'string=) :to-be-truthy))))
+  (sb-ext:with-timeout 5
+    (let ((addresses (cl-cc/vm:dns-resolve "localhost" :ttl 60)))
+      (expect (member "127.0.0.1" addresses :test #'string=) :to-be-truthy)
+      (expect (plusp (length (cl-cc/vm:getaddrinfo "localhost" :service 80))) :to-be-truthy)
+      (let* ((timeout 5)
+             (join-timeout (gensym "JOIN-TIMEOUT"))
+             (async (cl-cc/vm:dns-resolve-async "localhost"))
+             (thread (cl-cc/vm::dns-async-result-thread async)))
+        (unwind-protect
+             (progn
+               (expect (eq (sb-thread:join-thread thread :timeout timeout :default join-timeout)
+                           join-timeout)
+                       :to-be-falsy)
+               (expect (cl-cc/vm:dns-async-result-done-p async) :to-be-truthy)
+               (expect (cl-cc/vm:dns-async-result-error async) :to-equal nil)
+               (expect (member "127.0.0.1" (cl-cc/vm:dns-async-result-result async)
+                               :test #'string=)
+                       :to-be-truthy))
+          (when (sb-thread:thread-alive-p thread)
+            (sb-thread:terminate-thread thread))
+          (sb-thread:join-thread thread :timeout timeout :default join-timeout))))))
 
 (it-sequential "io-fr853-tls-context-and-unsupported-condition"
   (let ((context (cl-cc/vm:make-tls-context :verify-peer t)))

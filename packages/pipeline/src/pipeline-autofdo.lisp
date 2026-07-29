@@ -204,50 +204,61 @@ profile instead of failing compilation."
       (t (let ((ip-token (find-if #'%autofdo-hex-token-p parts)))
            (and ip-token (list (%autofdo-parse-ip ip-token) 1)))))))
 
-(defun autofdo-hot-cold-layout-decisions (function-hotness &key (hot-percentile 0.80))
-  "Generate hot/cold function layout decisions from FUNCTION-HOTNESS rows."
-  (let* ((rows (sort (copy-list function-hotness) #'> :key #'cdr))
-         (total (reduce #'+ rows :key #'cdr :initial-value 0))
-         (seen 0))
-    (loop for (fn . count) in rows
-          for hotp = (or (zerop total)
-                         (<= (/ (float (incf seen count)) total) hot-percentile)
-                         (= count (cdar rows)))
-          collect (list :function fn
-                        :count count
-                        :layout (if hotp :hot :cold)))))
+(defun %autofdo-branch-from-line (line)
+  "Return (PC . PROBABILITY) from perf/DTrace branch sample LINE.
+
+Accepted rows are `branch PC TAKEN TOTAL` and `dtrace-branch PC TAKEN TOTAL`.
+Malformed rows and zero totals are ignored conservatively."
+  (let ((parts (remove "" (uiop:split-string line :separator (list #\Space #\Tab #\Newline))
+                       :test (function string=))))
+    (when (and (= (length parts) 4)
+               (member (string-downcase (first parts))
+                       (list "branch" "dtrace-branch") :test (function string=)))
+      (let ((pc (%autofdo-parse-ip (second parts)))
+            (taken (%autofdo-parse-int (third parts)))
+            (total (%autofdo-parse-int (fourth parts))))
+        (when (and pc taken total (plusp total) (<= 0 taken total))
+          (cons pc (/ (float taken) total)))))))
+
 
 (defun read-autofdo-profile (profile-path &key perf-map-path executable-path)
   "Read PROFILE-PATH and return an AUTOFDO-PROFILE structure.
-Supported inputs include AutoFDO address/count rows, `perf script` rows, and a
-basic binary perf.data parser for PERF_RECORD_MMAP/PERF_RECORD_SAMPLE."
-  (let* ((bytes (%autofdo-read-file-bytes profile-path)))
+Supported inputs include AutoFDO address/count rows, `perf script` rows,
+DTrace branch rows, and a basic binary perf.data record parser."
+  (let ((bytes (%autofdo-read-file-bytes profile-path)))
     (when (%autofdo-binary-profile-p bytes)
       (return-from read-autofdo-profile
         (read-perf-data-binary profile-path
                                :perf-map-path perf-map-path
                                :executable-path executable-path))))
   (let* ((map (read-perf-map (or perf-map-path (perf-map-path))))
-          (hotness (make-hash-table :test #'equal))
-          (samples nil))
+         (hotness (make-hash-table :test (function equal)))
+         (branches (make-hash-table :test (function eql)))
+         (samples nil))
     (when (probe-file profile-path)
       (handler-case
-          (with-open-file (in profile-path :direction :input :element-type 'character)
+          (with-open-file (in profile-path :direction :input :element-type (quote character))
             (loop for line = (read-line in nil nil)
                   while line
-                  for sample = (%autofdo-sample-from-line line)
-                  when sample
-                    do (destructuring-bind (ip count) sample
+                  for branch = (%autofdo-branch-from-line line)
+                  for sample = (unless branch (%autofdo-sample-from-line line))
+                  do (cond
+                       (branch
+                        (setf (gethash (car branch) branches) (cdr branch)))
+                       (sample
+                        (destructuring-bind (ip count) sample
                           (let ((fn (%autofdo-map-ip ip map executable-path)))
                             (push (list :ip ip :count count :function fn) samples)
-                            (%autofdo-record-function-sample hotness fn count)))))
-         (error () nil)))
-    (let ((rows nil))
-      (maphash (lambda (k v) (push (cons k v) rows)) hotness)
-      (setf rows (sort rows #'> :key #'cdr))
+                            (%autofdo-record-function-sample hotness fn count)))))))
+        (error () nil)))
+    (let ((rows nil)
+          (branch-rows nil))
+      (maphash (lambda (key value) (push (cons key value) rows)) hotness)
+      (maphash (lambda (pc probability) (push (cons pc probability) branch-rows)) branches)
+      (setf rows (sort rows (function >) :key (function cdr)))
       (make-autofdo-profile
        :function-hotness rows
-       :branch-probabilities nil
+       :branch-probabilities (sort branch-rows (function <) :key (function car))
        :raw-samples (nreverse samples)
        :perf-map map
        :layout-decisions (autofdo-hot-cold-layout-decisions rows)))))
