@@ -346,15 +346,10 @@
        (declare (ignore instance slot-name))
        instance)"
     "(defun slot-exists-p (instance slot-name)
-       (declare (ignore instance slot-name))
-       nil)"
+       (cl:slot-exists-p instance slot-name))"
     "(defun update-instance-for-different-class (previous current &rest initargs)
        (declare (ignore previous current initargs))
        nil)"
-    "(defun make-instances-obsolete (class)
-       (declare (ignore class))
-       nil)"
-
     ;; Hash table accessors
     "(defun sxhash (object)
        (cond ((integerp object) object)

@@ -608,3 +608,23 @@
     ;; cache appears to re-resolve/fall back gracefully instead of raising. Needs
     ;; a domain decision on whether stale-generation dispatch should error.
     (cl-cc/vm::execute-instruction inst s 30 labels)))
+
+(it-sequential "stdlib-slot-exists-p-funcall-present-and-missing"
+  (assert-evaluates-to
+   "(progn
+      (defclass vm-slot-exists-wrapper () ((present :initarg :present)))
+      (let ((instance (make-instance (quote vm-slot-exists-wrapper) :present 1)))
+        (list (funcall (function slot-exists-p) instance (quote present))
+              (funcall (function slot-exists-p) instance (quote missing)))))"
+   (quote (t nil))
+   :stdlib t))
+
+(it-sequential "stdlib-make-instances-obsolete-symbol-and-class-return-class"
+  (assert-evaluates-to
+   "(progn
+      (defclass vm-obsolete-return () ())
+      (let ((class (find-class (quote vm-obsolete-return))))
+        (list (eq (make-instances-obsolete (quote vm-obsolete-return)) class)
+              (eq (make-instances-obsolete class) class))))"
+   (quote (t t))
+   :stdlib t))
