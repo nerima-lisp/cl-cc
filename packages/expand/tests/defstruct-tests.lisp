@@ -144,15 +144,14 @@
       (expect (gethash id-accessor cl-cc/expand:*defstruct-read-only-accessor-map*) :to-be-truthy)
       (expect (gethash payload-accessor cl-cc/expand:*accessor-slot-map*) :to-be-truthy))))
 
-;; The read-only setf enforcement in EXPAND-SETF-ACCESSOR is verified correct in
-;; isolation (it signals for (setf (packet-id p) 10) after registering a
-;; read-only PACKET-ID). But when the full defstruct-tests file runs, accumulated
-;; global state from the ~38 preceding tests suppresses the read-only branch, so
-;; the guard does not fire. This is a pre-existing test-isolation fragility that
-;; the broken framework assert-signals masked (it always passed vacuously);
-;; correct cl-weave (signals) exposes it. Needs a test-isolation fix, not a
-;; source fix. See memory cl-cc-cl-weave-fixtures.
-(it-sequential "ds-read-only-accessor-setf-signals-error" (cl-cc/expand:with-fresh-defstruct-registries (ds-expand '(defstruct packet (id 0 :read-only t) payload)) (signals error (cl-cc/expand::expand-setf-accessor '(packet-id packet) 10))))
+(it-sequential "ds-read-only-accessor-setf-signals-error"
+  (cl-cc/expand:with-fresh-defstruct-registries
+    (let* ((exp (ds-expand (quote (defstruct packet (id 0 :read-only t) payload))))
+           (slot-specs (fourth (second exp)))
+           (id-slot (first slot-specs))
+           (id-accessor (getf (rest id-slot) :reader)))
+      (signals error
+        (cl-cc/expand::expand-setf-accessor (list id-accessor (quote packet)) 10)))))
 
 (it-sequential "ds-empty-struct-has-zero-slots"
   (cl-cc/expand:with-fresh-defstruct-registries
