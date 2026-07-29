@@ -20,8 +20,8 @@
   (let* ((heap (make-write-barrier-test-heap))
          (young (cl-cc/runtime:rt-heap-young-from-base heap))
          (old (cl-cc/runtime:rt-heap-old-base heap))
-         (boxed-young (cl-cc/runtime:encode-pointer young))
-         (boxed-old (cl-cc/runtime:encode-pointer old)))
+         (boxed-young (cl-cc/runtime:encode-pointer young cl-cc/runtime:+tag-object+))
+         (boxed-old (cl-cc/runtime:encode-pointer old cl-cc/runtime:+tag-object+)))
     (expect (cl-cc/jit:old-to-young-reference-p heap old young) :to-be-truthy)
     (expect (not (cl-cc/jit:old-to-young-reference-p heap old old)) :to-be-truthy)
     (expect

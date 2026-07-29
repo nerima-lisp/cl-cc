@@ -8,6 +8,7 @@
   lib,
   version,
   sbclWithTests,
+  sbclWithJitTests,
   apps,
   clProlog,
   clWeave,
@@ -41,6 +42,16 @@
     installPhase = "mkdir -p $out && touch $out/passed";
     meta.description = "cl-cc canonical fast unit test suite";
   };
+
+  jitTests = pkgs.runCommand "cl-cc-jit-tests" { nativeBuildInputs = [ sbclWithJitTests ]; } ''
+    export HOME="$TMPDIR/home"
+    export XDG_CACHE_HOME="$TMPDIR/cache"
+    mkdir -p "$HOME" "$XDG_CACHE_HOME"
+    sbcl --non-interactive \
+      --eval '(require :asdf)' \
+      --eval '(asdf:test-system "cl-cc-jit/tests")'
+    touch $out
+  '';
 
   # Standalone cl-weave suite for packages/prolog-tools (the cl-prolog based
   # call-graph analysis tools). Independent of `default` above: that one

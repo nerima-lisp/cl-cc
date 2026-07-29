@@ -516,6 +516,7 @@
             testAsdfSystems
             sbclWithCLCC
             sbclWithJavascriptTests
+            sbclWithJitTests
             sbclWithTests
             cl-cc-prolog-tools
             cl-cc-prolog-tools-test
@@ -583,6 +584,7 @@
               pkgs
               lib
               version
+              sbclWithJitTests
               sbclWithTests
               clProlog
               clWeave
@@ -602,7 +604,7 @@
               test-image = testImage;
             };
           inherit (appsModule) apps;
-          inherit (checksModule) testSuite prologToolsTests;
+          inherit (checksModule) testSuite jitTests prologToolsTests;
           inherit (devshellModule) devShells;
         }
       );
@@ -637,6 +639,10 @@
         # packages/prolog-tools has its own cl-weave suite, driven by
         # `asdf:test-system` rather than by cl-cc's runner.
         cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
+
+        # The JIT write-barrier suite is a secondary ASDF system and must be
+        # exercised explicitly; building its FASLs alone does not run tests.
+        cl-cc-jit-tests = perSystem.${system}.jitTests;
       });
 
       apps = forAllSystems (system: perSystem.${system}.apps);

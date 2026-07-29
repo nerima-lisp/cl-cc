@@ -27,4 +27,4 @@
   :perform (asdf:test-op
     (operation component)
     (declare (ignore operation component))
-    (uiop:symbol-call :cl-cc/test '#:run-tests)))
+    (unless (uiop:symbol-call :cl-weave :run-all :reporter :spec :pass-with-no-tests nil) (error "cl-cc-jit test suite failed."))))

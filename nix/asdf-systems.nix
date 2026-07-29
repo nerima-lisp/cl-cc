@@ -191,6 +191,15 @@ let
   # Umbrella + helpers. cl-cc bundles the umbrella package + compile-pipeline.
   # cl-cc-cli depends on :cl-cc. cl-cc-testing-framework also depends on :cl-cc.
   derivedSpec = {
+    cl-cc-jit = {
+      src = "src/jit";
+      deps = [
+        "cl-cc-runtime"
+        "cl-cc-vm"
+        "cl-cc-codegen"
+        "cl-cc-compile"
+      ];
+    };
     cl-cc = {
       # t/ and run-tests.lisp are shipped even though `systems = [ "cl-cc" ]`
       # never compiles them. cl-cc.asd defines "cl-cc/test" as well as "cl-cc",
@@ -226,6 +235,7 @@ let
         "cl-cc-regalloc"
         "cl-cc-codegen"
         "cl-cc-emit"
+        "cl-cc-jit"
       ];
     };
     cl-cc-cli = {
@@ -356,6 +366,27 @@ let
   # Keep self-hosting E2E tests available as an explicit system; the canonical
   # fast test app does not auto-load it.
   testAsdfSystems = {
+    "cl-cc-jit/tests" = sbcl.buildASDFSystem {
+      pname = "cl-cc-jit-tests";
+      version = "0.1.0";
+      src = pkgSrc testSrc;
+      systems = [ "cl-cc-jit/tests" ];
+
+      # cl-cc-jit/tests is a secondary system in cl-cc-jit.asd. Resolve it
+      # from this writable test source before the production JIT derivation.
+      preBuild = ''
+        export CL_SOURCE_REGISTRY="$src//''${CL_SOURCE_REGISTRY:+:$CL_SOURCE_REGISTRY}"
+      '';
+
+      postInstall = ''
+        find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
+      '';
+
+      lispLibs = with productionAsdfSystems; [
+        cl-cc-jit
+        cl-cc-testing-framework
+      ];
+    };
     "cl-cc/test" = sbcl.buildASDFSystem {
       # pname stays hyphenated: it becomes a store path component, which cannot
       # contain a slash. Only `systems` names the ASDF system.
@@ -433,6 +464,9 @@ in
   # on every run.
   sbclWithTests = sbcl.withPackages (
     _: [ testAsdfSystems."cl-cc/test" ] ++ (lib.attrValues productionAsdfSystems)
+  );
+  sbclWithJitTests = sbcl.withPackages (
+    _: [ testAsdfSystems."cl-cc-jit/tests" ] ++ (lib.attrValues productionAsdfSystems)
   );
   sbclWithJavascriptTests = sbcl.withPackages (
     _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-javascript-test" ]
