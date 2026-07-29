@@ -264,12 +264,23 @@ Falls back to the generic binop-ctor when no specialization applies."
 
 (defun %numeric-binop-precision (op lhs rhs ctx)
   "Return the VM precision when OP has a statically specialized float constructor."
-  (let ((lhs-type (%ast-proven-type ctx lhs))
-        (rhs-type (%ast-proven-type ctx rhs)))
+  (labels ((single-float-node-p (node)
+             (loop while (typep node (quote ast-the))
+                   for declared = (ast-the-type node)
+                   when (and declared
+                             (type-equal-p (parse-type-specifier declared)
+                                           +codegen-single-float-type+))
+                     do (return-from single-float-node-p t)
+                   do (setf node (ast-the-value node)))
+             (if (typep node (quote ast-quote))
+                 (typep (ast-quote-value node) (quote single-float))
+                 (let ((proven-type (%ast-proven-type ctx node)))
+                   (and proven-type
+                        (type-equal-p proven-type +codegen-single-float-type+))))))
     (when (and (eq (%numeric-binop-specialization-kind lhs rhs ctx) :float)
                (%numeric-binop-ctor-function op :float))
-      (if (and (is-subtype-p lhs-type +codegen-single-float-type+)
-               (is-subtype-p rhs-type +codegen-single-float-type+))
+      (if (and (single-float-node-p lhs)
+               (single-float-node-p rhs))
           :f32
           :f64))))
 

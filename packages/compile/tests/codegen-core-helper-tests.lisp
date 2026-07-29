@@ -203,13 +203,21 @@
 (it-sequential "numeric-binop-precision-single-floats"
   (let ((ctx (make-codegen-ctx)))
     (expect (cl-cc/compile::%numeric-binop-precision
-             '+
+             (quote +)
              (make-ast-quote :value 1.0f0)
              (make-ast-quote :value 2.0f0)
              ctx)
             :to-be :f32)
     (expect (cl-cc/compile::%numeric-binop-precision
-             '<
+             (quote +)
+             (make-ast-the :type (quote single-float)
+                           :value (make-ast-var :name (quote lhs)))
+             (make-ast-the :type (quote single-float)
+                           :value (make-ast-var :name (quote rhs)))
+             ctx)
+            :to-be :f32)
+    (expect (cl-cc/compile::%numeric-binop-precision
+             (quote <)
              (make-ast-quote :value 1.0f0)
              (make-ast-quote :value 2.0f0)
              ctx)
