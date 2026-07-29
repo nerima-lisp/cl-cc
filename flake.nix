@@ -116,7 +116,7 @@
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/f09e2e2";
+      url = "github:nerima-lisp/cl-cc-optimize/f020798";
       flake = false;
     };
     cl-cc-codegen-native = {
