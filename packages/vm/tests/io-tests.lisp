@@ -313,12 +313,11 @@
 ;;; ─── clone-vm-state ───────────────────────────────────────────────────────
 (it-sequential "clone-vm-state-copies-global-vars"
   (let ((source (cl-cc:make-vm-state)))
-    (setf (cl-cc/vm::vm-global-vars source) (make-hash-table :test (function equal)))
-    (setf (gethash "x" (cl-cc/vm::vm-global-vars source)) 42)
+    (setf (gethash 'x (cl-cc/vm::vm-global-vars source)) 42)
     (let ((clone (cl-cc/vm::clone-vm-state source)))
-      (expect (gethash "x" (cl-cc/vm::vm-global-vars clone)) :to-equal 42)
-      (setf (gethash "x" (cl-cc/vm::vm-global-vars clone)) 99)
-      (expect (gethash "x" (cl-cc/vm::vm-global-vars source)) :to-equal 42))))
+      (expect (gethash 'x (cl-cc/vm::vm-global-vars clone)) :to-equal 42)
+      (setf (gethash 'x (cl-cc/vm::vm-global-vars clone)) 99)
+      (expect (gethash 'x (cl-cc/vm::vm-global-vars source)) :to-equal 42))))
 
 ;;; ─── FR-868: file-position / file-length / with-binary-file ───────────────
 
