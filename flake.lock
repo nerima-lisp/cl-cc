@@ -207,16 +207,16 @@
     "cl-cc-runtime": {
       "flake": false,
       "locked": {
-        "lastModified": 1785358969,
-        "narHash": "sha256-LqVaoT5BJYCOjr1DbgUgiUGsINzuQUS3aGSgW0O2/gI=",
+        "lastModified": 1785362343,
+        "narHash": "sha256-Bfnrl5uabYLbdu75jPjDc79fK4cnpBMQ7jqlu/mc2P4=",
         "owner": "nerima-lisp",
         "repo": "cl-cc-runtime",
-        "rev": "e7d2419bdf7d3edb870773150b44643c5b55c0df",
+        "rev": "d8d636be399502cbabfedb899f8603c98e128bfb",
         "type": "github"
       },
       "original": {
         "owner": "nerima-lisp",
-        "ref": "e7d2419",
+        "ref": "d8d636b",
         "repo": "cl-cc-runtime",
         "type": "github"
       }

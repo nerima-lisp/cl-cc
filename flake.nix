@@ -136,7 +136,7 @@
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/e7d2419";
+      url = "github:nerima-lisp/cl-cc-runtime/d8d636b";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
