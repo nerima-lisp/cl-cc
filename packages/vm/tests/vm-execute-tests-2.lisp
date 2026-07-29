@@ -164,19 +164,4 @@
        s 0 (%labels))
       (expect (= 20 (cl-cc:vm-reg-get s :R4)) :to-be-truthy))))
 
-(it-sequential "vm-execute-vm-closure-propagates-dispatch-tag"
-  (let ((s (make-test-vm)))
-    (cl-cc:execute-instruction
-     (cl-cc:make-vm-closure :dst :R0
-                            :label "L_TAG"
-                            :params nil
-                            :optional-params nil
-                            :rest-param nil
-                            :key-params nil
-                            :rest-stack-alloc-p nil
-                            :inline-policy nil
-                            :dispatch-tag '(:known-function . tagged)
-                            :captured nil)
-     s 0 (%labels))
-    (let ((closure (cl-cc:vm-reg-get s :R0)))
-      (expect (cl-cc/vm::vm-closure-dispatch-tag closure) :to-equal '(:known-function . tagged)))))
+(progn (it-sequential "vm-execute-vm-closure-propagates-dispatch-tag" (let ((s (make-test-vm))) (cl-cc:execute-instruction (cl-cc:make-vm-closure :dst :R0 :label "L_TAG" :params nil :optional-params nil :rest-param nil :key-params nil :rest-stack-alloc-p nil :inline-policy nil :dispatch-tag (cons :known-function (quote tagged)) :captured nil) s 0 (%labels)) (let ((closure (cl-cc:vm-reg-get s :R0))) (expect (cl-cc/vm::vm-closure-dispatch-tag closure) :to-equal (cons :known-function (quote tagged)))))) (it-sequential "vm-multiple-values-grow-beyond-initial-capacity" (let* ((s (make-test-vm)) (expected (loop for i below 96 collect i)) (registers (loop for i below 96 collect (intern (format nil "MV~D" i) :keyword)))) (loop for register in registers for value in expected do (cl-cc:vm-reg-set s register value)) (cl-cc:execute-instruction (cl-cc:make-vm-values :src-regs registers) s 0 (make-hash-table :test (function equal))) (expect (cl-cc/vm::vm-values-list s) :to-equal expected) (setf (cl-cc/vm::vm-values-list s) expected) (cl-cc:execute-instruction (cl-cc:make-vm-values-to-list :dst :R0) s 0 (make-hash-table :test (function equal))) (expect (cl-cc:vm-reg-get s :R0) :to-equal expected))) (it-sequential "vm-apply-preserves-more-than-64-host-values" (let* ((s (make-test-vm)) (expected (loop for i below 96 collect i))) (cl-cc:vm-reg-set s :FN (lambda (&rest values) (values-list values))) (cl-cc:vm-reg-set s :ARGS expected) (cl-cc:execute-instruction (cl-cc:make-vm-apply :dst :R0 :func :FN :args (list :ARGS)) s 0 (make-hash-table :test (function equal))) (expect (cl-cc:vm-reg-get s :R0) :to-equal 0) (expect (cl-cc/vm::vm-values-list s) :to-equal expected))) (it-sequential "vm-call-preserves-more-than-64-host-values" (let* ((s (make-test-vm)) (expected (loop for i below 96 collect i))) (cl-cc:vm-reg-set s :FN (lambda (values) (values-list values))) (cl-cc:vm-reg-set s :src-regs expected) (cl-cc:execute-instruction (cl-cc:make-vm-call :dst :R0 :func :FN :args (list :src-regs)) s 0 (make-hash-table :test (function equal))) (expect (cl-cc:vm-reg-get s :R0) :to-equal 0) (expect (cl-cc/vm::vm-values-list s) :to-equal expected))))
