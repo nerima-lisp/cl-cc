@@ -302,6 +302,40 @@
                    :result-register :R0)))
     (expect (= 77 (cl-cc:run-compiled program)) :to-be-truthy)))
 
+(it-sequential "vm-abort-to-prompt-restores-physical-stack-snapshot"
+  (let* ((state (make-test-vm))
+         (labels (%labels "body" 10))
+         (closure (%make-test-closure "body" nil)))
+    (cl-cc/vm::vm-push-call-frame state 1 :outer-result)
+    (let ((prompt-usage (cl-cc/runtime::stack-segment-used
+                         (cl-cc/vm::vm-current-stack-segment state))))
+      (cl-cc:vm-reg-set state :fn closure)
+      (cl-cc:vm-reg-set state :prompt 'p)
+      (cl-cc:execute-instruction
+       (cl-cc:make-vm-call-with-prompt :dst :result :func :fn :prompt :prompt)
+       state 3 labels)
+      (let ((aborted-chain (cl-cc/vm::vm-current-stack-segment state)))
+        (expect (> (cl-cc/runtime::stack-segment-used aborted-chain) prompt-usage)
+                :to-be-truthy)
+        (cl-cc:vm-reg-set state :abort-prompt 'p)
+        (cl-cc:vm-reg-set state :abort-value 77)
+        (multiple-value-bind (new-pc signal return-value)
+            (cl-cc:execute-instruction
+             (cl-cc:make-vm-abort-to-prompt
+              :prompt :abort-prompt :value :abort-value)
+             state 10 labels)
+          (declare (ignore signal return-value))
+          (let ((restored-chain (cl-cc/vm::vm-current-stack-segment state)))
+            (expect (= 4 new-pc) :to-be-truthy)
+            (expect (eq restored-chain aborted-chain) :to-be-null)
+            (expect (= prompt-usage
+                       (cl-cc/runtime::stack-segment-used restored-chain))
+                    :to-be-truthy)
+            (expect (= 0 (cl-cc/runtime::stack-segment-used aborted-chain))
+                    :to-be-truthy)
+            (expect (cl-cc/runtime::stack-segment-prev aborted-chain)
+                    :to-be-null)))))))
+
 (it-sequential "vm-execute-mv-buffer-frame-protocol"
   (let ((s (make-test-vm))
         (labels nil))
