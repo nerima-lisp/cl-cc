@@ -190,6 +190,19 @@ profile instead of failing compilation."
        :perf-map (sort map #'< :key #'first)
        :layout-decisions (autofdo-hot-cold-layout-decisions rows)))))
 
+(defun autofdo-hot-cold-layout-decisions (function-hotness &key (hot-percentile 0.80))
+  "Generate hot/cold function layout decisions from FUNCTION-HOTNESS rows."
+  (let* ((rows (sort (copy-list function-hotness) #'> :key #'cdr))
+         (total (reduce #'+ rows :key #'cdr :initial-value 0))
+         (seen 0))
+    (loop for (fn . count) in rows
+          for hotp = (or (zerop total)
+                         (<= (/ (float (incf seen count)) total) hot-percentile)
+                         (= count (cdar rows)))
+          collect (list :function fn
+                        :count count
+                        :layout (if hotp :hot :cold)))))
+
 (defun %autofdo-sample-from-line (line)
   "Return (IP COUNT) from a text profile LINE when possible."
   (let ((parts (remove "" (uiop:split-string line :separator '(#\Space #\Tab #\Newline))

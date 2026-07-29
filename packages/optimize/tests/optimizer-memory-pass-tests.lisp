@@ -502,15 +502,15 @@
                                             :initial-element nil :fill-pointer nil
                                             :adjustable nil :element-type nil)
                         (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r2)
-                        (make-vm-slot-read :dst :v :obj-reg :arr :slot-name 'x)
+                        (cl-cc:make-vm-slot-read :dst :v :obj-reg :arr :slot-name 'x)
                         (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r3)
                         (make-vm-ret :reg :v)))))
-    (expect (= 1 (%count-insts-of-type result #'vm-slot-write-p)) :to-be-truthy)))
+    (expect (= 1 (%count-insts-of-type result #'cl-cc/vm::vm-slot-write-p)) :to-be-truthy)))
 
 (it-sequential "dead-store-elim-unknown-alias-read-observes-slot-store"
   (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
                   (list (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r1)
-                        (make-vm-slot-read :dst :v :obj-reg :b :slot-name 'x)
+                        (cl-cc:make-vm-slot-read :dst :v :obj-reg :b :slot-name 'x)
                         (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r2)
                         (make-vm-ret :reg :v)))))
-    (expect (= 2 (%count-insts-of-type result #'vm-slot-write-p)) :to-be-truthy)))
+    (expect (= 2 (%count-insts-of-type result #'cl-cc/vm::vm-slot-write-p)) :to-be-truthy)))
