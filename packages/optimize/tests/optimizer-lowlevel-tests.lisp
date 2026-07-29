@@ -62,7 +62,7 @@
 
 (it-sequential "fold-branch-known known-true-no-branch"
   (destructuring-bind (const-val verify) (list 1 (lambda (out)
-             (assert-false (find-if #'cl-cc:vm-jump-p out))))
+             (expect (find-if #'cl-cc:vm-jump-p out) :to-be-falsy)))
     (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val)
                        (cl-cc:make-vm-jump-zero :reg :R0 :label "target")))
           (out (cl-cc/optimize::opt-pass-fold instrs)))
@@ -71,7 +71,7 @@
 
 (it-sequential "fold-branch-known known-false-jump"
   (destructuring-bind (const-val verify) (list nil (lambda (out)
-             (assert-true (find-if #'cl-cc:vm-jump-p out))))
+             (expect (find-if #'cl-cc:vm-jump-p out) :to-be-truthy)))
     (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val)
                        (cl-cc:make-vm-jump-zero :reg :R0 :label "target")))
           (out (cl-cc/optimize::opt-pass-fold instrs)))

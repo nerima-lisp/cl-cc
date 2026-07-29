@@ -234,7 +234,7 @@
 
 (defun %optimize-backend-assert-member (expected values test)
   "Assert that EXPECTED is present in VALUES according to TEST."
-  (assert-true (member expected values :test test)))
+  (expect (member expected values :test test) :to-be-truthy))
 
 (defun %optimize-backend-assert-evidence-contains
     (evidence modules api-symbols test-anchors)
@@ -259,8 +259,8 @@
     (feature-id status modules api-symbols test-anchors)
   "Assert the roadmap evidence contract for FEATURE-ID."
   (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-    (assert-true evidence)
-    (assert-eq status (cl-cc/optimize::opt-roadmap-evidence-status evidence))
+    (expect evidence :to-be-truthy)
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be status)
     (%optimize-backend-assert-evidence-contains
      evidence
      modules
@@ -621,9 +621,9 @@
                    cl-cc/optimize::opt-interval-logand
                    overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add)
                   ("FR-360" :implemented
-                    "packages/type/src/inference-handlers.lisp"
-                    ("CL-CC/TYPE" . "INFER-THE")
-                    infer-the-matching-type-is-fixnum)
+                    "packages/compile/src/codegen-core-control.lisp"
+                    ("CL-CC/COMPILE" . "%COMPILE-IF-BRANCH")
+                    codegen-the-with-declared-integer-type-emits-typep)
                    ("FR-366" :partial
                    "packages/expand/src/macros-runtime-support.lisp"
                    ("CL-CC/EXPAND" . "*LOAD-TIME-VALUE-CACHE*")

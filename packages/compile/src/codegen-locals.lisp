@@ -453,9 +453,13 @@ Returns (func-infos forward-env) where each info is (name label closure-reg box-
   "Maps backend keyword to the target class to instantiate for assembly emission.")
 
 (defun target-instance (target)
-  "Return a fresh target object for TARGET, or NIL for :vm."
+  "Return a fresh target object for TARGET, NIL for :vm, or signal an error."
   (let ((entry (assoc target *target-class-table*)))
-    (when entry (make-instance (cdr entry)))))
+    (cond
+      ((eq target :vm) nil)
+      (entry (make-instance (cdr entry)))
+      (t
+       (error "Unsupported target: ~S" target)))))
 
 (defun %emit-x86-64-regalloc (program target-object)
   "Run register allocation for an x86-64 target, updating TARGET-OBJECT in place.

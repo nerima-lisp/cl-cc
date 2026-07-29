@@ -35,6 +35,14 @@ against: the set has to be identical to what the old package scan produced."
           (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))
           (push sym registered))))))
 
+(defun %register-backend-runtime-bridges ()
+  "Register every loaded backend runtime bridge at pipeline start-up.
+
+This compatibility boundary is called unconditionally by both source compilation
+entry points. Bridge discovery belongs to the backend registries, so the pipeline
+must not name or scan an external backend package here."
+  (%register-backend-protocol-bridges))
+
 (defun %register-php-runtime-bridges ()
   "Register PHP runtime helpers as VM host bridge functions.
 
@@ -42,7 +50,6 @@ Kept as a name because the pipeline calls it at a specific point in start-up;
 the work is now the backend protocol's, and this registers whatever backends
 have registered themselves, PHP among them."
   (%register-backend-protocol-bridges))
-
 (defun %backend-vm-integration ()
   "Build the VM capabilities handed to every registered backend.
 

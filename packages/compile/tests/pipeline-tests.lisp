@@ -309,3 +309,22 @@ asserting the new path reproduces it has to still hold the old one."
       (let ((scan (%package-prefixed-function-symbols (first spec) (second spec))))
         (expect (plusp (length scan)) :to-be-truthy)
         (expect (set-difference scan registered) :to-be-null)))))
+
+  (it-sequential "backend-runtime-bridge-lifecycle-registers-provider-entry"
+    (let ((entry (first (cl-cc/bootstrap:backend-bridge-providers))))
+      (expect entry :to-be-truthy)
+      (when entry
+        (let* ((symbol (car entry))
+               (function (cdr entry))
+               (table cl-cc/vm::*vm-host-bridge-functions*))
+          (multiple-value-bind (previous present-p) (gethash symbol table)
+            (unwind-protect
+                 (progn
+                   (remhash symbol table)
+                   (let ((registered
+                           (cl-cc/pipeline::%register-backend-runtime-bridges)))
+                     (expect (member symbol registered) :to-be-truthy)
+                     (expect (gethash symbol table) :to-be function)))
+              (if present-p
+                  (setf (gethash symbol table) previous)
+                  (remhash symbol table))))))))
