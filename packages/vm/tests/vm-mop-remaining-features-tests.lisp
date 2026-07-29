@@ -309,30 +309,52 @@ turn into clean test failures rather than blocking the parallel worker thread."
 
 ;;; ─── Satiated generic functions ──────────────────────────────────────────
 
-(it-sequential "mop-satiated-gfs-dispatch-after-satiation-same-method"
+(it-sequential "mop-satiate-generic-function-preserves-dispatch"
   :timeout
   5
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-satiated (x))
       (defmethod mop-satiated ((x integer)) :integer)
-      (if (eq (mop-satiated 1) :integer) :ok :bad))"))
+      (let ((gf (ensure-generic-function 'mop-satiated)))
+        (satiate-generic-function gf)
+        (if (and (satiating-gfs-p gf)
+                 (satiating-gfs-p)
+                 (eq (mop-satiated 1) :integer))
+            :ok
+            :bad)))"))
 
-(it-sequential "mop-satiated-gfs-method-addition-after-satiation-behavior"
+(it-sequential "mop-satiated-gfs-method-addition-unsatiates-and-invalidates"
   :timeout
   5
   (assert-mop-red-ok
    "(progn
       (defgeneric mop-satiated-add (x))
       (defmethod mop-satiated-add ((x t)) :fallback)
-      (defmethod mop-satiated-add ((x integer)) :integer)
-      (if (eq (mop-satiated-add 1) :integer) :ok :bad))"))
+      (let ((gf (ensure-generic-function 'mop-satiated-add)))
+        (mop-satiated-add 1)
+        (satiate-generic-function gf)
+        (defmethod mop-satiated-add ((x integer)) :integer)
+        (if (and (not (satiating-gfs-p gf))
+                 (eq (mop-satiated-add 1) :integer))
+            :ok
+            :bad)))"))
 
-(it-sequential "mop-satiated-gfs-predicate"
+(it-sequential "mop-satiated-gfs-predicate-and-dynamic-session"
   :timeout
   5
   (assert-mop-red-ok
-   "(if (fboundp 'satiating-gfs-p) :ok :bad)"))
+   "(progn
+      (defgeneric mop-satiated-session (x))
+      (defmethod mop-satiated-session ((x t)) :fallback)
+      (let ((gf (ensure-generic-function 'mop-satiated-session)))
+        (if (and (not (satiating-gfs-p gf))
+                 (with-satiating-gfs (gf)
+                   (and (satiating-gfs-p)
+                        (satiating-gfs-p gf)))
+                 (satiating-gfs-p gf))
+            :ok
+            :bad)))"))
 
 ;;; ─── MOP functions directly accessible ──────────────────────────────────
 

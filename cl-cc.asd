@@ -160,7 +160,8 @@
        (:file "runtime-stdlib-3-debug-tests")
        (:file "runtime-stdlib-3-io-tests")
        (:file "crash-report-tests")
-       (:file "vm-mop-tests")))
+       (:file "vm-mop-tests")
+ (:file "vm-mop-remaining-features-tests")))
     (:module "parse-tests"
     :pathname "packages/parse/tests"
     :serial t
