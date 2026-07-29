@@ -54,7 +54,15 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
 :TOTAL-COLLECTED-BYTES, and :PAUSE-MS-P99."
   (cl-cc/runtime:gc-stats heap))
 
-(export 'gc-stats :cl-cc)
+(let ((vm-symbol (find-symbol "CLASS-SLOTS" :cl-cc/vm))
+      (expand-symbol (find-symbol "CLASS-SLOTS" :cl-cc/expand)))
+  (when (and vm-symbol expand-symbol (not (eq vm-symbol expand-symbol)))
+    (let ((macro-fn (cl-cc/expand:lookup-macro expand-symbol)))
+      (when macro-fn
+        (cl-cc/expand:register-macro vm-symbol macro-fn)))
+    (unintern expand-symbol :cl-cc/expand))
+  (shadowing-import vm-symbol :cl-cc)
+  (export (list 'gc-stats vm-symbol) :cl-cc))
 
 ;; Re-export all child-package symbols from :cl-cc umbrella, then wire
 ;; use-package bridges so expand/compile source files can see each other's
