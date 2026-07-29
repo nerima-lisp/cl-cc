@@ -51,47 +51,47 @@
 
 (it-sequential "target-64-bit-p-classification x86-64"
   (destructuring-bind (target verify) (list cl-cc/target:*x86-64-target* (lambda (target)
-             (assert-true (cl-cc/target:target-64-bit-p target))))
+             (expect (cl-cc/target:target-64-bit-p target) :to-be-truthy)))
     (funcall verify target)))
 
 (it-sequential "target-64-bit-p-classification aarch64"
   (destructuring-bind (target verify) (list cl-cc/target:*aarch64-target* (lambda (target)
-             (assert-true (cl-cc/target:target-64-bit-p target))))
+             (expect (cl-cc/target:target-64-bit-p target) :to-be-truthy)))
     (funcall verify target)))
 
 (it-sequential "target-64-bit-p-classification riscv64"
   (destructuring-bind (target verify) (list cl-cc/target:*riscv64-target* (lambda (target)
-             (assert-true (cl-cc/target:target-64-bit-p target))))
+             (expect (cl-cc/target:target-64-bit-p target) :to-be-truthy)))
     (funcall verify target)))
 
 (it-sequential "target-64-bit-p-classification wasm32"
   (destructuring-bind (target verify) (list cl-cc/target:*wasm32-target* (lambda (target)
-             (assert-false (cl-cc/target:target-64-bit-p target))))
+             (expect (cl-cc/target:target-64-bit-p target) :to-be-falsy)))
     (funcall verify target)))
 
 (it-sequential "target-has-feature-p-cases x86-sysv"
   (destructuring-bind (target feature verify) (list cl-cc/target:*x86-64-target* :sysv-abi (lambda (target feature)
-             (assert-true (cl-cc/target:target-has-feature-p target feature))))
+             (expect (cl-cc/target:target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-has-feature-p-cases arm-aapcs"
   (destructuring-bind (target feature verify) (list cl-cc/target:*aarch64-target* :aapcs64 (lambda (target feature)
-             (assert-true (cl-cc/target:target-has-feature-p target feature))))
+             (expect (cl-cc/target:target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-has-feature-p-cases wasm-structured"
   (destructuring-bind (target feature verify) (list cl-cc/target:*wasm32-target* :structured-control-flow (lambda (target feature)
-             (assert-true (cl-cc/target:target-has-feature-p target feature))))
+             (expect (cl-cc/target:target-has-feature-p target feature) :to-be-truthy)))
     (funcall verify target feature)))
 
 (it-sequential "target-has-feature-p-cases x86-no-wasm-feat"
   (destructuring-bind (target feature verify) (list cl-cc/target:*x86-64-target* :structured-control-flow (lambda (target feature)
-             (assert-false (cl-cc/target:target-has-feature-p target feature))))
+             (expect (cl-cc/target:target-has-feature-p target feature) :to-be-falsy)))
     (funcall verify target feature)))
 
 (it-sequential "target-has-feature-p-cases wasm-no-sysv"
   (destructuring-bind (target feature verify) (list cl-cc/target:*wasm32-target* :sysv-abi (lambda (target feature)
-             (assert-false (cl-cc/target:target-has-feature-p target feature))))
+             (expect (cl-cc/target:target-has-feature-p target feature) :to-be-falsy)))
     (funcall verify target feature)))
 
 (it-sequential "target-allocatable-regs-behavior"

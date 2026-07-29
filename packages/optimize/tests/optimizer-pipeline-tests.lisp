@@ -262,8 +262,7 @@
       (error "Missing optimizer convergence key: ~S" key)))
 
 (defun %assert-opt-default-convergence-edge (before after)
-  (assert-true (< (%opt-default-convergence-key-position before)
-                  (%opt-default-convergence-key-position after))))
+  (expect (< (%opt-default-convergence-key-position before) (%opt-default-convergence-key-position after)) :to-be-truthy))
 
 (it-sequential "opt-pass-registry-key-presence"
   (dolist (key *opt-pass-registry-presence-keys*)
@@ -660,10 +659,7 @@
     (:site3 :polymorphic :megamorphic :t3 :promote-megamorphic)))
 
 (defun %assert-opt-ic-patch-plan-case (site current-state next-state target expected-kind)
-  (assert-eq expected-kind
-             (cl-cc/optimize::opt-ic-patch-patch-kind
-              (cl-cc/optimize::opt-ic-make-patch-plan
-               site current-state next-state target))))
+  (expect (cl-cc/optimize::opt-ic-patch-patch-kind (cl-cc/optimize::opt-ic-make-patch-plan site current-state next-state target)) :to-be expected-kind))
 
 (it-sequential "optimize-ic-make-patch-plan-classifies-state-transitions"
   (dolist (case *opt-ic-patch-plan-cases*)
@@ -798,11 +794,7 @@
     (:aarch64 :cas :seq-cst :ldxr-stxr)))
 
 (defun %assert-opt-atomic-opcode-case (target operation memory-order expected-opcode)
-  (assert-eq expected-opcode
-             (cl-cc/optimize::opt-select-atomic-opcode
-              :target target
-              :operation operation
-              :memory-order memory-order)))
+  (expect (cl-cc/optimize::opt-select-atomic-opcode :target target :operation operation :memory-order memory-order) :to-be expected-opcode))
 
 (it-sequential "optimize-select-atomic-opcode-reflects-target-and-operation"
   (dolist (case *opt-atomic-opcode-cases*)
@@ -1022,12 +1014,10 @@
   (mapcar #'instruction->sexp instructions))
 
 (defun %opt-assert-program-changed (optimized program)
-  (assert-false (equal (%opt-instruction-sexps optimized)
-                       (%opt-instruction-sexps program))))
+  (expect (equal (%opt-instruction-sexps optimized) (%opt-instruction-sexps program)) :to-be-falsy))
 
 (defun %opt-assert-program-unchanged (optimized program)
-  (assert-equal (%opt-instruction-sexps optimized)
-                (%opt-instruction-sexps program)))
+  (expect (%opt-instruction-sexps program) :to-equal (%opt-instruction-sexps optimized)))
 
 (defun %opt-sortable-loop-body ()
   (list (make-vm-mul :dst :r7 :lhs :r3 :rhs :r4)
@@ -1043,8 +1033,8 @@
   (let* ((program (%opt-canonical-loop-program (%opt-sortable-loop-body)))
          (optimized (funcall pass program)))
     (%opt-assert-program-changed optimized program)
-    (assert-true (typep (nth 6 optimized) 'vm-move))
-    (assert-true (typep (nth 7 optimized) 'vm-mul))))
+    (expect (typep (nth 6 optimized) 'vm-move) :to-be-truthy)
+    (expect (typep (nth 7 optimized) 'vm-mul) :to-be-truthy)))
 
 (defun %opt-loop-split-marker-p (instruction)
   (and (typep instruction 'vm-label)

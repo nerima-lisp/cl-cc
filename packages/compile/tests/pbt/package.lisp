@@ -13,17 +13,11 @@
 
 (defpackage :cl-cc/pbt
   (:use :cl)
+  (:import-from :cl-weave #:expect)
   (:import-from :cl-cc/test
                  #:cl-cc-integration-suite
                  #:defsuite
                  #:in-suite
-                 #:assert-true
-                 #:assert-false
-                 #:assert-=
-                 #:assert-eq
-                 #:assert-equal
-                 #:assert-null
-                 #:assert-type
                  #:run-string)
   (:import-from :cl-cc
                 :ast-node :ast-int :ast-var :ast-binop :ast-if :ast-progn :ast-print
