@@ -14,12 +14,35 @@
     (expect (cl-cc/vm::vm-string-materialize original) :to-equal "abc")
     (expect (cl-cc/vm::vm-string-materialize copy) :to-equal "zbc")))
 
-(it-sequential "strings-cow-subseq-is-displaced-and-freeze-protects"
-  (let ((slice (cl-cc/vm::vm-string-subseq "abcdef" 2 5)))
+(it-sequential
+  "strings-cow-subseq-mutation-detaches-displaced-alias"
+  (let* ((parent (cl-cc/vm::vm-string-copy (copy-seq "abcdef")))
+         (slice (cl-cc/vm::vm-string-subseq parent 2 5))
+         (alias (cl-cc/vm::vm-string-copy slice)))
     (expect (cl-cc/vm::vm-string-materialize slice) :to-equal "cde")
     (expect (cl-cc/vm::vm-cow-string-start slice) :to-equal 2)
-    (cl-cc/vm::string-freeze slice)
-    (signals error (cl-cc/vm::vm-string-set-char slice 0 #\X))))
+    (expect
+      (eq
+        (cl-cc/vm::vm-cow-string-backing parent)
+        (cl-cc/vm::vm-cow-string-backing slice))
+      :to-be-truthy)
+    (expect
+      (eq
+        (cl-cc/vm::vm-cow-string-backing slice)
+        (cl-cc/vm::vm-cow-string-backing alias))
+      :to-be-truthy)
+    (cl-cc/vm::vm-string-set-char slice 1 #\X)
+    (expect (cl-cc/vm::vm-string-materialize parent) :to-equal "abcdef")
+    (expect (cl-cc/vm::vm-string-materialize alias) :to-equal "cde")
+    (expect (cl-cc/vm::vm-string-materialize slice) :to-equal "cXe")
+    (expect (cl-cc/vm::vm-cow-string-start slice) :to-equal 0)
+    (expect
+      (eq
+        (cl-cc/vm::vm-cow-string-backing slice)
+        (cl-cc/vm::vm-cow-string-backing alias))
+      :to-be-falsy)
+    (cl-cc/vm::string-freeze alias)
+    (signals error (cl-cc/vm::vm-string-set-char alias 0 #\Y))))
 
 (it-sequential "strings-taint-mark-untaint"
   (let ((s (copy-seq "unsafe")))
