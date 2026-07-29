@@ -203,8 +203,12 @@
   (destructuring-bind (sym) (list 'cl-cc/vm::copy-on-write-array-p)
     (expect (fboundp sym) :to-be-truthy)))
 
-(it-sequential "fr-function-exists fr-876-segmented-stack"
-  (destructuring-bind (sym) (list 'cl-cc/runtime::grow-stack-segment)
+(it-sequential "fr-876-segmented-stack-api-exists"
+  (dolist (sym (list (quote cl-cc/runtime::grow-stack-segment)
+                     (quote cl-cc/runtime::release-stack-segment)
+                     (quote cl-cc/runtime::stack-segment-ensure-space)
+                     (quote cl-cc/runtime::stack-segment-note-frame)
+                     (quote cl-cc/runtime::stack-segment-release-frame)))
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-877-copying-stack"
