@@ -176,7 +176,7 @@ let
         "(require :sb-cover)"
         "(declaim (optimize sb-cover:store-coverage-data))"
         "(require :asdf)"
-        "(asdf:initialize-source-registry `(:source-registry (:tree ,(uiop:getcwd)) :ignore-inherited-configuration))"
+        "(asdf:initialize-source-registry `(:source-registry (:tree ,(uiop:getcwd)) :inherit-configuration))"
         ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
       ];
       lispPostLoadEvalForms = [
@@ -226,7 +226,7 @@ let
         "(require :sb-cover)"
         "(declaim (optimize sb-cover:store-coverage-data))"
         "(require :asdf)"
-        "(asdf:initialize-source-registry `(:source-registry (:tree ,(uiop:getcwd)) :ignore-inherited-configuration))"
+        "(asdf:initialize-source-registry `(:source-registry (:tree ,(uiop:getcwd)) :inherit-configuration))"
         ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
       ];
       lispPostLoadEvalForms = [
