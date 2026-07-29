@@ -212,9 +212,14 @@ Literals reuse a per-compilation-unit vm-const register via an EQUAL hash table.
     ((typep ast 'ast-quote)
      (let ((val (ast-quote-value ast)))
        (cond
+         ((typep val 'single-float) (parse-type-specifier 'single-float))
+         ((typep val 'double-float) (parse-type-specifier 'double-float))
          ((floatp val) +codegen-float-type+)
          (t nil))))
     (t nil)))
+
+(defparameter +codegen-single-float-type+
+  (parse-type-specifier 'single-float))
 
 (defun %proven-fixnum-type-p (ty)
   "Return T if TY is a proven subtype of fixnum (or nil when type is unknown)."
@@ -256,6 +261,17 @@ Falls back to the generic binop-ctor when no specialization applies."
       ((or (and (%proven-float-type-p lhs-type) (%proven-float-type-p rhs-type))
            (and (%float-literal-node-p lhs) (%float-literal-node-p rhs))) :float)
       (t nil))))
+
+(defun %numeric-binop-precision (op lhs rhs ctx)
+  "Return the VM precision when OP has a statically specialized float constructor."
+  (let ((lhs-type (%ast-proven-type ctx lhs))
+        (rhs-type (%ast-proven-type ctx rhs)))
+    (when (and (eq (%numeric-binop-specialization-kind lhs rhs ctx) :float)
+               (%numeric-binop-ctor-function op :float))
+      (if (and (is-subtype-p lhs-type +codegen-single-float-type+)
+               (is-subtype-p rhs-type +codegen-single-float-type+))
+          :f32
+          :f64))))
 
 (defun %guard-type-for-numeric-kind (kind)
   (case kind
@@ -350,27 +366,33 @@ failing at compile time."
            (comparison-p (%numeric-comparison-binop-p op))
            (result-reg (if comparison-p (make-register ctx) dst))
            (kind (%numeric-binop-specialization-kind lhs-ast rhs-ast ctx))
+           (precision (%numeric-binop-precision op lhs-ast rhs-ast ctx))
            (guard-type (%guard-type-for-numeric-kind kind))
            (ctor (%numeric-binop-constructor op lhs-ast rhs-ast ctx)))
-      (if (and (eq (ctx-target ctx) :vm)
-               kind guard-type (> (ctx-safety ctx) 0))
-          (let ((deopt-label (make-label ctx "deopt_binop"))
-                (slow-label (make-label ctx "deopt_binop_slow"))
-                (done-label (make-label ctx "deopt_binop_done"))
-                (deopt-id (make-label ctx "deopt_guard")))
-            (emit ctx (cl-cc/vm:make-vm-type-check
-                       :src lhs-reg :type-name guard-type :label deopt-label :id deopt-id))
-            (emit ctx (cl-cc/vm:make-vm-type-check
-                       :src rhs-reg :type-name guard-type :label deopt-label :id deopt-id))
-            (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg))
-            (emit ctx (make-vm-jump :label done-label))
-            (emit ctx (make-vm-label :name deopt-label))
-            (emit ctx (cl-cc/vm:make-vm-deopt
-                       :label slow-label :id deopt-id :reason (list :type-check guard-type)))
-            (emit ctx (make-vm-label :name slow-label))
-            (emit ctx (funcall (binop-ctor op) :dst result-reg :lhs lhs-reg :rhs rhs-reg))
-            (emit ctx (make-vm-label :name done-label)))
-          (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg)))
+      (labels ((emit-selected ()
+                 (if precision
+                     (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg
+                                      :precision precision))
+                     (emit ctx (funcall ctor :dst result-reg :lhs lhs-reg :rhs rhs-reg)))))
+        (if (and (eq (ctx-target ctx) :vm)
+                 kind guard-type (> (ctx-safety ctx) 0))
+            (let ((deopt-label (make-label ctx "deopt_binop"))
+                  (slow-label (make-label ctx "deopt_binop_slow"))
+                  (done-label (make-label ctx "deopt_binop_done"))
+                  (deopt-id (make-label ctx "deopt_guard")))
+              (emit ctx (cl-cc/vm:make-vm-type-check
+                         :src lhs-reg :type-name guard-type :label deopt-label :id deopt-id))
+              (emit ctx (cl-cc/vm:make-vm-type-check
+                         :src rhs-reg :type-name guard-type :label deopt-label :id deopt-id))
+              (emit-selected)
+              (emit ctx (make-vm-jump :label done-label))
+              (emit ctx (make-vm-label :name deopt-label))
+              (emit ctx (cl-cc/vm:make-vm-deopt
+                         :label slow-label :id deopt-id :reason (list :type-check guard-type)))
+              (emit ctx (make-vm-label :name slow-label))
+              (emit ctx (funcall (binop-ctor op) :dst result-reg :lhs lhs-reg :rhs rhs-reg))
+              (emit ctx (make-vm-label :name done-label)))
+            (emit-selected)))
       (when comparison-p
         (%emit-vm-branch-boolean-as-cl-boolean ctx result-reg dst "binop_bool"))
       dst)))

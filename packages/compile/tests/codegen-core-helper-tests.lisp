@@ -199,3 +199,33 @@
      (make-ast-int :value 5) ctx dst nil nil nil :else)
     (let ((insts (codegen-instructions ctx)))
       (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) insts) :to-be-falsy))))
+
+(it-sequential "numeric-binop-precision-single-floats"
+  (let ((ctx (make-codegen-ctx)))
+    (expect (cl-cc/compile::%numeric-binop-precision
+             '+
+             (make-ast-quote :value 1.0f0)
+             (make-ast-quote :value 2.0f0)
+             ctx)
+            :to-be :f32)
+    (expect (cl-cc/compile::%numeric-binop-precision
+             '<
+             (make-ast-quote :value 1.0f0)
+             (make-ast-quote :value 2.0f0)
+             ctx)
+            :to-be nil)))
+
+(it-sequential "numeric-binop-precision-double-and-mixed-floats"
+  (let ((ctx (make-codegen-ctx)))
+    (expect (cl-cc/compile::%numeric-binop-precision
+             '+
+             (make-ast-quote :value 1.0d0)
+             (make-ast-quote :value 2.0d0)
+             ctx)
+            :to-be :f64)
+    (expect (cl-cc/compile::%numeric-binop-precision
+             '+
+             (make-ast-quote :value 1.0f0)
+             (make-ast-quote :value 2.0d0)
+             ctx)
+            :to-be :f64)))

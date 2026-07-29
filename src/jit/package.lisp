@@ -11,9 +11,9 @@
    #:walk-stack-frame #:register-live-set
    ;; safepoints (FR-551)
    #:*safepoint-enabled* #:emit-safepoint-poll #:*safepoint-flag*
-   #:*safepoint-interval* #:with-safepoints
+   #:*safepoint-interval* #:*safepoint-armed-p* #:init-safepoint-page #:arm-safepoint #:disarm-safepoint #:with-safepoints
    ;; write-barrier (FR-552)
-   #:*card-table* #:card-table-mark #:card-table-clear
+   #:*card-table* #:card-index #:card-table-init #:card-table-mark #:card-table-clear #:card-table-clear-all #:in-old-generation-p #:in-young-generation-p #:old-to-young-reference-p
    #:emit-write-barrier #:barrier-elision-p
    #:with-satb-barrier
    ;; call-stubs (FR-553)

@@ -127,22 +127,9 @@ Requires: dominant type with ≥ 95% frequency + small callee size."
          t)))
 
 (defun emit-guarded-inline (stream func-name call-site callee-code)
-  "Emit guarded inline code: type check + inline body + deopt slow path.
-Pattern:
-  CMP [obj+header], expected-class-tag
-  JNE slow_path
-  ; inline body here
-  JMP done
-slow_path:
-  CALL original_function
-done:"
+  "Reject guarded-inline emission until its native backend is implemented."
   (declare (ignore stream func-name call-site callee-code))
-  ;; In production: emit native x86-64/aarch64 code
-  ;; 1. Compare object header tag with expected class
-  ;; 2. If mismatch, jump to deoptimization slow path
-  ;; 3. Otherwise, execute inlined callee body
-  ;; 4. Merge paths
-  (values))
+  (error "Guarded inline emission is unsupported until a native code emitter and deoptimization path are available."))
 
 ;;; ──── Megamorphic IC Handling (FR-561) ────
 (defvar *megamorphic-threshold* 4
@@ -157,11 +144,9 @@ done:"
             *megamorphic-threshold*))))
 
 (defun emit-megamorphic-dispatch (stream call-site type-distribution)
-  "Emit hash-based O(1) dispatch for a megamorphic call site.
-Uses a global type feedback cache shared across call sites."
+  "Reject megamorphic dispatch until its native backend is implemented."
   (declare (ignore stream call-site type-distribution))
-  ;; In production: emit hash lookup + direct jump table
-  (values))
+  (error "Megamorphic dispatch emission is unsupported until a native hash-dispatch emitter is available."))
 
 ;;; ──── JIT Warmup (FR-562) ────
 (defvar *jit-warmup-profile* nil

@@ -13,24 +13,9 @@
 
 ;;; ──── Stub installation ────
 (defun install-call-stub (func-name bytecode)
-  "Install a call stub for FUNC-NAME that triggers JIT compilation on first call.
-The stub is a 5-byte x86-64 trampoline: CALL compile_stub.
-When bytecode is compiled, the stub is patched to JMP compiled_code."
-  (ensure-jit-native-code-enabled "install a call stub")
-  (let ((stub-addr (allocate-executable-memory *call-stub-size*)))
-    ;; Emit CALL rel32 to compile_stub handler
-    #+x86-64
-    (progn
-      (setf (sb-sys:sap-ref-8 stub-addr 0) #xE8) ; CALL rel32 opcode
-      ;; rel32 = compile_stub_addr - (stub_addr + 5)
-      (setf (sb-sys:sap-ref-32 stub-addr 1)
-            (- (sb-sys:sap-int (get-compile-stub-address))
-               (sb-sys:sap-int stub-addr)
-               5)))
-    ;; Store in table
-    (setf (gethash func-name *call-stub-table*)
-          (cons stub-addr bytecode))
-    stub-addr))
+  "Reject call-stub installation until the native ABI bridge is implemented."
+  (declare (ignore func-name bytecode))
+  (error "Call stub installation is unsupported until a native ABI bridge is available."))
 
 ;;; ──── Stub patching (after compilation) ────
 (defun patch-stub-to-direct (func-name compiled-code-addr)
@@ -108,7 +93,5 @@ Uses mmap with PROT_READ | PROT_WRITE | PROT_EXEC."
                  -1 0))
 
 (defun get-compile-stub-address ()
-  "Return the address of the compile-stub-handler entry point."
-  (ensure-jit-native-code-enabled "resolve compile stub address")
-  (sb-sys:sap-int (sb-sys:vector-sap
-                   (make-array 1 :element-type '(unsigned-byte 8)))))
+  "Reject compile-stub resolution until the native ABI bridge is implemented."
+  (error "Resolving the compile stub address is unsupported until a native ABI bridge is available."))

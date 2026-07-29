@@ -71,24 +71,15 @@
                (load asd-path)))))
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
-      ;; :cl-cc-cli and :cl-cc-testing-framework depend on :cl-cc.
-      ;; These .asd files are only present in development/test builds; probe-file
-      ;; guards so the production Nix derivation succeeds without them.
+      ;; Development/test systems that depend on :cl-cc are loaded explicitly
+      ;; so slash-qualified test systems resolve from the root ASD alone.
       (maybe-load-asd :cl-cc-cli "packages/cli/cl-cc-cli.asd" here)
       (maybe-load-asd :cl-cc-testing-framework "packages/testing-framework/cl-cc-testing-framework.asd" here)
       (maybe-load-asd :cl-cc-docgen "packages/docgen/cl-cc-docgen.asd" here)
-      ;; Register the real FR-796/FR-797 protocol tool system when present.
-      ;; VM no longer defines fallback packages; this optional ASDF reference is
-      ;; the development/test bridge to packages/tools/cl-cc-tools.asd.
       (maybe-load-asd :cl-cc-tools "packages/tools/cl-cc-tools.asd" here)
-      ;; Prolog-based call-graph analysis tools built on the external
-      ;; cl-prolog engine. Optional, like the other entries in this block:
-      ;; probe-file guards so the production Nix derivation succeeds without it.
       (maybe-load-asd :cl-cc-prolog-tools "packages/prolog-tools/cl-cc-prolog-tools.asd" here)
-      ;; FR-320 minimal Lisp code formatter. Optional, like the other entries
-      ;; in this block: probe-file guards so the production Nix derivation
-      ;; succeeds without it.
-      (maybe-load-asd :cl-cc-formatter "packages/formatter/cl-cc-formatter.asd" here))))
+      (maybe-load-asd :cl-cc-formatter "packages/formatter/cl-cc-formatter.asd" here)
+      (maybe-load-asd :cl-cc-jit "src/jit/cl-cc-jit.asd" here))))
 
 ;; :cl-cc-cli is defined in packages/cli/cl-cc-cli.asd.
 ;; :cl-cc-testing-framework is defined in packages/testing-framework/cl-cc-testing-framework.asd.
@@ -104,8 +95,7 @@
   :homepage "https://github.com/nerima-lisp/cl-cc"
   :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
-  :depends-on (:cl-cc :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools
-               :cl-cc-formatter)
+  :depends-on (:cl-cc :cl-cc-jit :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools :cl-cc-formatter)
   :serial t
   :components
   (;; Unit tests — each module now lives in its workspace's tests/ dir

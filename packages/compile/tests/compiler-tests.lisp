@@ -248,3 +248,14 @@
 (it-sequential "float-unboxing-via-the"
   (assert-run= 3.0 "(the float (+ 1.0 2.0))")
   (assert-run= 12.0 "(the float (* 3.0 4.0))"))
+
+(it-sequential "float-unboxing-preserves-source-precision"
+  (dolist (case (list (list "(+ 1.0f0 2.0f0)" :f32)
+                      (list "(+ 1.0d0 2.0d0)" :f64)
+                      (list "(+ 1.0f0 2.0d0)" :f64)))
+    (destructuring-bind (source expected) case
+      (let* ((result (compile-string source))
+             (instruction (find-if (lambda (inst) (typep inst 'vm-float-add))
+                                   (cl-cc/compile:compilation-result-vm-instructions result))))
+        (expect instruction :to-be-truthy)
+        (expect (cl-cc/vm:vm-float-precision instruction) :to-be expected)))))

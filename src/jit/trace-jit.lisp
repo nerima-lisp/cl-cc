@@ -62,25 +62,9 @@ If the guard fails at runtime, execution side-exits to the interpreter."
 
 ;;; ──── Trace compilation ────
 (defun compile-trace (trace)
-  "Compile a recorded TRACE into native code.
-The trace is a linear sequence (no control flow) with guards.
-Returns the entry address of the compiled trace."
-  (unless *trace-jit-enabled*
-    (return-from compile-trace nil))
-  (ensure-jit-native-code-enabled "compile a trace")
-  (let ((instructions (getf trace :instructions))
-        (guards (getf trace :guards))
-        (entry-pc (getf trace :entry-pc)))
-    (declare (ignore entry-pc guards))
-    ;; In production:
-    ;; 1. Allocate executable memory for the trace
-    ;; 2. Emit guard checking code: check each guard, side-exit if failed
-    ;; 3. Emit the linear instruction sequence (no branches needed!)
-    ;; 4. Inline any called functions into the trace body
-    ;; 5. End with a jump back to the trace entry (loop) or interpreter exit
-    (let ((trace-addr (allocate-trace-memory (* (length instructions) 8))))
-      ;; Simplified: return the allocated address
-      trace-addr)))
+  "Reject trace compilation until native emission and W^X transitions exist."
+  (declare (ignore trace))
+  (error "Trace compilation is unsupported until native emission and W^X memory protection are implemented."))
 
 ;;; ──── Side exit handling ────
 (defvar *side-exit-table* (make-hash-table :test #'eql)

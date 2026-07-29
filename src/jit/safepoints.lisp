@@ -1,7 +1,6 @@
 ;;;; src/jit/safepoints.lisp — FR-551 Safepoints (セーフポイント)
 ;;;; Polling-based safe points for JIT-compiled code.
 ;;;; JVM Safepoint / HotSpot polling page / V8 safepoints equivalent.
-
 (in-package :cl-cc/jit)
 
 ;;; ──── Configuration ────
@@ -15,79 +14,82 @@
   "Address of the safepoint flag page. When the GC sets this page to
 non-readable, the next poll triggers a SEGV caught by the signal handler.")
 
-(defvar *safepoint-page-address* nil
-  "Base address of the safepoint polling page.")
+(defvar *safepoint-lock* (sb-thread:make-mutex :name "cl-cc JIT safepoint coordination")
+  "Lock protecting safepoint coordination.")
 
+(defvar *safepoint-page-address* nil
+    "Base address of the safepoint polling page.")
+  (defvar *safepoint-armed-p* nil
+    "True while polls are armed by making the page unreadable.")
+
+;;; ──── Safepoint poll instruction ────
 (defvar *bytes-since-last-safepoint* 0
   "Counter: bytes emitted since last safepoint poll was inserted.")
 
-;;; ──── Safepoint poll instruction ────
-(defun emit-safepoint-poll (stream)
-  "Emit a safepoint polling instruction into the code stream.
-x86-64: TEST [safepoint-address], 0 (7 bytes).
-AArch64: LDR Wzr, [safepoint-address] (4 bytes)."
-  (when (and *safepoint-enabled*
-             (>= *bytes-since-last-safepoint* *safepoint-interval*))
-    #+x86-64
-    (progn
-      ;; TEST [rip+offset], 0 — polls safepoint flag via SEGV on unreadable page
-      ;; Encoding: 64 85 05 XX XX XX XX (RIP-relative)
-      (let ((offset (- *safepoint-page-address*
-                       (+ (stream-position stream) 7))))
-        (write-byte #x64 stream)    ; FS prefix / REX (simplified)
-        (write-byte #x85 stream)    ; TEST r/m32, r32
-        (write-byte #x05 stream)    ; ModRM: [RIP+disp32]
-        (write-sequence (encode-int32 offset) stream)))
-    #-x86-64
-    (progn
-      ;; Generic: emit NOP sequence as placeholder
-      (dotimes (i 4) (write-byte #x90 stream)))
-    (setf *bytes-since-last-safepoint* 0)))
-
 ;;; ──── Safepoint page setup ────
+(defun emit-safepoint-poll (stream)
+  "Emit a polling instruction when supported; otherwise fail rather than emitting invalid code."
+  (declare (ignore stream))
+  (when (and *safepoint-enabled* (>= *bytes-since-last-safepoint* *safepoint-interval*))
+    (error
+      "JIT safepoint poll emission is unsupported without a code-address relocation facility")))
+
 (defun init-safepoint-page ()
-  "Allocate and protect the safepoint polling page.
-The GC makes this page unreadable to trigger SEGV at safepoints."
+  "Allocate the normally readable safepoint polling page."
   (ensure-jit-native-code-enabled "initialize a safepoint page")
-  (let ((page (sb-posix:mmap nil 4096
-                              (logior sb-posix:prot-read sb-posix:prot-write)
-                              (logior sb-posix:map-private
-                                      (sb-posix-map-anonymous-flag))
-                              -1 0)))
-    (setf *safepoint-page-address* (sb-sys:sap-int page))
-    (sb-posix-mprotect page 4096 sb-posix:prot-none) ; start protected
-    page))
+  (sb-thread:with-mutex
+    (*safepoint-lock*)
+    (when *safepoint-page-address*
+      (error "Safepoint page is already initialized"))
+    (let ((page
+          (sb-posix:mmap
+            nil
+            4096
+            sb-posix:prot-read
+            (logior sb-posix:map-private (sb-posix-map-anonymous-flag))
+            -1
+            0)))
+      (setf *safepoint-page-address* (sb-sys:sap-int page)
+            *safepoint-armed-p* nil)
+      page)))
 
 (defun arm-safepoint ()
-  "Make the safepoint page readable (arm the safepoint mechanism)."
-  (when *safepoint-page-address*
-    (sb-posix-mprotect (sb-sys:int-sap *safepoint-page-address*)
-                       4096
-                       (logior sb-posix:prot-read))
-    (values)))
-
-(defun disarm-safepoint ()
-  "Make the safepoint page unreadable (disarm — no polls trigger)."
-  (when *safepoint-page-address*
-    (sb-posix-mprotect (sb-sys:int-sap *safepoint-page-address*)
-                       4096
-                       sb-posix:prot-none)
+  "Arm safepoint polls by making the polling page inaccessible."
+  (sb-thread:with-mutex
+    (*safepoint-lock*)
+    (unless *safepoint-page-address*
+      (error "Safepoint page is not initialized"))
+    (sb-posix-mprotect
+      (sb-sys:int-sap *safepoint-page-address*)
+      4096
+      sb-posix:prot-none)
+    (setf *safepoint-armed-p* t)
     (values)))
 
 ;;; ──── Stop-the-World implementation ────
+(defun disarm-safepoint ()
+  "Disarm safepoint polls by restoring read access to the polling page."
+  (sb-thread:with-mutex
+    (*safepoint-lock*)
+    (unless *safepoint-page-address*
+      (error "Safepoint page is not initialized"))
+    (sb-posix-mprotect
+      (sb-sys:int-sap *safepoint-page-address*)
+      4096
+      sb-posix:prot-read)
+    (setf *safepoint-armed-p* nil)
+    (values)))
+
 (defvar *stw-in-progress* nil
   "T when a Stop-the-World pause is active.")
 
 (defvar *thread-count-at-safepoint* 0
   "Number of threads that have reached the safepoint.")
 
-(defvar *safepoint-lock* nil
-  "Lock protecting safepoint coordination.")
-
 ;;; ──── Atomic increment helper ────
 (defmacro atomic-incf (place)
-  "Increment PLACE by 1. Placeholder for host atomic coordination."
-  `(incf ,place))
+  "Increment PLACE under the safepoint coordination lock."
+  `(sb-thread:with-mutex (*safepoint-lock*) (incf ,place)))
 
 (defun enter-safepoint ()
   "Called by a thread when it hits a safepoint poll during STW."
@@ -101,5 +103,5 @@ The GC makes this page unreadable to trigger SEGV at safepoints."
 (defmacro with-safepoints (&body body)
   "Execute BODY with safepoint polling enabled for JIT code generation."
   `(let ((*safepoint-enabled* t)
-         (*bytes-since-last-safepoint* 0))
-     ,@body))
+        (*bytes-since-last-safepoint* 0))
+    ,@body))

@@ -1,6 +1,8 @@
 # Tooling: Advanced Compilation II
 
-> **Status**: ✅ 120 / ✅ 0 / ✅ 0 — 120 FRs total. FULLY COMPLETE. All FRs implemented, evidenced, and verified. Full codebase audit completed 2026-05-27. See `docs/README.md` for overall progress.
+> **Status**: 実装状況を再監査中（120 FRを索引化）。少なくともFR-553/558/559/560/561/562は部分実装であり、全件完了・検証済みではありません。
+>
+> **検証範囲**: `t/tooling-advanced-2-evidence-tests.lisp` はFR IDの索引網羅性と、参照ファイルまたはディレクトリの存在を確認する情報的テストです。各FRの挙動、CLI導線、VM/JIT統合、ネイティブコード生成の完成を検証するものではありません。
 
 Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, binary/linker, type system extensions, concurrency models, embedded targets, polyhedral/auto-parallelization, multi-level IR, FFI, build reliability, memory representation, function transforms, test instrumentation, build scalability, low-level control.
 
@@ -16,27 +18,28 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: スタックマップなしでMoving GCは実装不可能。JITコンパイラとGCの連携の要
 - **難易度**: Hard
 
-#### ✅ FR-551: Safepoints (セーフポイント)
+#### 🟡 FR-551: Safepoints (セーフポイント)
 
 - **対象**: `packages/vm/src/vm-run.lisp`, `packages/emit/src/x86-64-codegen.lisp`, FR-420（Concurrent GC）前提
-- **現状**: GCはVM命令間の暗黙の停止点のみ。JITコード実行中の安全な停止点がない
+- **現状**: ポーリングページの確保と保護状態の切り替えは実装済み。ただし機械語へのポーリング命令生成は安全なバックエンド統合が未完了のため明示的にunsupportedとなり、JITコードへの挿入導線も未実装
 - **内容**: **ポーリングベース**: JITコードのバックエッジ・関数エントリ・一定命令間隔にポーリング命令（`test [safepoint_flag], 0`）を挿入。GCがflagをセットすると次のポーリングで停止。**スタックウォーキング**: 停止時に全スレッドのフレームをスタックマップ（FR-550）で走査。**Stop-the-World実装**: Concurrent GC（FR-420）のSTWフェーズを実現。JVM Safepoint / HotSpot polling page / V8 safepoints
 - **根拠**: Concurrent GCがスタックスキャンを行う唯一安全な方法。ランタイムの根幹インフラ
 - **難易度**: Hard
 
-#### ✅ FR-552: Write Barrier Optimization (書き込みバリア最適化)
+#### 🟡 FR-552: Write Barrier Optimization (書き込みバリア最適化)
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/emit/src/x86-64-codegen.lisp`
-- **現状**: 2世代GC（`gc.lisp`）の世代間参照追跡（remembered set）にwrite barrierが必要だが最適化なし
+- **現状**: カードテーブルと世代範囲判定は実装済み。ただし機械語へのwrite barrier生成は安全なバックエンド統合が未完了のため明示的にunsupportedとなり、barrier elisionとSATBも未実装
 - **内容**: **Card Table barrier**: ヒープを512バイト「カード」に分割し、スロット書き込み時に対応カードをダーティマーク（1バイト書き込みのみ）。**Remembered set barrier**: Old→Youngの参照のみ記録（Young→Old不要）。**Barrier elision**: コンパイル時にYoung世代オブジェクトへの書き込みと証明された場合はバリア省略（エスケープ解析FR-341連携）。**Snapshot-at-the-beginning (SATB)**: Concurrent GC用のバリア実装
 - **根拠**: write barrierは頻繁に実行されるコード（スロット書き込み毎）。最適化なしでは5〜10%オーバーヘッドが常に発生
 - **難易度**: Hard
 
-#### ✅ FR-553: Lazy JIT Compilation / Call Stubs (遅延JITコンパイル)
+#### 🟡 FR-553: Lazy JIT Compilation / Call Stubs (遅延JITコンパイル)
 
 - **対象**: `src/jit/baseline.lisp`, `packages/vm/src/vm.lisp`
 - **現状**: JIT（FR-330〜331）は呼び出しカウント到達時にコンパイル開始。初回呼び出し時の遅延コンパイルなし
-- **内容**: **コールスタブ**: 未コンパイル関数エントリに「コンパイルしてから再呼び出し」する5バイトのtrampoline stub（`call compile_stub`）を配置。初回呼び出し時のみJITコンパイルを起動し、完了後にstubを実際のコードへの`jmp`で上書き（atomic patch）。**バックグラウンドコンパイル**: コンパイルをバックグラウンドスレッドで実行し、インタープリタで実行継続。V8 Ignition stubs / HotSpot interpreter stubs
+- **要件**: **コールスタブ**: 未コンパイル関数エントリに「コンパイルしてから再呼び出し」する5バイトのtrampoline stub（`call compile_stub`）を配置。初回呼び出し時のみJITコンパイルを起動し、完了後にstubを実際のコードへの`jmp`で上書き（atomic patch）。**バックグラウンドコンパイル**: コンパイルをバックグラウンドスレッドで実行し、インタープリタで実行継続。V8 Ignition stubs / HotSpot interpreter stubs
+- **実装状況**: 部分実装。`src/jit/call-stubs.lisp` にスタブ表とコンパイル要求の管理骨格はあるが、`install-call-stub` と `get-compile-stub-address` はネイティブABIブリッジ未実装として明示的にunsupportedとなる。VMからの初回呼び出し導線、実行可能スタブ生成、atomic patchのend-to-end動作は未完了
 - **根拠**: 全関数を起動時にコンパイルすると初回レイテンシが爆発。Lazy compilationで使われた関数のみをコンパイルする省エネ戦略
 - **難易度**: Hard
 
@@ -60,43 +63,48 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 
 ### Phase 105 — JIT高度化
 
-#### ✅ FR-558: Trace JIT / Hot Trace Recording (トレースJIT)
+#### 🟡 FR-558: Trace JIT / Hot Trace Recording (トレースJIT)
 
 - **対象**: `src/jit/`, `packages/vm/src/vm-run.lisp`
 - **現状**: JIT（FR-330〜334）はメソッド（関数）単位のコンパイル。ホットトレース（パス）単位のコンパイルなし
-- **内容**: **トレース記録**: ループバックエッジのホットカウント到達時に実行パスを**線形命令列（トレース）**として記録。呼び出し先関数も含めてインライン化した超長直線コードを生成。**ガード命令**: トレースが想定した型・分岐方向と異なる場合に脱出（side exit）するガード挿入。**トレースツリー**: 複数のsideexitから派生するトレースをツリー構造で管理。LuaJIT / Mozilla TraceMonkey (Firefox 3.5〜) / PyPy
+- **要件**: **トレース記録**: ループバックエッジのホットカウント到達時に実行パスを**線形命令列（トレース）**として記録。呼び出し先関数も含めてインライン化した超長直線コードを生成。**ガード命令**: トレースが想定した型・分岐方向と異なる場合に脱出（side exit）するガード挿入。**トレースツリー**: 複数のsideexitから派生するトレースをツリー構造で管理。LuaJIT / Mozilla TraceMonkey (Firefox 3.5〜) / PyPy
+- **実装状況**: 部分実装。`src/jit/trace-jit.lisp` に記録状態とトレースツリーの骨格はあるが、`compile-trace` はネイティブ命令生成とW^Xメモリ統合が未実装として失敗する。VMのバックエッジからの記録、ネイティブトレース実行、ガードとside exitのend-to-end統合は未完了
 - **根拠**: LuaJITがトレースJITで他のLuaより10〜50x高速化を実現。メソッドJITより呼び出しオーバーヘッドがなく、ループ集中型ワークロードに特に有効
 - **難易度**: Very Hard
 
-#### ✅ FR-559: Type Feedback Collection (型フィードバック収集)
+#### 🟡 FR-559: Type Feedback Collection (型フィードバック収集)
 
 - **対象**: `packages/vm/src/vm-clos.lisp`, `src/jit/baseline.lisp`
 - **現状**: PIC（FR-334）はメソッドキャッシュのみ。汎用な型フィードバック（引数型・戻り値型の実行時観測）なし
-- **内容**: **ICベース型プロファイリング**: 各呼び出しサイト・各演算に**型プロファイルスロット**を付与。Tier-0/Tier-1実行時に型観測データを蓄積（`fixnum/float/string/cons`の出現率）。**フィードバックベクタ**: 関数ごとのICデータを構造化して保持。Tier-2コンパイル時にフィードバックデータを入力としてspecialized codeを生成。V8 Maglev / HotSpot type profiling
+- **要件**: **ICベース型プロファイリング**: 各呼び出しサイト・各演算に**型プロファイルスロット**を付与。Tier-0/Tier-1実行時に型観測データを蓄積（`fixnum/float/string/cons`の出現率）。**フィードバックベクタ**: 関数ごとのICデータを構造化して保持。Tier-2コンパイル時にフィードバックデータを入力としてspecialized codeを生成。V8 Maglev / HotSpot type profiling
+- **実装状況**: 部分実装。`src/jit/baseline.lisp` に型フィードバック表、記録API、集計・スナップショット処理はあるが、Tier-0/VMの各呼び出しサイト・演算への計測挿入と、観測結果を使うTier-2 specialized native code生成は完成を確認できない。現状のbaseline compile結果はネイティブコードではなくメタデータartifact
 - **根拠**: PICだけではカバーできない「変数の型」の観測。型フィードバックはJIT投機的最適化の全ての基盤
 - **難易度**: Hard
 
-#### ✅ FR-560: Speculative Inlining with Guards (ガード付き投機的インライン化)
+#### 🟡 FR-560: Speculative Inlining with Guards (ガード付き投機的インライン化)
 
 - **対象**: `src/jit/`, FR-559（型フィードバック）前提
 - **現状**: インライン化（ML-guided FR-372）は静的サイズ閾値。型フィードバックに基づく動的インライン化なし
-- **内容**: 型フィードバック（FR-559）で「この呼び出しサイトで受信したオブジェクトの98%がclass Xである」と判明した場合、**型ガード + インライン済みコード + deoptスローパス**を生成。型ガード（`typep obj 'X`）が失敗した場合のみdeopt（FR-333）。ホットパスは型チェック1命令 + インライン済みメソッド本体。V8 TurboFan / HotSpot speculative inlining
+- **要件**: 型フィードバック（FR-559）で「この呼び出しサイトで受信したオブジェクトの98%がclass Xである」と判明した場合、**型ガード + インライン済みコード + deoptスローパス**を生成。型ガード（`typep obj 'X`）が失敗した場合のみdeopt（FR-333）。ホットパスは型チェック1命令 + インライン済みメソッド本体。V8 TurboFan / HotSpot speculative inlining
+- **実装状況**: 部分実装。型分布から候補を判定する処理はあるが、`emit-guarded-inline` はunsupportedであり、型ガード、インライン済みネイティブコード、deoptスローパスの生成・実行統合は未完了
 - **根拠**: 一般的なCLOSコードで呼び出しの95%以上が同一型。投機的インライン化でgeneric dispatch overhead完全除去
 - **難易度**: Hard
 
-#### ✅ FR-561: Megamorphic IC Handling (メガモーフィックICハンドリング)
+#### 🟡 FR-561: Megamorphic IC Handling (メガモーフィックICハンドリング)
 
 - **対象**: `packages/vm/src/vm-clos.lisp`, `src/jit/baseline.lisp`, FR-334（PIC）の拡張
 - **現状**: PIC（FR-334）は最大4エントリでオーバーフロー後はグローバルキャッシュにフォールバック
-- **内容**: PICが4エントリを超えた**メガモーフィック**状態での専用最適化: **グローバル型フィードバックキャッシュ**: 全コールサイト横断でのメソッドキャッシュ共有。**Inlining caches for megamorphic**: ハッシュベースのO(1)ディスパッチを維持しつつ予測不能な分岐を除去。**型分布に基づく確率的speculative inlining**: 最頻出1〜2型のみガード付きインライン化
+- **要件**: PICが4エントリを超えた**メガモーフィック**状態での専用最適化: **グローバル型フィードバックキャッシュ**: 全コールサイト横断でのメソッドキャッシュ共有。**Inlining caches for megamorphic**: ハッシュベースのO(1)ディスパッチを維持しつつ予測不能な分岐を除去。**型分布に基づく確率的speculative inlining**: 最頻出1〜2型のみガード付きインライン化
+- **実装状況**: 部分実装。メガモーフィック状態の判定処理はあるが、`emit-megamorphic-dispatch` はunsupportedである。グローバルキャッシュを用いた実行可能なハッシュディスパッチと、型分布に基づくガード付きインライン化は未完了
 - **根拠**: GCキャラクタリゼーション的コード（多相コレクション操作）では避けられないメガモーフィック状態。専用ハンドリングで未最適化フォールバックを回避
 - **難易度**: Hard
 
-#### ✅ FR-562: JIT Warmup / AOT Pre-warming (JITウォームアップ最適化)
+#### 🟡 FR-562: JIT Warmup / AOT Pre-warming (JITウォームアップ最適化)
 
 - **対象**: `src/jit/`, `packages/cli/src/main.lisp`
 - **現状**: JIT（FR-330〜331）はcall countが閾値到達後に初めてコンパイル。最初の数千回呼び出しはインタープリタ
-- **内容**: **プロファイル付きAOTコンパイル**: 事前プロファイル実行（`./cl-cc run --warmup-profile app.lisp`）でホット関数を特定→`--aot-warm`でそれらをプロセス起動前にコンパイル済み状態にする。**Lazy compilation ordering**: 依存関係順にコンパイルして初期化シーケンスを最適化。JIT閾値を0に設定して即時Tier-2へのオプション（`--jit-threshold=0`）
+- **要件**: **プロファイル付きAOTコンパイル**: 事前プロファイル実行（`./cl-cc run --warmup-profile app.lisp`）でホット関数を特定→`--aot-warm`でそれらをプロセス起動前にコンパイル済み状態にする。**Lazy compilation ordering**: 依存関係順にコンパイルして初期化シーケンスを最適化。JIT閾値を0に設定して即時Tier-2へのオプション（`--jit-threshold=0`）
+- **実装状況**: 部分実装。インメモリのウォームアップカウンタと`aot-pre-warm`ラッパーはあるが、`--warmup-profile`、`--aot-warm`、`--jit-threshold=0`のCLI導線、プロファイルの永続化・読込、起動前のネイティブコンパイル統合は未完了。現状のラッパーはplaceholder compiler経由のメタデータartifactを返す
 - **根拠**: サーバープロセスの「ウォームアップ期間」でのスループット低下問題（数分間の低速フェーズ）を解消。Javaの-server flagとAOTコンパイルの折衷案
 - **難易度**: Medium
 
@@ -212,10 +220,10 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: SBCL REPLでの探索的開発の結果をテストに変換するワークフロー。バグ再現セッションの共有にも有効
 - **難易度**: Medium
 
-#### ✅ FR-580: GC Safepoint-Free Regions (GCセーフポイントフリー領域)
+#### 🟡 FR-580: GC Safepoint-Free Regions (GCセーフポイントフリー領域)
 
 - **対象**: `packages/runtime/src/gc.lisp`, FR-551（Safepoints）の拡張
-- **現状**: 全コードパスにセーフポイントポーリングが挿入される（FR-551）
+- **現状**: 前提となるFR-551のポーリング命令生成とJITコードへの挿入が未統合であり、セーフポイントフリー領域も未実装
 - **内容**: `(cl-cc:without-gc-preemption ...)` フォームでGCセーフポイントチェックを一時無効化。**リアルタイムコード**: オーディオコールバック・割り込みハンドラ等のGCポーズ許容不可なパスに使用。無効化中のアロケーションは禁止（コンパイル時検証、FR-357 Allocation-free verificationと連携）。Azul Zing / OpenJDK `@Restricted` annotation相当
 - **根拠**: ソフトリアルタイム要件（レイテンシ保証）のコードでGCセーフポイントの確定的除去が必要
 - **難易度**: Medium
