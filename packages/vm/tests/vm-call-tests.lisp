@@ -192,25 +192,4 @@ that lookup can't find."
     (expect (= 10 (cl-cc:vm-reg-get s :R2)) :to-be-truthy)
     (expect (= 20 (cl-cc:vm-reg-get s :R3)) :to-be-truthy)))
 
-(it-sequential "vm-ret-behavior"
-  (let ((s (make-test-vm)))
-    (cl-cc:vm-reg-set s :R0 42)
-    (multiple-value-bind (new-pc sig ret)
-        (cl-cc:execute-instruction
-         (cl-cc:make-vm-ret :reg :R0) s 0 (%labels))
-      (expect new-pc :to-be-null)
-      (expect sig :to-be-truthy)
-      (expect (= 42 ret) :to-be-truthy)))
-  (let ((s (make-test-vm)))
-    ;; Push a frame: return to pc 8, result into :R4
-    (cl-cc/vm::vm-push-call-frame s 8 :R4)
-    (push nil (cl-cc:vm-method-call-stack s))
-    (cl-cc:vm-reg-set s :R5 777)
-    (multiple-value-bind (new-pc sig ret)
-        (cl-cc:execute-instruction
-         (cl-cc:make-vm-ret :reg :R5) s 5 (%labels))
-      (expect (= 8 new-pc) :to-be-truthy)
-      (expect sig :to-be-null)
-      (expect ret :to-be-null)
-      (expect (= 777 (cl-cc:vm-reg-get s :R4)) :to-be-truthy)
-      (expect (cl-cc:vm-call-stack s) :to-be-null))))
+(progn (it-sequential "vm-ret-behavior" (let ((s (make-test-vm))) (cl-cc:vm-reg-set s :R0 42) (multiple-value-bind (new-pc sig ret) (cl-cc:execute-instruction (cl-cc:make-vm-ret :reg :R0) s 0 (%labels)) (expect new-pc :to-be-null) (expect sig :to-be-truthy) (expect (= 42 ret) :to-be-truthy))) (let ((s (make-test-vm))) (cl-cc/vm::vm-push-call-frame s 8 :R4) (push nil (cl-cc:vm-method-call-stack s)) (cl-cc:vm-reg-set s :R5 777) (multiple-value-bind (new-pc sig ret) (cl-cc:execute-instruction (cl-cc:make-vm-ret :reg :R5) s 5 (%labels)) (expect (= 8 new-pc) :to-be-truthy) (expect sig :to-be-null) (expect ret :to-be-null) (expect (= 777 (cl-cc:vm-reg-get s :R4)) :to-be-truthy) (expect (cl-cc:vm-call-stack s) :to-be-null)))) (it-sequential "vm-ret-preserves-more-than-64-values-across-call-frame" (let* ((s (make-test-vm)) (expected (loop for i below 96 collect i))) (cl-cc/vm::vm-push-call-frame s 8 :R4) (push nil (cl-cc:vm-method-call-stack s)) (cl-cc:vm-reg-set s :RET 0) (setf (cl-cc/vm::vm-values-list s) expected) (multiple-value-bind (new-pc sig ret) (cl-cc:execute-instruction (cl-cc:make-vm-ret :reg :RET) s 5 (%labels)) (expect (= 8 new-pc) :to-be-truthy) (expect sig :to-be-null) (expect ret :to-be-null) (expect (cl-cc/vm::vm-values-list s) :to-equal expected)))) (it-sequential "vm-tail-call-return-preserves-more-than-64-values" (let* ((s (make-test-vm)) (expected (loop for i below 96 collect i)) (closure (%make-test-closure "fn_tail_mv" nil)) (labels (%labels "fn_tail_mv" 20))) (cl-cc:vm-reg-set s :FN closure) (cl-cc:execute-instruction (cl-cc:make-vm-tail-call :dst :R0 :func :FN :args nil) s 5 labels) (expect (cl-cc:vm-call-stack s) :to-be-null) (cl-cc:vm-reg-set s :RET 0) (setf (cl-cc/vm::vm-values-list s) expected) (multiple-value-bind (new-pc sig ret) (cl-cc:execute-instruction (cl-cc:make-vm-ret :reg :RET) s 20 labels) (expect new-pc :to-be-null) (expect sig :to-be-truthy) (expect (= 0 ret) :to-be-truthy) (expect (cl-cc/vm::vm-values-list s) :to-equal expected)))))

@@ -94,11 +94,70 @@ Returns (values docstring timeout depends-on tags body-forms)."
                  (:tags      (setf tags val)))))
     (values docstring timeout depends-on tags rest)))
 
-(defvar *known-test-names* (make-hash-table :test #'eq)
-  "Every DEFTEST NAME symbol ever registered, for doc/test traceability
+(progn
+  (defvar *known-test-names* (make-hash-table :test (function eq))
+    "Every DEFTEST NAME symbol ever registered, for doc/test traceability
 checks (e.g. \"does this documented FR anchor name a real test?\") that used
 to query *TEST-REGISTRY* by symbol directly. Values are the cl-weave test
 description string DEFTEST registered them under.")
+
+  (defun %normalize-timeout-ms (timeout)
+    "Convert a positive timeout in seconds to cl-weave milliseconds."
+    (unless (and (realp timeout) (plusp timeout))
+      (error "Timeout must be a positive real number: ~S" timeout))
+    (ceiling (* timeout 1000)))
+
+  (defun %map-cl-weave-tests (function &optional (suite (cl-weave::root-suite)))
+    "Call FUNCTION with each test and its containing suite."
+    (dolist (child (cl-weave::suite-children suite))
+      (if (cl-weave::test-case-p child)
+          (funcall function child suite)
+          (%map-cl-weave-tests function child))))
+
+  (defun %set-test-timeouts-by-selector! (selector timeout overwrite)
+    (let ((timeout-ms (%normalize-timeout-ms timeout)))
+      (%map-cl-weave-tests
+       (lambda (test suite)
+         (when (and (funcall selector test suite)
+                    (or overwrite
+                        (null (cl-weave::test-case-timeout-ms test))))
+           (setf (cl-weave::test-case-timeout-ms test) timeout-ms))))))
+
+  (defun set-test-timeouts! (test-names timeout &key overwrite)
+    "Set TIMEOUT in seconds for registered tests named by TEST-NAMES."
+    (%set-test-timeouts-by-selector!
+     (lambda (test suite)
+       (declare (ignore suite))
+       (member (cl-weave::test-case-name test) test-names
+               :test (lambda (registered requested)
+                       (string= registered
+                                (etypecase requested
+                                  (string requested)
+                                  (symbol (symbol-name requested)))))))
+     timeout overwrite))
+
+  (defun set-test-timeouts-by-prefix! (prefix timeout &key overwrite)
+    "Set TIMEOUT in seconds for registered tests whose names start with PREFIX."
+    (%set-test-timeouts-by-selector!
+     (lambda (test suite)
+       (declare (ignore suite))
+       (let ((name (cl-weave::test-case-name test)))
+         (and (<= (length prefix) (length name))
+              (string= prefix name :end2 (length prefix)))))
+     timeout overwrite))
+
+  (defun set-suite-test-timeout! (suite-name timeout &key recursive overwrite)
+    "Set TIMEOUT in seconds for tests in SUITE-NAME, optionally recursively."
+    (let ((target (gethash suite-name *suite-objects*)))
+      (%set-test-timeouts-by-selector!
+       (lambda (test suite)
+         (declare (ignore test))
+         (if recursive
+             (loop for current = suite then (cl-weave::suite-parent current)
+                   while current
+                   thereis (eq current target))
+             (eq suite target)))
+       timeout overwrite))))
 
 
 ;;; ------------------------------------------------------------
