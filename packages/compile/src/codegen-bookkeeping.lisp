@@ -136,12 +136,12 @@ Signals UNRESOLVED-FORWARD-REFERENCE-ERROR when ERRORP and refs remain."
   (let ((existing
           (find-if (lambda (cell)
                      (and (equal form
-                                 (cl-cc/vm::vm-load-time-value-cell-form cell))
+                                 (cl-cc/vm:vm-load-time-value-cell-form cell))
                           (eql read-only-p
-                               (cl-cc/vm::vm-load-time-value-cell-read-only-p cell))))
+                               (cl-cc/vm:vm-load-time-value-cell-read-only-p cell))))
                    *load-time-value-cells*)))
     (if existing
-        (cl-cc/vm::vm-load-time-value-cell-id existing)
+        (cl-cc/vm:vm-load-time-value-cell-id existing)
         (multiple-value-bind (value constantp)
             (if read-only-p
                 (%pure-load-time-value form)
