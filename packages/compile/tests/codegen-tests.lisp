@@ -530,7 +530,7 @@ stable, isolated context."
       (expect (= 1 (length cl-cc/compile::*load-time-value-cells*)) :to-be-truthy))
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-load-time-value)))
       (expect inst :to-be-truthy)
-      (expect (= 0 (cl-cc/vm::vm-load-time-value-cell-id inst)) :to-be-truthy)
+      (expect (= 0 (cl-cc/vm::vm-load-time-value-inst-cell-id inst)) :to-be-truthy)
       (progn
         (expect (cl-cc/vm::vm-load-time-value-cell-form
                  (first cl-cc/compile::*load-time-value-cells*))
