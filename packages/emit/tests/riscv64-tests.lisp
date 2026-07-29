@@ -9,10 +9,16 @@
   (expect (fboundp 'cl-cc/emit:make-riscv64-assembler) :to-be-truthy)
   (expect (fboundp 'cl-cc/emit:riscv64-emit-instruction) :to-be-truthy))
 
-(it-sequential "riscv64-runtime-stdlib-2-red-stub"
+(it-sequential "riscv64-emits-concrete-addi-encoding"
   :timeout
   10
-  (expect t :to-be-truthy))
+  (let ((assembler (cl-cc/emit:make-riscv64-assembler)))
+    (cl-cc/emit:riscv64-emit-instruction
+     assembler
+     '(:addi :a0 :zero 42))
+    (expect (cl-cc/emit:riscv64-emit-bytes assembler)
+            :to-equalp
+            #(19 5 160 2))))
 
 (defun %riscv64-collect-bytes (emit-fn)
   (let ((bytes nil))
