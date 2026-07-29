@@ -2,70 +2,52 @@
 
 (in-package :cl-cc/test)
 
-(defsuite runtime-crypto-compress-suite
-  :description "Runtime crypto/Base64/compression tests (FR-738, FR-739, FR-740)"
-  :parent cl-cc-unit-suite)
 
-(in-suite runtime-crypto-compress-suite)
 
 (defun %octet-string (octets)
   (map 'string #'code-char octets))
 
-(deftest fr-738-sha256-fips-vector-abc
-  "FR-738: SHA-256 matches the FIPS 180-4 abc test vector."
-  (assert-equal
-   "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-   (cl-cc/runtime:sha256-hex "abc")))
+(it-sequential "fr-738-sha256-fips-vector-abc"
+  (expect (cl-cc/runtime:sha256-hex "abc") :to-equal "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))
 
-(deftest fr-738-sha512-fips-vector-abc
-  "FR-738: SHA-512 matches the FIPS 180-4 abc test vector."
-  (assert-equal
-   "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
-   (cl-cc/runtime:sha512-hex "abc")))
+(it-sequential "fr-738-sha512-fips-vector-abc"
+  (expect (cl-cc/runtime:sha512-hex "abc") :to-equal "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"))
 
-(deftest fr-738-hmac-sha256-rfc4231-vector
-  "FR-738: HMAC-SHA256 matches RFC 4231 test case 1."
-  (assert-equal
-   "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
-   (cl-cc/runtime:hmac-sha256-hex (make-array 20 :element-type '(unsigned-byte 8) :initial-element #x0b)
-                                  "Hi There")))
+(it-sequential "fr-738-hmac-sha256-rfc4231-vector"
+  (expect (cl-cc/runtime:hmac-sha256-hex (make-array 20 :element-type '(unsigned-byte 8) :initial-element #x0b)
+                                  "Hi There") :to-equal "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"))
 
-(deftest fr-739-base64-rfc4648-vectors
-  "FR-739: Base64 encode/decode follows RFC 4648 padding vectors."
-  (assert-equal "" (cl-cc/runtime:base64-encode ""))
-  (assert-equal "Zg==" (cl-cc/runtime:base64-encode "f"))
-  (assert-equal "Zm8=" (cl-cc/runtime:base64-encode "fo"))
-  (assert-equal "Zm9v" (cl-cc/runtime:base64-encode "foo"))
-  (assert-equal "foobar" (%octet-string (cl-cc/runtime:base64-decode "Zm9vYmFy"))))
+(it-sequential "fr-739-base64-rfc4648-vectors"
+  (expect (cl-cc/runtime:base64-encode "") :to-equal "")
+  (expect (cl-cc/runtime:base64-encode "f") :to-equal "Zg==")
+  (expect (cl-cc/runtime:base64-encode "fo") :to-equal "Zm8=")
+  (expect (cl-cc/runtime:base64-encode "foo") :to-equal "Zm9v")
+  (expect (%octet-string (cl-cc/runtime:base64-decode "Zm9vYmFy")) :to-equal "foobar"))
 
-(deftest fr-739-base64-url-safe-and-streaming
-  "FR-739: URL-safe alphabet and streaming helpers round-trip octets."
+(it-sequential "fr-739-base64-url-safe-and-streaming"
   (let* ((bytes #(251 255 238 250))
          (encoded (cl-cc/runtime:base64-encode bytes :url-safe t :padding nil)))
-    (assert-equal "-__u-g" encoded)
-    (assert-true (equalp bytes (cl-cc/runtime:base64-decode encoded :url-safe t))))
+    (expect encoded :to-equal "-__u-g")
+    (expect (equalp bytes (cl-cc/runtime:base64-decode encoded :url-safe t)) :to-be-truthy))
   (let ((input (make-string-input-stream "hello"))
         (encoded (make-string-output-stream)))
     (cl-cc/runtime:base64-encode-stream input encoded)
-    (assert-equal "aGVsbG8=" (get-output-stream-string encoded))))
+    (expect (get-output-stream-string encoded) :to-equal "aGVsbG8=")))
 
-(deftest fr-740-deflate-stored-roundtrip
-  "FR-740: raw DEFLATE stored-block compression round-trips data."
+(it-sequential "fr-740-deflate-stored-roundtrip"
   (let* ((plain "hello hello hello")
          (compressed (cl-cc/runtime:deflate-compress plain))
          (decompressed (cl-cc/runtime:deflate-decompress compressed)))
-    (assert-equal plain (%octet-string decompressed))))
+    (expect (%octet-string decompressed) :to-equal plain)))
 
-(deftest fr-740-zlib-roundtrip-and-checksum
-  "FR-740: zlib wrapper round-trips data and validates Adler-32."
+(it-sequential "fr-740-zlib-roundtrip-and-checksum"
   (let* ((plain "zlib payload")
          (compressed (cl-cc/runtime:zlib-compress plain))
          (decompressed (cl-cc/runtime:zlib-decompress compressed)))
-    (assert-equal plain (%octet-string decompressed))))
+    (expect (%octet-string decompressed) :to-equal plain)))
 
-(deftest fr-740-gzip-roundtrip-and-trailer
-  "FR-740: gzip wrapper round-trips data and validates CRC32/ISIZE trailer."
+(it-sequential "fr-740-gzip-roundtrip-and-trailer"
   (let* ((plain "gzip payload")
          (compressed (cl-cc/runtime:gzip-compress plain))
          (decompressed (cl-cc/runtime:gzip-decompress compressed)))
-    (assert-equal plain (%octet-string decompressed))))
+    (expect (%octet-string decompressed) :to-equal plain)))

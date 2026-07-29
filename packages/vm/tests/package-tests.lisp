@@ -2,20 +2,14 @@
 
 (in-package :cl-cc/test)
 
-(defsuite package-suite
-  :description "Package export smoke tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite package-suite)
 
-(deftest cl-cc-package-exists
-  "The cl-cc package should be available at load time."
-  (assert-true (find-package :cl-cc)))
+(it-sequential "cl-cc-package-exists"
+  (expect (find-package :cl-cc) :to-be-truthy))
 
-(deftest cl-cc-package-exports-representatives
-  "Representative exports stay external in the package surface."
+(it-sequential "cl-cc-package-exports-representatives"
   (dolist (name '("CST-NODE" "RUN-STRING" "QUERY-GRAMMAR" "OUR-MACROEXPAND-ALL" "AST-INT"))
     (multiple-value-bind (sym status)
         (find-symbol name :cl-cc)
-      (assert-true sym)
-      (assert-eq :external status))))
+      (expect sym :to-be-truthy)
+      (expect status :to-be :external))))

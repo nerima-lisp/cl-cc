@@ -2,89 +2,114 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-cli-pure-suite)
 
-(deftest-each cli-string-suffix-p-basic-cases
-  "string-suffix-p returns t when the suffix matches, nil otherwise."
-  :cases (("php-match"     t   ".php"   "hello.php")
-          ("out-match"     t   "out"    "a.out")
-          ("lisp-mismatch" nil ".lisp"  "hello.php")
-          ("too-long"      nil "longer" "short"))
-  (expected suffix str)
-  (assert-eq expected (if (cl-cc/cli::%string-suffix-p suffix str) t nil)))
+(it-sequential "cli-string-suffix-p-basic-cases php-match"
+  (destructuring-bind (expected suffix str) (list t ".php" "hello.php")
+    (expect (if (cl-cc/cli::%string-suffix-p suffix str) t nil) :to-be expected)))
 
-(deftest-each cli-arch-keyword-parses-supported-architectures
-  "Each recognized architecture string maps to its canonical keyword."
-  :cases (("x86-64"  :x86-64 "x86-64")
-          ("x86_64"  :x86-64 "x86_64")
-          ("arm64"   :arm64  "arm64")
-          ("aarch64" :arm64  "aarch64"))
-  (expected input)
-  (assert-eq expected (cl-cc/cli::%arch-keyword input)))
+(it-sequential "cli-string-suffix-p-basic-cases out-match"
+  (destructuring-bind (expected suffix str) (list t "out" "a.out")
+    (expect (if (cl-cc/cli::%string-suffix-p suffix str) t nil) :to-be expected)))
 
-(deftest cli-arch-keyword-invalid-exits-2
-  "An unrecognized architecture string prints an error to stderr and exits with code 2."
+(it-sequential "cli-string-suffix-p-basic-cases lisp-mismatch"
+  (destructuring-bind (expected suffix str) (list nil ".lisp" "hello.php")
+    (expect (if (cl-cc/cli::%string-suffix-p suffix str) t nil) :to-be expected)))
+
+(it-sequential "cli-string-suffix-p-basic-cases too-long"
+  (destructuring-bind (expected suffix str) (list nil "longer" "short")
+    (expect (if (cl-cc/cli::%string-suffix-p suffix str) t nil) :to-be expected)))
+
+(it-sequential "cli-arch-keyword-parses-supported-architectures x86-64"
+  (destructuring-bind (expected input) (list :x86-64 "x86-64")
+    (expect (cl-cc/cli::%arch-keyword input) :to-be expected)))
+
+(it-sequential "cli-arch-keyword-parses-supported-architectures x86_64"
+  (destructuring-bind (expected input) (list :x86-64 "x86_64")
+    (expect (cl-cc/cli::%arch-keyword input) :to-be expected)))
+
+(it-sequential "cli-arch-keyword-parses-supported-architectures arm64"
+  (destructuring-bind (expected input) (list :arm64 "arm64")
+    (expect (cl-cc/cli::%arch-keyword input) :to-be expected)))
+
+(it-sequential "cli-arch-keyword-parses-supported-architectures aarch64"
+  (destructuring-bind (expected input) (list :arm64 "aarch64")
+    (expect (cl-cc/cli::%arch-keyword input) :to-be expected)))
+
+(it-sequential "cli-arch-keyword-invalid-exits-2"
   (let ((stderr (make-string-output-stream)))
     (let ((code (with-fake-quit
                   (let ((*error-output* stderr))
                     (cl-cc/cli::%arch-keyword "mips")
-                    (assert-false t)))))
-      (assert-= 2 code))
-    (assert-true (search "Unknown architecture" (get-output-stream-string stderr)))))
+                    (expect t :to-be-falsy)))))
+      (expect (= 2 code) :to-be-truthy))
+    (expect (search "Unknown architecture" (get-output-stream-string stderr)) :to-be-truthy)))
 
-(deftest-each cli-compile-target-keyword-parses-supported-architectures
-  "Each recognized architecture string maps to its compilation target keyword."
-  :cases (("x86-64"  :x86_64  "x86-64")
-          ("x86_64"  :x86_64  "x86_64")
-          ("arm64"   :aarch64 "arm64")
-          ("aarch64" :aarch64 "aarch64"))
-  (expected input)
-  (assert-eq expected (cl-cc/cli::%compile-target-keyword input)))
+(it-sequential "cli-compile-target-keyword-parses-supported-architectures x86-64"
+  (destructuring-bind (expected input) (list :x86_64 "x86-64")
+    (expect (cl-cc/cli::%compile-target-keyword input) :to-be expected)))
 
-(deftest cli-compile-target-keyword-invalid-signals-error
-  "An unrecognized architecture string for compilation signals an error with a descriptive message."
+(it-sequential "cli-compile-target-keyword-parses-supported-architectures x86_64"
+  (destructuring-bind (expected input) (list :x86_64 "x86_64")
+    (expect (cl-cc/cli::%compile-target-keyword input) :to-be expected)))
+
+(it-sequential "cli-compile-target-keyword-parses-supported-architectures arm64"
+  (destructuring-bind (expected input) (list :aarch64 "arm64")
+    (expect (cl-cc/cli::%compile-target-keyword input) :to-be expected)))
+
+(it-sequential "cli-compile-target-keyword-parses-supported-architectures aarch64"
+  (destructuring-bind (expected input) (list :aarch64 "aarch64")
+    (expect (cl-cc/cli::%compile-target-keyword input) :to-be expected)))
+
+(it-sequential "cli-compile-target-keyword-invalid-signals-error"
   (handler-case
       (progn
         (cl-cc/cli::%compile-target-keyword "weird")
-        (assert-false t))
+        (expect t :to-be-falsy))
     (error (e)
-      (assert-true (search "Unknown architecture for compilation"
-                           (princ-to-string e))))))
+      (expect (search "Unknown architecture for compilation"
+                           (princ-to-string e)) :to-be-truthy))))
 
-(deftest-each cli-parse-opt-remarks-mode-cases
-  "Each recognized mode string maps to its keyword; nil/empty returns nil."
-  :cases (("nil-input" nil      nil)
-          ("empty-str" nil      "")
-          ("all"       :all     "all")
-          ("changed"   :changed "changed")
-          ("missed"    :missed  "missed"))
-  (expected input)
-  (assert-eq expected (cl-cc/cli::%parse-opt-remarks-mode input)))
+(it-sequential "cli-parse-opt-remarks-mode-cases nil-input"
+  (destructuring-bind (expected input) (list nil nil)
+    (expect (cl-cc/cli::%parse-opt-remarks-mode input) :to-be expected)))
 
-(deftest cli-parse-opt-remarks-mode-invalid-exits-2
-  "An unrecognized opt-remarks mode string prints an error and exits with code 2."
+(it-sequential "cli-parse-opt-remarks-mode-cases empty-str"
+  (destructuring-bind (expected input) (list nil "")
+    (expect (cl-cc/cli::%parse-opt-remarks-mode input) :to-be expected)))
+
+(it-sequential "cli-parse-opt-remarks-mode-cases all"
+  (destructuring-bind (expected input) (list :all "all")
+    (expect (cl-cc/cli::%parse-opt-remarks-mode input) :to-be expected)))
+
+(it-sequential "cli-parse-opt-remarks-mode-cases changed"
+  (destructuring-bind (expected input) (list :changed "changed")
+    (expect (cl-cc/cli::%parse-opt-remarks-mode input) :to-be expected)))
+
+(it-sequential "cli-parse-opt-remarks-mode-cases missed"
+  (destructuring-bind (expected input) (list :missed "missed")
+    (expect (cl-cc/cli::%parse-opt-remarks-mode input) :to-be expected)))
+
+(it-sequential "cli-parse-opt-remarks-mode-invalid-exits-2"
   (let ((stderr (make-string-output-stream)))
     (let ((code (with-fake-quit
                   (let ((*error-output* stderr))
                     (cl-cc/cli::%parse-opt-remarks-mode "bogus")
-                    (assert-false t)))))
-      (assert-= 2 code))
-    (assert-true (search "Unknown opt-remarks mode" (get-output-stream-string stderr)))))
+                    (expect t :to-be-falsy)))))
+      (expect (= 2 code) :to-be-truthy))
+    (expect (search "Unknown opt-remarks mode" (get-output-stream-string stderr)) :to-be-truthy)))
 
-(deftest cli-parse-opt-remarks-mode-invalid-shows-did-you-mean
-  "A near-match opt-remarks mode string produces a did-you-mean suggestion in the error output."
+(it-sequential "cli-parse-opt-remarks-mode-invalid-shows-did-you-mean"
   (let ((stderr (make-string-output-stream)))
     (let ((code (with-fake-quit
                   (let ((*error-output* stderr))
                     (cl-cc/cli::%parse-opt-remarks-mode "chagned")
-                    (assert-false t)))))
-      (assert-= 2 code))
+                    (expect t :to-be-falsy)))))
+      (expect (= 2 code) :to-be-truthy))
     (let ((out (get-output-stream-string stderr)))
-      (assert-true (search "did you mean" out))
-      (assert-true (search "changed" out)))))
+      (expect (search "did you mean" out) :to-be-truthy)
+      (expect (search "changed" out) :to-be-truthy))))
 
-(deftest cli-parse-compile-opts-reads-shared-flags
-  "%parse-compile-opts correctly reads all shared compiler option flags from parsed args."
+(it-sequential "cli-parse-compile-opts-reads-shared-flags"
   (let* ((parsed (make-cli-parsed
                   :command "compile"
                  :flags '(("--pass-pipeline" . t)
@@ -97,18 +122,17 @@
                            ("--shadow-stack" . t)
                           ("--opt-remarks" . "changed"))))
          (opts (cl-cc/cli::%parse-compile-opts parsed)))
-    (assert-true (cl-cc/cli::compile-opts-pass-pipeline opts))
-    (assert-true (cl-cc/cli::compile-opts-print-pass-timings opts))
-    (assert-string= "trace.json" (cl-cc/cli::compile-opts-trace-json-path opts))
-    (assert-string= "fg.svg" (cl-cc/cli::compile-opts-flamegraph-path opts))
-    (assert-true (cl-cc/cli::compile-opts-print-pass-stats opts))
-    (assert-true (cl-cc/cli::compile-opts-trace-emit opts))
-    (assert-true (cl-cc/cli::compile-opts-verify-transforms opts))
-    (assert-true (cl-cc/cli::compile-opts-shadow-stack opts))
-    (assert-eq :changed (cl-cc/cli::compile-opts-opt-remarks-mode opts))))
+    (expect (cl-cc/cli::compile-opts-pass-pipeline opts) :to-be-truthy)
+    (expect (cl-cc/cli::compile-opts-print-pass-timings opts) :to-be-truthy)
+    (expect (cl-cc/cli::compile-opts-trace-json-path opts) :to-equal "trace.json")
+    (expect (cl-cc/cli::compile-opts-flamegraph-path opts) :to-equal "fg.svg")
+    (expect (cl-cc/cli::compile-opts-print-pass-stats opts) :to-be-truthy)
+    (expect (cl-cc/cli::compile-opts-trace-emit opts) :to-be-truthy)
+    (expect (cl-cc/cli::compile-opts-verify-transforms opts) :to-be-truthy)
+    (expect (cl-cc/cli::compile-opts-shadow-stack opts) :to-be-truthy)
+    (expect (cl-cc/cli::compile-opts-opt-remarks-mode opts) :to-be :changed)))
 
-(deftest cli-compile-opts-kwargs-expands-struct
-  "%compile-opts-kwargs expands a compile-opts struct into the expected keyword argument plist."
+(it-sequential "cli-compile-opts-kwargs-expands-struct"
   (let* ((opts (cl-cc/cli::make-compile-opts
                 :pass-pipeline t
                 :print-pass-timings t
@@ -119,7 +143,7 @@
                  :shadow-stack t
                 :opt-remarks-mode :missed))
          (kwargs (cl-cc/cli::%compile-opts-kwargs opts :trace-stream)))
-    (assert-equal '(:trace-json-stream :trace-stream
+    (expect kwargs :to-equal '(:trace-json-stream :trace-stream
                     :print-pass-stats t
                     :pass-pipeline t
                      :opt-bisect-limit nil
@@ -128,17 +152,15 @@
                      :shadow-stack t
                     :print-pass-timings t
                     :print-opt-remarks t
-                    :opt-remarks-mode :missed)
-                  kwargs)))
+                    :opt-remarks-mode :missed))))
 
-(deftest cli-dump-ir-phase-invalid-signals-error
-  "An unrecognized IR phase keyword passed to %dump-ir-phase signals an error."
+(it-sequential "cli-dump-ir-phase-invalid-signals-error"
   (handler-case
       (progn
         (cl-cc/cli::%dump-ir-phase :bogus nil *standard-output* nil)
-        (assert-false t))
+        (expect t :to-be-falsy))
     (error (e)
-      (assert-true (search "Unknown IR phase" (princ-to-string e))))))
+      (expect (search "Unknown IR phase" (princ-to-string e)) :to-be-truthy))))
 
 ;;; FR-463 regression: %dump-ir-phase dispatches all 6 recognized IR phases
 ;;; and produces non-empty output for a minimal compilation-result.
@@ -162,63 +184,112 @@ dump function can write at least one line without erroring."
      :vm-instructions (list (cl-cc:make-vm-const :dst :r0 :value 42))
      :optimized-instructions (list (cl-cc:make-vm-const :dst :r0 :value 42)))))
 
-(deftest-each cli-dump-ir-phase-dispatches-all-phases
-  "Each recognized IR phase keyword produces non-empty output via %dump-ir-phase."
-  :cases (("ast" :ast)
-          ("cps" :cps)
-          ("ssa" :ssa)
-          ("vm"  :vm)
-          ("opt" :opt)
-          ("asm" :asm))
-  (phase)
-  (let* ((result (%make-minimal-compilation-result))
+(it-sequential "cli-dump-ir-phase-dispatches-all-phases ast"
+  (destructuring-bind (phase) (list :ast)
+    (let* ((result (%make-minimal-compilation-result))
          (stream (make-string-output-stream)))
     (cl-cc/cli::%dump-ir-phase phase result stream nil)
     (let ((output (get-output-stream-string stream)))
-      (assert-true (> (length output) 0)))))
+      (expect (> (length output) 0) :to-be-truthy)))))
 
-(deftest cli-dump-ir-phase-annotate-source-writes-comment-for-ast
-  "With annotate-source T, the AST phase emits a source location comment line."
+(it-sequential "cli-dump-ir-phase-dispatches-all-phases cps"
+  (destructuring-bind (phase) (list :cps)
+    (let* ((result (%make-minimal-compilation-result))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream nil)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)))))
+
+(it-sequential "cli-dump-ir-phase-dispatches-all-phases ssa"
+  (destructuring-bind (phase) (list :ssa)
+    (let* ((result (%make-minimal-compilation-result))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream nil)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)))))
+
+(it-sequential "cli-dump-ir-phase-dispatches-all-phases vm"
+  (destructuring-bind (phase) (list :vm)
+    (let* ((result (%make-minimal-compilation-result))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream nil)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)))))
+
+(it-sequential "cli-dump-ir-phase-dispatches-all-phases opt"
+  (destructuring-bind (phase) (list :opt)
+    (let* ((result (%make-minimal-compilation-result))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream nil)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)))))
+
+(it-sequential "cli-dump-ir-phase-dispatches-all-phases asm"
+  (destructuring-bind (phase) (list :asm)
+    (let* ((result (%make-minimal-compilation-result))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream nil)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)))))
+
+(it-sequential "cli-dump-ir-phase-annotate-source-writes-comment-for-ast"
   (let* ((result (%make-minimal-compilation-result))
          (stream (make-string-output-stream)))
     (cl-cc/cli::%dump-ir-phase :ast result stream t)
     (let ((output (get-output-stream-string stream)))
-      (assert-true (search "; source:" output)))))
+      (expect (search "; source:" output) :to-be-truthy))))
 
-(deftest-each cli-dump-ir-phase-annotate-source-writes-comment-for-vm-and-opt
-  "With annotate-source T, VM and OPT phases emit source location comment lines."
-  :cases (("vm" :vm)
-          ("opt" :opt))
-  (phase)
-  (let* ((result (%make-minimal-compilation-result))
+(it-sequential "cli-dump-ir-phase-annotate-source-writes-comment-for-vm-and-opt vm"
+  (destructuring-bind (phase) (list :vm)
+    (let* ((result (%make-minimal-compilation-result))
          (stream (make-string-output-stream)))
     (cl-cc/cli::%dump-ir-phase phase result stream t)
     (let ((output (get-output-stream-string stream)))
-      (assert-true (search "; source:" output)))))
+      (expect (search "; source:" output) :to-be-truthy)))))
 
-(deftest cli-dump-ir-phase-asm-output-is-ansi-colored
-  "ASM phase wraps assembly output in ANSI opcode color and reset sequences."
+(it-sequential "cli-dump-ir-phase-annotate-source-writes-comment-for-vm-and-opt opt"
+  (destructuring-bind (phase) (list :opt)
+    (let* ((result (%make-minimal-compilation-result))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream t)
+    (let ((output (get-output-stream-string stream)))
+      (expect (search "; source:" output) :to-be-truthy)))))
+
+(it-sequential "cli-dump-ir-phase-asm-output-is-ansi-colored"
   (let* ((result (%make-minimal-compilation-result))
          (stream (make-string-output-stream)))
     (cl-cc/cli::%dump-ir-phase :asm result stream nil)
     (let ((output (get-output-stream-string stream)))
-      (assert-true (search cl-cc/cli::+ansi-opcode+ output))
-      (assert-true (search cl-cc/cli::+ansi-reset+ output)))))
+      (expect (search cl-cc/cli::+ansi-opcode+ output) :to-be-truthy)
+      (expect (search cl-cc/cli::+ansi-reset+ output) :to-be-truthy))))
 
-(deftest-each cli-dump-ir-phase-annotate-source-omits-comment-on-missing-location
-  "annotate-source T emits no source comment when the AST has no source location."
-  :cases (("ast" :ast)
-          ("vm"  :vm)
-          ("opt" :opt))
-  (phase)
-  (let* ((result (%make-minimal-compilation-result :source-location-p nil))
+(it-sequential "cli-dump-ir-phase-annotate-source-omits-comment-on-missing-location ast"
+  (destructuring-bind (phase) (list :ast)
+    (let* ((result (%make-minimal-compilation-result :source-location-p nil))
          (stream (make-string-output-stream)))
     (cl-cc/cli::%dump-ir-phase phase result stream t)
     (let ((output (get-output-stream-string stream)))
-      (assert-true (> (length output) 0))
-      (assert-false (search "; source:" output)))))
+      (expect (> (length output) 0) :to-be-truthy)
+      (expect (search "; source:" output) :to-be-falsy)))))
 
-(deftest cli-dump-ir-phase-phase-table-covers-all-recognized-phases
-  "*ir-phase-dump-fns* covers every phase in *ir-phases*."
+(it-sequential "cli-dump-ir-phase-annotate-source-omits-comment-on-missing-location vm"
+  (destructuring-bind (phase) (list :vm)
+    (let* ((result (%make-minimal-compilation-result :source-location-p nil))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream t)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)
+      (expect (search "; source:" output) :to-be-falsy)))))
+
+(it-sequential "cli-dump-ir-phase-annotate-source-omits-comment-on-missing-location opt"
+  (destructuring-bind (phase) (list :opt)
+    (let* ((result (%make-minimal-compilation-result :source-location-p nil))
+         (stream (make-string-output-stream)))
+    (cl-cc/cli::%dump-ir-phase phase result stream t)
+    (let ((output (get-output-stream-string stream)))
+      (expect (> (length output) 0) :to-be-truthy)
+      (expect (search "; source:" output) :to-be-falsy)))))
+
+(it-sequential "cli-dump-ir-phase-phase-table-covers-all-recognized-phases"
   (dolist (phase cl-cc/cli::*ir-phases*)
-    (assert-true (cdr (assoc phase cl-cc/cli::*ir-phase-dump-fns*)))))
+    (expect (cdr (assoc phase cl-cc/cli::*ir-phase-dump-fns*)) :to-be-truthy)))

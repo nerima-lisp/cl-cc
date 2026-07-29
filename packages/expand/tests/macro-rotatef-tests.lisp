@@ -2,50 +2,41 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macro-rotatef-suite
-  :description "ROTATEF expansion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macro-rotatef-suite)
 
-(deftest rotatef-two-var-structure
-  "ROTATEF with two vars expands to a LET + two SETQs returning nil"
+(it-sequential "rotatef-two-var-structure"
   (let ((result (our-macroexpand-1 '(rotatef x y))))
-    (assert-eq (car result) 'let)
-    (assert-= (length (cadr result)) 1)
+    (expect 'let :to-be (car result))
+    (expect (= (length (cadr result)) 1) :to-be-truthy)
     (let* ((binding (caadr result))
            (tmp-var (first binding))
            (tmp-val (second binding)))
-      (assert-eq tmp-val 'x)
-      (assert-eq (car (caddr result)) 'setq)
-      (assert-eq (cadr (caddr result)) 'x)
-      (assert-eq (caddr (caddr result)) 'y)
-      (assert-eq (car (cadddr result)) 'setq)
-      (assert-eq (cadr (cadddr result)) 'y)
-      (assert-eq (caddr (cadddr result)) tmp-var)
-      (assert-null (car (last result)))))
+      (expect 'x :to-be tmp-val)
+      (expect 'setq :to-be (car (caddr result)))
+      (expect 'x :to-be (cadr (caddr result)))
+      (expect 'y :to-be (caddr (caddr result)))
+      (expect 'setq :to-be (car (cadddr result)))
+      (expect 'y :to-be (cadr (cadddr result)))
+      (expect tmp-var :to-be (caddr (cadddr result)))
+      (expect (car (last result)) :to-be-null)))
   (let ((result (our-macroexpand-1 '(rotatef a b))))
-    (assert-null (car (last result)))))
+    (expect (car (last result)) :to-be-null)))
 
-(deftest rotatef-single-var-returns-nil
-  "ROTATEF with a single argument returns NIL (ANSI: identity)"
-  (assert-null (our-macroexpand-1 '(rotatef x))))
+(it-sequential "rotatef-single-var-returns-nil"
+  (expect (our-macroexpand-1 '(rotatef x)) :to-be-null))
 
-(deftest rotatef-three-var-structure
-  "ROTATEF with three arguments expands to LET + chain of SETFs returning nil"
+(it-sequential "rotatef-three-var-structure"
   (let ((result (our-macroexpand-1 '(rotatef x y z))))
-    (assert-eq (car result) 'let)
-    (assert-null (car (last result)))))
+    (expect 'let :to-be (car result))
+    (expect (car (last result)) :to-be-null)))
 
-(deftest rotatef-preserves-places
-  "ROTATEF correctly names both places in the expansion"
+(it-sequential "rotatef-preserves-places"
   (let ((result (our-macroexpand-1 '(rotatef foo bar))))
-    (assert-eq (cadr (caadr result)) 'foo)
-    (assert-eq (cadr (caddr result)) 'foo)
-    (assert-eq (caddr (caddr result)) 'bar)
-    (assert-eq (cadr (cadddr result)) 'bar)))
+    (expect 'foo :to-be (cadr (caadr result)))
+    (expect 'foo :to-be (cadr (caddr result)))
+    (expect 'bar :to-be (caddr (caddr result)))
+    (expect 'bar :to-be (cadr (cadddr result)))))
 
-(deftest integration-rotatef-full-expansion
-  "Full expansion of ROTATEF does not contain the ROTATEF symbol"
+(it-sequential "integration-rotatef-full-expansion"
   (let ((result (our-macroexpand '(rotatef p q))))
-    (assert-false (search "rotatef" (string-downcase (format nil "~S" result))))))
+    (expect (search "rotatef" (string-downcase (format nil "~S" result))) :to-be-falsy)))

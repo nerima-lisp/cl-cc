@@ -8,193 +8,183 @@
 
 ;;; ─── FR-502/507: fill/replace/copy-seq sequence support ────────────────────
 
-(deftest compile-fill-vector
-  "fill works on a vector; with :start/:end it modifies only the specified range."
+(it-sequential "compile-fill-vector"
   (let ((r (run-string "(let ((v (make-array 3 :initial-contents '(1 2 3))))
                            (fill v 0)
                            v)" :stdlib t)))
-    (assert-true (vectorp r))
-    (assert-= 0 (aref r 0))
-    (assert-= 0 (aref r 1))
-    (assert-= 0 (aref r 2)))
+    (expect (vectorp r) :to-be-truthy)
+    (expect (= 0 (aref r 0)) :to-be-truthy)
+    (expect (= 0 (aref r 1)) :to-be-truthy)
+    (expect (= 0 (aref r 2)) :to-be-truthy))
   (let ((r (run-string "(let ((v (make-array 5 :initial-contents '(0 1 2 3 4))))
                            (fill v 9 :start 1 :end 4)
                            v)" :stdlib t)))
-    (assert-true (vectorp r))
-    (assert-= 0 (aref r 0))
-    (assert-= 9 (aref r 1))
-    (assert-= 9 (aref r 2))
-    (assert-= 9 (aref r 3))
-    (assert-= 4 (aref r 4))))
+    (expect (vectorp r) :to-be-truthy)
+    (expect (= 0 (aref r 0)) :to-be-truthy)
+    (expect (= 9 (aref r 1)) :to-be-truthy)
+    (expect (= 9 (aref r 2)) :to-be-truthy)
+    (expect (= 9 (aref r 3)) :to-be-truthy)
+    (expect (= 4 (aref r 4)) :to-be-truthy)))
 
-(deftest compile-replace-and-copy-seq-vector
-  "replace copies elements into dest; copy-seq returns a fresh copy."
-  :timeout 180
+(it-sequential "compile-replace-and-copy-seq-vector"
+  :timeout
+  180
   (let ((r (run-string "(let ((d (make-array 3 :initial-contents '(0 0 0)))
                               (s (make-array 3 :initial-contents '(1 2 3))))
                            (replace d s)
                            d)" :stdlib t)))
-    (assert-true (vectorp r))
-    (assert-= 1 (aref r 0))
-    (assert-= 2 (aref r 1))
-    (assert-= 3 (aref r 2)))
+    (expect (vectorp r) :to-be-truthy)
+    (expect (= 1 (aref r 0)) :to-be-truthy)
+    (expect (= 2 (aref r 1)) :to-be-truthy)
+    (expect (= 3 (aref r 2)) :to-be-truthy))
   (let ((r (run-string "(let ((d (list 0 0 0))
                               (s (make-array 3 :initial-contents '(1 2 3))))
                            (replace d s)
                            d)" :stdlib t)))
-    (assert-equal '(1 2 3) r))
+    (expect r :to-equal '(1 2 3)))
   (let ((r (run-string "(let ((d (make-array 3 :initial-contents '(0 0 0)))
                               (s '(1 2 3)))
                            (replace d s)
                            d)" :stdlib t)))
-    (assert-true (vectorp r))
-    (assert-= 1 (aref r 0))
-    (assert-= 2 (aref r 1))
-    (assert-= 3 (aref r 2)))
+    (expect (vectorp r) :to-be-truthy)
+    (expect (= 1 (aref r 0)) :to-be-truthy)
+    (expect (= 2 (aref r 1)) :to-be-truthy)
+    (expect (= 3 (aref r 2)) :to-be-truthy))
   (let ((r (run-string "(let ((v (make-array 3 :initial-contents '(1 2 3))))
                            (copy-seq v))" :stdlib t)))
-    (assert-true (vectorp r))
-    (assert-= 3 (length r))
-    (assert-= 1 (aref r 0))))
+    (expect (vectorp r) :to-be-truthy)
+    (expect (= 3 (length r)) :to-be-truthy)
+    (expect (= 1 (aref r 0)) :to-be-truthy)))
 
 ;;; ─── FR-697: assoc/member with :test/:key keyword args ───────────────────────
 
-(deftest-each compile-sequence-test-keyword
-  "member and assoc accept :test/#'equal for string equality."
-  :cases (("member-test"   '("b" "c") "(member \"b\" '(\"a\" \"b\" \"c\") :test #'equal)")
-          ("assoc-test"    '("b" . 2) "(assoc \"b\" '((\"a\" . 1) (\"b\" . 2)) :test #'equal)"))
-  (expected form)
-  (assert-equal expected (run-string form :stdlib t)))
+(it-sequential "compile-sequence-test-keyword member-test"
+  (destructuring-bind (expected form) (list '("b" "c") "(member \"b\" '(\"a\" \"b\" \"c\") :test #'equal)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
-(deftest compile-member-assoc-key-keyword
-  "member and assoc with :key extract or transform the correct field."
+(it-sequential "compile-sequence-test-keyword assoc-test"
+  (destructuring-bind (expected form) (list '("b" . 2) "(assoc \"b\" '((\"a\" . 1) (\"b\" . 2)) :test #'equal)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-member-assoc-key-keyword"
   (let ((r (run-string "(member 2 '((1 . a) (2 . b) (3 . c)) :key #'car)" :stdlib t)))
-    (assert-true (consp r))
-    (assert-= 2 (caar r)))
+    (expect (consp r) :to-be-truthy)
+    (expect (= 2 (caar r)) :to-be-truthy))
   (let ((r (run-string "(assoc 4 '((1 . a) (2 . b) (3 . c)) :key (lambda (x) (* x x)))" :stdlib t)))
-    (assert-true (consp r))
-    (assert-= 2 (car r))))
+    (expect (consp r) :to-be-truthy)
+    (expect (= 2 (car r)) :to-be-truthy)))
 
 ;;; ─── position/count/find-if with keyword args ────────────────────────────────
 
-(deftest-each compile-sequence-position-count-keywords
-  "position and count accept :test and :key keyword args."
-  :cases (("position-test" 1 "(position \"b\" '(\"a\" \"b\" \"c\") :test #'equal)")
-          ("position-key"  1 "(position 2 '((1 . a) (2 . b) (3 . c)) :key #'car)")
-          ("count-test"    2 "(count \"a\" '(\"a\" \"b\" \"a\") :test #'equal)"))
-  (expected form)
-  (assert-= expected (run-string form :stdlib t)))
+(it-sequential "compile-sequence-position-count-keywords position-test"
+  (destructuring-bind (expected form) (list 1 "(position \"b\" '(\"a\" \"b\" \"c\") :test #'equal)")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
 
-(deftest compile-find-if-key-keyword
-  "find-if with :key applies the key function."
+(it-sequential "compile-sequence-position-count-keywords position-key"
+  (destructuring-bind (expected form) (list 1 "(position 2 '((1 . a) (2 . b) (3 . c)) :key #'car)")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "compile-sequence-position-count-keywords count-test"
+  (destructuring-bind (expected form) (list 2 "(count \"a\" '(\"a\" \"b\" \"a\") :test #'equal)")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "compile-find-if-key-keyword"
   (let ((r (run-string "(find-if #'evenp '((1 . a) (2 . b) (3 . c)) :key #'car)" :stdlib t)))
-    (assert-true (consp r))
-    (assert-= 2 (car r))))
+    (expect (consp r) :to-be-truthy)
+    (expect (= 2 (car r)) :to-be-truthy)))
 
 ;;; ─── remove-duplicates and remove with :test keyword ────────────────────────
 
-(deftest compile-remove-test-keywords
-  "remove-duplicates and remove with :test #'equal handle string equality."
-  :timeout 10
-  (assert-= 2 (length (run-string "(remove-duplicates '(\"a\" \"b\" \"a\") :test #'equal)" :stdlib t)))
-  (assert-equal '("b") (run-string "(remove \"a\" '(\"a\" \"b\" \"a\") :test #'equal)" :stdlib t)))
+(it-sequential "compile-remove-test-keywords"
+  :timeout
+  10
+  (expect (= 2 (length (run-string "(remove-duplicates '(\"a\" \"b\" \"a\") :test #'equal)" :stdlib t))) :to-be-truthy)
+  (expect (run-string "(remove \"a\" '(\"a\" \"b\" \"a\") :test #'equal)" :stdlib t) :to-equal '("b")))
 
 ;;; ─── string-upcase/downcase with :start/:end ─────────────────────────────────
 
-(deftest-each compile-string-case-bounds
-  "string-upcase, string-downcase, and string-capitalize accept :start/:end keyword args."
-  :cases (("upcase"      "hELlo" "(string-upcase \"hello\" :start 1 :end 3)")
-          ("downcase"    "HellO" "(string-downcase \"HELLO\" :start 1 :end 4)")
-          ("capitalize"  "hEllo" "(string-capitalize \"hELLo\" :start 1 :end 4)"))
-  (expected form)
-  (assert-string= expected (run-string form)))
+(it-sequential "compile-string-case-bounds upcase"
+  (destructuring-bind (expected form) (list "hELlo" "(string-upcase \"hello\" :start 1 :end 3)")
+    (expect (run-string form) :to-equal expected)))
 
-(deftest-each compile-string-trim-bounds
-  "string-left-trim and string-right-trim remove characters from the correct side only."
-  :cases (("left"  "hello  " "(string-left-trim \" \" \"  hello  \")")
-          ("right" "  hello" "(string-right-trim \" \" \"  hello  \")"))
-  (expected form)
-  (assert-string= expected (run-string form :stdlib t)))
+(it-sequential "compile-string-case-bounds downcase"
+  (destructuring-bind (expected form) (list "HellO" "(string-downcase \"HELLO\" :start 1 :end 4)")
+    (expect (run-string form) :to-equal expected)))
 
-(deftest-each compile-nstring-case-bounds
-  "nstring-upcase, nstring-downcase, and nstring-capitalize return the mutated string."
-  :cases (("upcase"      "hELLo" "(nstring-upcase \"hello\" :start 1 :end 4)")
-          ("downcase"    "HellO" "(nstring-downcase \"HELLO\" :start 1 :end 4)")
-          ("capitalize"  "hEllo" "(nstring-capitalize \"hELLo\" :start 1 :end 4)"))
-  (expected form)
-  (assert-string= expected (run-string form :stdlib t)))
+(it-sequential "compile-string-case-bounds capitalize"
+  (destructuring-bind (expected form) (list "hEllo" "(string-capitalize \"hELLo\" :start 1 :end 4)")
+    (expect (run-string form) :to-equal expected)))
 
-(deftest compile-empty-let-and-flet
-  "let/flet accept empty binding lists."
-  (assert-= 42 (run-string "(let () 42)"))
-  (assert-= 7 (run-string "(flet () 7)")))
+(it-sequential "compile-string-trim-bounds left"
+  (destructuring-bind (expected form) (list "hello  " "(string-left-trim \" \" \"  hello  \")")
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
-(deftest compile-top-level-defvar-visible-to-following-defun
-  "Top-level defvars stay on the direct path so later definitions are not skipped by CPS labels."
-  (assert-= 43
-            (run-string
+(it-sequential "compile-string-trim-bounds right"
+  (destructuring-bind (expected form) (list "  hello" "(string-right-trim \" \" \"  hello  \")")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-nstring-case-bounds upcase"
+  (destructuring-bind (expected form) (list "hELLo" "(nstring-upcase \"hello\" :start 1 :end 4)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-nstring-case-bounds downcase"
+  (destructuring-bind (expected form) (list "HellO" "(nstring-downcase \"HELLO\" :start 1 :end 4)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-nstring-case-bounds capitalize"
+  (destructuring-bind (expected form) (list "hEllo" "(nstring-capitalize \"hELLo\" :start 1 :end 4)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-empty-let-and-flet"
+  (expect (= 42 (run-string "(let () 42)")) :to-be-truthy)
+  (expect (= 7 (run-string "(flet () 7)")) :to-be-truthy))
+
+(it-sequential "compile-top-level-defvar-visible-to-following-defun"
+  (expect (= 43 (run-string
              "(progn
                 (defvar *defvar-cps-visibility-probe-a* 41)
                 (defvar *defvar-cps-visibility-probe-b* 2)
                 (defun defvar-cps-visibility-probe ()
                   (+ *defvar-cps-visibility-probe-a* *defvar-cps-visibility-probe-b*))
-                (defvar-cps-visibility-probe))")))
+                (defvar-cps-visibility-probe))")) :to-be-truthy))
 
-(deftest compile-type-of-float-and-function
-  "type-of returns float and function type names for runtime values."
-  (assert-eq 'single-float (run-string "(type-of 1.0)"))
-  (assert-eq 'function (run-string "(type-of (lambda (x) x))")))
+(it-sequential "compile-type-of-float-and-function"
+  (expect (run-string "(type-of 1.0)") :to-be 'single-float)
+  (expect (run-string "(type-of (lambda (x) x))") :to-be 'function))
 
-(deftest compile-error-format-control
-  "error accepts string format control plus arguments."
-  (assert-true
-   (run-string
+(it-sequential "compile-error-format-control"
+  (expect (run-string
     "(handler-case
          (progn (error \"bad ~A\" 42) nil)
        (error (e)
-         (not (null (search \"42\" (format nil \"~A\" e))))))")))
+         (not (null (search \"42\" (format nil \"~A\" e))))))") :to-be-truthy))
 
-(deftest compile-warn-format-control
-  "warn accepts string format control plus arguments and returns nil."
-  (assert-= 42 (run-string "(progn (warn \"warn ~A\" 7) 42)")))
+(it-sequential "compile-warn-format-control"
+  (expect (= 42 (run-string "(progn (warn \"warn ~A\" 7) 42)")) :to-be-truthy))
 
 ;;; ─── FR-599: #n= / #n# label and reference reader macros ────────────────────
 
-(deftest compile-hash-n-eq
-  "#n= labels a data object and #n# references it; works with strings too."
+(it-sequential "compile-hash-n-eq"
   (let ((r (run-string "(list #0=(1 2 3) #0#)")))
-    (assert-equal '(1 2 3) (first r))
-    (assert-equal '(1 2 3) (second r)))
-  (assert-string= "hello" (run-string "#0=\"hello\"")))
+    (expect (first r) :to-equal '(1 2 3))
+    (expect (second r) :to-equal '(1 2 3)))
+  (expect (run-string "#0=\"hello\"") :to-equal "hello"))
 
 ;;; ─── FR-592: readtable API compatibility ────────────────────────────────────
 
-(deftest compile-readtable-compatibility-api
-  "Readtable API calls are available and preserve registered macro metadata."
-  (assert-true (run-string "(readtablep *readtable*)" :stdlib t))
-  (assert-eq :downcase
-             (run-string "(let ((rt (copy-readtable)))
+(it-sequential "compile-readtable-compatibility-api"
+  (expect (run-string "(readtablep *readtable*)" :stdlib t) :to-be-truthy)
+  (expect (run-string "(let ((rt (copy-readtable)))
                              (setf (readtable-case rt) :downcase)
                              (readtable-case rt))"
-                          :stdlib t))
-  ;; Restore the case before returning: RUN-STRING calls share one global
-  ;; readtable object, and a dynamic (let ((*readtable* ...)) ...) does not reach
-  ;; the reader — %VM-HOST-READTABLE-FOR-STATE resolves *READTABLE* from the VM
-  ;; global store, not from the binding stack. Leaving :DOWNCASE set made the
-  ;; next assertion's source lex as "unknown dispatch character #!".
-  (assert-string= "abc"
-                 (run-string "(progn
+                          :stdlib t) :to-be :downcase)
+  (expect (run-string "(progn
                                 (setf (readtable-case *readtable*) :downcase)
                                 (let ((name (symbol-name (read-from-string \"ABC\"))))
                                   (setf (readtable-case *readtable*) :upcase)
                                   name))"
-                             :stdlib t))
-  ;; The character literals need a doubled backslash: these are Lisp strings, so
-  ;; "#\\!" is what puts #\! into the compiled source. Written singly the string
-  ;; reader eats the backslash and cl-cc's lexer receives "#!", which is not a
-  ;; dispatch character and aborts the whole assertion.
-  (assert-equal '(t t)
-                (run-string "(let ((rt (copy-readtable)))
+                             :stdlib t) :to-equal "abc")
+  (expect (run-string "(let ((rt (copy-readtable)))
                                (set-macro-character #\\! (lambda (stream char)
                                                           (declare (ignore stream char))
                                                           :ok)
@@ -203,9 +193,8 @@
                                (multiple-value-bind (fn non-terminating-p)
                                    (get-macro-character #\\? rt)
                                  (list (functionp fn) non-terminating-p)))"
-                            :stdlib t))
-  (assert-true
-   (run-string "(let ((rt (copy-readtable)))
+                            :stdlib t) :to-equal '(t t))
+  (expect (run-string "(let ((rt (copy-readtable)))
                   (make-dispatch-macro-character #\\# nil rt)
                   (set-dispatch-macro-character #\\# #\\q
                                                 (lambda (stream char arg)
@@ -213,273 +202,264 @@
                                                   :q)
                                                 rt)
                   (functionp (get-dispatch-macro-character #\\# #\\q rt)))"
-               :stdlib t)))
+               :stdlib t) :to-be-truthy))
 
 ;;; ─── FR-641: union/intersection/set-difference with :test ────────────────────
 
-(deftest-each compile-set-ops-test-keyword
-  "union and intersection accept :test #'equal for string equality."
-  :cases (("union"        3 "(length (union '(\"a\" \"b\") '(\"b\" \"c\") :test #'equal))")
-          ("intersection" 2 "(length (intersection '(\"a\" \"b\" \"c\") '(\"b\" \"c\" \"d\") :test #'equal))")
-          ("set-diff"     2 "(length (set-difference '(\"a\" \"b\" \"c\") '(\"b\") :test #'equal))"))
-  (expected form)
-  (assert-= expected (run-string form :stdlib t)))
+(it-sequential "compile-set-ops-test-keyword union"
+  (destructuring-bind (expected form) (list 3 "(length (union '(\"a\" \"b\") '(\"b\" \"c\") :test #'equal))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "compile-set-ops-test-keyword intersection"
+  (destructuring-bind (expected form) (list 2 "(length (intersection '(\"a\" \"b\" \"c\") '(\"b\" \"c\" \"d\") :test #'equal))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "compile-set-ops-test-keyword set-diff"
+  (destructuring-bind (expected form) (list 2 "(length (set-difference '(\"a\" \"b\" \"c\") '(\"b\") :test #'equal))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
 
 ;;; ─── FR-688: delete/substitute with :test keyword ────────────────────────────
 
-(deftest compile-delete-test-keyword
-  "delete with :test #'equal removes matching strings."
+(it-sequential "compile-delete-test-keyword"
   (let ((r (run-string "(delete \"a\" '(\"a\" \"b\" \"a\") :test #'equal)" :stdlib t)))
-    (assert-equal '("b") r)))
+    (expect r :to-equal '("b"))))
 
-(deftest compile-substitute-test-keyword
-  "substitute with :test #'equal replaces matching strings."
+(it-sequential "compile-substitute-test-keyword"
   (let ((r (run-string "(substitute \"x\" \"a\" '(\"a\" \"b\" \"a\") :test #'equal)" :stdlib t)))
-    (assert-= 3 (length r))
-    (assert-string= "x" (first r))
-    (assert-string= "x" (third r))))
+    (expect (= 3 (length r)) :to-be-truthy)
+    (expect (first r) :to-equal "x")
+    (expect (third r) :to-equal "x")))
 
 ;;; ─── compile-file-pathname host bridge ───────────────────────────────────────
 
-(deftest compile-compile-file-pathname
-  "compile-file-pathname returns a pathname with .fasl type."
+(it-sequential "compile-compile-file-pathname"
   (let ((r (run-string "(compile-file-pathname \"/tmp/foo.lisp\")")))
-    (assert-true (pathnamep r))))
+    (expect (pathnamep r) :to-be-truthy)))
 
-(deftest compile-compile-file-is-fbound
-  "compile-file is available as a stdlib function."
-  (assert-true (run-string "(fboundp 'compile-file)" :stdlib t)))
+(it-sequential "compile-compile-file-is-fbound"
+  (expect (run-string "(fboundp 'compile-file)" :stdlib t) :to-be-truthy))
 
-(deftest compile-safe-debug-bridges
-  "disassemble is non-blocking and inspect uses describe while returning the object."
-  (assert-null (run-string "(disassemble 42)"))
-  (assert-= 42 (run-string "(inspect 42)")))
+(it-sequential "compile-safe-debug-bridges"
+  (expect (run-string "(disassemble 42)") :to-be-null)
+  (expect (= 42 (run-string "(inspect 42)")) :to-be-truthy))
 
-(deftest compile-foreign-funcall-strlen
-  "foreign-funcall provides a minimal host-backed FFI path."
-  (assert-= 4 (run-string "(foreign-funcall \"strlen\" :string \"abcd\" :int)" :stdlib t))
-  (assert-= 5 (run-string "(cffi:foreign-funcall \"strlen\" :string \"abcde\" :int)" :stdlib t)))
+(it-sequential "compile-foreign-funcall-strlen"
+  (expect (= 4 (run-string "(foreign-funcall \"strlen\" :string \"abcd\" :int)" :stdlib t)) :to-be-truthy)
+  (expect (= 5 (run-string "(cffi:foreign-funcall \"strlen\" :string \"abcde\" :int)" :stdlib t)) :to-be-truthy))
 
-(deftest compile-documentation-defun-docstring
-  "documentation returns docstrings captured by the defun expander."
-  (assert-string=
-   "doc text"
-   (run-string
+(it-sequential "compile-documentation-defun-docstring"
+  (expect (run-string
     "(progn (defun documented-probe () \"doc text\" 42)
        (documentation 'documented-probe 'function))"
-    :stdlib t))
-  (assert-null (run-string "(documentation 'missing-doc-probe 'function)" :stdlib t)))
+    :stdlib t) :to-equal "doc text")
+  (expect (run-string "(documentation 'missing-doc-probe 'function)" :stdlib t) :to-be-null))
 
-(deftest compile-subtypep-basic-two-values
-  "subtypep is available at runtime and preserves ANSI two-value results."
-  (assert-equal '(t t)
-                (run-string "(multiple-value-list (subtypep 'integer 'number))" :stdlib t))
-  (assert-equal '(nil t)
-                (run-string "(multiple-value-list (subtypep 'string 'integer))" :stdlib t)))
+(it-sequential "compile-subtypep-basic-two-values"
+  (expect (run-string "(multiple-value-list (subtypep 'integer 'number))" :stdlib t) :to-equal '(t t))
+  (expect (run-string "(multiple-value-list (subtypep 'string 'integer))" :stdlib t) :to-equal '(nil t)))
 
-(deftest compile-string-octets-bridges
-  "string-to-octets / octets-to-string round-trip UTF-8 data and honor encoding keywords."
+(it-sequential "compile-string-octets-bridges"
   (let ((octets (run-string "(string-to-octets \"hé\" :encoding :utf-8)")))
-    (assert-true (vectorp octets))
-    (assert-= 3 (length octets))
-    (assert-= 104 (aref octets 0))
-    (assert-= 195 (aref octets 1))
-    (assert-= 169 (aref octets 2)))
+    (expect (vectorp octets) :to-be-truthy)
+    (expect (= 3 (length octets)) :to-be-truthy)
+    (expect (= 104 (aref octets 0)) :to-be-truthy)
+    (expect (= 195 (aref octets 1)) :to-be-truthy)
+    (expect (= 169 (aref octets 2)) :to-be-truthy))
   (let ((octets (run-string "(string-to-octets \"é\" :external-format :latin-1)")))
-    (assert-= 1 (length octets))
-    (assert-= 233 (aref octets 0)))
+    (expect (= 1 (length octets)) :to-be-truthy)
+    (expect (= 233 (aref octets 0)) :to-be-truthy))
   (let ((octets (run-string "(string-to-octets \"A\" :encoding :utf-16)")))
-    (assert-true (vectorp octets))
-    (assert-= 2 (length octets))
-    (assert-= 65 (aref octets 0))
-    (assert-= 0 (aref octets 1)))
+    (expect (vectorp octets) :to-be-truthy)
+    (expect (= 2 (length octets)) :to-be-truthy)
+    (expect (= 65 (aref octets 0)) :to-be-truthy)
+    (expect (= 0 (aref octets 1)) :to-be-truthy))
   (let ((octets (run-string "(string-to-octets (string (code-char 128512)) :encoding :utf-16)")))
-    (assert-true (vectorp octets))
-    (assert-= 4 (length octets))
-    (assert-= #x3d (aref octets 0))
-    (assert-= #xd8 (aref octets 1))
-    (assert-= #x00 (aref octets 2))
-    (assert-= #xde (aref octets 3)))
-  (assert-string=
-   "hé"
-   (run-string "(octets-to-string (string-to-octets \"hé\" :external-format :utf-8) :encoding :utf-8)"))
-  (assert-string=
-   "A"
-   (run-string "(octets-to-string (string-to-octets \"A\" :encoding :utf-16) :encoding :utf-16)"))
-  (assert-=
-   128512
-   (run-string "(char-code (aref (octets-to-string (string-to-octets (string (code-char 128512)) :encoding :utf-16) :encoding :utf-16) 0))")))
+    (expect (vectorp octets) :to-be-truthy)
+    (expect (= 4 (length octets)) :to-be-truthy)
+    (expect (= #x3d (aref octets 0)) :to-be-truthy)
+    (expect (= #xd8 (aref octets 1)) :to-be-truthy)
+    (expect (= #x00 (aref octets 2)) :to-be-truthy)
+    (expect (= #xde (aref octets 3)) :to-be-truthy))
+  (expect (run-string "(octets-to-string (string-to-octets \"hé\" :external-format :utf-8) :encoding :utf-8)") :to-equal "hé")
+  (expect (run-string "(octets-to-string (string-to-octets \"A\" :encoding :utf-16) :encoding :utf-16)") :to-equal "A")
+  (expect (= 128512 (run-string "(char-code (aref (octets-to-string (string-to-octets (string (code-char 128512)) :encoding :utf-16) :encoding :utf-16) 0))")) :to-be-truthy))
 
 ;;; ─── FR-604: float 2-arg prototype form ──────────────────────────────────────
 
-(deftest compile-float-2arg
-  "float with prototype argument converts to float ignoring prototype."
-  (assert-true (floatp (run-string "(float 3 1.0d0)")))
-  (assert-= (float 3) (run-string "(float 3 1.0d0)")))
+(it-sequential "compile-float-2arg"
+  (expect (floatp (run-string "(float 3 1.0d0)")) :to-be-truthy)
+  (expect (= (float 3) (run-string "(float 3 1.0d0)")) :to-be-truthy))
 
 ;;; ─── FR-605: bignum predicate helper ────────────────────────────────────────
 
-(deftest compile-bignump
-  "bignump answers T for integers outside the fixnum range and NIL for a fixnum."
-  (assert-true (run-string "(bignump (expt 2 100))" :stdlib t))
-  (assert-true (null (run-string "(bignump 42)" :stdlib t))))
+(it-sequential "compile-bignump"
+  (expect (run-string "(bignump (expt 2 100))" :stdlib t) :to-be-truthy)
+  (expect (null (run-string "(bignump 42)" :stdlib t)) :to-be-truthy))
 
 ;;; ─── FR-361/363/396: declaim inline policy + optimize quality handling ─────
 
-(deftest compile-declaim-optimize-form-records-global-policy
-  "DECLAIM optimize still evaluates to NIL while recording global quality levels."
+(it-sequential "compile-declaim-optimize-form-records-global-policy"
   (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
-    (assert-equal nil
-                  (run-string "(declaim (optimize speed (safety 0) (debug 3))) nil" :stdlib t))
-    (assert-= 3 (gethash 'speed cl-cc/expand:*declaim-optimize-registry*))
-    (assert-= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*))
-    (assert-= 3 (gethash 'debug cl-cc/expand:*declaim-optimize-registry*))))
+    (expect (run-string "(declaim (optimize speed (safety 0) (debug 3))) nil" :stdlib t) :to-equal nil)
+    (expect (= 3 (gethash 'speed cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (= 3 (gethash 'debug cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)))
 
-(deftest compile-declaim-safety-zero-suppresses-later-defun-type-assertion
-  "A global `(declaim (optimize (safety 0)))` suppresses vm-typep in later defuns."
+(it-sequential "compile-declaim-safety-zero-suppresses-later-defun-type-assertion"
   (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
     (let* ((result (cl-cc/compile:compile-toplevel-forms
                     '((declaim (optimize (safety 0)))
                       (defun later-safe (x) (the integer x)))
                     :target :vm))
            (insts (cl-cc/compile:compilation-result-vm-instructions result)))
-      (assert-true (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref))) insts))
-      (assert-null (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-typep)) insts)))))
+      (expect (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref))) insts) :to-be-truthy)
+      (expect (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-typep)) insts) :to-be-null))))
 
-(deftest compile-declaim-safety-zero-suppresses-top-level-the-type-assertion
-  "Global safety 0 is honored by the VM CPS top-level path for THE forms."
+(it-sequential "compile-declaim-safety-zero-suppresses-top-level-the-type-assertion"
   (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
     (let* ((result (cl-cc/compile:compile-toplevel-forms
                     '((declaim (optimize (safety 0)))
                       (the integer 42))
                     :target :vm))
            (insts (cl-cc/compile:compilation-result-vm-instructions result)))
-      (assert-null (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-typep)) insts)))))
+      (expect (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-typep)) insts) :to-be-null))))
 
-(deftest-each compile-declaim-optimize-inline-policy-applies-globally-across-compilations
-  "Global optimize qualities annotate later defun callable refs through the existing inline policy path."
-  :cases (("speed-three" '(declaim (optimize (speed 3))) :inline)
-          ("debug-three" '(declaim (optimize (debug 3))) :notinline)
-          ("space-two" '(declaim (optimize (space 2))) :notinline))
-  (declaim-form expected-policy)
-  (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
-    (assert-equal nil (our-macroexpand-1 declaim-form))
+(it-sequential "compile-declaim-optimize-inline-policy-applies-globally-across-compilations speed-three"
+  (destructuring-bind (declaim-form expected-policy) (list '(declaim (optimize (speed 3))) :inline)
+    (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
+    (expect (our-macroexpand-1 declaim-form) :to-equal nil)
     (let* ((result (cl-cc/compile:compile-toplevel-forms
                     '((defun mapped-inline-policy (x) (+ x 1)))
                     :target :vm
                     :pass-pipeline '(:inline)))
             (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
-      (assert-true closure)
-      (assert-eq expected-policy (cl-cc/vm:vm-closure-inline-policy closure)))))
+      (expect closure :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be expected-policy)))))
 
-(deftest compile-declaim-inline-applies-globally-across-compilations
-  "A prior `(declaim (inline f))` annotates later defuns compiled in another unit."
+(it-sequential "compile-declaim-optimize-inline-policy-applies-globally-across-compilations debug-three"
+  (destructuring-bind (declaim-form expected-policy) (list '(declaim (optimize (debug 3))) :notinline)
+    (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
+    (expect (our-macroexpand-1 declaim-form) :to-equal nil)
+    (let* ((result (cl-cc/compile:compile-toplevel-forms
+                    '((defun mapped-inline-policy (x) (+ x 1)))
+                    :target :vm
+                    :pass-pipeline '(:inline)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+                              (cl-cc/compile:compilation-result-vm-instructions result))))
+      (expect closure :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be expected-policy)))))
+
+(it-sequential "compile-declaim-optimize-inline-policy-applies-globally-across-compilations space-two"
+  (destructuring-bind (declaim-form expected-policy) (list '(declaim (optimize (space 2))) :notinline)
+    (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
+    (expect (our-macroexpand-1 declaim-form) :to-equal nil)
+    (let* ((result (cl-cc/compile:compile-toplevel-forms
+                    '((defun mapped-inline-policy (x) (+ x 1)))
+                    :target :vm
+                    :pass-pipeline '(:inline)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+                              (cl-cc/compile:compilation-result-vm-instructions result))))
+      (expect closure :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be expected-policy)))))
+
+(it-sequential "compile-declaim-inline-applies-globally-across-compilations"
   (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
-    (assert-equal nil (our-macroexpand-1 '(declaim (inline big))))
+    (expect (our-macroexpand-1 '(declaim (inline big))) :to-equal nil)
     (let* ((result (cl-cc/compile:compile-toplevel-forms
                     (list `(defun big (x) ,(%fr-361-large-body-form)))
                     :target :vm
                     :pass-pipeline '(:inline)))
             (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
-      (assert-true closure)
-      (assert-eq :inline (cl-cc/vm:vm-closure-inline-policy closure)))))
+      (expect closure :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be :inline))))
 
-(deftest compile-declaim-notinline-applies-globally-across-compilations
-  "Explicit NOTINLINE still wins even when optimize speed 3 would prefer inlining."
+(it-sequential "compile-declaim-notinline-applies-globally-across-compilations"
   (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq))
         (cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
-    (assert-equal nil (our-macroexpand-1 '(declaim (optimize (speed 3)))))
-    (assert-equal nil (our-macroexpand-1 '(declaim (notinline inc))))
+    (expect (our-macroexpand-1 '(declaim (optimize (speed 3)))) :to-equal nil)
+    (expect (our-macroexpand-1 '(declaim (notinline inc))) :to-equal nil)
     (let* ((result (cl-cc/compile:compile-toplevel-forms
                     '((defun inc (x) (+ x 1)))
                     :target :vm
                     :pass-pipeline '(:inline)))
             (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
-      (assert-true closure)
-      (assert-eq :notinline (cl-cc/vm:vm-closure-inline-policy closure)))))
+      (expect closure :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be :notinline))))
 
 ;;; ─── ANSI proclaim / with-compilation-unit runtime support ─────────────────
 
-(deftest compile-proclaim-records-global-declaration
-  "proclaim returns its declaration spec and records inline declarations globally."
-  ;; CL-CC::, not this file's package: RUN-STRING reads its source with *PACKAGE*
-  ;; bound to :CL-CC, so the proclaimed name comes back interned there.
+(it-sequential "compile-proclaim-records-global-declaration"
   (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
-    (assert-equal '(inline cl-cc::proclaimed-fn)
-                  (run-string "(proclaim '(inline proclaimed-fn))" :stdlib t))
-    (assert-eq :inline
-               (gethash 'cl-cc::proclaimed-fn cl-cc/expand:*declaim-inline-registry*))))
+    (expect (run-string "(proclaim '(inline proclaimed-fn))" :stdlib t) :to-equal '(inline cl-cc::proclaimed-fn))
+    (expect (gethash 'cl-cc::proclaimed-fn cl-cc/expand:*declaim-inline-registry*) :to-be :inline)))
 
-(deftest compile-with-compilation-unit-evaluates-body
-  "with-compilation-unit acts as a minimal compilation-unit wrapper around its body."
-  (assert-= 11 (run-string "(with-compilation-unit () (let ((x 11)) x))" :stdlib t)))
+(it-sequential "compile-with-compilation-unit-evaluates-body"
+  (expect (= 11 (run-string "(with-compilation-unit () (let ((x 11)) x))" :stdlib t)) :to-be-truthy))
 
 ;;; ─── FR-598: stream typep ────────────────────────────────────────────────────
 
-(deftest-each compile-typep-stream-truthy
-  "typep returns truthy for various stream types."
-  :cases (("standard-output-stream" "(typep *standard-output* 'stream)"                              nil)
-          ("output-stream-type"     "(output-stream-p *standard-output*)"                              t)
-          ("string-output-stream"   "(let ((s (make-string-output-stream))) (typep s 'string-stream))" t))
-  (form stdlib-p)
-  (assert-true (run-string form :stdlib stdlib-p)))
+(it-sequential "compile-typep-stream-truthy standard-output-stream"
+  (destructuring-bind (form stdlib-p) (list "(typep *standard-output* 'stream)" nil)
+    (expect (run-string form :stdlib stdlib-p) :to-be-truthy)))
 
-(deftest compile-typep-non-stream
-  "typep returns 0 for a non-stream value."
-  (assert-= 0 (run-string "(typep 42 'stream)")))
+(it-sequential "compile-typep-stream-truthy output-stream-type"
+  (destructuring-bind (form stdlib-p) (list "(output-stream-p *standard-output*)" t)
+    (expect (run-string form :stdlib stdlib-p) :to-be-truthy)))
+
+(it-sequential "compile-typep-stream-truthy string-output-stream"
+  (destructuring-bind (form stdlib-p) (list "(let ((s (make-string-output-stream))) (typep s 'string-stream))" t)
+    (expect (run-string form :stdlib stdlib-p) :to-be-truthy)))
+
+(it-sequential "compile-typep-non-stream"
+  (expect (= 0 (run-string "(typep 42 'stream)")) :to-be-truthy))
 
 ;;; ─── FR-603: (setf (values ...)) ────────────────────────────────────────────
 
-(deftest compile-setf-values-floor
-  "(setf (values a b) (floor 7 3)) destructures multiple values."
+(it-sequential "compile-setf-values-floor"
   (let ((r (run-string "(let (a b) (setf (values a b) (floor 7 3)) (list a b))" :stdlib t)))
-    (assert-= 2 (first r))
-    (assert-= 1 (second r))))
+    (expect (= 2 (first r)) :to-be-truthy)
+    (expect (= 1 (second r)) :to-be-truthy)))
 
 ;;; FR-562: Unicode character names via lexer
-(deftest-each compile-unicode-char-code
-  "Lexer resolves Unicode character names and code-char supports full Unicode range."
-  :cases (("greek-alpha" 945    "(char-code #\\Greek_Small_Letter_Alpha)")
-          ("snowman"     9731   "(char-code #\\Snowman)")
-          ("emoji"       128512 "(char-code (code-char 128512))"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "compile-unicode-char-code greek-alpha"
+  (destructuring-bind (expected form) (list 945 "(char-code #\\Greek_Small_Letter_Alpha)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-unicode-char-code snowman"
+  (destructuring-bind (expected form) (list 9731 "(char-code #\\Snowman)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-unicode-char-code emoji"
+  (destructuring-bind (expected form) (list 128512 "(char-code (code-char 128512))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; FR-687: make-string :element-type with both keywords
-(deftest-each compile-make-string-element-type
-  "make-string accepts :element-type; with both keywords it fills correctly."
-  :cases (("length"
-           "(length (make-string 5 :element-type 'character))"
-           (lambda (result)
-             (assert-= 5 result)))
-          ("fill"
-           "(make-string 3 :initial-element #\\x :element-type 'character)"
-           (lambda (result)
-             (assert-string= "xxx" result))))
-  (form verify)
-  (funcall verify (run-string form)))
+(it-sequential "compile-make-string-element-type length"
+  (destructuring-bind (form verify) (list "(length (make-string 5 :element-type 'character))" (lambda (result)
+             (expect (= 5 result) :to-be-truthy)))
+    (funcall verify (run-string form))))
+
+(it-sequential "compile-make-string-element-type fill"
+  (destructuring-bind (form verify) (list "(make-string 3 :initial-element #\\x :element-type 'character)" (lambda (result)
+             (expect result :to-equal "xxx")))
+    (funcall verify (run-string form))))
 
 ;;; FR-254: with-region macro expansion/compile path
-(deftest compile-with-region-runtime-lifetime
-  "with-region macro expands through compiler path and enforces lifetime at runtime." 
-  (assert-= 7
-           (run-string "(with-region (r) (cl-cc/runtime:rt-region-deref (cl-cc/runtime:rt-region-alloc r 7)))"
-                       :stdlib t))
-  (assert-true
-   (run-string "(handler-case (let (ref) (with-region (r) (setf ref (cl-cc/runtime:rt-region-alloc r 9))) (cl-cc/runtime:rt-region-deref ref) nil) (error () t))"
-               :stdlib t)))
+(it-sequential "compile-with-region-runtime-lifetime"
+  (expect (= 7 (run-string "(with-region (r) (cl-cc/runtime:rt-region-deref (cl-cc/runtime:rt-region-alloc r 7)))"
+                       :stdlib t)) :to-be-truthy)
+  (expect (run-string "(handler-case (let (ref) (with-region (r) (setf ref (cl-cc/runtime:rt-region-alloc r 9))) (cl-cc/runtime:rt-region-deref ref) nil) (error () t))"
+               :stdlib t) :to-be-truthy))
 
-(deftest compile-copy-hash-table-cow-write-keeps-original
-  "copy-hash-table copy-on-write path keeps original table unchanged on mutation." 
-  (assert-= 1
-           (run-string "(let* ((h (make-hash-table))
+(it-sequential "compile-copy-hash-table-cow-write-keeps-original"
+  (expect (= 1 (run-string "(let* ((h (make-hash-table))
                                (_ (setf (gethash 'a h) 1))
                                (c (copy-hash-table h)))
                           (setf (gethash 'a c) 99)
                           (gethash 'a h))"
-                       :stdlib t)))
+                       :stdlib t)) :to-be-truthy))
 
 ;;; (run-tests is defined in framework.lisp)

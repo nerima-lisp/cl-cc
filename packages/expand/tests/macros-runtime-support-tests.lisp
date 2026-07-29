@@ -3,45 +3,33 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-runtime-support-suite
-  :description "Tests for runtime support and package-system macros"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-runtime-support-suite)
 
-(deftest in-package-expansion
-  "IN-PACKAGE expands to a progn that installs the package."
+(it-sequential "in-package-expansion"
   (let ((result (our-macroexpand-1 '(in-package :cl-cc))))
-    (assert-eq 'progn (car result))
-    (assert-eq 'setq (car (second result)))
-    (assert-equal '(quote :cl-cc) (third result))))
+    (expect (car result) :to-be 'progn)
+    (expect (car (second result)) :to-be 'setq)
+    (expect (third result) :to-equal '(quote :cl-cc))))
 
-(deftest declare-expansion-preserves-form
-  "DECLARE survives macroexpansion so lowering can still see it."
-  (assert-equal '(declare (special x))
-                (our-macroexpand-1 '(declare (special x)))))
+(it-sequential "declare-expansion-preserves-form"
+  (expect (our-macroexpand-1 '(declare (special x))) :to-equal '(declare (special x))))
 
-(deftest declaim-non-inline-forms-still-expand-to-nil
-  "DECLAIM still expands away for non-inline/non-optimize clauses."
-  (assert-equal nil (our-macroexpand-1 '(declaim (special x)))))
+(it-sequential "declaim-non-inline-forms-still-expand-to-nil"
+  (expect (our-macroexpand-1 '(declaim (special x))) :to-equal nil))
 
-(deftest declaim-inline-updates-registry
-  "DECLAIM records global inline/notinline policy while still expanding to NIL."
+(it-sequential "declaim-inline-updates-registry"
   (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
-    (assert-equal nil
-                  (our-macroexpand-1
+    (expect (our-macroexpand-1
                    '(declaim (inline fast slow)
                              (notinline slow)
-                             (special x))))
-    (assert-eq :inline (gethash 'fast cl-cc/expand:*declaim-inline-registry*))
-    (assert-eq :notinline (gethash 'slow cl-cc/expand:*declaim-inline-registry*))
-    (assert-false (gethash 'x cl-cc/expand:*declaim-inline-registry*))))
+                             (special x))) :to-equal nil)
+    (expect (gethash 'fast cl-cc/expand:*declaim-inline-registry*) :to-be :inline)
+    (expect (gethash 'slow cl-cc/expand:*declaim-inline-registry*) :to-be :notinline)
+    (expect (gethash 'x cl-cc/expand:*declaim-inline-registry*) :to-be-falsy)))
 
-(deftest declaim-optimize-updates-registry
-  "DECLAIM records optimize quality levels while still expanding to NIL."
+(it-sequential "declaim-optimize-updates-registry"
   (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
-    (assert-equal nil
-                  (our-macroexpand-1
+    (expect (our-macroexpand-1
                    '(declaim (optimize speed
                                        (safety 0)
                                        (debug 3)
@@ -49,63 +37,55 @@
                                        (compilation-speed 1)
                                        (speed 4)
                                        (unknown-quality 2))
-                             (special x))))
-    (assert-= 3 (gethash 'speed cl-cc/expand:*declaim-optimize-registry*))
-    (assert-= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*))
-    (assert-= 3 (gethash 'debug cl-cc/expand:*declaim-optimize-registry*))
-    (assert-= 2 (gethash 'space cl-cc/expand:*declaim-optimize-registry*))
-    (assert-= 1 (gethash 'compilation-speed cl-cc/expand:*declaim-optimize-registry*))
-    (assert-false (gethash 'unknown-quality cl-cc/expand:*declaim-optimize-registry*))))
+                             (special x))) :to-equal nil)
+    (expect (= 3 (gethash 'speed cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (= 3 (gethash 'debug cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (= 2 (gethash 'space cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (= 1 (gethash 'compilation-speed cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy)
+    (expect (gethash 'unknown-quality cl-cc/expand:*declaim-optimize-registry*) :to-be-falsy)))
 
-(deftest declaim-optimize-updates-fresh-registry-after-repeat-expansion
-  "DECLAIM optimize side effects are not hidden by macroexpansion caches."
+(it-sequential "declaim-optimize-updates-fresh-registry-after-repeat-expansion"
   (let ((form '(declaim (optimize (safety 0)))))
     (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
-      (assert-equal nil (our-macroexpand-1 form))
-      (assert-= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*)))
+      (expect (our-macroexpand-1 form) :to-equal nil)
+      (expect (= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy))
     (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
-      (assert-equal nil (our-macroexpand-1 form))
-      (assert-= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*)))))
+      (expect (our-macroexpand-1 form) :to-equal nil)
+      (expect (= 0 (gethash 'safety cl-cc/expand:*declaim-optimize-registry*)) :to-be-truthy))))
 
-(deftest locally-preserves-declarations
-  "LOCALLY keeps declarations in a LET wrapper."
+(it-sequential "locally-preserves-declarations"
   (let ((result (our-macroexpand-1 '(locally (declare (special x)) x))))
-    (assert-eq 'let (car result))
-    (assert-eq 'declare (car (caddr result)))))
+    (expect (car result) :to-be 'let)
+    (expect (car (caddr result)) :to-be 'declare)))
 
-(deftest progv-expands-with-unwind-protect
-  "PROGV binds dynamically through LET* and UNWIND-PROTECT."
+(it-sequential "progv-expands-with-unwind-protect"
   (let ((result (our-macroexpand-1 '(progv syms vals (foo)))))
-    (assert-eq 'let* (car result))
-    (assert-eq 'unwind-protect (car (caddr result)))))
+    (expect (car result) :to-be 'let*)
+    (expect (car (caddr result)) :to-be 'unwind-protect)))
 
-(deftest defpackage-creates-package
-  "(defpackage :foo ...) expands to progn with runtime-backed package helpers."
+(it-sequential "defpackage-creates-package"
   (let* ((result (our-macroexpand-1 '(defpackage :foo (:use :cl) (:export foo))))
          (result-str (format nil "~S" result)))
-    (assert-eq (car result) 'progn)
-    (assert-true (search "RT-FIND-PACKAGE" result-str))
-    (assert-true (search "RT-MAKE-PACKAGE" result-str))
-    (assert-true (search "RT-EXPORT" result-str))
-    (assert-false (search "ADD-PACKAGE-LOCAL-NICKNAME" result-str))))
+    (expect 'progn :to-be (car result))
+    (expect (search "RT-FIND-PACKAGE" result-str) :to-be-truthy)
+    (expect (search "RT-MAKE-PACKAGE" result-str) :to-be-truthy)
+    (expect (search "RT-EXPORT" result-str) :to-be-truthy)
+    (expect (search "ADD-PACKAGE-LOCAL-NICKNAME" result-str) :to-be-falsy)))
 
-(deftest package-iteration-expands-to-runtime-package-lookup
-  "Package iteration macros resolve explicit package designators through RT-FIND-PACKAGE."
+(it-sequential "package-iteration-expands-to-runtime-package-lookup"
   (let* ((result (our-macroexpand-1 '(do-symbols (s :cl-user) s)))
          (result-str (format nil "~S" result)))
-    (assert-true (search "RT-FIND-PACKAGE" result-str))
-    (assert-false (search "(FIND-PACKAGE :CL-USER)" result-str))))
+    (expect (search "RT-FIND-PACKAGE" result-str) :to-be-truthy)
+    (expect (search "(FIND-PACKAGE :CL-USER)" result-str) :to-be-falsy)))
 
-(deftest foreign-funcall-expands-to-vm-bridge
-  "FOREIGN-FUNCALL expands directly to the VM bridge implementation."
+(it-sequential "foreign-funcall-expands-to-vm-bridge"
   (dolist (head (list 'foreign-funcall
                       (intern "FOREIGN-FUNCALL" (find-package :cffi))))
     (let ((result (our-macroexpand-1 `(,head "strlen" :string "abcd" :int))))
-      (assert-string= "%FOREIGN-FUNCALL" (symbol-name (car result)))
-      (assert-string= "CL-CC/VM" (package-name (symbol-package (car result)))))))
+      (expect (symbol-name (car result)) :to-equal "%FOREIGN-FUNCALL")
+      (expect (package-name (symbol-package (car result))) :to-equal "CL-CC/VM"))))
 
-(deftest foreign-funcall-string-encoded-cffi-aliases-are-not-registered
-  "String-encoded CFFI compatibility aliases are not accepted as macro heads."
+(it-sequential "foreign-funcall-string-encoded-cffi-aliases-are-not-registered"
   (dolist (name '("CFFI:FOREIGN-FUNCALL" "CFFI::FOREIGN-FUNCALL"))
-    (assert-false
-     (cl-cc/expand::lookup-macro (intern name :cl-cc/expand)))))
+    (expect (cl-cc/expand::lookup-macro (intern name :cl-cc/expand)) :to-be-falsy)))

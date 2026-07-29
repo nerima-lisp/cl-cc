@@ -10,8 +10,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
-
 ;;; ─── helpers ──────────────────────────────────────────────────────────────
 
 (defun make-spill-test-interval (vreg start end &key use-positions fp-p)
@@ -25,42 +23,36 @@
 
 ;;; ─── %collect-live-range-splits ───────────────────────────────────────────
 
-(deftest spill-collect-live-range-splits-no-split-below-minimum
-  "%collect-live-range-splits produces no boundaries when the gap between uses is smaller than the minimum hole size."
-  ;; Gap of 5 between uses 2 and 7 is below minimum hole size of 8.
+(it-sequential "spill-collect-live-range-splits-no-split-below-minimum"
   (let* ((interval (make-spill-test-interval :v 0 10 :use-positions '(2 7)))
          (minimum-hole-size 8))
     (multiple-value-bind (child-groups boundaries)
         (cl-cc/regalloc::%collect-live-range-splits (list interval) minimum-hole-size)
-      (assert-= 1 (length child-groups))
-      (assert-null boundaries))))
+      (expect (= 1 (length child-groups)) :to-be-truthy)
+      (expect boundaries :to-be-null))))
 
-(deftest spill-collect-live-range-splits-boundary-when-hole-exceeds-minimum
-  "%collect-live-range-splits emits a split boundary when the use gap exceeds the minimum hole size."
-  ;; Gap of 15 between uses 2 and 17 exceeds minimum of 8.
+(it-sequential "spill-collect-live-range-splits-boundary-when-hole-exceeds-minimum"
   (let* ((interval (make-spill-test-interval :v 0 20 :use-positions '(2 17)))
          (minimum-hole-size 8))
     (multiple-value-bind (child-groups boundaries)
         (cl-cc/regalloc::%collect-live-range-splits (list interval) minimum-hole-size)
-      (assert-= 1 (length child-groups))
-      (assert-= 1 (length boundaries))
-      (assert-= 2 (cl-cc/regalloc::split-boundary-after-position (first boundaries)))
-      (assert-= 17 (cl-cc/regalloc::split-boundary-before-position (first boundaries))))))
+      (expect (= 1 (length child-groups)) :to-be-truthy)
+      (expect (= 1 (length boundaries)) :to-be-truthy)
+      (expect (= 2 (cl-cc/regalloc::split-boundary-after-position (first boundaries))) :to-be-truthy)
+      (expect (= 17 (cl-cc/regalloc::split-boundary-before-position (first boundaries))) :to-be-truthy))))
 
-(deftest spill-collect-live-range-splits-separate-groups-per-interval
-  "%collect-live-range-splits produces one child group per input interval."
+(it-sequential "spill-collect-live-range-splits-separate-groups-per-interval"
   (let* ((int-a (make-spill-test-interval :a 0 10 :use-positions '(1 2)))
          (int-b (make-spill-test-interval :b 5 20 :use-positions '(5 6)))
          (minimum-hole-size 8))
     (multiple-value-bind (child-groups boundaries)
         (cl-cc/regalloc::%collect-live-range-splits (list int-a int-b) minimum-hole-size)
       (declare (ignore boundaries))
-      (assert-= 2 (length child-groups)))))
+      (expect (= 2 (length child-groups)) :to-be-truthy))))
 
 ;;; ─── %assign-live-range-split-slots ──────────────────────────────────────
 
-(deftest spill-assign-live-range-split-slots-sequential-1-indexed
-  "%assign-live-range-split-slots assigns sequential 1-indexed slot numbers to split boundaries."
+(it-sequential "spill-assign-live-range-split-slots-sequential-1-indexed"
   (let* ((interval (make-spill-test-interval :v 0 30 :use-positions '(2 20)))
          (minimum-hole-size 8))
     (multiple-value-bind (child-groups boundaries)
@@ -68,17 +60,15 @@
       (declare (ignore child-groups))
       (let ((slot-count (cl-cc/regalloc::%assign-live-range-split-slots boundaries)))
         (when (plusp (length boundaries))
-          (assert-= 1 (cl-cc/regalloc::split-boundary-slot (first boundaries)))
-          (assert-= 1 slot-count))))))
+          (expect (= 1 (cl-cc/regalloc::split-boundary-slot (first boundaries))) :to-be-truthy)
+          (expect (= 1 slot-count) :to-be-truthy))))))
 
-(deftest spill-assign-live-range-split-slots-zero-when-no-boundaries
-  "%assign-live-range-split-slots returns zero when the boundary list is empty."
-  (assert-= 0 (cl-cc/regalloc::%assign-live-range-split-slots '())))
+(it-sequential "spill-assign-live-range-split-slots-zero-when-no-boundaries"
+  (expect (= 0 (cl-cc/regalloc::%assign-live-range-split-slots '())) :to-be-truthy))
 
 ;;; ─── %boundaries-by-position ──────────────────────────────────────────────
 
-(deftest spill-boundaries-by-position-indexes-by-keyfn
-  "%boundaries-by-position builds a hash table indexing each boundary by the value of the key function."
+(it-sequential "spill-boundaries-by-position-indexes-by-keyfn"
   (let* ((b1 (cl-cc/regalloc::make-live-range-split-boundary
               :after-position 3 :before-position 10
               :from-vreg :a :to-vreg :a/split1 :slot 1))
@@ -87,12 +77,11 @@
               :from-vreg :b :to-vreg :b/split1 :slot 2))
          (table (cl-cc/regalloc::%boundaries-by-position
                  (list b1 b2) #'cl-cc/regalloc::split-boundary-after-position)))
-    (assert-true (member b1 (gethash 3 table) :test #'eq))
-    (assert-true (member b2 (gethash 5 table) :test #'eq))
-    (assert-null (gethash 99 table))))
+    (expect (member b1 (gethash 3 table) :test #'eq) :to-be-truthy)
+    (expect (member b2 (gethash 5 table) :test #'eq) :to-be-truthy)
+    (expect (gethash 99 table) :to-be-null)))
 
-(deftest spill-boundaries-by-position-groups-same-position
-  "%boundaries-by-position collects all boundaries that share the same key value into a single list."
+(it-sequential "spill-boundaries-by-position-groups-same-position"
   (let* ((b1 (cl-cc/regalloc::make-live-range-split-boundary
               :after-position 5 :before-position 10
               :from-vreg :a :to-vreg :a/s1 :slot 1))
@@ -101,26 +90,22 @@
               :from-vreg :b :to-vreg :b/s1 :slot 2))
          (table (cl-cc/regalloc::%boundaries-by-position
                  (list b1 b2) #'cl-cc/regalloc::split-boundary-after-position)))
-    (assert-= 2 (length (gethash 5 table)))))
+    (expect (= 2 (length (gethash 5 table))) :to-be-truthy)))
 
 ;;; ─── split-live-ranges ────────────────────────────────────────────────────
 
-(deftest spill-split-live-ranges-no-split-returns-originals
-  "split-live-ranges returns the original instructions and intervals unchanged when no holes are large enough to split."
+(it-sequential "spill-split-live-ranges-no-split-returns-originals"
   (let* ((interval (make-spill-test-interval :v 0 5 :use-positions '(1 2 3 4)))
          (instructions (list (make-vm-const :dst :v :value 42)))
          (minimum-hole-size 8))
     (multiple-value-bind (new-instructions new-intervals split-count new-float)
         (cl-cc/regalloc::split-live-ranges instructions (list interval) nil minimum-hole-size)
-      (assert-equal instructions new-instructions)
-      (assert-= 1 (length new-intervals))
-      (assert-= 0 split-count)
-      (assert-null new-float))))
+      (expect new-instructions :to-equal instructions)
+      (expect (= 1 (length new-intervals)) :to-be-truthy)
+      (expect (= 0 split-count) :to-be-truthy)
+      (expect new-float :to-be-null))))
 
-(deftest spill-split-live-ranges-single-split-inserts-load-and-store
-  "split-live-ranges inserts vm-spill-load and vm-spill-store instructions when a live range is split."
-  ;; Uses at 0 and 20 with a 20-unit gap trigger a split: a spill-load appears
-  ;; before position 20 and a spill-store after position 0.
+(it-sequential "spill-split-live-ranges-single-split-inserts-load-and-store"
   (let* ((interval (make-spill-test-interval :v 0 25 :use-positions '(0 20)))
          (instructions (loop for i from 0 to 24
                              collect (make-vm-const :dst (intern (format nil "X~D" i) :keyword)
@@ -129,104 +114,149 @@
     (multiple-value-bind (new-instructions new-intervals split-count new-float)
         (cl-cc/regalloc::split-live-ranges instructions (list interval) nil minimum-hole-size)
       (declare (ignore new-intervals new-float))
-      (assert-true (plusp split-count))
-      (assert-true (some (lambda (inst) (typep inst 'cl-cc/regalloc::vm-spill-load)) new-instructions))
-      (assert-true (some (lambda (inst) (typep inst 'cl-cc/regalloc::vm-spill-store)) new-instructions)))))
+      (expect (plusp split-count) :to-be-truthy)
+      (expect (some (lambda (inst) (typep inst 'cl-cc/regalloc::vm-spill-load)) new-instructions) :to-be-truthy)
+      (expect (some (lambda (inst) (typep inst 'cl-cc/regalloc::vm-spill-store)) new-instructions) :to-be-truthy))))
 
 ;;; ─── %finalize-split-spill-registers ─────────────────────────────────────
 
-(deftest-each spill-finalize-split-spill-registers
-  "%finalize-split-spill-registers rewrites spill instruction virtual regs to physical, or passes non-spill instructions through."
-  :cases (("store-rewrite"    :store :v0 :rax 1)
-          ("load-rewrite"     :load  :v1 :rbx 2)
-          ("passthrough"      :const nil nil   nil)
-          ("unassigned-store" :store :unassigned nil 3))
-  (kind vreg phys slot)
-  (let* ((assignment (make-hash-table :test #'eq))
+(it-sequential "spill-finalize-split-spill-registers store-rewrite" (destructuring-bind (kind vreg phys slot) (list :store :v0 :rax 1)
+    (let* ((assignment (make-hash-table :test #'eq))
          (inst (cond
                  ((eq kind :store) (cl-cc/regalloc::make-vm-spill-store :src-reg vreg :slot slot))
                  ((eq kind :load)  (cl-cc/regalloc::make-vm-spill-load  :dst-reg vreg :slot slot))
                  (t                (make-vm-const :dst :r0 :value 99)))))
     (when phys (setf (gethash vreg assignment) phys))
     (let ((result (cl-cc/regalloc::%finalize-split-spill-registers (list inst) assignment)))
-      (assert-equal 1 (length result))
+      (expect (length result) :to-equal 1)
       (cond
         ((and (eq kind :store) phys)
-         (assert-true (eq phys (cl-cc/regalloc::vm-spill-src (first result))))
-         (assert-equal slot (cl-cc/regalloc::vm-spill-slot (first result))))
+         (expect (eq phys (cl-cc/regalloc::vm-spill-src (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
         ((and (eq kind :load) phys)
-         (assert-true (eq phys (cl-cc/regalloc::vm-spill-dst (first result))))
-         (assert-equal slot (cl-cc/regalloc::vm-spill-slot (first result))))
+         (expect (eq phys (cl-cc/regalloc::vm-spill-dst (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
         (t
-         (assert-true (eq inst (first result))))))))
+         (expect (eq inst (first result)) :to-be-truthy)))))))
+
+(it-sequential "spill-finalize-split-spill-registers load-rewrite"
+  (destructuring-bind (kind vreg phys slot) (list :load :v1 :rbx 2)
+    (let* ((assignment (make-hash-table :test #'eq))
+         (inst (cond
+                 ((eq kind :store) (cl-cc/regalloc::make-vm-spill-store :src-reg vreg :slot slot))
+                 ((eq kind :load)  (cl-cc/regalloc::make-vm-spill-load  :dst-reg vreg :slot slot))
+                 (t                (make-vm-const :dst :r0 :value 99)))))
+    (when phys (setf (gethash vreg assignment) phys))
+    (let ((result (cl-cc/regalloc::%finalize-split-spill-registers (list inst) assignment)))
+      (expect (length result) :to-equal 1)
+      (cond
+        ((and (eq kind :store) phys)
+         (expect (eq phys (cl-cc/regalloc::vm-spill-src (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
+        ((and (eq kind :load) phys)
+         (expect (eq phys (cl-cc/regalloc::vm-spill-dst (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
+        (t
+         (expect (eq inst (first result)) :to-be-truthy)))))))
+
+(it-sequential "spill-finalize-split-spill-registers passthrough"
+  (destructuring-bind (kind vreg phys slot) (list :const nil nil nil)
+    (let* ((assignment (make-hash-table :test #'eq))
+         (inst (cond
+                 ((eq kind :store) (cl-cc/regalloc::make-vm-spill-store :src-reg vreg :slot slot))
+                 ((eq kind :load)  (cl-cc/regalloc::make-vm-spill-load  :dst-reg vreg :slot slot))
+                 (t                (make-vm-const :dst :r0 :value 99)))))
+    (when phys (setf (gethash vreg assignment) phys))
+    (let ((result (cl-cc/regalloc::%finalize-split-spill-registers (list inst) assignment)))
+      (expect (length result) :to-equal 1)
+      (cond
+        ((and (eq kind :store) phys)
+         (expect (eq phys (cl-cc/regalloc::vm-spill-src (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
+        ((and (eq kind :load) phys)
+         (expect (eq phys (cl-cc/regalloc::vm-spill-dst (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
+        (t
+         (expect (eq inst (first result)) :to-be-truthy)))))))
+
+(it-sequential "spill-finalize-split-spill-registers unassigned-store"
+  (destructuring-bind (kind vreg phys slot) (list :store :unassigned nil 3)
+    (let* ((assignment (make-hash-table :test #'eq))
+         (inst (cond
+                 ((eq kind :store) (cl-cc/regalloc::make-vm-spill-store :src-reg vreg :slot slot))
+                 ((eq kind :load)  (cl-cc/regalloc::make-vm-spill-load  :dst-reg vreg :slot slot))
+                 (t                (make-vm-const :dst :r0 :value 99)))))
+    (when phys (setf (gethash vreg assignment) phys))
+    (let ((result (cl-cc/regalloc::%finalize-split-spill-registers (list inst) assignment)))
+      (expect (length result) :to-equal 1)
+      (cond
+        ((and (eq kind :store) phys)
+         (expect (eq phys (cl-cc/regalloc::vm-spill-src (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
+        ((and (eq kind :load) phys)
+         (expect (eq phys (cl-cc/regalloc::vm-spill-dst (first result))) :to-be-truthy)
+         (expect (cl-cc/regalloc::vm-spill-slot (first result)) :to-equal slot))
+        (t
+         (expect (eq inst (first result)) :to-be-truthy)))))))
 
 ;;; ─── regalloc-loop-depths ─────────────────────────────────────────────────
 
-(deftest spill-loop-depths-empty-for-straight-line-code
-  "regalloc-loop-depths returns an empty hash table when the instruction stream contains no backward branches."
+(it-sequential "spill-loop-depths-empty-for-straight-line-code"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-const :dst :r1 :value 2)))
          (depths (cl-cc/regalloc::regalloc-loop-depths instructions)))
-    (assert-= 0 (hash-table-count depths))))
+    (expect (= 0 (hash-table-count depths)) :to-be-truthy)))
 
-(deftest spill-loop-depths-increments-for-backward-branch-targets
-  "regalloc-loop-depths assigns a loop depth of at least 1 to positions covered by a backward branch."
-  ;; A backward branch from position 3 to the label at position 1 marks
-  ;; positions 1, 2, 3 with depth >= 1.
+(it-sequential "spill-loop-depths-increments-for-backward-branch-targets"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 0)     ; 0
                              (make-vm-label :name "loop-head")     ; 1
                              (make-vm-const :dst :r1 :value 1)     ; 2
                              (make-vm-jump :label "loop-head")))   ; 3
          (depths (cl-cc/regalloc::regalloc-loop-depths instructions)))
-    (assert-true (>= (gethash 1 depths 0) 1))
-    (assert-true (>= (gethash 2 depths 0) 1))
-    (assert-true (>= (gethash 3 depths 0) 1))))
+    (expect (>= (gethash 1 depths 0) 1) :to-be-truthy)
+    (expect (>= (gethash 2 depths 0) 1) :to-be-truthy)
+    (expect (>= (gethash 3 depths 0) 1) :to-be-truthy)))
 
 ;;; ─── regalloc-ml-spill-cost ───────────────────────────────────────────────
 
-(deftest spill-ml-cost-positive-for-nontrivial-interval
-  "regalloc-ml-spill-cost returns a positive score for an interval with multiple use positions."
+(it-sequential "spill-ml-cost-positive-for-nontrivial-interval"
   (let* ((cl-cc/regalloc::*ml-regalloc-enabled* t)
          (interval (make-spill-test-interval :v 0 10 :use-positions '(1 3 7))))
-    (assert-true (> (cl-cc/regalloc::regalloc-ml-spill-cost interval nil) 0))))
+    (expect (> (cl-cc/regalloc::regalloc-ml-spill-cost interval nil) 0) :to-be-truthy)))
 
-(deftest spill-ml-cost-adds-bonus-for-call-crossing
-  "regalloc-ml-spill-cost produces a higher cost for an interval that crosses a call than one that does not."
+(it-sequential "spill-ml-cost-adds-bonus-for-call-crossing"
   (let* ((no-call (cl-cc/regalloc::make-live-interval :vreg :nc :start 0 :end 10
                                                       :use-positions '(2) :crosses-call-p nil
                                                       :return-value-p nil))
          (crosses (cl-cc/regalloc::make-live-interval :vreg :cc :start 0 :end 10
                                                       :use-positions '(2) :crosses-call-p t
                                                       :return-value-p nil)))
-    (assert-true (> (cl-cc/regalloc::regalloc-ml-spill-cost crosses nil)
-                    (cl-cc/regalloc::regalloc-ml-spill-cost no-call nil)))))
+    (expect (> (cl-cc/regalloc::regalloc-ml-spill-cost crosses nil)
+                    (cl-cc/regalloc::regalloc-ml-spill-cost no-call nil)) :to-be-truthy)))
 
-(deftest spill-ml-cost-adds-bonus-for-return-value
-  "regalloc-ml-spill-cost produces a higher cost for a return-value interval than a plain interval."
+(it-sequential "spill-ml-cost-adds-bonus-for-return-value"
   (let* ((plain  (cl-cc/regalloc::make-live-interval :vreg :p :start 0 :end 10
                                                      :use-positions '(2) :crosses-call-p nil
                                                      :return-value-p nil))
          (retval (cl-cc/regalloc::make-live-interval :vreg :r :start 0 :end 10
                                                      :use-positions '(2) :crosses-call-p nil
                                                      :return-value-p t)))
-    (assert-true (> (cl-cc/regalloc::regalloc-ml-spill-cost retval nil)
-                    (cl-cc/regalloc::regalloc-ml-spill-cost plain nil)))))
+    (expect (> (cl-cc/regalloc::regalloc-ml-spill-cost retval nil)
+                    (cl-cc/regalloc::regalloc-ml-spill-cost plain nil)) :to-be-truthy)))
 
-(deftest spill-ml-cost-reduces-for-rematerializable-const
-  "regalloc-ml-spill-cost produces a lower cost for an interval with a remat-const than a plain interval."
+(it-sequential "spill-ml-cost-reduces-for-rematerializable-const"
   (let* ((plain (cl-cc/regalloc::make-live-interval :vreg :p :start 0 :end 10
                                                     :use-positions '(2) :remat-const nil))
          (remat (cl-cc/regalloc::make-live-interval :vreg :r :start 0 :end 10
                                                     :use-positions '(2) :remat-const 42)))
-    (assert-true (< (cl-cc/regalloc::regalloc-ml-spill-cost remat nil)
-                    (cl-cc/regalloc::regalloc-ml-spill-cost plain nil)))))
+    (expect (< (cl-cc/regalloc::regalloc-ml-spill-cost remat nil)
+                    (cl-cc/regalloc::regalloc-ml-spill-cost plain nil)) :to-be-truthy)))
 
-(deftest spill-ml-cost-weights-loop-body-uses
-  "regalloc-ml-spill-cost produces a higher cost for uses inside a loop than uses at depth 0."
+(it-sequential "spill-ml-cost-weights-loop-body-uses"
   (let* ((interval (make-spill-test-interval :v 0 10 :use-positions '(5)))
          (depths (let ((ht (make-hash-table :test #'eql)))
                    (setf (gethash 5 ht) 2)
                    ht))
          (shallow-cost (cl-cc/regalloc::regalloc-ml-spill-cost interval nil))
          (loop-cost    (cl-cc/regalloc::regalloc-ml-spill-cost interval depths)))
-    (assert-true (> loop-cost shallow-cost))))
+    (expect (> loop-cost shallow-cost) :to-be-truthy)))

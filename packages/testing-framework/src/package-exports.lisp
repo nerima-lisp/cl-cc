@@ -22,20 +22,8 @@
            cl-cc-e2e-suite
            cl-cc-conformance-suite
           run-suite
-          deftest
           defsuite
           in-suite
-          assert-=
-          assert-eq
-          assert-eql
-          assert-equal
-          assert-string=
-          assert-null
-          assert-true
-          assert-false
-          assert-type
-          assert-signals
-          assert-values
           assert-faster-than
           assert-no-consing
           assert-no-allocation
@@ -45,15 +33,13 @@
           assert-bool
           assert-list-contains
           assert-bitfield
+          assert-snapshot
           assert-compiles-to
           assert-evaluates-to
           assert-macro-expands-to
           assert-infers-type
-          deftest-each
           ;; High-level test macros (requirement #7)
           deftest-compile
-          deftest-codegen
-          deftest-vm
            defbenchmark
            run-benchmark
            benchmark-statistics
@@ -71,6 +57,24 @@
            pending
            expected-fail
            defexpected
+           shrink
+           shrink-integer
+           shrink-list
+           shrink-string
+           minimize-failing-input
+           check-property-with-shrinking
+           register-type-generator
+           deftype-generator
+           generator-for-type
+           generate-for-type
+           generate-from-type-annotation
+           make-pbt-command
+           pbt-command-p
+           pbt-command-name
+           pbt-command-precondition
+           pbt-command-run
+           generate-stateful-command-sequence
+           run-stateful-command-sequence
            assert-no-crash
            assert-terminates
           defmetamorphic

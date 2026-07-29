@@ -6,39 +6,31 @@
 
 (in-package :cl-cc/test)
 
-(defsuite pipeline-native-suite
-  :description "Serial tests for native pipeline helpers that temporarily replace global functions."
-  :parent cl-cc-integration-suite
-  :parallel nil)
 
-(in-suite pipeline-native-suite)
 
 ;;; ─── %make-native-opts ──────────────────────────────────────────────────────
 
-(deftest pipeline-native-make-opts-defaults
-  "%make-native-opts returns a plist with :opt-remarks-mode defaulting to :all; other slots nil."
+(it-sequential "pipeline-native-make-opts-defaults"
   (let ((opts (cl-cc::%make-native-opts)))
-    (assert-true (listp opts))
-    (assert-null (getf opts :pass-pipeline))
-    (assert-= 1 (getf opts :inline-threshold-scale))
-    (assert-null (getf opts :print-pass-timings))
-    (assert-null (getf opts :timing-stream))
-    (assert-eq :all (getf opts :opt-remarks-mode))
-    (assert-null (getf opts :trace-json-stream))))
+    (expect (listp opts) :to-be-truthy)
+    (expect (getf opts :pass-pipeline) :to-be-null)
+    (expect (= 1 (getf opts :inline-threshold-scale)) :to-be-truthy)
+    (expect (getf opts :print-pass-timings) :to-be-null)
+    (expect (getf opts :timing-stream) :to-be-null)
+    (expect (getf opts :opt-remarks-mode) :to-be :all)
+    (expect (getf opts :trace-json-stream) :to-be-null)))
 
-(deftest pipeline-native-make-opts-explicit-values
-  "%make-native-opts captures explicit keyword values into the plist."
+(it-sequential "pipeline-native-make-opts-explicit-values"
   (let ((opts (cl-cc::%make-native-opts :pass-pipeline '(:fold :dce)
                                         :inline-threshold-scale 2
                                         :print-pass-timings t
                                         :opt-remarks-mode :pass)))
-    (assert-equal '(:fold :dce) (getf opts :pass-pipeline))
-    (assert-= 2 (getf opts :inline-threshold-scale))
-    (assert-true (getf opts :print-pass-timings))
-    (assert-eq :pass (getf opts :opt-remarks-mode))))
+    (expect (getf opts :pass-pipeline) :to-equal '(:fold :dce))
+    (expect (= 2 (getf opts :inline-threshold-scale)) :to-be-truthy)
+    (expect (getf opts :print-pass-timings) :to-be-truthy)
+    (expect (getf opts :opt-remarks-mode) :to-be :pass)))
 
-(deftest pipeline-native-make-opts-applyable-to-compile-expression
-  "%make-native-opts plist can be APPLYed directly as compile-expression keyword args."
+(it-sequential "pipeline-native-make-opts-applyable-to-compile-expression"
   (let ((captured-args nil))
     (with-replaced-function (cl-cc:compile-expression
                              (lambda (form &rest args)
@@ -48,61 +40,80 @@
       (let ((opts (cl-cc::%make-native-opts :pass-pipeline '(:fold)
                                             :inline-threshold-scale 2)))
         (apply #'cl-cc:compile-expression '(+ 1 2) :target :x86_64 opts)
-        (assert-equal '(:fold) (getf captured-args :pass-pipeline))
-        (assert-= 2 (getf captured-args :inline-threshold-scale))))))
+        (expect (getf captured-args :pass-pipeline) :to-equal '(:fold))
+        (expect (= 2 (getf captured-args :inline-threshold-scale)) :to-be-truthy)))))
 
 ;;; ─── *compile-cache-root* ───────────────────────────────────────────────────
 
-(deftest pipeline-native-cache-root
-  "*compile-cache-root* is a pathname whose namestring contains .cache/cl-cc/native/."
+(it-sequential "pipeline-native-cache-root"
   (let ((str (namestring cl-cc::*compile-cache-root*)))
-    (assert-true (pathnamep cl-cc::*compile-cache-root*))
-    (assert-true (stringp str))
-    (assert-true (search ".cache/cl-cc/native/" str))))
+    (expect (pathnamep cl-cc::*compile-cache-root*) :to-be-truthy)
+    (expect (stringp str) :to-be-truthy)
+    (expect (search ".cache/cl-cc/native/" str) :to-be-truthy)))
 
 ;;; ─── %compile-cache-key ─────────────────────────────────────────────────────
 
-(deftest-each pipeline-native-cache-key-contains-components
-  "%compile-cache-key result contains the arch and language substrings (uppercased by ~A)."
-  :cases (("x86-64-lisp"  :x86-64 :lisp  "X86-64" "LISP")
-          ("arm64-lisp"   :arm64  :lisp  "ARM64"  "LISP")
-          ("x86-64-php"   :x86-64 :php   "X86-64" "PHP"))
-  (arch lang arch-str lang-str)
-  (let ((key (cl-cc::%compile-cache-key "(+ 1 2)" arch lang)))
-    (assert-true (search arch-str key))
-    (assert-true (search lang-str key))))
+(it-sequential "pipeline-native-cache-key-contains-components x86-64-lisp"
+  (destructuring-bind (arch lang arch-str lang-str) (list :x86-64 :lisp "X86-64" "LISP")
+    (let ((key (cl-cc::%compile-cache-key "(+ 1 2)" arch lang)))
+    (expect (search arch-str key) :to-be-truthy)
+    (expect (search lang-str key) :to-be-truthy))))
 
-(deftest pipeline-native-cache-key-string-properties
-  "%compile-cache-key returns a string; same args are deterministic; result has >= 3 dash-separated parts."
-  (assert-true (stringp (cl-cc::%compile-cache-key "hello" :x86-64 :lisp)))
+(it-sequential "pipeline-native-cache-key-contains-components arm64-lisp"
+  (destructuring-bind (arch lang arch-str lang-str) (list :arm64 :lisp "ARM64" "LISP")
+    (let ((key (cl-cc::%compile-cache-key "(+ 1 2)" arch lang)))
+    (expect (search arch-str key) :to-be-truthy)
+    (expect (search lang-str key) :to-be-truthy))))
+
+(it-sequential "pipeline-native-cache-key-contains-components x86-64-php"
+  (destructuring-bind (arch lang arch-str lang-str) (list :x86-64 :php "X86-64" "PHP")
+    (let ((key (cl-cc::%compile-cache-key "(+ 1 2)" arch lang)))
+    (expect (search arch-str key) :to-be-truthy)
+    (expect (search lang-str key) :to-be-truthy))))
+
+(it-sequential "pipeline-native-cache-key-string-properties"
+  (expect (stringp (cl-cc::%compile-cache-key "hello" :x86-64 :lisp)) :to-be-truthy)
   (let ((k1 (cl-cc::%compile-cache-key "(defun f (x) x)" :x86-64 :lisp))
         (k2 (cl-cc::%compile-cache-key "(defun f (x) x)" :x86-64 :lisp)))
-    (assert-equal k1 k2))
+    (expect k2 :to-equal k1))
   (let* ((key (cl-cc::%compile-cache-key "test" :x86-64 :lisp))
          (parts (cl:loop for start = 0 then (1+ pos)
                          for pos = (position #\- key :start start)
                          collect (subseq key start (or pos (length key)))
                          while pos)))
-    (assert-true (>= (length parts) 3))))
+    (expect (>= (length parts) 3) :to-be-truthy)))
 
-(deftest-each pipeline-native-cache-key-differs-by-dimension
-  "%compile-cache-key: varying arch, language, source content, or native options each produces a distinct key."
-  :cases (("arch"     (lambda () (cl-cc::%compile-cache-key "source" :arm64  :lisp)))
-           ("language" (lambda () (cl-cc::%compile-cache-key "source" :x86-64 :php)))
-           ("content"  (lambda () (cl-cc::%compile-cache-key "bbb"    :x86-64 :lisp)))
-           ("options"  (lambda () (cl-cc::%compile-cache-key
+(it-sequential "pipeline-native-cache-key-differs-by-dimension arch"
+  (destructuring-bind (make-variant) (list (lambda () (cl-cc::%compile-cache-key "source" :arm64  :lisp)))
+    (let ((baseline (cl-cc::%compile-cache-key "source" :x86-64 :lisp)))
+    (expect (equal baseline (funcall make-variant)) :to-be-falsy))))
+
+(it-sequential "pipeline-native-cache-key-differs-by-dimension language"
+  (destructuring-bind (make-variant) (list (lambda () (cl-cc::%compile-cache-key "source" :x86-64 :php)))
+    (let ((baseline (cl-cc::%compile-cache-key "source" :x86-64 :lisp)))
+    (expect (equal baseline (funcall make-variant)) :to-be-falsy))))
+
+(it-sequential "pipeline-native-cache-key-differs-by-dimension content"
+  (destructuring-bind (make-variant) (list (lambda () (cl-cc::%compile-cache-key "bbb"    :x86-64 :lisp)))
+    (let ((baseline (cl-cc::%compile-cache-key "source" :x86-64 :lisp)))
+    (expect (equal baseline (funcall make-variant)) :to-be-falsy))))
+
+(it-sequential "pipeline-native-cache-key-differs-by-dimension options"
+  (destructuring-bind (make-variant) (list (lambda () (cl-cc::%compile-cache-key
                                      "source" :x86-64 :lisp
                                      (cl-cc::%make-native-opts :speed 3))))
-           ("inline-threshold" (lambda () (cl-cc::%compile-cache-key
+    (let ((baseline (cl-cc::%compile-cache-key "source" :x86-64 :lisp)))
+    (expect (equal baseline (funcall make-variant)) :to-be-falsy))))
+
+(it-sequential "pipeline-native-cache-key-differs-by-dimension inline-threshold"
+  (destructuring-bind (make-variant) (list (lambda () (cl-cc::%compile-cache-key
                                             "source" :x86-64 :lisp
                                             (cl-cc::%make-native-opts
-                                             :inline-threshold-scale 2)))))
-  (make-variant)
-  (let ((baseline (cl-cc::%compile-cache-key "source" :x86-64 :lisp)))
-    (assert-false (equal baseline (funcall make-variant)))))
+                                             :inline-threshold-scale 2))))
+    (let ((baseline (cl-cc::%compile-cache-key "source" :x86-64 :lisp)))
+    (expect (equal baseline (funcall make-variant)) :to-be-falsy))))
 
-(deftest pipeline-native-cache-key-ignores-observability-options
-  "%compile-cache-key does not vary for reporting-only native options that cannot affect artifact bytes."
+(it-sequential "pipeline-native-cache-key-ignores-observability-options"
   (let ((baseline (cl-cc::%compile-cache-key
                    "source" :x86-64 :lisp
                    (cl-cc::%make-native-opts :speed 3
@@ -118,41 +129,39 @@
                                               :print-pass-stats t
                                               :stats-stream *standard-output*
                                               :trace-json-stream *standard-output*))))
-    (assert-equal baseline reporting)))
+    (expect reporting :to-equal baseline)))
 
 ;;; ─── %compile-cache-path ────────────────────────────────────────────────────
 
-(deftest pipeline-native-cache-path-rooted-under-cache-root
-  "%compile-cache-path returns a pathname rooted under *compile-cache-root*."
+(it-sequential "pipeline-native-cache-path-rooted-under-cache-root"
   (let* ((path     (cl-cc::%compile-cache-path "mykey" #P"a.out"))
          (root-str (namestring cl-cc::*compile-cache-root*))
          (path-str (namestring path)))
-    (assert-true (pathnamep path))
-    (assert-true (and (> (length path-str) (length root-str))
-                      (string= root-str (subseq path-str 0 (length root-str)))))))
+    (expect (pathnamep path) :to-be-truthy)
+    (expect (and (> (length path-str) (length root-str))
+                      (string= root-str (subseq path-str 0 (length root-str)))) :to-be-truthy)))
 
-(deftest pipeline-native-cache-path-embeds-key-in-path
-  "%compile-cache-path embeds the cache key string inside the returned path."
+(it-sequential "pipeline-native-cache-path-embeds-key-in-path"
   (let* ((key "unique-cache-key-42")
          (path (cl-cc::%compile-cache-path key #P"a.out")))
-    (assert-true (search key (namestring path)))))
+    (expect (search key (namestring path)) :to-be-truthy)))
 
-(deftest pipeline-native-cache-path-different-keys-differ
-  "%compile-cache-path returns distinct paths for distinct keys."
+(it-sequential "pipeline-native-cache-path-different-keys-differ"
   (let ((p1 (cl-cc::%compile-cache-path "key-one" #P"a.out"))
         (p2 (cl-cc::%compile-cache-path "key-two" #P"a.out")))
-    (assert-false (equal (namestring p1) (namestring p2)))))
+    (expect (equal (namestring p1) (namestring p2)) :to-be-falsy)))
 
-(deftest pipeline-native-cache-path-preserves-output-filename
-  "%compile-cache-path preserves the filename from the output-file argument."
+(it-sequential "pipeline-native-cache-path-preserves-output-filename"
   (let ((path (cl-cc::%compile-cache-path "k" #P"a.out")))
-    (assert-true (pathnamep path))
-    (assert-equal "a" (pathname-name path))))
+    (expect (pathnamep path) :to-be-truthy)
+    (expect (pathname-name path) :to-equal "a")))
 
-(deftest-each pipeline-native-cache-path-filename-components
-  "%compile-cache-path preserves the filename and extension from the output-file argument."
-  :cases (("filename"  "my-program" (lambda (p) (pathname-name p)))
-          ("extension" "out"        (lambda (p) (pathname-type p))))
-  (expected accessor)
-  (let ((path (cl-cc::%compile-cache-path "somekey" #P"my-program.out")))
-    (assert-equal expected (funcall accessor path))))
+(it-sequential "pipeline-native-cache-path-filename-components filename"
+  (destructuring-bind (expected accessor) (list "my-program" (lambda (p) (pathname-name p)))
+    (let ((path (cl-cc::%compile-cache-path "somekey" #P"my-program.out")))
+    (expect (funcall accessor path) :to-equal expected))))
+
+(it-sequential "pipeline-native-cache-path-filename-components extension"
+  (destructuring-bind (expected accessor) (list "out" (lambda (p) (pathname-type p)))
+    (let ((path (cl-cc::%compile-cache-path "somekey" #P"my-program.out")))
+    (expect (funcall accessor path) :to-equal expected))))

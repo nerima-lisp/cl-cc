@@ -2,7 +2,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (defun %fr-vm-unary (ctor value)
   (let ((state (make-test-vm)))
@@ -21,77 +20,112 @@
             (cl-cc:vm-values-list state)
             state)))
 
-(deftest fr-668-parse-float-returns-float-and-position
-  "vm-parse-float parses decimal and exponent syntax and records the end position."
+(it-sequential "fr-668-parse-float-returns-float-and-position"
   (multiple-value-bind (value values-list)
       (%fr-vm-unary #'cl-cc:make-vm-parse-float " -12.5e1 rest")
-    (assert-= -125.0d0 value)
-    (assert-= -125.0d0 (first values-list))
-    (assert-= 8 (second values-list))))
+    (expect (= -125.0d0 value) :to-be-truthy)
+    (expect (= -125.0d0 (first values-list)) :to-be-truthy)
+    (expect (= 8 (second values-list)) :to-be-truthy)))
 
-(deftest fr-668-parse-integer-records-position
-  "vm-parse-integer keeps the existing primary value and stores the parse end position."
+(it-sequential "fr-668-parse-integer-records-position"
   (multiple-value-bind (value values-list)
       (%fr-vm-unary #'cl-cc:make-vm-parse-integer "12345")
-    (assert-= 12345 value)
-    (assert-equal '(12345 5) values-list)))
+    (expect (= 12345 value) :to-be-truthy)
+    (expect values-list :to-equal '(12345 5))))
 
-(deftest fr-669-float-decode-functions-match-cl-values
-  "VM float decode instructions produce CL-compatible multiple values."
+(it-sequential "fr-669-float-decode-functions-match-cl-values"
   (let ((float 6.5d0))
     (multiple-value-bind (expected-sig expected-exp expected-sign) (decode-float float)
       (multiple-value-bind (actual values-list)
           (%fr-vm-unary #'cl-cc:make-vm-decode-float float)
-        (assert-= expected-sig actual)
-        (assert-equal (list expected-sig expected-exp expected-sign) values-list)))
+        (expect (= expected-sig actual) :to-be-truthy)
+        (expect values-list :to-equal (list expected-sig expected-exp expected-sign))))
     (multiple-value-bind (expected-sig expected-exp expected-sign) (integer-decode-float float)
       (multiple-value-bind (actual values-list)
           (%fr-vm-unary #'cl-cc:make-vm-integer-decode-float float)
-        (assert-= expected-sig actual)
-        (assert-equal (list expected-sig expected-exp expected-sign) values-list)))))
+        (expect (= expected-sig actual) :to-be-truthy)
+        (expect values-list :to-equal (list expected-sig expected-exp expected-sign))))))
 
-(deftest-each fr-669-float-inspection-and-scale
-  "VM float inspection helpers and scale-float execute without runtime wrappers."
-  :cases (("radix" #'cl-cc:make-vm-float-radix 1.0d0 2)
-          ("digits" #'cl-cc:make-vm-float-digits 1.0d0 53)
-          ("sign" #'cl-cc:make-vm-float-sign -2.0d0 -1.0d0))
-  (ctor input expected)
-  (multiple-value-bind (actual) (%fr-vm-unary ctor input)
-    (assert-= expected actual)))
+(it-sequential "fr-669-float-inspection-and-scale radix"
+  (destructuring-bind (ctor input expected) (list #'cl-cc:make-vm-float-radix 1.0d0 2)
+    (multiple-value-bind (actual) (%fr-vm-unary ctor input)
+    (expect (= expected actual) :to-be-truthy))))
 
-(deftest fr-669-scale-float-scales-by-binary-exponent
-  "vm-scale-float scales a float by powers of the IEEE binary radix."
+(it-sequential "fr-669-float-inspection-and-scale digits"
+  (destructuring-bind (ctor input expected) (list #'cl-cc:make-vm-float-digits 1.0d0 53)
+    (multiple-value-bind (actual) (%fr-vm-unary ctor input)
+    (expect (= expected actual) :to-be-truthy))))
+
+(it-sequential "fr-669-float-inspection-and-scale sign"
+  (destructuring-bind (ctor input expected) (list #'cl-cc:make-vm-float-sign -2.0d0 -1.0d0)
+    (multiple-value-bind (actual) (%fr-vm-unary ctor input)
+    (expect (= expected actual) :to-be-truthy))))
+
+(it-sequential "fr-669-scale-float-scales-by-binary-exponent"
   (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-scale-float 1.5d0 3)
-    (assert-= 12.0d0 actual)))
+    (expect (= 12.0d0 actual) :to-be-truthy)))
 
-(deftest-each fr-754-coerce-runtime-cases
-  "vm-coerce supports numeric, sequence, string, and character conversions."
-  :cases (("integer-to-double" 3 'double-float 3.0d0)
-          ("ratio-to-single" 1/2 'single-float 0.5f0)
-          ("float-to-integer" 3.9d0 'integer 3)
-          ("list-to-vector" '(a b) 'vector #(a b))
-          ("vector-to-list" #(1 2 3) 'list '(1 2 3))
-          ("char-to-string" #\x 'string "x")
-          ("string-to-character" "Z" 'character #\Z))
-  (value type expected)
-  (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+(it-sequential "fr-754-coerce-runtime-cases integer-to-double"
+  (destructuring-bind (value type expected) (list 3 'double-float 3.0d0)
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
     (if (vectorp expected)
-        (assert-equal (coerce expected 'list) (coerce actual 'list))
-        (assert-equal expected actual))))
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
 
-(deftest fr-757-function-cell-management-round-trip
-  "set-fdefinition, fboundp, fdefinition, and fmakunbound manage the VM function registry."
+(it-sequential "fr-754-coerce-runtime-cases ratio-to-single"
+  (destructuring-bind (value type expected) (list 1/2 'single-float 0.5f0)
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+    (if (vectorp expected)
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
+
+(it-sequential "fr-754-coerce-runtime-cases float-to-integer"
+  (destructuring-bind (value type expected) (list 3.9d0 'integer 3)
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+    (if (vectorp expected)
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
+
+(it-sequential "fr-754-coerce-runtime-cases list-to-vector"
+  (destructuring-bind (value type expected) (list '(a b) 'vector #(a b))
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+    (if (vectorp expected)
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
+
+(it-sequential "fr-754-coerce-runtime-cases vector-to-list"
+  (destructuring-bind (value type expected) (list #(1 2 3) 'list '(1 2 3))
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+    (if (vectorp expected)
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
+
+(it-sequential "fr-754-coerce-runtime-cases char-to-string"
+  (destructuring-bind (value type expected) (list #\x 'string "x")
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+    (if (vectorp expected)
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
+
+(it-sequential "fr-754-coerce-runtime-cases string-to-character"
+  (destructuring-bind (value type expected) (list "Z" 'character #\Z)
+    (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
+    (if (vectorp expected)
+        (expect (coerce actual 'list) :to-equal (coerce expected 'list))
+        (expect actual :to-equal expected)))))
+
+(it-sequential "fr-757-function-cell-management-round-trip"
   (let ((state (make-test-vm))
         (fn #'identity))
     (cl-cc:vm-reg-set state 1 'fr-757-fn)
     (cl-cc:vm-reg-set state 2 fn)
     (exec1 (cl-cc:make-vm-set-fdefinition :dst 0 :lhs 1 :rhs 2) state)
-    (assert-eq fn (cl-cc:vm-reg-get state 0))
+    (expect (cl-cc:vm-reg-get state 0) :to-be fn)
     (exec1 (cl-cc:make-vm-fboundp :dst 3 :src 1) state)
-    (assert-true (cl-cc:vm-reg-get state 3))
+    (expect (cl-cc:vm-reg-get state 3) :to-be-truthy)
     (exec1 (cl-cc:make-vm-fdefinition :dst 4 :src 1) state)
-    (assert-eq fn (cl-cc:vm-reg-get state 4))
+    (expect (cl-cc:vm-reg-get state 4) :to-be fn)
     (exec1 (cl-cc:make-vm-fmakunbound :dst 5 :src 1) state)
-    (assert-eq 'fr-757-fn (cl-cc:vm-reg-get state 5))
+    (expect (cl-cc:vm-reg-get state 5) :to-be 'fr-757-fn)
     (exec1 (cl-cc:make-vm-fboundp :dst 6 :src 1) state)
-    (assert-false (cl-cc:vm-reg-get state 6))))
+    (expect (cl-cc:vm-reg-get state 6) :to-be-falsy)))

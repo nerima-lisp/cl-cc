@@ -34,6 +34,4 @@
           cl-cc/parse:clear-grammar-rules
           cl-cc/parse:parse-combinator
           cl-cc/parse:parse-ok-p
-          cl-cc/parse:parse-with-grammar
-          cl-cc/php:tokenize-php-source
-          cl-cc/php:parse-php-source))
+          cl-cc/parse:parse-with-grammar))

@@ -1,7 +1,6 @@
 ;;;; optimizer-inlining-tests.lisp — Inlining pass unit tests
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; ── Inlining Pass: Unit Tests ──────────────────────────────────────────────
 
@@ -9,9 +8,7 @@
   "T if INSTRUCTIONS contains at least one vm-call."
   (some #'cl-cc:vm-call-p instructions))
 
-(deftest inline-small-function
-  "A small function (+ x 1) called via vm-func-ref: vm-call eliminated and
-   result vm-move into the call's dst register (:R6) must appear."
+(it-sequential "inline-small-function"
   (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "inc"
                                           :params '(:R10)
                                           :captured nil))
@@ -27,15 +24,13 @@
          (halt    (cl-cc:make-vm-halt))
          (instrs  (list closure fref jump-past lbl body1 body2 ret after arg call halt))
          (out     (cl-cc/optimize::opt-pass-inline instrs)))
-    (assert-true (not (inline-has-call-p out)))
-    (assert-true (some (lambda (i)
+    (expect (not (inline-has-call-p out)) :to-be-truthy)
+    (expect (some (lambda (i)
                          (and (cl-cc:vm-move-p i)
                               (eq :R6 (cl-cc/vm::vm-dst i))))
-                       out))))
+                       out) :to-be-truthy)))
 
-(deftest inline-skip-large-function
-  "A function whose body exceeds the inline threshold is NOT inlined;
-   the vm-call remains in the output."
+(it-sequential "inline-skip-large-function"
   (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "big"
                                           :params '(:R10)
                                           :captured nil))
@@ -61,10 +56,9 @@
                           body
                           (list ret after arg call halt)))
           (out     (cl-cc/optimize::opt-pass-inline instrs)))
-    (assert-true (inline-has-call-p out))))
+    (expect (inline-has-call-p out) :to-be-truthy)))
 
-(deftest inline-force-large-function-via-policy
-  "INLINE policy bypasses the cost threshold but still uses the normal structural path."
+(it-sequential "inline-force-large-function-via-policy"
   (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "big-inline"
                                           :params '(:R10)
                                           :captured nil
@@ -89,10 +83,9 @@
                           body
                           (list ret after arg call halt)))
          (out     (cl-cc/optimize::opt-pass-inline instrs)))
-    (assert-false (inline-has-call-p out))))
+    (expect (inline-has-call-p out) :to-be-falsy)))
 
-(deftest inline-notinline-policy-blocks-small-function
-  "NOTINLINE policy keeps even a tiny function call intact."
+(it-sequential "inline-notinline-policy-blocks-small-function"
   (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "tiny-noinline"
                                           :params '(:R10)
                                           :captured nil
@@ -109,12 +102,10 @@
          (halt    (cl-cc:make-vm-halt))
          (instrs  (list closure fref jump-past lbl body1 body2 ret after arg call halt))
          (out     (cl-cc/optimize::opt-pass-inline instrs)))
-    (assert-true (inline-has-call-p out))))
+    (expect (inline-has-call-p out) :to-be-truthy)))
 
-(deftest-each inline-skip-cases
-  "Functions with captured vars, recursive bodies, or self-references are NOT inlined."
-  :cases (("captured-vars"
-           (lambda ()
+(it-sequential "inline-skip-cases captured-vars"
+  (destructuring-bind (make-instrs) (list (lambda ()
              (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "captured"
                                                      :params '(:R10) :captured '(:R99)))
                     (fref    (cl-cc:make-vm-func-ref :dst :R5 :label "captured"))
@@ -128,8 +119,12 @@
                     (call    (cl-cc:make-vm-call :dst :R6 :func :R5 :args '(:R1)))
                     (halt    (cl-cc:make-vm-halt)))
                (list closure fref jump-past lbl body1 body2 ret after arg call halt))))
-          ("recursive-global-ref"
-           (lambda ()
+    (let* ((instrs (funcall make-instrs))
+         (out    (cl-cc/optimize::opt-pass-inline instrs)))
+    (expect (inline-has-call-p out) :to-be-truthy))))
+
+(it-sequential "inline-skip-cases recursive-global-ref"
+  (destructuring-bind (make-instrs) (list (lambda ()
              (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "rec"
                                                      :params '(:R10) :captured nil))
                     (fref    (cl-cc:make-vm-func-ref :dst :R5 :label "rec"))
@@ -144,8 +139,12 @@
                     (call    (cl-cc:make-vm-call :dst :R6 :func :R5 :args '(:R1)))
                     (halt    (cl-cc:make-vm-halt)))
                (list closure fref jump-past lbl b1 b2 b3 ret after arg call halt))))
-          ("self-recursive-guard"
-           (lambda ()
+    (let* ((instrs (funcall make-instrs))
+         (out    (cl-cc/optimize::opt-pass-inline instrs)))
+    (expect (inline-has-call-p out) :to-be-truthy))))
+
+(it-sequential "inline-skip-cases self-recursive-guard"
+  (destructuring-bind (make-instrs) (list (lambda ()
              (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "loop"
                                                      :params '(:R10) :captured nil))
                     (fref    (cl-cc:make-vm-func-ref :dst :R5 :label "loop"))
@@ -158,15 +157,12 @@
                     (arg     (cl-cc:make-vm-const :dst :R1 :value 5))
                     (call    (cl-cc:make-vm-call :dst :R6 :func :R5 :args '(:R1)))
                     (halt    (cl-cc:make-vm-halt)))
-               (list closure fref jump-past lbl self body1 ret after arg call halt)))))
-  (make-instrs)
-  (let* ((instrs (funcall make-instrs))
+               (list closure fref jump-past lbl self body1 ret after arg call halt))))
+    (let* ((instrs (funcall make-instrs))
          (out    (cl-cc/optimize::opt-pass-inline instrs)))
-    (assert-true (inline-has-call-p out))))
+    (expect (inline-has-call-p out) :to-be-truthy))))
 
-(deftest inline-register-rename
-  "After inlining, the body's registers are renamed to fresh indices so they
-   do not conflict with existing registers at the call site."
+(it-sequential "inline-register-rename"
   (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "g"
                                           :params '(:R10)
                                           :captured nil))
@@ -188,7 +184,7 @@
                         after site1 site2 arg call halt))
          (out     (cl-cc/optimize::opt-pass-inline instrs)))
     ;; The call should be inlined (small body, no captures)
-    (assert-true (not (inline-has-call-p out)))
+    (expect (not (inline-has-call-p out)) :to-be-truthy)
     ;; The inlined body must use renamed registers (not the original :R11/:R12)
     ;; so collect all dst registers written after the call site's :R12 const
     ;; and before the halt — at least one must be > :R12 index
@@ -197,10 +193,9 @@
                                         (eq :R6 (cl-cc/vm::vm-dst i)))
                               collect i)))
       ;; The final vm-move into :R6 must exist (proof of inlining)
-      (assert-true (not (null inlined-dsts))))))
+      (expect (not (null inlined-dsts)) :to-be-truthy))))
 
-(deftest inline-propagates-constant-call-args
-  "Constant call arguments are emitted as constants inside the inlined body."
+(it-sequential "inline-propagates-constant-call-args"
   (let* ((closure (cl-cc:make-vm-closure :dst :R0 :label "k"
                                           :params '(:R10)
                                           :captured nil))
@@ -216,10 +211,9 @@
          (halt    (cl-cc:make-vm-halt))
          (instrs  (list closure fref jump-past lbl body1 body2 ret after arg call halt))
          (out     (cl-cc/optimize::opt-pass-inline instrs)))
-    (assert-true (not (inline-has-call-p out)))
-    (assert-equal 2
-                  (count-if (lambda (i)
+    (expect (not (inline-has-call-p out)) :to-be-truthy)
+    (expect (count-if (lambda (i)
                               (and (cl-cc:vm-const-p i)
                                    (eql 4 (cl-cc/vm::vm-value i))))
-                            out))))
+                            out) :to-equal 2)))
 

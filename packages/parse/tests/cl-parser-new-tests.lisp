@@ -7,7 +7,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 (defun %parser-symbol-name-tree (form)
   (cond
@@ -21,247 +20,342 @@
 
 ;;; ─── NEW: parse-source atom parsing ────────────────────────────────────────
 
-(deftest-each parser-atom-types
-  "parse-source: various atom types parsed correctly"
-  :cases (("float"          "3.14"        3.14)
-          ("zero"           "0"           0)
-          ("large-int"      "999999"      999999)
-          ("keyword"        ":foo"        :foo)
-          ("keyword-upper"  ":BAR"        :bar)
-          ("char-a"         "#\\a"        #\a)
-          ("char-space"     "#\\Space"    #\Space)
-          ("char-newline"   "#\\Newline"  #\Newline))
-  (source expected)
-  (let ((result (parse-one source)))
-    (assert-eql expected result)))
+(it-sequential "parser-atom-types float"
+  (destructuring-bind (source expected) (list "3.14" 3.14)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
 
-(deftest parser-parse-dotted-pair-produces-cons
-  "parse-source: dotted pair (a . b) produces a cons cell with A and B."
+(it-sequential "parser-atom-types zero"
+  (destructuring-bind (source expected) (list "0" 0)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-atom-types large-int"
+  (destructuring-bind (source expected) (list "999999" 999999)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-atom-types keyword"
+  (destructuring-bind (source expected) (list ":foo" :foo)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-atom-types keyword-upper"
+  (destructuring-bind (source expected) (list ":BAR" :bar)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-atom-types char-a"
+  (destructuring-bind (source expected) (list "#\\a" #\a)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-atom-types char-space"
+  (destructuring-bind (source expected) (list "#\\Space" #\Space)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-atom-types char-newline"
+  (destructuring-bind (source expected) (list "#\\Newline" #\Newline)
+    (let ((result (parse-one source)))
+    (expect result :to-be expected))))
+
+(it-sequential "parser-parse-dotted-pair-produces-cons"
   (let ((result (parse-one "(a . b)")))
-    (assert-true (consp result))
-    (assert-equal "A" (symbol-name (car result)))
-    (assert-equal "B" (symbol-name (cdr result)))))
+    (expect (consp result) :to-be-truthy)
+    (expect (symbol-name (car result)) :to-equal "A")
+    (expect (symbol-name (cdr result)) :to-equal "B")))
 
-(deftest parser-parse-deeply-nested-list
-  "parse-source: 6-deep nested list gives cons; innermost element is 1."
+(it-sequential "parser-parse-deeply-nested-list"
   (let ((result (parse-one "((((((1))))))")))
-    (assert-true (consp result))
-    (assert-= 1 (first (first (first (first (first (first result)))))))))
+    (expect (consp result) :to-be-truthy)
+    (expect (= 1 (first (first (first (first (first (first result))))))) :to-be-truthy)))
 
-(deftest-each parser-parse-source-vector
-  "parse-source: vector literals parse to vectors with the expected length."
-  :cases (("empty" "#()"      0)
-          ("three" "#(1 2 3)" 3))
-  (source expected-len)
-  (let ((result (parse-one source)))
-    (assert-true (vectorp result))
-    (assert-= expected-len (length result))))
+(it-sequential "parser-parse-source-vector empty"
+  (destructuring-bind (source expected-len) (list "#()" 0)
+    (let ((result (parse-one source)))
+    (expect (vectorp result) :to-be-truthy)
+    (expect (= expected-len (length result)) :to-be-truthy))))
 
-(deftest parser-parse-source-empty-signals-error
-  "parse-source signals an error on an empty source string."
-  (assert-signals error (parse-one "")))
+(it-sequential "parser-parse-source-vector three"
+  (destructuring-bind (source expected-len) (list "#(1 2 3)" 3)
+    (let ((result (parse-one source)))
+    (expect (vectorp result) :to-be-truthy)
+    (expect (= expected-len (length result)) :to-be-truthy))))
 
-(deftest parser-parse-source-quasiquote-produces-cons
-  "parse-source: quasiquoted list and quasiquoted atom both produce cons cells."
+(it-sequential "parser-parse-source-empty-signals-error"
+  (signals error (parse-one "")))
+
+(it-sequential "parser-parse-source-quasiquote-produces-cons"
   (let ((result (parse-one "`(a b)")))
-    (assert-true (consp result))
-    (assert-equal "QUASIQUOTE" (symbol-name (first result))))
+    (expect (consp result) :to-be-truthy)
+    (expect (symbol-name (first result)) :to-equal "QUASIQUOTE"))
   (let ((result (parse-one "`,x")))
-    (assert-equal '("QUASIQUOTE" ("UNQUOTE" "X"))
-                  (%parser-symbol-name-tree result))))
+    (expect (%parser-symbol-name-tree result) :to-equal '("QUASIQUOTE" ("UNQUOTE" "X")))))
 
-(deftest parser-parse-source-long-symbol-name-preserved
-  "parse-source preserves a 200-character symbol name exactly."
+(it-sequential "parser-parse-source-long-symbol-name-preserved"
   (let* ((long-name (make-string 200 :initial-element #\A))
          (result (parse-one long-name)))
-    (assert-true (symbolp result))
-    (assert-= 200 (length (symbol-name result)))))
+    (expect (symbolp result) :to-be-truthy)
+    (expect (= 200 (length (symbol-name result))) :to-be-truthy)))
 
 ;;; ─── NEW: parse-all-forms additional cases ─────────────────────────────────
 
-(deftest parser-parse-all-forms-mixed-types
-  "parse-all-forms: parses integer, string, and list from a single source string."
+(it-sequential "parser-parse-all-forms-mixed-types"
   (let ((forms (parse-many "42 \"hello\" (+ 1 2)")))
-    (assert-= 3 (length forms))
-    (assert-= 42 (first forms))
-    (assert-string= "hello" (second forms))
-    (assert-true (consp (third forms)))))
+    (expect (= 3 (length forms)) :to-be-truthy)
+    (expect (= 42 (first forms)) :to-be-truthy)
+    (expect (second forms) :to-equal "hello")
+    (expect (consp (third forms)) :to-be-truthy)))
 
-(deftest parser-parse-all-forms-strips-line-comments
-  "parse-all-forms: line comments beginning with ; are stripped before parsing."
+(it-sequential "parser-parse-all-forms-strips-line-comments"
   (let ((forms (parse-many (format nil "; comment~%1 2"))))
-    (assert-= 2 (length forms))
-    (assert-= 1 (first forms))
-    (assert-= 2 (second forms))))
+    (expect (= 2 (length forms)) :to-be-truthy)
+    (expect (= 1 (first forms)) :to-be-truthy)
+    (expect (= 2 (second forms)) :to-be-truthy)))
 
-(deftest-each parse-all-forms-length-cases
-  "parse-all-forms returns the correct form count."
-  :cases (("whitespace-only" (format nil " ~% ") 0)
-          ("ten-forms"       "1 2 3 4 5 6 7 8 9 10"  10))
-  (source expected-len)
-  (assert-= expected-len (length (parse-many source))))
+(it-sequential "parse-all-forms-length-cases whitespace-only"
+  (destructuring-bind (source expected-len) (list (format nil " ~% ") 0)
+    (expect (= expected-len (length (parse-many source))) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-length-cases ten-forms"
+  (destructuring-bind (source expected-len) (list "1 2 3 4 5 6 7 8 9 10" 10)
+    (expect (= expected-len (length (parse-many source))) :to-be-truthy)))
 
 ;;; ─── NEW: AST node constructors ────────────────────────────────────────────
 
-(deftest-each ast-constructor-basic
-  "AST node constructors create correct struct types"
-  :cases (("ast-int"       (cl-cc/ast:make-ast-int :value 5)              #'cl-cc/ast:ast-int-p)
-          ("ast-var"       (cl-cc/ast:make-ast-var :name 'x)              #'cl-cc/ast:ast-var-p)
-          ("ast-quote"     (cl-cc/ast:make-ast-quote :value 'hello)       #'cl-cc/ast:ast-quote-p)
-          ("ast-progn"     (cl-cc/ast:make-ast-progn :forms nil)          #'cl-cc/ast:ast-progn-p)
-          ("ast-print"     (cl-cc/ast:make-ast-print :expr nil)           #'cl-cc/ast:ast-print-p)
-          ("ast-block"     (cl-cc/ast:make-ast-block :name 'b :body nil)  #'cl-cc/ast:ast-block-p)
-          ("ast-go"        (cl-cc/ast:make-ast-go :tag 'done)             #'cl-cc/ast:ast-go-p)
-          ("ast-setq"      (cl-cc/ast:make-ast-setq :var 'x :value nil)   #'cl-cc/ast:ast-setq-p)
-          ("ast-function"  (cl-cc/ast:make-ast-function :name 'foo)       #'cl-cc/ast:ast-function-p)
-          ("ast-the"       (cl-cc/ast:make-ast-the :type 'fixnum :value nil) #'cl-cc/ast:ast-the-p)
-          ("ast-values"    (cl-cc/ast:make-ast-values :forms nil)         #'cl-cc/ast:ast-values-p))
-  (node pred)
-  (assert-true (funcall pred node)))
+(it-sequential "ast-constructor-basic ast-int"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-int :value 5) #'cl-cc/ast:ast-int-p)
+    (expect (funcall pred node) :to-be-truthy)))
 
-(deftest ast-source-location-fields-stored
-  "AST nodes store source-file, source-line, and source-column from constructor."
+(it-sequential "ast-constructor-basic ast-var"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-var :name 'x) #'cl-cc/ast:ast-var-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-quote"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-quote :value 'hello) #'cl-cc/ast:ast-quote-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-progn"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-progn :forms nil) #'cl-cc/ast:ast-progn-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-print"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-print :expr nil) #'cl-cc/ast:ast-print-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-block"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-block :name 'b :body nil) #'cl-cc/ast:ast-block-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-go"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-go :tag 'done) #'cl-cc/ast:ast-go-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-setq"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-setq :var 'x :value nil) #'cl-cc/ast:ast-setq-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-function"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-function :name 'foo) #'cl-cc/ast:ast-function-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-the"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-the :type 'fixnum :value nil) #'cl-cc/ast:ast-the-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-constructor-basic ast-values"
+  (destructuring-bind (node pred) (list (cl-cc/ast:make-ast-values :forms nil) #'cl-cc/ast:ast-values-p)
+    (expect (funcall pred node) :to-be-truthy)))
+
+(it-sequential "ast-source-location-fields-stored"
   (let ((node (cl-cc/ast:make-ast-int :value 42
                                        :source-file "test.lisp"
                                        :source-line 10
                                        :source-column 5)))
-    (assert-string= "test.lisp" (cl-cc::ast-source-file node))
-    (assert-= 10 (cl-cc::ast-source-line node))
-    (assert-= 5  (cl-cc::ast-source-column node))))
+    (expect (cl-cc::ast-source-file node) :to-equal "test.lisp")
+    (expect (= 10 (cl-cc::ast-source-line node)) :to-be-truthy)
+    (expect (= 5 (cl-cc::ast-source-column node)) :to-be-truthy)))
 
-(deftest ast-lambda-callable-slots
-  "ast-lambda stores params, optional-params, rest-param, and key-params correctly."
+(it-sequential "ast-lambda-callable-slots"
   (let ((node (cl-cc/ast:make-ast-lambda :params '(x)
                                           :optional-params '((y nil))
                                           :rest-param 'args
                                           :key-params '((z nil))
                                           :body nil)))
-    (assert-equal '(x) (cl-cc::ast-lambda-params node))
-    (assert-equal '((y nil)) (cl-cc::ast-lambda-optional-params node))
-    (assert-eq 'args (cl-cc::ast-lambda-rest-param node))
-    (assert-equal '((z nil)) (cl-cc::ast-lambda-key-params node))))
+    (expect (cl-cc::ast-lambda-params node) :to-equal '(x))
+    (expect (cl-cc::ast-lambda-optional-params node) :to-equal '((y nil)))
+    (expect (cl-cc::ast-lambda-rest-param node) :to-be 'args)
+    (expect (cl-cc::ast-lambda-key-params node) :to-equal '((z nil)))))
 
-(deftest ast-slot-def-full-options
-  "ast-slot-def stores name, initarg, reader, writer, accessor, and type."
+(it-sequential "ast-slot-def-full-options"
   (let ((slot (cl-cc/ast:make-ast-slot-def :name 'x
                                             :initarg :x
                                             :reader 'get-x
                                             :writer 'set-x
                                             :accessor 'x-accessor
                                             :type 'integer)))
-    (assert-eq 'x         (cl-cc::ast-slot-name     slot))
-    (assert-eq :x         (cl-cc::ast-slot-initarg   slot))
-    (assert-eq 'get-x     (cl-cc::ast-slot-reader    slot))
-    (assert-eq 'set-x     (cl-cc::ast-slot-writer    slot))
-    (assert-eq 'x-accessor (cl-cc::ast-slot-accessor slot))
-    (assert-eq 'integer   (cl-cc::ast-slot-type      slot))))
+    (expect (cl-cc::ast-slot-name     slot) :to-be 'x)
+    (expect (cl-cc::ast-slot-initarg   slot) :to-be :x)
+    (expect (cl-cc::ast-slot-reader    slot) :to-be 'get-x)
+    (expect (cl-cc::ast-slot-writer    slot) :to-be 'set-x)
+    (expect (cl-cc::ast-slot-accessor slot) :to-be 'x-accessor)
+    (expect (cl-cc::ast-slot-type      slot) :to-be 'integer)))
 
-(deftest-each ast-location-string-formats
-  "ast-location-string formats file:line:col when present; falls back to <unknown location>."
-  :cases (("with-location"    (cl-cc/ast:make-ast-int :value 1
-                                :source-file "foo.lisp" :source-line 3 :source-column 7)
-           "foo.lisp:3:7")
-          ("unknown-location" (cl-cc/ast:make-ast-int :value 1)
-           "<unknown location>"))
-  (node expected)
-  (assert-string= expected (cl-cc/ast:ast-location-string node)))
+(it-sequential "ast-location-string-formats with-location"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-int :value 1
+                                :source-file "foo.lisp" :source-line 3 :source-column 7) "foo.lisp:3:7")
+    (expect (cl-cc/ast:ast-location-string node) :to-equal expected)))
+
+(it-sequential "ast-location-string-formats unknown-location"
+  (destructuring-bind (node expected) (list (cl-cc/ast:make-ast-int :value 1) "<unknown location>")
+    (expect (cl-cc/ast:ast-location-string node) :to-equal expected)))
 
 ;;; ─── NEW: lower-sexp-to-ast additional forms ──────────────────────────────
 
-(deftest lower-binary-operators-produce-ast-binop
-  "lower-sexp-to-ast maps all standard binary operators to ast-binop with the correct op."
+(it-sequential "lower-binary-operators-produce-ast-binop"
   (dolist (op '(+ - * = < > <= >=))
     (let ((node (lower (list op 1 2))))
-      (assert-true (cl-cc/ast:ast-binop-p node))
-      (assert-eq op (cl-cc/ast:ast-binop-op node)))))
+      (expect (cl-cc/ast:ast-binop-p node) :to-be-truthy)
+      (expect (cl-cc/ast:ast-binop-op node) :to-be op))))
 
-(deftest lower-print-produces-ast-print-with-int-expr
-  "lower-sexp-to-ast: (print 42) produces ast-print whose expr is ast-int."
+(it-sequential "lower-print-produces-ast-print-with-int-expr"
   (let ((node (lower '(print 42))))
-    (assert-true (cl-cc/ast:ast-print-p node))
-    (assert-true (cl-cc/ast:ast-int-p (cl-cc/ast:ast-print-expr node)))))
+    (expect (cl-cc/ast:ast-print-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-int-p (cl-cc/ast:ast-print-expr node)) :to-be-truthy)))
 
-(deftest lower-defparameter-produces-ast-defvar
-  "lower-sexp-to-ast: defparameter produces ast-defvar with the correct name."
+(it-sequential "lower-defparameter-produces-ast-defvar"
   (let ((node (lower '(defparameter *x* 99))))
-    (assert-true (cl-cc/ast:ast-defvar-p node))
-    (assert-eq '*x* (cl-cc/ast:ast-defvar-name node))))
+    (expect (cl-cc/ast:ast-defvar-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-defvar-name node) :to-be '*x*)))
 
-(deftest-each lower-extended-lambda-list-params
-  "lower-sexp-to-ast: &optional, &rest, &key all populate the correct extended-params slot."
-  :cases (("optional" '(lambda (x &optional (y 0)) (+ x y))
-           #'cl-cc/ast:ast-lambda-p #'cl-cc::ast-lambda-optional-params 1)
-          ("rest"     '(lambda (x &rest args) args)
-           #'cl-cc/ast:ast-lambda-p #'cl-cc::ast-lambda-rest-param :rest)
-          ("key"      '(defun f (x &key (size 10)) x)
-           #'cl-cc/ast:ast-defun-p #'cl-cc::ast-defun-key-params 1))
-  (form pred-p get-slot expected)
-  (let ((node (lower form)))
-    (assert-true (funcall pred-p node))
+(it-sequential "lower-extended-lambda-list-params optional"
+  (destructuring-bind (form pred-p get-slot expected) (list '(lambda (x &optional (y 0)) (+ x y)) #'cl-cc/ast:ast-lambda-p #'cl-cc::ast-lambda-optional-params 1)
+    (let ((node (lower form)))
+    (expect (funcall pred-p node) :to-be-truthy)
     (let ((slot-val (funcall get-slot node)))
       (if (eq expected :rest)
-          (assert-eq 'args slot-val)
-          (assert-= expected (length slot-val))))))
+          (expect slot-val :to-be 'args)
+          (expect (= expected (length slot-val)) :to-be-truthy))))))
 
-(deftest lower-return-from-without-value-signals-error
-  "lower-sexp-to-ast: (return-from blk) without a value signals an error."
-  (assert-signals error (lower '(return-from blk))))
+(it-sequential "lower-extended-lambda-list-params rest"
+  (destructuring-bind (form pred-p get-slot expected) (list '(lambda (x &rest args) args) #'cl-cc/ast:ast-lambda-p #'cl-cc::ast-lambda-rest-param :rest)
+    (let ((node (lower form)))
+    (expect (funcall pred-p node) :to-be-truthy)
+    (let ((slot-val (funcall get-slot node)))
+      (if (eq expected :rest)
+          (expect slot-val :to-be 'args)
+          (expect (= expected (length slot-val)) :to-be-truthy))))))
 
-(deftest lower-multiple-value-call-produces-ast-mvc
-  "lower-sexp-to-ast: multiple-value-call produces ast-multiple-value-call with 2 arg forms."
+(it-sequential "lower-extended-lambda-list-params key"
+  (destructuring-bind (form pred-p get-slot expected) (list '(defun f (x &key (size 10)) x) #'cl-cc/ast:ast-defun-p #'cl-cc::ast-defun-key-params 1)
+    (let ((node (lower form)))
+    (expect (funcall pred-p node) :to-be-truthy)
+    (let ((slot-val (funcall get-slot node)))
+      (if (eq expected :rest)
+          (expect slot-val :to-be 'args)
+          (expect (= expected (length slot-val)) :to-be-truthy))))))
+
+(it-sequential "lower-return-from-without-value-produces-ast"
+  ;; (return-from blk) with no value is valid CL (returns NIL from BLK);
+  ;; the lowerer accepts it and produces an AST-RETURN-FROM node.
+  (expect (cl-cc/ast:ast-return-from-p (lower '(return-from blk))) :to-be-truthy))
+
+(it-sequential "lower-multiple-value-call-produces-ast-mvc"
   (let ((node (lower '(multiple-value-call #'list (values 1 2) (values 3 4)))))
-    (assert-true (cl-cc/ast:ast-multiple-value-call-p node))
-    (assert-= 2 (length (cl-cc::ast-mv-call-args node)))))
+    (expect (cl-cc/ast:ast-multiple-value-call-p node) :to-be-truthy)
+    (expect (= 2 (length (cl-cc::ast-mv-call-args node))) :to-be-truthy)))
 
-(deftest lower-setf-slot-value-produces-ast-set-slot-value
-  "lower-sexp-to-ast: (setf (slot-value obj 'x) 10) produces ast-set-slot-value."
+(it-sequential "lower-setf-slot-value-produces-ast-set-slot-value"
   (let ((node (lower '(setf (slot-value obj 'x) 10))))
-    (assert-true (cl-cc/ast:ast-set-slot-value-p node))
-    (assert-eq 'x (cl-cc/ast:ast-set-slot-value-slot node))))
+    (expect (cl-cc/ast:ast-set-slot-value-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-set-slot-value-slot node) :to-be 'x)))
 
-(deftest lower-setf-simple-variable-produces-ast-setq
-  "lower-sexp-to-ast: (setf x 10) for a plain variable produces ast-setq."
+(it-sequential "lower-setf-simple-variable-produces-ast-setq"
   (let ((node (lower '(setf x 10))))
-    (assert-true (cl-cc/ast:ast-setq-p node))
-    (assert-eq 'x (cl-cc/ast:ast-setq-var node))))
+    (expect (cl-cc/ast:ast-setq-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-setq-var node) :to-be 'x)))
 
-(deftest lower-quasiquote-expands-unquote
-  "lower-sexp-to-ast: quasiquote expands list structure and unquoted forms."
+(it-sequential "lower-quasiquote-expands-unquote"
   (let ((result (cl-cc/ast:ast-to-sexp
                  (lower '(quasiquote (a (unquote x) b))))))
-    (assert-equal '("CONS" ("QUOTE" "A")
+    (expect (%parser-symbol-name-tree result) :to-equal '("CONS" ("QUOTE" "A")
                     ("CONS" "X"
-                     ("CONS" ("QUOTE" "B") ("QUOTE" NIL))))
-                  (%parser-symbol-name-tree result))))
+                     ("CONS" ("QUOTE" "B") ("QUOTE" NIL)))))))
 
-(deftest lower-quasiquote-expands-unquote-splicing
-  "lower-sexp-to-ast: unquote-splicing expands through append in list context."
+(it-sequential "lower-quasiquote-expands-unquote-splicing"
   (let ((result (cl-cc/ast:ast-to-sexp
                  (lower '(quasiquote (a (unquote-splicing xs) b))))))
-    (assert-equal '("CONS" ("QUOTE" "A")
+    (expect (%parser-symbol-name-tree result) :to-equal '("CONS" ("QUOTE" "A")
                     ("APPEND" "XS"
-                     ("CONS" ("QUOTE" "B") ("QUOTE" NIL))))
-                  (%parser-symbol-name-tree result))))
+                     ("CONS" ("QUOTE" "B") ("QUOTE" NIL)))))))
 
 ;;; ─── NEW: lower-sexp-to-ast error cases ───────────────────────────────────
 
-(deftest-each lower-sexp-body-errors
-  "lower-sexp-to-ast signals error for forms missing required body or cleanup."
-  :cases (("progn-no-body"     '(progn))
-          ("let-no-body"       '(let ()))
-          ("lambda-no-body"    '(lambda ()))
-          ("defun-no-body"     '(defun f ()))
-          ("block-no-body"     '(block b))
-          ("binop-wrong-arity" '(+ 1))
-          ("go-no-tag"         '(go))
-          ("catch-no-body"     '(catch 'tag))
-          ("throw-wrong-arity" '(throw 'tag))
-          ("unwind-no-cleanup" '(unwind-protect (x)))
-          ("handler-no-clause" '(handler-case (x)))
-          ("the-wrong-arity"   '(the fixnum))
-          ("defclass-no-slots" '(defclass c ()))
-          ("defgeneric-no-ll"  '(defgeneric g))
-          ("defmethod-no-body" '(defmethod m ()))
-          ("defmacro-no-body"  '(defmacro m ())))
-  (form)
-  (assert-signals error (lower form)))
+(it-sequential "lower-sexp-empty-progn-lowers"
+  ;; (progn) is valid CL (yields NIL); the lowerer accepts it.
+  (destructuring-bind (form) (list '(progn))
+    (expect (lower form) :to-be-truthy)))
+
+(it-sequential "lower-sexp-body-errors let-no-body"
+  (destructuring-bind (form) (list '(let ()))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors lambda-no-body"
+  (destructuring-bind (form) (list '(lambda ()))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-empty-defun-lowers"
+  ;; (defun f ()) has an empty body (yields NIL); valid CL, lowerer accepts it.
+  (destructuring-bind (form) (list '(defun f ()))
+    (expect (lower form) :to-be-truthy)))
+
+(it-sequential "lower-sexp-empty-block-lowers"
+  ;; (block b) with no body is valid CL (yields NIL); lowerer accepts it.
+  (destructuring-bind (form) (list '(block b))
+    (expect (lower form) :to-be-truthy)))
+
+(it-sequential "lower-sexp-unary-plus-lowers"
+  ;; (+ 1) is valid CL (unary + yields its argument); lowerer folds to AST-INT.
+  (destructuring-bind (form) (list '(+ 1))
+    (expect (lower form) :to-be-truthy)))
+
+(it-sequential "lower-sexp-body-errors go-no-tag"
+  (destructuring-bind (form) (list '(go))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors catch-no-body"
+  (destructuring-bind (form) (list '(catch 'tag))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors throw-wrong-arity"
+  (destructuring-bind (form) (list '(throw 'tag))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors unwind-no-cleanup"
+  (destructuring-bind (form) (list '(unwind-protect (x)))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors handler-no-clause"
+  (destructuring-bind (form) (list '(handler-case (x)))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors the-wrong-arity"
+  (destructuring-bind (form) (list '(the fixnum))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors defclass-no-slots"
+  (destructuring-bind (form) (list '(defclass c ()))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors defgeneric-no-ll"
+  (destructuring-bind (form) (list '(defgeneric g))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors defmethod-no-body"
+  (destructuring-bind (form) (list '(defmethod m ()))
+    (signals error (lower form))))
+
+(it-sequential "lower-sexp-body-errors defmacro-no-body"
+  (destructuring-bind (form) (list '(defmacro m ()))
+    (signals error (lower form))))

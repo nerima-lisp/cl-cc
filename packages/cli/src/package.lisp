@@ -26,4 +26,16 @@
             ;; Flag accessor helpers
             :flag
             :flag-or
-            :getopt))
+            :getopt
+            ;; FR-720 plugin architecture
+            :*plugin-directory*
+            :*loaded-plugins*
+            :*repl-command-extensions*
+            :*compiler-pass-extensions*
+            :*vm-instruction-extensions*
+            :define-cl-cc-plugin
+            :registered-repl-command
+            :registered-vm-instruction
+            :registered-compiler-passes
+            :run-repl-command-extension
+            :load-cl-cc-plugins))

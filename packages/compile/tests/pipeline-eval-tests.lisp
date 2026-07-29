@@ -1,50 +1,86 @@
 (in-package :cl-cc/test)
-(in-suite cl-cc-integration-serial-suite)
 
 ;;; ─── typed assertions / typed instructions ───────────────────────────────
 
-(deftest-each pipeline-the-type-assertions
-  "run-string evaluates (the ...) assertions: accepts matching values, signals on mismatch."
-  :cases (("fixnum"
-            "(the fixnum 42)"              42  "(the fixnum \"oops\")")
-           ("refinement"
-            "(the (refine fixnum plusp) 42)" 42 "(the (refine fixnum plusp) -1)")
-           ("values"
-            "(the (values fixnum string) (values 1 \"ok\"))" 1
-            "(the (values fixnum string) (values 1 2))"))
-  (ok-form expected err-form)
-  (assert-= expected (run-string ok-form))
-  (assert-signals type-error (run-string err-form)))
+(it-sequential "pipeline-the-type-assertions fixnum"
+  (destructuring-bind (ok-form expected err-form) (list "(the fixnum 42)" 42 "(the fixnum \"oops\")")
+    (expect (= expected (run-string ok-form)) :to-be-truthy) (signals type-error (run-string err-form))))
 
-(deftest pipeline-the-values-type-error-is-catchable
-  "handler-case can catch (the (values ...)) mismatches as type-error."
-  (assert-eq :ok
-              (run-string "(handler-case (the (values fixnum string) (values 1 2)) (type-error (c) (declare (ignore c)) :ok))")))
+(it-sequential "pipeline-the-type-assertions refinement"
+  (destructuring-bind (ok-form expected err-form) (list "(the (refine fixnum plusp) 42)" 42 "(the (refine fixnum plusp) -1)")
+    (expect (= expected (run-string ok-form)) :to-be-truthy) (signals type-error (run-string err-form))))
 
-(deftest pipeline-the-values-preserves-secondary-values
-  "(the (values ...)) preserves secondary values after the runtime check."
-  (assert-equal '(1 "ok")
-                (run-string "(multiple-value-bind (a b) (the (values fixnum string) (values 1 \"ok\")) (list a b))")))
+(it-sequential "pipeline-the-type-assertions values"
+  (destructuring-bind (ok-form expected err-form) (list "(the (values fixnum string) (values 1 \"ok\"))" 1 "(the (values fixnum string) (values 1 2))")
+    (expect (= expected (run-string ok-form)) :to-be-truthy) (signals type-error (run-string err-form))))
 
-(deftest-each pipeline-typed-fixnum-instruction-types
-  "Typed fixnum operations compile to the specialized VM instruction types."
-  :cases (("add" "(defun typed-add ((x fixnum) (y fixnum)) fixnum (+ x y))" 'cl-cc/vm::vm-integer-add)
-          ("sub" "(defun typed-sub ((x fixnum) (y fixnum)) fixnum (- x y))" 'cl-cc/vm::vm-integer-sub)
-          ("mul" "(defun typed-mul ((x fixnum) (y fixnum)) fixnum (* x y))" 'cl-cc/vm::vm-integer-mul)
-          ("lt"  "(defun typed-lt  ((x fixnum) (y fixnum)) fixnum (< x y))" 'cl-cc/vm::vm-lt)
-          ("gt"  "(defun typed-gt  ((x fixnum) (y fixnum)) fixnum (> x y))" 'cl-cc/vm::vm-gt)
-          ("eq"  "(defun typed-eq  ((x fixnum) (y fixnum)) fixnum (= x y))" 'cl-cc/vm::vm-num-eq)
-          ("eq-fixnum" "(defun typed-eq-pred ((x fixnum) (y fixnum)) fixnum (eq x y))" 'cl-cc/vm::vm-num-eq)
-          ("eql-fixnum" "(defun typed-eql-pred ((x fixnum) (y fixnum)) fixnum (eql x y))" 'cl-cc/vm::vm-num-eq)
-          ("equal-fixnum" "(defun typed-equal-pred ((x fixnum) (y fixnum)) fixnum (equal x y))" 'cl-cc/vm::vm-num-eq)
-          ("equal-symbol" "(defun typed-equal-symbol ((x symbol) (y symbol)) fixnum (equal x y))" 'cl-cc/vm::vm-eq))
-  (code expected-type)
-  (let ((instrs (vm-program-instructions
+(it-sequential "pipeline-the-values-type-error-is-catchable"
+  (expect (run-string "(handler-case (the (values fixnum string) (values 1 2)) (type-error (c) (declare (ignore c)) :ok))") :to-be :ok))
+
+(it-sequential "pipeline-the-values-preserves-secondary-values"
+  (expect (run-string "(multiple-value-bind (a b) (the (values fixnum string) (values 1 \"ok\")) (list a b))") :to-equal '(1 "ok")))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types add"
+  (destructuring-bind (code expected-type) (list "(defun typed-add ((x fixnum) (y fixnum)) fixnum (+ x y))" 'cl-cc/vm::vm-integer-add)
+    (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
-    (assert-true (some (lambda (i) (typep i expected-type)) instrs))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
-(deftest pipeline-equality-predicate-specialization-preserves-generic-equal
-  "Typed fixnum EQUAL specializes to vm-num-eq, but unknown EQUAL keeps vm-equal."
+(it-sequential "pipeline-typed-fixnum-instruction-types sub"
+  (destructuring-bind (code expected-type) (list "(defun typed-sub ((x fixnum) (y fixnum)) fixnum (- x y))" 'cl-cc/vm::vm-integer-sub)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types mul"
+  (destructuring-bind (code expected-type) (list "(defun typed-mul ((x fixnum) (y fixnum)) fixnum (* x y))" 'cl-cc/vm::vm-integer-mul)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types lt"
+  (destructuring-bind (code expected-type) (list "(defun typed-lt  ((x fixnum) (y fixnum)) fixnum (< x y))" 'cl-cc/vm::vm-lt)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types gt"
+  (destructuring-bind (code expected-type) (list "(defun typed-gt  ((x fixnum) (y fixnum)) fixnum (> x y))" 'cl-cc/vm::vm-gt)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types eq"
+  (destructuring-bind (code expected-type) (list "(defun typed-eq  ((x fixnum) (y fixnum)) fixnum (= x y))" 'cl-cc/vm::vm-num-eq)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types eq-fixnum"
+  (destructuring-bind (code expected-type) (list "(defun typed-eq-pred ((x fixnum) (y fixnum)) fixnum (eq x y))" 'cl-cc/vm::vm-num-eq)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types eql-fixnum"
+  (destructuring-bind (code expected-type) (list "(defun typed-eql-pred ((x fixnum) (y fixnum)) fixnum (eql x y))" 'cl-cc/vm::vm-num-eq)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types equal-fixnum"
+  (destructuring-bind (code expected-type) (list "(defun typed-equal-pred ((x fixnum) (y fixnum)) fixnum (equal x y))" 'cl-cc/vm::vm-num-eq)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-typed-fixnum-instruction-types equal-symbol"
+  (destructuring-bind (code expected-type) (list "(defun typed-equal-symbol ((x symbol) (y symbol)) fixnum (equal x y))" 'cl-cc/vm::vm-eq)
+    (let ((instrs (vm-program-instructions
+                 (compilation-result-program (compile-string code :target :vm)))))
+    (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
+
+(it-sequential "pipeline-equality-predicate-specialization-preserves-generic-equal"
   (let ((typed-instrs
           (vm-program-instructions
            (compilation-result-program
@@ -53,187 +89,222 @@
           (vm-program-instructions
            (compilation-result-program
             (compile-string "(defun generic-equal-pred (x y) (equal x y))" :target :vm)))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-num-eq)) typed-instrs))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) typed-instrs))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) generic-instrs))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-num-eq)) typed-instrs) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) typed-instrs) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) generic-instrs) :to-be-truthy)))
 
 ;;; ─── compile-string / run-string ─────────────────────────────────────────
 
-(deftest-each pipeline-compile-string-returns-result
-  "compile-string returns a compilation-result for simple and multi-form inputs."
-  :cases (("single-form"   "(+ 1 2)")
-          ("multiple-forms" "(defun f (x) x)"))
-  (expr)
-  (assert-true (typep (compile-string expr :target :vm) 'cl-cc/compile:compilation-result)))
+(it-sequential "pipeline-compile-string-returns-result single-form"
+  (destructuring-bind (expr) (list "(+ 1 2)")
+    (expect (typep (compile-string expr :target :vm) 'cl-cc/compile:compilation-result) :to-be-truthy)))
 
-(deftest pipeline-compile-string-custom-pass-pipeline
-  "compile-string forwards a string pass pipeline to optimizer core."
+(it-sequential "pipeline-compile-string-returns-result multiple-forms"
+  (destructuring-bind (expr) (list "(defun f (x) x)")
+    (expect (typep (compile-string expr :target :vm) 'cl-cc/compile:compilation-result) :to-be-truthy)))
+
+(it-sequential "pipeline-compile-string-custom-pass-pipeline"
   (let* ((baseline (compile-string "(+ 1 2)" :target :vm))
          (result (compile-string "(+ 1 2)" :target :vm :pass-pipeline "fold,dce")))
-    (assert-true (typep result 'cl-cc/compile:compilation-result))
-    (assert-true (listp (cl-cc:compilation-result-optimized-instructions baseline)))
-    (assert-true (listp (cl-cc:compilation-result-optimized-instructions result)))
-    (assert-true (> (length (cl-cc:compilation-result-vm-instructions result)) 0))))
+    (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)
+    (expect (listp (cl-cc:compilation-result-optimized-instructions baseline)) :to-be-truthy)
+    (expect (listp (cl-cc:compilation-result-optimized-instructions result)) :to-be-truthy)
+    (expect (> (length (cl-cc:compilation-result-vm-instructions result)) 0) :to-be-truthy)))
 
-(deftest-each pipeline-run-string-forms
-  "run-string evaluates various expression forms."
-  :cases (("arithmetic"  3  "(+ 1 2)")
-          ("literal"    42  "42")
-          ("nested"     12  "(+ (* 2 3) (- 7 1))")
-          ("let-form"    5  "(let ((x 2) (y 3)) (+ x y))")
-          ("if-true"     1  "(if t 1 2)")
-          ("if-false"    2  "(if nil 1 2)")
-          ("lambda"      9  "((lambda (x) (* x x)) 3)"))
-  (expected expr)
-  (assert-= expected (run-string expr)))
+(it-sequential "pipeline-run-string-forms arithmetic"
+  (destructuring-bind (expected expr) (list 3 "(+ 1 2)")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
 
-(deftest-each pipeline-run-string-list-regressions
-  "run-string executes list-building and local-recursion forms correctly on the VM path."
-  :cases (("list"          '(1 2 3) "(list 1 2 3)")
-          ("cons"          '(1 2 3) "(cons 1 (list 2 3))")
-          ("dolist-sum"    6         "(let ((acc 0)) (dolist (x (list 1 2 3) acc) (setq acc (+ acc x))))")
-          ("labels-simple" 3         "(labels ((f (x) (if (= x 0) 0 (+ 1 (f (- x 1)))))) (f 3))"))
-  (expected expr)
-  (assert-equal expected (run-string expr)))
+(it-sequential "pipeline-run-string-forms literal"
+  (destructuring-bind (expected expr) (list 42 "42")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
 
-(deftest pipeline-run-string-hash-cons-reuses-flat-pairs
-  "hash-cons is an explicit VM primitive; cons keeps fresh-cell semantics."
+(it-sequential "pipeline-run-string-forms nested"
+  (destructuring-bind (expected expr) (list 12 "(+ (* 2 3) (- 7 1))")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-forms let-form"
+  (destructuring-bind (expected expr) (list 5 "(let ((x 2) (y 3)) (+ x y))")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-forms if-true"
+  (destructuring-bind (expected expr) (list 1 "(if t 1 2)")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-forms if-false"
+  (destructuring-bind (expected expr) (list 2 "(if nil 1 2)")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-forms lambda"
+  (destructuring-bind (expected expr) (list 9 "((lambda (x) (* x x)) 3)")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-list-regressions list"
+  (destructuring-bind (expected expr) (list '(1 2 3) "(list 1 2 3)")
+    (expect (run-string expr) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-list-regressions cons"
+  (destructuring-bind (expected expr) (list '(1 2 3) "(cons 1 (list 2 3))")
+    (expect (run-string expr) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-list-regressions dolist-sum"
+  (destructuring-bind (expected expr) (list 6 "(let ((acc 0)) (dolist (x (list 1 2 3) acc) (setq acc (+ acc x))))")
+    (expect (run-string expr) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-list-regressions labels-simple"
+  (destructuring-bind (expected expr) (list 3 "(labels ((f (x) (if (= x 0) 0 (+ 1 (f (- x 1)))))) (f 3))")
+    (expect (run-string expr) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-hash-cons-reuses-flat-pairs"
   (cl-cc/vm:vm-clear-hash-cons-table)
-  (assert-true
-   (eq t (run-string "(let ((a (hash-cons 'x 'y)) (b (hash-cons 'x 'y))) (eq a b))")))
-  (assert-true
-   (eq nil (run-string "(let ((a (hash-cons 'x 'y)) (b (cons 'x 'y))) (eq a b))"))))
+  (expect (eq t (run-string "(let ((a (hash-cons 'x 'y)) (b (hash-cons 'x 'y))) (eq a b))")) :to-be-truthy)
+  (expect (eq nil (run-string "(let ((a (hash-cons 'x 'y)) (b (cons 'x 'y))) (eq a b))")) :to-be-truthy))
 
-(deftest-each pipeline-run-string-stdlib-regressions
-  "run-string with stdlib handles the recovered HOF and set/list paths."
-  :cases (("mapcar"        '(2 4 6)   "(mapcar (lambda (x) (+ x x)) (list 1 2 3))")
-          ("find-if"       4           "(find-if (lambda (x) (> x 3)) (list 1 2 3 4 5))")
-          ("count-if"      2           "(count-if (lambda (x) (> x 2)) (list 1 2 3 4))")
-          ("reduce"        10          "(reduce (lambda (a b) (+ a b)) (list 1 2 3 4))")
-          ("set-difference" '(1 3 5)   "(set-difference (list 1 2 3 4 5) (list 2 4))")
-          ("position-miss" nil         "(position 9 (list 1 2 3))"))
-  (expected expr)
-  (assert-equal expected (run-string expr :stdlib t)))
+(it-sequential "pipeline-run-string-stdlib-regressions mapcar"
+  (destructuring-bind (expected expr) (list '(2 4 6) "(mapcar (lambda (x) (+ x x)) (list 1 2 3))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
 
-(deftest-each pipeline-run-string-function-cell-regressions
-  "run-string resolves function-cell helpers needed by selfhost source loading."
-  :cases (("symbol-function"
-           42
-           "(progn (defun sf-regression (x) (+ x 1)) (funcall (symbol-function 'sf-regression) 41))")
-          ("setf-gethash-fallback"
-           9
-           "(let ((h (make-hash-table))) (setf-gethash 'k h 9) (gethash 'k h))")
-          ("make-array-numeric-fill-pointer"
-           1
-           "(let ((v (make-array 8 :fill-pointer 1))) (fill-pointer v))"))
-  (expected expr)
-  (assert-= expected (run-string expr)))
+(it-sequential "pipeline-run-string-stdlib-regressions find-if"
+  (destructuring-bind (expected expr) (list 4 "(find-if (lambda (x) (> x 3)) (list 1 2 3 4 5))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
 
-(deftest-each pipeline-run-string-output-options
-  "run-string forwards timing/stats/trace-json output without altering the evaluation result."
-  :cases (("timings"
-           (list :print-pass-timings t :timing-stream)
-           (lambda (text) (assert-true (search "OPT-PASS-FOLD" (string-upcase text)))))
-          ("stats"
-           (list :print-pass-stats t :stats-stream)
-           (lambda (text)
-             (let ((u (string-upcase text)))
-               (assert-true (search "OPT-PASS-FOLD" u))
-               (assert-true (search "BEFORE=" u)))))
-          ("trace-json"
-           (list :trace-json-stream)
-           (lambda (text)
-             (assert-true (search "\"traceEvents\"" text))
-             (assert-true (search "OPT-PASS-FOLD" text)))))
-  (kwarg-prefix verify)
-  (let* ((stream (make-string-output-stream))
+(it-sequential "pipeline-run-string-stdlib-regressions count-if"
+  (destructuring-bind (expected expr) (list 2 "(count-if (lambda (x) (> x 2)) (list 1 2 3 4))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-stdlib-regressions reduce"
+  (destructuring-bind (expected expr) (list 10 "(reduce (lambda (a b) (+ a b)) (list 1 2 3 4))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-stdlib-regressions set-difference"
+  (destructuring-bind (expected expr) (list '(1 3 5) "(set-difference (list 1 2 3 4 5) (list 2 4))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-stdlib-regressions position-miss"
+  (destructuring-bind (expected expr) (list nil "(position 9 (list 1 2 3))")
+    (expect (run-string expr :stdlib t) :to-equal expected)))
+
+(it-sequential "pipeline-run-string-function-cell-regressions symbol-function"
+  (destructuring-bind (expected expr) (list 42 "(progn (defun sf-regression (x) (+ x 1)) (funcall (symbol-function 'sf-regression) 41))")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-function-cell-regressions setf-gethash-fallback"
+  (destructuring-bind (expected expr) (list 9 "(let ((h (make-hash-table))) (setf-gethash 'k h 9) (gethash 'k h))")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-function-cell-regressions make-array-numeric-fill-pointer"
+  (destructuring-bind (expected expr) (list 1 "(let ((v (make-array 8 :fill-pointer 1))) (fill-pointer v))")
+    (expect (= expected (run-string expr)) :to-be-truthy)))
+
+(it-sequential "pipeline-run-string-output-options timings"
+  (destructuring-bind (kwarg-prefix verify) (list (list :print-pass-timings t :timing-stream) (lambda (text) (expect (search "OPT-PASS-FOLD" (string-upcase text)) :to-be-truthy)))
+    (let* ((stream (make-string-output-stream))
          (kwargs (append kwarg-prefix (list stream))))
-    (assert-= 3 (apply #'run-string "(+ 1 2)" :pass-pipeline "fold" kwargs))
-    (funcall verify (get-output-stream-string stream))))
+    (expect (= 3 (apply #'run-string "(+ 1 2)" :pass-pipeline "fold" kwargs)) :to-be-truthy)
+    (funcall verify (get-output-stream-string stream)))))
+
+(it-sequential "pipeline-run-string-output-options stats"
+  (destructuring-bind (kwarg-prefix verify) (list (list :print-pass-stats t :stats-stream) (lambda (text)
+             (let ((u (string-upcase text)))
+               (expect (search "OPT-PASS-FOLD" u) :to-be-truthy)
+               (expect (search "BEFORE=" u) :to-be-truthy))))
+    (let* ((stream (make-string-output-stream))
+         (kwargs (append kwarg-prefix (list stream))))
+    (expect (= 3 (apply #'run-string "(+ 1 2)" :pass-pipeline "fold" kwargs)) :to-be-truthy)
+    (funcall verify (get-output-stream-string stream)))))
+
+(it-sequential "pipeline-run-string-output-options trace-json"
+  (destructuring-bind (kwarg-prefix verify) (list (list :trace-json-stream) (lambda (text)
+             (expect (search "\"traceEvents\"" text) :to-be-truthy)
+             (expect (search "OPT-PASS-FOLD" text) :to-be-truthy)))
+    (let* ((stream (make-string-output-stream))
+         (kwargs (append kwarg-prefix (list stream))))
+    (expect (= 3 (apply #'run-string "(+ 1 2)" :pass-pipeline "fold" kwargs)) :to-be-truthy)
+    (funcall verify (get-output-stream-string stream)))))
 
 ;;; ─── prescan / parse / stdlib / our-eval ─────────────────────────────────
 
-(deftest-each pipeline-prescan-in-package-behavior
-  "%prescan-in-package extracts the package name from in-package forms; nil for others."
-  :cases (("keyword-form"
-           "(in-package :cl-cc)"
-           (lambda (result)
-             (assert-string= "CL-CC" (string-upcase result))))
-          ("string-form"
-           "(in-package \"CL-CC\")"
-           (lambda (result)
-             (assert-string= "CL-CC" (string-upcase result))))
-          ("non-package"
-           "(defun f (x) x)"
-           (lambda (result)
-             (assert-null result)))
-          ("with-comment"
-           (format nil ";;; header comment~%(in-package :cl-cc)")
-           (lambda (result)
-             (assert-true (stringp result)))))
-  (source verify)
-  (funcall verify (cl-cc::%prescan-in-package source)))
+(it-sequential "pipeline-prescan-in-package-behavior keyword-form"
+  (destructuring-bind (source verify) (list "(in-package :cl-cc)" (lambda (result)
+             (expect (string-upcase result) :to-equal "CL-CC")))
+    (funcall verify (cl-cc::%prescan-in-package source))))
 
-(deftest-each pipeline-parse-source-for-language
-  "parse-source-for-language: :lisp/:elisp parses one/multiple forms; unknown signals error."
-  :cases (("single-form"
-           "(+ 1 2)" :lisp 1
-           (lambda (forms)
-             (assert-equal '(+ 1 2) (first forms))))
-          ("single-form-elisp"
-           "(+ 1 2)" :elisp 1
-           (lambda (forms)
-             (assert-equal '(+ 1 2) (first forms))))
-          ("multiple-forms"
-           "(+ 1 2) (* 3 4)" :lisp 2
-           (lambda (_forms)
-             (declare (ignore _forms)))))
-  (source lang expected-count verify)
-  (let ((forms (cl-cc::parse-source-for-language source lang)))
-    (assert-= expected-count (length forms))
-    (funcall verify forms)))
+(it-sequential "pipeline-prescan-in-package-behavior string-form"
+  (destructuring-bind (source verify) (list "(in-package \"CL-CC\")" (lambda (result)
+             (expect (string-upcase result) :to-equal "CL-CC")))
+    (funcall verify (cl-cc::%prescan-in-package source))))
 
-(deftest pipeline-parse-unknown-language-signals
-  "parse-source-for-language signals error for unknown language."
-  (assert-signals error
-    (cl-cc::parse-source-for-language "(+ 1 2)" :unknown)))
+(it-sequential "pipeline-prescan-in-package-behavior non-package"
+  (destructuring-bind (source verify) (list "(defun f (x) x)" (lambda (result)
+             (expect result :to-be-null)))
+    (funcall verify (cl-cc::%prescan-in-package source))))
 
-(deftest pipeline-stdlib-forms-content
-  "get-stdlib-forms returns a non-empty list containing key definitions."
+(it-sequential "pipeline-prescan-in-package-behavior with-comment"
+  (destructuring-bind (source verify) (list (format nil ";;; header comment~%(in-package :cl-cc)") (lambda (result)
+             (expect (stringp result) :to-be-truthy)))
+    (funcall verify (cl-cc::%prescan-in-package source))))
+
+(it-sequential "pipeline-parse-source-for-language single-form"
+  (destructuring-bind (source lang expected-count verify) (list "(+ 1 2)" :lisp 1 (lambda (forms)
+             (expect (first forms) :to-equal '(+ 1 2))))
+    (let ((forms (cl-cc::parse-source-for-language source lang)))
+    (expect (= expected-count (length forms)) :to-be-truthy)
+    (funcall verify forms))))
+
+(it-sequential "pipeline-parse-source-for-language single-form-elisp"
+  (destructuring-bind (source lang expected-count verify) (list "(+ 1 2)" :elisp 1 (lambda (forms)
+             (expect (first forms) :to-equal '(+ 1 2))))
+    (let ((forms (cl-cc::parse-source-for-language source lang)))
+    (expect (= expected-count (length forms)) :to-be-truthy)
+    (funcall verify forms))))
+
+(it-sequential "pipeline-parse-source-for-language multiple-forms"
+  (destructuring-bind (source lang expected-count verify) (list "(+ 1 2) (* 3 4)" :lisp 2 (lambda (_forms)
+             (declare (ignore _forms))))
+    (let ((forms (cl-cc::parse-source-for-language source lang)))
+    (expect (= expected-count (length forms)) :to-be-truthy)
+    (funcall verify forms))))
+
+(it-sequential "pipeline-parse-unknown-language-signals"
+  (signals error (cl-cc::parse-source-for-language "(+ 1 2)" :unknown)))
+
+(it-sequential "pipeline-stdlib-forms-content"
   (let ((forms (cl-cc::get-stdlib-forms)))
-    (assert-true (> (length forms) 10))
-    (assert-true (cl:some (lambda (f)
+    (expect (> (length forms) 10) :to-be-truthy)
+    (expect (cl:some (lambda (f)
                             (and (consp f) (eq (car f) 'defun)
                                  (eq (cadr f) 'mapcar)))
-                          forms))
-    (assert-true (cl:some (lambda (f)
+                          forms) :to-be-truthy)
+    (expect (cl:some (lambda (f)
                             (and (consp f) (eq (car f) 'defun)
                                  (eq (cadr f) 'reduce)))
-                          forms))))
+                          forms) :to-be-truthy)))
 
-(deftest pipeline-stdlib-forms-return-fresh-tree
-  "get-stdlib-forms returns a fresh nested tree on each call."
+(it-sequential "pipeline-stdlib-forms-return-fresh-tree"
   (let* ((forms-a (cl-cc::get-stdlib-forms))
          (forms-b (cl-cc::get-stdlib-forms))
          (defun-a (cl:find-if (lambda (f) (and (consp f) (eq (car f) 'defun))) forms-a))
          (defun-b (cl:find-if (lambda (f) (and (consp f) (eq (car f) 'defun))) forms-b)))
-    (assert-true (consp defun-a))
-    (assert-true (consp defun-b))
-    (assert-false (eq defun-a defun-b))
+    (expect (consp defun-a) :to-be-truthy)
+    (expect (consp defun-b) :to-be-truthy)
+    (expect (eq defun-a defun-b) :to-be-falsy)
     (let ((original-name (second defun-b)))
       (setf (second defun-a) 'mutated-stdlib-name)
-      (assert-eq original-name (second defun-b)))))
+      (expect (second defun-b) :to-be original-name))))
 
-(deftest-each pipeline-our-eval-forms
-  "our-eval evaluates arithmetic, quoted data, and conditionals."
-  :cases (("arithmetic"  6          '(* 2 3))
-          ("quote-data"  '(a b c)   '(quote (a b c)))
-          ("if-form"     10         '(if t 10 20)))
-  (expected expr)
-  (assert-equal expected (cl-cc::our-eval expr)))
+(it-sequential "pipeline-our-eval-forms arithmetic"
+  (destructuring-bind (expected expr) (list 6 '(* 2 3))
+    (expect (cl-cc::our-eval expr) :to-equal expected)))
 
-(deftest pipeline-our-eval-uses-vm-compile-path-for-simple-expression
-  "our-eval evaluates simple expressions via the VM compile path."
+(it-sequential "pipeline-our-eval-forms quote-data"
+  (destructuring-bind (expected expr) (list '(a b c) '(quote (a b c)))
+    (expect (cl-cc::our-eval expr) :to-equal expected)))
+
+(it-sequential "pipeline-our-eval-forms if-form"
+  (destructuring-bind (expected expr) (list 10 '(if t 10 20))
+    (expect (cl-cc::our-eval expr) :to-equal expected)))
+
+(it-sequential "pipeline-our-eval-uses-vm-compile-path-for-simple-expression"
   (let ((orig (symbol-function 'cl-cc::compile-expression)))
     (unwind-protect
          (let ((called nil))
@@ -248,12 +319,11 @@
                      :cps '(identity 3)
                      :vm-instructions nil
                     :optimized-instructions nil)))
-           (assert-= 3 (cl-cc::our-eval '(+ 1 2)))
-           (assert-true called))
+           (expect (= 3 (cl-cc::our-eval '(+ 1 2))) :to-be-truthy)
+           (expect called :to-be-truthy))
       (setf (symbol-function 'cl-cc::compile-expression) orig))))
 
-(deftest pipeline-our-eval-falls-back-to-vm-for-definitions
-  "our-eval still uses the compile→VM path for top-level definition forms."
+(it-sequential "pipeline-our-eval-falls-back-to-vm-for-definitions"
   (let ((orig (symbol-function 'cl-cc::compile-expression))
         (called nil))
     (unwind-protect
@@ -262,8 +332,7 @@
                  (lambda (&rest args)
                    (setf called t)
                    (apply orig args)))
-            (assert-eq '*pipeline-cps-fallback*
-                       (cl-cc::our-eval '(defvar *pipeline-cps-fallback* 7)))
-            (assert-true called))
+            (expect (cl-cc::our-eval '(defvar *pipeline-cps-fallback* 7)) :to-be '*pipeline-cps-fallback*)
+            (expect called :to-be-truthy))
       (ignore-errors (makunbound '*pipeline-cps-fallback*))
       (setf (symbol-function 'cl-cc::compile-expression) orig))))

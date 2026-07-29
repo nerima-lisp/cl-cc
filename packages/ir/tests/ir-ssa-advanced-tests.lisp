@@ -5,7 +5,6 @@
 ;;; are covered in ir-ssa-dominator-tests.lisp.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; Define a minimal subtype of ir-inst so we can test ir-collect-uses
 ;;; with real operand data.  This is local to this test file.
@@ -16,8 +15,7 @@
 (defmethod cl-cc/ir:ir-operands ((inst test-use-inst))
   (tuinst-operands inst))
 
-(deftest ir-ssa-unsealed-creates-incomplete-phi
-  "ir-read-var on an unsealed block with predecessors creates a placeholder."
+(it-sequential "ir-ssa-unsealed-creates-incomplete-phi"
   (let* ((fn (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (blk (cl-cc/ir:ir-new-block fn :unsealed)))
@@ -25,11 +23,10 @@
     (cl-cc/ir:ir-add-edge entry blk)
     ;; Block is NOT sealed — reading should insert an incomplete phi
     (let ((result (cl-cc/ir:ir-read-var fn 'x blk)))
-      (assert-true (cl-cc/ir:ir-value-p result))
-      (assert-true (> (length (cl-cc/ir:irb-params blk)) 0)))))
+      (expect (cl-cc/ir:ir-value-p result) :to-be-truthy)
+      (expect (> (length (cl-cc/ir:irb-params blk)) 0) :to-be-truthy))))
 
-(deftest ir-ssa-seal-resolves-incomplete-phi
-  "ir-seal-block resolves incomplete phis created before sealing."
+(it-sequential "ir-ssa-seal-resolves-incomplete-phi"
   (let* ((fn (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (blk (cl-cc/ir:ir-new-block fn :target))
@@ -39,20 +36,17 @@
     (cl-cc/ir:ir-add-edge entry blk)
     ;; Read x in unsealed blk — creates incomplete phi
     (let ((placeholder (cl-cc/ir:ir-read-var fn 'x blk)))
-      (assert-true (cl-cc/ir:ir-value-p placeholder))
+      (expect (cl-cc/ir:ir-value-p placeholder) :to-be-truthy)
       ;; Now seal — should resolve the placeholder
       (cl-cc/ir:ir-seal-block fn entry)
       (cl-cc/ir:ir-seal-block fn blk)
       ;; After sealing, reading x should still work
       (let ((resolved (cl-cc/ir:ir-read-var fn 'x blk)))
-        (assert-true (cl-cc/ir:ir-value-p resolved))))))
+        (expect (cl-cc/ir:ir-value-p resolved) :to-be-truthy)))))
 
-(deftest-each ir-ssa-phi-elimination-cases
-  "ir-read-var at join: same value → trivially eliminated (0 params); distinct → kept (>0 params)."
-  :cases (("same-value"     t)
-          ("distinct-values" nil))
-  (same-value-p)
-  (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
+(it-sequential "ir-ssa-phi-elimination-cases same-value"
+  (destructuring-bind (same-value-p) (list t)
+    (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (left  (cl-cc/ir:ir-new-block fn :left))
          (right (cl-cc/ir:ir-new-block fn :right))
@@ -66,14 +60,35 @@
     (cl-cc/ir:ir-write-var fn 'x left v1)
     (cl-cc/ir:ir-write-var fn 'x right v2)
     (let ((result (cl-cc/ir:ir-read-var fn 'x join)))
-      (assert-true (cl-cc/ir:ir-value-p result))
+      (expect (cl-cc/ir:ir-value-p result) :to-be-truthy)
       (if same-value-p
-          (progn (assert-eq v1 result)
-                 (assert-= 0 (length (cl-cc/ir:irb-params join))))
-          (assert-true (> (length (cl-cc/ir:irb-params join)) 0))))))
+          (progn (expect result :to-be v1)
+                 (expect (length (cl-cc/ir:irb-params join)) :to-equal 0))
+          (expect (> (length (cl-cc/ir:irb-params join)) 0) :to-be-truthy))))))
 
-(deftest ir-ssa-loop-self-reference
-  "A loop back-edge produces a block arg that refers to itself."
+(it-sequential "ir-ssa-phi-elimination-cases distinct-values"
+  (destructuring-bind (same-value-p) (list nil)
+    (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
+         (entry (cl-cc/ir:irf-entry fn))
+         (left  (cl-cc/ir:ir-new-block fn :left))
+         (right (cl-cc/ir:ir-new-block fn :right))
+         (join  (cl-cc/ir:ir-new-block fn :join))
+         (v1    (cl-cc/ir:ir-new-value fn))
+         (v2    (if same-value-p v1 (cl-cc/ir:ir-new-value fn))))
+    (cl-cc/ir:ir-add-edge entry left)  (cl-cc/ir:ir-add-edge entry right)
+    (cl-cc/ir:ir-add-edge left join)   (cl-cc/ir:ir-add-edge right join)
+    (cl-cc/ir:ir-seal-block fn entry)  (cl-cc/ir:ir-seal-block fn left)
+    (cl-cc/ir:ir-seal-block fn right)  (cl-cc/ir:ir-seal-block fn join)
+    (cl-cc/ir:ir-write-var fn 'x left v1)
+    (cl-cc/ir:ir-write-var fn 'x right v2)
+    (let ((result (cl-cc/ir:ir-read-var fn 'x join)))
+      (expect (cl-cc/ir:ir-value-p result) :to-be-truthy)
+      (if same-value-p
+          (progn (expect result :to-be v1)
+                 (expect (length (cl-cc/ir:irb-params join)) :to-equal 0))
+          (expect (> (length (cl-cc/ir:irb-params join)) 0) :to-be-truthy))))))
+
+(it-sequential "ir-ssa-loop-self-reference"
   (let* ((fn (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (loop-hdr (cl-cc/ir:ir-new-block fn :loop))
@@ -90,19 +105,18 @@
     (cl-cc/ir:ir-write-var fn 'x loop-hdr v-update)
     ;; Read x in loop header — should return the loop-local definition
     (let ((result (cl-cc/ir:ir-read-var fn 'x loop-hdr)))
-      (assert-true (cl-cc/ir:ir-value-p result))
-      (assert-eq v-update result))))
+      (expect (cl-cc/ir:ir-value-p result) :to-be-truthy)
+      (expect result :to-be v-update))))
 
-(deftest ir-ssa-seal-clears-incomplete-phis
-  "After ir-seal-block, the incomplete-phis hash table is empty."
+(it-sequential "ir-ssa-seal-clears-incomplete-phis"
   (let* ((fn (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (blk (cl-cc/ir:ir-new-block fn :target)))
     (cl-cc/ir:ir-add-edge entry blk)
     ;; Read before sealing — creates incomplete phi
     (cl-cc/ir:ir-read-var fn 'x blk)
-    (assert-true (> (hash-table-count (cl-cc/ir:irb-incomplete-phis blk)) 0))
+    (expect (> (hash-table-count (cl-cc/ir:irb-incomplete-phis blk)) 0) :to-be-truthy)
     ;; Seal clears the table
     (cl-cc/ir:ir-seal-block fn entry)
     (cl-cc/ir:ir-seal-block fn blk)
-    (assert-= 0 (hash-table-count (cl-cc/ir:irb-incomplete-phis blk)))))
+    (expect (hash-table-count (cl-cc/ir:irb-incomplete-phis blk)) :to-equal 0)))

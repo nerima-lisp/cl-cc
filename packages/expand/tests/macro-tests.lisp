@@ -4,92 +4,89 @@
 ;;;;
 (in-package :cl-cc/test)
 
-(defsuite macro-suite
-  :description "Test suite for macro expansion"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite macro-suite)
 ;;; ─── %expand-quasiquote ──────────────────────────────────────────────────
 
-(deftest-each expand-quasiquote-wraps-in-quote
-  "%expand-quasiquote wraps self-evaluating atoms and symbols in (quote ...)."
-  :cases (("atom"   'foo 'foo)
-          ("number" 42   42))
-  (input expected-val)
-  (assert-equal (list 'quote expected-val) (cl-cc/expand::%expand-quasiquote input)))
+(it-sequential "expand-quasiquote-wraps-in-quote atom"
+  (destructuring-bind (input expected-val) (list 'foo 'foo)
+    (expect (cl-cc/expand::%expand-quasiquote input) :to-equal (list 'quote expected-val))))
 
-(deftest expand-quasiquote-unquote-extracts
-  "Top-level unquote returns its argument directly."
-  (assert-equal 'x (cl-cc/expand::%expand-quasiquote '(cl-cc:unquote x))))
+(it-sequential "expand-quasiquote-wraps-in-quote number"
+  (destructuring-bind (input expected-val) (list 42 42)
+    (expect (cl-cc/expand::%expand-quasiquote input) :to-equal (list 'quote expected-val))))
 
-(deftest expand-quasiquote-list-wraps-in-list
-  "Plain list elements are wrapped in (list ...) -- adjacent list chunks merge."
+(it-sequential "expand-quasiquote-unquote-extracts"
+  (expect (cl-cc/expand::%expand-quasiquote '(cl-cc:unquote x)) :to-equal 'x))
+
+(it-sequential "expand-quasiquote-list-wraps-in-list"
   (let ((result (cl-cc/expand::%expand-quasiquote '(a b))))
     ;; Adjacent (list ...) parts are merged into a single (list ...) form
-    (assert-eq 'list (car result))))
+    (expect (car result) :to-be 'list)))
 
-(deftest expand-quasiquote-unquote-in-list
-  "Unquote inside list is spliced as a (list val) part."
-  ;; Use explicit quote to avoid CL's own unquote processing.
+(it-sequential "expand-quasiquote-unquote-in-list"
   (let* ((result (cl-cc/expand::%expand-quasiquote '(a (cl-cc:unquote x))))
          (str (format nil "~S" result)))
-    (assert-true (search "X" str))))
+    (expect (search "X" str) :to-be-truthy)))
 
 ;;; ─── %qq-head-p ──────────────────────────────────────────────────────────
 
-(deftest-each qq-head-p-cases
-  "%qq-head-p: returns T for matching symbol name, NIL otherwise."
-  :cases (("matching"      '(unquote x)  "UNQUOTE"  t)
-          ("non-matching"  '(unquote x)  "SPLICE"   nil)
-          ("atom"          'unquote      "UNQUOTE"  nil)
-          ("empty-list"    nil           "UNQUOTE"  nil))
-  (form name expected)
-  (if expected
-      (assert-true  (cl-cc/expand::%qq-head-p form name))
-      (assert-false (cl-cc/expand::%qq-head-p form name))))
+(it-sequential "qq-head-p-cases matching"
+  (destructuring-bind (form name expected) (list '(unquote x) "UNQUOTE" t)
+    (if expected
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-truthy)
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-falsy))))
+
+(it-sequential "qq-head-p-cases non-matching"
+  (destructuring-bind (form name expected) (list '(unquote x) "SPLICE" nil)
+    (if expected
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-truthy)
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-falsy))))
+
+(it-sequential "qq-head-p-cases atom"
+  (destructuring-bind (form name expected) (list 'unquote "UNQUOTE" nil)
+    (if expected
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-truthy)
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-falsy))))
+
+(it-sequential "qq-head-p-cases empty-list"
+  (destructuring-bind (form name expected) (list nil "UNQUOTE" nil)
+    (if expected
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-truthy)
+      (expect (cl-cc/expand::%qq-head-p form name) :to-be-falsy))))
 
 ;;; ─── %step-cache-and-return ──────────────────────────────────────────────
 
-(deftest step-cache-and-return-returns-values
-  "%step-cache-and-return returns (values result expanded-p) unchanged."
+(it-sequential "step-cache-and-return-returns-values"
   (multiple-value-bind (r p)
       (cl-cc/expand::%step-cache-and-return '(foo) nil '(bar) t)
-    (assert-equal '(bar) r)
-    (assert-true  p)))
+    (expect r :to-equal '(bar))
+    (expect p :to-be-truthy)))
 
-(deftest step-cache-and-return-no-expand
-  "%step-cache-and-return returns (values form nil) for non-expanded case."
+(it-sequential "step-cache-and-return-no-expand"
   (multiple-value-bind (r p)
       (cl-cc/expand::%step-cache-and-return '(foo) nil '(foo) nil)
-    (assert-equal '(foo) r)
-    (assert-false p)))
+    (expect r :to-equal '(foo))
+    (expect p :to-be-falsy)))
 
 ;;; ─── %cache-all-result ───────────────────────────────────────────────────
 
-(deftest cache-all-result-returns-result
-  "%cache-all-result always returns the RESULT argument unchanged."
-  (assert-equal '(expanded form)
-                (cl-cc/expand::%cache-all-result '(original) nil '(expanded form))))
+(it-sequential "cache-all-result-returns-result"
+  (expect (cl-cc/expand::%cache-all-result '(original) nil '(expanded form)) :to-equal '(expanded form)))
 
-(deftest cache-all-result-skips-uninterned-form
-  "%cache-all-result does not cache when FORM contains an uninterned symbol."
+(it-sequential "cache-all-result-skips-uninterned-form"
   (let ((fresh-sym (make-symbol "X"))
         (env nil))
     (cl-cc/expand::%cache-all-result (list fresh-sym) env 'result)
     ;; No error, result still returned
-    (assert-true t)))
+    (expect t :to-be-truthy)))
 
 ;;; ─── %maybe-postprocess-expansion ────────────────────────────────────────
 
-(deftest maybe-postprocess-expansion-no-postprocess
-  "%maybe-postprocess-expansion returns RESULT unchanged when :post-expand is absent."
+(it-sequential "maybe-postprocess-expansion-no-postprocess"
   (let ((descriptor '(:kind :macro-expander :lambda-list (form))))
-    (assert-equal '(foo bar)
-                  (cl-cc/expand::%maybe-postprocess-expansion '(foo bar) descriptor nil))))
+    (expect (cl-cc/expand::%maybe-postprocess-expansion '(foo bar) descriptor nil) :to-equal '(foo bar))))
 
-(deftest maybe-postprocess-expansion-returns-result-for-other-postprocess
-  "%maybe-postprocess-expansion returns RESULT for unrecognized :post-expand values."
+(it-sequential "maybe-postprocess-expansion-returns-result-for-other-postprocess"
   (let ((descriptor '(:kind :macro-expander :post-expand :some-unknown)))
-    (assert-equal '(baz)
-                  (cl-cc/expand::%maybe-postprocess-expansion '(baz) descriptor nil))))
+    (expect (cl-cc/expand::%maybe-postprocess-expansion '(baz) descriptor nil) :to-equal '(baz))))

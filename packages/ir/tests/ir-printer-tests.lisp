@@ -6,35 +6,28 @@
 
 (in-package :cl-cc/test)
 
-(defsuite ir-printer-suite :description "Extended IR printer tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite ir-printer-suite)
 ;;; ─── ir-format-value ──────────────────────────────────────────────────────────
 
-(deftest ir-format-value-assigns-sequential-percent-ids
-  "ir-format-value: ir-values allocated in order format as %0, %1, %2."
+(it-sequential "ir-format-value-assigns-sequential-percent-ids"
   (let* ((fn (cl-cc/ir:ir-make-function 'test))
          (v0 (cl-cc/ir:ir-new-value fn))
          (v1 (cl-cc/ir:ir-new-value fn))
          (v2 (cl-cc/ir:ir-new-value fn)))
-    (assert-equal "%0" (cl-cc/ir:ir-format-value v0))
-    (assert-equal "%1" (cl-cc/ir:ir-format-value v1))
-    (assert-equal "%2" (cl-cc/ir:ir-format-value v2))))
+    (expect (cl-cc/ir:ir-format-value v0) :to-equal "%0")
+    (expect (cl-cc/ir:ir-format-value v1) :to-equal "%1")
+    (expect (cl-cc/ir:ir-format-value v2) :to-equal "%2")))
 
-(deftest ir-format-value-string-contains-literal-text
-  "ir-format-value for a string literal embeds the original text."
-  (assert-true (search "hello" (cl-cc/ir:ir-format-value "hello"))))
+(it-sequential "ir-format-value-string-contains-literal-text"
+  (expect (search "hello" (cl-cc/ir:ir-format-value "hello")) :to-be-truthy))
 
-(deftest ir-format-value-symbol-is-uppercased
-  "ir-format-value for a symbol produces an uppercase representation."
-  (assert-true (search "FOO" (cl-cc/ir:ir-format-value 'foo))))
+(it-sequential "ir-format-value-symbol-is-uppercased"
+  (expect (search "FOO" (cl-cc/ir:ir-format-value 'foo)) :to-be-truthy))
 
 ;;; ─── ir-print-block ───────────────────────────────────────────────────────────
 
-(deftest ir-print-block-variations
-  "ir-print-block: no-preds annotation, predecessor listing, params, instructions, terminator."
+(it-sequential "ir-print-block-variations"
   (let* ((fn    (cl-cc/ir:ir-make-function 'test))
          (entry (cl-cc/ir:irf-entry fn))
          (then  (cl-cc/ir:ir-new-block fn :then))
@@ -45,51 +38,45 @@
          (term  (cl-cc/ir:make-ir-inst)))
     ;; no predecessors shows (none)
     (let ((s (with-output-to-string (out) (cl-cc/ir:ir-print-block entry out))))
-      (assert-true (search "(none)" s)))
+      (expect (search "(none)" s) :to-be-truthy))
     ;; block with predecessor lists it
     (cl-cc/ir:ir-add-edge entry then)
     (let ((s (with-output-to-string (out) (cl-cc/ir:ir-print-block then out))))
-      (assert-true (search "entry" s)))
+      (expect (search "entry" s) :to-be-truthy))
     ;; block with params shows label and param
     (push v (cl-cc/ir:irb-params join))
     (let ((s (with-output-to-string (out) (cl-cc/ir:ir-print-block join out))))
-      (assert-true (search "join" s))
-      (assert-true (search (cl-cc/ir:ir-format-value v) s)))
+      (expect (search "join" s) :to-be-truthy)
+      (expect (search (cl-cc/ir:ir-format-value v) s) :to-be-truthy))
     ;; block with instruction shows result value
     (cl-cc/ir:ir-emit entry inst)
     (let ((s (with-output-to-string (out) (cl-cc/ir:ir-print-block entry out))))
-      (assert-true (search "%1" s)))
+      (expect (search "%1" s) :to-be-truthy))
     ;; block with terminator shows its type name
     (cl-cc/ir:ir-set-terminator entry term)
     (let ((s (with-output-to-string (out) (cl-cc/ir:ir-print-block entry out))))
-      (assert-true (search "IR-INST" s)))))
+      (expect (search "IR-INST" s) :to-be-truthy))))
 
 ;;; ─── ir-print-function / ir-function-to-string ────────────────────────────────
 
-(deftest ir-print-function-aspects
-  "ir-function-to-string: define keyword, return type, anonymous, params, multiblock, closing brace."
-  ;; starts with define
+(it-sequential "ir-print-function-aspects"
   (let* ((fn (cl-cc/ir:ir-make-function 'add))
          (s  (cl-cc/ir:ir-function-to-string fn)))
-    (assert-true (search "define" s))
-    (assert-true (search "}" s)))
-  ;; includes return type
+    (expect (search "define" s) :to-be-truthy)
+    (expect (search "}" s) :to-be-truthy))
   (let* ((fn (cl-cc/ir:ir-make-function 'add :return-type :integer))
          (s  (cl-cc/ir:ir-function-to-string fn)))
-    (assert-true (search "INTEGER" s)))
-  ;; nil name → anonymous
+    (expect (search "INTEGER" s) :to-be-truthy))
   (let* ((fn (cl-cc/ir:ir-make-function nil))
          (s  (cl-cc/ir:ir-function-to-string fn)))
-    (assert-true (search "anonymous" s)))
-  ;; function parameters
+    (expect (search "anonymous" s) :to-be-truthy))
   (let* ((fn (cl-cc/ir:ir-make-function 'f))
          (p0 (cl-cc/ir:ir-new-value fn))
          (p1 (cl-cc/ir:ir-new-value fn)))
     (setf (cl-cc/ir:irf-params fn) (list p0 p1))
     (let ((s (cl-cc/ir:ir-function-to-string fn)))
-      (assert-true (search "%0" s))
-      (assert-true (search "%1" s))))
-  ;; all reachable blocks present
+      (expect (search "%0" s) :to-be-truthy)
+      (expect (search "%1" s) :to-be-truthy)))
   (let* ((fn    (cl-cc/ir:ir-make-function 'branch))
          (entry (cl-cc/ir:irf-entry fn))
          (then  (cl-cc/ir:ir-new-block fn :then))
@@ -97,36 +84,33 @@
     (cl-cc/ir:ir-add-edge entry then)
     (cl-cc/ir:ir-add-edge entry else)
     (let ((s (cl-cc/ir:ir-function-to-string fn)))
-      (assert-true (search "entry" s))
-      (assert-true (search "then" s))
-      (assert-true (search "else" s)))))
+      (expect (search "entry" s) :to-be-truthy)
+      (expect (search "then" s) :to-be-truthy)
+      (expect (search "else" s) :to-be-truthy))))
 
 ;;; ─── ir-print-module ──────────────────────────────────────────────────────────
 
-(deftest ir-print-module-empty-shows-zero-count
-  "ir-print-module with no functions shows 'IR Module' header and 0 in output."
+(it-sequential "ir-print-module-empty-shows-zero-count"
   (let* ((mod (cl-cc/ir:make-ir-module :functions nil))
          (s   (with-output-to-string (out) (cl-cc/ir:ir-print-module mod out))))
-    (assert-true (search "IR Module" s))
-    (assert-true (search "0" s))))
+    (expect (search "IR Module" s) :to-be-truthy)
+    (expect (search "0" s) :to-be-truthy)))
 
-(deftest ir-print-module-single-function-included
-  "ir-print-module with one function shows '1 function' and the function's name."
+(it-sequential "ir-print-module-single-function-included"
   (let* ((fn  (cl-cc/ir:ir-make-function 'my-fn))
          (mod (cl-cc/ir:make-ir-module :functions (list fn)))
          (s   (with-output-to-string (out) (cl-cc/ir:ir-print-module mod out))))
-    (assert-true (search "1 function" s))
-    (assert-true (search "my-fn" s))))
+    (expect (search "1 function" s) :to-be-truthy)
+    (expect (search "my-fn" s) :to-be-truthy)))
 
-(deftest ir-print-module-multiple-functions-in-order
-  "ir-print-module with two functions shows '2 functions' and alpha appears before beta."
+(it-sequential "ir-print-module-multiple-functions-in-order"
   (let* ((f1  (cl-cc/ir:ir-make-function 'alpha))
          (f2  (cl-cc/ir:ir-make-function 'beta))
          (mod (cl-cc/ir:make-ir-module :functions (list f1 f2)))
          (s   (with-output-to-string (out) (cl-cc/ir:ir-print-module mod out))))
-    (assert-true (search "2 functions" s))
+    (expect (search "2 functions" s) :to-be-truthy)
     (let ((pos-a (search "alpha" s))
           (pos-b (search "beta" s)))
-      (assert-true pos-a)
-      (assert-true pos-b)
-      (assert-true (< pos-a pos-b)))))
+      (expect pos-a :to-be-truthy)
+      (expect pos-b :to-be-truthy)
+      (expect (< pos-a pos-b) :to-be-truthy))))

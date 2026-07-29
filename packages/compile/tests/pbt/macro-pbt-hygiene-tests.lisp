@@ -10,8 +10,6 @@
 
 (in-package :cl-cc/pbt)
 
-(in-suite macro-pbt-suite)
-
 ;;; Property: Macro Expansion Idempotency
 
 (cl-weave:describe "macro expansion idempotency properties (hygiene)"
@@ -23,21 +21,21 @@
                     (when flag body1 body2)
                     (when (= x 0) (print 1))))
       (let ((exp1 (cl-cc:our-macroexpand form)))
-        (assert-equal exp1 (cl-cc:our-macroexpand exp1)))))
+        (expect (cl-cc:our-macroexpand exp1) :to-equal exp1))))
 
   (cl-weave:it "Fully expanding representative UNLESS forms twice gives the same result."
     (dolist (form '((unless t body)
                     (unless flag body1 body2)
                     (unless (= x 0) (print 1))))
       (let ((exp1 (cl-cc:our-macroexpand form)))
-        (assert-equal exp1 (cl-cc:our-macroexpand exp1)))))
+        (expect (cl-cc:our-macroexpand exp1) :to-equal exp1))))
 
   (cl-weave:it "Fully expanding representative AND forms twice gives the same result."
     (dolist (form '((and a b)
                     (and a b c)
                     (and (= x 0) flag (print 1))))
       (let ((exp1 (cl-cc:our-macroexpand form)))
-        (assert-equal exp1 (cl-cc:our-macroexpand exp1)))))
+        (expect (cl-cc:our-macroexpand exp1) :to-equal exp1))))
 
   (cl-weave:it-property "macroexpand-idempotent-or-hygiene-pbt"
       ((args (cl-weave:gen-list (gen-body-form) :min-length 2 :max-length 4)))

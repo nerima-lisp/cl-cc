@@ -15,7 +15,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 (defun %standalone-find-system (system-name)
   "Return the ASDF system object for SYSTEM-NAME, or NIL on failure."
@@ -30,27 +29,57 @@
         (declare (ignore status))
         sym))))
 
-(deftest-each standalone-sibling-systems-loaded
-  "Each extracted sibling ASDF system is registered, its feature package
-exists, and a representative symbol resolves in that package."
-  :cases
-  (("cl-cc-ast"      :cl-cc-ast      :cl-cc/ast      "AST-CHILDREN")
-   ("cl-cc-parse"   :cl-cc-parse   :cl-cc/parse   "PARSE-CL-SOURCE")
-   ("cl-cc-binary"   :cl-cc-binary   :cl-cc/binary   "MACH-O-BUILDER")
-   ("cl-cc-runtime"  :cl-cc-runtime  :cl-cc/runtime  "RT-CONS")
-   ("cl-cc-bytecode" :cl-cc-bytecode :cl-cc/bytecode "ENCODE-ADD")
-   ("cl-cc-ir"       :cl-cc-ir       :cl-cc/ir       "IR-MAKE-FUNCTION")
-   ("cl-cc-mir"      :cl-cc-mir      :cl-cc/mir      "MIR-MAKE-FUNCTION")
-   ("cl-cc-type"     :cl-cc-type     :cl-cc/type     "TYPE-TO-STRING")
-   ("cl-cc-optimize" :cl-cc-optimize :cl-cc/optimize "OPTIMIZE-INSTRUCTIONS")
-   ("cl-cc-emit"     :cl-cc-emit     :cl-cc/emit     "ALLOCATE-REGISTERS")
-   ("cl-cc-expand"   :cl-cc-expand   :cl-cc/expand   "OUR-MACROEXPAND-1")
-   ("cl-cc-compile"  :cl-cc-compile  :cl-cc/compile  "COMPILE-EXPRESSION")
-   ("cl-cc-vm"       :cl-cc-vm       :cl-cc/vm       "VM-STATE"))
-  (system-name package-name representative-symbol)
-  (assert-true (%standalone-find-system system-name))
-  (assert-true (find-package package-name))
-  (assert-true (%standalone-symbol-present-p representative-symbol package-name)))
+(it-sequential "standalone-sibling-systems-loaded cl-cc-ast"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-ast :cl-cc/ast "AST-CHILDREN")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-parse"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-parse :cl-cc/parse "PARSE-CL-SOURCE")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-binary"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-binary :cl-cc/binary "MACH-O-BUILDER")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-runtime"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-runtime :cl-cc/runtime "RT-CONS")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-bytecode"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-bytecode :cl-cc/bytecode "ENCODE-ADD")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-ir"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-ir :cl-cc/ir "IR-MAKE-FUNCTION")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-mir"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-mir :cl-cc/mir "MIR-MAKE-FUNCTION")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-type"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-type :cl-cc/type "TYPE-TO-STRING")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-optimize"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-optimize :cl-cc/optimize "OPTIMIZE-INSTRUCTIONS")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-emit"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-emit :cl-cc/emit "ALLOCATE-REGISTERS")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-expand"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-expand :cl-cc/expand "OUR-MACROEXPAND-1")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-compile"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-compile :cl-cc/compile "COMPILE-EXPRESSION")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
+
+(it-sequential "standalone-sibling-systems-loaded cl-cc-vm"
+  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-vm :cl-cc/vm "VM-STATE")
+    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
 
 (defun %bridge-registered-p (symbol-name)
   "Return T when SYMBOL-NAME resolved via :cl-cc (as the VM does) is in the bridge table.
@@ -58,24 +87,42 @@ The VM looks up function names via (find-symbol name :cl-cc), so this mirrors th
   (let ((sym (find-symbol symbol-name :cl-cc)))
     (and sym (gethash sym cl-cc/vm::*vm-host-bridge-functions*))))
 
-(deftest-each bridge-cross-package-symbols-registered
-  "All cross-package VM host bridge symbols are registered after full system load.
-Guards against load-order race where vm-bridge.lisp silently skips registration
-because :cl-cc-compile/:cl-cc-parse/:cl-cc-expand packages don't exist yet."
-  :cases (("run-string"               t   "RUN-STRING")
-          ("run-string-repl"          t   "RUN-STRING-REPL")
-          ("our-load"                 t   "OUR-LOAD")
-          ("compile-expression"       t   "COMPILE-EXPRESSION")
-          ("compile-string"           t   "COMPILE-STRING")
-          ("our-eval"                 t   "OUR-EVAL")
-          ("parse-all-forms"          t   "PARSE-ALL-FORMS")
-          ("generate-lambda-bindings" t   "GENERATE-LAMBDA-BINDINGS")
-          ;; REGISTER-MACRO absent: stores VM closures in macro-env → TYPE-ERROR
-          ("register-macro-absent"    nil "REGISTER-MACRO"))
-  (expected symbol-name)
-  (assert-equal expected (not (null (%bridge-registered-p symbol-name)))))
+(it-sequential "bridge-cross-package-symbols-registered run-string"
+  (destructuring-bind (expected symbol-name) (list t "RUN-STRING")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
 
-(deftest vm-eval-hooks-wired-after-load
-  "*vm-eval-hook* and *vm-compile-string-hook* are non-nil after pipeline.lisp loads."
-  (assert-true cl-cc/vm::*vm-eval-hook*)
-  (assert-true cl-cc/vm::*vm-compile-string-hook*))
+(it-sequential "bridge-cross-package-symbols-registered run-string-repl"
+  (destructuring-bind (expected symbol-name) (list t "RUN-STRING-REPL")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered our-load"
+  (destructuring-bind (expected symbol-name) (list t "OUR-LOAD")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered compile-expression"
+  (destructuring-bind (expected symbol-name) (list t "COMPILE-EXPRESSION")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered compile-string"
+  (destructuring-bind (expected symbol-name) (list t "COMPILE-STRING")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered our-eval"
+  (destructuring-bind (expected symbol-name) (list t "OUR-EVAL")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered parse-all-forms"
+  (destructuring-bind (expected symbol-name) (list t "PARSE-ALL-FORMS")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered generate-lambda-bindings"
+  (destructuring-bind (expected symbol-name) (list t "GENERATE-LAMBDA-BINDINGS")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "bridge-cross-package-symbols-registered register-macro-absent"
+  (destructuring-bind (expected symbol-name) (list nil "REGISTER-MACRO")
+    (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
+
+(it-sequential "vm-eval-hooks-wired-after-load"
+  (expect cl-cc/vm::*vm-eval-hook* :to-be-truthy)
+  (expect cl-cc/vm::*vm-compile-string-hook* :to-be-truthy))

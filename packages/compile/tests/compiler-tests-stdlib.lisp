@@ -2,8 +2,6 @@
 
 ;;; Standard Library Set Operations Tests
 
-(in-suite cl-cc-integration-serial-suite)
-
 (deftest-compile stdlib-list-ops
   "set-difference, union, append-lists, and last-cons work on lists."
   :cases (("set-diff"       '(1 3 5)     "(set-difference (list 1 2 3 4 5) (list 2 4))")
@@ -27,88 +25,117 @@
           ("init-accum"   '(3 2 1) "(reduce (lambda (acc x) (cons x acc)) (list 1 2 3) :initial-value nil)"))
   :stdlib t)
 
-(in-suite cl-cc-integration-suite)
+(it-sequential "compile-hash-table-keys"
+  (expect (= 2 (run-string " (let ((ht (make-hash-table))) (setf (gethash :x ht) 10) (setf (gethash :y ht) 20) (length (hash-table-keys ht)))")) :to-be-truthy))
 
-(deftest compile-hash-table-keys
-  "hash-table-keys returns list of keys"
-  (assert-= 2 (run-string " (let ((ht (make-hash-table))) (setf (gethash :x ht) 10) (setf (gethash :y ht) 20) (length (hash-table-keys ht)))")))
-
-(deftest-each compile-clos-mop-introspection
-  "CLOS MOP helpers expose direct/effective slots, slot metadata, metaclass, and redefinition migration."
-  :tags '(:ansi-gap :mop)
-  :cases (("direct-vs-effective-slots"
-           '((cl-cc::b) (cl-cc::a cl-cc::b))
-           "(progn
+(it-sequential "compile-clos-mop-introspection direct-vs-effective-slots"
+  :tags
+  '(:ansi-gap :mop)
+  (destructuring-bind (expected form) (list '((cl-cc::b) (cl-cc::a cl-cc::b)) "(progn
               (defclass mop-base () ((a :initarg :a)))
               (defclass mop-child (mop-base) ((b :initarg :b)))
               (list (mapcar #'slot-definition-name (class-direct-slots (find-class 'mop-child)))
                     (mapcar #'slot-definition-name (class-slots (find-class 'mop-child)))))")
-          ("slot-type-initfunction-metaclass"
-           '(cl-cc::x integer 7 standard-class)
-           "(progn
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-clos-mop-introspection slot-type-initfunction-metaclass"
+  :tags
+  '(:ansi-gap :mop)
+  (destructuring-bind (expected form) (list '(cl-cc::x integer 7 standard-class) "(progn
               (defclass typed-mop () ((x :initarg :x :initform 7 :type integer)) (:metaclass standard-class))
               (let ((slot (car (class-slots (find-class 'typed-mop)))))
                 (list (slot-definition-name slot)
                       (slot-definition-type slot)
                       (funcall (slot-definition-initfunction slot))
                       (class-metaclass (find-class 'typed-mop)))))")
-          ("compute-effective-slot-definition"
-           'integer
-           "(progn
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-clos-mop-introspection compute-effective-slot-definition"
+  :tags
+  '(:ansi-gap :mop)
+  (destructuring-bind (expected form) (list 'integer "(progn
               (defclass effective-mop () ((x :initarg :x :type integer)))
               (slot-definition-type
                (compute-effective-slot-definition
                 (find-class 'effective-mop)
                 'x
                 (class-direct-slots (find-class 'effective-mop)))))")
-          ("redefined-class-lazy-migration"
-           nil
-           "(let ((obj nil))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-clos-mop-introspection redefined-class-lazy-migration"
+  :tags
+  '(:ansi-gap :mop)
+  (destructuring-bind (expected form) (list nil "(let ((obj nil))
               (defclass redef-mop () ((x :initarg :x)))
               (setq obj (make-instance 'redef-mop :x 1))
               (defclass redef-mop () ((y :initarg :y)))
               (slot-value obj 'y))")
-          ("redefined-class-slot-boundp-migration"
-           t
-           "(let ((obj nil))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-clos-mop-introspection redefined-class-slot-boundp-migration"
+  :tags
+  '(:ansi-gap :mop)
+  (destructuring-bind (expected form) (list t "(let ((obj nil))
               (defclass boundp-redef-mop () ((x :initarg :x)))
               (setq obj (make-instance 'boundp-redef-mop :x 1))
               (defclass boundp-redef-mop () ((y :initarg :y)))
               (slot-boundp obj 'y))")
-          ("redefined-class-slot-makunbound-migration"
-           nil
-           "(let ((obj nil))
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-clos-mop-introspection redefined-class-slot-makunbound-migration"
+  :tags
+  '(:ansi-gap :mop)
+  (destructuring-bind (expected form) (list nil "(let ((obj nil))
               (defclass makun-redef-mop () ((x :initarg :x)))
               (setq obj (make-instance 'makun-redef-mop :x 1))
               (defclass makun-redef-mop () ((y :initarg :y)))
               (slot-makunbound obj 'y)
-              (slot-boundp obj 'y))"))
-  (expected form)
-  (assert-equal expected (run-string form :stdlib t)))
+              (slot-boundp obj 'y))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
 ;;; Defstruct Tests
 
-(deftest-each compile-defstruct
-  "defstruct creates constructors, accessors, predicates, and custom variants."
-  :cases (("basic"       10 " (progn (defstruct point x y) (let ((p (make-point :x 10 :y 20))) (point-x p)))")
-          ("default"      0 " (progn (defstruct counter (count 0)) (let ((c (make-counter))) (counter-count c)))")
-          ("predicate"    1 " (progn (defstruct my-box value) (let ((b (make-my-box :value 42))) (if (my-box-p b) 1 0)))")
-          ("typep"        1 " (progn (defstruct my-pair first second) (let ((p (make-my-pair :first 1 :second 2))) (if (typep p 'my-pair) 1 0)))")
-          ("boa"          3 " (progn (defstruct (my-vec (:constructor make-my-vec (x y))) x y) (let ((v (make-my-vec 1 3))) (my-vec-y v)))")
-          ("conc-name"   42 " (progn (defstruct (my-item (:conc-name item-)) value) (let ((i (make-my-item :value 42))) (item-value i)))"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "compile-defstruct basic"
+  (destructuring-bind (expected form) (list 10 " (progn (defstruct point x y) (let ((p (make-point :x 10 :y 20))) (point-x p)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-defstruct default"
+  (destructuring-bind (expected form) (list 0 " (progn (defstruct counter (count 0)) (let ((c (make-counter))) (counter-count c)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-defstruct predicate"
+  (destructuring-bind (expected form) (list 1 " (progn (defstruct my-box value) (let ((b (make-my-box :value 42))) (if (my-box-p b) 1 0)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-defstruct typep"
+  (destructuring-bind (expected form) (list 1 " (progn (defstruct my-pair first second) (let ((p (make-my-pair :first 1 :second 2))) (if (typep p 'my-pair) 1 0)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-defstruct boa"
+  (destructuring-bind (expected form) (list 3 " (progn (defstruct (my-vec (:constructor make-my-vec (x y))) x y) (let ((v (make-my-vec 1 3))) (my-vec-y v)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-defstruct conc-name"
+  (destructuring-bind (expected form) (list 42 " (progn (defstruct (my-item (:conc-name item-)) value) (let ((i (make-my-item :value 42))) (item-value i)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; Car/Cdr Composition Tests
 
-(deftest-each compile-cxr-basic
-  "c*r compositions extract elements from list structures."
-  :cases (("caar"  1    "(caar (list (list 1 2) (list 3 4)))")
-          ("cadr"  2    "(cadr (list 1 2 3))")
-          ("cddr"  '(3) "(cddr (list 1 2 3))")
-          ("caddr" 3    "(caddr (list 1 2 3 4))"))
-  (expected form)
-  (assert-equal expected (run-string form)))
+(it-sequential "compile-cxr-basic caar"
+  (destructuring-bind (expected form) (list 1 "(caar (list (list 1 2) (list 3 4)))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-cxr-basic cadr"
+  (destructuring-bind (expected form) (list 2 "(cadr (list 1 2 3))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-cxr-basic cddr"
+  (destructuring-bind (expected form) (list '(3) "(cddr (list 1 2 3))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-cxr-basic caddr"
+  (destructuring-bind (expected form) (list 3 "(caddr (list 1 2 3 4))")
+    (expect (run-string form) :to-equal expected)))
 
 ;;; Stdlib Find/Position Tests
 
@@ -120,158 +147,193 @@
           ("position-miss" nil "(position 9 (list 1 2 3))"))
   :stdlib t)
 
-(deftest-each stdlib-cons-printing-forms
-  "Stdlib forms producing cons/alist structures render correctly as lowercase strings."
-  :cases (("find-with-key"   "(2 . b)"           "(find 2 (list (cons 1 'a) (cons 2 'b) (cons 3 'c)) :key (lambda (x) (car x)))")
-          ("pairlis"         "((b . 2) (a . 1))"  "(pairlis (list 'a 'b) (list 1 2))")
-          ("assoc-if"        "(2 . b)"            "(assoc-if (lambda (k) (= k 2)) (list (cons 1 'a) (cons 2 'b)))")
-          ("rassoc"          "(2 . b)"            "(rassoc 'b (list (cons 1 'a) (cons 2 'b) (cons 3 'c)))")
-          ("find-sharpsign-key" "(2 . b)"         "(find 2 (list (cons 1 'a) (cons 2 'b) (cons 3 'c)) :key #'car)"))
-  (expected form)
-  (assert-string= expected
-                         (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
-                           (string-downcase (format nil "~S" (run-string form :stdlib t))))))
+(it-sequential "stdlib-cons-printing-forms find-with-key"
+  (destructuring-bind (expected form) (list "(2 . b)" "(find 2 (list (cons 1 'a) (cons 2 'b) (cons 3 'c)) :key (lambda (x) (car x)))")
+    (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+                           (string-downcase (format nil "~S" (run-string form :stdlib t)))) :to-equal expected)))
 
-(deftest stdlib-identity
-  "identity returns its argument"
+(it-sequential "stdlib-cons-printing-forms pairlis"
+  (destructuring-bind (expected form) (list "((b . 2) (a . 1))" "(pairlis (list 'a 'b) (list 1 2))")
+    (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+                           (string-downcase (format nil "~S" (run-string form :stdlib t)))) :to-equal expected)))
+
+(it-sequential "stdlib-cons-printing-forms assoc-if"
+  (destructuring-bind (expected form) (list "(2 . b)" "(assoc-if (lambda (k) (= k 2)) (list (cons 1 'a) (cons 2 'b)))")
+    (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+                           (string-downcase (format nil "~S" (run-string form :stdlib t)))) :to-equal expected)))
+
+(it-sequential "stdlib-cons-printing-forms rassoc"
+  (destructuring-bind (expected form) (list "(2 . b)" "(rassoc 'b (list (cons 1 'a) (cons 2 'b) (cons 3 'c)))")
+    (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+                           (string-downcase (format nil "~S" (run-string form :stdlib t)))) :to-equal expected)))
+
+(it-sequential "stdlib-cons-printing-forms find-sharpsign-key"
+  (destructuring-bind (expected form) (list "(2 . b)" "(find 2 (list (cons 1 'a) (cons 2 'b) (cons 3 'c)) :key #'car)")
+    (expect (let ((*package* (find-package :cl-cc)) (*print-pretty* nil))
+                           (string-downcase (format nil "~S" (run-string form :stdlib t)))) :to-equal expected)))
+
+(it-sequential "stdlib-identity"
   (assert-run= 42 "(identity 42)"))
 
 ;;; Setf Places Tests
 
-(deftest-each compile-setf-places
-  "setf on list places returns and mutates the correct value."
-  :cases (("car"         99 "(let ((pair (cons 1 2))) (setf (car pair) 99) (car pair))")
-          ("cdr"         99 "(let ((pair (cons 1 2))) (setf (cdr pair) 99) (cdr pair))")
-          ("first"       42 "(let ((lst (list 1 2 3))) (setf (first lst) 42) (first lst))")
-          ("rest"        42 "(let ((lst (list 1 2 3))) (setf (rest lst) (list 42)) (car (cdr lst)))")
-          ("second"      99 "(let ((lst (list 10 20 30))) (setf (second lst) 99) (car (cdr lst)))")
-          ("cadr"        88 "(let ((lst (list 10 20 30))) (setf (cadr lst) 88) (car (cdr lst)))")
-          ("cddr"        77 "(let ((lst (list 10 20 30))) (setf (cddr lst) (list 77)) (car (cdr (cdr lst))))")
-          ("caddr"       66 "(let ((lst (list 10 20 30))) (setf (caddr lst) 66) (car (cdr (cdr lst))))")
-          ("nth"         99 "(let ((lst (list 10 20 30))) (setf (nth 1 lst) 99) (nth 1 lst))")
-          ("returns-val" 42 "(let ((pair (cons 1 2))) (setf (car pair) 42))"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "compile-setf-places car"
+  (destructuring-bind (expected form) (list 99 "(let ((pair (cons 1 2))) (setf (car pair) 99) (car pair))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places cdr"
+  (destructuring-bind (expected form) (list 99 "(let ((pair (cons 1 2))) (setf (cdr pair) 99) (cdr pair))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places first"
+  (destructuring-bind (expected form) (list 42 "(let ((lst (list 1 2 3))) (setf (first lst) 42) (first lst))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places rest"
+  (destructuring-bind (expected form) (list 42 "(let ((lst (list 1 2 3))) (setf (rest lst) (list 42)) (car (cdr lst)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places second"
+  (destructuring-bind (expected form) (list 99 "(let ((lst (list 10 20 30))) (setf (second lst) 99) (car (cdr lst)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places cadr"
+  (destructuring-bind (expected form) (list 88 "(let ((lst (list 10 20 30))) (setf (cadr lst) 88) (car (cdr lst)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places cddr"
+  (destructuring-bind (expected form) (list 77 "(let ((lst (list 10 20 30))) (setf (cddr lst) (list 77)) (car (cdr (cdr lst))))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places caddr"
+  (destructuring-bind (expected form) (list 66 "(let ((lst (list 10 20 30))) (setf (caddr lst) 66) (car (cdr (cdr lst))))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places nth"
+  (destructuring-bind (expected form) (list 99 "(let ((lst (list 10 20 30))) (setf (nth 1 lst) 99) (nth 1 lst))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-setf-places returns-val"
+  (destructuring-bind (expected form) (list 42 "(let ((pair (cons 1 2))) (setf (car pair) 42))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
 ;;; Package System Tests
 
-(deftest-each compile-package-forms
-  "in-package and defpackage return their package keywords; subsequent forms evaluate normally."
-  :cases (("in-package"        :cl-cc   "(in-package :cl-cc)")
-          ("defpackage"        :test-pkg "(defpackage :test-pkg (:use :cl))")
-          ("in-package-then-code" 42   "(progn (in-package :cl-cc) 42)"))
-  (expected form)
-  (assert-equal expected (run-string form)))
+(it-sequential "compile-package-forms in-package"
+  (destructuring-bind (expected form) (list :cl-cc "(in-package :cl-cc)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-package-forms defpackage"
+  (destructuring-bind (expected form) (list :test-pkg "(defpackage :test-pkg (:use :cl))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-package-forms in-package-then-code"
+  (destructuring-bind (expected form) (list 42 "(progn (in-package :cl-cc) 42)")
+    (expect (run-string form) :to-equal expected)))
 
 ;;; Macrolet Tests
 
 ;;; Macrolet and Function Reference Tests (#'builtin)
 
-(deftest-each compile-macrolet-and-funcall
-  "macrolet scoped macros and #'builtin funcall return the expected numeric results."
-  :cases (("macrolet-basic"    6  "(macrolet ((double (x) `(+ ,x ,x))) (double 3))")
-          ("macrolet-multiple" 10 "(macrolet ((add1 (x) `(+ ,x 1)) (add2 (x) `(+ ,x 2))) (+ (add1 3) (add2 4)))")
-          ("macrolet-scoped"   42 "(let ((x 42)) (macrolet ((get-x () 'x)) (get-x)))")
-          ("macrolet-nested"    8 "(macrolet ((square (x) `(* ,x ,x))) (macrolet ((sq-plus-sq (a b) `(+ (square ,a) (square ,b)))) (sq-plus-sq 2 2)))")
-          ("funcall-car"        1 "(funcall #'car (cons 1 2))")
-          ("funcall-plus"       7 "(funcall #'+ 3 4)"))
-  (expected form)
-  (assert-= expected (run-string form)))
+(it-sequential "compile-macrolet-and-funcall macrolet-basic"
+  (destructuring-bind (expected form) (list 6 "(macrolet ((double (x) `(+ ,x ,x))) (double 3))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
 
-(deftest-each compile-function-sharpsign
-  "#'builtin creates callables usable with funcall and higher-order functions."
-  :cases (("cons-pair"  '(1 . 2) "(funcall #'cons 1 2)")
-          ("car-mapcar" '(1 2 3) "(mapcar #'car (list (cons 1 'a) (cons 2 'b) (cons 3 'c)))"))
-  (expected form)
-  (assert-equal expected (run-string form :stdlib t)))
+(it-sequential "compile-macrolet-and-funcall macrolet-multiple"
+  (destructuring-bind (expected form) (list 10 "(macrolet ((add1 (x) `(+ ,x 1)) (add2 (x) `(+ ,x 2))) (+ (add1 3) (add2 4)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-macrolet-and-funcall macrolet-scoped"
+  (destructuring-bind (expected form) (list 42 "(let ((x 42)) (macrolet ((get-x () 'x)) (get-x)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-macrolet-and-funcall macrolet-nested"
+  (destructuring-bind (expected form) (list 8 "(macrolet ((square (x) `(* ,x ,x))) (macrolet ((sq-plus-sq (a b) `(+ (square ,a) (square ,b)))) (sq-plus-sq 2 2)))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-macrolet-and-funcall funcall-car"
+  (destructuring-bind (expected form) (list 1 "(funcall #'car (cons 1 2))")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-macrolet-and-funcall funcall-plus"
+  (destructuring-bind (expected form) (list 7 "(funcall #'+ 3 4)")
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "compile-function-sharpsign cons-pair"
+  (destructuring-bind (expected form) (list '(1 . 2) "(funcall #'cons 1 2)")
+    (expect (run-string form :stdlib t) :to-equal expected)))
+
+(it-sequential "compile-function-sharpsign car-mapcar"
+  (destructuring-bind (expected form) (list '(1 2 3) "(mapcar #'car (list (cons 1 'a) (cons 2 'b) (cons 3 'c)))")
+    (expect (run-string form :stdlib t) :to-equal expected)))
 
 ;;; Warn Test
 
 ;;; String Concatenation Tests
 
-(deftest-each compile-string-concat
-  "string-concat and concatenate 'string join strings correctly."
-  :cases (("two-strings" "hello world" "(string-concat \"hello \" \"world\")")
-          ("concat-abc"  "abc"         "(concatenate 'string \"a\" \"b\" \"c\")")
-          ("concat-two"  "foobar"      "(concatenate 'string \"foo\" \"bar\")")
-          ("concat-one"  "hello"       "(concatenate 'string \"hello\")"))
-  (expected form)
-  (assert-string= expected (run-string form)))
+(it-sequential "compile-string-concat two-strings"
+  (destructuring-bind (expected form) (list "hello world" "(string-concat \"hello \" \"world\")")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-string-concat concat-abc"
+  (destructuring-bind (expected form) (list "abc" "(concatenate 'string \"a\" \"b\" \"c\")")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-string-concat concat-two"
+  (destructuring-bind (expected form) (list "foobar" "(concatenate 'string \"foo\" \"bar\")")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-string-concat concat-one"
+  (destructuring-bind (expected form) (list "hello" "(concatenate 'string \"hello\")")
+    (expect (run-string form) :to-equal expected)))
 
 ;;; Check-Type Tests
 
-(deftest-each compile-check-type
-  "check-type passes silently for correct type and signals error for wrong type."
-  :cases (("passes"
-           "(let ((x 42)) (check-type x integer))"
-           (lambda (form)
-             (assert-eq nil (run-string form))))
-          ("errors"
-           "(let ((x \"hello\")) (check-type x integer))"
-           (lambda (form)
-             (assert-signals error (run-string form)))))
-  (form verify)
-  (funcall verify form))
+(it-sequential "compile-check-type passes"
+  (destructuring-bind (form verify) (list "(let ((x 42)) (check-type x integer))" (lambda (form)
+             (expect (run-string form) :to-be nil)))
+    (funcall verify form)))
 
-(deftest-each compile-correctable-type-restarts
-  "check-type, ccase, and ctypecase honor STORE-VALUE restarts."
-  :cases (("check-type-store-value"
-           7
-           "(let ((x \"bad\")) (handler-bind ((type-error (lambda (c) (declare (ignore c)) (store-value 7)))) (check-type x integer) x))")
-          ("ccase-store-value"
-           11
-           "(let ((x 'bad)) (handler-bind ((type-error (lambda (c) (declare (ignore c)) (store-value 'ok)))) (ccase x (ok 11))))")
-          ("ctypecase-store-value"
-           42
-           "(let ((x \"bad\")) (handler-bind ((type-error (lambda (c) (declare (ignore c)) (store-value 42)))) (ctypecase x (integer x))))"))
-  (expected form)
-  (assert-= expected (run-string form :stdlib t)))
+(it-sequential "compile-check-type errors"
+  (destructuring-bind (form verify) (list "(let ((x \"hello\")) (check-type x integer))" (lambda (form)
+             (let ((%%signaled1 nil)) (handler-case (progn (run-string form)) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))))
+    (funcall verify form)))
 
-(deftest compile-handler-bind-handler-runs-for-signal
-  "A handler-bind handler runs when the body signals.
+(it-sequential "compile-correctable-type-restarts check-type-store-value"
+  (destructuring-bind (expected form) (list 7 "(let ((x \"bad\")) (handler-bind ((type-error (lambda (c) (declare (ignore c)) (store-value 7)))) (check-type x integer) x))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
 
-HANDLER-BIND pushes its handlers onto *%CONDITION-HANDLERS*, but the macro named
-that variable with a :CL-CC/EXPAND symbol while the stdlib DEFVARs a :CL-CC one
-and *VM-INITIAL-GLOBALS* seeds a :CL-CC/VM one — three distinct symbols, so PROGV
-bound one binding and every reader looked at another. The list always read empty
-and no handler ever ran."
-  (assert-= 1 (run-string
+(it-sequential "compile-correctable-type-restarts ccase-store-value"
+  (destructuring-bind (expected form) (list 11 "(let ((x 'bad)) (handler-bind ((type-error (lambda (c) (declare (ignore c)) (store-value 'ok)))) (ccase x (ok 11))))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "compile-correctable-type-restarts ctypecase-store-value"
+  (destructuring-bind (expected form) (list 42 "(let ((x \"bad\")) (handler-bind ((type-error (lambda (c) (declare (ignore c)) (store-value 42)))) (ctypecase x (integer x))))")
+    (expect (= expected (run-string form :stdlib t)) :to-be-truthy)))
+
+(it-sequential "compile-handler-bind-handler-runs-for-signal"
+  (expect (= 1 (run-string
                "(let ((n 0)) (handler-bind ((error (lambda (c) (setq n 1))))
                                (signal \"e\"))
                   n)"
-               :stdlib t)))
+               :stdlib t)) :to-be-truthy))
 
-(deftest compile-handler-bind-handler-runs-for-error
-  "A handler-bind handler runs when the body signals with ERROR, not just SIGNAL.
-
-Only the SIGNAL macro walked *%CONDITION-HANDLERS*; ERROR lowers to
-VM-SIGNAL-ERROR, which consults the exception table and the handler stack. ANSI
-uses HANDLER-BIND mostly with ERROR, so the whole facility was inert there."
-  (assert-= 1 (run-string
+(it-sequential "compile-handler-bind-handler-runs-for-error"
+  (expect (= 1 (run-string
                "(let ((n 0)) (handler-bind ((error (lambda (c) (setq n 1))))
                                (ignore-errors (error \"e\")))
                   n)"
-               :stdlib t)))
+               :stdlib t)) :to-be-truthy))
 
-(deftest compile-cerror-is-caught-by-handler-case
-  "A continuable error reaches an enclosing handler-case.
-
-VM-CERROR used to resolve handlers with VM-FIND-HANDLER, which walks only the
-handler stack. HANDLER-CASE registers PC ranges in the zero-cost exception table
-instead, so no HANDLER-CASE ever saw a continuable error and this form fell
-through to :NO."
-  (assert-eq :caught
-             (run-string "(handler-case (progn (assert (= 1 2)) :no)
+(it-sequential "compile-cerror-is-caught-by-handler-case"
+  (expect (run-string "(handler-case (progn (assert (= 1 2)) :no)
                             (error () :caught))"
-                         :stdlib t)))
+                         :stdlib t) :to-be :caught))
 
-(deftest compile-cerror-continues-when-unhandled
-  "An unhandled continuable error returns, so execution proceeds past it."
-  (assert-eq :after
-             (run-string "(progn (assert (= 1 2)) :after)" :stdlib t)))
+(it-sequential "compile-cerror-continues-when-unhandled"
+  (expect (run-string "(progn (assert (= 1 2)) :after)" :stdlib t) :to-be :after))
 
-(deftest compile-assert-place-restarts
-  "assert uses STORE-VALUE restarts to update listed places and re-check the test."
+(it-sequential "compile-assert-place-restarts"
   (let ((result
           (run-string
            "(let ((x 1) (y 2))
@@ -279,23 +341,28 @@ through to :NO."
     (assert (= (+ x y) 11) (x y))
     (list x y)))"
            :stdlib t)))
-    (assert-equal '(5 6) result)))
+    (expect result :to-equal '(5 6))))
 
 ;;; Eval-When Tests
 
-(deftest-each compile-eval-when-numeric
-  "eval-when :execute/:load-toplevel includes body and returns numeric value."
-  :cases (("execute"       42 "(eval-when (:execute) 42)")
-          ("load-toplevel" 10 "(eval-when (:load-toplevel :execute) (+ 3 7))")
-          ("all"            5 "(eval-when (:compile-toplevel :load-toplevel :execute) 5)"))
-  (expected form)
-  (handler-bind ((warning #'muffle-warning))
-    (assert-= expected (run-string form))))
+(it-sequential "compile-eval-when-numeric execute"
+  (destructuring-bind (expected form) (list 42 "(eval-when (:execute) 42)")
+    (handler-bind ((warning #'muffle-warning))
+    (expect (= expected (run-string form)) :to-be-truthy))))
 
-(deftest compile-eval-when-skip
-  "eval-when without :execute skips body"
+(it-sequential "compile-eval-when-numeric load-toplevel"
+  (destructuring-bind (expected form) (list 10 "(eval-when (:load-toplevel :execute) (+ 3 7))")
+    (handler-bind ((warning #'muffle-warning))
+    (expect (= expected (run-string form)) :to-be-truthy))))
+
+(it-sequential "compile-eval-when-numeric all"
+  (destructuring-bind (expected form) (list 5 "(eval-when (:compile-toplevel :load-toplevel :execute) 5)")
+    (handler-bind ((warning #'muffle-warning))
+    (expect (= expected (run-string form)) :to-be-truthy))))
+
+(it-sequential "compile-eval-when-skip"
   (handler-bind ((warning #'muffle-warning))
-    (assert-eq nil (run-string "(eval-when (:compile-toplevel) 42)"))))
+    (expect (run-string "(eval-when (:compile-toplevel) 42)") :to-be nil)))
 
 ;;; Property List and Set Operations Tests
 
@@ -312,10 +379,14 @@ through to :NO."
 
 ;;; Eval Tests
 
-(deftest-each our-eval-numeric
-  "our-eval compiles and runs arithmetic, lambda, and let forms."
-  :cases (("basic"  42 '(+ 20 22))
-          ("lambda" 10 '(funcall (lambda (x) (+ x 3)) 7))
-          ("let"    15 '(let ((a 5) (b 10)) (+ a b))))
-  (expected form)
-  (assert-= expected (our-eval form)))
+(it-sequential "our-eval-numeric basic"
+  (destructuring-bind (expected form) (list 42 '(+ 20 22))
+    (expect (= expected (our-eval form)) :to-be-truthy)))
+
+(it-sequential "our-eval-numeric lambda"
+  (destructuring-bind (expected form) (list 10 '(funcall (lambda (x) (+ x 3)) 7))
+    (expect (= expected (our-eval form)) :to-be-truthy)))
+
+(it-sequential "our-eval-numeric let"
+  (destructuring-bind (expected form) (list 15 '(let ((a 5) (b 10)) (+ a b)))
+    (expect (= expected (our-eval form)) :to-be-truthy)))

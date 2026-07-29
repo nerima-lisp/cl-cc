@@ -2,47 +2,40 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macro-shiftf-suite
-  :description "SHIFTF expansion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macro-shiftf-suite)
 
-(deftest shiftf-two-place-structure
-  "SHIFTF (shiftf place newval) expands to LET + SETF returning old value"
+(it-sequential "shiftf-two-place-structure"
   (let ((result (our-macroexpand-1 '(shiftf x 99))))
-    (assert-eq (car result) 'let)
-    (assert-= (length (cadr result)) 1)
-    (assert-eq (cadr (caadr result)) 'x)
-    (assert-eq (car (caddr result)) 'setf)
-    (assert-eq (cadr (caddr result)) 'x)
+    (expect 'let :to-be (car result))
+    (expect (= (length (cadr result)) 1) :to-be-truthy)
+    (expect 'x :to-be (cadr (caadr result)))
+    (expect 'setf :to-be (car (caddr result)))
+    (expect 'x :to-be (cadr (caddr result)))
     (let ((tmp-var (first (caadr result))))
-      (assert-eq (car (last result)) tmp-var))))
+      (expect tmp-var :to-be (car (last result))))))
 
-(deftest shiftf-returns-first-old-value
-  "SHIFTF returns the old value of the first place (the leading temp)"
+(it-sequential "shiftf-returns-first-old-value"
   (let ((result (our-macroexpand-1 '(shiftf a b 0))))
     (let ((first-temp (first (caadr result))))
-      (assert-eq (car (last result)) first-temp))))
+      (expect first-temp :to-be (car (last result))))))
 
-(deftest shiftf-three-place-chain
-  "SHIFTF with three places shifts values through a chain"
+(it-sequential "shiftf-three-place-chain"
   (let ((result (our-macroexpand-1 '(shiftf a b c 0))))
-    (assert-eq (car result) 'let)
-    (assert-= (length (cadr result)) 3)
-    (assert-eq (car (caddr result)) 'setf)
-    (assert-eq (car (cadddr result)) 'setf)
+    (expect 'let :to-be (car result))
+    (expect (= (length (cadr result)) 3) :to-be-truthy)
+    (expect 'setf :to-be (car (caddr result)))
+    (expect 'setf :to-be (car (cadddr result)))
     (let ((first-temp (first (caadr result))))
-      (assert-eq (car (last result)) first-temp))))
+      (expect first-temp :to-be (car (last result))))))
 
-(deftest-each shiftf-insufficient-args-signals-error
-  "SHIFTF signals an error when called with fewer than two arguments."
-  :cases (("no-args"  '(shiftf))
-          ("one-arg"  '(shiftf x)))
-  (form)
-  (assert-signals error (our-macroexpand-1 form)))
+(it-sequential "shiftf-insufficient-args-signals-error no-args"
+  (destructuring-bind (form) (list '(shiftf))
+    (signals error (our-macroexpand-1 form))))
 
-(deftest integration-shiftf-full-expansion
-  "Full expansion of SHIFTF does not contain the SHIFTF symbol"
+(it-sequential "shiftf-insufficient-args-signals-error one-arg"
+  (destructuring-bind (form) (list '(shiftf x))
+    (signals error (our-macroexpand-1 form))))
+
+(it-sequential "integration-shiftf-full-expansion"
   (let ((result (our-macroexpand '(shiftf a b 0))))
-    (assert-false (search "shiftf" (string-downcase (format nil "~S" result))))))
+    (expect (search "shiftf" (string-downcase (format nil "~S" result))) :to-be-falsy)))

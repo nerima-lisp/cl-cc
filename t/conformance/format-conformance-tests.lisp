@@ -6,12 +6,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite ansi-conformance-format-suite
-  :description "ANSI CL FORMAT Directive Conformance Tests"
-  :parent cl-cc-conformance-suite
-  :parallel nil)
 
-(in-suite ansi-conformance-format-suite)
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Helper
@@ -33,223 +28,143 @@
 ;;; Basic Output Directives
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest format-tilde-a-self-host
-  "~A should print values aesthetically without host CL fallback."
-  :timeout 30
-  :tags '(:format :tilde-a :self-host)
+(it-sequential "format-tilde-a-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "hello 42"
-                  (fmt-run "~A ~A" "hello" 42))))
+    (expect (fmt-run "~A ~A" "hello" 42) :to-equal "hello 42")))
 
-(deftest format-tilde-s-self-host
-  "~S should print values with escaping without host CL fallback."
-  :timeout 30
-  :tags '(:format :tilde-s :self-host)
+(it-sequential "format-tilde-s-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "\"hello\" 42"
-                  (fmt-run "~S ~S" "hello" 42))))
+    (expect (fmt-run "~S ~S" "hello" 42) :to-equal "\"hello\" 42")))
 
-(deftest format-tilde-percent-self-host
-  "~% should emit newline without host CL."
-  :timeout 30
-  :tags '(:format :tilde-percent :self-host)
+(it-sequential "format-tilde-percent-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal (format nil "a~%b")
-                  (fmt-run "a~%b"))))
+    (expect (fmt-run "a~%b") :to-equal (format nil "a~%b"))))
 
-(deftest format-tilde-ampersand-self-host
-  "~& should emit fresh-line without host CL."
-  :timeout 30
-  :tags '(:format :tilde-ampersand :self-host)
+(it-sequential "format-tilde-ampersand-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     ;; ~& at start should not emit extra newline
-    (assert-equal "" (fmt-run "~&"))))
+    (expect (fmt-run "~&") :to-equal "")))
 
-(deftest format-tilde-tilde-self-host
-  "~~ should emit literal tilde without host CL."
-  :timeout 30
-  :tags '(:format :tilde-tilde :self-host)
+(it-sequential "format-tilde-tilde-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "~" (fmt-run "~~"))))
+    (expect (fmt-run "~~") :to-equal "~")))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Numeric Directives
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest format-tilde-d-self-host
-  "~D should print decimal integers without host CL."
-  :timeout 30
-  :tags '(:format :tilde-d :self-host)
+(it-sequential "format-tilde-d-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "42" (fmt-run "~D" 42))
-    (assert-equal "-1" (fmt-run "~D" -1))))
+    (expect (fmt-run "~D" 42) :to-equal "42")
+    (expect (fmt-run "~D" -1) :to-equal "-1")))
 
-(deftest format-tilde-b-self-host
-  "~B should print binary integers without host CL."
-  :timeout 30
-  :tags '(:format :tilde-b :self-host)
+(it-sequential "format-tilde-b-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "101010" (fmt-run "~B" 42))))
+    (expect (fmt-run "~B" 42) :to-equal "101010")))
 
-(deftest format-tilde-o-self-host
-  "~O should print octal integers without host CL."
-  :timeout 30
-  :tags '(:format :tilde-o :self-host)
+(it-sequential "format-tilde-o-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "52" (fmt-run "~O" 42))))
+    (expect (fmt-run "~O" 42) :to-equal "52")))
 
-(deftest format-tilde-x-self-host
-  "~X should print hexadecimal integers without host CL."
-  :timeout 30
-  :tags '(:format :tilde-x :self-host)
+(it-sequential "format-tilde-x-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "2A" (fmt-run "~X" 42))))
+    (expect (fmt-run "~X" 42) :to-equal "2A")))
 
-(deftest format-tilde-r-self-host
-  "~R should print Roman/English numerals without host CL."
-  :timeout 30
-  :tags '(:format :tilde-r :self-host)
+(it-sequential "format-tilde-r-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     ;; ~R with no arg prints cardinal English
-    (assert-equal "forty-two" (fmt-run "~R" 42))))
+    (expect (fmt-run "~R" 42) :to-equal "forty-two")))
 
-(deftest format-tilde-f-self-host
-  "~F should print floating-point numbers without host CL."
-  :timeout 30
-  :tags '(:format :tilde-f :self-host)
+(it-sequential "format-tilde-f-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "3.14" (fmt-run "~F" 3.14))))
+    (expect (fmt-run "~F" 3.14) :to-equal "3.14")))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Control Flow Directives
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest format-tilde-asterisk-self-host
-  "~* should jump arguments without host CL."
-  :timeout 30
-  :tags '(:format :tilde-asterisk :self-host)
+(it-sequential "format-tilde-asterisk-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     ;; ~* skips one arg, ~:* backs up
-    (assert-equal "2" (fmt-run "~*~D" 1 2))))
+    (expect (fmt-run "~*~D" 1 2) :to-equal "2")))
 
-(deftest format-tilde-question-self-host
-  "~? should do recursive formatting without host CL."
-  :timeout 30
-  :tags '(:format :tilde-question :self-host)
+(it-sequential "format-tilde-question-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "hello" (fmt-run "~?" "~A" "hello"))))
+    (expect (fmt-run "~?" "~A" "hello") :to-equal "hello")))
 
-(deftest format-tilde-bracket-self-host
-  "~[ should do conditional formatting without host CL."
-  :timeout 30
-  :tags '(:format :tilde-bracket :self-host)
+(it-sequential "format-tilde-bracket-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "zero" (fmt-run "~[zero~;one~;two~]" 0))
-    (assert-equal "one" (fmt-run "~[zero~;one~;two~]" 1))))
+    (expect (fmt-run "~[zero~;one~;two~]" 0) :to-equal "zero")
+    (expect (fmt-run "~[zero~;one~;two~]" 1) :to-equal "one")))
 
-(deftest format-tilde-brace-self-host
-  "~{ should iterate over list without host CL."
-  :timeout 30
-  :tags '(:format :tilde-brace :self-host)
+(it-sequential "format-tilde-brace-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "abc" (fmt-run "~{~A~}" '("a" "b" "c")))))
+    (expect (fmt-run "~{~A~}" '("a" "b" "c")) :to-equal "abc")))
 
-(deftest format-tilde-caret-self-host
-  "~^ should escape on missing args without host CL."
-  :timeout 30
-  :tags '(:format :tilde-caret :self-host)
+(it-sequential "format-tilde-caret-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     ;; ~^ inside ~{ suppresses the trailing separator on the LAST element only:
     ;; ~{~A~^, ~} is the canonical comma-join, so this is "a, b, c" (not "ab" —
     ;; the previous expectation encoded a bug where plain ~^ always terminated,
     ;; dropping every separator and the final element).
-    (assert-equal "a, b, c"
-                  (fmt-run "~{~A~^, ~}" '("a" "b" "c")))))
+    (expect (fmt-run "~{~A~^, ~}" '("a" "b" "c")) :to-equal "a, b, c")))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; format nil (return as string)
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest format-nil-self-host
-  "(format nil ...) should return formatted string without host CL."
-  :timeout 30
-  :tags '(:format :nil-destination :self-host)
+(it-sequential "format-nil-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t)
         (result (cl-cc:run-string "(format nil \"hello ~A\" \"world\")")))
-    (assert-equal "hello world" result)))
+    (expect result :to-equal "hello world")))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Format Edge Cases
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest format-tilde-t-self-host
-  "~T should tabulate without host CL."
-  :timeout 30
-  :tags '(:format :tilde-t :self-host)
+(it-sequential "format-tilde-t-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     ;; ~4T should tab to column 4
-    (assert-equal "    x" (fmt-run "~4Tx"))))
+    (expect (fmt-run "~4Tx") :to-equal "    x")))
 
-(deftest format-tab-after-rendered-directives-self-host
-  "~T should use the current output column after other native directives."
-  :timeout 30
-  :tags '(:format :tilde-t :self-host)
+(it-sequential "format-tab-after-rendered-directives-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "12  !" (fmt-run "~D~4T!" 12))
-    (assert-equal "A   !" (fmt-run "~C~4T!" #\A))
-    (assert-equal "1.5   !" (fmt-run "~F~6T!" 1.5))))
+    (expect (fmt-run "~D~4T!" 12) :to-equal "12  !")
+    (expect (fmt-run "~C~4T!" #\A) :to-equal "A   !")
+    (expect (fmt-run "~F~6T!" 1.5) :to-equal "1.5   !")))
 
-(deftest format-tilde-p-self-host
-  "~P should pluralize without host CL."
-  :timeout 30
-  :tags '(:format :tilde-p :self-host)
+(it-sequential "format-tilde-p-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "1 dog" (fmt-run "~D dog~:P" 1))
-    (assert-equal "2 dogs" (fmt-run "~D dog~:P" 2))))
+    (expect (fmt-run "~D dog~:P" 1) :to-equal "1 dog")
+    (expect (fmt-run "~D dog~:P" 2) :to-equal "2 dogs")))
 
-(deftest format-tilde-c-self-host
-  "~C should format characters without host CL."
-  :timeout 30
-  :tags '(:format :tilde-c :self-host)
+(it-sequential "format-tilde-c-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "A" (fmt-run "~C" #\A))))
+    (expect (fmt-run "~C" #\A) :to-equal "A")))
 
-(deftest format-case-conversion-self-host
-  "~(...~) should apply ANSI case conversion without host CL fallback."
-  :timeout 30
-  :tags '(:format :case-conversion :self-host)
+(it-sequential "format-case-conversion-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "hello world" (fmt-run "~(~A~)" "HELLO WORLD"))
-    (assert-equal "Hello World" (fmt-run "~:(~A~)" "hello world"))
-    (assert-equal "Hello world" (fmt-run "~@(~A~)" "hello world"))
-    (assert-equal "HELLO WORLD" (fmt-run "~:@(~A~)" "hello world"))))
+    (expect (fmt-run "~(~A~)" "HELLO WORLD") :to-equal "hello world")
+    (expect (fmt-run "~:(~A~)" "hello world") :to-equal "Hello World")
+    (expect (fmt-run "~@(~A~)" "hello world") :to-equal "Hello world")
+    (expect (fmt-run "~:@(~A~)" "hello world") :to-equal "HELLO WORLD")))
 
-(deftest format-at-modifier-self-host
-  "~@D should always print sign."
-  :timeout 30
-  :tags '(:format :at-modifier :self-host)
+(it-sequential "format-at-modifier-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "+42" (fmt-run "~@D" 42))
-    (assert-equal "-1" (fmt-run "~@D" -1))))
+    (expect (fmt-run "~@D" 42) :to-equal "+42")
+    (expect (fmt-run "~@D" -1) :to-equal "-1")))
 
-(deftest format-colon-modifier-self-host
-  "~:D should print with commas."
-  :timeout 30
-  :tags '(:format :colon-modifier :self-host)
+(it-sequential "format-colon-modifier-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
-    (assert-equal "1,000" (fmt-run "~:D" 1000))))
+    (expect (fmt-run "~:D" 1000) :to-equal "1,000")))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Native Binary FORMAT
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest format-native-binary-e2e
-  "FORMAT should work in native-compiled code (not just VM interpreter)."
-  :timeout 60
-  :tags '(:format :native :e2e)
-  ;; Compile a simple program that uses FORMAT and run it
+(it-sequential "format-native-binary-e2e"
   (let ((result (cl-cc:run-string
                  "(let ((out (make-string-output-stream)))
                     (format out \"Hello ~A!\" \"World\")
                     (get-output-stream-string out))")))
-    (assert-equal "Hello World!" result)))
+    (expect result :to-equal "Hello World!")))

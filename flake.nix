@@ -96,7 +96,7 @@
       flake = false;
     };
     cl-cc-vm = {
-      url = "github:nerima-lisp/cl-cc-vm/e1ea6bc28b80366cd814afa4a375f438604037ce";
+      url = "github:nerima-lisp/cl-cc-vm/d68bccc0ca8b6241bf75ced5c118a26b2db8a246";
       flake = false;
     };
     cl-cc-ir = {
@@ -116,11 +116,11 @@
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/f26060c1cb6e0aecdf664a5894665265a9990747";
+      url = "github:nerima-lisp/cl-cc-optimize/f29d8bc377a72c4d6ad2461a94e57438d0d498c5";
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/ca82ba30a874e51e00dcc3a603ab024e341a81f0";
+      url = "github:nerima-lisp/cl-cc-codegen-native/59f3ab8c414c16d90d0a1237d6e62d1f4f5623c9";
       flake = false;
     };
     cl-cc-parse = {
@@ -128,7 +128,7 @@
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/f7ee5d7d09a1f24da7ad630be6ddcd0178342f06";
+      url = "github:nerima-lisp/cl-cc-php/c8c597fced94d67a64e67a677a9fc2e0903c1dc7";
       flake = false;
     };
     cl-cc-javascript = {

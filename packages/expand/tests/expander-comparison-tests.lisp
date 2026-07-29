@@ -2,114 +2,144 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-comparison-suite
-  :description "Numeric and character comparison expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-comparison-suite)
 
 ;;; ─── = / < / > / <= / >= (numeric comparison chaining) ─────────────────
 
-(deftest-each expander-numeric-cmp-zero-arg-error
-  "0-arg numeric comparison operators signal an error."
-  :cases (("eq"  '(=))
-          ("lt"  '(<))
-          ("gt"  '(>))
-          ("lte" '(<=))
-          ("gte" '(>=)))
-  (form)
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-numeric-cmp-zero-arg-error eq"
+  (destructuring-bind (form) (list '(=))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest-each expander-numeric-cmp-unary-returns-t
-  "1-arg numeric comparison operators return T."
-  :cases (("eq"  '(= x)  t)
-          ("lt"  '(< x)  t)
-          ("gt"  '(> x)  t)
-          ("lte" '(<= x) t)
-          ("gte" '(>= x) t))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-numeric-cmp-zero-arg-error lt"
+  (destructuring-bind (form) (list '(<))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest-each expander-numeric-cmp-binary-builtin
-  "2-arg numeric comparison operators produce the binary form."
-  :cases (("eq"  '(= a b)  '(= a b))
-          ("lt"  '(< a b)  '(< a b))
-          ("lte" '(<= a b) '(<= a b)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-numeric-cmp-zero-arg-error gt"
+  (destructuring-bind (form) (list '(>))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest expander-numeric-cmp-nary-chain
-  "3-arg = expands into a chain of pairwise comparisons."
+(it-sequential "expander-numeric-cmp-zero-arg-error lte"
+  (destructuring-bind (form) (list '(<=))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
+
+(it-sequential "expander-numeric-cmp-zero-arg-error gte"
+  (destructuring-bind (form) (list '(>=))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
+
+(it-sequential "expander-numeric-cmp-unary-returns-t eq"
+  (destructuring-bind (form expected) (list '(= x) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-unary-returns-t lt"
+  (destructuring-bind (form expected) (list '(< x) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-unary-returns-t gt"
+  (destructuring-bind (form expected) (list '(> x) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-unary-returns-t lte"
+  (destructuring-bind (form expected) (list '(<= x) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-unary-returns-t gte"
+  (destructuring-bind (form expected) (list '(>= x) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-binary-builtin eq"
+  (destructuring-bind (form expected) (list '(= a b) '(= a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-binary-builtin lt"
+  (destructuring-bind (form expected) (list '(< a b) '(< a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-binary-builtin lte"
+  (destructuring-bind (form expected) (list '(<= a b) '(<= a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-cmp-nary-chain"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(= a b c))))
     ;; let-binding wrapper with AND/IF chain
-    (assert-true (member (car result) '(let if and)))))
+    (expect (member (car result) '(let if and)) :to-be-truthy)))
 
 ;;; ─── /= (not-equal, all-distinct) ────────────────────────────────────────
 
-(deftest expander-neq-zero-arg-signals-error
-  "0-arg /= signals an error."
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all '(/=))))
+(it-sequential "expander-neq-zero-arg-signals-error"
+  (signals error (cl-cc/expand:compiler-macroexpand-all '(/=))))
 
-(deftest expander-neq-unary-returns-t
-  "1-arg /= returns T."
-  (assert-equal t (cl-cc/expand:compiler-macroexpand-all '(/= x))))
+(it-sequential "expander-neq-unary-returns-t"
+  (expect (cl-cc/expand:compiler-macroexpand-all '(/= x)) :to-equal t))
 
-(deftest expander-neq-binary-expands-to-not-eq
-  "2-arg /= expands to (not (= a b))."
+(it-sequential "expander-neq-binary-expands-to-not-eq"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(/= a b))))
-    (assert-eq 'not (first result))
-    (assert-eq '= (car (second result)))))
+    (expect (first result) :to-be 'not)
+    (expect (car (second result)) :to-be '=)))
 
-(deftest expander-neq-nary-generates-let-with-pairs
-  "3-arg /= expands to nested IF checks over pairwise inequality."
+(it-sequential "expander-neq-nary-generates-let-with-pairs"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(/= a b c))))
     ;; Top level must be (let ...)
-    (assert-eq 'let (first result))
+    (expect (first result) :to-be 'let)
     ;; Body should start with nested IF checks over pairwise (/=) expansion.
     (let ((body (third result)))
-      (assert-eq 'if (first body)))))
+      (expect (first body) :to-be 'if))))
 
 ;;; ─── char comparison chaining ────────────────────────────────────────────
 
-(deftest-each expander-char-cmp-zero-arg-error
-  "0-arg character comparison operators signal an error."
-  :cases (("char="  '(char=))
-          ("char<"  '(char<))
-          ("char<=" '(char<=)))
-  (form)
-  (assert-signals error (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-char-cmp-zero-arg-error char="
+  (destructuring-bind (form) (list '(char=))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest-each expander-char-cmp-unary-returns-t
-  "1-arg character comparison operators return T."
-  :cases (("char="      '(char= c)      t)
-          ("char-equal" '(char-equal c) t))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-char-cmp-zero-arg-error char<"
+  (destructuring-bind (form) (list '(char<))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
 
-(deftest-each expander-char-cmp-binary-builtin
-  "2-arg character comparison operators produce the binary form."
-  :cases (("char="  '(char= a b)  '(char= a b))
-          ("char<"  '(char< a b)  '(char< a b))
-          ("char-lessp" '(char-lessp a b) '(char-lessp a b)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-char-cmp-zero-arg-error char<="
+  (destructuring-bind (form) (list '(char<=))
+    (signals error (cl-cc/expand:compiler-macroexpand-all form))))
+
+(it-sequential "expander-char-cmp-unary-returns-t char="
+  (destructuring-bind (form expected) (list '(char= c) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-char-cmp-unary-returns-t char-equal"
+  (destructuring-bind (form expected) (list '(char-equal c) t)
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-char-cmp-binary-builtin char="
+  (destructuring-bind (form expected) (list '(char= a b) '(char= a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-char-cmp-binary-builtin char<"
+  (destructuring-bind (form expected) (list '(char< a b) '(char< a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-char-cmp-binary-builtin char-lessp"
+  (destructuring-bind (form expected) (list '(char-lessp a b) '(char-lessp a b))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
 
 ;;; ─── expander-numeric-identity-and-unary (original tests kept) ──────────
 
-(deftest expander-numeric-comparison-chain-uses-temporaries
-  "Variadic comparisons expand into chained comparisons with temporary bindings."
+(it-sequential "expander-numeric-comparison-chain-uses-temporaries"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(= a b c))))
-    (assert-eq 'let (car result))
+    (expect (car result) :to-be 'let)
     (let ((body (caddr result)))
-      (assert-eq 'if (car body))
-      (assert-eq '= (car (second body)))
-      (assert-eq '= (car (third body))))))
+      (expect (car body) :to-be 'if)
+      (expect (car (second body)) :to-be '=)
+      (expect (car (third body)) :to-be '=))))
 
-(deftest-each expander-numeric-arity-normalization
-  "log, float-sign, and float normalize their arities."
-  :cases (("log-1"        '(log x)         '(log x))
-          ("log-2"        '(log x y)        '(/ (log x) (log y)))
-          ("float-sign-2" '(float-sign x y) '(* (float-sign x) (abs y)))
-          ("float-2"      '(float x y)      '(float x)))
-  (form expected)
-  (assert-equal expected (cl-cc/expand:compiler-macroexpand-all form)))
+(it-sequential "expander-numeric-arity-normalization log-1"
+  (destructuring-bind (form expected) (list '(log x) '(log x))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-arity-normalization log-2"
+  (destructuring-bind (form expected) (list '(log x y) '(/ (log x) (log y)))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-arity-normalization float-sign-2"
+  (destructuring-bind (form expected) (list '(float-sign x y) '(* (float-sign x) (abs y)))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))
+
+(it-sequential "expander-numeric-arity-normalization float-2"
+  (destructuring-bind (form expected) (list '(float x y) '(float x))
+    (expect (cl-cc/expand:compiler-macroexpand-all form) :to-equal expected)))

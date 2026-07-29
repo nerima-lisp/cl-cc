@@ -1,5 +1,4 @@
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defun idiom-zero-fill-loop ()
   (list (make-vm-const :dst :rzero :value 0)
@@ -59,32 +58,27 @@
         (make-vm-jump :label "Lstrlen")
         (make-vm-label :name "Lstrlen-exit")))
 
-(deftest fr-684-memset-recognition-collapses-zero-fill-loop
-  "FR-684: canonical dotimes zero fill is recognized as a memset/fill idiom."
+(it-sequential "fr-684-memset-recognition-collapses-zero-fill-loop"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-zero-fill-loop))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-fill)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-fill)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-falsy)))
 
-(deftest fr-684-memcpy-recognition-collapses-unit-stride-copy-loop
-  "FR-684: canonical unit-stride aref/aset copy is recognized as memcpy."
+(it-sequential "fr-684-memcpy-recognition-collapses-unit-stride-copy-loop"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-copy-loop))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-copy-vector)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-copy-vector)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-falsy)))
 
-(deftest fr-684-memcpy-recognition-skips-strided-copy-loop
-  "FR-684: strided copy loops are not rewritten as memcpy."
+(it-sequential "fr-684-memcpy-recognition-skips-strided-copy-loop"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-copy-loop :strided-p t))))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-copy-vector)) result))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-copy-vector)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-truthy)))
 
-(deftest fr-684-popcount-recognition-emits-logcount
-  "FR-684: Kernighan bit-counting loop becomes vm-logcount for POPCNT/CNT lowering."
+(it-sequential "fr-684-popcount-recognition-emits-logcount"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-popcount-loop))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-logcount)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logcount)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) result) :to-be-falsy)))
 
-(deftest fr-684-strlen-recognition-emits-string-length
-  "FR-684: loop counting until #\\Nul becomes vm-string-length."
+(it-sequential "fr-684-strlen-recognition-emits-string-length"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-strlen-loop))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-string-length)) result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-char)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-string-length)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-char)) result) :to-be-falsy)))

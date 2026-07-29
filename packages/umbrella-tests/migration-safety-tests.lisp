@@ -17,11 +17,7 @@
 ;;; Suite
 ;;; ----------------------------------------------------------------
 
-(defsuite migration-safety-suite
-  :description "Symbol identity invariants for package-by-feature migration"
-  :parent cl-cc-unit-suite)
 
-(in-suite migration-safety-suite)
 
 ;;; ----------------------------------------------------------------
 ;;; A. Bootstrap symbol identity
@@ -31,8 +27,7 @@
 ;;; Prolog engine and compiler see different symbols and silently fail
 ;;; to unify terms.
 
-(deftest bootstrap-symbol-identity
-  "All 12 pre-interned bootstrap symbols must be eq in :cl-cc and :cl-cc/bootstrap."
+(it-sequential "bootstrap-symbol-identity"
   (dolist (name '("BINOP" "CONST" "VAR" "CMP"
                   "INTEGER-TYPE" "BOOLEAN-TYPE"
                   "ENV-LOOKUP" "MAKE-CST-TOKEN"
@@ -41,10 +36,10 @@
     (let ((cl-cc-sym   (find-symbol name :cl-cc))
           (boot-sym    (find-symbol name :cl-cc/bootstrap)))
       ;; Both packages must have the symbol at all.
-      (assert-true cl-cc-sym)
-      (assert-true boot-sym)
+      (expect cl-cc-sym :to-be-truthy)
+      (expect boot-sym :to-be-truthy)
       ;; And it must be the exact same object.
-      (assert-eq boot-sym cl-cc-sym))))
+      (expect cl-cc-sym :to-be boot-sym))))
 
 ;;; ----------------------------------------------------------------
 ;;; B. AST type export verification
@@ -54,8 +49,7 @@
 ;;; :inherited, a future `in-package :cl-cc/compile` would shadow it,
 ;;; breaking method dispatch on that specializer.
 
-(deftest ast-types-exported
-  "All 38 AST types used as defmethod specializers must be exported from :cl-cc/ast."
+(it-sequential "ast-types-exported"
   (dolist (name '("AST-INT" "AST-VAR" "AST-BINOP" "AST-IF" "AST-LET"
                   "AST-LAMBDA" "AST-DEFUN" "AST-DEFCLASS" "AST-DEFGENERIC"
                   "AST-DEFMETHOD" "AST-MAKE-INSTANCE" "AST-SLOT-VALUE"
@@ -70,8 +64,8 @@
                   "AST-MULTIPLE-VALUE-CALL"))
     (multiple-value-bind (sym status)
         (find-symbol name :cl-cc/ast)
-      (assert-true sym)
-      (assert-eq :external status))))
+      (expect sym :to-be-truthy)
+      (expect status :to-be :external))))
 
 ;;; ----------------------------------------------------------------
 ;;; C. VM instruction type export verification
@@ -79,8 +73,7 @@
 ;;; Same rationale as B but for VM instruction types used as defmethod
 ;;; specializers in emit/ (regalloc, x86-64, aarch64, wasm backends).
 
-(deftest vm-types-exported
-  "All 37 VM instruction types used as defmethod specializers must be exported from :cl-cc/vm."
+(it-sequential "vm-types-exported"
   (dolist (name '("VM-INSTRUCTION" "VM-CONST" "VM-FUNC-REF"
                   "VM-GET-GLOBAL" "VM-SET-GLOBAL"
                   "VM-MOVE" "VM-BINOP" "VM-SELECT"
@@ -97,8 +90,8 @@
                   "VM-ESTABLISH-CATCH" "VM-THROW"))
     (multiple-value-bind (sym status)
         (find-symbol name :cl-cc/vm)
-      (assert-true sym)
-      (assert-eq :external status))))
+      (expect sym :to-be-truthy)
+      (expect status :to-be :external))))
 
 ;;; ----------------------------------------------------------------
 ;;; D. Cross-package symbol identity for CLOS dispatch
@@ -110,8 +103,7 @@
 ;;; the one in the child package, defmethod specializers will silently
 ;;; dispatch against the wrong (or no) class.
 
-(deftest clos-dispatch-ast-symbol-identity
-  "AST type symbols must be eq between :cl-cc and :cl-cc/ast."
+(it-sequential "clos-dispatch-ast-symbol-identity"
   (dolist (name '("AST-INT" "AST-VAR" "AST-BINOP" "AST-IF" "AST-LET"
                   "AST-LAMBDA" "AST-DEFUN" "AST-DEFCLASS" "AST-DEFGENERIC"
                   "AST-DEFMETHOD" "AST-MAKE-INSTANCE" "AST-SLOT-VALUE"
@@ -126,12 +118,11 @@
                   "AST-MULTIPLE-VALUE-CALL"))
     (let ((umbrella (find-symbol name :cl-cc))
           (child    (find-symbol name :cl-cc/ast)))
-      (assert-true umbrella)
-      (assert-true child)
-      (assert-eq child umbrella))))
+      (expect umbrella :to-be-truthy)
+      (expect child :to-be-truthy)
+      (expect umbrella :to-be child))))
 
-(deftest clos-dispatch-vm-symbol-identity
-  "VM instruction type symbols must be eq between :cl-cc and :cl-cc/vm."
+(it-sequential "clos-dispatch-vm-symbol-identity"
   (dolist (name '("VM-INSTRUCTION" "VM-CONST" "VM-FUNC-REF"
                   "VM-GET-GLOBAL" "VM-SET-GLOBAL"
                   "VM-MOVE" "VM-BINOP" "VM-SELECT"
@@ -148,6 +139,6 @@
                   "VM-ESTABLISH-CATCH" "VM-THROW"))
     (let ((umbrella (find-symbol name :cl-cc))
           (child    (find-symbol name :cl-cc/vm)))
-      (assert-true umbrella)
-      (assert-true child)
-      (assert-eq child umbrella))))
+      (expect umbrella :to-be-truthy)
+      (expect child :to-be-truthy)
+      (expect umbrella :to-be child))))

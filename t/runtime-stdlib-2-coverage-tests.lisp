@@ -1,10 +1,6 @@
 (in-package :cl-cc/test)
 
-(defsuite runtime-stdlib-2-coverage-suite
-  :description "Runtime-stdlib-2 FR evidence registry coverage tests"
-  :parent cl-cc-documentation-suite)
 
-(in-suite runtime-stdlib-2-coverage-suite)
 
 (defparameter *runtime-stdlib-2-fr-ids*
   '("FR-787" "FR-788" "FR-791" "FR-792" "FR-793" "FR-796" "FR-797" "FR-800" "FR-801"
@@ -95,14 +91,12 @@
     ("FR-931" . "packages/vm/src/vm-clos.lisp"))            ; Phase 175 CAMUC
   "Mapping from runtime-stdlib-2 FR IDs to expected evidence files.")
 
-(deftest runtime-stdlib-2-fr-registry-covers-all-71-ids
-  "The central registry maps every runtime-stdlib-2 FR ID to an expected evidence file."
-  :timeout 5
+(it-sequential "runtime-stdlib-2-fr-registry-covers-all-71-ids"
   (let ((registered (mapcar #'car *runtime-stdlib-2-fr-evidence-registry*)))
-    (assert-equal 71 (length *runtime-stdlib-2-fr-ids*))
-    (assert-equal 71 (length registered))
-    (assert-equal nil (set-difference *runtime-stdlib-2-fr-ids* registered :test #'string=))
-    (assert-equal nil (set-difference registered *runtime-stdlib-2-fr-ids* :test #'string=))
+    (expect (length *runtime-stdlib-2-fr-ids*) :to-equal 71)
+    (expect (length registered) :to-equal 71)
+    (expect (set-difference *runtime-stdlib-2-fr-ids* registered :test #'string=) :to-equal nil)
+    (expect (set-difference registered *runtime-stdlib-2-fr-ids* :test #'string=) :to-equal nil)
     (dolist (entry *runtime-stdlib-2-fr-evidence-registry*)
-      (assert-true (stringp (cdr entry)))
-      (assert-true (plusp (length (cdr entry)))))))
+      (expect (stringp (cdr entry)) :to-be-truthy)
+      (expect (plusp (length (cdr entry))) :to-be-truthy))))

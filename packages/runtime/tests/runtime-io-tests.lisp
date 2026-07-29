@@ -6,64 +6,54 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── rt-format ──────────────────────────────────────────────────────────────
 
-(deftest rt-format-nil-stream-returns-string
-  "rt-format with nil stream returns the formatted string directly."
-  (assert-equal "42" (cl-cc/runtime:rt-format nil "~A" 42)))
+(it-sequential "rt-format-nil-stream-returns-string"
+  (expect (cl-cc/runtime:rt-format nil "~A" 42) :to-equal "42"))
 
-(deftest rt-format-explicit-stream-writes-to-it
-  "rt-format with an explicit stream writes the formatted output to that stream."
+(it-sequential "rt-format-explicit-stream-writes-to-it"
   (let ((s (make-string-output-stream)))
     (cl-cc/runtime:rt-format s "~A" "hello")
-    (assert-equal "hello" (get-output-stream-string s))))
+    (expect (get-output-stream-string s) :to-equal "hello")))
 
 ;;; ─── String output stream helpers ──────────────────────────────────────────
 
-(deftest rt-make-string-output-stream-creates-stream-and-get-empty
-  "rt-make-string-output-stream produces a stream; get-output-stream-string returns empty initially."
+(it-sequential "rt-make-string-output-stream-creates-stream-and-get-empty"
   (let ((s (cl-cc/runtime:rt-make-string-output-stream)))
-    (assert-true (streamp s))
-    (assert-equal "" (cl-cc/runtime:rt-get-output-stream-string s))))
+    (expect (streamp s) :to-be-truthy)
+    (expect (cl-cc/runtime:rt-get-output-stream-string s) :to-equal "")))
 
-(deftest rt-get-output-stream-string-after-write-returns-content
-  "rt-get-output-stream-string returns the written content after write-string."
+(it-sequential "rt-get-output-stream-string-after-write-returns-content"
   (let ((s (cl-cc/runtime:rt-make-string-output-stream)))
     (write-string "hello world" s)
-    (assert-equal "hello world" (cl-cc/runtime:rt-get-output-stream-string s))))
+    (expect (cl-cc/runtime:rt-get-output-stream-string s) :to-equal "hello world")))
 
-(deftest rt-get-output-stream-string-works-with-standard-stream
-  "rt-get-output-stream-string also works with a standard make-string-output-stream."
+(it-sequential "rt-get-output-stream-string-works-with-standard-stream"
   (let ((s (make-string-output-stream)))
     (write-string "test" s)
-    (assert-equal "test" (cl-cc/runtime:rt-get-output-stream-string s))))
+    (expect (cl-cc/runtime:rt-get-output-stream-string s) :to-equal "test")))
 
-(deftest rt-stream-op-output-wrappers-write-in-order
-  "rt-write-char, rt-write-string, rt-write-line all target an explicit output stream."
+(it-sequential "rt-stream-op-output-wrappers-write-in-order"
   (let ((s (make-string-output-stream)))
     (cl-cc/runtime:rt-write-char #\A s)
     (cl-cc/runtime:rt-write-string "BC" s)
     (cl-cc/runtime:rt-write-line "D" s)
-    (assert-equal (format nil "ABCD~%") (get-output-stream-string s))))
+    (expect (get-output-stream-string s) :to-equal (format nil "ABCD~%"))))
 
-(deftest rt-stream-op-input-wrappers-read-and-peek
-  "rt-read-char consumes; rt-peek-char does not advance the stream."
+(it-sequential "rt-stream-op-input-wrappers-read-and-peek"
   (let ((s (make-string-input-stream "xyz")))
-    (assert-equal #\x (cl-cc/runtime:rt-read-char s))
-    (assert-equal #\y (cl-cc/runtime:rt-peek-char s))
-    (assert-equal #\y (cl-cc/runtime:rt-read-char s))))
+    (expect (cl-cc/runtime:rt-read-char s) :to-equal #\x)
+    (expect (cl-cc/runtime:rt-peek-char s) :to-equal #\y)
+    (expect (cl-cc/runtime:rt-read-char s) :to-equal #\y)))
 
 ;;; ─── rt-read-line ───────────────────────────────────────────────────────────
 
-(deftest rt-read-line-from-string-stream
-  "rt-read-line reads a line from a string input stream."
+(it-sequential "rt-read-line-from-string-stream"
   (let ((s (make-string-input-stream "hello")))
-    (assert-equal "hello" (cl-cc/runtime:rt-read-line s))))
+    (expect (cl-cc/runtime:rt-read-line s) :to-equal "hello")))
 
-(deftest rt-read-byte-write-byte-roundtrip-through-file
-  "Binary byte helpers round-trip bytes through a temporary file stream."
+(it-sequential "rt-read-byte-write-byte-roundtrip-through-file"
   (let* ((path (merge-pathnames "cl-cc-runtime-io-bytes.bin" (uiop:temporary-directory)))
          (out (open path :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))))
     (unwind-protect
@@ -74,99 +64,88 @@
            (let ((in (open path :direction :input :element-type '(unsigned-byte 8))))
              (unwind-protect
                   (progn
-                    (assert-equal 65 (cl-cc/runtime:rt-read-byte in))
-                    (assert-equal 66 (cl-cc/runtime:rt-read-byte in)))
+                    (expect (cl-cc/runtime:rt-read-byte in) :to-equal 65)
+                    (expect (cl-cc/runtime:rt-read-byte in) :to-equal 66))
                (close in))))
       (when (probe-file path)
         (delete-file path)))))
 
 ;;; ─── rt-write-line ──────────────────────────────────────────────────────────
 
-(deftest rt-write-line-to-string
-  "rt-write-line writes string followed by newline to stream."
+(it-sequential "rt-write-line-to-string"
   (let ((s (make-string-output-stream)))
     (cl-cc/runtime:rt-write-line "test" s)
-    (assert-equal (format nil "test~%") (get-output-stream-string s))))
+    (expect (get-output-stream-string s) :to-equal (format nil "test~%"))))
 
 ;;; ─── Package wrappers ───────────────────────────────────────────────────────
 
-(deftest rt-make-package-creates-package
-  "rt-make-package creates a runtime package descriptor and records it in the registry." 
+(it-sequential "rt-make-package-creates-package"
   (let* ((pkg-name (gensym "RT-PKG-"))
          (pkg (cl-cc/runtime:rt-make-package pkg-name :use '(:cl))))
-    (assert-true (hash-table-p pkg))
-    (assert-equal (string pkg-name) (gethash :name pkg))
-    (assert-eq pkg (gethash (string pkg-name) cl-cc/runtime:*rt-package-registry*))))
+    (expect (hash-table-p pkg) :to-be-truthy)
+    (expect (gethash :name pkg) :to-equal (string pkg-name))
+    (expect (gethash (string pkg-name) cl-cc/runtime:*rt-package-registry*) :to-be pkg)))
 
-(deftest rt-find-package-locates-created-package
-  "rt-find-package returns the descriptor created through rt-make-package." 
+(it-sequential "rt-find-package-locates-created-package"
   (let* ((pkg-name (gensym "RT-PKG-"))
          (pkg (cl-cc/runtime:rt-make-package pkg-name :use '(:cl))))
-    (assert-eq pkg (cl-cc/runtime:rt-find-package pkg-name))))
+    (expect (cl-cc/runtime:rt-find-package pkg-name) :to-be pkg)))
 
-(deftest rt-find-package-prefers-runtime-registry
-  "rt-find-package resolves through runtime registry metadata once seeded." 
+(it-sequential "rt-find-package-prefers-runtime-registry"
   (let* ((pkg-name (gensym "RT-PKG-"))
          (pkg (cl-cc/runtime:rt-make-package pkg-name :use '(:cl))))
-    (assert-eq pkg (gethash (string pkg-name) cl-cc/runtime:*rt-package-registry*))
-    (assert-eq pkg (cl-cc/runtime:rt-find-package pkg-name))))
+    (expect (gethash (string pkg-name) cl-cc/runtime:*rt-package-registry*) :to-be pkg)
+    (expect (cl-cc/runtime:rt-find-package pkg-name) :to-be pkg)))
 
-(deftest rt-export-records-symbol
-  "rt-export records the symbol in runtime package metadata." 
+(it-sequential "rt-export-records-symbol"
   (let* ((pkg-name (gensym "RT-PKG-"))
          (pkg (cl-cc/runtime:rt-make-package pkg-name :use '(:cl)))
          (sym (cl-cc/runtime:rt-intern "FOO" pkg)))
     (cl-cc/runtime:rt-export sym pkg)
-    (assert-true (member sym (gethash :exports pkg) :test #'eq))))
+    (expect (member sym (gethash :exports pkg) :test #'eq) :to-be-truthy)))
 
-(deftest rt-use-unuse-package-maintains-inherited-symbols
-  "rt-use-package de-duplicates use-list entries and rt-unuse-package rebuilds inherited symbols."
+(it-sequential "rt-use-unuse-package-maintains-inherited-symbols"
   (let ((cl-cc/runtime:*rt-package-registry* (make-hash-table :test #'equal)))
     (let* ((lib (cl-cc/runtime:rt-make-package "RT-USE-LIB"))
            (user (cl-cc/runtime:rt-make-package "RT-USE-USER"))
            (sym (cl-cc/runtime:rt-intern "EXPORTED" lib)))
       (cl-cc/runtime:rt-export sym lib)
-      (assert-true (cl-cc/runtime::rt-use-package lib user))
+      (expect (cl-cc/runtime::rt-use-package lib user) :to-be-truthy)
       (multiple-value-bind (found status)
           (cl-cc/runtime::rt-find-symbol "EXPORTED" user)
-        (assert-eq sym found)
-        (assert-eq :inherited status))
-      (assert-true (cl-cc/runtime::rt-use-package lib user))
-      (assert-= 1 (length (gethash :use-list user)))
+        (expect found :to-be sym)
+        (expect status :to-be :inherited))
+      (expect (cl-cc/runtime::rt-use-package lib user) :to-be-truthy)
+      (expect (= 1 (length (gethash :use-list user))) :to-be-truthy)
       (cl-cc/runtime::rt-unuse-package lib user)
       (multiple-value-bind (found status)
           (cl-cc/runtime::rt-find-symbol "EXPORTED" user)
-        (assert-eq nil found)
-        (assert-eq nil status)))))
+        (expect found :to-be nil)
+        (expect status :to-be nil)))))
 
 ;;; ─── rt-peek-char ───────────────────────────────────────────────────────────
 
-(deftest rt-peek-char-does-not-advance
-  "rt-peek-char returns next character without consuming it; peeking twice gives same char."
+(it-sequential "rt-peek-char-does-not-advance"
   (let ((s (make-string-input-stream "abc")))
     (let ((first-peek  (cl-cc/runtime:rt-peek-char s))
           (second-peek (cl-cc/runtime:rt-peek-char s)))
-      (assert-equal #\a first-peek)
-      (assert-equal #\a second-peek))))
+      (expect first-peek :to-equal #\a)
+      (expect second-peek :to-equal #\a))))
 
-(deftest rt-make-string-stream-input-direction
-  "rt-make-string-stream :input creates a readable stream; first char is 'a'."
+(it-sequential "rt-make-string-stream-input-direction"
   (let ((in (cl-cc/runtime:rt-make-string-stream "abc" :direction :input)))
-    (assert-equal #\a (read-char in))))
+    (expect (read-char in) :to-equal #\a)))
 
-(deftest rt-make-string-stream-output-direction
-  "rt-make-string-stream :output creates a writable stream; written content is retrievable."
+(it-sequential "rt-make-string-stream-output-direction"
   (let ((out (cl-cc/runtime:rt-make-string-stream "ignored" :direction :output)))
     (write-string "ok" out)
-    (assert-equal "ok" (cl-cc/runtime:rt-get-output-stream-string out))))
+    (expect (cl-cc/runtime:rt-get-output-stream-string out) :to-equal "ok")))
 
 ;;; ─── Stream predicates ──────────────────────────────────────────────────────
 
-(deftest rt-stream-element-type-is-character
-  "rt-stream-element-type returns 'character for standard-input."
-  (assert-equal 'character (cl-cc/runtime:rt-stream-element-type *standard-input*)))
+(it-sequential "rt-stream-element-type-is-character"
+  (expect (cl-cc/runtime:rt-stream-element-type *standard-input*) :to-equal 'character))
 
-(deftest rt-interactive-stream-p-is-zero-for-string-stream
-  "rt-interactive-stream-p returns 0 for a non-interactive string input stream."
+(it-sequential "rt-interactive-stream-p-is-zero-for-string-stream"
   (let ((s (make-string-input-stream "x")))
-    (assert-= 0 (cl-cc/runtime:rt-interactive-stream-p s))))
+    (expect (= 0 (cl-cc/runtime:rt-interactive-stream-p s)) :to-be-truthy)))

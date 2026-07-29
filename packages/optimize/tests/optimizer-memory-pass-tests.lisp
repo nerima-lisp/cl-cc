@@ -9,7 +9,6 @@
 ;;;;   %mps-flush-if-src-overwritten, %mps-flush-dependent-on-reg.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── opt-must-alias-p / opt-may-alias-p ─────────────────────────────────
 
@@ -24,74 +23,88 @@
        ,then-form
        ,else-form))
 
-(deftest-each must-alias-cases
-  "opt-must-alias-p: true iff both registers share the same canonical root."
-  :cases (("same-root"    :r0 :r1  '(:r0 :root0 :r1 :root0) t)
-          ("diff-roots"   :r0 :r1  '(:r0 :root0 :r1 :root1) nil)
-          ("unknown-root" :r0 :r1  '(:r0 :root0)             nil))
-  (reg-a reg-b entries expected)
-  (let ((alias (apply #'%make-alias-table entries)))
+(it-sequential "must-alias-cases same-root"
+  (destructuring-bind (reg-a reg-b entries expected) (list :r0 :r1 '(:r0 :root0 :r1 :root0) t)
+    (let ((alias (apply #'%make-alias-table entries)))
     (assert-boolean-case expected
-        (assert-true  (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias))
-        (assert-false (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias)))))
+        (expect (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias) :to-be-truthy)
+        (expect (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias) :to-be-falsy)))))
 
-(deftest-each may-alias-cases
-  "opt-may-alias-p: conservatively true when a register is unknown or shares root."
-  :cases (("same-root"        :r0 :r1  '(:r0 :root0 :r1 :root0) t)
-          ("unknown-register" :r0 :r99 '(:r0 :root0)             t)
-          ("diff-known-roots" :r0 :r1  '(:r0 :root0 :r1 :root1)  nil))
-  (reg-a reg-b entries expected)
-  (let ((alias (apply #'%make-alias-table entries)))
+(it-sequential "must-alias-cases diff-roots"
+  (destructuring-bind (reg-a reg-b entries expected) (list :r0 :r1 '(:r0 :root0 :r1 :root1) nil)
+    (let ((alias (apply #'%make-alias-table entries)))
     (assert-boolean-case expected
-        (assert-true  (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias))
-        (assert-false (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias)))))
+        (expect (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias) :to-be-truthy)
+        (expect (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias) :to-be-falsy)))))
+
+(it-sequential "must-alias-cases unknown-root"
+  (destructuring-bind (reg-a reg-b entries expected) (list :r0 :r1 '(:r0 :root0) nil)
+    (let ((alias (apply #'%make-alias-table entries)))
+    (assert-boolean-case expected
+        (expect (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias) :to-be-truthy)
+        (expect (cl-cc/optimize:opt-must-alias-p reg-a reg-b alias) :to-be-falsy)))))
+
+(it-sequential "may-alias-cases same-root"
+  (destructuring-bind (reg-a reg-b entries expected) (list :r0 :r1 '(:r0 :root0 :r1 :root0) t)
+    (let ((alias (apply #'%make-alias-table entries)))
+    (assert-boolean-case expected
+        (expect (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias) :to-be-truthy)
+        (expect (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias) :to-be-falsy)))))
+
+(it-sequential "may-alias-cases unknown-register"
+  (destructuring-bind (reg-a reg-b entries expected) (list :r0 :r99 '(:r0 :root0) t)
+    (let ((alias (apply #'%make-alias-table entries)))
+    (assert-boolean-case expected
+        (expect (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias) :to-be-truthy)
+        (expect (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias) :to-be-falsy)))))
+
+(it-sequential "may-alias-cases diff-known-roots"
+  (destructuring-bind (reg-a reg-b entries expected) (list :r0 :r1 '(:r0 :root0 :r1 :root1) nil)
+    (let ((alias (apply #'%make-alias-table entries)))
+    (assert-boolean-case expected
+        (expect (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias) :to-be-truthy)
+        (expect (cl-cc/optimize:opt-may-alias-p reg-a reg-b alias) :to-be-falsy)))))
 
 ;;; ─── opt-slot-alias-key / opt-rewrite-inst-regs ────────────────────────
 
-(deftest slot-alias-key-uses-canonical-root-when-known
-  "opt-slot-alias-key returns a key using the canonical root when the register is in the alias map."
+(it-sequential "slot-alias-key-uses-canonical-root-when-known"
   (let ((alias (make-hash-table :test #'eq)))
     (setf (gethash :r0 alias) :root0)
-    (assert-equal '(:slot :root0 x) (cl-cc/optimize::opt-slot-alias-key :r0 'x alias))))
+    (expect (cl-cc/optimize::opt-slot-alias-key :r0 'x alias) :to-equal '(:slot :root0 x))))
 
-(deftest slot-alias-key-falls-back-to-register-when-unknown
-  "opt-slot-alias-key returns a key using the register itself when not in the alias map."
+(it-sequential "slot-alias-key-falls-back-to-register-when-unknown"
   (let ((alias (make-hash-table :test #'eq)))
-    (assert-equal '(:slot :r5 y) (cl-cc/optimize::opt-slot-alias-key :r5 'y alias))))
+    (expect (cl-cc/optimize::opt-slot-alias-key :r5 'y alias) :to-equal '(:slot :r5 y))))
 
-(deftest rewrite-inst-regs-substitutes-source-registers
-  "opt-rewrite-inst-regs substitutes known source registers; dst is never rewritten."
+(it-sequential "rewrite-inst-regs-substitutes-source-registers"
   (let* ((copies (make-hash-table :test #'eq)))
     (setf (gethash :r0 copies) :r5)
     (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) copies)))
-      (assert-eq :r2 (cl-cc/vm::vm-dst inst))
-      (assert-eq :r5 (cl-cc/vm::vm-lhs inst)))))
+      (expect (cl-cc/vm::vm-dst inst) :to-be :r2)
+      (expect (cl-cc/vm::vm-lhs inst) :to-be :r5))))
 
-(deftest rewrite-inst-regs-substitutes-ssa-keyword-registers
-  "opt-rewrite-inst-regs substitutes SSA keyword registers, not only :R-number VM registers."
+(it-sequential "rewrite-inst-regs-substitutes-ssa-keyword-registers"
   (let ((copies (make-hash-table :test #'eq)))
     (setf (gethash :i copies) :i.1
           (gethash :one copies) :one.0)
     (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
                  (make-vm-add :dst :i.3 :lhs :i :rhs :one)
                  copies)))
-      (assert-eq :i.3 (cl-cc/vm::vm-dst inst))
-      (assert-eq :i.1 (cl-cc/vm::vm-lhs inst))
-      (assert-eq :one.0 (cl-cc/vm::vm-rhs inst)))))
+      (expect (cl-cc/vm::vm-dst inst) :to-be :i.3)
+      (expect (cl-cc/vm::vm-lhs inst) :to-be :i.1)
+      (expect (cl-cc/vm::vm-rhs inst) :to-be :one.0))))
 
-(deftest rewrite-inst-regs-never-rewrites-dst
-  "opt-rewrite-inst-regs leaves dst unchanged even when the register appears in the copy map."
+(it-sequential "rewrite-inst-regs-never-rewrites-dst"
   (let* ((copies (make-hash-table :test #'eq)))
     (setf (gethash :r0 copies) :r99)
     (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs (make-vm-add :dst :r0 :lhs :r1 :rhs :r2) copies)))
-      (assert-eq :r0 (cl-cc/vm::vm-dst inst)))))
+      (expect (cl-cc/vm::vm-dst inst) :to-be :r0))))
 
-(deftest rewrite-inst-regs-no-op-on-empty-copy-map
-  "opt-rewrite-inst-regs leaves source registers unchanged when the copy map is empty."
+(it-sequential "rewrite-inst-regs-no-op-on-empty-copy-map"
   (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
                (make-vm-move :dst :r0 :src :r1)
                (make-hash-table :test #'eq))))
-    (assert-eq :r1 (cl-cc/vm::vm-src inst))))
+    (expect (cl-cc/vm::vm-src inst) :to-be :r1)))
 
 ;;; ─── opt-pass-dead-store-elim ────────────────────────────────────────────
 
@@ -99,69 +112,61 @@
   "Count instructions in RESULT matching TYPE-PRED."
   (count-if type-pred result))
 
-(deftest dead-store-elim-overwrite-without-read-removes-earlier-store
-  "opt-pass-dead-store-elim removes a set-global that is overwritten without an intervening read."
+(it-sequential "dead-store-elim-overwrite-without-read-removes-earlier-store"
   (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
                   (list (make-vm-const :dst :r0 :value 1)
                         (make-vm-set-global :src :r0 :name 'g)
                         (make-vm-const :dst :r1 :value 2)
                         (make-vm-set-global :src :r1 :name 'g)
                         (make-vm-ret :reg :r1)))))
-    (assert-= 1 (%count-insts-of-type result #'vm-set-global-p))))
+    (expect (= 1 (%count-insts-of-type result #'vm-set-global-p)) :to-be-truthy)))
 
-(deftest dead-store-elim-read-between-stores-preserves-both
-  "opt-pass-dead-store-elim keeps a set-global that is read before the next overwrite."
+(it-sequential "dead-store-elim-read-between-stores-preserves-both"
   (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
                   (list (make-vm-const :dst :r0 :value 1)
                         (make-vm-set-global :src :r0 :name 'g)
                         (make-vm-get-global :dst :r1 :name 'g)
                         (make-vm-ret :reg :r1)))))
-    (assert-= 1 (%count-insts-of-type result #'vm-set-global-p))
-    (assert-= 1 (%count-insts-of-type result #'vm-get-global-p))))
+    (expect (= 1 (%count-insts-of-type result #'vm-set-global-p)) :to-be-truthy)
+    (expect (= 1 (%count-insts-of-type result #'vm-get-global-p)) :to-be-truthy)))
 
-(deftest dead-store-elim-store-reaching-ret-is-preserved
-  "opt-pass-dead-store-elim preserves a set-global that reaches the terminator."
+(it-sequential "dead-store-elim-store-reaching-ret-is-preserved"
   (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
                   (list (make-vm-const :dst :r0 :value 42)
                         (make-vm-set-global :src :r0 :name 'result)
                         (make-vm-ret :reg :r0)))))
-    (assert-= 1 (%count-insts-of-type result #'vm-set-global-p))))
+    (expect (= 1 (%count-insts-of-type result #'vm-set-global-p)) :to-be-truthy)))
 
 ;;; ─── opt-pass-store-to-load-forward ──────────────────────────────────────
 
-(deftest store-to-load-forward-prior-store-replaces-get-global
-  "opt-pass-store-to-load-forward replaces vm-get-global with vm-move when a preceding set-global is pending."
+(it-sequential "store-to-load-forward-prior-store-replaces-get-global"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (make-vm-const :dst :r0 :value 10)
                         (make-vm-set-global :src :r0 :name 'x)
                         (make-vm-get-global :dst :r1 :name 'x)
                         (make-vm-ret :reg :r1)))))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-move))       result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move))       result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-falsy)))
 
-(deftest store-to-load-forward-no-prior-store-preserves-get-global
-  "opt-pass-store-to-load-forward leaves vm-get-global intact when no prior store exists."
+(it-sequential "store-to-load-forward-no-prior-store-preserves-get-global"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (make-vm-get-global :dst :r0 :name 'unknown)
                         (make-vm-ret :reg :r0)))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-truthy)))
 
-(deftest store-to-load-forward-prior-slot-write-replaces-slot-read
-  "opt-pass-store-to-load-forward replaces a matching vm-slot-read with a move from the pending slot write value."
+(it-sequential "store-to-load-forward-prior-slot-write-replaces-slot-read"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'slot :value-reg :value)
                         (cl-cc:make-vm-slot-read  :dst :out :obj-reg :obj :slot-name 'slot)
                         (make-vm-ret :reg :out)))))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
               (and (typep i 'cl-cc/vm::vm-move)
                    (eq :out (cl-cc/vm::vm-dst i))
                    (eq :value (cl-cc/vm::vm-src i))))
-           result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-slot-read)) result))))
+           result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-slot-read)) result) :to-be-falsy)))
 
-(deftest store-to-load-forward-cross-block-dominating-store-replaces-get-global
-  "A dominating store remains forwardable across a branch/join when every incoming path agrees on the same fact."
+(it-sequential "store-to-load-forward-cross-block-dominating-store-replaces-get-global"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (make-vm-const :dst :r0 :value 10)
                         (make-vm-set-global :src :r0 :name 'x)
@@ -173,16 +178,14 @@
                         (make-vm-label :name "join")
                         (make-vm-get-global :dst :r1 :name 'x)
                         (make-vm-ret :reg :r1)))))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-move)
                   (eq :r1 (cl-cc/vm::vm-dst i))
                   (eq :r0 (cl-cc/vm::vm-src i))))
-           result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result))))
+           result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-falsy)))
 
-(deftest store-to-load-forward-join-disagree-preserves-get-global
-  "A join does not forward when predecessor paths disagree on the last store for the same location."
+(it-sequential "store-to-load-forward-join-disagree-preserves-get-global"
   (let* ((load (make-vm-get-global :dst :r2 :name 'x))
          (result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (make-vm-jump-zero :reg :r9 :label "else")
@@ -195,15 +198,13 @@
                         (make-vm-label :name "join")
                         load
                         (make-vm-ret :reg :r2)))))
-    (assert-true (member load result :test #'eq))
-    (assert-false
-     (some (lambda (i)
+    (expect (member load result :test #'eq) :to-be-truthy)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-move)
                   (eq :r2 (cl-cc/vm::vm-dst i))))
-            result))))
+            result) :to-be-falsy)))
 
-(deftest store-to-load-forward-cross-block-dominating-slot-write-replaces-slot-read
-  "A dominating slot write is forwardable across branch/join when incoming paths agree."
+(it-sequential "store-to-load-forward-cross-block-dominating-slot-write-replaces-slot-read"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'slot :value-reg :val)
                         (make-vm-jump-zero :reg :r9 :label "else")
@@ -214,27 +215,14 @@
                         (make-vm-label :name "join")
                         (cl-cc:make-vm-slot-read :dst :out :obj-reg :obj :slot-name 'slot)
                         (make-vm-ret :reg :out)))))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-move)
                   (eq :out (cl-cc/vm::vm-dst i))
                   (eq :val (cl-cc/vm::vm-src i))))
-           result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-slot-read)) result))))
+           result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-slot-read)) result) :to-be-falsy)))
 
-(deftest store-to-load-forward-branch-constant-prunes-infeasible-edge
-  "When branch condition is locally constant, infeasible join edge is pruned for forwarding.
-
-Path shape:
-  set x=1
-  cond=0
-  jump-zero cond -> else
-  then: set x=2 (infeasible)
-  else: (no overwrite)
-  join: get x
-
-Without path refinement, join disagrees (x=1 vs x=2) and load is preserved.
-With refinement, infeasible then-edge is excluded and load forwards from x=1."
+(it-sequential "store-to-load-forward-branch-constant-prunes-infeasible-edge"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (make-vm-const :dst :r0 :value 1)
                         (make-vm-set-global :src :r0 :name 'x)
@@ -247,136 +235,120 @@ With refinement, infeasible then-edge is excluded and load forwards from x=1."
                         (make-vm-label :name "join")
                         (make-vm-get-global :dst :r2 :name 'x)
                         (make-vm-ret :reg :r2)))))
-    (assert-true
-     (some (lambda (i)
+    (expect (some (lambda (i)
              (and (typep i 'cl-cc/vm::vm-move)
                   (eq :r2 (cl-cc/vm::vm-dst i))
                   (eq :r0 (cl-cc/vm::vm-src i))))
-           result))
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result))))
+           result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-falsy)))
 
 ;;; ─── opt-pass-cons-slot-forward ──────────────────────────────────────────
 
-(deftest cons-slot-forward-replaces-car-with-original-car-register
-  "opt-pass-cons-slot-forward rewrites car of a fresh cons to a move from car-src."
+(it-sequential "cons-slot-forward-replaces-car-with-original-car-register"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-car  :dst :out  :src :cell))))
          (move (second result)))
-    (assert-true (typep move 'cl-cc/vm::vm-move))
-    (assert-eq :out (cl-cc/vm::vm-dst move))
-    (assert-eq :head (cl-cc/vm::vm-src move))))
+    (expect (typep move 'cl-cc/vm::vm-move) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst move) :to-be :out)
+    (expect (cl-cc/vm::vm-src move) :to-be :head)))
 
-(deftest cons-slot-forward-replaces-cdr-through-move-alias
-  "opt-pass-cons-slot-forward propagates the fresh cons fact through vm-move aliases."
+(it-sequential "cons-slot-forward-replaces-cdr-through-move-alias"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-move :dst :alias :src :cell)
                         (make-vm-cdr  :dst :out   :src :alias))))
          (move (third result)))
-    (assert-true (typep move 'cl-cc/vm::vm-move))
-    (assert-eq :out (cl-cc/vm::vm-dst move))
-    (assert-eq :tail (cl-cc/vm::vm-src move))))
+    (expect (typep move 'cl-cc/vm::vm-move) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst move) :to-be :out)
+    (expect (cl-cc/vm::vm-src move) :to-be :tail)))
 
-(deftest cons-slot-forward-source-overwrite-kills-fact
-  "Overwriting a source register kills dependent cons-slot facts before forwarding."
+(it-sequential "cons-slot-forward-source-overwrite-kills-fact"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons  :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-const :dst :head :value 99)
                         (make-vm-car   :dst :out  :src :cell)))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result))
-    (assert-false (some (lambda (i)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result) :to-be-truthy)
+    (expect (some (lambda (i)
                           (and (typep i 'cl-cc/vm::vm-move)
                                (eq :out (cl-cc/vm::vm-dst i))))
-                        result))))
+                        result) :to-be-falsy)))
 
-(deftest cons-slot-forward-rplaca-kills-fact
-  "Destructive cons mutation prevents stale car/cdr forwarding."
+(it-sequential "cons-slot-forward-rplaca-kills-fact"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons   :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-rplaca :cons :cell :val :new-head)
                         (make-vm-car    :dst :out :src :cell)))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result) :to-be-truthy)))
 
-(deftest cons-slot-forward-cons-overwriting-source-is-conservative
-  "When vm-cons overwrites a slot source, the old slot value has no forwarding register."
+(it-sequential "cons-slot-forward-cons-overwriting-source-is-conservative"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons :dst :head :car-src :head :cdr-src :tail)
                         (make-vm-car  :dst :out  :src :head)))))
-    (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result) :to-be-truthy)))
 
 ;;; ─── mem-pass-state struct helpers ──────────────────────────────────────────
 
-(deftest mps-emit-pushes-instruction-onto-result
-  "%mps-emit appends an instruction to the state's result list."
+(it-sequential "mps-emit-pushes-instruction-onto-result"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (inst  (make-vm-const :dst :r0 :value 1)))
     (cl-cc/optimize::%mps-emit state inst)
-    (assert-= 1 (length (cl-cc/optimize::mps-result state)))
-    (assert-eq inst (first (cl-cc/optimize::mps-result state)))))
+    (expect (= 1 (length (cl-cc/optimize::mps-result state))) :to-be-truthy)
+    (expect (first (cl-cc/optimize::mps-result state)) :to-be inst)))
 
-(deftest mps-remember-store-then-flush-one-emits-stored-instruction
-  "%mps-flush-one emits the instruction registered by %mps-remember-store."
+(it-sequential "mps-remember-store-then-flush-one-emits-stored-instruction"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (inst  (make-vm-const :dst :r0 :value 7)))
     (cl-cc/optimize::%mps-remember-store state :some-key inst)
     (cl-cc/optimize::%mps-flush-one state :some-key)
-    (assert-= 1 (length (cl-cc/optimize::mps-result state)))
-    (assert-eq inst (first (cl-cc/optimize::mps-result state)))
-    (assert-null (cl-cc/optimize::%mps-pending-store state :some-key))))
+    (expect (= 1 (length (cl-cc/optimize::mps-result state))) :to-be-truthy)
+    (expect (first (cl-cc/optimize::mps-result state)) :to-be inst)
+    (expect (cl-cc/optimize::%mps-pending-store state :some-key) :to-be-null)))
 
-(deftest mps-flush-all-emits-all-pending-stores
-  "%mps-flush-all emits all pending stores and clears the pending table."
+(it-sequential "mps-flush-all-emits-all-pending-stores"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (i1    (make-vm-const :dst :r0 :value 1))
         (i2    (make-vm-const :dst :r1 :value 2)))
     (cl-cc/optimize::%mps-remember-store state :k1 i1)
     (cl-cc/optimize::%mps-remember-store state :k2 i2)
     (cl-cc/optimize::%mps-flush-all state)
-    (assert-= 2 (length (cl-cc/optimize::mps-result state)))
-    (assert-= 0 (hash-table-count (cl-cc/optimize::mps-pending-by-name state)))))
+    (expect (= 2 (length (cl-cc/optimize::mps-result state))) :to-be-truthy)
+    (expect (= 0 (hash-table-count (cl-cc/optimize::mps-pending-by-name state))) :to-be-truthy)))
 
-(deftest mps-drop-pending-removes-key-from-pending
-  "%mps-drop-pending removes the key from both pending-by-name and pending-order."
+(it-sequential "mps-drop-pending-removes-key-from-pending"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (inst  (make-vm-const :dst :r0 :value 1)))
     (cl-cc/optimize::%mps-remember-store state :key inst)
     (cl-cc/optimize::%mps-drop-pending state :key)
-    (assert-null (cl-cc/optimize::%mps-pending-store state :key))
-    (assert-null (cl-cc/optimize::mps-pending-order state))))
+    (expect (cl-cc/optimize::%mps-pending-store state :key) :to-be-null)
+    (expect (cl-cc/optimize::mps-pending-order state) :to-be-null)))
 
 ;;; ─── *opt-heap-root-kind-table* data integrity ───────────────────────────
 
-(deftest heap-root-kind-table-integrity-and-lookup
-  "*opt-heap-root-kind-table* has 4 entries; opt-heap-root-kind dispatches correctly; non-heap returns nil."
-  (assert-null (cl-cc/optimize::opt-heap-root-kind (make-vm-const :dst :r0 :value 1)))
-  (assert-= 4 (length cl-cc/optimize::*opt-heap-root-kind-table*))
-  (assert-eq :cons    (cdr (assoc 'vm-cons          cl-cc/optimize::*opt-heap-root-kind-table*)))
-  (assert-eq :array   (cdr (assoc 'vm-make-array    cl-cc/optimize::*opt-heap-root-kind-table*)))
-  (assert-eq :closure (cdr (assoc 'vm-closure       cl-cc/optimize::*opt-heap-root-kind-table*)))
-  (assert-eq :closure (cdr (assoc 'vm-make-closure  cl-cc/optimize::*opt-heap-root-kind-table*)))
+(it-sequential "heap-root-kind-table-integrity-and-lookup"
+  (expect (cl-cc/optimize::opt-heap-root-kind (make-vm-const :dst :r0 :value 1)) :to-be-null)
+  (expect (= 4 (length cl-cc/optimize::*opt-heap-root-kind-table*)) :to-be-truthy)
+  (expect (cdr (assoc 'vm-cons          cl-cc/optimize::*opt-heap-root-kind-table*)) :to-be :cons)
+  (expect (cdr (assoc 'vm-make-array    cl-cc/optimize::*opt-heap-root-kind-table*)) :to-be :array)
+  (expect (cdr (assoc 'vm-closure       cl-cc/optimize::*opt-heap-root-kind-table*)) :to-be :closure)
+  (expect (cdr (assoc 'vm-make-closure  cl-cc/optimize::*opt-heap-root-kind-table*)) :to-be :closure)
   (let ((inst (make-vm-closure :dst :r0 :label "f" :params '(x) :captured nil)))
-    (assert-eq :closure (cl-cc/optimize::opt-heap-root-kind inst))))
+    (expect (cl-cc/optimize::opt-heap-root-kind inst) :to-be :closure)))
 
 ;;; ─── *opt-interval-binop-table* / %opt-update-interval-binop ────────────
 
-(deftest interval-binop-table-coverage
-  "*opt-interval-binop-table* covers generic and fixnum add/sub/mul variants."
-  (assert-= 6 (length cl-cc/optimize::*opt-interval-binop-table*))
-  (assert-true (assoc 'vm-add cl-cc/optimize::*opt-interval-binop-table*))
-  (assert-true (assoc 'vm-integer-add cl-cc/optimize::*opt-interval-binop-table*))
-  (assert-true (assoc 'vm-sub cl-cc/optimize::*opt-interval-binop-table*))
-  (assert-true (assoc 'vm-integer-sub cl-cc/optimize::*opt-interval-binop-table*))
-  (assert-true (assoc 'vm-mul cl-cc/optimize::*opt-interval-binop-table*))
-  (assert-true (assoc 'vm-integer-mul cl-cc/optimize::*opt-interval-binop-table*)))
+(it-sequential "interval-binop-table-coverage"
+  (expect (= 6 (length cl-cc/optimize::*opt-interval-binop-table*)) :to-be-truthy)
+  (expect (assoc 'vm-add cl-cc/optimize::*opt-interval-binop-table*) :to-be-truthy)
+  (expect (assoc 'vm-integer-add cl-cc/optimize::*opt-interval-binop-table*) :to-be-truthy)
+  (expect (assoc 'vm-sub cl-cc/optimize::*opt-interval-binop-table*) :to-be-truthy)
+  (expect (assoc 'vm-integer-sub cl-cc/optimize::*opt-interval-binop-table*) :to-be-truthy)
+  (expect (assoc 'vm-mul cl-cc/optimize::*opt-interval-binop-table*) :to-be-truthy)
+  (expect (assoc 'vm-integer-mul cl-cc/optimize::*opt-interval-binop-table*) :to-be-truthy))
 
-(deftest-each update-interval-binop-cases
-  "%opt-update-interval-binop: known operands → updates dst; unknown operand → kills dst."
-  :cases (("add-known"   'opt-interval-add 2 3 5 t)
-          ("sub-known"   'opt-interval-sub 5 2 3 t)
-          ("add-unknown" 'opt-interval-add nil nil nil nil))
-  (fn-sym lhs-val rhs-val expected-lo expected-found)
-  (let ((intervals (make-hash-table :test #'eq))
+(it-sequential "update-interval-binop-cases add-known"
+  (destructuring-bind (fn-sym lhs-val rhs-val expected-lo expected-found) (list 'opt-interval-add 2 3 5 t)
+    (let ((intervals (make-hash-table :test #'eq))
         (inst      (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
     (when lhs-val
       (setf (gethash :r0 intervals) (cl-cc/optimize::opt-make-interval lhs-val lhs-val)))
@@ -385,12 +357,38 @@ With refinement, infeasible then-edge is excluded and load forwards from x=1."
     (cl-cc/optimize::%opt-update-interval-binop
      inst intervals (symbol-function fn-sym))
     (assert-boolean-case expected-found
-        (assert-= expected-lo
-                  (cl-cc/optimize::opt-interval-lo (gethash :r2 intervals)))
-        (assert-false (nth-value 1 (gethash :r2 intervals))))))
+        (expect (= expected-lo (cl-cc/optimize::opt-interval-lo (gethash :r2 intervals))) :to-be-truthy)
+        (expect (nth-value 1 (gethash :r2 intervals)) :to-be-falsy)))))
 
-(deftest optimize-instructions-rewrites-logand-one-eq-zero-to-evenp
-  "The fold pipeline recognizes low-bit equality tests and rewrites them to vm-evenp."
+(it-sequential "update-interval-binop-cases sub-known"
+  (destructuring-bind (fn-sym lhs-val rhs-val expected-lo expected-found) (list 'opt-interval-sub 5 2 3 t)
+    (let ((intervals (make-hash-table :test #'eq))
+        (inst      (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
+    (when lhs-val
+      (setf (gethash :r0 intervals) (cl-cc/optimize::opt-make-interval lhs-val lhs-val)))
+    (when rhs-val
+      (setf (gethash :r1 intervals) (cl-cc/optimize::opt-make-interval rhs-val rhs-val)))
+    (cl-cc/optimize::%opt-update-interval-binop
+     inst intervals (symbol-function fn-sym))
+    (assert-boolean-case expected-found
+        (expect (= expected-lo (cl-cc/optimize::opt-interval-lo (gethash :r2 intervals))) :to-be-truthy)
+        (expect (nth-value 1 (gethash :r2 intervals)) :to-be-falsy)))))
+
+(it-sequential "update-interval-binop-cases add-unknown"
+  (destructuring-bind (fn-sym lhs-val rhs-val expected-lo expected-found) (list 'opt-interval-add nil nil nil nil)
+    (let ((intervals (make-hash-table :test #'eq))
+        (inst      (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
+    (when lhs-val
+      (setf (gethash :r0 intervals) (cl-cc/optimize::opt-make-interval lhs-val lhs-val)))
+    (when rhs-val
+      (setf (gethash :r1 intervals) (cl-cc/optimize::opt-make-interval rhs-val rhs-val)))
+    (cl-cc/optimize::%opt-update-interval-binop
+     inst intervals (symbol-function fn-sym))
+    (assert-boolean-case expected-found
+        (expect (= expected-lo (cl-cc/optimize::opt-interval-lo (gethash :r2 intervals))) :to-be-truthy)
+        (expect (nth-value 1 (gethash :r2 intervals)) :to-be-falsy)))))
+
+(it-sequential "optimize-instructions-rewrites-logand-one-eq-zero-to-evenp"
   (let* ((result (cl-cc/optimize:optimize-instructions
                   (list (make-vm-get-global :dst :x :name 'x)
                         (make-vm-const :dst :one :value 1)
@@ -401,14 +399,13 @@ With refinement, infeasible then-edge is excluded and load forwards from x=1."
                   :max-iterations 1
                   :pass-pipeline '(:fold :dce)))
          (even-inst (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-evenp)) result)))
-    (assert-true even-inst)
-    (assert-eq :pred (cl-cc/vm::vm-dst even-inst))
-    (assert-eq :x (cl-cc/vm::vm-src even-inst))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm::vm-logand)) result))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm::vm-num-eq)) result))))
+    (expect even-inst :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst even-inst) :to-be :pred)
+    (expect (cl-cc/vm::vm-src even-inst) :to-be :x)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-logand)) result) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-num-eq)) result) :to-be-falsy)))
 
-(deftest overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add
-  "Bit-width range facts let the optimizer remove a checked add when overflow is impossible."
+(it-sequential "overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add"
   (let* ((result (cl-cc/optimize:optimize-instructions
                   (list (make-vm-get-global :dst :x :name 'x)
                         (make-vm-get-global :dst :y :name 'y)
@@ -420,70 +417,79 @@ With refinement, infeasible then-edge is excluded and load forwards from x=1."
                   :max-iterations 1
                   :pass-pipeline '(:overflow-check-elim)))
          (unchecked (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-integer-add)) result)))
-    (assert-true unchecked)
-    (assert-eq :sum (cl-cc/vm::vm-dst unchecked))
-    (assert-eq :x8 (cl-cc/vm::vm-lhs unchecked))
-    (assert-eq :y8 (cl-cc/vm::vm-rhs unchecked))
-    (assert-false (some (lambda (inst) (typep inst 'cl-cc/vm::vm-add-checked)) result))))
+    (expect unchecked :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst unchecked) :to-be :sum)
+    (expect (cl-cc/vm::vm-lhs unchecked) :to-be :x8)
+    (expect (cl-cc/vm::vm-rhs unchecked) :to-be :y8)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-add-checked)) result) :to-be-falsy)))
 
 ;;; ─── %mps-pending-uses-reg-p ─────────────────────────────────────────────
 
-(deftest-each mps-pending-uses-reg-p-cases
-  "%mps-pending-uses-reg-p: T when pending store reads the register; NIL otherwise."
-  :cases (("set-global-src-match"
-           (make-vm-set-global :src :r0 :name 'g) :r0 t)
-          ("set-global-no-match"
-           (make-vm-set-global :src :r1 :name 'g) :r0 nil)
-          ("slot-write-obj-match"
-           (make-vm-slot-write :obj-reg :r0 :slot-name 's :value-reg :r2) :r0 t)
-          ("slot-write-value-match"
-           (make-vm-slot-write :obj-reg :r1 :slot-name 's :value-reg :r0) :r0 t)
-          ("slot-write-no-match"
-           (make-vm-slot-write :obj-reg :r1 :slot-name 's :value-reg :r2) :r0 nil))
-  (inst reg expected)
-  (assert-boolean-case expected
-      (assert-true  (cl-cc/optimize::%mps-pending-uses-reg-p inst reg))
-      (assert-false (cl-cc/optimize::%mps-pending-uses-reg-p inst reg))))
+(it-sequential "mps-pending-uses-reg-p-cases set-global-src-match"
+  (destructuring-bind (inst reg expected) (list (make-vm-set-global :src :r0 :name 'g) :r0 t)
+    (assert-boolean-case expected
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-truthy)
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-falsy))))
+
+(it-sequential "mps-pending-uses-reg-p-cases set-global-no-match"
+  (destructuring-bind (inst reg expected) (list (make-vm-set-global :src :r1 :name 'g) :r0 nil)
+    (assert-boolean-case expected
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-truthy)
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-falsy))))
+
+(it-sequential "mps-pending-uses-reg-p-cases slot-write-obj-match"
+  (destructuring-bind (inst reg expected) (list (make-vm-slot-write :obj-reg :r0 :slot-name 's :value-reg :r2) :r0 t)
+    (assert-boolean-case expected
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-truthy)
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-falsy))))
+
+(it-sequential "mps-pending-uses-reg-p-cases slot-write-value-match"
+  (destructuring-bind (inst reg expected) (list (make-vm-slot-write :obj-reg :r1 :slot-name 's :value-reg :r0) :r0 t)
+    (assert-boolean-case expected
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-truthy)
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-falsy))))
+
+(it-sequential "mps-pending-uses-reg-p-cases slot-write-no-match"
+  (destructuring-bind (inst reg expected) (list (make-vm-slot-write :obj-reg :r1 :slot-name 's :value-reg :r2) :r0 nil)
+    (assert-boolean-case expected
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-truthy)
+      (expect (cl-cc/optimize::%mps-pending-uses-reg-p inst reg) :to-be-falsy))))
 
 ;;; ─── %mps-flush-if-src-overwritten ──────────────────────────────────────────
 
-(deftest mps-flush-if-src-overwritten-matching-reg-triggers-flush
-  "%mps-flush-if-src-overwritten emits a pending store when its src register is overwritten."
+(it-sequential "mps-flush-if-src-overwritten-matching-reg-triggers-flush"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (sg    (make-vm-set-global :src :r0 :name 'g)))
     (cl-cc/optimize::%mps-remember-store state 'g sg)
     (cl-cc/optimize::%mps-flush-if-src-overwritten state :r0)
-    (assert-true (member sg (cl-cc/optimize::mps-result state)))
-    (assert-null (cl-cc/optimize::%mps-pending-store state 'g))))
+    (expect (member sg (cl-cc/optimize::mps-result state)) :to-be-truthy)
+    (expect (cl-cc/optimize::%mps-pending-store state 'g) :to-be-null)))
 
-(deftest mps-flush-if-src-overwritten-unrelated-reg-leaves-store-pending
-  "%mps-flush-if-src-overwritten leaves a pending store intact when the overwritten register is unrelated."
+(it-sequential "mps-flush-if-src-overwritten-unrelated-reg-leaves-store-pending"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (sg    (make-vm-set-global :src :r0 :name 'g)))
     (cl-cc/optimize::%mps-remember-store state 'g sg)
     (cl-cc/optimize::%mps-flush-if-src-overwritten state :r9)
-    (assert-true (cl-cc/optimize::%mps-pending-store state 'g))
-    (assert-null (cl-cc/optimize::mps-result state))))
+    (expect (cl-cc/optimize::%mps-pending-store state 'g) :to-be-truthy)
+    (expect (cl-cc/optimize::mps-result state) :to-be-null)))
 
 ;;; ─── %mps-flush-dependent-on-reg ────────────────────────────────────────────
 
-(deftest mps-flush-dependent-on-reg-flushes-matching-stores
-  "%mps-flush-dependent-on-reg emits pending stores that reference the register; leaves unrelated stores pending."
+(it-sequential "mps-flush-dependent-on-reg-flushes-matching-stores"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (sg1   (make-vm-set-global :src :r0 :name 'g1))
         (sg2   (make-vm-set-global :src :r1 :name 'g2)))
     (cl-cc/optimize::%mps-remember-store state 'g1 sg1)
     (cl-cc/optimize::%mps-remember-store state 'g2 sg2)
     (cl-cc/optimize::%mps-flush-dependent-on-reg state :r0)
-    (assert-true  (member sg1 (cl-cc/optimize::mps-result state)))
-    (assert-null  (cl-cc/optimize::%mps-pending-store state 'g1))
-    (assert-true  (cl-cc/optimize::%mps-pending-store state 'g2))))
+    (expect (member sg1 (cl-cc/optimize::mps-result state)) :to-be-truthy)
+    (expect (cl-cc/optimize::%mps-pending-store state 'g1) :to-be-null)
+    (expect (cl-cc/optimize::%mps-pending-store state 'g2) :to-be-truthy)))
 
-(deftest mps-flush-dependent-on-reg-exclude-key-skips-matching-store
-  "%mps-flush-dependent-on-reg does not flush the store identified by :exclude-key."
+(it-sequential "mps-flush-dependent-on-reg-exclude-key-skips-matching-store"
   (let ((state (cl-cc/optimize::make-mem-pass-state))
         (sg    (make-vm-set-global :src :r0 :name 'g)))
     (cl-cc/optimize::%mps-remember-store state 'g sg)
     (cl-cc/optimize::%mps-flush-dependent-on-reg state :r0 :exclude-key 'g)
-    (assert-true  (cl-cc/optimize::%mps-pending-store state 'g))
-    (assert-null  (cl-cc/optimize::mps-result state))))
+    (expect (cl-cc/optimize::%mps-pending-store state 'g) :to-be-truthy)
+    (expect (cl-cc/optimize::mps-result state) :to-be-null)))

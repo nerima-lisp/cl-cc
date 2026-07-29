@@ -4,19 +4,15 @@
 
 ;; rt-shell forks; forking while parallel test workers hold heap/malloc
 ;; locks deadlocks the child before exec on macOS. Run it serially.
-(in-suite cl-cc-serial-suite)
 
-(deftest rt-process-management-shell-output
-  "FR-1007: rt-shell returns captured stdout."
-  (assert-equal "hello" (cl-cc/runtime:rt-shell "printf hello")))
+(it-sequential "rt-process-management-shell-output"
+  (expect (cl-cc/runtime:rt-shell "printf hello") :to-equal "hello"))
 
-(in-suite cl-cc-unit-suite)
 
-(deftest rt-stackmap-compression-roundtrip
-  "FR-1115: stack map delta compression round-trips and safepoint API registers maps."
+(it-sequential "rt-stackmap-compression-roundtrip"
   (let* ((slots '((8 . :object) (24 . :fixnum) (32 . :object)))
          (compressed (cl-cc/runtime:rt-compress-stackmap-slots slots)))
-    (assert-equal slots (cl-cc/runtime:rt-decompress-stackmap-slots compressed))
-    (assert-true (search ".gc_map" (cl-cc/runtime:rt-gc-map-section-documentation)))
+    (expect (cl-cc/runtime:rt-decompress-stackmap-slots compressed) :to-equal slots)
+    (expect (search ".gc_map" (cl-cc/runtime:rt-gc-map-section-documentation)) :to-be-truthy)
     (cl-cc/runtime:rt-emit-gc-safepoint :kind :test :frame-id :rt-test-frame :live-slots slots)
-    (assert-true (gethash :rt-test-frame cl-cc/runtime::*rt-gc-stackmap-table*))))
+    (expect (gethash :rt-test-frame cl-cc/runtime::*rt-gc-stackmap-table*) :to-be-truthy)))

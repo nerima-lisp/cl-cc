@@ -9,45 +9,37 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-stdlib-utils-suite
-  :description "Tests for macros-stdlib-utils.lisp: list/tree/string/array utilities"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-stdlib-utils-suite)
 
 ;;; ─── tailp ────────────────────────────────────────────────────────────────
 
-(deftest tailp-expansion
-  "TAILP expands to a DO loop; termination clause is a cons (checks identity)."
+(it-sequential "tailp-expansion"
   (let* ((result (our-macroexpand-1 '(tailp obj lst)))
          (end-clause (third result)))
-    (assert-eq 'do (car result))
-    (assert-true (consp end-clause))))
+    (expect (car result) :to-be 'do)
+    (expect (consp end-clause) :to-be-truthy)))
 
 ;;; ─── ldiff ────────────────────────────────────────────────────────────────
 
-(deftest ldiff-expansion
-  "LDIFF expands to a LET; body contains NREVERSE to reverse accumulated result."
+(it-sequential "ldiff-expansion"
   (let* ((result (our-macroexpand-1 '(ldiff lst obj)))
          (body (cddr result)))
-    (assert-eq 'let (car result))
-    (assert-true (%tree-contains-p 'nreverse body))))
+    (expect (car result) :to-be 'let)
+    (expect (%tree-contains-p 'nreverse body) :to-be-truthy)))
 
 ;;; ─── copy-alist ───────────────────────────────────────────────────────────
 
-(deftest copy-alist-expansion
-  "COPY-ALIST expands to a LET with a DOLIST body."
+(it-sequential "copy-alist-expansion"
   (let* ((result (our-macroexpand-1 '(copy-alist alist)))
          (body (cddr result)))
-    (assert-eq 'let (car result))
-    (assert-true (some (lambda (f) (and (consp f) (eq (car f) 'dolist))) body))))
+    (expect (car result) :to-be 'let)
+    (expect (some (lambda (f) (and (consp f) (eq (car f) 'dolist))) body) :to-be-truthy)))
 
 ;;; ─── tree-equal ───────────────────────────────────────────────────────────
 
-(deftest tree-equal-expands-to-labels
-  "TREE-EQUAL expands to a LABELS form for recursive traversal."
+(it-sequential "tree-equal-expands-to-labels"
   (let ((result (our-macroexpand-1 '(tree-equal x y))))
-    (assert-eq 'labels (car result))))
+    (expect (car result) :to-be 'labels)))
 
 (defun %tree-contains-p (target form)
   "True if TARGET appears anywhere inside FORM (nested)."
@@ -56,118 +48,129 @@
                           (%tree-contains-p target (cdr form))))
         (t nil)))
 
-(deftest tree-equal-uses-default-eql-test
-  "TREE-EQUAL without :test uses #'eql as the comparison function."
+(it-sequential "tree-equal-uses-default-eql-test"
   (let* ((result   (our-macroexpand-1 '(tree-equal x y)))
          (bindings (second result))
          (fn-body  (cddr (first bindings))))
     ;; eql appears anywhere in the recursive fn body (nested ok)
-    (assert-true (%tree-contains-p 'eql fn-body))))
+    (expect (%tree-contains-p 'eql fn-body) :to-be-truthy)))
 
-(deftest tree-equal-respects-test-keyword
-  "TREE-EQUAL with :test #'equal uses the supplied test."
+(it-sequential "tree-equal-respects-test-keyword"
   (let* ((result (our-macroexpand-1 '(tree-equal x y :test #'equal)))
          (fn-body (cddr (first (second result)))))
-    (assert-true (%tree-contains-p 'equal fn-body))))
+    (expect (%tree-contains-p 'equal fn-body) :to-be-truthy)))
 
 ;;; ─── get-properties ───────────────────────────────────────────────────────
 
-(deftest get-properties-expansion
-  "GET-PROPERTIES expands to a DO loop; termination clause returns VALUES."
+(it-sequential "get-properties-expansion"
   (let* ((result (our-macroexpand-1 '(get-properties plist '(:a :b))))
          (end-clause (third result)))
-    (assert-eq 'do (car result))
-    (assert-true (some (lambda (f) (and (consp f) (eq (car f) 'values))) end-clause))))
+    (expect (car result) :to-be 'do)
+    (expect (some (lambda (f) (and (consp f) (eq (car f) 'values))) end-clause) :to-be-truthy)))
 
 ;;; ─── Destructive set operations ───────────────────────────────────────────
 
-(deftest-each destructive-set-ops-delegate
-  "nunion/nintersection/nset-difference/nset-exclusive-or each delegate to non-n counterpart."
-  :cases (("nunion"             '(nunion a b)             'union)
-          ("nintersection"      '(nintersection a b)      'intersection)
-          ("nset-difference"    '(nset-difference a b)    'set-difference)
-          ("nset-exclusive-or"  '(nset-exclusive-or a b)  'set-exclusive-or))
-  (form expected-head)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq expected-head (car result))))
+(it-sequential "destructive-set-ops-delegate nunion"
+  (destructuring-bind (form expected-head) (list '(nunion a b) 'union)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "destructive-set-ops-delegate nintersection"
+  (destructuring-bind (form expected-head) (list '(nintersection a b) 'intersection)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "destructive-set-ops-delegate nset-difference"
+  (destructuring-bind (form expected-head) (list '(nset-difference a b) 'set-difference)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "destructive-set-ops-delegate nset-exclusive-or"
+  (destructuring-bind (form expected-head) (list '(nset-exclusive-or a b) 'set-exclusive-or)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
 
 ;;; ─── nsubst / nsubst-if / nsubst-if-not ──────────────────────────────────
 
-(deftest-each nsubst-delegation-cases
-  "NSUBST delegates to SUBST (no :test) or SUBST-IF (with :test)."
-  :cases (("no-test"   '(nsubst new old tree)               'subst)
-          ("with-test" '(nsubst new old tree :test #'equal) 'subst-if))
-  (form expected-head)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq expected-head (car result))))
+(it-sequential "nsubst-delegation-cases no-test"
+  (destructuring-bind (form expected-head) (list '(nsubst new old tree) 'subst)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
 
-(deftest-each nsubst-if-variants-delegate
-  "NSUBST-IF and NSUBST-IF-NOT delegate to their SUBST counterparts."
-  :cases (("nsubst-if"     '(nsubst-if new pred tree)     'subst-if)
-          ("nsubst-if-not" '(nsubst-if-not new pred tree) 'subst-if-not))
-  (form expected-head)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq expected-head (car result))))
+(it-sequential "nsubst-delegation-cases with-test"
+  (destructuring-bind (form expected-head) (list '(nsubst new old tree :test #'equal) 'subst-if)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "nsubst-if-variants-delegate nsubst-if"
+  (destructuring-bind (form expected-head) (list '(nsubst-if new pred tree) 'subst-if)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "nsubst-if-variants-delegate nsubst-if-not"
+  (destructuring-bind (form expected-head) (list '(nsubst-if-not new pred tree) 'subst-if-not)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
 
 ;;; ─── nstring-upcase / nstring-downcase / nstring-capitalize ──────────────
 
-(deftest-each nstring-case-variants-no-bounds-delegate
-  "NSTRING-{UPCASE,DOWNCASE,CAPITALIZE} without :start/:end delegate to non-n counterpart."
-  :cases (("nstring-upcase"     '(nstring-upcase s)     'string-upcase)
-          ("nstring-downcase"   '(nstring-downcase s)   'string-downcase)
-          ("nstring-capitalize" '(nstring-capitalize s) 'string-capitalize))
-  (form expected-head)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq expected-head (car result))))
+(it-sequential "nstring-case-variants-no-bounds-delegate nstring-upcase"
+  (destructuring-bind (form expected-head) (list '(nstring-upcase s) 'string-upcase)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
 
-(deftest nstring-upcase-with-bounds
-  "NSTRING-UPCASE with :start or :end passes the keyword through to STRING-UPCASE."
+(it-sequential "nstring-case-variants-no-bounds-delegate nstring-downcase"
+  (destructuring-bind (form expected-head) (list '(nstring-downcase s) 'string-downcase)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "nstring-case-variants-no-bounds-delegate nstring-capitalize"
+  (destructuring-bind (form expected-head) (list '(nstring-capitalize s) 'string-capitalize)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "nstring-upcase-with-bounds"
   (let ((result-start (our-macroexpand-1 '(nstring-upcase s :start 2)))
         (result-end   (our-macroexpand-1 '(nstring-upcase s :end 5))))
-    (assert-eq 'string-upcase (car result-start))
-    (assert-true (member :start result-start))
-    (assert-eq 'string-upcase (car result-end))
-    (assert-true (member :end result-end))))
+    (expect (car result-start) :to-be 'string-upcase)
+    (expect (member :start result-start) :to-be-truthy)
+    (expect (car result-end) :to-be 'string-upcase)
+    (expect (member :end result-end) :to-be-truthy)))
 
 ;;; ─── Array predicate macros ───────────────────────────────────────────────
 
-(deftest bit-vector-p-expands-to-let
-  "BIT-VECTOR-P expands to a LET that guards with VECTORP."
+(it-sequential "bit-vector-p-expands-to-let"
   (let ((result (our-macroexpand-1 '(bit-vector-p x))))
-    (assert-eq 'let (car result))))
+    (expect (car result) :to-be 'let)))
 
-(deftest-each simple-predicate-delegation-cases
-  "SIMPLE-STRING-P and SIMPLE-BIT-VECTOR-P delegate to their non-simple counterparts."
-  :cases (("simple-string-p"     '(simple-string-p x)     'stringp)
-          ("simple-bit-vector-p" '(simple-bit-vector-p x) 'bit-vector-p))
-  (form expected-head)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq expected-head (car result))))
+(it-sequential "simple-predicate-delegation-cases simple-string-p"
+  (destructuring-bind (form expected-head) (list '(simple-string-p x) 'stringp)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
+
+(it-sequential "simple-predicate-delegation-cases simple-bit-vector-p"
+  (destructuring-bind (form expected-head) (list '(simple-bit-vector-p x) 'bit-vector-p)
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be expected-head))))
 
 ;;; ─── Array utility macros ─────────────────────────────────────────────────
 
-(deftest array-element-type-returns-t
-  "ARRAY-ELEMENT-TYPE evaluates array for side effects then returns T."
+(it-sequential "array-element-type-returns-t"
   (let ((result (our-macroexpand-1 '(array-element-type arr))))
-    (assert-eq 'progn (car result))
+    (expect (car result) :to-be 'progn)
     ;; last element is quoted T
-    (assert-equal ''t (car (last result)))))
+    (expect (car (last result)) :to-equal ''t)))
 
-(deftest array-in-bounds-p-expands-to-let
-  "ARRAY-IN-BOUNDS-P expands to a LET binding the array and subscript list."
+(it-sequential "array-in-bounds-p-expands-to-let"
   (let ((result (our-macroexpand-1 '(array-in-bounds-p arr 0 1))))
-    (assert-eq 'let (car result))))
+    (expect (car result) :to-be 'let)))
 
-(deftest array-in-bounds-p-uses-every
-  "ARRAY-IN-BOUNDS-P body uses EVERY to check each subscript."
+(it-sequential "array-in-bounds-p-uses-every"
   (let* ((result (our-macroexpand-1 '(array-in-bounds-p arr 0 1)))
          (body (cddr result)))
-    (assert-true (some (lambda (f) (and (consp f) (eq (car f) 'and))) body))))
+    (expect (some (lambda (f) (and (consp f) (eq (car f) 'and))) body) :to-be-truthy)))
 
-(deftest upgraded-array-element-type-returns-t
-  "UPGRADED-ARRAY-ELEMENT-TYPE evaluates type for side effects then returns T.
-The macro is registered under CL:UPGRADED-ARRAY-ELEMENT-TYPE since cl-cc/expand
-uses CL. Use CL:: prefix because cl-cc/test shadows it with cl-cc/type's defun."
+(it-sequential "upgraded-array-element-type-returns-t"
   (let ((result (our-macroexpand-1 '(cl:upgraded-array-element-type 'integer))))
-    (assert-eq 'progn (car result))
-    (assert-equal ''t (car (last result)))))
+    (expect (car result) :to-be 'progn)
+    (expect (car (last result)) :to-equal ''t)))

@@ -128,17 +128,7 @@
    ;; internals directly; there is no equivalent to port them to now that
    ;; cl-weave is the engine (cl-weave has its own 615-test self-suite covering
    ;; the same ground for cl-weave's own internals).
-    (:module "cli-tests"
-     :pathname "packages/cli/tests"
-     :serial t
-     :components
-     ((:file "test-support")
-      (:file "args-tests")
-       (:file "cli-tests")
-       (:file "flamegraph-tests")
-       (:file "main-tests")
-      (:file "main-dump-tests")
-      (:file "main-utils-tests")))
+    (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests")))
     (:module "vm-tests"
     :pathname "packages/vm/tests"
     :serial t

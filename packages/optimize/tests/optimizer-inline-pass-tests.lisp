@@ -8,7 +8,6 @@
 ;;;;   Reachability    — opt-reachable-function-labels
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -30,69 +29,71 @@
 
 ;;; ─── opt-make-pure-function-memo-table ──────────────────────────────────────
 
-(deftest opt-memo-table-is-hash-table
-  "opt-make-pure-function-memo-table returns an empty equal hash-table."
+(it-sequential "opt-memo-table-is-hash-table"
   (let ((ht (cl-cc/optimize::opt-make-pure-function-memo-table)))
-    (assert-true (hash-table-p ht))
-    (assert-= 0 (hash-table-count ht))))
+    (expect (hash-table-p ht) :to-be-truthy)
+    (expect (= 0 (hash-table-count ht)) :to-be-truthy)))
 
 ;;; ─── opt-pure-function-memo-get / opt-pure-function-memo-put ────────────────
 
-(deftest-each opt-memo-get-miss-cases
-  "opt-pure-function-memo-get returns nil/nil when label is impure or pure but no value stored."
-  :cases (("impure-label" nil)
-          ("pure-no-put"  t))
-  (mark-pure-p)
-  (let ((memo  (cl-cc/optimize::opt-make-pure-function-memo-table))
+(it-sequential "opt-memo-get-miss-cases impure-label"
+  (destructuring-bind (mark-pure-p) (list nil)
+    (let ((memo  (cl-cc/optimize::opt-make-pure-function-memo-table))
         (pures (make-hash-table :test #'equal)))
     (when mark-pure-p (setf (gethash "fn" pures) t))
     (multiple-value-bind (val found-p)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(1))
-      (assert-null val)
-      (assert-null found-p))))
+      (expect val :to-be-null)
+      (expect found-p :to-be-null)))))
 
-(deftest opt-memo-roundtrip
-  "opt-pure-function-memo-put then get returns the stored result."
+(it-sequential "opt-memo-get-miss-cases pure-no-put"
+  (destructuring-bind (mark-pure-p) (list t)
+    (let ((memo  (cl-cc/optimize::opt-make-pure-function-memo-table))
+        (pures (make-hash-table :test #'equal)))
+    (when mark-pure-p (setf (gethash "fn" pures) t))
+    (multiple-value-bind (val found-p)
+        (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(1))
+      (expect val :to-be-null)
+      (expect found-p :to-be-null)))))
+
+(it-sequential "opt-memo-roundtrip"
   (let ((memo   (cl-cc/optimize::opt-make-pure-function-memo-table))
         (pures  (make-hash-table :test #'equal)))
     (setf (gethash "fn" pures) t)
     (cl-cc/optimize::opt-pure-function-memo-put memo pures "fn" '(2) :answer)
     (multiple-value-bind (val found-p)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(2))
-      (assert-eq :answer val)
-      (assert-true found-p))))
+      (expect val :to-be :answer)
+      (expect found-p :to-be-truthy))))
 
-(deftest opt-memo-put-ignores-impure-label
-  "opt-pure-function-memo-put does not store for labels absent from pure-labels."
+(it-sequential "opt-memo-put-ignores-impure-label"
   (let ((memo   (cl-cc/optimize::opt-make-pure-function-memo-table))
         (pures  (make-hash-table :test #'equal)))
     (cl-cc/optimize::opt-pure-function-memo-put memo pures "impure" '() :result)
-    (assert-= 0 (hash-table-count memo))))
+    (expect (= 0 (hash-table-count memo)) :to-be-truthy)))
 
-(deftest opt-memo-lru-evicts-oldest-entry-at-max-size
-  "When max-size is set, inserting over capacity evicts the least-recently-used key."
+(it-sequential "opt-memo-lru-evicts-oldest-entry-at-max-size"
   (let ((memo  (cl-cc/optimize::opt-make-pure-function-memo-table :max-size 2))
         (pures (make-hash-table :test #'equal)))
     (setf (gethash "fn" pures) t)
     (cl-cc/optimize::opt-pure-function-memo-put memo pures "fn" '(1) :a)
     (cl-cc/optimize::opt-pure-function-memo-put memo pures "fn" '(2) :b)
     (cl-cc/optimize::opt-pure-function-memo-put memo pures "fn" '(3) :c)
-    (assert-= 2 (hash-table-count memo))
+    (expect (= 2 (hash-table-count memo)) :to-be-truthy)
     (multiple-value-bind (v1 f1)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(1))
       (declare (ignore v1))
-      (assert-false f1))
+      (expect f1 :to-be-falsy))
     (multiple-value-bind (v2 f2)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(2))
-      (assert-true f2)
-      (assert-eq :b v2))
+      (expect f2 :to-be-truthy)
+      (expect v2 :to-be :b))
     (multiple-value-bind (v3 f3)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(3))
-      (assert-true f3)
-      (assert-eq :c v3))))
+      (expect f3 :to-be-truthy)
+      (expect v3 :to-be :c))))
 
-(deftest opt-memo-lru-touch-on-get-updates-recentness
-  "A successful memo get updates recency so a different key is evicted next."
+(it-sequential "opt-memo-lru-touch-on-get-updates-recentness"
   (let ((memo  (cl-cc/optimize::opt-make-pure-function-memo-table :max-size 2))
         (pures (make-hash-table :test #'equal)))
     (setf (gethash "fn" pures) t)
@@ -102,31 +103,29 @@
     (multiple-value-bind (_v f)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(1))
       (declare (ignore _v))
-      (assert-true f))
+      (expect f :to-be-truthy))
     (cl-cc/optimize::opt-pure-function-memo-put memo pures "fn" '(3) :c)
     (multiple-value-bind (_v f)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(2))
       (declare (ignore _v))
-      (assert-false f))
+      (expect f :to-be-falsy))
     (multiple-value-bind (v1 f1)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(1))
-      (assert-true f1)
-      (assert-eq :a v1))
+      (expect f1 :to-be-truthy)
+      (expect v1 :to-be :a))
     (multiple-value-bind (v3 f3)
         (cl-cc/optimize::opt-pure-function-memo-get memo pures "fn" '(3))
-      (assert-true f3)
-      (assert-eq :c v3))))
+      (expect f3 :to-be-truthy)
+      (expect v3 :to-be :c))))
 
 ;;; ─── opt-function-body-instruction-tables ───────────────────────────────────
 
-(deftest opt-body-instruction-set-empty
-  "opt-function-body-instruction-tables on empty func-defs returns empty tables."
+(it-sequential "opt-body-instruction-set-empty"
   (multiple-value-bind (ht _labels)
       (cl-cc/optimize::opt-function-body-instruction-tables (make-hash-table :test #'equal))
-    (assert-= 0 (hash-table-count ht))))
+    (expect (= 0 (hash-table-count ht)) :to-be-truthy)))
 
-(deftest opt-body-instruction-set-contains-body-insts
-  "opt-function-body-instruction-tables body-inst-set includes every body instruction."
+(it-sequential "opt-body-instruction-set-contains-body-insts"
   (let* ((c1    (make-vm-const :dst :r1 :value 42))
          (ret   (make-vm-ret   :reg :r1))
          (fdefs (make-hash-table :test #'equal)))
@@ -134,11 +133,10 @@
           (list :closure nil :params nil :body (list c1 ret)))
     (multiple-value-bind (s _labels)
         (cl-cc/optimize::opt-function-body-instruction-tables fdefs)
-      (assert-true (gethash c1  s))
-      (assert-true (gethash ret s)))))
+      (expect (gethash c1  s) :to-be-truthy)
+      (expect (gethash ret s) :to-be-truthy))))
 
-(deftest opt-body-instruction-labels-maps-to-label
-  "opt-function-body-instruction-tables inst->label maps each body inst to its label."
+(it-sequential "opt-body-instruction-labels-maps-to-label"
   (let* ((c1    (make-vm-const :dst :r0 :value 1))
          (ret   (make-vm-ret   :reg :r0))
          (fdefs (make-hash-table :test #'equal)))
@@ -146,30 +144,27 @@
           (list :closure nil :params nil :body (list c1 ret)))
     (multiple-value-bind (_set inst->label)
         (cl-cc/optimize::opt-function-body-instruction-tables fdefs)
-      (assert-equal "myfn" (gethash c1  inst->label))
-      (assert-equal "myfn" (gethash ret inst->label)))))
+      (expect (gethash c1  inst->label) :to-equal "myfn")
+      (expect (gethash ret inst->label) :to-equal "myfn"))))
 
 ;;; ─── opt-reachable-function-labels ──────────────────────────────────────────
 
-(deftest opt-reachable-empty-roots
-  "opt-reachable-function-labels returns empty set when roots is empty."
+(it-sequential "opt-reachable-empty-roots"
   (let ((graph (make-hash-table :test #'equal))
         (roots (make-hash-table :test #'equal)))
     (setf (gethash "a" graph) '("b"))
     (let ((r (cl-cc/optimize::opt-reachable-function-labels graph roots)))
-      (assert-= 0 (hash-table-count r)))))
+      (expect (= 0 (hash-table-count r)) :to-be-truthy))))
 
-(deftest opt-reachable-direct-root
-  "opt-reachable-function-labels includes the root label itself."
+(it-sequential "opt-reachable-direct-root"
   (let ((graph (make-hash-table :test #'equal))
         (roots (make-hash-table :test #'equal)))
     (setf (gethash "fn" graph) nil)
     (setf (gethash "fn" roots) t)
     (let ((r (cl-cc/optimize::opt-reachable-function-labels graph roots)))
-      (assert-true (gethash "fn" r)))))
+      (expect (gethash "fn" r) :to-be-truthy))))
 
-(deftest opt-reachable-transitive
-  "opt-reachable-function-labels follows call edges transitively."
+(it-sequential "opt-reachable-transitive"
   (let ((graph (make-hash-table :test #'equal))
         (roots (make-hash-table :test #'equal)))
     (setf (gethash "a" graph) '("b"))
@@ -177,17 +172,16 @@
     (setf (gethash "c" graph) nil)
     (setf (gethash "a" roots) t)
     (let ((r (cl-cc/optimize::opt-reachable-function-labels graph roots)))
-      (assert-true (gethash "a" r))
-      (assert-true (gethash "b" r))
-      (assert-true (gethash "c" r)))))
+      (expect (gethash "a" r) :to-be-truthy)
+      (expect (gethash "b" r) :to-be-truthy)
+      (expect (gethash "c" r) :to-be-truthy))))
 
-(deftest opt-reachable-cycle-terminates
-  "opt-reachable-function-labels terminates on cyclic call graphs."
+(it-sequential "opt-reachable-cycle-terminates"
   (let ((graph (make-hash-table :test #'equal))
         (roots (make-hash-table :test #'equal)))
     (setf (gethash "x" graph) '("y"))
     (setf (gethash "y" graph) '("x"))
     (setf (gethash "x" roots) t)
     (let ((r (cl-cc/optimize::opt-reachable-function-labels graph roots)))
-      (assert-true  (gethash "x" r))
-      (assert-true  (gethash "y" r)))))
+      (expect (gethash "x" r) :to-be-truthy)
+      (expect (gethash "y" r) :to-be-truthy))))

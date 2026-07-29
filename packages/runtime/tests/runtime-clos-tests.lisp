@@ -7,7 +7,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -17,19 +16,17 @@
 
 ;;; ─── Class Descriptors ──────────────────────────────────────────────────────
 
-(deftest rt-defclass-registers-descriptor
-  "rt-defclass registers and returns a descriptor hash table with CPL metadata."
+(it-sequential "rt-defclass-registers-descriptor"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
     (let ((base  (cl-cc/runtime:rt-defclass 'rt-base '() '(x)))
           (child (cl-cc/runtime:rt-defclass 'rt-child '(rt-base) '(y))))
-      (assert-true (hash-table-p base))
-      (assert-true (hash-table-p child))
-      (assert-eq child (cl-cc/runtime:rt-find-class 'rt-child))
-      (assert-eq 'rt-child (gethash :__name__ child))
-      (assert-true (member 'rt-base (gethash :__cpl__ child))))))
+      (expect (hash-table-p base) :to-be-truthy)
+      (expect (hash-table-p child) :to-be-truthy)
+      (expect (cl-cc/runtime:rt-find-class 'rt-child) :to-be child)
+      (expect (gethash :__name__ child) :to-be 'rt-child)
+      (expect (member 'rt-base (gethash :__cpl__ child)) :to-be-truthy))))
 
-(deftest rt-register-method-and-call-generic
-  "rt-register-method stores a method; rt-call-generic dispatches it."
+(it-sequential "rt-register-method-and-call-generic"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq))
         (cl-cc/runtime:*rt-generic-function-registry* (make-hash-table :test #'equal)))
     (let* ((klass (cl-cc/runtime:rt-defclass 'rt-node '() '(value)))
@@ -40,10 +37,9 @@
       (cl-cc/runtime:rt-register-method gf 'rt-node
         (lambda (instance)
           (gethash :__name__ (gethash :__class__ instance))))
-      (assert-eq 'rt-node (cl-cc/runtime:rt-call-generic gf obj)))))
+      (expect (cl-cc/runtime:rt-call-generic gf obj) :to-be 'rt-node))))
 
-(deftest rt-compute-applicable-methods-returns-primary-descriptor
-  "rt-compute-applicable-methods returns the registered primary descriptor."
+(it-sequential "rt-compute-applicable-methods-returns-primary-descriptor"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq))
         (cl-cc/runtime:*rt-generic-function-registry* (make-hash-table :test #'equal)))
     (let* ((klass (cl-cc/runtime:rt-defclass 'rt-node '() '(value)))
@@ -55,50 +51,61 @@
         (lambda (instance)
           (gethash :__name__ (gethash :__class__ instance))))
       (let ((methods (cl-cc/runtime:rt-compute-applicable-methods gf (list obj))))
-        (assert-= 1 (length methods))
-        (assert-eq 'rt-node (gethash :specializer (first methods)))
-        (assert-true (functionp (gethash :function (first methods))))))))
+        (expect (= 1 (length methods)) :to-be-truthy)
+        (expect (gethash :specializer (first methods)) :to-be 'rt-node)
+        (expect (functionp (gethash :function (first methods))) :to-be-truthy)))))
 
 ;;; ─── EQL Specializers ───────────────────────────────────────────────────────
 
-(deftest-each rt-eql-specializer-p-cases
-  "%rt-eql-specializer-p recognizes (eql ...) lists only."
-  :cases (("eql-form" '(eql 42)  t)
-          ("non-eql"  '(foo 42)  nil)
-          ("not-cons" 'symbol    nil)
-          ("bare-eql" 'eql       nil))
-  (form expected)
-  (assert-equal expected (cl-cc/runtime::%rt-eql-specializer-p form)))
+(it-sequential "rt-eql-specializer-p-cases eql-form"
+  (destructuring-bind (form expected) (list '(eql 42) t)
+    (expect (cl-cc/runtime::%rt-eql-specializer-p form) :to-equal expected)))
 
-(deftest-each rt-extract-eql-specializer-keys-cases
-  "%rt-extract-eql-specializer-keys extracts value from eql specializer forms."
-  :cases (("direct"  '(eql 42)    '(42))
-          ("wrapped" '((eql 42))  '(42))
-          ("non-eql" '(integer)   nil)
-          ("symbol"  'integer     nil))
-  (spec expected)
-  (assert-equal expected (cl-cc/runtime::%rt-extract-eql-specializer-keys spec)))
+(it-sequential "rt-eql-specializer-p-cases non-eql"
+  (destructuring-bind (form expected) (list '(foo 42) nil)
+    (expect (cl-cc/runtime::%rt-eql-specializer-p form) :to-equal expected)))
 
-(deftest rt-call-generic-eql-dispatch
-  "rt-call-generic dispatches on eql specializers before class-based lookup."
+(it-sequential "rt-eql-specializer-p-cases not-cons"
+  (destructuring-bind (form expected) (list 'symbol nil)
+    (expect (cl-cc/runtime::%rt-eql-specializer-p form) :to-equal expected)))
+
+(it-sequential "rt-eql-specializer-p-cases bare-eql"
+  (destructuring-bind (form expected) (list 'eql nil)
+    (expect (cl-cc/runtime::%rt-eql-specializer-p form) :to-equal expected)))
+
+(it-sequential "rt-extract-eql-specializer-keys-cases direct"
+  (destructuring-bind (spec expected) (list '(eql 42) '(42))
+    (expect (cl-cc/runtime::%rt-extract-eql-specializer-keys spec) :to-equal expected)))
+
+(it-sequential "rt-extract-eql-specializer-keys-cases wrapped"
+  (destructuring-bind (spec expected) (list '((eql 42)) '(42))
+    (expect (cl-cc/runtime::%rt-extract-eql-specializer-keys spec) :to-equal expected)))
+
+(it-sequential "rt-extract-eql-specializer-keys-cases non-eql"
+  (destructuring-bind (spec expected) (list '(integer) nil)
+    (expect (cl-cc/runtime::%rt-extract-eql-specializer-keys spec) :to-equal expected)))
+
+(it-sequential "rt-extract-eql-specializer-keys-cases symbol"
+  (destructuring-bind (spec expected) (list 'integer nil)
+    (expect (cl-cc/runtime::%rt-extract-eql-specializer-keys spec) :to-equal expected)))
+
+(it-sequential "rt-call-generic-eql-dispatch"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
     (let ((gf (make-hash-table :test #'equal)))
       (setf (gethash :__name__ gf) 'rt-eql-test-gf)
       (cl-cc/runtime:rt-register-method gf '(eql 99) (lambda (x) (* x 2)))
-      (assert-= 1 (hash-table-count (gethash :__eql-index__ gf)))
-      (assert-= 198 (cl-cc/runtime:rt-call-generic gf 99)))))
+      (expect (= 1 (hash-table-count (gethash :__eql-index__ gf))) :to-be-truthy)
+      (expect (= 198 (cl-cc/runtime:rt-call-generic gf 99)) :to-be-truthy))))
 
-(deftest rt-call-generic-eql-index-precedes-class-fallback
-  "rt-call-generic uses the EQL index before class fallback methods."
+(it-sequential "rt-call-generic-eql-index-precedes-class-fallback"
   (let ((gf (make-hash-table :test #'equal)))
     (setf (gethash :__name__ gf) 'rt-eql-fallback-test-gf)
     (cl-cc/runtime:rt-register-method gf 'symbol (lambda (x) (declare (ignore x)) :class))
     (cl-cc/runtime:rt-register-method gf '(eql :read) (lambda (x) (declare (ignore x)) :eql))
-    (assert-eq :eql (cl-cc/runtime:rt-call-generic gf :read))
-    (assert-eq :class (cl-cc/runtime:rt-call-generic gf :write))))
+    (expect (cl-cc/runtime:rt-call-generic gf :read) :to-be :eql)
+    (expect (cl-cc/runtime:rt-call-generic gf :write) :to-be :class)))
 
-(deftest rt-call-generic-standard-method-combination-runs-before-primary-after
-  "rt-call-generic executes before -> primary -> after (after in reverse order)."
+(it-sequential "rt-call-generic-standard-method-combination-runs-before-primary-after"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
     (let* ((klass (cl-cc/runtime:rt-defclass 'rt-combo-node '() '()))
            (obj (make-hash-table :test #'eq))
@@ -114,11 +121,10 @@
                                         (lambda (_) (declare (ignore _)) (push :after-1 log)))
       (cl-cc/runtime:rt-register-method gf '(:__AFTER__ t)
                                         (lambda (_) (declare (ignore _)) (push :after-2 log)))
-      (assert-eq :ok (cl-cc/runtime:rt-call-generic gf obj))
-      (assert-equal '(:after-1 :after-2 :primary :before) log))))
+      (expect (cl-cc/runtime:rt-call-generic gf obj) :to-be :ok)
+      (expect log :to-equal '(:after-1 :after-2 :primary :before)))))
 
-(deftest rt-call-generic-custom-method-combination-folds-qualified-methods
-  "rt-call-generic folds qualified methods using custom method-combination operator." 
+(it-sequential "rt-call-generic-custom-method-combination-folds-qualified-methods"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
     (let* ((klass (cl-cc/runtime:rt-defclass 'rt-sum-node '() '()))
            (obj (make-hash-table :test #'eq))
@@ -130,93 +136,93 @@
                                         (lambda (_) (declare (ignore _)) 10))
       (cl-cc/runtime:rt-register-method gf '(:__+__ t)
                                         (lambda (_) (declare (ignore _)) 7))
-      (assert-= 17 (cl-cc/runtime:rt-call-generic gf obj)))))
+      (expect (= 17 (cl-cc/runtime:rt-call-generic gf obj)) :to-be-truthy))))
 
-(deftest rt-register-method-with-qualifier-normalizes-qualified-key
-  "rt-register-method accepts optional qualifier and stores qualified method key."
+(it-sequential "rt-register-method-with-qualifier-normalizes-qualified-key"
   (let ((gf (make-hash-table :test #'equal)))
     (setf (gethash :__methods__ gf) (make-hash-table :test #'equal)
           (gethash :__eql-index__ gf) (make-hash-table :test #'equal))
     (cl-cc/runtime:rt-register-method gf 'my-class (lambda (x) x) :before)
-    (assert-true (functionp (gethash '(:__BEFORE__ my-class)
-                                      (gethash :__methods__ gf))))))
+    (expect (functionp (gethash '(:__BEFORE__ my-class)
+                                      (gethash :__methods__ gf))) :to-be-truthy)))
 
 ;;; ─── Argument Classification ────────────────────────────────────────────────
 
-(deftest-each rt-classify-arg-primitive-types
-  "*rt-primitive-type-classifiers* drives %rt-classify-arg for CL primitive values."
-  :cases (("integer" 42        'integer)
-          ("string"  "hello"   'string)
-          ("symbol"  'foo      'symbol)
-          ("unknown" 3.14      t)
-          ("vector"  #(1 2 3)  t))
-  (arg expected)
-  (assert-equal expected (cl-cc/runtime::%rt-classify-arg arg)))
+(it-sequential "rt-classify-arg-primitive-types integer"
+  (destructuring-bind (arg expected) (list 42 'integer)
+    (expect (cl-cc/runtime::%rt-classify-arg arg) :to-equal expected)))
 
-(deftest rt-classify-arg-clos-descriptor
-  "%rt-classify-arg extracts :__name__ from a descriptor hash table."
+(it-sequential "rt-classify-arg-primitive-types string"
+  (destructuring-bind (arg expected) (list "hello" 'string)
+    (expect (cl-cc/runtime::%rt-classify-arg arg) :to-equal expected)))
+
+(it-sequential "rt-classify-arg-primitive-types symbol"
+  (destructuring-bind (arg expected) (list 'foo 'symbol)
+    (expect (cl-cc/runtime::%rt-classify-arg arg) :to-equal expected)))
+
+(it-sequential "rt-classify-arg-primitive-types unknown"
+  (destructuring-bind (arg expected) (list 3.14 t)
+    (expect (cl-cc/runtime::%rt-classify-arg arg) :to-equal expected)))
+
+(it-sequential "rt-classify-arg-primitive-types vector"
+  (destructuring-bind (arg expected) (list #(1 2 3) t)
+    (expect (cl-cc/runtime::%rt-classify-arg arg) :to-equal expected)))
+
+(it-sequential "rt-classify-arg-clos-descriptor"
   (let* ((class-ht (make-hash-table :test #'eq))
          (obj      (make-hash-table :test #'eq)))
     (setf (gethash :__name__  class-ht) 'my-class
           (gethash :__class__ obj)       class-ht)
-    (assert-eq 'my-class (cl-cc/runtime::%rt-classify-arg obj))))
+    (expect (cl-cc/runtime::%rt-classify-arg obj) :to-be 'my-class)))
 
-(deftest rt-classify-arg-plain-hash-table-returns-t
-  "%rt-classify-arg returns T for a hash table without :__class__."
+(it-sequential "rt-classify-arg-plain-hash-table-returns-t"
   (let ((ht (make-hash-table :test #'eq)))
-    (assert-eq t (cl-cc/runtime::%rt-classify-arg ht))))
+    (expect (cl-cc/runtime::%rt-classify-arg ht) :to-be t)))
 
-(deftest rt-primitive-type-classifiers-table-entries
-  "*rt-primitive-type-classifiers* contains exactly integer/string/symbol."
+(it-sequential "rt-primitive-type-classifiers-table-entries"
   (let ((table cl-cc/runtime::*rt-primitive-type-classifiers*))
-    (assert-true (assoc 'integer table))
-    (assert-true (assoc 'string  table))
-    (assert-true (assoc 'symbol  table))
-    (assert-= 3 (length table))))
+    (expect (assoc 'integer table) :to-be-truthy)
+    (expect (assoc 'string  table) :to-be-truthy)
+    (expect (assoc 'symbol  table) :to-be-truthy)
+    (expect (= 3 (length table)) :to-be-truthy)))
 
 ;;; ─── Slot Access ────────────────────────────────────────────────────────────
 
-(deftest rt-slot-ops
-  "rt-slot-value/set/boundp/makunbound/exists-p on standard CLOS instances."
+(it-sequential "rt-slot-ops"
   (let ((obj (make-instance 'rt-clos-test-fixture :x 42)))
-    (assert-= 42 (cl-cc/runtime:rt-slot-value obj 'x))
+    (expect (= 42 (cl-cc/runtime:rt-slot-value obj 'x)) :to-be-truthy)
     (cl-cc/runtime:rt-slot-set obj 'x 99)
-    (assert-= 99 (cl-cc/runtime:rt-slot-value obj 'x))
-    (assert-= 1 (cl-cc/runtime:rt-slot-boundp   obj 'x))
-    (assert-= 1 (cl-cc/runtime:rt-slot-exists-p obj 'x))
-    (assert-= 0 (cl-cc/runtime:rt-slot-exists-p obj 'nonexistent))
+    (expect (= 99 (cl-cc/runtime:rt-slot-value obj 'x)) :to-be-truthy)
+    (expect (= 1 (cl-cc/runtime:rt-slot-boundp   obj 'x)) :to-be-truthy)
+    (expect (= 1 (cl-cc/runtime:rt-slot-exists-p obj 'x)) :to-be-truthy)
+    (expect (= 0 (cl-cc/runtime:rt-slot-exists-p obj 'nonexistent)) :to-be-truthy)
     (cl-cc/runtime:rt-slot-makunbound obj 'x)
-    (assert-= 0 (cl-cc/runtime:rt-slot-boundp obj 'x))))
+    (expect (= 0 (cl-cc/runtime:rt-slot-boundp obj 'x)) :to-be-truthy)))
 
-(deftest rt-class-name-and-of
-  "rt-class-name/rt-class-of work on hash-table descriptors and real CLOS objects."
+(it-sequential "rt-class-name-and-of"
   (let ((ht (make-hash-table :test #'eq)))
     (setf (gethash :__name__ ht) 'my-class)
-    (assert-eq 'my-class (cl-cc/runtime:rt-class-name ht)))
+    (expect (cl-cc/runtime:rt-class-name ht) :to-be 'my-class))
   (let ((obj (make-instance 'rt-clos-test-fixture :x 1)))
-    (assert-eq 'rt-clos-test-fixture
-               (class-name (cl-cc/runtime:rt-class-of obj)))))
+    (expect (class-name (cl-cc/runtime:rt-class-of obj)) :to-be 'rt-clos-test-fixture)))
 
 ;;; ─── %rt-cpl-walk (extracted helper) ────────────────────────────────────────
 
-(deftest rt-cpl-walk-stops-at-already-seen
-  "%rt-cpl-walk: passing NAME already in SEEN returns SEEN unchanged."
+(it-sequential "rt-cpl-walk-stops-at-already-seen"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
-    (assert-equal '(foo) (cl-cc/runtime::%rt-cpl-walk 'foo '(foo)))))
+    (expect (cl-cc/runtime::%rt-cpl-walk 'foo '(foo)) :to-equal '(foo))))
 
-(deftest rt-cpl-walk-single-class-no-supers
-  "%rt-cpl-walk on a class with no superclasses returns (name)."
+(it-sequential "rt-cpl-walk-single-class-no-supers"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
     (cl-cc/runtime:rt-defclass 'cpl-base '() '())
-    (assert-equal '(cpl-base) (cl-cc/runtime::%rt-cpl-walk 'cpl-base '()))))
+    (expect (cl-cc/runtime::%rt-cpl-walk 'cpl-base '()) :to-equal '(cpl-base))))
 
-(deftest rt-cpl-walk-inherits-parent
-  "%rt-cpl-walk on child→parent returns (child parent) in order."
+(it-sequential "rt-cpl-walk-inherits-parent"
   (let ((cl-cc/runtime:*rt-class-registry* (make-hash-table :test #'eq)))
     (cl-cc/runtime:rt-defclass 'cpl-parent '() '())
     (cl-cc/runtime:rt-defclass 'cpl-child '(cpl-parent) '())
     (let ((result (cl-cc/runtime::%rt-cpl-walk 'cpl-child '())))
-      (assert-true (member 'cpl-child result :test #'eq))
-      (assert-true (member 'cpl-parent result :test #'eq))
-      (assert-true (< (position 'cpl-child result)
-                      (position 'cpl-parent result))))))
+      (expect (member 'cpl-child result :test #'eq) :to-be-truthy)
+      (expect (member 'cpl-parent result :test #'eq) :to-be-truthy)
+      (expect (< (position 'cpl-child result)
+                      (position 'cpl-parent result)) :to-be-truthy))))

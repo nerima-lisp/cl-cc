@@ -6,115 +6,104 @@
 ;;;;   optimize-backend-roadmap doc parsing and evidence coverage.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-documentation-suite)
 
-(deftest optimize-formal-tooling-superopt-abstract-and-translation-validation
-  "FR-750/751/752: formal tooling has concrete superopt, AI, and translation-validation behavior."
+(it-sequential "optimize-formal-tooling-superopt-abstract-and-translation-validation"
   (let* ((window (list (cl-cc:make-vm-move :dst :r1 :src :r0)
                        (cl-cc:make-vm-move :dst :r1 :src :r0)))
          (optimized (cl-cc/optimize:opt-pass-superopt window)))
-    (assert-= 1 (length optimized))
-    (assert-true (typep (first optimized) 'cl-cc/vm:vm-move))
-    (assert-eq :r1 (cl-cc/vm::vm-dst (first optimized)))
-    (assert-eq :r0 (cl-cc/vm::vm-src (first optimized))))
+    (expect (= 1 (length optimized)) :to-be-truthy)
+    (expect (typep (first optimized) 'cl-cc/vm:vm-move) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst (first optimized)) :to-be :r1)
+    (expect (cl-cc/vm::vm-src (first optimized)) :to-be :r0))
   (let* ((program (list (cl-cc:make-vm-const :dst :r0 :value 2)
                         (cl-cc:make-vm-const :dst :r1 :value 5)
                         (cl-cc:make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
          (state (cl-cc/optimize:ai-compute-fixed-point program))
          (facts (cl-cc/optimize::ai-state-facts state))
          (r2 (gethash :r2 facts)))
-    (assert-equal '(7 . 7) (getf r2 :interval))
-    (assert-eq :non-null (getf r2 :nullness)))
+    (expect (getf r2 :interval) :to-equal '(7 . 7))
+    (expect (getf r2 :nullness) :to-be :non-null))
   (let ((before (list (cl-cc:make-vm-const :dst :r0 :value 1)
                       (cl-cc:make-vm-halt :reg :r0)))
         (after (list (cl-cc:make-vm-const :dst :r0 :value 2)
                      (cl-cc:make-vm-halt :reg :r0))))
-    (assert-true (cl-cc/optimize::translation-validation-equivalent-p before before))
-    (assert-false (cl-cc/optimize::translation-validation-equivalent-p before after))
+    (expect (cl-cc/optimize::translation-validation-equivalent-p before before) :to-be-truthy)
+    (expect (cl-cc/optimize::translation-validation-equivalent-p before after) :to-be-falsy)
     (let ((cl-cc/optimize:*translation-validation-enabled* t))
-      (assert-eq after (handler-bind ((warning #'muffle-warning))
-                         (cl-cc/optimize:validate-optimizer-translation :unit before after))))))
+      (expect (handler-bind ((warning #'muffle-warning))
+                         (cl-cc/optimize:validate-optimizer-translation :unit before after)) :to-be after))))
 
-(deftest optimize-differential-fuzzing-deterministic-smoke
-  "FR-753: differential fuzzing generator/interpreter is deterministic and catches mismatches without signaling."
+(it-sequential "optimize-differential-fuzzing-deterministic-smoke"
   (let* ((result (cl-cc/optimize:opt-run-compiler-fuzz
                   :trials 8
                   :seed 753
                   :max-program-length 8
                   :optimizer #'identity)))
-    (assert-true (getf result :ok))
-    (assert-= 8 (getf result :trials))
-    (assert-= 753 (getf result :seed)))
+    (expect (getf result :ok) :to-be-truthy)
+    (expect (= 8 (getf result :trials)) :to-be-truthy)
+    (expect (= 753 (getf result :seed)) :to-be-truthy))
   (let* ((program (cl-cc/optimize::opt-generate-random-ir-program
                    :state (cl-cc/optimize::%opt-fuzz-random-state 9)
                    :max-program-length 6))
          (expected (multiple-value-list (cl-cc/optimize::opt-fuzz-interpret-ir program)))
          (actual (multiple-value-list (cl-cc/optimize::opt-fuzz-interpret-ir (copy-list program)))))
-    (assert-equal expected actual)))
+    (expect actual :to-equal expected)))
 
-(deftest optimize-roadmap-runtime-helpers-have-concrete-behavior
-  "Roadmap helper APIs maintain concrete PIC, profile, deopt, shape, and tiering state."
+(it-sequential "optimize-roadmap-runtime-helpers-have-concrete-behavior"
   (let ((site (cl-cc/optimize::make-opt-ic-site :max-polymorphic-entries 2)))
-    (assert-eq :uninitialized (cl-cc/optimize::opt-ic-site-state site))
+    (expect (cl-cc/optimize::opt-ic-site-state site) :to-be :uninitialized)
     (cl-cc/optimize::opt-ic-transition site :shape-a :target-a)
-    (assert-eq :monomorphic (cl-cc/optimize::opt-ic-site-state site))
+    (expect (cl-cc/optimize::opt-ic-site-state site) :to-be :monomorphic)
     (cl-cc/optimize::opt-ic-transition site :shape-b :target-b)
-    (assert-eq :polymorphic (cl-cc/optimize::opt-ic-site-state site))
+    (expect (cl-cc/optimize::opt-ic-site-state site) :to-be :polymorphic)
     (cl-cc/optimize::opt-ic-transition site :shape-c :target-c)
-    (assert-eq :megamorphic (cl-cc/optimize::opt-ic-site-state site))
-    (assert-= 3 (cl-cc/optimize::opt-ic-site-misses site))
-    (assert-= 3 (length (cl-cc/optimize::opt-ic-site-megamorphic-fallback site))))
+    (expect (cl-cc/optimize::opt-ic-site-state site) :to-be :megamorphic)
+    (expect (= 3 (cl-cc/optimize::opt-ic-site-misses site)) :to-be-truthy)
+    (expect (= 3 (length (cl-cc/optimize::opt-ic-site-megamorphic-fallback site))) :to-be-truthy))
   (let ((spec-log (cl-cc/optimize::make-opt-speculation-log :threshold 2)))
-    (assert-false (cl-cc/optimize::opt-speculation-failed-p spec-log :site :guard))
-    (assert-= 1 (cl-cc/optimize::opt-record-speculation-failure spec-log :site :guard))
-    (assert-false (cl-cc/optimize::opt-speculation-failed-p spec-log :site :guard))
-    (assert-= 2 (cl-cc/optimize::opt-record-speculation-failure spec-log :site :guard))
-    (assert-true (cl-cc/optimize::opt-speculation-failed-p spec-log :site :guard)))
+    (expect (cl-cc/optimize::opt-speculation-failed-p spec-log :site :guard) :to-be-falsy)
+    (expect (= 1 (cl-cc/optimize::opt-record-speculation-failure spec-log :site :guard)) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-speculation-failed-p spec-log :site :guard) :to-be-falsy)
+    (expect (= 2 (cl-cc/optimize::opt-record-speculation-failure spec-log :site :guard)) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-speculation-failed-p spec-log :site :guard) :to-be-truthy))
   (let ((profile (cl-cc/optimize::make-opt-profile-data)))
-    (assert-= 3 (cl-cc/optimize::opt-profile-record-edge profile :entry :exit 3))
-    (assert-= 2 (cl-cc/optimize::opt-profile-record-value profile :ic-site 42 2))
-    (assert-= 4 (cl-cc/optimize::opt-profile-record-call-chain profile '(:main :callee) 4))
-    (assert-equal (cons 2 64)
-                  (cl-cc/optimize::opt-profile-record-allocation profile :alloc-site 64 2)))
+    (expect (= 3 (cl-cc/optimize::opt-profile-record-edge profile :entry :exit 3)) :to-be-truthy)
+    (expect (= 2 (cl-cc/optimize::opt-profile-record-value profile :ic-site 42 2)) :to-be-truthy)
+    (expect (= 4 (cl-cc/optimize::opt-profile-record-call-chain profile '(:main :callee) 4)) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-profile-record-allocation profile :alloc-site 64 2) :to-equal (cons 2 64)))
   (let* ((frame (cl-cc/optimize::make-opt-deopt-frame
                  :vm-pc 7
                  :register-map '((:rax . :r0) (:rbx . :r1))))
          (state (cl-cc/optimize::opt-materialize-deopt-state
                  frame
                  '((:rax . 10) (:rbx . 20)))))
-    (assert-equal '((:r0 . 10) (:r1 . 20)) state))
+    (expect state :to-equal '((:r0 . 10) (:r1 . 20))))
   (let ((shape (cl-cc/optimize::make-opt-shape-descriptor-for-slots
                 9
                 '(:class :slots))))
-    (assert-= 0 (cl-cc/optimize::opt-shape-slot-offset shape :class))
-    (assert-= 1 (cl-cc/optimize::opt-shape-slot-offset shape :slots))
-    (assert-null (cl-cc/optimize::opt-shape-slot-offset shape :missing)))
-  (assert-= 120
-            (cl-cc/optimize::opt-adaptive-compilation-threshold
+    (expect (= 0 (cl-cc/optimize::opt-shape-slot-offset shape :class)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-shape-slot-offset shape :slots)) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-shape-slot-offset shape :missing) :to-be-null))
+  (expect (= 120 (cl-cc/optimize::opt-adaptive-compilation-threshold
              :base 90
              :warmup-p t
              :cache-pressure 0.7
-             :failures 1)))
+             :failures 1)) :to-be-truthy))
 
-(deftest optimize-roadmap-support-helpers-have-conservative-behavior
-  "Roadmap support helpers expose conservative lattice, summary, allocation, stack-map, guard, cache, module, and Sea-of-Nodes behavior."
+(it-sequential "optimize-roadmap-support-helpers-have-conservative-behavior"
   (let* ((bottom (cl-cc/optimize::opt-lattice-bottom))
          (seven-a (cl-cc/optimize::opt-lattice-constant 7))
          (seven-b (cl-cc/optimize::opt-lattice-constant 7))
          (eight (cl-cc/optimize::opt-lattice-constant 8))
          (overdefined (cl-cc/optimize::opt-lattice-overdefined)))
-    (assert-eq :constant
-               (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet bottom seven-a)))
-    (assert-= 7
-              (cl-cc/optimize::opt-lattice-value-value
-               (cl-cc/optimize::opt-lattice-meet seven-a seven-b)))
-    (assert-eq :overdefined
-               (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet seven-a eight)))
-    (assert-eq :overdefined
-               (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet seven-a overdefined))))
+    (expect (cl-cc/optimize::opt-lattice-value-kind
+                (cl-cc/optimize::opt-lattice-meet bottom seven-a)) :to-be :constant)
+    (expect (= 7 (cl-cc/optimize::opt-lattice-value-value
+               (cl-cc/optimize::opt-lattice-meet seven-a seven-b))) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-lattice-value-kind
+                (cl-cc/optimize::opt-lattice-meet seven-a eight)) :to-be :overdefined)
+    (expect (cl-cc/optimize::opt-lattice-value-kind
+                (cl-cc/optimize::opt-lattice-meet seven-a overdefined)) :to-be :overdefined))
   (let ((pure-summary (cl-cc/optimize::make-opt-function-summary
                        :name 'pure-helper
                        :pure-p t
@@ -123,35 +112,33 @@
                             :name 'effectful-helper
                             :pure-p t
                             :effects '(:heap-write))))
-    (assert-true (cl-cc/optimize::opt-function-summary-safe-to-inline-p pure-summary))
-    (assert-false (cl-cc/optimize::opt-function-summary-safe-to-inline-p effectful-summary)))
+    (expect (cl-cc/optimize::opt-function-summary-safe-to-inline-p pure-summary) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-function-summary-safe-to-inline-p effectful-summary) :to-be-falsy))
   (let* ((pool (cl-cc/optimize::make-opt-slab-pool :object-size 2))
          (first-object (cl-cc/optimize::opt-slab-allocate pool)))
-    (assert-equal '(:slab-object 2 1) first-object)
+    (expect first-object :to-equal '(:slab-object 2 1))
     (cl-cc/optimize::opt-slab-free pool first-object)
-    (assert-eq first-object (cl-cc/optimize::opt-slab-allocate pool)))
+    (expect (cl-cc/optimize::opt-slab-allocate pool) :to-be first-object))
   (let ((region (cl-cc/optimize::make-opt-bump-region :limit 8)))
-    (assert-= 0 (cl-cc/optimize::opt-bump-allocate region 3))
-    (assert-= 3 (cl-cc/optimize::opt-bump-mark region))
-    (assert-= 4 (cl-cc/optimize::opt-bump-allocate region 2 :alignment 4))
-    (assert-null (cl-cc/optimize::opt-bump-allocate region 4))
+    (expect (= 0 (cl-cc/optimize::opt-bump-allocate region 3)) :to-be-truthy)
+    (expect (= 3 (cl-cc/optimize::opt-bump-mark region)) :to-be-truthy)
+    (expect (= 4 (cl-cc/optimize::opt-bump-allocate region 2 :alignment 4)) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-bump-allocate region 4) :to-be-null)
     (cl-cc/optimize::opt-bump-reset region)
-    (assert-= 3 (cl-cc/optimize::opt-bump-region-cursor region)))
+    (expect (= 3 (cl-cc/optimize::opt-bump-region-cursor region)) :to-be-truthy))
   (let ((stack-map (cl-cc/optimize::make-opt-stack-map :pc 42 :roots '(:r0 :r2))))
-    (assert-true (cl-cc/optimize::opt-stack-map-live-root-p stack-map :r0))
-    (assert-false (cl-cc/optimize::opt-stack-map-live-root-p stack-map :r1)))
+    (expect (cl-cc/optimize::opt-stack-map-live-root-p stack-map :r0) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-stack-map-live-root-p stack-map :r1) :to-be-falsy))
   (let ((guard (cl-cc/optimize::make-opt-guard-state :executions 9)))
-    (assert-eq :tag-bit-test
-               (cl-cc/optimize::opt-guard-record guard t))
-    (assert-eq :full-type-check
-               (cl-cc/optimize::opt-guard-record guard nil)))
+    (expect (cl-cc/optimize::opt-guard-record guard t) :to-be :tag-bit-test)
+    (expect (cl-cc/optimize::opt-guard-record guard nil) :to-be :full-type-check))
   (let* ((cold (cl-cc/optimize::make-opt-jit-cache-entry :id :cold :size 8 :warmth 1))
          (warm (cl-cc/optimize::make-opt-jit-cache-entry :id :warm :size 8 :warmth 9))
          (evicted (cl-cc/optimize::opt-jit-cache-select-eviction
                    (list warm cold)
                    :current-size 90
                    :max-size 100)))
-    (assert-eq cold evicted))
+    (expect evicted :to-be cold))
   (let ((summary (cl-cc/optimize::opt-merge-module-summaries
                   (list (cl-cc/optimize::make-opt-module-summary
                          :module :a
@@ -161,32 +148,25 @@
                          :module :b
                          :exports '(foo bar)
                          :function-count 3)))))
-    (assert-equal '(:a :b) (getf summary :modules))
-    (assert-= 5 (getf summary :function-count))
-    (assert-true (member 'foo (getf summary :exports)))
-    (assert-true (member 'bar (getf summary :exports))))
-  (assert-true
-   (cl-cc/optimize::opt-sea-node-schedulable-p
-    (cl-cc/optimize::make-opt-sea-node :id :n1 :op :add :controls '(:entry))))
-  (assert-false
-   (cl-cc/optimize::opt-sea-node-schedulable-p
-      (cl-cc/optimize::make-opt-sea-node :id :n2 :controls '(:entry)))))
+    (expect (getf summary :modules) :to-equal '(:a :b))
+    (expect (= 5 (getf summary :function-count)) :to-be-truthy)
+    (expect (member 'foo (getf summary :exports)) :to-be-truthy)
+    (expect (member 'bar (getf summary :exports)) :to-be-truthy))
+  (expect (cl-cc/optimize::opt-sea-node-schedulable-p
+    (cl-cc/optimize::make-opt-sea-node :id :n1 :op :add :controls '(:entry))) :to-be-truthy)
+  (expect (cl-cc/optimize::opt-sea-node-schedulable-p
+      (cl-cc/optimize::make-opt-sea-node :id :n2 :controls '(:entry))) :to-be-falsy))
 
-(deftest optimizer-roadmap-value-profiling-top-k-and-range-behavior
-  "FR-261 keeps a bounded per-site Top-K histogram while preserving numeric range feedback."
+(it-sequential "optimizer-roadmap-value-profiling-top-k-and-range-behavior"
   (let ((profile (cl-cc/optimize:make-opt-profile-data :value-limit 2)))
-    (assert-= 2 (cl-cc/optimize:opt-profile-record-value profile :site 10 2))
-    (assert-= 3 (cl-cc/optimize:opt-profile-record-value profile :site 20 3))
-    (assert-= 1 (cl-cc/optimize:opt-profile-record-value profile :site 30 1))
-    (assert-equal '((20 . 3) (10 . 2))
-                  (cl-cc/optimize:opt-profile-top-values profile :site))
-    (assert-equal '((20 . 3))
-                  (cl-cc/optimize:opt-profile-top-values profile :site 1))
-    (assert-equal '(10 . 30)
-                  (cl-cc/optimize:opt-profile-value-range profile :site))))
+    (expect (= 2 (cl-cc/optimize:opt-profile-record-value profile :site 10 2)) :to-be-truthy)
+    (expect (= 3 (cl-cc/optimize:opt-profile-record-value profile :site 20 3)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize:opt-profile-record-value profile :site 30 1)) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-profile-top-values profile :site) :to-equal '((20 . 3) (10 . 2)))
+    (expect (cl-cc/optimize:opt-profile-top-values profile :site 1) :to-equal '((20 . 3)))
+    (expect (cl-cc/optimize:opt-profile-value-range profile :site) :to-equal '(10 . 30))))
 
-(deftest optimizer-roadmap-speculation-log-gating-and-persistence-behavior
-  "FR-283 exposes a process-global speculation log with gating and .prof persistence helpers."
+(it-sequential "optimizer-roadmap-speculation-log-gating-and-persistence-behavior"
   (let* ((cl-cc/optimize:*opt-speculation-log*
            (cl-cc/optimize:make-opt-speculation-log :threshold 2))
          (temp-path (merge-pathnames
@@ -197,34 +177,29 @@
                      (uiop:temporary-directory))))
     (unwind-protect
          (progn
-           (assert-true (cl-cc/optimize:opt-speculation-allowed-p :site :guard))
-           (assert-= 1
-                     (cl-cc/optimize:opt-record-speculation-failure
+           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-truthy)
+           (expect (= 1 (cl-cc/optimize:opt-record-speculation-failure
                       cl-cc/optimize:*opt-speculation-log*
                       :site
-                      :guard))
-           (assert-true (cl-cc/optimize:opt-speculation-allowed-p :site :guard))
-           (assert-= 2
-                     (cl-cc/optimize:opt-record-speculation-failure
+                      :guard)) :to-be-truthy)
+           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-truthy)
+           (expect (= 2 (cl-cc/optimize:opt-record-speculation-failure
                       cl-cc/optimize:*opt-speculation-log*
                       :site
-                      :guard))
-           (assert-false (cl-cc/optimize:opt-speculation-allowed-p :site :guard))
+                      :guard)) :to-be-truthy)
+           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-falsy)
            (cl-cc/optimize:opt-save-speculation-log temp-path)
-           (assert-eq cl-cc/optimize:*opt-speculation-log*
-                      (cl-cc/optimize:opt-clear-speculation-log))
-           (assert-true (cl-cc/optimize:opt-speculation-allowed-p :site :guard))
+           (expect (cl-cc/optimize:opt-clear-speculation-log) :to-be cl-cc/optimize:*opt-speculation-log*)
+           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-truthy)
            (setf (cl-cc/optimize::opt-spec-log-threshold cl-cc/optimize:*opt-speculation-log*) 99)
            (cl-cc/optimize:opt-load-speculation-log temp-path)
-           (assert-= 2
-                     (cl-cc/optimize::opt-spec-log-threshold
-                      cl-cc/optimize:*opt-speculation-log*))
-           (assert-true
-            (cl-cc/optimize:opt-speculation-failed-p
+           (expect (= 2 (cl-cc/optimize::opt-spec-log-threshold
+                      cl-cc/optimize:*opt-speculation-log*)) :to-be-truthy)
+           (expect (cl-cc/optimize:opt-speculation-failed-p
              cl-cc/optimize:*opt-speculation-log*
              :site
-             :guard))
-           (assert-false (cl-cc/optimize:opt-speculation-allowed-p :site :guard)))
+             :guard) :to-be-truthy)
+           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-falsy))
       (when (probe-file temp-path)
         (delete-file temp-path)))))
 
@@ -292,110 +267,95 @@
      api-symbols
      test-anchors)))
 
-(deftest optimize-backend-roadmap-completed-headings-avoid-incomplete-language
-  "FRs marked ✅ in optimize-backend.md must not explicitly say they are unimplemented."
-  (assert-null (%optimize-backend-doc-completed-heading-contradictions)))
+(it-sequential "optimize-backend-roadmap-completed-headings-avoid-incomplete-language"
+  (expect (%optimize-backend-doc-completed-heading-contradictions) :to-be-null))
 
-(deftest optimize-backend-roadmap-evidence-covers-doc-fr-list
-  "Every docs/notes/optimize-backend.md FR id has status-aware audit evidence."
+(it-sequential "optimize-backend-roadmap-evidence-covers-doc-fr-list"
   (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))
          (ids (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features))
          (table (cl-cc/optimize:optimize-backend-roadmap-register-doc-evidence))
          (implemented 0)
          (not-implemented 0)
          (profiles nil))
-    (assert-= 232 (length ids))
-    (assert-= (length ids) (hash-table-count table))
+    (expect (= 232 (length ids)) :to-be-truthy)
+    (expect (= (length ids) (hash-table-count table)) :to-be-truthy)
     (dolist (feature features)
       (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature))
              (doc-status (cl-cc/optimize::opt-roadmap-feature-status feature))
              (evidence-status (%optimize-backend-evidence-status-for-feature feature))
              (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-        (assert-false (search ":" feature-id))
-        (assert-true (member doc-status '(:implemented :partial :planned :unknown)))
-        (assert-true evidence)
-        (assert-equal feature-id
-                      (cl-cc/optimize::opt-roadmap-evidence-feature-id evidence))
-        (assert-eq evidence-status
-                   (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-        (assert-true
-         (member "docs/notes/optimize-backend.md"
+        (expect (search ":" feature-id) :to-be-falsy)
+        (expect (member doc-status '(:implemented :partial :planned :unknown)) :to-be-truthy)
+        (expect evidence :to-be-truthy)
+        (expect (cl-cc/optimize::opt-roadmap-evidence-feature-id evidence) :to-equal feature-id)
+        (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be evidence-status)
+        (expect (member "docs/notes/optimize-backend.md"
                  (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                 :test #'string=))
+                 :test #'string=) :to-be-truthy)
          (when (eq evidence-status :implemented)
-           (assert-true
-            (cl-cc/optimize::optimize-roadmap-evidence-well-formed-p evidence)))
+           (expect (cl-cc/optimize::optimize-roadmap-evidence-well-formed-p evidence) :to-be-truthy))
         (push (cl-cc/optimize::opt-roadmap-evidence-modules evidence) profiles)
         (if (eq evidence-status :implemented)
             (progn
               (incf implemented)
-              (assert-true
-               (cl-cc/optimize:optimize-backend-roadmap-implementation-evidence-complete-p
-                evidence)))
+              (expect (cl-cc/optimize:optimize-backend-roadmap-implementation-evidence-complete-p
+                evidence) :to-be-truthy))
             (progn
               (incf not-implemented)
-              (assert-false
-               (cl-cc/optimize:optimize-backend-roadmap-implementation-evidence-complete-p
-                evidence))))))
-    (assert-true (> implemented 0))
-    (assert-true (>= not-implemented 0))
-    (assert-true (<= implemented (length ids)))
-    (assert-true (> (length (remove-duplicates profiles :test #'equal)) 5))))
+              (expect (cl-cc/optimize:optimize-backend-roadmap-implementation-evidence-complete-p
+                evidence) :to-be-falsy)))))
+    (expect (> implemented 0) :to-be-truthy)
+    (expect (>= not-implemented 0) :to-be-truthy)
+    (expect (<= implemented (length ids)) :to-be-truthy)
+    (expect (> (length (remove-duplicates profiles :test #'equal)) 5) :to-be-truthy)))
 
-(deftest optimize-backend-roadmap-status-summary-counts-headings
-  "Backend roadmap status summary reports a consistent heading partition."
+(it-sequential "optimize-backend-roadmap-status-summary-counts-headings"
   (let* ((summary (cl-cc/optimize:optimize-backend-roadmap-status-summary))
          (total (getf summary :total 0))
          (implemented (getf summary :implemented 0))
          (partial (getf summary :partial 0))
          (planned (getf summary :planned 0))
          (unknown (getf summary :unknown 0)))
-    (assert-= 232 total)
-    (assert-= total (+ implemented partial planned unknown))
-    (assert-true (>= partial 0))
-    (assert-true (>= unknown 0))))
+    (expect (= 232 total) :to-be-truthy)
+    (expect (= total (+ implemented partial planned unknown)) :to-be-truthy)
+    (expect (>= partial 0) :to-be-truthy)
+    (expect (>= unknown 0) :to-be-truthy)))
 
-(deftest optimize-backend-roadmap-all-fr-complete-gate-is-strict
-  "Completion gate reflects all-✅ state exactly."
-  (assert-false (cl-cc/optimize:optimize-backend-roadmap-all-fr-complete-p)))
+(it-sequential "optimize-backend-roadmap-all-fr-complete-gate-is-strict"
+  (expect (cl-cc/optimize:optimize-backend-roadmap-all-fr-complete-p) :to-be-falsy))
 
-(deftest optimize-backend-roadmap-fr-ids-by-status-partitions-document
-  "Status-filtered FR ID lists partition the optimize-backend roadmap exactly once."
+(it-sequential "optimize-backend-roadmap-fr-ids-by-status-partitions-document"
   (let* ((implemented (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented))
          (partial (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :partial))
          (planned (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :planned))
          (unknown (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :unknown))
          (all (append implemented partial planned unknown))
          (all-doc (cl-cc/optimize:optimize-backend-roadmap-doc-fr-ids)))
-    (assert-= (length all-doc) (length all))
-    (assert-= (length all-doc) (length (remove-duplicates all :test #'string=)))
-    (assert-true (>= (length partial) 0))
-    (assert-true (>= (length unknown) 0))
-    (assert-true (every (lambda (id) (member id all-doc :test #'string=)) all))))
+    (expect (= (length all-doc) (length all)) :to-be-truthy)
+    (expect (= (length all-doc) (length (remove-duplicates all :test #'string=))) :to-be-truthy)
+    (expect (>= (length partial) 0) :to-be-truthy)
+    (expect (>= (length unknown) 0) :to-be-truthy)
+    (expect (every (lambda (id) (member id all-doc :test #'string=)) all) :to-be-truthy)))
 
-(deftest optimize-backend-roadmap-analysis-evidence-is-loaded
-  "Representative backend FR clusters expose status-aware audit anchors."
+(it-sequential "optimize-backend-roadmap-analysis-evidence-is-loaded"
   (let ((complete 0)
         (open 0))
     (dolist (feature-id '("FR-007" "FR-116" "FR-209" "FR-282" "FR-370" "FR-502"))
       (let* ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id))
              (status (and evidence
                           (cl-cc/optimize::opt-roadmap-evidence-status evidence))))
-        (assert-true evidence)
-        (assert-true (member status '(:implemented :partial :planned)))
-        (assert-true
-         (cl-cc/optimize::optimize-roadmap-evidence-well-formed-p evidence))
+        (expect evidence :to-be-truthy)
+        (expect (member status '(:implemented :partial :planned)) :to-be-truthy)
+        (expect (cl-cc/optimize::optimize-roadmap-evidence-well-formed-p evidence) :to-be-truthy)
         (if (eq status :implemented)
             (incf complete)
             (progn
               (incf open)
-              (assert-false
-               (cl-cc/optimize:optimize-backend-roadmap-implementation-evidence-complete-p
-                evidence))))))
-     (assert-= 6 (+ complete open))))
+              (expect (cl-cc/optimize:optimize-backend-roadmap-implementation-evidence-complete-p
+                evidence) :to-be-falsy)))))
+     (expect (= 6 (+ complete open)) :to-be-truthy)))
 
-(deftest optimize-backend-roadmap-promoted-existing-frs-have-specific-evidence
-  "Backend FRs promoted from existing implementation use specific evidence anchors."
+(it-sequential "optimize-backend-roadmap-promoted-existing-frs-have-specific-evidence"
   (dolist (case '(("FR-014" :implemented
                     "packages/optimize/src/optimizer-memory-dse.lisp"
                    cl-cc/optimize::opt-pass-cons-slot-forward
@@ -424,8 +384,7 @@
        (list api-symbol)
        (list test-anchor)))))
 
-(deftest optimize-backend-roadmap-phase40-frs-have-specific-evidence
-  "Phase 40 partial-eval/specialization FRs expose concrete optimization anchors."
+(it-sequential "optimize-backend-roadmap-phase40-frs-have-specific-evidence"
   (dolist (case '(("FR-209" :implemented
                    "packages/optimize/src/optimizer-speculative-peval.lisp"
                    cl-cc/optimize::opt-specialize-constant-args
@@ -446,8 +405,7 @@
        (list api-symbol)
        (list test-anchor)))))
 
-(deftest optimize-backend-roadmap-fr-217-has-specific-evidence
-  "FR-217 memory-SSA implementation is backed by concrete helpers and tests."
+(it-sequential "optimize-backend-roadmap-fr-217-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-217"
    :implemented
@@ -458,8 +416,7 @@
    '(memory-ssa-snapshot-assigns-monotonic-versions-for-def-use-chain
      memory-ssa-snapshot-slot-location-uses-alias-root)))
 
-(deftest optimize-backend-roadmap-fr-251-has-specific-evidence
-  "FR-251 abstract-interpretation framework is backed by generic domain helpers and tests."
+(it-sequential "optimize-backend-roadmap-fr-251-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-251"
    :implemented
@@ -470,8 +427,7 @@
    '(abstract-domain-struct-retains-operators
      abstract-interpretation-runs-over-cfg-and-produces-result)))
 
-(deftest optimize-backend-roadmap-fr-252-has-specific-evidence
-  "FR-252 interprocedural regalloc is backed by policy derivation and allocator integration tests."
+(it-sequential "optimize-backend-roadmap-fr-252-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-252"
    :implemented
@@ -488,8 +444,7 @@
      regalloc-interprocedural-policy-end-to-end-keeps-call-crossing-safe
      regalloc-interprocedural-policy-prefers-callee-saved-on-call-crossing)))
 
-(deftest optimize-backend-roadmap-fr-253-has-specific-evidence
-  "FR-253 COW helper layer is backed by concrete copy/write APIs and tests."
+(it-sequential "optimize-backend-roadmap-fr-253-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-253"
    :implemented
@@ -501,8 +456,7 @@
    '(optimize-cow-copy-is-constant-time-share
      optimize-cow-write-detaches-when-shared)))
 
-(deftest optimize-backend-roadmap-fr-254-has-specific-evidence
-  "FR-254 region helper layer is backed by bump/slab APIs and tests."
+(it-sequential "optimize-backend-roadmap-fr-254-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-254"
    :implemented
@@ -518,8 +472,7 @@
    '(optimize-bump-region-mark-reset-restores-cursor
      optimize-slab-pool-reuses-freed-object)))
 
-(deftest optimize-backend-roadmap-fr-008-has-specific-evidence
-  "FR-008 float lane has concrete allocator/emitter evidence."
+(it-sequential "optimize-backend-roadmap-fr-008-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-008"
    :implemented
@@ -528,8 +481,7 @@
    nil
    '(regalloc-float-vregs-allocated-to-distinct-xmm-registers)))
 
-(deftest optimize-backend-roadmap-fr-283-has-specific-evidence
-  "FR-283 multiply-high support is backed by concrete VM semantics, native encoder, and roadmap audit anchors."
+(it-sequential "optimize-backend-roadmap-fr-283-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-283"
    :implemented
@@ -553,8 +505,7 @@
      aarch64-mul-high-emitter-encodings
      aarch64-mul-high-size-and-dispatch-registered)))
 
-(deftest optimize-backend-roadmap-fr-303-has-specific-evidence
-  "FR-303 overflow detection is backed by checked VM instructions and native trap emitters."
+(it-sequential "optimize-backend-roadmap-fr-303-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-303"
    :implemented
@@ -575,8 +526,7 @@
      aarch64-emit-sub-checked-emits-12-bytes
      aarch64-emit-mul-checked-emits-24-bytes)))
 
-(deftest optimize-backend-roadmap-fr-295-has-specific-evidence
-  "FR-295 PGO instrumentation has concrete counter-plan, pipeline, and CLI tests."
+(it-sequential "optimize-backend-roadmap-fr-295-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-295"
    :implemented
@@ -597,8 +547,7 @@
      cli-maybe-make-profiled-vm-state-enabled-for-pgo-generate
      cli-write-pgo-profile-emits-file)))
 
-(deftest optimize-backend-roadmap-fr-352-has-specific-evidence
-  "FR-352 bit-width analysis is backed by interval helpers, range propagation, and low-bit rewrites."
+(it-sequential "optimize-backend-roadmap-fr-352-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-352"
    :implemented
@@ -617,8 +566,7 @@
      overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add
      optimize-instructions-rewrites-logand-one-eq-zero-to-evenp)))
 
-(deftest optimize-backend-roadmap-fr-523-to-fr-528-have-fr-specific-evidence
-  "FR-523..FR-528 keep per-FR module/API/test anchors instead of a shared generic bucket."
+(it-sequential "optimize-backend-roadmap-fr-523-to-fr-528-have-fr-specific-evidence"
   (dolist (case '(("FR-523" cl-cc/optimize::opt-pass-affine-loop-analysis
                     optimize-affine-loop-summary-builds-descriptor)
                   ("FR-524" cl-cc/optimize::opt-pass-loop-interchange
@@ -640,8 +588,7 @@
        (list api-symbol)
        (list test-anchor)))))
 
-(deftest optimize-backend-roadmap-audited-fr-statuses-match-doc
-  "The audited optimize-backend FRs keep their intended doc statuses after roadmap updates."
+(it-sequential "optimize-backend-roadmap-audited-fr-statuses-match-doc"
   (let ((table (make-hash-table :test #'equal)))
     (dolist (feature (cl-cc/optimize:optimize-backend-roadmap-doc-features))
       (setf (gethash (cl-cc/optimize::opt-roadmap-feature-id feature) table)
@@ -662,10 +609,9 @@
                      ("FR-462" :implemented)
                      ("FR-463" :implemented)))
       (destructuring-bind (feature-id expected-status) case
-        (assert-eq expected-status (gethash feature-id table))))))
+        (expect (gethash feature-id table) :to-be expected-status)))))
 
-(deftest optimize-backend-roadmap-audited-frs-have-specific-evidence
-  "The audited optimize-backend FRs retain concrete module, API, and test anchors."
+(it-sequential "optimize-backend-roadmap-audited-frs-have-specific-evidence"
   (dolist (case '(("FR-303" :implemented
                    "packages/codegen/src/x86-64-emit-ops.lisp"
                    ("CL-CC/CODEGEN" . "EMIT-VM-ADD-CHECKED")
@@ -738,32 +684,27 @@
        (list api-symbol)
        (list test-anchor)))))
 
-(deftest optimize-backend-roadmap-support-evidence-has-behavior
-  "Backend support evidence exercises analysis, profile, allocation, guard, and layout helpers."
+(it-sequential "optimize-backend-roadmap-support-evidence-has-behavior"
   (let* ((bottom (cl-cc/optimize::opt-lattice-bottom))
          (const-a (cl-cc/optimize::opt-lattice-constant :a))
          (const-b (cl-cc/optimize::opt-lattice-constant :b)))
-    (assert-eq :constant
-               (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet bottom const-a)))
-    (assert-eq :overdefined
-               (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet const-a const-b))))
+    (expect (cl-cc/optimize::opt-lattice-value-kind
+                (cl-cc/optimize::opt-lattice-meet bottom const-a)) :to-be :constant)
+    (expect (cl-cc/optimize::opt-lattice-value-kind
+                (cl-cc/optimize::opt-lattice-meet const-a const-b)) :to-be :overdefined))
   (let ((profile (cl-cc/optimize::make-opt-profile-data)))
-    (assert-= 5 (cl-cc/optimize::opt-profile-record-edge profile :a :b 5))
-    (assert-= 2 (cl-cc/optimize::opt-profile-record-call-chain profile '(:a :b) 2))
-    (assert-equal (cons 3 32)
-                  (cl-cc/optimize::opt-profile-record-allocation profile :site 32 3)))
+    (expect (= 5 (cl-cc/optimize::opt-profile-record-edge profile :a :b 5)) :to-be-truthy)
+    (expect (= 2 (cl-cc/optimize::opt-profile-record-call-chain profile '(:a :b) 2)) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-profile-record-allocation profile :site 32 3) :to-equal (cons 3 32)))
   (let ((region (cl-cc/optimize::make-opt-bump-region :limit 16)))
-    (assert-= 0 (cl-cc/optimize::opt-bump-allocate region 4))
-    (assert-= 8 (cl-cc/optimize::opt-bump-allocate region 4 :alignment 8)))
+    (expect (= 0 (cl-cc/optimize::opt-bump-allocate region 4)) :to-be-truthy)
+    (expect (= 8 (cl-cc/optimize::opt-bump-allocate region 4 :alignment 8)) :to-be-truthy))
   (let ((guard (cl-cc/optimize::make-opt-guard-state :executions 10)))
-    (assert-eq :tag-bit-test (cl-cc/optimize::opt-guard-record guard t)))
+    (expect (cl-cc/optimize::opt-guard-record guard t) :to-be :tag-bit-test))
   (let ((shape (cl-cc/optimize::make-opt-shape-descriptor-for-slots 1 '(:x :y :z))))
-    (assert-= 2 (cl-cc/optimize::opt-shape-slot-offset shape :z))))
+    (expect (= 2 (cl-cc/optimize::opt-shape-slot-offset shape :z)) :to-be-truthy)))
 
-(deftest optimize-backend-roadmap-fr-463-has-specific-evidence
-  "FR-463 Compiler Explorer compatible output is backed by CLI dump functions, phase table, and annotate-source support."
+(it-sequential "optimize-backend-roadmap-fr-463-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
    "FR-463"
    :implemented

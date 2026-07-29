@@ -2,12 +2,6 @@
 
 (in-package :cl-cc/test)
 
-(defsuite predicate-suite
-  :description "Predicate macro expansion tests"
-  :parent cl-cc-integration-suite)
-
-(in-suite predicate-suite)
-
 ;;; ─── Sequence-dispatch aware expansion accessors ────────────────────────
 ;;;
 ;;; The sequence predicates no longer expand straight into a list loop. When the
@@ -37,147 +31,173 @@ assert on the same form they used to get before the dispatch wrapper existed."
         (second (assoc 'list (cddr (caddr expansion))))
         expansion)))
 
-(deftest-each predicate-not-delegates-via-complement
-  "Each -NOT predicate expands to the base form with (complement pred) as the first arg."
-  :cases (("find-if-not"     'find-if     '(find-if-not pred lst))
-          ("position-if-not" 'position-if '(position-if-not pred lst))
-          ("count-if-not"    'count-if    '(count-if-not pred lst))
-          ("rassoc-if-not"   'rassoc-if   '(rassoc-if-not pred alist))
-          ("assoc-if-not"    'assoc-if    '(assoc-if-not pred alist)))
-  (base-op form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq base-op (car result))
-    (assert-eq 'complement (caadr result))))
+(it-sequential "predicate-not-delegates-via-complement find-if-not"
+  (destructuring-bind (base-op form) (list 'find-if '(find-if-not pred lst))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be base-op)
+    (expect (caadr result) :to-be 'complement))))
 
-(deftest-each find-if-not-runtime
-  "FIND-IF-NOT returns first element not satisfying predicate; nil when all satisfy."
-  :cases (("found"     "(find-if-not #'oddp '(1 3 4 5 6))"  4)
-          ("not-found" "(find-if-not #'numberp '(1 2 3))"   nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "predicate-not-delegates-via-complement position-if-not"
+  (destructuring-bind (base-op form) (list 'position-if '(position-if-not pred lst))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be base-op)
+    (expect (caadr result) :to-be 'complement))))
 
-(deftest position-if-expansion-structure
-  "POSITION-IF's list path binds the predicate in a LET whose body is BLOCK NIL,
-so a match can RETURN without scanning the rest of the sequence."
+(it-sequential "predicate-not-delegates-via-complement count-if-not"
+  (destructuring-bind (base-op form) (list 'count-if '(count-if-not pred lst))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be base-op)
+    (expect (caadr result) :to-be 'complement))))
+
+(it-sequential "predicate-not-delegates-via-complement rassoc-if-not"
+  (destructuring-bind (base-op form) (list 'rassoc-if '(rassoc-if-not pred alist))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be base-op)
+    (expect (caadr result) :to-be 'complement))))
+
+(it-sequential "predicate-not-delegates-via-complement assoc-if-not"
+  (destructuring-bind (base-op form) (list 'assoc-if '(assoc-if-not pred alist))
+    (let ((result (our-macroexpand-1 form)))
+    (expect (car result) :to-be base-op)
+    (expect (caadr result) :to-be 'complement))))
+
+(it-sequential "find-if-not-runtime found"
+  (destructuring-bind (form expected) (list "(find-if-not #'oddp '(1 3 4 5 6))" 4)
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "find-if-not-runtime not-found"
+  (destructuring-bind (form expected) (list "(find-if-not #'numberp '(1 2 3))" nil)
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "position-if-expansion-structure"
   (let* ((list-body (predicate-expansion-list-body '(position-if pred lst)))
          (body      (caddr list-body)))
-    (assert-eq 'let   (car list-body))
-    (assert-eq 'block (car body))
-    (assert-eq nil    (second body))))
+    (expect (car list-body) :to-be 'let)
+    (expect (car body) :to-be 'block)
+    (expect (second body) :to-be nil)))
 
-(deftest-each position-if-runtime
-  "POSITION-IF returns the 0-based index of first matching element; nil when not found."
-  :cases (("found"     "(position-if #'evenp '(1 3 4 7 8))"  2)
-          ("not-found" "(position-if #'evenp '(1 3 5))"       nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "position-if-runtime found"
+  (destructuring-bind (form expected) (list "(position-if #'evenp '(1 3 4 7 8))" 2)
+    (expect (run-string form) :to-equal expected)))
 
-
-(deftest-each position-if-not-runtime
-  "POSITION-IF-NOT returns index of first element not satisfying predicate; nil when all satisfy."
-  :cases (("found"     "(position-if-not #'oddp '(1 3 4 5))"  2)
-          ("not-found" "(position-if-not #'oddp '(1 3 5))"    nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "position-if-runtime not-found"
+  (destructuring-bind (form expected) (list "(position-if #'evenp '(1 3 5))" nil)
+    (expect (run-string form) :to-equal expected)))
 
 
-(deftest-each count-if-not-runtime
-  "COUNT-IF-NOT counts elements not satisfying predicate."
-  :cases (("some"  "(count-if-not #'oddp '(1 2 3 4 5))"   2)
-          ("empty" "(count-if-not #'numberp '())"           0))
-  (form expected)
-  (assert-= expected (run-string form)))
+(it-sequential "position-if-not-runtime found"
+  (destructuring-bind (form expected) (list "(position-if-not #'oddp '(1 3 4 5))" 2)
+    (expect (run-string form) :to-equal expected)))
 
-(deftest-each remove-if-key-expansion
-  "REMOVE-IF and REMOVE-IF-NOT with :key bind the predicate, the key function and
-the accumulator separately, so the key form is evaluated once rather than per element."
-  :cases (("remove-if"     '(remove-if #'oddp lst :key #'car))
-          ("remove-if-not" '(remove-if-not #'evenp lst :key #'car)))
-  (form)
-  (let ((list-body (predicate-expansion-list-body form)))
-    (assert-eq 'let (car list-body))
-    (assert-true (> (length (cadr list-body)) 1))))
+(it-sequential "position-if-not-runtime not-found"
+  (destructuring-bind (form expected) (list "(position-if-not #'oddp '(1 3 5))" nil)
+    (expect (run-string form) :to-equal expected)))
 
-(deftest find-if-not-with-key
-  "FIND-IF-NOT with :key delegates to FIND-IF with complement."
+
+(it-sequential "count-if-not-runtime some"
+  (destructuring-bind (form expected) (list "(count-if-not #'oddp '(1 2 3 4 5))" 2)
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "count-if-not-runtime empty"
+  (destructuring-bind (form expected) (list "(count-if-not #'numberp '())" 0)
+    (expect (= expected (run-string form)) :to-be-truthy)))
+
+(it-sequential "remove-if-key-expansion remove-if"
+  (destructuring-bind (form) (list '(remove-if #'oddp lst :key #'car))
+    (let ((list-body (predicate-expansion-list-body form)))
+    (expect (car list-body) :to-be 'let)
+    (expect (> (length (cadr list-body)) 1) :to-be-truthy))))
+
+(it-sequential "remove-if-key-expansion remove-if-not"
+  (destructuring-bind (form) (list '(remove-if-not #'evenp lst :key #'car))
+    (let ((list-body (predicate-expansion-list-body form)))
+    (expect (car list-body) :to-be 'let)
+    (expect (> (length (cadr list-body)) 1) :to-be-truthy))))
+
+(it-sequential "find-if-not-with-key"
   (let ((result (our-macroexpand-1 '(find-if-not #'oddp lst :key #'car))))
-    (assert-eq (car result) 'find-if)))
+    (expect 'find-if :to-be (car result))))
 
-(deftest position-if-with-key
-  "POSITION-IF with :key binds the predicate, the key function and the index
-separately, so the key form is evaluated once rather than per element."
+(it-sequential "position-if-with-key"
   (let ((list-body (predicate-expansion-list-body '(position-if #'oddp lst :key #'car))))
-    (assert-eq (car list-body) 'let)
-    (assert-true (> (length (cadr list-body)) 2))))
+    (expect 'let :to-be (car list-body))
+    (expect (> (length (cadr list-body)) 2) :to-be-truthy)))
 
-(deftest count-if-not-with-key
-  "COUNT-IF-NOT with :key delegates to COUNT-IF with complement."
+(it-sequential "count-if-not-with-key"
   (let ((result (our-macroexpand-1 '(count-if-not #'oddp lst :key #'car))))
-    (assert-eq (car result) 'count-if)))
+    (expect 'count-if :to-be (car result))))
 
-(deftest-each predicate-if-outer-is-let
-  "RASSOC-IF and ASSOC-IF both expand to LET forms binding the predicate."
-  :cases (("rassoc-if" '(rassoc-if pred alist))
-          ("assoc-if"  '(assoc-if pred alist)))
-  (form)
-  (assert-eq 'let (car (our-macroexpand-1 form))))
+(it-sequential "predicate-if-outer-is-let rassoc-if"
+  (destructuring-bind (form) (list '(rassoc-if pred alist))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
 
-(deftest rassoc-if-body-checks-cdr
-  "RASSOC-IF body DOLIST applies predicate to (cdr pair)."
+(it-sequential "predicate-if-outer-is-let assoc-if"
+  (destructuring-bind (form) (list '(assoc-if pred alist))
+    (expect (car (our-macroexpand-1 form)) :to-be 'let)))
+
+(it-sequential "rassoc-if-body-checks-cdr"
   (let* ((result (our-macroexpand-1 '(rassoc-if pred alist)))
          (dolist-form (caddr result))
          (when-form (second (cdr dolist-form)))
          (and-form (second when-form))
          (funcall-form (third and-form))
          (cdr-arg (caddr funcall-form)))
-    (assert-eq (car dolist-form) 'dolist)
-    (assert-eq (car funcall-form) 'funcall)
-    (assert-eq (car cdr-arg) 'cdr)))
+    (expect 'dolist :to-be (car dolist-form))
+    (expect 'funcall :to-be (car funcall-form))
+    (expect 'cdr :to-be (car cdr-arg))))
 
 
-(deftest-each member-if-runtime
-  "MEMBER-IF returns the tail starting at first satisfying element; nil when not found."
-  :cases (("found"     "(member-if #'evenp '(1 3 4 5 6))"  '(4 5 6))
-          ("not-found" "(member-if #'evenp '(1 3 5))"       nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "member-if-runtime found"
+  (destructuring-bind (form expected) (list "(member-if #'evenp '(1 3 4 5 6))" '(4 5 6))
+    (expect (run-string form) :to-equal expected)))
 
-(deftest-each member-if-not-runtime
-  "MEMBER-IF-NOT returns tail starting at first non-matching element; nil when all satisfy."
-  :cases (("found"     "(member-if-not #'oddp '(1 3 4 5))"  '(4 5))
-          ("not-found" "(member-if-not #'oddp '(1 3 5))"    nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "member-if-runtime not-found"
+  (destructuring-bind (form expected) (list "(member-if #'evenp '(1 3 5))" nil)
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "member-if-not-runtime found"
+  (destructuring-bind (form expected) (list "(member-if-not #'oddp '(1 3 4 5))" '(4 5))
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "member-if-not-runtime not-found"
+  (destructuring-bind (form expected) (list "(member-if-not #'oddp '(1 3 5))" nil)
+    (expect (run-string form) :to-equal expected)))
 
 
-(deftest assoc-if-body-is-dolist
-  "ASSOC-IF scans an alist with a DOLIST (linear scan), not an index loop."
+(it-sequential "assoc-if-body-is-dolist"
   (let* ((list-body (predicate-expansion-list-body '(assoc-if pred alist)))
          (body      (caddr list-body)))
-    (assert-eq (car body) 'dolist)))
+    (expect 'dolist :to-be (car body))))
 
 
-(deftest-each assoc-if-runtime
-  "ASSOC-IF returns first pair whose car satisfies predicate; nil when not found."
-  :cases (("found"     "(car (assoc-if #'evenp '((1 . 10) (2 . 20) (3 . 30))))"  2)
-          ("not-found" "(assoc-if #'evenp '((1 . 10) (3 . 30)))"                  nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "assoc-if-runtime found"
+  (destructuring-bind (form expected) (list "(car (assoc-if #'evenp '((1 . 10) (2 . 20) (3 . 30))))" 2)
+    (expect (run-string form) :to-equal expected)))
 
-(deftest-each assoc-if-not-runtime
-  "ASSOC-IF-NOT returns first pair whose car does NOT satisfy predicate; nil when all satisfy."
-  :cases (("found"     "(car (assoc-if-not #'evenp '((2 . 20) (3 . 30))))"  3)
-          ("not-found" "(assoc-if-not #'evenp '((2 . 20) (4 . 40)))"         nil))
-  (form expected)
-  (assert-equal expected (run-string form)))
+(it-sequential "assoc-if-runtime not-found"
+  (destructuring-bind (form expected) (list "(assoc-if #'evenp '((1 . 10) (3 . 30)))" nil)
+    (expect (run-string form) :to-equal expected)))
 
-(deftest-each complement-expansion-structure
-  "COMPLEMENT expands to LET+lambda whose body branches on APPLY with IF, so the
-inversion follows the VM's truthiness instead of NOT's ANSI test for NIL — a
-predicate reached as a function value answers 1/0, which NOT would read as true."
-  :cases (("top-is-let"    'let    (lambda (r) (car r)))
-          ("inner-lambda"  'lambda (lambda (r) (car (caddr r))))
-          ("body-if-head"  'if     (lambda (r) (car (caddr (caddr r)))))
-          ("apply-in-if"   'apply  (lambda (r) (car (cadr (caddr (caddr r)))))))
-  (expected accessor)
-  (assert-eq expected (funcall accessor (our-macroexpand-1 '(complement pred)))))
+(it-sequential "assoc-if-not-runtime found"
+  (destructuring-bind (form expected) (list "(car (assoc-if-not #'evenp '((2 . 20) (3 . 30))))" 3)
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "assoc-if-not-runtime not-found"
+  (destructuring-bind (form expected) (list "(assoc-if-not #'evenp '((2 . 20) (4 . 40)))" nil)
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "complement-expansion-structure top-is-let"
+  (destructuring-bind (expected accessor) (list 'let (lambda (r) (car r)))
+    (expect (funcall accessor (our-macroexpand-1 '(complement pred))) :to-be expected)))
+
+(it-sequential "complement-expansion-structure inner-lambda"
+  (destructuring-bind (expected accessor) (list 'lambda (lambda (r) (car (caddr r))))
+    (expect (funcall accessor (our-macroexpand-1 '(complement pred))) :to-be expected)))
+
+(it-sequential "complement-expansion-structure body-if-head"
+  (destructuring-bind (expected accessor) (list 'if (lambda (r) (car (caddr (caddr r)))))
+    (expect (funcall accessor (our-macroexpand-1 '(complement pred))) :to-be expected)))
+
+(it-sequential "complement-expansion-structure apply-in-if"
+  (destructuring-bind (expected accessor) (list 'apply (lambda (r) (car (cadr (caddr (caddr r))))))
+    (expect (funcall accessor (our-macroexpand-1 '(complement pred))) :to-be expected)))

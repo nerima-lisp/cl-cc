@@ -3,7 +3,6 @@
 ;;;; Verifies FR coverage and evidence file existence.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-documentation-suite)
 
 ;;; ─── FR table ──────────────────────────────────────────────────────────────────
 ;; Each entry: (fr-id (target-files) difficulty)
@@ -250,24 +249,19 @@
 
 ;;; ─── Tests ──────────────────────────────────────────────────────────────────────
 
-(deftest tooling-advanced-1-evidence-registry-covers-all-frs
-  "Verify that *tooling-advanced-1-fr-table* contains exactly the 136 FR IDs
-   listed in docs/notes/tooling-advanced-1.md and no extras."
+(it-sequential "tooling-advanced-1-evidence-registry-covers-all-frs"
   (let ((table-ids (mapcar #'car *tooling-advanced-1-fr-table*))
         (expected-ids *tooling-advanced-1-all-fr-ids*))
     ;; Every expected FR is present in the table.
     (dolist (id expected-ids)
-      (assert-true (member id table-ids :test #'string=)))
+      (expect (member id table-ids :test #'string=) :to-be-truthy))
     ;; Every table FR is expected (no extras).
     (dolist (id table-ids)
-      (assert-true (member id expected-ids :test #'string=)))
+      (expect (member id expected-ids :test #'string=) :to-be-truthy))
     ;; Verify total count.
-    (assert-= 136 (length table-ids))))
+    (expect (= 136 (length table-ids)) :to-be-truthy)))
 
-(deftest tooling-advanced-1-evidence-files-exist
-  "Verify that every target file referenced in *tooling-advanced-1-fr-table*
-   exists on disk.  Directories are checked for existence; for new-path
-   entries (no file yet) the existence check is skipped with a warning."
+(it-sequential "tooling-advanced-1-evidence-files-exist"
   (let ((checked 0)
         (skipped 0))
     (dolist (entry *tooling-advanced-1-fr-table*)
@@ -283,4 +277,4 @@
     (format t "~&; evidence-files-exist: ~D checked, ~D skipped (new paths)" checked skipped)
     ;; We do not fail on missing (new) files — this test is informational.
     ;; Zero checked would indicate a problem.
-    (assert-true (> checked 0))))
+    (expect (> checked 0) :to-be-truthy)))

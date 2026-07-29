@@ -9,16 +9,11 @@
 ;;;;
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-integration-suite)
-
 ;; Behavioral tests -- compile-level dispatch via run-string
-(deftest-each fr-009-pic-behavioral
-    "FR-009 PIC dispatch produces correct results across type switches."
-    :timeout 15
-    :cases
-    (("two-class-switch"
-      '(:a :a :b :a)
-      "(progn
+(it-sequential "fr-009-pic-behavioral two-class-switch"
+  :timeout
+  15
+  (destructuring-bind (expected form) (list '(:a :a :b :a) "(progn
          (defclass pic-class-a () ())
          (defclass pic-class-b () ())
          (defgeneric pic-id (x))
@@ -27,9 +22,12 @@
          (let* ((a (make-instance 'pic-class-a))
                 (b (make-instance 'pic-class-b)))
            (list (pic-id a) (pic-id a) (pic-id b) (pic-id a))))")
-      ("multi-arg-pic"
-       '((:x= 1) (:y= 2) (:x= 3) (:y= 4))
-       "(progn
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "fr-009-pic-behavioral multi-arg-pic"
+  :timeout
+  15
+  (destructuring-bind (expected form) (list '((:x= 1) (:y= 2) (:x= 3) (:y= 4)) "(progn
           (defclass point-x () ((v :initarg :v)))
           (defclass point-y () ((v :initarg :v)))
           (defgeneric pick-x (obj))
@@ -40,9 +38,12 @@
                 (x3 (make-instance 'point-x :v 3))
                 (y4 (make-instance 'point-y :v 4)))
             (list (pick-x x1) (pick-x y2) (pick-x x3) (pick-x y4))))")
-      ("three-class-thrash"
-       '(:a :b :c :a :b :c)
-       "(progn
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "fr-009-pic-behavioral three-class-thrash"
+  :timeout
+  15
+  (destructuring-bind (expected form) (list '(:a :b :c :a :b :c) "(progn
           (defclass thrash-a () ())
           (defclass thrash-b () ())
           (defclass thrash-c () ())
@@ -55,9 +56,12 @@
                 (c (make-instance 'thrash-c)))
             (list (thrash-id a) (thrash-id b) (thrash-id c)
                   (thrash-id a) (thrash-id b) (thrash-id c))))")
-      ("mixed-with-inheritance"
-       '(:base :derived :base)
-       "(progn
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "fr-009-pic-behavioral mixed-with-inheritance"
+  :timeout
+  15
+  (destructuring-bind (expected form) (list '(:base :derived :base) "(progn
           (defclass pic-base () ())
           (defclass pic-derived (pic-base) ())
           (defgeneric inh-id (x))
@@ -65,13 +69,11 @@
           (defmethod inh-id ((x pic-derived)) :derived)
           (let ((b (make-instance 'pic-base))
                 (d (make-instance 'pic-derived)))
-            (list (inh-id b) (inh-id d) (inh-id b))))"))
-   (expected form)
-   (assert-equal expected (run-string form)))
+            (list (inh-id b) (inh-id d) (inh-id b))))")
+    (expect (run-string form) :to-equal expected)))
 
 ;; VM-level PIC profiling tests -- cache hit/miss counters and type-feedback
-(deftest fr-009-pic-cache-transitions-and-profiling
-    "FR-009 PIC cache transitions and profiling counters."
+(it-sequential "fr-009-pic-cache-transitions-and-profiling"
   (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (generic-caches (make-hash-table :test #'equal))
          (method-a (make-instance 'cl-cc/vm::vm-closure-object
@@ -93,13 +95,12 @@
       (incf (cdr (gethash 'prof-a-class ht)))
       (let* ((entry-a (gethash 'prof-a-class ht))
              (entry-b (gethash 'prof-b-class ht)))
-        (assert-eq method-a (car entry-a))
-        (assert-eq method-b (car entry-b))
-        (assert-= 2 (cdr entry-a))
-        (assert-= 1 (cdr entry-b))))))
+        (expect (car entry-a) :to-be method-a)
+        (expect (car entry-b) :to-be method-b)
+        (expect (= 2 (cdr entry-a)) :to-be-truthy)
+        (expect (= 1 (cdr entry-b)) :to-be-truthy)))))
 
-(deftest fr-009-pic-invalidation-on-method-registration
-    "FR-009 PIC cache invalidation on new method registration."
+(it-sequential "fr-009-pic-invalidation-on-method-registration"
   (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (cache (make-hash-table :test #'eq))
          (method-1 (make-instance 'cl-cc/vm::vm-closure-object
@@ -109,11 +110,11 @@
     (setf (gethash 'inv-class-a cache) (cons method-1 5))
     (setf (gethash 'inv-class-b cache) (cons method-2 3))
     (remhash 'inv-class-a cache)
-    (assert-false (gethash 'inv-class-a cache))
+    (expect (gethash 'inv-class-a cache) :to-be-falsy)
     (let ((entry-b (gethash 'inv-class-b cache)))
-      (assert-eq method-2 (car entry-b))
-      (assert-= 3 (cdr entry-b)))
+      (expect (car entry-b) :to-be method-2)
+      (expect (= 3 (cdr entry-b)) :to-be-truthy))
     (setf (gethash 'inv-class-a cache) (cons method-2 0))
     (let ((new-entry (gethash 'inv-class-a cache)))
-      (assert-eq method-2 (car new-entry))
-      (assert-= 0 (cdr new-entry)))))
+      (expect (car new-entry) :to-be method-2)
+      (expect (= 0 (cdr new-entry)) :to-be-truthy))))

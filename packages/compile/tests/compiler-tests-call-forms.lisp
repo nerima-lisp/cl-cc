@@ -1,26 +1,71 @@
 ;;;; compiler-tests-call-forms.lisp — Function call, lambda list, variadic, and multiple-values compiler tests
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; Function Call Tests
 
-(deftest-each compile-function-call-structure
-  "Lambda, flet, labels, and higher-order forms all compile to a valid vm-program."
-  :cases (("lambda-simple"       "((lambda (x) x) 5)")
-          ("lambda-multi-arg"    "((lambda (a b c) (+ a (+ b c))) 1 2 3)")
-          ("lambda-nested"       "((lambda (x) (+ x 1)) ((lambda (y) (* y 2)) 3))")
-          ("lambda-return-fn"    "((lambda (n) (lambda (x) (+ x n))) 5)")
-          ("flet-basic"          "(flet ((double (x) (* x 2))) (double 21))")
-          ("flet-multi"          "(flet ((add1 (x) (+ x 1)) (add2 (x) (+ x 2))) (add2 (add1 10)))")
-          ("labels-recursive"    "(labels ((count (n) (if (= n 0) 0 (+ 1 (count (- n 1)))))) (count 5))")
-          ("labels-mutual"       "(labels ((even? (n) (if (= n 0) 1 (odd? (- n 1)))) (odd? (n) (if (= n 0) 0 (even? (- n 1))))) (even? 10))")
-          ("labels-with-let"     "(let ((x 10)) (labels ((rec (n) (if (= n 0) x (+ 1 (rec (- n 1)))))) (rec 3)))"))
-  (form)
-  (let* ((result (compile-string form :target :vm))
+(it-sequential "compile-function-call-structure lambda-simple"
+  (destructuring-bind (form) (list "((lambda (x) x) 5)")
+    (let* ((result (compile-string form :target :vm))
          (program (compilation-result-program result)))
-    (assert-false (null program))
-    (assert-type vm-program program)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure lambda-multi-arg"
+  (destructuring-bind (form) (list "((lambda (a b c) (+ a (+ b c))) 1 2 3)")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure lambda-nested"
+  (destructuring-bind (form) (list "((lambda (x) (+ x 1)) ((lambda (y) (* y 2)) 3))")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure lambda-return-fn"
+  (destructuring-bind (form) (list "((lambda (n) (lambda (x) (+ x n))) 5)")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure flet-basic"
+  (destructuring-bind (form) (list "(flet ((double (x) (* x 2))) (double 21))")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure flet-multi"
+  (destructuring-bind (form) (list "(flet ((add1 (x) (+ x 1)) (add2 (x) (+ x 2))) (add2 (add1 10)))")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure labels-recursive"
+  (destructuring-bind (form) (list "(labels ((count (n) (if (= n 0) 0 (+ 1 (count (- n 1)))))) (count 5))")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure labels-mutual"
+  (destructuring-bind (form) (list "(labels ((even? (n) (if (= n 0) 1 (odd? (- n 1)))) (odd? (n) (if (= n 0) 0 (even? (- n 1))))) (even? 10))")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
+
+(it-sequential "compile-function-call-structure labels-with-let"
+  (destructuring-bind (form) (list "(let ((x 10)) (labels ((rec (n) (if (= n 0) x (+ 1 (rec (- n 1)))))) (rec 3)))")
+    (let* ((result (compile-string form :target :vm))
+         (program (compilation-result-program result)))
+    (expect (null program) :to-be-falsy)
+    (expect (typep program 'vm-program) :to-be-truthy))))
 
 ;;; Multiple Top-Level Forms and Values Tests
 
@@ -59,29 +104,55 @@
           ("nreverse"    3  "(car (nreverse (list 1 2 3)))"))
   )
 
-(deftest compile-member-builtin
-  "member finds element in list"
-  (assert-true (not (null (run-string "(member 3 (list 1 2 3 4))")))))
+(it-sequential "compile-member-builtin"
+  (expect (not (null (run-string "(member 3 (list 1 2 3 4))"))) :to-be-truthy))
 
-(deftest-each compile-numeric-predicates-and-case
-  "Numeric predicates return CL booleans and case returns the selected value."
-  :cases (("zerop-0"    t  "(zerop 0)")
-          ("zerop-5"    nil  "(zerop 5)")
-          ("plusp-5"    t  "(plusp 5)")
-          ("minusp-neg" t  "(minusp (- 0 3))")
-          ("evenp-true"  t "(evenp 4)")
-          ("evenp-false" nil "(evenp 3)")
-          ("oddp-true"   t "(oddp 3)")
-          ("not-zero" nil "(not 0)")
-          ("not-false-equality" t "(not (= 1 2))")
-          ("case-match"     2  "(case 'b (a 1) (b 2) (c 3))")
-          ("case-otherwise" 99 "(case 'z (a 1) (otherwise 99))"))
-  (expected form)
-  (assert-equal expected (run-string form)))
+(it-sequential "compile-numeric-predicates-and-case zerop-0"
+  (destructuring-bind (expected form) (list t "(zerop 0)")
+    (expect (run-string form) :to-equal expected)))
 
-(deftest compile-keyword-self-eval
-  "keywords evaluate to themselves; typecase dispatches on type."
-  (assert-eq :test (run-string ":test"))
+(it-sequential "compile-numeric-predicates-and-case zerop-5"
+  (destructuring-bind (expected form) (list nil "(zerop 5)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case plusp-5"
+  (destructuring-bind (expected form) (list t "(plusp 5)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case minusp-neg"
+  (destructuring-bind (expected form) (list t "(minusp (- 0 3))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case evenp-true"
+  (destructuring-bind (expected form) (list t "(evenp 4)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case evenp-false"
+  (destructuring-bind (expected form) (list nil "(evenp 3)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case oddp-true"
+  (destructuring-bind (expected form) (list t "(oddp 3)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case not-zero"
+  (destructuring-bind (expected form) (list nil "(not 0)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case not-false-equality"
+  (destructuring-bind (expected form) (list t "(not (= 1 2))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case case-match"
+  (destructuring-bind (expected form) (list 2 "(case 'b (a 1) (b 2) (c 3))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-numeric-predicates-and-case case-otherwise"
+  (destructuring-bind (expected form) (list 99 "(case 'z (a 1) (otherwise 99))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-keyword-self-eval"
+  (expect (run-string ":test") :to-be :test)
   (assert-run= 1 "(typecase 42 (integer 1) (string 2) (otherwise 3))"))
 
 ;;; Extended Lambda List Tests (&rest, &optional, &key)

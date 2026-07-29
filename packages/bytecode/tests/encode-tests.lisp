@@ -9,53 +9,63 @@
 ;;; Suite
 ;;; ------------------------------------------------------------
 
-(defsuite bytecode-encode-suite
-  :description "Bytecode ISA v2 encoder tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite bytecode-encode-suite)
 
 ;;; ------------------------------------------------------------
 ;;; Opcode constants
 ;;; ------------------------------------------------------------
 
-(deftest-each bytecode-opcode-constants
-  "Opcode constants have to expected integer values."
-  :cases (("nop"        cl-cc/bytecode:+op-nop+        #x00)
-          ("load-const" cl-cc/bytecode:+op-load-const+ #x01)
-          ("add"        cl-cc/bytecode:+op-add+        #x10)
-          ("return"     cl-cc/bytecode:+op-return+     #x35)
-          ("wide"       cl-cc/bytecode:+op-wide+       #xFE))
-  (constant expected)
-  (assert-= expected constant))
+(it-sequential "bytecode-opcode-constants nop"
+  (destructuring-bind (constant expected) (list cl-cc/bytecode:+op-nop+ #x00)
+    (expect (= expected constant) :to-be-truthy)))
+
+(it-sequential "bytecode-opcode-constants load-const"
+  (destructuring-bind (constant expected) (list cl-cc/bytecode:+op-load-const+ #x01)
+    (expect (= expected constant) :to-be-truthy)))
+
+(it-sequential "bytecode-opcode-constants add"
+  (destructuring-bind (constant expected) (list cl-cc/bytecode:+op-add+ #x10)
+    (expect (= expected constant) :to-be-truthy)))
+
+(it-sequential "bytecode-opcode-constants return"
+  (destructuring-bind (constant expected) (list cl-cc/bytecode:+op-return+ #x35)
+    (expect (= expected constant) :to-be-truthy)))
+
+(it-sequential "bytecode-opcode-constants wide"
+  (destructuring-bind (constant expected) (list cl-cc/bytecode:+op-wide+ #xFE)
+    (expect (= expected constant) :to-be-truthy)))
 
 ;;; ------------------------------------------------------------
 ;;; encode-nop
 ;;; ------------------------------------------------------------
 
-(deftest bytecode-encode-nop-is-zero
-  "encode-nop produces a zero 32-bit word."
-  (assert-= 0 (cl-cc/bytecode:encode-nop)))
+(it-sequential "bytecode-encode-nop-is-zero"
+  (expect (= 0 (cl-cc/bytecode:encode-nop)) :to-be-truthy))
 
 ;;; ------------------------------------------------------------
 ;;; encode-3op
 ;;; ------------------------------------------------------------
 
-(deftest-each bytecode-encode-3op-cases
-  "encode-3op packs opcode, dst, src1, src2 into correct bit positions."
-  :cases (("basic"          cl-cc/bytecode:+op-add+ 1   2   3)
-          ("max-registers"  cl-cc/bytecode:+op-add+ 255 255 255)
-          ("zero-registers" cl-cc/bytecode:+op-mul+ 0   0   0))
-  (op dst src1 src2)
-  (assert-bitfield (cl-cc/bytecode:encode-3op op dst src1 src2)
-    (24 8 op) (16 8 dst) (8 8 src1) (0 8 src2)))
+(it-sequential "bytecode-encode-3op-cases basic"
+  (destructuring-bind (op dst src1 src2) (list cl-cc/bytecode:+op-add+ 1 2 3)
+    (assert-bitfield (cl-cc/bytecode:encode-3op op dst src1 src2)
+    (24 8 op) (16 8 dst) (8 8 src1) (0 8 src2))))
+
+(it-sequential "bytecode-encode-3op-cases max-registers"
+  (destructuring-bind (op dst src1 src2) (list cl-cc/bytecode:+op-add+ 255 255 255)
+    (assert-bitfield (cl-cc/bytecode:encode-3op op dst src1 src2)
+    (24 8 op) (16 8 dst) (8 8 src1) (0 8 src2))))
+
+(it-sequential "bytecode-encode-3op-cases zero-registers"
+  (destructuring-bind (op dst src1 src2) (list cl-cc/bytecode:+op-mul+ 0 0 0)
+    (assert-bitfield (cl-cc/bytecode:encode-3op op dst src1 src2)
+    (24 8 op) (16 8 dst) (8 8 src1) (0 8 src2))))
 
 ;;; ------------------------------------------------------------
 ;;; encode-2op
 ;;; ------------------------------------------------------------
 
-(deftest bytecode-encode-2op-packs-bit-fields-correctly
-  "encode-2op places opcode in bits[31:24], dst in [23:16], src in [15:8], low byte zero."
+(it-sequential "bytecode-encode-2op-packs-bit-fields-correctly"
   (assert-bitfield (cl-cc/bytecode:encode-2op cl-cc/bytecode:+op-neg+ 4 5 0)
     (24 8 cl-cc/bytecode:+op-neg+) (16 8 4) (8 8 5) (0 8 0)))
 
@@ -63,66 +73,77 @@
 ;;; encode-imm
 ;;; ------------------------------------------------------------
 
-(deftest-each bytecode-encode-imm-cases
-  "encode-imm encodes opcode, register, and immediate into the correct bit fields."
-  :cases (("positive" 3 100     100)
-          ("zero"     0 0       0)
-          ("negative" 1 -1      #xFFFF)
-          ("min"      0 -32768 #x8000))
-  (reg imm expected-low16)
-  (assert-bitfield (cl-cc/bytecode:encode-imm cl-cc/bytecode:+op-load-fixnum+ reg imm)
-    (24 8 cl-cc/bytecode:+op-load-fixnum+) (16 8 reg) (0 16 expected-low16)))
+(it-sequential "bytecode-encode-imm-cases positive"
+  (destructuring-bind (reg imm expected-low16) (list 3 100 100)
+    (assert-bitfield (cl-cc/bytecode:encode-imm cl-cc/bytecode:+op-load-fixnum+ reg imm)
+    (24 8 cl-cc/bytecode:+op-load-fixnum+) (16 8 reg) (0 16 expected-low16))))
+
+(it-sequential "bytecode-encode-imm-cases zero"
+  (destructuring-bind (reg imm expected-low16) (list 0 0 0)
+    (assert-bitfield (cl-cc/bytecode:encode-imm cl-cc/bytecode:+op-load-fixnum+ reg imm)
+    (24 8 cl-cc/bytecode:+op-load-fixnum+) (16 8 reg) (0 16 expected-low16))))
+
+(it-sequential "bytecode-encode-imm-cases negative"
+  (destructuring-bind (reg imm expected-low16) (list 1 -1 #xFFFF)
+    (assert-bitfield (cl-cc/bytecode:encode-imm cl-cc/bytecode:+op-load-fixnum+ reg imm)
+    (24 8 cl-cc/bytecode:+op-load-fixnum+) (16 8 reg) (0 16 expected-low16))))
+
+(it-sequential "bytecode-encode-imm-cases min"
+  (destructuring-bind (reg imm expected-low16) (list 0 -32768 #x8000)
+    (assert-bitfield (cl-cc/bytecode:encode-imm cl-cc/bytecode:+op-load-fixnum+ reg imm)
+    (24 8 cl-cc/bytecode:+op-load-fixnum+) (16 8 reg) (0 16 expected-low16))))
 
 ;;; ------------------------------------------------------------
 ;;; encode-branch
 ;;; ------------------------------------------------------------
 
-(deftest-each bytecode-encode-branch-cases
-  "encode-branch encodes the opcode and offset into the correct bit fields."
-  :cases (("zero"     0   0)
-          ("positive" 50 50)
-          ("negative" -1 #xFFFFFF))
-  (offset expected-low24)
-  (assert-bitfield (cl-cc/bytecode:encode-branch cl-cc/bytecode:+op-jump+ offset)
-    (24 8 cl-cc/bytecode:+op-jump+) (0 24 expected-low24)))
+(it-sequential "bytecode-encode-branch-cases zero"
+  (destructuring-bind (offset expected-low24) (list 0 0)
+    (assert-bitfield (cl-cc/bytecode:encode-branch cl-cc/bytecode:+op-jump+ offset)
+    (24 8 cl-cc/bytecode:+op-jump+) (0 24 expected-low24))))
+
+(it-sequential "bytecode-encode-branch-cases positive"
+  (destructuring-bind (offset expected-low24) (list 50 50)
+    (assert-bitfield (cl-cc/bytecode:encode-branch cl-cc/bytecode:+op-jump+ offset)
+    (24 8 cl-cc/bytecode:+op-jump+) (0 24 expected-low24))))
+
+(it-sequential "bytecode-encode-branch-cases negative"
+  (destructuring-bind (offset expected-low24) (list -1 #xFFFFFF)
+    (assert-bitfield (cl-cc/bytecode:encode-branch cl-cc/bytecode:+op-jump+ offset)
+    (24 8 cl-cc/bytecode:+op-jump+) (0 24 expected-low24))))
 
 ;;; ------------------------------------------------------------
 ;;; bytecode-builder: emit and build
 ;;; ------------------------------------------------------------
 
-(deftest bytecode-builder-empty-chunk
-  "build-bytecode on empty builder gives zero-length code vector."
+(it-sequential "bytecode-builder-empty-chunk"
   (let ((b (cl-cc/bytecode:make-bytecode-builder)))
     (let ((chunk (cl-cc/bytecode:build-bytecode b)))
-      (assert-= 0 (length (cl-cc/bytecode:bytecode-chunk-code chunk))))))
+      (expect (= 0 (length (cl-cc/bytecode:bytecode-chunk-code chunk))) :to-be-truthy))))
 
-(deftest bytecode-builder-emit-one
-  "Emitting one instruction gives a code vector of length 1."
+(it-sequential "bytecode-builder-emit-one"
   (let ((b (cl-cc/bytecode:make-bytecode-builder)))
     (cl-cc/bytecode:emit (cl-cc/bytecode:encode-nop) b)
     (let ((chunk (cl-cc/bytecode:build-bytecode b)))
-      (assert-= 1 (length (cl-cc/bytecode:bytecode-chunk-code chunk))))))
+      (expect (= 1 (length (cl-cc/bytecode:bytecode-chunk-code chunk))) :to-be-truthy))))
 
-(deftest bytecode-builder-emit-preserves-word
-  "emit stores the exact word; build-bytecode returns it unchanged."
+(it-sequential "bytecode-builder-emit-preserves-word"
   (let* ((b (cl-cc/bytecode:make-bytecode-builder))
          (w (cl-cc/bytecode:encode-3op cl-cc/bytecode:+op-add+ 5 6 7)))
     (cl-cc/bytecode:emit w b)
     (let* ((chunk (cl-cc/bytecode:build-bytecode b))
            (code  (cl-cc/bytecode:bytecode-chunk-code chunk)))
-      (assert-= w (aref code 0)))))
+      (expect (= w (aref code 0)) :to-be-truthy))))
 
-(deftest bytecode-builder-emit-constant
-  "emit-constant stores a value in the constant pool."
+(it-sequential "bytecode-builder-emit-constant"
   (let ((b (cl-cc/bytecode:make-bytecode-builder)))
     (let ((idx (cl-cc/bytecode:emit-constant 'hello b)))
-      (assert-= 0 idx)
+      (expect (= 0 idx) :to-be-truthy)
       (let ((chunk (cl-cc/bytecode:build-bytecode b)))
-        (assert-= 1 (length (cl-cc/bytecode:bytecode-chunk-constants chunk)))
-        (assert-equal 'hello (aref (cl-cc/bytecode:bytecode-chunk-constants chunk) 0))))))
+        (expect (= 1 (length (cl-cc/bytecode:bytecode-chunk-constants chunk))) :to-be-truthy)
+        (expect (aref (cl-cc/bytecode:bytecode-chunk-constants chunk) 0) :to-equal 'hello)))))
 
-(deftest bytecode-builder-emit-multiple
-  "Emitting multiple instructions preserves order."
+(it-sequential "bytecode-builder-emit-multiple"
   (let ((b  (cl-cc/bytecode:make-bytecode-builder))
         (w0 (cl-cc/bytecode:encode-nop))
         (w1 (cl-cc/bytecode:encode-3op cl-cc/bytecode:+op-add+ 1 2 3))
@@ -132,36 +153,31 @@
     (cl-cc/bytecode:emit w2 b)
     (let* ((chunk (cl-cc/bytecode:build-bytecode b))
            (code  (cl-cc/bytecode:bytecode-chunk-code chunk)))
-      (assert-= 3 (length code))
-      (assert-= w0 (aref code 0))
-      (assert-= w1 (aref code 1))
-      (assert-= w2 (aref code 2)))))
+      (expect (= 3 (length code)) :to-be-truthy)
+      (expect (= w0 (aref code 0)) :to-be-truthy)
+      (expect (= w1 (aref code 1)) :to-be-truthy)
+      (expect (= w2 (aref code 2)) :to-be-truthy))))
 
 ;;; ------------------------------------------------------------
 ;;; Specific instruction encoders
 ;;; ------------------------------------------------------------
 
-(deftest bytecode-encode-add
-  "encode-add produces correct opcode and registers."
+(it-sequential "bytecode-encode-add"
   (assert-bitfield (cl-cc/bytecode:encode-add 1 2 3)
     (24 8 cl-cc/bytecode:+op-add+) (16 8 1) (8 8 2) (0 8 3)))
 
-(deftest bytecode-encode-move
-  "encode-move produces correct opcode."
+(it-sequential "bytecode-encode-move"
   (let ((w (cl-cc/bytecode:encode-move 5 10)))
-    (assert-= cl-cc/bytecode:+op-move+ (ldb (byte 8 24) w))))
+    (expect (= cl-cc/bytecode:+op-move+ (ldb (byte 8 24) w)) :to-be-truthy)))
 
-(deftest bytecode-encode-jump
-  "encode-jump produces correct opcode and offset."
+(it-sequential "bytecode-encode-jump"
   (assert-bitfield (cl-cc/bytecode:encode-jump 10)
     (24 8 cl-cc/bytecode:+op-jump+) (0 24 10)))
 
-(deftest bytecode-encode-return
-  "encode-return produces correct opcode with src register."
+(it-sequential "bytecode-encode-return"
   (assert-bitfield (cl-cc/bytecode:encode-return 3)
     (24 8 cl-cc/bytecode:+op-return+) (16 8 3)))
 
-(deftest bytecode-encode-tail-call-is-3op
-  "encode-tail-call uses 3-operand format: dst=0(pad), src1=func, src2=nargs."
+(it-sequential "bytecode-encode-tail-call-is-3op"
   (assert-bitfield (cl-cc/bytecode:encode-tail-call 5 3)
     (24 8 cl-cc/bytecode:+op-tail-call+) (16 8 0) (8 8 5) (0 8 3)))

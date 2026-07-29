@@ -5,213 +5,207 @@
 
 (in-package :cl-cc/test)
 
-(defsuite binary-buffer-suite
-  :description "Binary buffer operations and serialization primitives"
-  :parent cl-cc-unit-suite)
 
-(in-suite binary-buffer-suite)
 
 ;;; ------------------------------------------------------------
 ;;; Binary Buffer — make-binary-buffer, write/read operations
 ;;; ------------------------------------------------------------
 
-(deftest binary-buffer-create-empty-buffer
-  "make-binary-buffer returns an adjustable buffer with fill-pointer 0."
+(it-sequential "binary-buffer-create-empty-buffer"
   (let ((buf (cl-cc/binary::make-binary-buffer 256)))
-    (assert-true (typep buf '(array (unsigned-byte 8) (*))))
-    (assert-true (array-has-fill-pointer-p buf))
-    (assert-equal 0 (length buf))))
+    (expect (typep buf '(array (unsigned-byte 8) (*))) :to-be-truthy)
+    (expect (array-has-fill-pointer-p buf) :to-be-truthy)
+    (expect (length buf) :to-equal 0)))
 
-(deftest binary-buffer-write-u8-roundtrips
-  "Writing a u8 to a buffer appends the byte."
+(it-sequential "binary-buffer-write-u8-roundtrips"
   (let ((buf (cl-cc/binary::make-binary-buffer 16)))
     (cl-cc/binary::binary-buffer-write-u8 buf #xAB)
-    (assert-equal 1 (length buf))
-    (assert-equal #xAB (aref buf 0))
+    (expect (length buf) :to-equal 1)
+    (expect (aref buf 0) :to-equal #xAB)
     (cl-cc/binary::binary-buffer-write-u8 buf #x00)
     (cl-cc/binary::binary-buffer-write-u8 buf #xFF)
-    (assert-equal 3 (length buf))
-    (assert-equal #x00 (aref buf 1))
-    (assert-equal #xFF (aref buf 2))))
+    (expect (length buf) :to-equal 3)
+    (expect (aref buf 1) :to-equal #x00)
+    (expect (aref buf 2) :to-equal #xFF)))
 
-(deftest binary-buffer-write-u16le-roundtrips
-  "write-u16le appends two bytes in little-endian order."
+(it-sequential "binary-buffer-write-u16le-roundtrips"
   (let ((buf (cl-cc/binary::make-binary-buffer 16)))
     (cl-cc/binary::binary-buffer-write-u16le buf #xABCD)
-    (assert-equal 2 (length buf))
-    (assert-equal #xCD (aref buf 0))
-    (assert-equal #xAB (aref buf 1))))
+    (expect (length buf) :to-equal 2)
+    (expect (aref buf 0) :to-equal #xCD)
+    (expect (aref buf 1) :to-equal #xAB)))
 
-(deftest binary-buffer-write-u32le-roundtrips
-  "write-u32le appends four bytes in little-endian order."
+(it-sequential "binary-buffer-write-u32le-roundtrips"
   (let ((buf (cl-cc/binary::make-binary-buffer 16)))
     (cl-cc/binary::binary-buffer-write-u32le buf #xDEADBEEF)
-    (assert-equal 4 (length buf))
-    (assert-equal #xEF (aref buf 0))
-    (assert-equal #xBE (aref buf 1))
-    (assert-equal #xAD (aref buf 2))
-    (assert-equal #xDE (aref buf 3))))
+    (expect (length buf) :to-equal 4)
+    (expect (aref buf 0) :to-equal #xEF)
+    (expect (aref buf 1) :to-equal #xBE)
+    (expect (aref buf 2) :to-equal #xAD)
+    (expect (aref buf 3) :to-equal #xDE)))
 
-(deftest binary-buffer-write-u64le-roundtrips
-  "write-u64le appends eight bytes in little-endian order."
+(it-sequential "binary-buffer-write-u64le-roundtrips"
   (let ((buf (cl-cc/binary::make-binary-buffer 16)))
     (cl-cc/binary::binary-buffer-write-u64le buf #x0123456789ABCDEF)
-    (assert-equal 8 (length buf))
-    (assert-equal #xEF (aref buf 0))
-    (assert-equal #xCD (aref buf 1))
-    (assert-equal #xAB (aref buf 2))
-    (assert-equal #x89 (aref buf 3))
-    (assert-equal #x67 (aref buf 4))
-    (assert-equal #x45 (aref buf 5))
-    (assert-equal #x23 (aref buf 6))
-    (assert-equal #x01 (aref buf 7))))
+    (expect (length buf) :to-equal 8)
+    (expect (aref buf 0) :to-equal #xEF)
+    (expect (aref buf 1) :to-equal #xCD)
+    (expect (aref buf 2) :to-equal #xAB)
+    (expect (aref buf 3) :to-equal #x89)
+    (expect (aref buf 4) :to-equal #x67)
+    (expect (aref buf 5) :to-equal #x45)
+    (expect (aref buf 6) :to-equal #x23)
+    (expect (aref buf 7) :to-equal #x01)))
 
-(deftest binary-buffer-write-pad-zero-fills
-  "write-pad fills with N zero bytes."
+(it-sequential "binary-buffer-write-pad-zero-fills"
   (let ((buf (cl-cc/binary::make-binary-buffer 16))
         (pad-count 5))
     (cl-cc/binary::binary-buffer-write-pad buf pad-count)
-    (assert-equal pad-count (length buf))
+    (expect (length buf) :to-equal pad-count)
     (dotimes (i pad-count)
-      (assert-equal 0 (aref buf i)))))
+      (expect (aref buf i) :to-equal 0))))
 
-(deftest binary-buffer-write-bytes-vector
-  "write-bytes from a vector copies all elements."
+(it-sequential "binary-buffer-write-bytes-vector"
   (let ((buf (cl-cc/binary::make-binary-buffer 16))
         (data #(1 2 3 4 5)))
     (cl-cc/binary::binary-buffer-write-bytes buf data)
-    (assert-equal 5 (length buf))
+    (expect (length buf) :to-equal 5)
     (dotimes (i 5)
-      (assert-equal (aref data i) (aref buf i)))))
+      (expect (aref buf i) :to-equal (aref data i)))))
 
-(deftest binary-buffer-write-bytes-list
-  "write-bytes from a list copies all elements."
+(it-sequential "binary-buffer-write-bytes-list"
   (let ((buf (cl-cc/binary::make-binary-buffer 16))
         (data '(10 20 30)))
     (cl-cc/binary::binary-buffer-write-bytes buf data)
-    (assert-equal 3 (length buf))
-    (assert-equal 10 (aref buf 0))
-    (assert-equal 20 (aref buf 1))
-    (assert-equal 30 (aref buf 2))))
+    (expect (length buf) :to-equal 3)
+    (expect (aref buf 0) :to-equal 10)
+    (expect (aref buf 1) :to-equal 20)
+    (expect (aref buf 2) :to-equal 30)))
 
-(deftest binary-buffer-to-array-preserves-contents
-  "binary-buffer-to-array returns a copy with same contents."
+(it-sequential "binary-buffer-to-array-preserves-contents"
   (let ((buf (cl-cc/binary::make-binary-buffer 16)))
     (cl-cc/binary::binary-buffer-write-u8 buf 42)
     (cl-cc/binary::binary-buffer-write-u8 buf 99)
     (let ((copy (cl-cc/binary::binary-buffer-to-array buf)))
-      (assert-equal 2 (length copy))
-      (assert-equal 42 (aref copy 0))
-      (assert-equal 99 (aref copy 1)))))
+      (expect (length copy) :to-equal 2)
+      (expect (aref copy 0) :to-equal 42)
+      (expect (aref copy 1) :to-equal 99))))
 
 ;;; ------------------------------------------------------------
 ;;; byte-buffer — make-byte-buffer, buffer-write-byte
 ;;; ------------------------------------------------------------
 
-(deftest byte-buffer-create-and-write
-  "make-byte-buffer creates an empty byte-buffer; buffer-write-byte appends."
+(it-sequential "byte-buffer-create-and-write"
   (let ((bb (cl-cc/binary::make-byte-buffer 64)))
     (cl-cc/binary::buffer-write-byte bb #x7F)
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 1 (length data))
-      (assert-equal #x7F (aref data 0)))))
+      (expect (length data) :to-equal 1)
+      (expect (aref data 0) :to-equal #x7F))))
 
-(deftest byte-buffer-multiple-writes
-  "Multiple buffer-write-byte calls append sequentially."
+(it-sequential "byte-buffer-multiple-writes"
   (let ((bb (cl-cc/binary::make-byte-buffer 64)))
     (dotimes (i 10)
       (cl-cc/binary::buffer-write-byte bb i))
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 10 (length data))
+      (expect (length data) :to-equal 10)
       (dotimes (i 10)
-        (assert-equal i (aref data i))))))
+        (expect (aref data i) :to-equal i)))))
 
-(deftest byte-buffer-write-bytes-via-class
-  "buffer-write-bytes via CLOS byte-buffer writes correctly."
+(it-sequential "byte-buffer-write-bytes-via-class"
   (let ((bb (cl-cc/binary::make-byte-buffer 64)))
     (cl-cc/binary::buffer-write-bytes bb #(100 200 255))
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 3 (length data))
-      (assert-equal 100 (aref data 0))
-      (assert-equal 200 (aref data 1))
-      (assert-equal 255 (aref data 2)))))
+      (expect (length data) :to-equal 3)
+      (expect (aref data 0) :to-equal 100)
+      (expect (aref data 1) :to-equal 200)
+      (expect (aref data 2) :to-equal 255))))
 
 ;;; ------------------------------------------------------------
 ;;; Utilities — align-up, string-to-ascii-bytes
 ;;; ------------------------------------------------------------
 
-(deftest-each align-up-cases
-  "align-up rounds VALUE up to the nearest multiple of ALIGNMENT."
-  :cases (("already-aligned-16-by-8"   16   8   16)
-          ("already-aligned-1024"      1024 256 1024)
-          ("9-rounds-to-16"            9    8   16)
-          ("15-rounds-to-16"           15   8   16)
-          ("129-rounds-to-256"         129  128 256)
-          ("zero-stays-zero"           0    8   0)
-          ("alignment-one-passthrough" 42   1   42))
-  (value alignment expected)
-  (assert-equal expected (cl-cc/binary::align-up value alignment)))
+(it-sequential "align-up-cases already-aligned-16-by-8"
+  (destructuring-bind (value alignment expected) (list 16 8 16)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
 
-(deftest string-to-ascii-bytes-converts-correctly
-  "string-to-ascii-bytes converts each character to its ASCII code."
+(it-sequential "align-up-cases already-aligned-1024"
+  (destructuring-bind (value alignment expected) (list 1024 256 1024)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
+
+(it-sequential "align-up-cases 9-rounds-to-16"
+  (destructuring-bind (value alignment expected) (list 9 8 16)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
+
+(it-sequential "align-up-cases 15-rounds-to-16"
+  (destructuring-bind (value alignment expected) (list 15 8 16)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
+
+(it-sequential "align-up-cases 129-rounds-to-256"
+  (destructuring-bind (value alignment expected) (list 129 128 256)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
+
+(it-sequential "align-up-cases zero-stays-zero"
+  (destructuring-bind (value alignment expected) (list 0 8 0)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
+
+(it-sequential "align-up-cases alignment-one-passthrough"
+  (destructuring-bind (value alignment expected) (list 42 1 42)
+    (expect (cl-cc/binary::align-up value alignment) :to-equal expected)))
+
+(it-sequential "string-to-ascii-bytes-converts-correctly"
   (let ((bytes (cl-cc/binary::string-to-ascii-bytes "ABC")))
-    (assert-equal 3 (length bytes))
-    (assert-equal (char-code #\A) (aref bytes 0))
-    (assert-equal (char-code #\B) (aref bytes 1))
-    (assert-equal (char-code #\C) (aref bytes 2))))
+    (expect (length bytes) :to-equal 3)
+    (expect (aref bytes 0) :to-equal (char-code #\A))
+    (expect (aref bytes 1) :to-equal (char-code #\B))
+    (expect (aref bytes 2) :to-equal (char-code #\C))))
 
-(deftest string-to-ascii-bytes-empty-string
-  "string-to-ascii-bytes on empty string returns empty vector."
+(it-sequential "string-to-ascii-bytes-empty-string"
   (let ((bytes (cl-cc/binary::string-to-ascii-bytes "")))
-    (assert-equal 0 (length bytes))))
+    (expect (length bytes) :to-equal 0)))
 
 ;;; ------------------------------------------------------------
 ;;; Serialization — serialize-uint32-le, serialize-uint64-le
 ;;; ------------------------------------------------------------
 
-(deftest serialize-uint32-le-outputs-little-endian
-  "serialize-uint32-le writes 4 bytes in little-endian order."
+(it-sequential "serialize-uint32-le-outputs-little-endian"
   (let ((bb (cl-cc/binary::make-byte-buffer 16)))
     (cl-cc/binary::serialize-uint32-le #x12345678 bb)
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 4 (length data))
-      (assert-equal #x78 (aref data 0))
-      (assert-equal #x56 (aref data 1))
-      (assert-equal #x34 (aref data 2))
-      (assert-equal #x12 (aref data 3)))))
+      (expect (length data) :to-equal 4)
+      (expect (aref data 0) :to-equal #x78)
+      (expect (aref data 1) :to-equal #x56)
+      (expect (aref data 2) :to-equal #x34)
+      (expect (aref data 3) :to-equal #x12))))
 
-(deftest serialize-uint64-le-outputs-little-endian
-  "serialize-uint64-le writes 8 bytes in little-endian order."
+(it-sequential "serialize-uint64-le-outputs-little-endian"
   (let ((bb (cl-cc/binary::make-byte-buffer 16)))
     (cl-cc/binary::serialize-uint64-le #xAABBCCDD00112233 bb)
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 8 (length data))
-      (assert-equal #x33 (aref data 0))
-      (assert-equal #x22 (aref data 1))
-      (assert-equal #x11 (aref data 2))
-      (assert-equal #x00 (aref data 3))
-      (assert-equal #xDD (aref data 4))
-      (assert-equal #xCC (aref data 5))
-      (assert-equal #xBB (aref data 6))
-      (assert-equal #xAA (aref data 7)))))
+      (expect (length data) :to-equal 8)
+      (expect (aref data 0) :to-equal #x33)
+      (expect (aref data 1) :to-equal #x22)
+      (expect (aref data 2) :to-equal #x11)
+      (expect (aref data 3) :to-equal #x00)
+      (expect (aref data 4) :to-equal #xDD)
+      (expect (aref data 5) :to-equal #xCC)
+      (expect (aref data 6) :to-equal #xBB)
+      (expect (aref data 7) :to-equal #xAA))))
 
-(deftest serialize-bytes-writes-all
-  "serialize-bytes writes all bytes from a simple-array."
+(it-sequential "serialize-bytes-writes-all"
   (let ((bb (cl-cc/binary::make-byte-buffer 16))
         (input (make-array 4 :element-type '(unsigned-byte 8) :initial-contents '(1 3 5 7))))
     (cl-cc/binary::serialize-bytes input bb)
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 4 (length data))
+      (expect (length data) :to-equal 4)
       (dotimes (i 4)
-        (assert-equal (aref input i) (aref data i))))))
+        (expect (aref data i) :to-equal (aref input i))))))
 
-(deftest serialize-string-16-pads-to-16
-  "serialize-string-16 writes exactly 16 bytes, null-padding shorter strings."
+(it-sequential "serialize-string-16-pads-to-16"
   (let ((bb (cl-cc/binary::make-byte-buffer 32)))
     (cl-cc/binary::serialize-string-16 "HI" bb)
     (let ((data (cl-cc/binary::buffer-get-bytes bb)))
-      (assert-equal 16 (length data))
-      (assert-equal (char-code #\H) (aref data 0))
-      (assert-equal (char-code #\I) (aref data 1))
+      (expect (length data) :to-equal 16)
+      (expect (aref data 0) :to-equal (char-code #\H))
+      (expect (aref data 1) :to-equal (char-code #\I))
       (dotimes (i 14)
-        (assert-equal 0 (aref data (+ i 2)))))))
+        (expect (aref data (+ i 2)) :to-equal 0)))))

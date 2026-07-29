@@ -4,34 +4,42 @@
 ;;; and opt-inst-cse-eligible-p (Phase 0 of optimizer modernization).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── vm-inst-effect-kind ─────────────────────────────────────────────────
 
-(deftest-each effect-kind-pure
-  "Arithmetic and comparison instructions are classified as :pure."
-  :cases (("vm-const"   (make-vm-const :dst :r0 :value 42))
-          ("vm-move"    (make-vm-move  :dst :r0 :src :r1))
-          ("vm-add"     (make-vm-add   :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-sub"     (make-vm-sub   :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-mul"     (make-vm-mul   :dst :r0 :lhs :r1 :rhs :r2)))
-  (inst)
-  (assert-eq :pure (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-pure vm-const"
+  (destructuring-bind (inst) (list (make-vm-const :dst :r0 :value 42))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
 
-(deftest-each effect-kind-control
-  "Control flow instructions are classified as :control."
-  :cases (("vm-ret"  (make-vm-ret  :reg :r0))
-          ("vm-jump" (make-vm-jump :label "L0")))
-  (inst)
-  (assert-eq :control (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-pure vm-move"
+  (destructuring-bind (inst) (list (make-vm-move  :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
 
-(deftest effect-kind-call-unknown
-  "vm-call is classified as :unknown (conservative)."
-  (assert-eq :unknown (cl-cc/optimize:vm-inst-effect-kind
-                        (make-vm-call :dst :r0 :func :r1 :args nil))))
+(it-sequential "effect-kind-pure vm-add"
+  (destructuring-bind (inst) (list (make-vm-add   :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
 
-(deftest opt-infer-transitive-function-purity-acyclic
-  "Known direct-call DAGs infer purity transitively, while impure callees block it."
+(it-sequential "effect-kind-pure vm-sub"
+  (destructuring-bind (inst) (list (make-vm-sub   :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
+
+(it-sequential "effect-kind-pure vm-mul"
+  (destructuring-bind (inst) (list (make-vm-mul   :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
+
+(it-sequential "effect-kind-control vm-ret"
+  (destructuring-bind (inst) (list (make-vm-ret  :reg :r0))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :control)))
+
+(it-sequential "effect-kind-control vm-jump"
+  (destructuring-bind (inst) (list (make-vm-jump :label "L0"))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :control)))
+
+(it-sequential "effect-kind-call-unknown"
+  (expect (cl-cc/optimize:vm-inst-effect-kind
+                        (make-vm-call :dst :r0 :func :r1 :args nil)) :to-be :unknown))
+
+(it-sequential "opt-infer-transitive-function-purity-acyclic"
   (let* ((pure-leaf-closure (make-vm-closure :dst :r10 :label "pure-leaf" :params '(:r0)))
          (pure-leaf-label   (make-vm-label :name "pure-leaf"))
          (pure-leaf-body    (make-vm-add :dst :r1 :lhs :r0 :rhs :r0))
@@ -55,13 +63,12 @@
                       impure-leaf-closure impure-leaf-label impure-leaf-write impure-leaf-ret
                       impure-wrapper-closure impure-wrapper-label impure-wrapper-ref impure-wrapper-call impure-wrapper-ret))
          (pure (cl-cc/optimize::opt-infer-transitive-function-purity insts)))
-    (assert-true (gethash "pure-leaf" pure))
-    (assert-true (gethash "pure-wrapper" pure))
-    (assert-false (gethash "impure-leaf" pure))
-    (assert-false (gethash "impure-wrapper" pure))))
+    (expect (gethash "pure-leaf" pure) :to-be-truthy)
+    (expect (gethash "pure-wrapper" pure) :to-be-truthy)
+    (expect (gethash "impure-leaf" pure) :to-be-falsy)
+    (expect (gethash "impure-wrapper" pure) :to-be-falsy)))
 
-(deftest opt-infer-transitive-function-purity-recursive-conservative
-  "Recursive functions remain conservative and are not inferred pure yet."
+(it-sequential "opt-infer-transitive-function-purity-recursive-conservative"
   (let* ((loop-closure (make-vm-closure :dst :r30 :label "loop" :params '(:r0)))
          (loop-label   (make-vm-label :name "loop"))
          (self-ref     (make-vm-func-ref :dst :r31 :label "loop"))
@@ -69,156 +76,215 @@
          (loop-ret     (make-vm-ret :reg :r32))
          (pure (cl-cc/optimize::opt-infer-transitive-function-purity
                 (list loop-closure loop-label self-ref self-call loop-ret))))
-    (assert-false (gethash "loop" pure))))
+    (expect (gethash "loop" pure) :to-be-falsy)))
 
-(deftest-each pure-function-memo-table-behavior
-  "Memo table hits only for labels pre-registered as pure; impure labels are never cached."
-  :cases (("pure-label"   "pure-f"   t   3)
-          ("impure-label" "impure-f" nil nil))
-  (label-name register-p expected-value)
-  (let ((memo (cl-cc/optimize::opt-make-pure-function-memo-table))
+(it-sequential "pure-function-memo-table-behavior pure-label"
+  (destructuring-bind (label-name register-p expected-value) (list "pure-f" t 3)
+    (let ((memo (cl-cc/optimize::opt-make-pure-function-memo-table))
         (pure (make-hash-table :test #'equal)))
     (when register-p (setf (gethash label-name pure) t))
     (cl-cc/optimize::opt-pure-function-memo-put memo pure label-name '(1 2) 3)
     (multiple-value-bind (value found-p)
         (cl-cc/optimize::opt-pure-function-memo-get memo pure label-name '(1 2))
       (if register-p
-          (progn (assert-true  found-p)
-                 (assert-equal expected-value value))
-          (progn (assert-false found-p)
-                 (assert-false value))))))
+          (progn (expect found-p :to-be-truthy)
+                 (expect value :to-equal expected-value))
+          (progn (expect found-p :to-be-falsy)
+                 (expect value :to-be-falsy)))))))
+
+(it-sequential "pure-function-memo-table-behavior impure-label"
+  (destructuring-bind (label-name register-p expected-value) (list "impure-f" nil nil)
+    (let ((memo (cl-cc/optimize::opt-make-pure-function-memo-table))
+        (pure (make-hash-table :test #'equal)))
+    (when register-p (setf (gethash label-name pure) t))
+    (cl-cc/optimize::opt-pure-function-memo-put memo pure label-name '(1 2) 3)
+    (multiple-value-bind (value found-p)
+        (cl-cc/optimize::opt-pure-function-memo-get memo pure label-name '(1 2))
+      (if register-p
+          (progn (expect found-p :to-be-truthy)
+                 (expect value :to-equal expected-value))
+          (progn (expect found-p :to-be-falsy)
+                 (expect value :to-be-falsy)))))))
 
 ;;; ─── opt-inst-pure-p ─────────────────────────────────────────────────────
 
-(deftest-each opt-pure-arithmetic
-  "All arithmetic instructions are pure."
-  :cases (("add" (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))
-          ("sub" (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2))
-          ("mul" (make-vm-mul :dst :r0 :lhs :r1 :rhs :r2))
-          ("neg" (make-vm-neg :dst :r0 :src :r1))
-          ("inc" (make-vm-inc :dst :r0 :src :r1))
-          ("dec" (make-vm-dec :dst :r0 :src :r1)))
-  (inst)
-  (assert-true (cl-cc/optimize:opt-inst-pure-p inst)))
+(it-sequential "opt-pure-arithmetic add"
+  (destructuring-bind (inst) (list (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
 
-(deftest-each opt-pure-comparison
-  "Comparison instructions are pure."
-  :cases (("lt" (make-vm-lt :dst :r0 :lhs :r1 :rhs :r2))
-          ("gt" (make-vm-gt :dst :r0 :lhs :r1 :rhs :r2))
-          ("le" (make-vm-le :dst :r0 :lhs :r1 :rhs :r2))
-          ("ge" (make-vm-ge :dst :r0 :lhs :r1 :rhs :r2)))
-  (inst)
-  (assert-true (cl-cc/optimize:opt-inst-pure-p inst)))
+(it-sequential "opt-pure-arithmetic sub"
+  (destructuring-bind (inst) (list (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
 
-(deftest-each opt-pure-type-predicates
-  "Type predicate instructions are pure."
-  :cases (("null-p"   (make-vm-null-p   :dst :r0 :src :r1))
-          ("cons-p"   (make-vm-cons-p   :dst :r0 :src :r1))
-          ("number-p" (make-vm-number-p :dst :r0 :src :r1)))
-  (inst)
-  (assert-true (cl-cc/optimize:opt-inst-pure-p inst)))
+(it-sequential "opt-pure-arithmetic mul"
+  (destructuring-bind (inst) (list (make-vm-mul :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
 
-(deftest-each opt-not-pure-io
-  "I/O and call instructions are not pure."
-  :cases (("print" (make-vm-print :reg :r0))
-          ("call"  (make-vm-call  :dst :r0 :func :r1 :args nil)))
-  (inst)
-  (assert-false (cl-cc/optimize:opt-inst-pure-p inst)))
+(it-sequential "opt-pure-arithmetic neg"
+  (destructuring-bind (inst) (list (make-vm-neg :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-arithmetic inc"
+  (destructuring-bind (inst) (list (make-vm-inc :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-arithmetic dec"
+  (destructuring-bind (inst) (list (make-vm-dec :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-comparison lt"
+  (destructuring-bind (inst) (list (make-vm-lt :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-comparison gt"
+  (destructuring-bind (inst) (list (make-vm-gt :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-comparison le"
+  (destructuring-bind (inst) (list (make-vm-le :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-comparison ge"
+  (destructuring-bind (inst) (list (make-vm-ge :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-type-predicates null-p"
+  (destructuring-bind (inst) (list (make-vm-null-p   :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-type-predicates cons-p"
+  (destructuring-bind (inst) (list (make-vm-cons-p   :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-pure-type-predicates number-p"
+  (destructuring-bind (inst) (list (make-vm-number-p :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-truthy)))
+
+(it-sequential "opt-not-pure-io print"
+  (destructuring-bind (inst) (list (make-vm-print :reg :r0))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-falsy)))
+
+(it-sequential "opt-not-pure-io call"
+  (destructuring-bind (inst) (list (make-vm-call  :dst :r0 :func :r1 :args nil))
+    (expect (cl-cc/optimize:opt-inst-pure-p inst) :to-be-falsy)))
 
 ;;; ─── opt-inst-dce-eligible-p ─────────────────────────────────────────────
 
-(deftest-each dce-eligible-simple
-  "Pure and alloc instructions are DCE-eligible."
-  :cases (("pure-add"   (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2))
-          ("alloc-cons" (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2)))
-  (inst)
-  (assert-true (cl-cc/optimize:opt-inst-dce-eligible-p inst)))
+(it-sequential "dce-eligible-simple pure-add"
+  (destructuring-bind (inst) (list (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-truthy)))
 
-(deftest-each dce-not-eligible-simple
-  "I/O and global-write instructions are NOT DCE-eligible."
-  :cases (("io-print"       (make-vm-print      :reg :r0))
-          ("set-global"     (make-vm-set-global :src :r0 :name 'x)))
-  (inst)
-  (assert-false (cl-cc/optimize:opt-inst-dce-eligible-p inst)))
+(it-sequential "dce-eligible-simple alloc-cons"
+  (destructuring-bind (inst) (list (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-truthy)))
+
+(it-sequential "dce-not-eligible-simple io-print"
+  (destructuring-bind (inst) (list (make-vm-print      :reg :r0))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-falsy)))
+
+(it-sequential "dce-not-eligible-simple set-global"
+  (destructuring-bind (inst) (list (make-vm-set-global :src :r0 :name 'x))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-falsy)))
 
 ;;; ─── opt-inst-cse-eligible-p ─────────────────────────────────────────────
 
-(deftest cse-eligibility
-  "Pure instructions are CSE-eligible; allocation instructions are not."
-  (assert-true  (cl-cc/optimize:opt-inst-cse-eligible-p
-                  (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2)))
-  (assert-false (cl-cc/optimize:opt-inst-cse-eligible-p
-                  (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))))
+(it-sequential "cse-eligibility"
+  (expect (cl-cc/optimize:opt-inst-cse-eligible-p
+                  (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2)) :to-be-truthy)
+  (expect (cl-cc/optimize:opt-inst-cse-eligible-p
+                  (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2)) :to-be-falsy))
 
 ;;; ─── Effect Kind: IO / Alloc / Read-Only / Write-Global ─────────────────
 
-(deftest-each effect-kind-io
-  "I/O instructions are classified as :io."
-  :cases (("vm-print"  (make-vm-print      :reg :r0))
-          ("vm-format" (make-vm-format-inst :dst :r0 :fmt "" :arg-regs nil)))
-  (inst)
-  (assert-eq :io (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-io vm-print"
+  (destructuring-bind (inst) (list (make-vm-print      :reg :r0))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :io)))
 
-(deftest-each effect-kind-alloc
-  "Allocation instructions are classified as :alloc."
-  :cases (("vm-cons"        (make-vm-cons        :dst :r0 :car-src :r1 :cdr-src :r2))
-          ("vm-make-string" (make-vm-make-string  :dst :r0 :src :r1 :char nil)))
-  (inst)
-  (assert-eq :alloc (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-io vm-format"
+  (destructuring-bind (inst) (list (make-vm-format-inst :dst :r0 :fmt "" :arg-regs nil))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :io)))
 
-(deftest-each effect-kind-read-only
-  "Read-only heap/global instructions are classified as :read-only."
-  :cases (("vm-car"        (make-vm-car        :dst :r0 :src :r1))
-          ("vm-cdr"        (make-vm-cdr        :dst :r0 :src :r1))
-          ("vm-get-global" (make-vm-get-global  :dst :r0 :name 'x)))
-  (inst)
-  (assert-eq :read-only (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-alloc vm-cons"
+  (destructuring-bind (inst) (list (make-vm-cons        :dst :r0 :car-src :r1 :cdr-src :r2))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :alloc)))
 
-(deftest-each effect-kind-write-global
-  "Global/heap mutation instructions are classified as :write-global."
-  :cases (("vm-set-global" (make-vm-set-global :src :r0 :name 'x))
-          ("vm-rplaca"     (make-vm-rplaca     :cons :r0 :val :r1))
-          ("vm-rplacd"     (make-vm-rplacd     :cons :r0 :val :r1)))
-  (inst)
-  (assert-eq :write-global (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-alloc vm-make-string"
+  (destructuring-bind (inst) (list (make-vm-make-string  :dst :r0 :src :r1 :char nil))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :alloc)))
 
-(deftest-each effect-kind-bitwise-pure
-  "Bitwise / boolean unary instructions are classified as :pure."
-  :cases (("vm-not"    (make-vm-not    :dst :r0 :src :r1))
-          ("vm-lognot" (make-vm-lognot :dst :r0 :src :r1))
-          ("vm-bswap"  (make-vm-bswap  :dst :r0 :src :r1)))
-  (inst)
-  (assert-eq :pure (cl-cc/optimize:vm-inst-effect-kind inst)))
+(it-sequential "effect-kind-read-only vm-car"
+  (destructuring-bind (inst) (list (make-vm-car        :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :read-only)))
+
+(it-sequential "effect-kind-read-only vm-cdr"
+  (destructuring-bind (inst) (list (make-vm-cdr        :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :read-only)))
+
+(it-sequential "effect-kind-read-only vm-get-global"
+  (destructuring-bind (inst) (list (make-vm-get-global  :dst :r0 :name 'x))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :read-only)))
+
+(it-sequential "effect-kind-write-global vm-set-global"
+  (destructuring-bind (inst) (list (make-vm-set-global :src :r0 :name 'x))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :write-global)))
+
+(it-sequential "effect-kind-write-global vm-rplaca"
+  (destructuring-bind (inst) (list (make-vm-rplaca     :cons :r0 :val :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :write-global)))
+
+(it-sequential "effect-kind-write-global vm-rplacd"
+  (destructuring-bind (inst) (list (make-vm-rplacd     :cons :r0 :val :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :write-global)))
+
+(it-sequential "effect-kind-bitwise-pure vm-not"
+  (destructuring-bind (inst) (list (make-vm-not    :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
+
+(it-sequential "effect-kind-bitwise-pure vm-lognot"
+  (destructuring-bind (inst) (list (make-vm-lognot :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
+
+(it-sequential "effect-kind-bitwise-pure vm-bswap"
+  (destructuring-bind (inst) (list (make-vm-bswap  :dst :r0 :src :r1))
+    (expect (cl-cc/optimize:vm-inst-effect-kind inst) :to-be :pure)))
 
 ;;; ─── CSE / DCE Properties of New Kinds ──────────────────────────────────
 
-(deftest-each dce-eligible-kinds
-  "Pure and alloc instructions are DCE-eligible."
-  :cases (("pure-add"   (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2))
-          ("alloc-cons" (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2)))
-  (inst)
-  (assert-true (cl-cc/optimize:opt-inst-dce-eligible-p inst)))
+(it-sequential "dce-eligible-kinds pure-add"
+  (destructuring-bind (inst) (list (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-truthy)))
 
-(deftest-each dce-not-eligible-kinds
-  "IO, write-global, and read-only instructions are NOT DCE-eligible."
-  :cases (("io-print"        (make-vm-print      :reg :r0))
-          ("write-set-global" (make-vm-set-global :src :r0 :name 'x))
-          ("read-get-global"  (make-vm-get-global :dst :r0 :name 'x)))
-  (inst)
-  (assert-false (cl-cc/optimize:opt-inst-dce-eligible-p inst)))
+(it-sequential "dce-eligible-kinds alloc-cons"
+  (destructuring-bind (inst) (list (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-truthy)))
 
-(deftest-each cse-not-eligible-non-pure
-  "Non-pure instructions are not CSE-eligible."
-  :cases (("alloc-cons"      (make-vm-cons       :dst :r0 :car-src :r1 :cdr-src :r2))
-          ("io-print"        (make-vm-print       :reg :r0))
-          ("read-get-global" (make-vm-get-global  :dst :r0 :name 'x)))
-  (inst)
-  (assert-false (cl-cc/optimize:opt-inst-cse-eligible-p inst)))
+(it-sequential "dce-not-eligible-kinds io-print"
+  (destructuring-bind (inst) (list (make-vm-print      :reg :r0))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-falsy)))
+
+(it-sequential "dce-not-eligible-kinds write-set-global"
+  (destructuring-bind (inst) (list (make-vm-set-global :src :r0 :name 'x))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-falsy)))
+
+(it-sequential "dce-not-eligible-kinds read-get-global"
+  (destructuring-bind (inst) (list (make-vm-get-global :dst :r0 :name 'x))
+    (expect (cl-cc/optimize:opt-inst-dce-eligible-p inst) :to-be-falsy)))
+
+(it-sequential "cse-not-eligible-non-pure alloc-cons"
+  (destructuring-bind (inst) (list (make-vm-cons       :dst :r0 :car-src :r1 :cdr-src :r2))
+    (expect (cl-cc/optimize:opt-inst-cse-eligible-p inst) :to-be-falsy)))
+
+(it-sequential "cse-not-eligible-non-pure io-print"
+  (destructuring-bind (inst) (list (make-vm-print       :reg :r0))
+    (expect (cl-cc/optimize:opt-inst-cse-eligible-p inst) :to-be-falsy)))
+
+(it-sequential "cse-not-eligible-non-pure read-get-global"
+  (destructuring-bind (inst) (list (make-vm-get-global  :dst :r0 :name 'x))
+    (expect (cl-cc/optimize:opt-inst-cse-eligible-p inst) :to-be-falsy)))
 
 ;;; ─── DCE Extended Coverage ───────────────────────────────────────────────
 
-(deftest dce-add-elimination
-  "DCE eliminates dead vm-add (unused result) but preserves used vm-add."
+(it-sequential "dce-add-elimination"
   (let* ((dead-insts (list (make-vm-const :dst :r0 :value 1)
                            (make-vm-const :dst :r1 :value 2)
                            (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1) ; dead: r2 unused
@@ -227,10 +293,10 @@
                            (make-vm-const :dst :r1 :value 2)
                            (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                            (make-vm-ret   :reg :r2)))) ; r2 is used here
-    (assert-false (some (lambda (i) (typep i 'cl-cc/vm::vm-add))
-                        (cl-cc/optimize::opt-pass-dce dead-insts)))
-    (assert-true  (some (lambda (i) (typep i 'cl-cc/vm::vm-add))
-                        (cl-cc/optimize::opt-pass-dce used-insts)))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add))
+                        (cl-cc/optimize::opt-pass-dce dead-insts)) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add))
+                        (cl-cc/optimize::opt-pass-dce used-insts)) :to-be-truthy)))
 
 ;;; ─── effect-row->effect-kind bridge ─────────────────────────────────────
 
@@ -240,17 +306,25 @@
    :effects (mapcar (lambda (n) (cl-cc/type:make-type-effect-op :name n :args nil)) effect-names)
    :row-var nil))
 
-(deftest-each effect-row->kind
-  "effect-row->effect-kind maps type system rows to optimizer effect kinds."
-  :cases (("pure"         (make-effect-row)         :pure)
-          ("io"           (make-effect-row 'io)      :io)
-          ("state"        (make-effect-row 'state)   :write-global)
-          ("error"        (make-effect-row 'error)   :control)
-          ("unknown-tag"  (make-effect-row 'network) :unknown))
-  (row expected)
-  (assert-eq expected (cl-cc:effect-row->effect-kind row)))
+(it-sequential "effect-row->kind pure"
+  (destructuring-bind (row expected) (list (make-effect-row) :pure)
+    (expect (cl-cc:effect-row->effect-kind row) :to-be expected)))
 
-(deftest effect-kind-vm-label-is-control
-  "vm-label instruction is classified as :control by the typecase fast-path."
-  (assert-eq :control
-             (cl-cc/optimize:vm-inst-effect-kind (make-vm-label :name "L0"))))
+(it-sequential "effect-row->kind io"
+  (destructuring-bind (row expected) (list (make-effect-row 'io) :io)
+    (expect (cl-cc:effect-row->effect-kind row) :to-be expected)))
+
+(it-sequential "effect-row->kind state"
+  (destructuring-bind (row expected) (list (make-effect-row 'state) :write-global)
+    (expect (cl-cc:effect-row->effect-kind row) :to-be expected)))
+
+(it-sequential "effect-row->kind error"
+  (destructuring-bind (row expected) (list (make-effect-row 'error) :control)
+    (expect (cl-cc:effect-row->effect-kind row) :to-be expected)))
+
+(it-sequential "effect-row->kind unknown-tag"
+  (destructuring-bind (row expected) (list (make-effect-row 'network) :unknown)
+    (expect (cl-cc:effect-row->effect-kind row) :to-be expected)))
+
+(it-sequential "effect-kind-vm-label-is-control"
+  (expect (cl-cc/optimize:vm-inst-effect-kind (make-vm-label :name "L0")) :to-be :control))

@@ -2,26 +2,25 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-definitions-function-suite :description "Definition-form function unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite expander-definitions-function-suite)
-(deftest-each expander-defun-lambda-preserve-structure
-  "Plain defun and lambda preserve their structure after macro expansion."
-  :cases (("defun"  '(defun triple (x) (* 3 x)) 'defun  2 '(x))
-          ("lambda" '(lambda (x y) (+ x y))     'lambda 1 '(x y)))
-  (form expected-head params-pos expected-params)
-  (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
-    (assert-eq    expected-head   (car result))
-    (assert-equal expected-params (nth params-pos result))))
+(it-sequential "expander-defun-lambda-preserve-structure defun"
+  (destructuring-bind (form expected-head params-pos expected-params) (list '(defun triple (x) (* 3 x)) 'defun 2 '(x))
+    (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
+    (expect (car result) :to-be expected-head)
+    (expect (nth params-pos result) :to-equal expected-params))))
 
-(deftest expander-lambda-optional-default-expanded
-  "compiler-macroexpand-all: lambda &optional default value is expanded."
+(it-sequential "expander-defun-lambda-preserve-structure lambda"
+  (destructuring-bind (form expected-head params-pos expected-params) (list '(lambda (x y) (+ x y)) 'lambda 1 '(x y))
+    (let ((result (cl-cc/expand:compiler-macroexpand-all form)))
+    (expect (car result) :to-be expected-head)
+    (expect (nth params-pos result) :to-equal expected-params))))
+
+(it-sequential "expander-lambda-optional-default-expanded"
   (let ((result (cl-cc/expand:compiler-macroexpand-all
                  '(lambda (x &optional (y (+ 1 1))) (+ x y)))))
-    (assert-eq 'lambda (car result))
+    (expect (car result) :to-be 'lambda)
     (let* ((params (second result))
            (opt-param (third params)))
-      (assert-equal 'y (first opt-param))
-      (assert-equal '(+ 1 1) (second opt-param)))))
+      (expect (first opt-param) :to-equal 'y)
+      (expect (second opt-param) :to-equal '(+ 1 1)))))

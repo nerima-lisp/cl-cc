@@ -2,13 +2,9 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-definitions-type-suite :description "Definition-form type unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite expander-definitions-type-suite)
-(deftest expander-deftype-registers-alias
-  "compiler-macroexpand-all: (deftype foo fixnum) registers the alias and returns (quote foo)."
+(it-sequential "expander-deftype-registers-alias"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(deftype my-index-type fixnum))))
-    (assert-eq 'quote (car result))
-    (assert-eq 'my-index-type (second result))))
+    (expect (car result) :to-be 'quote)
+    (expect (second result) :to-be 'my-index-type)))

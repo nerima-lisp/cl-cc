@@ -11,27 +11,24 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
-
 (defun %docgen-fixture-path ()
   "Return the docgen fixture source path relative to the runtime CWD."
   (merge-pathnames "packages/docgen/tests/fixture-source.lisp"
                    *default-pathname-defaults*))
 
-(deftest docgen-generate-api-docs-emits-documented-definitions
-  "generate-api-docs renders documented functions, macros, structs, classes, parameters, and variables, and omits undocumented definitions."
+(it-sequential "docgen-generate-api-docs-emits-documented-definitions"
   (let ((markdown (cl-cc/docgen:generate-api-docs (%docgen-fixture-path))))
-    (assert-true (search "## defun documented-function" markdown))
-    (assert-true (search "Return X unchanged." markdown))
-    (assert-true (search "## defmacro documented-macro" markdown))
-    (assert-true (search "Evaluate BODY in order." markdown))
-    (assert-true (search "## defstruct documented-struct" markdown))
-    (assert-true (search "A documented fixture structure." markdown))
-    (assert-true (search "## defclass documented-class" markdown))
-    (assert-true (search "A documented fixture class." markdown))
-    (assert-true (search "## defparameter *documented-parameter*" markdown))
-    (assert-true (search "A documented fixture parameter." markdown))
-    (assert-true (search "## defvar *documented-var*" markdown))
-    (assert-true (search "A documented fixture variable." markdown))
+    (expect (search "## defun documented-function" markdown) :to-be-truthy)
+    (expect (search "Return X unchanged." markdown) :to-be-truthy)
+    (expect (search "## defmacro documented-macro" markdown) :to-be-truthy)
+    (expect (search "Evaluate BODY in order." markdown) :to-be-truthy)
+    (expect (search "## defstruct documented-struct" markdown) :to-be-truthy)
+    (expect (search "A documented fixture structure." markdown) :to-be-truthy)
+    (expect (search "## defclass documented-class" markdown) :to-be-truthy)
+    (expect (search "A documented fixture class." markdown) :to-be-truthy)
+    (expect (search "## defparameter *documented-parameter*" markdown) :to-be-truthy)
+    (expect (search "A documented fixture parameter." markdown) :to-be-truthy)
+    (expect (search "## defvar *documented-var*" markdown) :to-be-truthy)
+    (expect (search "A documented fixture variable." markdown) :to-be-truthy)
     ;; Undocumented definitions must be excluded from the output.
-    (assert-null (search "undocumented-function" markdown))))
+    (expect (search "undocumented-function" markdown) :to-be-null)))

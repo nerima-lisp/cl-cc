@@ -8,168 +8,233 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── CST Node Source Positions ───────────────────────────────────────────────
 
-(deftest parse-integer-byte-positions
-  "Integer CST token records correct byte positions"
+(it-sequential "parse-integer-byte-positions"
   (let ((node (parse-one-cst "42")))
-    (assert-= 0 (cl-cc:cst-node-start-byte node))
-    (assert-= 2 (cl-cc:cst-node-end-byte node))))
+    (expect (= 0 (cl-cc:cst-node-start-byte node)) :to-be-truthy)
+    (expect (= 2 (cl-cc:cst-node-end-byte node)) :to-be-truthy)))
 
-(deftest parse-offset-byte-positions
-  "Second token in stream has correct start offset"
+(it-sequential "parse-offset-byte-positions"
   (multiple-value-bind (nodes _diag)
       (cl-cc:parse-cl-source "1 99")
     (declare (ignore _diag))
     (let ((second-node (second nodes)))
-      (assert-= 2 (cl-cc:cst-node-start-byte second-node)))))
+      (expect (= 2 (cl-cc:cst-node-start-byte second-node)) :to-be-truthy))))
 
 ;;; ─── parse-cl-source: Multiple Forms ────────────────────────────────────────
 
-(deftest-each parse-cl-source-basic-behavior
-  "parse-cl-source: multiple forms, diagnostics return, and empty-string handling."
-  :cases (("multiple-forms"     "1 2 3" 3  nil)
-          ("returns-diagnostics" "42"   1  t)
-          ("empty-string"        ""     0  t))
-  (source expected-count check-diagnostics-listp)
-  (multiple-value-bind (nodes diag)
+(it-sequential "parse-cl-source-basic-behavior multiple-forms"
+  (destructuring-bind (source expected-count check-diagnostics-listp) (list "1 2 3" 3 nil)
+    (multiple-value-bind (nodes diag)
       (cl-cc:parse-cl-source source)
-    (assert-= expected-count (length nodes))
+    (expect (= expected-count (length nodes)) :to-be-truthy)
     (when check-diagnostics-listp
-      (assert-true (listp diag)))))
+      (expect (listp diag) :to-be-truthy)))))
+
+(it-sequential "parse-cl-source-basic-behavior returns-diagnostics"
+  (destructuring-bind (source expected-count check-diagnostics-listp) (list "42" 1 t)
+    (multiple-value-bind (nodes diag)
+      (cl-cc:parse-cl-source source)
+    (expect (= expected-count (length nodes)) :to-be-truthy)
+    (when check-diagnostics-listp
+      (expect (listp diag) :to-be-truthy)))))
+
+(it-sequential "parse-cl-source-basic-behavior empty-string"
+  (destructuring-bind (source expected-count check-diagnostics-listp) (list "" 0 t)
+    (multiple-value-bind (nodes diag)
+      (cl-cc:parse-cl-source source)
+    (expect (= expected-count (length nodes)) :to-be-truthy)
+    (when check-diagnostics-listp
+      (expect (listp diag) :to-be-truthy)))))
 
 ;;; ─── parse-all-forms: S-expression Output ───────────────────────────────────
 
-(deftest-each parse-all-forms-value-cases
-  "parse-all-forms returns the correct s-expression for various input forms."
-  :cases (("integer"    "42"        (lambda (f) (= f 42)))
-          ("string"     "\"hello\"" (lambda (f) (string= f "hello")))
-          ("nil-list"   "()"        (lambda (f) (null f)))
-          ("symbol"     "foo"       (lambda (f) (string= "FOO" (symbol-name f))))
-          ("call"       "(+ 1 2)"   (lambda (f) (and (eq '+ (car f)) (= 1 (cadr f)) (= 2 (caddr f)))))
-          ("quote"      "'foo"      (lambda (f) (and (eq 'quote (car f)) (string= "FOO" (symbol-name (cadr f))))))
-          ("nested"     "(let ((x (+ 1 2))) (* x x))"
-                        (lambda (f) (and (eq 'let (car f)) (string= "X" (symbol-name (caaadr f)))))))
-  (source pred)
-  (assert-true (funcall pred (parse-one-sexp source))))
+(it-sequential "parse-all-forms-value-cases integer"
+  (destructuring-bind (source pred) (list "42" (lambda (f) (= f 42)))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
 
-(deftest parse-all-forms-multiple
-  "parse-all-forms returns all top-level forms from multi-form input."
+(it-sequential "parse-all-forms-value-cases string"
+  (destructuring-bind (source pred) (list "\"hello\"" (lambda (f) (string= f "hello")))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-value-cases nil-list"
+  (destructuring-bind (source pred) (list "()" (lambda (f) (null f)))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-value-cases symbol"
+  (destructuring-bind (source pred) (list "foo" (lambda (f) (string= "FOO" (symbol-name f))))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-value-cases call"
+  (destructuring-bind (source pred) (list "(+ 1 2)" (lambda (f) (and (eq '+ (car f)) (= 1 (cadr f)) (= 2 (caddr f)))))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-value-cases quote"
+  (destructuring-bind (source pred) (list "'foo" (lambda (f) (and (eq 'quote (car f)) (string= "FOO" (symbol-name (cadr f))))))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-value-cases nested"
+  (destructuring-bind (source pred) (list "(let ((x (+ 1 2))) (* x x))" (lambda (f) (and (eq 'let (car f)) (string= "X" (symbol-name (caaadr f))))))
+    (expect (funcall pred (parse-one-sexp source)) :to-be-truthy)))
+
+(it-sequential "parse-all-forms-multiple"
   (let ((forms (cl-cc:parse-all-forms "(defun f (x) x) (f 1)")))
-    (assert-= 2 (length forms))
-    (assert-eq 'defun (caar forms))
-    (assert-string= "F" (symbol-name (cadar forms)))))
+    (expect (= 2 (length forms)) :to-be-truthy)
+    (expect (caar forms) :to-be 'defun)
+    (expect (symbol-name (cadar forms)) :to-equal "F")))
 
 ;;; ─── parse-source: Single Form ───────────────────────────────────────────────
 
-(deftest parse-source-returns-one-form
-  "parse-source returns the first s-expression"
-  (assert-= 99 (cl-cc:parse-source "99")))
+(it-sequential "parse-source-returns-one-form"
+  (expect (= 99 (cl-cc:parse-source "99")) :to-be-truthy))
 
-(deftest parse-source-errors-on-empty
-  "parse-source signals an error on empty source"
-  (assert-signals error (cl-cc:parse-source "")))
+(it-sequential "parse-source-errors-on-empty"
+  (signals error (cl-cc:parse-source "")))
 
 ;;; ─── Error Recovery via cst-error ───────────────────────────────────────────
 
-(deftest parse-unmatched-paren-adds-diagnostic
-  "Unmatched open paren produces a diagnostic"
+(it-sequential "parse-unmatched-paren-adds-diagnostic"
   (multiple-value-bind (nodes diag)
       (cl-cc:parse-cl-source "(+ 1")
     (declare (ignore nodes))
-    (assert-true (not (null diag)))))
+    (expect (not (null diag)) :to-be-truthy)))
 
 ;;; ─── Special Forms: sexp-head-to-kind Dispatch ───────────────────────────────
 
-(deftest-each parse-special-form-head-kind
-  "Parser assigns correct CST kind to special form heads"
-  :cases (("defun"   "(defun f (x) x)"  :defun)
-          ("let"     "(let ((x 1)) x)"  :let)
-          ("if"      "(if t 1 2)"       :if)
-          ("lambda"  "(lambda (x) x)"   :lambda)
-          ("unknown" "(my-fn a b)"      :call))
-  (source expected-kind)
-  (let ((node (parse-one-cst source)))
-    (assert-eq expected-kind (cl-cc:cst-node-kind node))))
+(it-sequential "parse-special-form-head-kind defun"
+  (destructuring-bind (source expected-kind) (list "(defun f (x) x)" :defun)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-special-form-head-kind let"
+  (destructuring-bind (source expected-kind) (list "(let ((x 1)) x)" :let)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-special-form-head-kind if"
+  (destructuring-bind (source expected-kind) (list "(if t 1 2)" :if)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-special-form-head-kind lambda"
+  (destructuring-bind (source expected-kind) (list "(lambda (x) x)" :lambda)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-special-form-head-kind unknown"
+  (destructuring-bind (source expected-kind) (list "(my-fn a b)" :call)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
 
 ;;; ─── parse-and-lower: Full Pipeline ─────────────────────────────────────────
 
-(deftest-each parse-and-lower-cases
-  "parse-and-lower: returns list, produces ast-int for integers, handles multiple forms."
-  :cases (("returns-list"      "(+ 1 2)" (lambda (asts) (and (listp asts) (not (null asts)))))
-          ("integer-ast-int"   "42"      (lambda (asts) (cl-cc/ast:ast-int-p (first asts))))
-          ("multiple-3-forms"  "1 2 3"   (lambda (asts) (= 3 (length asts)))))
-  (source pred)
-  (assert-true (funcall pred (cl-cc:parse-and-lower source))))
+(it-sequential "parse-and-lower-cases returns-list"
+  (destructuring-bind (source pred) (list "(+ 1 2)" (lambda (asts) (and (listp asts) (not (null asts)))))
+    (expect (funcall pred (cl-cc:parse-and-lower source)) :to-be-truthy)))
+
+(it-sequential "parse-and-lower-cases integer-ast-int"
+  (destructuring-bind (source pred) (list "42" (lambda (asts) (cl-cc/ast:ast-int-p (first asts))))
+    (expect (funcall pred (cl-cc:parse-and-lower source)) :to-be-truthy)))
+
+(it-sequential "parse-and-lower-cases multiple-3-forms"
+  (destructuring-bind (source pred) (list "1 2 3" (lambda (asts) (= 3 (length asts))))
+    (expect (funcall pred (cl-cc:parse-and-lower source)) :to-be-truthy)))
 
 ;;; ─── pratt-parse-expr: Direct Tests ──────────────────────────────────────────
 
-(deftest pratt-parse-expr-empty-nud-table-returns-error
-  "pratt-parse-expr with an empty NUD table returns cst-error for any non-empty input."
+(it-sequential "pratt-parse-expr-empty-nud-table-returns-error"
   (let* ((ctx  (make-test-ctx "42"))
          (node (cl-cc/parse::pratt-parse-expr ctx)))
-    (assert-true (cl-cc/parse:cst-error-p node))))
+    (expect (cl-cc/parse:cst-error-p node) :to-be-truthy)))
 
-(deftest pratt-parse-expr-eof-returns-error
-  "pratt-parse-expr on empty input returns cst-error even with empty NUD table."
+(it-sequential "pratt-parse-expr-eof-returns-error"
   (let* ((ctx  (make-test-ctx ""))
          (node (cl-cc/parse::pratt-parse-expr ctx)))
-    (assert-true (cl-cc/parse:cst-error-p node))))
+    (expect (cl-cc/parse:cst-error-p node) :to-be-truthy)))
 
-(deftest-each pratt-parse-expr-node-type
-  "parse-cl-source returns the correct CST node type for each CL grammar input shape."
-  :cases (("integer"     "42"               #'cl-cc:cst-token-p    nil)
-          ("symbol"      "foo"              #'cl-cc:cst-token-p    nil)
-          ("list"        "(+ 1 2)"          #'cl-cc:cst-interior-p nil)
-          ("quote"       "'x"               #'cl-cc:cst-interior-p :quote)
-          ("nested-list" "(let ((x 1)) x)"  #'cl-cc:cst-interior-p nil))
-  (source pred expected-kind)
-  (let ((node (parse-one-cst source)))
-    (assert-true (funcall pred node))
+(it-sequential "pratt-parse-expr-node-type integer"
+  (destructuring-bind (source pred expected-kind) (list "42" #'cl-cc:cst-token-p nil)
+    (let ((node (parse-one-cst source)))
+    (expect (funcall pred node) :to-be-truthy)
     (when expected-kind
-      (assert-eq expected-kind (cl-cc:cst-node-kind node)))))
+      (expect (cl-cc:cst-node-kind node) :to-be expected-kind)))))
+
+(it-sequential "pratt-parse-expr-node-type symbol"
+  (destructuring-bind (source pred expected-kind) (list "foo" #'cl-cc:cst-token-p nil)
+    (let ((node (parse-one-cst source)))
+    (expect (funcall pred node) :to-be-truthy)
+    (when expected-kind
+      (expect (cl-cc:cst-node-kind node) :to-be expected-kind)))))
+
+(it-sequential "pratt-parse-expr-node-type list"
+  (destructuring-bind (source pred expected-kind) (list "(+ 1 2)" #'cl-cc:cst-interior-p nil)
+    (let ((node (parse-one-cst source)))
+    (expect (funcall pred node) :to-be-truthy)
+    (when expected-kind
+      (expect (cl-cc:cst-node-kind node) :to-be expected-kind)))))
+
+(it-sequential "pratt-parse-expr-node-type quote"
+  (destructuring-bind (source pred expected-kind) (list "'x" #'cl-cc:cst-interior-p :quote)
+    (let ((node (parse-one-cst source)))
+    (expect (funcall pred node) :to-be-truthy)
+    (when expected-kind
+      (expect (cl-cc:cst-node-kind node) :to-be expected-kind)))))
+
+(it-sequential "pratt-parse-expr-node-type nested-list"
+  (destructuring-bind (source pred expected-kind) (list "(let ((x 1)) x)" #'cl-cc:cst-interior-p nil)
+    (let ((node (parse-one-cst source)))
+    (expect (funcall pred node) :to-be-truthy)
+    (when expected-kind
+      (expect (cl-cc:cst-node-kind node) :to-be expected-kind)))))
 
 ;;; ─── pratt-add-diagnostic: Direct Tests ─────────────────────────────────────
 
-(deftest-each pratt-add-diagnostic-count
-  "pratt-add-diagnostic accumulates the correct number of diagnostics."
-  :cases (("one"  1)
-          ("two"  2))
-  (n)
-  (let ((ctx (make-test-ctx "42")))
+(it-sequential "pratt-add-diagnostic-count one"
+  (destructuring-bind (n) (list 1)
+    (let ((ctx (make-test-ctx "42")))
     (dotimes (i n)
       (cl-cc/parse::pratt-add-diagnostic ctx (format nil "error ~a" i) (cons i (1+ i))))
-    (assert-equal n (length (cl-cc/parse::pratt-context-diagnostics ctx)))))
+    (expect (length (cl-cc/parse::pratt-context-diagnostics ctx)) :to-equal n))))
 
-(deftest pratt-add-diagnostic-records-message
-  "pratt-add-diagnostic stores the error message."
+(it-sequential "pratt-add-diagnostic-count two"
+  (destructuring-bind (n) (list 2)
+    (let ((ctx (make-test-ctx "42")))
+    (dotimes (i n)
+      (cl-cc/parse::pratt-add-diagnostic ctx (format nil "error ~a" i) (cons i (1+ i))))
+    (expect (length (cl-cc/parse::pratt-context-diagnostics ctx)) :to-equal n))))
+
+(it-sequential "pratt-add-diagnostic-records-message"
   (let ((ctx (make-test-ctx "42")))
     (cl-cc/parse::pratt-add-diagnostic ctx "unexpected token" (cons 0 2))
     (let ((diag (first (cl-cc/parse::pratt-context-diagnostics ctx))))
-      (assert-true (not (null diag))))))
+      (expect (not (null diag)) :to-be-truthy))))
 
 ;;; ─── pratt-parse-list-until: Direct Tests ───────────────────────────────────
 
-(deftest-each pratt-parse-list-until-length
-  "pratt-parse-list-until returns the correct number of parsed elements."
-  :cases (("empty"    "()"      0)
-          ("elements" "(1 2 3)" 3))
-  (source expected-len)
-  (let ((ctx (make-test-ctx source)))
+(it-sequential "pratt-parse-list-until-length empty"
+  (destructuring-bind (source expected-len) (list "()" 0)
+    (let ((ctx (make-test-ctx source)))
     (cl-cc/parse::pratt-advance ctx) ; consume LPAREN
     (let ((items (cl-cc/parse::pratt-parse-list-until ctx :T-RPAREN
                    (lambda (c) (cl-cc/parse::pratt-parse-expr c)))))
-      (assert-equal expected-len (length items)))))
+      (expect (length items) :to-equal expected-len)))))
 
-(deftest pratt-parse-list-until-consumes-terminator
-  "pratt-parse-list-until consumes the end token."
+(it-sequential "pratt-parse-list-until-length elements"
+  (destructuring-bind (source expected-len) (list "(1 2 3)" 3)
+    (let ((ctx (make-test-ctx source)))
+    (cl-cc/parse::pratt-advance ctx) ; consume LPAREN
+    (let ((items (cl-cc/parse::pratt-parse-list-until ctx :T-RPAREN
+                   (lambda (c) (cl-cc/parse::pratt-parse-expr c)))))
+      (expect (length items) :to-equal expected-len)))))
+
+(it-sequential "pratt-parse-list-until-consumes-terminator"
   (let ((ctx (make-test-ctx "(1) 42")))
     (cl-cc/parse::pratt-advance ctx) ; consume LPAREN
     (cl-cc/parse::pratt-parse-list-until ctx :T-RPAREN
       (lambda (c) (cl-cc/parse::pratt-parse-expr c)))
     ;; Next token should be 42, not RPAREN
     (let ((tok (cl-cc/parse::pratt-peek ctx)))
-      (assert-eq :T-INT (cl-cc:lexer-token-type tok))
-      (assert-equal 42 (cl-cc:lexer-token-value tok)))))
+      (expect (cl-cc:lexer-token-type tok) :to-be :T-INT)
+      (expect (cl-cc:lexer-token-value tok) :to-equal 42))))

@@ -2,38 +2,30 @@
 
 (in-package :cl-cc/test)
 
-(defsuite cl-lower-suite
-  :description "Lowering tests for parse/cl/lower.lisp"
-  :parent cl-cc-unit-suite)
 
-(in-suite cl-lower-suite)
 
 (defun lower (sexp)
   "Lower an s-expression to an AST node."
   (cl-cc::lower-sexp-to-ast sexp))
 
-(deftest lower-integer-produces-ast-int
-  "lower-sexp-to-ast: integer -> ast-int with correct value."
+(it-sequential "lower-integer-produces-ast-int"
   (let ((node (lower 42)))
-    (assert-true (cl-cc::ast-int-p node))
-    (assert-= 42 (cl-cc::ast-int-value node))))
+    (expect (cl-cc::ast-int-p node) :to-be-truthy)
+    (expect (= 42 (cl-cc::ast-int-value node)) :to-be-truthy)))
 
-(deftest lower-unary-minus-becomes-negation
-  "lower-sexp-to-ast: unary minus is lowered as 0 - x."
+(it-sequential "lower-unary-minus-becomes-negation"
   (let ((node (lower '(- 7))))
-    (assert-true (cl-cc::ast-binop-p node))
-    (assert-eq '- (cl-cc::ast-binop-op node))
-    (assert-= 0 (cl-cc::ast-int-value (cl-cc::ast-binop-lhs node)))
-    (assert-= 7 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs node)))))
+    (expect (cl-cc::ast-binop-p node) :to-be-truthy)
+    (expect (cl-cc::ast-binop-op node) :to-be '-)
+    (expect (= 0 (cl-cc::ast-int-value (cl-cc::ast-binop-lhs node))) :to-be-truthy)
+    (expect (= 7 (cl-cc::ast-int-value (cl-cc::ast-binop-rhs node))) :to-be-truthy)))
 
-(deftest lower-if-form
-  "lower-sexp-to-ast: if form -> ast-if."
+(it-sequential "lower-if-form"
   (let ((node (lower '(if x 1 2))))
-    (assert-true (cl-cc::ast-if-p node))
-    (assert-eq 'x (cl-cc::ast-var-name (cl-cc::ast-if-cond node)))))
+    (expect (cl-cc::ast-if-p node) :to-be-truthy)
+    (expect (cl-cc::ast-var-name (cl-cc::ast-if-cond node)) :to-be 'x)))
 
-(deftest lower-setq-multi-var
-  "lower-sexp-to-ast: multi-var setq -> ast-progn of setq forms."
+(it-sequential "lower-setq-multi-var"
   (let ((node (lower '(setq a 1 b 2))))
-    (assert-true (cl-cc::ast-progn-p node))
-    (assert-= 2 (length (cl-cc::ast-progn-forms node)))))
+    (expect (cl-cc::ast-progn-p node) :to-be-truthy)
+    (expect (= 2 (length (cl-cc::ast-progn-forms node))) :to-be-truthy)))

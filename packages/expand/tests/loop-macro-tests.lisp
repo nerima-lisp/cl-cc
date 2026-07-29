@@ -14,13 +14,8 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
-(defsuite loop-macro-suite
-  :description "LOOP macro expansion and runtime behaviour"
-  :parent cl-cc-integration-suite)
 
-(in-suite loop-macro-suite)
 
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;;; Helper macros — raise the abstraction level for common test patterns.
@@ -41,46 +36,55 @@
 
 (defmacro check-loop-equal (name description code expected)
   "LOOP runtime test: result is EQUAL to EXPECTED."
-  `(deftest ,name ,description
-     (assert-equal ,expected (run-string ,code))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (expect (run-string ,code) :to-equal ,expected)))
 
 (defmacro check-loop-= (name description code expected)
   "LOOP runtime test: result is = (numeric) to EXPECTED."
-  `(deftest ,name ,description
-     (assert-= ,expected (run-string ,code))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (expect (= ,expected (run-string ,code)) :to-be-truthy)))
 
 (defmacro check-loop-true (name description code)
   "LOOP runtime test: result is truthy."
-  `(deftest ,name ,description
-     (assert-true (run-string ,code))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (expect (run-string ,code) :to-be-truthy)))
 
 (defmacro check-loop-false (name description code)
   "LOOP runtime test: result is NIL."
-  `(deftest ,name ,description
-     (assert-false (run-string ,code))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (expect (run-string ,code) :to-be-falsy)))
 
 (defmacro check-loop-null (name description code)
   "LOOP runtime test: result is NIL (empty list)."
-  `(deftest ,name ,description
-     (assert-null (run-string ,code))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (expect (run-string ,code) :to-be-null)))
 
 (defmacro check-loop-expansion (name description clauses &body assertions)
   "LOOP structural test: macro-expand (loop ,@CLAUSES) then evaluate ASSERTIONS on the result."
-  `(deftest ,name ,description
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
      (let ((result (our-macroexpand-1 '(loop ,@clauses))))
+       (declare (ignorable result))
        ,@assertions)))
 
 (defmacro check-loop-length (name description code expected-length)
   "LOOP runtime test: result is a sequence of EXPECTED-LENGTH elements.
 Useful for hash-table tests where element order is non-deterministic."
-  `(deftest ,name ,description
-     (assert-= ,expected-length (length (run-string ,code)))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (expect (= ,expected-length (length (run-string ,code))) :to-be-truthy)))
 
 (defmacro check-loop-signals (name description clauses)
   "LOOP structural test: parsing CLAUSES must signal an error condition.
 Exercises error paths in the parser and emitter layers."
-  `(deftest ,name ,description
-     (assert-signals error (our-macroexpand-1 '(loop ,@clauses)))))
+  (declare (ignore description))
+  `(it-sequential ,(string-downcase (string name))
+     (signals error (our-macroexpand-1 '(loop ,@clauses)))))
 
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;;; Section 1: Expansion structure
@@ -89,50 +93,50 @@ Exercises error paths in the parser and emitter layers."
 (check-loop-expansion loop-basic-expands-to-block
   "A bare loop expands to (block nil (let* (...) (tagbody ...)))"
   (do (return 42))
-  (assert-true (consp result))
-  (assert-eq 'block (car result))
-  (assert-eq nil (cadr result)))
+  (expect (consp result) :to-be-truthy)
+  (expect (car result) :to-be 'block)
+  (expect (cadr result) :to-be nil))
 
 (check-loop-expansion loop-for-in-expands-to-let-tagbody
   "for x in list produces block → nil → let*"
   (for x in '(1 2 3) collect x)
-  (assert-eq 'block (car result))
-  (assert-eq nil (cadr result))
-  (assert-eq 'let* (car (caddr result))))
+  (expect (car result) :to-be 'block)
+  (expect (cadr result) :to-be nil)
+  (expect (car (caddr result)) :to-be 'let*))
 
 (check-loop-expansion loop-from-to-expands-to-block
   "for i from 1 to 5 expands to block → nil → let*"
   (for i from 1 to 5 collect i)
-  (assert-eq 'block (car result))
-  (assert-eq 'let* (car (caddr result))))
+  (expect (car result) :to-be 'block)
+  (expect (car (caddr result)) :to-be 'let*))
 
 (check-loop-expansion loop-repeat-has-counter-binding
   "repeat N expands with a counter binding in let*"
   (repeat 3 collect t)
-  (assert-eq 'block (car result))
-  (assert-true (consp (cadr (caddr result)))))
+  (expect (car result) :to-be 'block)
+  (expect (consp (cadr (caddr result))) :to-be-truthy))
 
 (check-loop-expansion loop-while-expands-to-block
   "while cond do ... expands to block"
   (while t do (return 1))
-  (assert-eq 'block (car result)))
+  (expect (car result) :to-be 'block))
 
 (check-loop-expansion loop-initially-finally-expands
   "initially/finally clauses appear in expansion"
   (initially (print 'start) finally (print 'end) repeat 1)
-  (assert-eq 'block (car result)))
+  (expect (car result) :to-be 'block))
 
 (check-loop-expansion loop-across-has-aref-and-length
   "for x across v expansion contains AREF and LENGTH"
   (for x across v collect x)
   (let ((s (format nil "~S" result)))
-    (assert-true (search "AREF" s))
-    (assert-true (search "LENGTH" s))))
+    (expect (search "AREF" s) :to-be-truthy)
+    (expect (search "LENGTH" s) :to-be-truthy)))
 
 (check-loop-expansion loop-across-has-four-bindings
   "for x across v expansion has at least 4 let* bindings (vec len idx var)"
   (for x across v collect x)
-  (assert-true (>= (length (cadr (caddr result))) 4)))
+  (expect (>= (length (cadr (caddr result))) 4) :to-be-truthy))
 
 
 ;;;; Runtime LOOP behavior tests

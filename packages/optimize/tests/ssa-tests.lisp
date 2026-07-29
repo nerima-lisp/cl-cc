@@ -4,7 +4,6 @@
 ;;; and SSA destruction (phi elimination → parallel copies).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -18,64 +17,64 @@
 
 ;;; ─── SSA Value Naming ────────────────────────────────────────────────────
 
-(deftest-each ssa-versioned-reg-format
-  "ssa-versioned-reg produces correctly formatted register keywords."
-  :cases (("version-3" :r5 3 "R5.3")
-          ("version-0" :r0 0 "R0.0"))
-  (reg ver expected)
-  (assert-equal expected (symbol-name (cl-cc/optimize:ssa-versioned-reg reg ver))))
+(it-sequential "ssa-versioned-reg-format version-3"
+  (destructuring-bind (reg ver expected) (list :r5 3 "R5.3")
+    (expect (symbol-name (cl-cc/optimize:ssa-versioned-reg reg ver)) :to-equal expected)))
+
+(it-sequential "ssa-versioned-reg-format version-0"
+  (destructuring-bind (reg ver expected) (list :r0 0 "R0.0")
+    (expect (symbol-name (cl-cc/optimize:ssa-versioned-reg reg ver)) :to-equal expected)))
 
 ;;; ─── SSA Rename State ────────────────────────────────────────────────────
 
-(deftest ssa-rename-state-push-pop
-  "ssr-push-new-version and ssr-pop-version maintain a stack correctly."
+(it-sequential "ssa-rename-state-push-pop"
   (let ((s (cl-cc/optimize:make-ssa-rename-state)))
     (let ((v0 (cl-cc/optimize:ssr-push-new-version s :r0)))
-      (assert-eq v0 (cl-cc/optimize:ssr-current-version s :r0))
+      (expect (cl-cc/optimize:ssr-current-version s :r0) :to-be v0)
       (let ((v1 (cl-cc/optimize:ssr-push-new-version s :r0)))
-        (assert-eq v1 (cl-cc/optimize:ssr-current-version s :r0))
+        (expect (cl-cc/optimize:ssr-current-version s :r0) :to-be v1)
         (cl-cc/optimize:ssr-pop-version s :r0)
-        (assert-eq v0 (cl-cc/optimize:ssr-current-version s :r0))))))
+        (expect (cl-cc/optimize:ssr-current-version s :r0) :to-be v0)))))
 
-(deftest ssa-rename-state-unversioned
-  "Unknown register returns itself before any version is assigned."
+(it-sequential "ssa-rename-state-unversioned"
   (let ((s (cl-cc/optimize:make-ssa-rename-state)))
-    (assert-eq :r99 (cl-cc/optimize:ssr-current-version s :r99))))
+    (expect (cl-cc/optimize:ssr-current-version s :r99) :to-be :r99)))
 
 ;;; ─── SSA Round-Trip ──────────────────────────────────────────────────────
 
-(deftest-each ssa-round-trip-cases
-  "ssa-round-trip handles various instruction sequences correctly."
-  :cases (("linear-sequence"
-           (list (make-vm-const :dst :r0 :value 1)
+(it-sequential "ssa-round-trip-cases linear-sequence"
+  (destructuring-bind (insts assert-fn) (list (list (make-vm-const :dst :r0 :value 1)
                  (make-vm-const :dst :r1 :value 2)
                  (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
-                 (make-vm-ret   :reg :r2))
-           (lambda (result) (assert-true (>= (length result) 1))))
-          ("preserves-types"
-           (list (make-vm-const :dst :r0 :value 42)
-                 (make-vm-ret   :reg :r0))
-           (lambda (result)
-             (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-ret)) result))))
-          ("empty"
-           nil
-           (lambda (result) (assert-null result)))
-          ("with-label"
-           (list (make-vm-const    :dst :r0 :value 1)
+                 (make-vm-ret   :reg :r2)) (lambda (result) (expect (>= (length result) 1) :to-be-truthy)))
+    (let ((result (cl-cc/optimize:ssa-round-trip insts)))
+    (funcall assert-fn result))))
+
+(it-sequential "ssa-round-trip-cases preserves-types"
+  (destructuring-bind (insts assert-fn) (list (list (make-vm-const :dst :r0 :value 42)
+                 (make-vm-ret   :reg :r0)) (lambda (result)
+             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ret)) result) :to-be-truthy)))
+    (let ((result (cl-cc/optimize:ssa-round-trip insts)))
+    (funcall assert-fn result))))
+
+(it-sequential "ssa-round-trip-cases empty"
+  (destructuring-bind (insts assert-fn) (list nil (lambda (result) (expect result :to-be-null)))
+    (let ((result (cl-cc/optimize:ssa-round-trip insts)))
+    (funcall assert-fn result))))
+
+(it-sequential "ssa-round-trip-cases with-label"
+  (destructuring-bind (insts assert-fn) (list (list (make-vm-const    :dst :r0 :value 1)
                  (make-vm-jump-zero :reg :r0 :label "L1")
                  (make-vm-const    :dst :r0 :value 2)
                  (make-vm-label    :name "L1")
-                 (make-vm-ret      :reg :r0))
-           (lambda (result)
-             (assert-true (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result)))))
-  (insts assert-fn)
-  (let ((result (cl-cc/optimize:ssa-round-trip insts)))
-    (funcall assert-fn result)))
+                 (make-vm-ret      :reg :r0)) (lambda (result)
+             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-truthy)))
+    (let ((result (cl-cc/optimize:ssa-round-trip insts)))
+    (funcall assert-fn result))))
 
 ;;; ─── Phi Placement ───────────────────────────────────────────────────────
 
-(deftest ssa-phi-placement-no-phis-linear
-  "A linear sequence (no branches) needs no phi-nodes."
+(it-sequential "ssa-phi-placement-no-phis-linear"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
@@ -86,10 +85,9 @@
       ;; No phi-nodes needed for linear code
       (let ((total-phis 0))
         (maphash (lambda (_b phis) (incf total-phis (length phis))) phi-map)
-        (assert-= 0 total-phis)))))
+        (expect (= 0 total-phis) :to-be-truthy)))))
 
-(deftest ssa-phi-placement-merge-point
-  "A join point (two predecessors) may receive phi-nodes."
+(it-sequential "ssa-phi-placement-merge-point"
   (let* ((insts (list (make-vm-const    :dst :r0 :value 0)
                       (make-vm-jump-zero :reg :r0 :label "merge")
                       (make-vm-const    :dst :r1 :value 42)
@@ -99,10 +97,9 @@
     (multiple-value-bind (cfg _phi _renamed)
         (cl-cc/optimize:ssa-construct insts)
       (declare (ignore _phi _renamed))
-      (assert-true (cl-cc/optimize:cfg-entry cfg)))))
+      (expect (cl-cc/optimize:cfg-entry cfg) :to-be-truthy))))
 
-(deftest ssa-phi-placement-prunes-never-read-reg
-  "ssa-place-phis skips phi insertion for registers that are never read."
+(it-sequential "ssa-phi-placement-prunes-never-read-reg"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-jump-zero :reg :r0 :label "then")
                       (make-vm-const :dst :r1 :value 10)
@@ -123,11 +120,10 @@
                    (when (find-if (lambda (p) (eq (cl-cc:phi-reg p) :r1)) phis)
                      (setf has-r1-phi t)))
                  phi-map)
-        (assert-false has-r1-phi)
-        (assert-= 0 total-phis)))))
+        (expect has-r1-phi :to-be-falsy)
+        (expect (= 0 total-phis) :to-be-truthy)))))
 
-(deftest ssa-phi-placement-prunes-local-only-reads
-  "ssa-place-phis skips phis when a register is only read inside defining blocks."
+(it-sequential "ssa-phi-placement-prunes-local-only-reads"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-jump-zero :reg :r0 :label "then")
                       (make-vm-const :dst :r1 :value 10)
@@ -147,10 +143,9 @@
                    (when (find-if (lambda (p) (eq (cl-cc:phi-reg p) :r1)) phis)
                      (setf has-r1-phi t)))
                  phi-map)
-        (assert-false has-r1-phi)))))
+        (expect has-r1-phi :to-be-falsy)))))
 
-(deftest ssa-phi-placement-keeps-live-in-join-phi
-  "ssa-place-phis keeps a join phi when a multi-defined register is read at the join."
+(it-sequential "ssa-phi-placement-keeps-live-in-join-phi"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-jump-zero :reg :r0 :label "then")
                       (make-vm-const :dst :r1 :value 10)
@@ -164,12 +159,10 @@
         (cl-cc/optimize:ssa-construct insts)
       (declare (ignore cfg _renamed))
       (let ((join (cl-cc/optimize:cfg-get-block-by-label cfg "join")))
-        (assert-true
-         (find-if (lambda (p) (eq (cl-cc:phi-reg p) :r1))
-                  (gethash join phi-map)))))))
+        (expect (find-if (lambda (p) (eq (cl-cc:phi-reg p) :r1))
+                  (gethash join phi-map)) :to-be-truthy)))))
 
-(deftest ssa-lcssa-inserts-exit-phi-for-loop-defined-value
-  "ssa-place-lcssa-phis adds an exit phi when a loop-defined reg is read outside." 
+(it-sequential "ssa-lcssa-inserts-exit-phi-for-loop-defined-value"
   (let* ((insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :one :value 1)
                       (make-vm-const :dst :lim :value 2)
@@ -192,10 +185,9 @@
     (setf has-i-phi
           (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
                    (gethash exit-block phi-map)))
-    (assert-true has-i-phi)))
+    (expect has-i-phi :to-be-truthy)))
 
-(deftest ssa-lcssa-places-phi-on-exit-not-later-use
-  "LCSSA places loop-defined value phis on loop exits, not delayed use blocks."
+(it-sequential "ssa-lcssa-places-phi-on-exit-not-later-use"
   (let* ((insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :one :value 1)
                       (make-vm-const :dst :lim :value 2)
@@ -218,15 +210,12 @@
     (setf phi-map (cl-cc/optimize::ssa-place-lcssa-phis cfg phi-map))
     (setf exit-block (cl-cc/optimize:cfg-get-block-by-label cfg "Lexit")
           post-block (cl-cc/optimize:cfg-get-block-by-label cfg "Lpost"))
-    (assert-true
-     (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
-              (gethash exit-block phi-map)))
-    (assert-false
-     (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
-              (gethash post-block phi-map)))))
+    (expect (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+              (gethash exit-block phi-map)) :to-be-truthy)
+    (expect (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+              (gethash post-block phi-map)) :to-be-falsy)))
 
-(deftest ssa-lcssa-construct-preserves-exit-phi
-  "LCSSA exit phis survive trivial phi elimination and feed outside-loop uses."
+(it-sequential "ssa-lcssa-construct-preserves-exit-phi"
   (let ((insts (list (make-vm-const :dst :i :value 0)
                      (make-vm-const :dst :one :value 1)
                      (make-vm-const :dst :lim :value 2)
@@ -247,15 +236,13 @@
                                 (gethash exit-block phi-map)))
              (post-reads (loop for inst in (gethash post-block renamed)
                                append (cl-cc/optimize::opt-inst-read-regs inst))))
-        (assert-true exit-phi)
-        (assert-eq :lcssa (cl-cc:phi-kind exit-phi))
-        (assert-true (member (cl-cc:phi-dst exit-phi) post-reads :test #'eq))
-        (assert-false
-         (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
-                  (gethash post-block phi-map)))))))
+        (expect exit-phi :to-be-truthy)
+        (expect (cl-cc:phi-kind exit-phi) :to-be :lcssa)
+        (expect (member (cl-cc:phi-dst exit-phi) post-reads :test #'eq) :to-be-truthy)
+        (expect (find-if (lambda (p) (eq (cl-cc:phi-reg p) :i))
+                  (gethash post-block phi-map)) :to-be-falsy)))))
 
-(deftest ssa-trivial-phi-elimination-rewrites-uses
-  "Trivial phi elimination removes dead phis and rewrites downstream uses."
+(it-sequential "ssa-trivial-phi-elimination-rewrites-uses"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (join   (make-ssa-test-block 3))
@@ -273,11 +260,10 @@
         (cl-cc/optimize:ssa-eliminate-trivial-phis phi-map renamed)
       (declare (ignore new-phi-map))
       (let ((rewritten (first (gethash join new-renamed-map))))
-        (assert-eq :r2 (cl-cc/vm::vm-lhs rewritten))
-        (assert-eq :r4 (cl-cc/vm::vm-rhs rewritten))))))
+        (expect (cl-cc/vm::vm-lhs rewritten) :to-be :r2)
+        (expect (cl-cc/vm::vm-rhs rewritten) :to-be :r4)))))
 
-(deftest ssa-trivial-phi-elimination-shortcuts-phi-of-phi-chain
-  "Phi elimination shortcuts A=phi(B,...) through a predecessor-local B phi."
+(it-sequential "ssa-trivial-phi-elimination-shortcuts-phi-of-phi-chain"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (join   (make-ssa-test-block 3))
@@ -302,11 +288,10 @@
       (let* ((new-phi-a (find-if (lambda (p) (eq (cl-cc:phi-dst p) :a.0))
                                  (gethash join new-phi-map)))
              (shortcut (assoc pred-b (cl-cc:phi-args new-phi-a) :test #'eq)))
-        (assert-true new-phi-a)
-        (assert-eq :b-from-2 (cdr shortcut))))))
+        (expect new-phi-a :to-be-truthy)
+        (expect (cdr shortcut) :to-be :b-from-2)))))
 
-(deftest ssa-trivial-phi-elimination-runs-all-passes-together
-  "Trivial phi elimination combines shortcutting, same-arg collapse, and dead removal."
+(it-sequential "ssa-trivial-phi-elimination-runs-all-passes-together"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (join   (make-ssa-test-block 3))
@@ -344,14 +329,13 @@
                    (declare (ignore _b))
                    (incf total-phis (length phis)))
                  new-phi-map)
-        (assert-= 0 total-phis)
-        (assert-eq :x.0 (cl-cc/vm::vm-lhs rewritten))
-        (assert-eq :v.0 (cl-cc/vm::vm-rhs rewritten))))))
+        (expect (= 0 total-phis) :to-be-truthy)
+        (expect (cl-cc/vm::vm-lhs rewritten) :to-be :x.0)
+        (expect (cl-cc/vm::vm-rhs rewritten) :to-be :v.0)))))
 
 ;;; ─── Targeted Trivial Phi Elimination Tests ─────────────────────────────
 
-(deftest ssa-phi-elim-all-same-arg-multi-pred
-  "A phi with three identical arguments from three predecessors is replaced."
+(it-sequential "ssa-phi-elim-all-same-arg-multi-pred"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (pred-c (make-ssa-test-block 3))
@@ -371,13 +355,12 @@
         (cl-cc/optimize:ssa-eliminate-trivial-phis phi-map renamed)
       (let ((total-phis 0))
         (maphash (lambda (_b phis) (incf total-phis (length phis))) new-phi-map)
-        (assert-= 0 total-phis)
+        (expect (= 0 total-phis) :to-be-truthy)
         (let ((rewritten (first (gethash join new-renamed-map))))
-          (assert-eq :r0 (cl-cc/vm::vm-lhs rewritten))
-          (assert-eq :r5 (cl-cc/vm::vm-rhs rewritten)))))))
+          (expect (cl-cc/vm::vm-lhs rewritten) :to-be :r0)
+          (expect (cl-cc/vm::vm-rhs rewritten) :to-be :r5))))))
 
-(deftest ssa-phi-elim-phi-of-phi-chain-deep
-  "Three-level phi chain A→B→C: after shortcutting, C's args bypass intermediate phi dsts."
+(it-sequential "ssa-phi-elim-phi-of-phi-chain-deep"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (join   (make-ssa-test-block 3))
@@ -408,16 +391,15 @@
                                 (gethash join new-phi-map)))
             (new-phi-b (find-if (lambda (p) (eq (cl-cc:phi-dst p) :b.0))
                                 (gethash pred-b new-phi-map))))
-        (assert-true new-phi-b)
-        (assert-eq :x.0 (cdr (assoc pred-a (cl-cc:phi-args new-phi-b) :test #'eq)))
-        (assert-true new-phi-c)
-        (assert-eq :z.0 (cdr (assoc pred-b (cl-cc:phi-args new-phi-c) :test #'eq)))
-        (assert-eq :w.0 (cdr (assoc pred-a (cl-cc:phi-args new-phi-c) :test #'eq)))
+        (expect new-phi-b :to-be-truthy)
+        (expect (cdr (assoc pred-a (cl-cc:phi-args new-phi-b) :test #'eq)) :to-be :x.0)
+        (expect new-phi-c :to-be-truthy)
+        (expect (cdr (assoc pred-b (cl-cc:phi-args new-phi-c) :test #'eq)) :to-be :z.0)
+        (expect (cdr (assoc pred-a (cl-cc:phi-args new-phi-c) :test #'eq)) :to-be :w.0)
         ;; phi-b arg pred-b is unchanged
-        (assert-eq :z.0 (cdr (assoc pred-b (cl-cc:phi-args new-phi-b) :test #'eq)))))))
+        (expect (cdr (assoc pred-b (cl-cc:phi-args new-phi-b) :test #'eq)) :to-be :z.0)))))
 
-(deftest ssa-phi-elim-unused-phi
-  "A phi whose destination is never read is removed entirely."
+(it-sequential "ssa-phi-elim-unused-phi"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (join   (make-ssa-test-block 3))
@@ -435,13 +417,12 @@
       (declare (ignore _new-renamed))
       (let ((total-phis 0))
         (maphash (lambda (_b phis) (incf total-phis (length phis))) new-phi-map)
-        (assert-= 0 total-phis)
+        (expect (= 0 total-phis) :to-be-truthy)
         ;; Verify the renamed instruction is untouched
         (let ((original (first (gethash join renamed))))
-          (assert-eq :r0 (cl-cc/vm::vm-reg original)))))))
+          (expect (cl-cc/vm::vm-reg original) :to-be :r0))))))
 
-(deftest ssa-phi-elim-idempotent
-  "Running ssa-eliminate-trivial-phis twice produces identical maps."
+(it-sequential "ssa-phi-elim-idempotent"
   (let* ((pred-a (make-ssa-test-block 1))
          (pred-b (make-ssa-test-block 2))
          (join   (make-ssa-test-block 3))
@@ -465,83 +446,75 @@
         (let ((count-1 0) (count-2 0))
           (maphash (lambda (_b phis) (incf count-1 (length phis))) first-phi)
           (maphash (lambda (_b phis) (incf count-2 (length phis))) second-phi)
-          (assert-= count-1 count-2))
+          (expect (= count-1 count-2) :to-be-truthy))
         ;; Same instruction content (first pass should have eliminated phi-b (same-arg :x.0))
         (let ((inst-1 (first (gethash join first-renamed)))
               (inst-2 (first (gethash join second-renamed))))
-          (assert-eq (cl-cc/vm::vm-lhs inst-1) (cl-cc/vm::vm-lhs inst-2))
-          (assert-eq (cl-cc/vm::vm-rhs inst-1) (cl-cc/vm::vm-rhs inst-2)))
+          (expect (cl-cc/vm::vm-lhs inst-2) :to-be (cl-cc/vm::vm-lhs inst-1))
+          (expect (cl-cc/vm::vm-rhs inst-2) :to-be (cl-cc/vm::vm-rhs inst-1)))
         ;; Verify phi-b was eliminated and phi-a remains
         (let ((phi-b-1 (find-if (lambda (p) (eq (cl-cc:phi-dst p) :b.0))
                                 (gethash join first-phi)))
               (phi-b-2 (find-if (lambda (p) (eq (cl-cc:phi-dst p) :b.0))
                                 (gethash join second-phi))))
           ;; phi-b is all-same-arg :x.0 → eliminated in both passes
-          (assert-false phi-b-1)
-          (assert-false phi-b-2))))))
+          (expect phi-b-1 :to-be-falsy)
+          (expect phi-b-2 :to-be-falsy))))))
 
 ;;; ─── Parallel Copy Sequentialization ─────────────────────────────────────
 
-(deftest ssa-seq-copies-behavior
-  "ssa-sequentialize-copies: empty→nil; simple→N vm-move; swap→3 vm-logxor."
-  ;; empty parallel copies
-  (assert-null (cl-cc/optimize:ssa-sequentialize-copies nil))
-  ;; simple non-conflicting: 2 copies → 2 moves
+(it-sequential "ssa-seq-copies-behavior"
+  (expect (cl-cc/optimize:ssa-sequentialize-copies nil) :to-be-null)
   (let* ((result (cl-cc/optimize:ssa-sequentialize-copies '((:r0 . :r1) (:r2 . :r3)))))
-    (assert-= 2 (length result))
-    (assert-true (every (lambda (i) (typep i 'cl-cc/vm::vm-move)) result)))
-  ;; two-register integer swap: branchless/temp-free XOR-swap
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (every (lambda (i) (typep i 'cl-cc/vm::vm-move)) result) :to-be-truthy))
   (let* ((result (cl-cc/optimize:ssa-sequentialize-copies '((:r0 . :r1) (:r1 . :r0)))))
-    (assert-= 3 (length result))
-    (assert-true (every (lambda (i) (typep i 'cl-cc/vm::vm-logxor)) result))))
+    (expect (= 3 (length result)) :to-be-truthy)
+    (expect (every (lambda (i) (typep i 'cl-cc/vm::vm-logxor)) result) :to-be-truthy)))
 
-(deftest ssa-seq-copies-xor-swap-shape
-  "A two-register cycle emits a=a^b; b=a^b; a=a^b with no temporary register."
+(it-sequential "ssa-seq-copies-xor-swap-shape"
   (let ((result (cl-cc/optimize:ssa-sequentialize-copies '((:r0 . :r1) (:r1 . :r0)))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     (destructuring-bind (first second third) result
-      (assert-eq :r0 (cl-cc/vm::vm-dst first))
-      (assert-eq :r0 (cl-cc/vm::vm-lhs first))
-      (assert-eq :r1 (cl-cc/vm::vm-rhs first))
-      (assert-eq :r1 (cl-cc/vm::vm-dst second))
-      (assert-eq :r0 (cl-cc/vm::vm-lhs second))
-      (assert-eq :r1 (cl-cc/vm::vm-rhs second))
-      (assert-eq :r0 (cl-cc/vm::vm-dst third))
-      (assert-eq :r0 (cl-cc/vm::vm-lhs third))
-      (assert-eq :r1 (cl-cc/vm::vm-rhs third)))))
+      (expect (cl-cc/vm::vm-dst first) :to-be :r0)
+      (expect (cl-cc/vm::vm-lhs first) :to-be :r0)
+      (expect (cl-cc/vm::vm-rhs first) :to-be :r1)
+      (expect (cl-cc/vm::vm-dst second) :to-be :r1)
+      (expect (cl-cc/vm::vm-lhs second) :to-be :r0)
+      (expect (cl-cc/vm::vm-rhs second) :to-be :r1)
+      (expect (cl-cc/vm::vm-dst third) :to-be :r0)
+      (expect (cl-cc/vm::vm-lhs third) :to-be :r0)
+      (expect (cl-cc/vm::vm-rhs third) :to-be :r1))))
 
-(deftest ssa-seq-copies-three-cycle-still-uses-temp
-  "Cycles larger than two registers still use one temporary move to preserve semantics."
+(it-sequential "ssa-seq-copies-three-cycle-still-uses-temp"
   (let* ((result (cl-cc/optimize:ssa-sequentialize-copies
                   '((:r0 . :r1) (:r1 . :r2) (:r2 . :r0))))
          (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move)) result)))
-    (assert-= 4 (length result))
-    (assert-= 4 (length moves))
-    (assert-true (some (lambda (i)
+    (expect (= 4 (length result)) :to-be-truthy)
+    (expect (= 4 (length moves)) :to-be-truthy)
+    (expect (some (lambda (i)
                          (let ((dst (cl-cc/vm::vm-dst i)))
                            (and (keywordp dst)
                                 (search "SSATMP" (symbol-name dst)))))
-                       moves))))
+                       moves) :to-be-truthy)))
 
-(deftest ssa-seq-copies-dag-emits-ready-leaves-first
-  "The dependency DAG lets non-cyclic chains drain without introducing temps."
+(it-sequential "ssa-seq-copies-dag-emits-ready-leaves-first"
   (let ((result (cl-cc/optimize:ssa-sequentialize-copies
                  '((:r0 . :r1) (:r1 . :r2) (:r3 . :r1)))))
-    (assert-= 3 (length result))
-    (assert-true (every (lambda (i) (typep i 'cl-cc/vm::vm-move)) result))
-    (assert-false (some (lambda (i)
+    (expect (= 3 (length result)) :to-be-truthy)
+    (expect (every (lambda (i) (typep i 'cl-cc/vm::vm-move)) result) :to-be-truthy)
+    (expect (some (lambda (i)
                           (search "SSATMP" (symbol-name (cl-cc/vm::vm-dst i))))
-                        result))
+                        result) :to-be-falsy)
     ;; :r0 and :r3 both read the old :r1, so they must precede :r1 <- :r2.
     (let ((r1-write-pos (position-if (lambda (i) (eq :r1 (cl-cc/vm::vm-dst i))) result)))
-      (assert-true r1-write-pos)
-      (assert-true (every (lambda (i)
+      (expect r1-write-pos :to-be-truthy)
+      (expect (every (lambda (i)
                             (or (eq :r1 (cl-cc/vm::vm-dst i))
                                 (< (position i result) r1-write-pos)))
-                          result)))))
+                          result) :to-be-truthy))))
 
-(deftest ssa-destroy-places-phi-copies-before-terminator
-  "ssa-destroy emits predecessor phi copies before the branch terminator."
+(it-sequential "ssa-destroy-places-phi-copies-before-terminator"
   (let* ((insts (list (make-vm-label :name "pred")
                       (make-vm-jump :label "join")
                       (make-vm-label :name "join")
@@ -561,12 +534,11 @@
     (let* ((out (cl-cc/optimize:ssa-destroy cfg phi-map renamed))
            (move-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-move)) out))
            (jump-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-jump)) out)))
-      (assert-true move-pos)
-      (assert-true jump-pos)
-      (assert-true (< move-pos jump-pos)))))
+      (expect move-pos :to-be-truthy)
+      (expect jump-pos :to-be-truthy)
+      (expect (< move-pos jump-pos) :to-be-truthy))))
 
-(deftest ssa-destroy-keeps-conditional-edge-phi-copy-on-target-edge
-  "ssa-destroy keeps target-edge phi copies out of the conditional fallthrough path."
+(it-sequential "ssa-destroy-keeps-conditional-edge-phi-copy-on-target-edge"
   (let* ((insts (list (make-vm-label :name "pred")
                       (make-vm-jump-zero :reg :cond :label "join")
                       (make-vm-label :name "fallthrough")
@@ -594,75 +566,67 @@
                                         (string= pad-name (cl-cc/vm::vm-name i))))
                                  out))
            (move-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-move)) out)))
-      (assert-true jump-pos)
-      (assert-false (string= "join" pad-name))
-      (assert-true pad-pos)
-      (assert-true move-pos)
-      (assert-true (< jump-pos move-pos))
-      (assert-true (< pad-pos move-pos))
-      (assert-eq :r2 (cl-cc/vm::vm-dst (nth (1+ pad-pos) out)))
-      (assert-eq :r1 (cl-cc/vm::vm-src (nth (1+ pad-pos) out))))))
+      (expect jump-pos :to-be-truthy)
+      (expect (string= "join" pad-name) :to-be-falsy)
+      (expect pad-pos :to-be-truthy)
+      (expect move-pos :to-be-truthy)
+      (expect (< jump-pos move-pos) :to-be-truthy)
+      (expect (< pad-pos move-pos) :to-be-truthy)
+      (expect (cl-cc/vm::vm-dst (nth (1+ pad-pos) out)) :to-be :r2)
+      (expect (cl-cc/vm::vm-src (nth (1+ pad-pos) out)) :to-be :r1))))
 
 ;;; ─── %ssa-resolve-reg ────────────────────────────────────────────────────
 
-(deftest ssa-resolve-reg-follows-chain
-  "%ssa-resolve-reg follows the replacement chain to its terminal value."
+(it-sequential "ssa-resolve-reg-follows-chain"
   (let ((r (make-hash-table :test #'eq)))
     (setf (gethash :r0 r) :r1
           (gethash :r1 r) :r2)
-    (assert-eq :r2 (cl-cc/optimize::%ssa-resolve-reg :r0 r))))
+    (expect (cl-cc/optimize::%ssa-resolve-reg :r0 r) :to-be :r2)))
 
-(deftest ssa-resolve-reg-identity-when-not-mapped
-  "%ssa-resolve-reg returns the register itself when it has no replacement."
+(it-sequential "ssa-resolve-reg-identity-when-not-mapped"
   (let ((r (make-hash-table :test #'eq)))
-    (assert-eq :r5 (cl-cc/optimize::%ssa-resolve-reg :r5 r))))
+    (expect (cl-cc/optimize::%ssa-resolve-reg :r5 r) :to-be :r5)))
 
 ;;; ─── %ssa-rewrite-tree ───────────────────────────────────────────────────
 
-(deftest ssa-rewrite-tree-replaces-symbol
-  "%ssa-rewrite-tree replaces a mapped symbol with its resolved replacement."
+(it-sequential "ssa-rewrite-tree-replaces-symbol"
   (let ((r (make-hash-table :test #'eq)))
     (setf (gethash :r0 r) :r9)
-    (assert-eq :r9 (cl-cc/optimize::%ssa-rewrite-tree :r0 r))))
+    (expect (cl-cc/optimize::%ssa-rewrite-tree :r0 r) :to-be :r9)))
 
-(deftest ssa-rewrite-tree-passthrough-unmapped
-  "%ssa-rewrite-tree passes through atoms that have no mapping."
+(it-sequential "ssa-rewrite-tree-passthrough-unmapped"
   (let ((r (make-hash-table :test #'eq)))
-    (assert-eq :r3  (cl-cc/optimize::%ssa-rewrite-tree :r3 r))
-    (assert-= 42    (cl-cc/optimize::%ssa-rewrite-tree 42  r))
-    (assert-eq 'foo (cl-cc/optimize::%ssa-rewrite-tree 'foo r))))
+    (expect (cl-cc/optimize::%ssa-rewrite-tree :r3 r) :to-be :r3)
+    (expect (= 42 (cl-cc/optimize::%ssa-rewrite-tree 42  r)) :to-be-truthy)
+    (expect (cl-cc/optimize::%ssa-rewrite-tree 'foo r) :to-be 'foo)))
 
-(deftest ssa-rewrite-tree-walks-cons
-  "%ssa-rewrite-tree recursively rewrites both car and cdr of a cons."
+(it-sequential "ssa-rewrite-tree-walks-cons"
   (let ((r (make-hash-table :test #'eq)))
     (setf (gethash :r0 r) :r1)
-    (assert-equal '(:r1 :r2) (cl-cc/optimize::%ssa-rewrite-tree '(:r0 :r2) r))))
+    (expect (cl-cc/optimize::%ssa-rewrite-tree '(:r0 :r2) r) :to-equal '(:r1 :r2))))
 
 ;;; ─── ssa-rewrite-dst ─────────────────────────────────────────────────────
 
-(deftest ssa-rewrite-dst-changes-destination
-  "ssa-rewrite-dst returns an instruction with the new destination register."
+(it-sequential "ssa-rewrite-dst-changes-destination"
   (let* ((inst   (make-vm-const :dst :r0 :value 42))
          (result (cl-cc/optimize::ssa-rewrite-dst inst :r0 :r9)))
-    (assert-true (typep result 'cl-cc/vm::vm-const))
-    (assert-eq :r9 (cl-cc/vm::vm-dst result))
-    (assert-= 42 (cl-cc/vm::vm-value result))))
+    (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst result) :to-be :r9)
+    (expect (= 42 (cl-cc/vm::vm-value result)) :to-be-truthy)))
 
-(deftest ssa-rewrite-dst-noop-when-no-match
-  "ssa-rewrite-dst returns INST unchanged when old-dst does not appear in the sexp."
+(it-sequential "ssa-rewrite-dst-noop-when-no-match"
   (let* ((inst (make-vm-const :dst :r1 :value 7)))
-    (assert-eq inst (cl-cc/optimize::ssa-rewrite-dst inst :r99 :r0))))
+    (expect (cl-cc/optimize::ssa-rewrite-dst inst :r99 :r0) :to-be inst)))
 
 ;;; ─── %ssa-collect-uses ───────────────────────────────────────────────────
 
-(deftest ssa-collect-uses-records-instruction-reads
-  "%ssa-collect-uses collects registers read by instructions in renamed-map."
+(it-sequential "ssa-collect-uses-records-instruction-reads"
   (let* ((phi-map    (make-hash-table :test #'eq))
          (renamed    (make-hash-table :test #'eq))
          (blk        (make-ssa-test-block 1))
          (inst       (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
     (setf (gethash blk renamed) (list inst))
     (let ((uses (cl-cc/optimize::%ssa-collect-uses phi-map renamed)))
-      (assert-true (gethash :r0 uses))
-      (assert-true (gethash :r1 uses))
-      (assert-false (gethash :r2 uses)))))
+      (expect (gethash :r0 uses) :to-be-truthy)
+      (expect (gethash :r1 uses) :to-be-truthy)
+      (expect (gethash :r2 uses) :to-be-falsy))))

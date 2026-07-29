@@ -2,23 +2,20 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;;; ─── printer smoke tests ───────────────────────────────────────────────
 
-(deftest mir-format-value-shows-id-and-name
-  "mir-format-value formats values with %N prefix and name; consts show their value."
+(it-sequential "mir-format-value-shows-id-and-name"
   (let* ((fn (mir-make-function :f))
          (v  (mir-new-value fn :name :x))
          (c  (make-mir-const :value 42)))
     (let ((sv (mir-format-value v))
           (sc (mir-format-value c)))
-      (assert-true (search "%0" sv))
-      (assert-true (search "X"  sv))
-      (assert-true (search "42" sc)))))
+      (expect (search "%0" sv) :to-be-truthy)
+      (expect (search "X"  sv) :to-be-truthy)
+      (expect (search "42" sc) :to-be-truthy))))
 
-(deftest mir-print-function-shows-name-and-entry
-  "mir-print-function outputs the function name and entry label."
+(it-sequential "mir-print-function-shows-name-and-entry"
   (let* ((fn  (mir-make-function :smoke))
          (blk (mirf-entry fn))
          (dst (mir-new-value fn :name :r))
@@ -26,35 +23,31 @@
     (mir-emit blk :const :dst dst :srcs (list c))
     (mir-emit blk :ret   :srcs (list dst))
     (let ((out (with-output-to-string (s) (mir-print-function fn s))))
-      (assert-true (search "SMOKE" out))
-      (assert-true (search "ENTRY" out)))))
+      (expect (search "SMOKE" out) :to-be-truthy)
+      (expect (search "ENTRY" out) :to-be-truthy))))
 
-(deftest mir-format-value-phi-operand
-  "mir-format-value renders a (pred-block . value) phi operand as [label:value]."
+(it-sequential "mir-format-value-phi-operand"
   (let* ((fn  (mir-make-function :f))
          (blk (mir-new-block fn :label :loop))
          (v   (mir-new-value fn :name :x))
          (out (mir-format-value (cons blk v))))
-    (assert-true (search "LOOP" out))
-    (assert-true (search "%0"   out))
-    (assert-true (search "["    out))))
+    (expect (search "LOOP" out) :to-be-truthy)
+    (expect (search "%0"   out) :to-be-truthy)
+    (expect (search "["    out) :to-be-truthy)))
 
-(deftest mir-format-value-unknown-operand-falls-back-to-aesthetic
-  "mir-format-value falls back to ~S for operands that are neither value, const, nor phi pair."
-  (assert-equal ":FOO" (mir-format-value :foo)))
+(it-sequential "mir-format-value-unknown-operand-falls-back-to-aesthetic"
+  (expect (mir-format-value :foo) :to-equal ":FOO"))
 
-(deftest mir-print-inst-emits-meta-comment
-  "mir-print-inst appends instruction metadata as a trailing comment."
+(it-sequential "mir-print-inst-emits-meta-comment"
   (let* ((fn   (mir-make-function :f))
          (blk  (mirf-entry fn))
          (dst  (mir-new-value fn :name :r))
          (inst (mir-emit blk :call :dst dst :meta '(:effect-kind :read-only)))
          (out  (with-output-to-string (s) (mir-print-inst inst s))))
-    (assert-true (search ";" out))
-    (assert-true (search "READ-ONLY" out))))
+    (expect (search ";" out) :to-be-truthy)
+    (expect (search "READ-ONLY" out) :to-be-truthy)))
 
-(deftest mir-print-block-shows-preds-and-phis
-  "mir-print-block annotates predecessor labels and prints phi nodes ahead of the body."
+(it-sequential "mir-print-block-shows-preds-and-phis"
   (let* ((fn    (mir-make-function :f))
          (entry (mirf-entry fn))
          (blk   (mir-new-block fn :label :merge))
@@ -62,119 +55,134 @@
     (mir-add-succ entry blk)
     (mir-emit blk :phi :dst phi)
     (let ((out (with-output-to-string (s) (mir-print-block blk s))))
-      (assert-true (search "MERGE" out))
-      (assert-true (search "preds:" out))
-      (assert-true (search "ENTRY" out))
-      (assert-true (search "PHI" out)))))
+      (expect (search "MERGE" out) :to-be-truthy)
+      (expect (search "preds:" out) :to-be-truthy)
+      (expect (search "ENTRY" out) :to-be-truthy)
+      (expect (search "PHI" out) :to-be-truthy))))
 
 ;;;; ─── target-desc ──────────────────────────────────────────────────────
 
-(deftest target-x86-64-description
-  "x86-64 target: name/word-size/endianness, arg registers, return rax, callee-saved."
-  (assert-eq :x86-64  (target-name *x86-64-target*))
-  (assert-=  8        (target-word-size *x86-64-target*))
-  (assert-eq :little  (target-endianness *x86-64-target*))
-  (assert-=  16       (target-stack-alignment *x86-64-target*))
-  (assert-eq :rax     (target-ret-reg *x86-64-target*))
-  (assert-eq :rdi     (first (target-arg-regs *x86-64-target*)))
-  (assert-=  6        (length (target-arg-regs *x86-64-target*)))
-  (assert-true (member :rbx (target-callee-saved *x86-64-target*)))
-  (assert-true (member :r12 (target-callee-saved *x86-64-target*))))
+(it-sequential "target-x86-64-description"
+  (expect (target-name *x86-64-target*) :to-be :x86-64)
+  (expect (= 8 (target-word-size *x86-64-target*)) :to-be-truthy)
+  (expect (target-endianness *x86-64-target*) :to-be :little)
+  (expect (= 16 (target-stack-alignment *x86-64-target*)) :to-be-truthy)
+  (expect (target-ret-reg *x86-64-target*) :to-be :rax)
+  (expect (first (target-arg-regs *x86-64-target*)) :to-be :rdi)
+  (expect (= 6 (length (target-arg-regs *x86-64-target*))) :to-be-truthy)
+  (expect (member :rbx (target-callee-saved *x86-64-target*)) :to-be-truthy)
+  (expect (member :r12 (target-callee-saved *x86-64-target*)) :to-be-truthy))
 
-(deftest-each target-non-x86-basic
-  "Non-x86 targets: name, word-size/gpr-count, return register, and arg-register count."
-  :cases (("aarch64" *aarch64-target* :aarch64 8 :x0  8 nil)
-          ("riscv64" *riscv64-target* :riscv64 8 :a0  8 32)
-          ("wasm32"  *wasm32-target*  :wasm32  4 nil  0  0))
-  (target expected-name expected-word expected-ret expected-args expected-gprs)
-  (assert-eq expected-name (target-name target))
-  (assert-= expected-word (target-word-size target))
-  (when expected-ret
-    (assert-eq expected-ret (target-ret-reg target)))
-  (assert-= expected-args (length (target-arg-regs target)))
-  (when expected-gprs
-    (assert-= expected-gprs (target-gpr-count target))))
+(it-sequential "target-non-x86-basic aarch64"
+  (destructuring-bind (target expected-name expected-word expected-ret expected-args expected-gprs) (list *aarch64-target* :aarch64 8 :x0 8 nil)
+    (expect (target-name target) :to-be expected-name) (expect (= expected-word (target-word-size target)) :to-be-truthy) (when expected-ret
+    (expect (target-ret-reg target) :to-be expected-ret)) (expect (= expected-args (length (target-arg-regs target))) :to-be-truthy) (when expected-gprs
+    (expect (= expected-gprs (target-gpr-count target)) :to-be-truthy))))
 
-(deftest-each target-registry-lookup
-  "find-target returns the correct target-desc for each registered name."
-  :cases (("x86-64"      :x86-64
-           (lambda (target)
-             (assert-eq *x86-64-target* target)))
-          ("aarch64"     :aarch64
-           (lambda (target)
-             (assert-eq *aarch64-target* target)))
-          ("riscv64"     :riscv64
-           (lambda (target)
-             (assert-eq *riscv64-target* target)))
-          ("wasm32"      :wasm32
-           (lambda (target)
-             (assert-eq *wasm32-target* target)))
-          ("nonexistent" :nonexistent
-           (lambda (target)
-             (assert-null target))))
-  (name verify)
-  (funcall verify (find-target name)))
+(it-sequential "target-non-x86-basic riscv64"
+  (destructuring-bind (target expected-name expected-word expected-ret expected-args expected-gprs) (list *riscv64-target* :riscv64 8 :a0 8 32)
+    (expect (target-name target) :to-be expected-name) (expect (= expected-word (target-word-size target)) :to-be-truthy) (when expected-ret
+    (expect (target-ret-reg target) :to-be expected-ret)) (expect (= expected-args (length (target-arg-regs target))) :to-be-truthy) (when expected-gprs
+    (expect (= expected-gprs (target-gpr-count target)) :to-be-truthy))))
 
-(deftest-each target-64-bit-predicate
-  "target-64-bit-p returns true for 64-bit targets, false for 32-bit."
-  :cases (("x86-64"  *x86-64-target*
-           (lambda (target)
-             (assert-true (target-64-bit-p target))))
-          ("aarch64" *aarch64-target*
-           (lambda (target)
-             (assert-true (target-64-bit-p target))))
-          ("riscv64" *riscv64-target*
-           (lambda (target)
-             (assert-true (target-64-bit-p target))))
-          ("wasm32"  *wasm32-target*
-           (lambda (target)
-             (assert-false (target-64-bit-p target)))))
-  (target verify)
-  (funcall verify target))
+(it-sequential "target-non-x86-basic wasm32"
+  (destructuring-bind (target expected-name expected-word expected-ret expected-args expected-gprs) (list *wasm32-target* :wasm32 4 nil 0 0)
+    (expect (target-name target) :to-be expected-name) (expect (= expected-word (target-word-size target)) :to-be-truthy) (when expected-ret
+    (expect (target-ret-reg target) :to-be expected-ret)) (expect (= expected-args (length (target-arg-regs target))) :to-be-truthy) (when expected-gprs
+    (expect (= expected-gprs (target-gpr-count target)) :to-be-truthy))))
 
-(deftest-each target-feature-predicate
-  "target-has-feature-p correctly detects presence and absence of features."
-  :cases (("x86-64-fused-cmp"   *x86-64-target*  :has-fused-cmp-branch
-           (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
-          ("aarch64-tail-call"  *aarch64-target* :has-native-tail-call
-           (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
-          ("riscv64-psabi"      *riscv64-target* :riscv-elf-psabi
-           (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
-          ("wasm32-wasi"        *wasm32-target*  :wasi-0.2
-           (lambda (target feature)
-             (assert-true (target-has-feature-p target feature))))
-          ("x86-64-no-wasi"     *x86-64-target*  :wasi-0.2
-           (lambda (target feature)
-             (assert-false (target-has-feature-p target feature))))
-          ("wasm32-no-sysv"     *wasm32-target*  :sysv-abi
-           (lambda (target feature)
-             (assert-false (target-has-feature-p target feature)))))
-  (target feature verify)
-  (funcall verify target feature))
+(it-sequential "target-registry-lookup x86-64"
+  (destructuring-bind (name verify) (list :x86-64 (lambda (target)
+             (expect target :to-be *x86-64-target*)))
+    (funcall verify (find-target name))))
 
-(deftest target-scratch-regs-excluded-from-allocatable
-  "Scratch registers must not appear in the allocatable register set."
+(it-sequential "target-registry-lookup aarch64"
+  (destructuring-bind (name verify) (list :aarch64 (lambda (target)
+             (expect target :to-be *aarch64-target*)))
+    (funcall verify (find-target name))))
+
+(it-sequential "target-registry-lookup riscv64"
+  (destructuring-bind (name verify) (list :riscv64 (lambda (target)
+             (expect target :to-be *riscv64-target*)))
+    (funcall verify (find-target name))))
+
+(it-sequential "target-registry-lookup wasm32"
+  (destructuring-bind (name verify) (list :wasm32 (lambda (target)
+             (expect target :to-be *wasm32-target*)))
+    (funcall verify (find-target name))))
+
+(it-sequential "target-registry-lookup nonexistent"
+  (destructuring-bind (name verify) (list :nonexistent (lambda (target)
+             (expect target :to-be-null)))
+    (funcall verify (find-target name))))
+
+(it-sequential "target-64-bit-predicate x86-64"
+  (destructuring-bind (target verify) (list *x86-64-target* (lambda (target)
+             (expect (target-64-bit-p target) :to-be-truthy)))
+    (funcall verify target)))
+
+(it-sequential "target-64-bit-predicate aarch64"
+  (destructuring-bind (target verify) (list *aarch64-target* (lambda (target)
+             (expect (target-64-bit-p target) :to-be-truthy)))
+    (funcall verify target)))
+
+(it-sequential "target-64-bit-predicate riscv64"
+  (destructuring-bind (target verify) (list *riscv64-target* (lambda (target)
+             (expect (target-64-bit-p target) :to-be-truthy)))
+    (funcall verify target)))
+
+(it-sequential "target-64-bit-predicate wasm32"
+  (destructuring-bind (target verify) (list *wasm32-target* (lambda (target)
+             (expect (target-64-bit-p target) :to-be-falsy)))
+    (funcall verify target)))
+
+(it-sequential "target-feature-predicate x86-64-fused-cmp"
+  (destructuring-bind (target feature verify) (list *x86-64-target* :has-fused-cmp-branch (lambda (target feature)
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
+    (funcall verify target feature)))
+
+(it-sequential "target-feature-predicate aarch64-tail-call"
+  (destructuring-bind (target feature verify) (list *aarch64-target* :has-native-tail-call (lambda (target feature)
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
+    (funcall verify target feature)))
+
+(it-sequential "target-feature-predicate riscv64-psabi"
+  (destructuring-bind (target feature verify) (list *riscv64-target* :riscv-elf-psabi (lambda (target feature)
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
+    (funcall verify target feature)))
+
+(it-sequential "target-feature-predicate wasm32-wasi"
+  (destructuring-bind (target feature verify) (list *wasm32-target* :wasi-0.2 (lambda (target feature)
+             (expect (target-has-feature-p target feature) :to-be-truthy)))
+    (funcall verify target feature)))
+
+(it-sequential "target-feature-predicate x86-64-no-wasi"
+  (destructuring-bind (target feature verify) (list *x86-64-target* :wasi-0.2 (lambda (target feature)
+             (expect (target-has-feature-p target feature) :to-be-falsy)))
+    (funcall verify target feature)))
+
+(it-sequential "target-feature-predicate wasm32-no-sysv"
+  (destructuring-bind (target feature verify) (list *wasm32-target* :sysv-abi (lambda (target feature)
+             (expect (target-has-feature-p target feature) :to-be-falsy)))
+    (funcall verify target feature)))
+
+(it-sequential "target-scratch-regs-excluded-from-allocatable"
   (dolist (target (list *x86-64-target* *aarch64-target* *riscv64-target*))
     (let ((alloc   (target-allocatable-regs target))
           (scratch (target-scratch-regs target)))
       (dolist (sr scratch)
-        (assert-false (member sr alloc))))))
+        (expect (member sr alloc) :to-be-falsy)))))
 
-(deftest target-caller-saved-subset-of-allocatable-and-disjoint-from-callee
-  "Caller-saved registers are a subset of allocatable and disjoint from callee-saved."
+(it-sequential "target-caller-saved-subset-of-allocatable-and-disjoint-from-callee"
   (let* ((alloc  (target-allocatable-regs *x86-64-target*))
          (callee (target-callee-saved *x86-64-target*))
          (caller (target-caller-saved *x86-64-target*)))
     (dolist (r caller)
-      (assert-true  (member r alloc)))
+      (expect (member r alloc) :to-be-truthy))
     (dolist (r caller)
-      (assert-false (member r callee)))))
+      (expect (member r callee) :to-be-falsy))))
 
-(deftest target-register-and-find-roundtrip
-  "register-target followed by find-target returns the same target-desc."
+(it-sequential "target-register-and-find-roundtrip"
   (let* ((custom (make-target-desc
                   :name      :test-custom
                   :word-size 8
@@ -187,6 +195,6 @@
          (got (progn
                 (register-target custom)
                 (find-target :test-custom))))
-    (assert-eq custom got)
-    (assert-eq :test-custom (target-name got))
+    (expect got :to-be custom)
+    (expect (target-name got) :to-be :test-custom)
     (remhash :test-custom *target-registry*)))

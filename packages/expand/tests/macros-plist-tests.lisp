@@ -3,44 +3,35 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-plist-suite
-  :description "Tests for macros-plist.lisp"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-plist-suite)
 
 ;;; ── GETF ─────────────────────────────────────────────────────────────────────
 
-(deftest getf-expansion
-  "GETF: outer LET, inner LET uses MEMBER, body is IF, default passes through."
+(it-sequential "getf-expansion"
   (let* ((result     (our-macroexpand-1 '(getf plist :key)))
          (inner-let  (caddr result))
          (found-init (cadar (cadr inner-let)))
          (if-form    (caddr inner-let)))
-    (assert-eq 'let (car result))
-    (assert-eq 'member (car found-init))
-    (assert-eq 'if (car if-form)))
-  ;; Default passes through to the IF fallback
+    (expect (car result) :to-be 'let)
+    (expect (car found-init) :to-be 'member)
+    (expect (car if-form) :to-be 'if))
   (let* ((result    (our-macroexpand-1 '(getf plist :key :missing)))
          (inner-let (caddr result))
          (if-form   (caddr inner-let)))
-    (assert-equal :missing (cadddr if-form))))
+    (expect (cadddr if-form) :to-equal :missing)))
 
 ;;; ── REMF ─────────────────────────────────────────────────────────────────────
 
-(deftest remf-expansion
-  "REMF: outer LET containing a LOOP."
+(it-sequential "remf-expansion"
   (let* ((result (our-macroexpand-1 '(remf plist :key)))
          (body   (cddr result)))
-    (assert-eq 'let (car result))
-    (assert-true (some (lambda (f) (and (consp f) (eq (car f) 'loop))) body))))
+    (expect (car result) :to-be 'let)
+    (expect (some (lambda (f) (and (consp f) (eq (car f) 'loop))) body) :to-be-truthy)))
 
 ;;; ── %PLIST-PUT ───────────────────────────────────────────────────────────────
 
-(deftest plist-put-expansion
-  "%PLIST-PUT: outer LET, body iterates with LOOP."
-  ;; %plist-put is internal to cl-cc/expand (where the macro is defined)
+(it-sequential "plist-put-expansion"
   (let* ((result    (our-macroexpand-1 '(cl-cc/expand::%plist-put my-plist :key 42)))
          (loop-form (caddr result)))
-    (assert-eq 'let (car result))
-    (assert-eq 'loop (car loop-form))))
+    (expect (car result) :to-be 'let)
+    (expect (car loop-form) :to-be 'loop)))

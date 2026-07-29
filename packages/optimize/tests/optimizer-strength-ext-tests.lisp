@@ -7,135 +7,174 @@
 ;;;;   empty input).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── opt-reassociate-commutative-p ──────────────────────────────────────
 
-(deftest-each reassociate-commutative-p-true-for-commutative-ops
-  "opt-reassociate-commutative-p returns T for commutative/associative instructions."
-  :cases (("vm-add"         (make-vm-add         :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-integer-add" (make-vm-integer-add  :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-mul"         (make-vm-mul          :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-integer-mul" (make-vm-integer-mul  :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-logand"      (make-vm-logand       :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-logior"      (make-vm-logior       :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-logxor"      (make-vm-logxor       :dst :r0 :lhs :r1 :rhs :r2)))
-  (inst)
-  (assert-true (cl-cc/optimize::opt-reassociate-commutative-p inst)))
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-add"
+  (destructuring-bind (inst) (list (make-vm-add         :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
 
-(deftest-each reassociate-commutative-p-false-for-non-commutative
-  "opt-reassociate-commutative-p returns NIL for non-commutative instructions."
-  :cases (("vm-sub"  (make-vm-sub  :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-div"  (make-vm-div  :dst :r0 :lhs :r1 :rhs :r2))
-          ("vm-move" (make-vm-move :dst :r0 :src :r1))
-          ("vm-const" (make-vm-const :dst :r0 :value 1)))
-  (inst)
-  (assert-false (cl-cc/optimize::opt-reassociate-commutative-p inst)))
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-integer-add"
+  (destructuring-bind (inst) (list (make-vm-integer-add  :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
+
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-mul"
+  (destructuring-bind (inst) (list (make-vm-mul          :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
+
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-integer-mul"
+  (destructuring-bind (inst) (list (make-vm-integer-mul  :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
+
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-logand"
+  (destructuring-bind (inst) (list (make-vm-logand       :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
+
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-logior"
+  (destructuring-bind (inst) (list (make-vm-logior       :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
+
+(it-sequential "reassociate-commutative-p-true-for-commutative-ops vm-logxor"
+  (destructuring-bind (inst) (list (make-vm-logxor       :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-truthy)))
+
+(it-sequential "reassociate-commutative-p-false-for-non-commutative vm-sub"
+  (destructuring-bind (inst) (list (make-vm-sub  :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-falsy)))
+
+(it-sequential "reassociate-commutative-p-false-for-non-commutative vm-div"
+  (destructuring-bind (inst) (list (make-vm-div  :dst :r0 :lhs :r1 :rhs :r2))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-falsy)))
+
+(it-sequential "reassociate-commutative-p-false-for-non-commutative vm-move"
+  (destructuring-bind (inst) (list (make-vm-move :dst :r0 :src :r1))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-falsy)))
+
+(it-sequential "reassociate-commutative-p-false-for-non-commutative vm-const"
+  (destructuring-bind (inst) (list (make-vm-const :dst :r0 :value 1))
+    (expect (cl-cc/optimize::opt-reassociate-commutative-p inst) :to-be-falsy)))
 
 ;;; ─── opt-copy-commutative-binop ──────────────────────────────────────────
 
-(deftest-each copy-commutative-binop-creates-correct-type
-  "opt-copy-commutative-binop creates a new instruction with the same type but new regs."
-  :cases (("vm-add"         (make-vm-add         :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-add)
-          ("vm-integer-add" (make-vm-integer-add  :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-integer-add)
-          ("vm-mul"         (make-vm-mul          :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-mul)
-          ("vm-logand"      (make-vm-logand       :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-logand)
-          ("vm-logior"      (make-vm-logior       :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-logior)
-          ("vm-logxor"      (make-vm-logxor       :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-logxor))
-  (inst expected-type)
-  (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
-    (assert-true (typep new-inst expected-type))
-    (assert-eq :r3 (cl-cc/vm::vm-dst new-inst))
-    (assert-eq :r4 (cl-cc/vm::vm-lhs new-inst))
-    (assert-eq :r5 (cl-cc/vm::vm-rhs new-inst))))
+(it-sequential "copy-commutative-binop-creates-correct-type vm-add"
+  (destructuring-bind (inst expected-type) (list (make-vm-add         :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-add)
+    (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
+    (expect (typep new-inst expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst new-inst) :to-be :r3)
+    (expect (cl-cc/vm::vm-lhs new-inst) :to-be :r4)
+    (expect (cl-cc/vm::vm-rhs new-inst) :to-be :r5))))
 
-(deftest copy-commutative-binop-otherwise-returns-inst
-  "opt-copy-commutative-binop returns INST unchanged for non-commutative types."
+(it-sequential "copy-commutative-binop-creates-correct-type vm-integer-add"
+  (destructuring-bind (inst expected-type) (list (make-vm-integer-add  :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-integer-add)
+    (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
+    (expect (typep new-inst expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst new-inst) :to-be :r3)
+    (expect (cl-cc/vm::vm-lhs new-inst) :to-be :r4)
+    (expect (cl-cc/vm::vm-rhs new-inst) :to-be :r5))))
+
+(it-sequential "copy-commutative-binop-creates-correct-type vm-mul"
+  (destructuring-bind (inst expected-type) (list (make-vm-mul          :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-mul)
+    (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
+    (expect (typep new-inst expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst new-inst) :to-be :r3)
+    (expect (cl-cc/vm::vm-lhs new-inst) :to-be :r4)
+    (expect (cl-cc/vm::vm-rhs new-inst) :to-be :r5))))
+
+(it-sequential "copy-commutative-binop-creates-correct-type vm-logand"
+  (destructuring-bind (inst expected-type) (list (make-vm-logand       :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-logand)
+    (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
+    (expect (typep new-inst expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst new-inst) :to-be :r3)
+    (expect (cl-cc/vm::vm-lhs new-inst) :to-be :r4)
+    (expect (cl-cc/vm::vm-rhs new-inst) :to-be :r5))))
+
+(it-sequential "copy-commutative-binop-creates-correct-type vm-logior"
+  (destructuring-bind (inst expected-type) (list (make-vm-logior       :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-logior)
+    (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
+    (expect (typep new-inst expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst new-inst) :to-be :r3)
+    (expect (cl-cc/vm::vm-lhs new-inst) :to-be :r4)
+    (expect (cl-cc/vm::vm-rhs new-inst) :to-be :r5))))
+
+(it-sequential "copy-commutative-binop-creates-correct-type vm-logxor"
+  (destructuring-bind (inst expected-type) (list (make-vm-logxor       :dst :r0 :lhs :r0 :rhs :r0) 'cl-cc/vm::vm-logxor)
+    (let ((new-inst (cl-cc/optimize::opt-copy-commutative-binop inst :r3 :r4 :r5)))
+    (expect (typep new-inst expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst new-inst) :to-be :r3)
+    (expect (cl-cc/vm::vm-lhs new-inst) :to-be :r4)
+    (expect (cl-cc/vm::vm-rhs new-inst) :to-be :r5))))
+
+(it-sequential "copy-commutative-binop-otherwise-returns-inst"
   (let* ((inst (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2))
          (result (cl-cc/optimize::opt-copy-commutative-binop inst :r9 :r8 :r7)))
     ;; The original inst is returned unchanged (otherwise clause)
-    (assert-eq inst result)))
+    (expect result :to-be inst)))
 
 ;;; ─── opt-pass-reassociate ────────────────────────────────────────────────
 
-(deftest reassociate-empty-input-returns-nil
-  "opt-pass-reassociate on empty input returns nil."
-  (assert-null (cl-cc/optimize::opt-pass-reassociate nil)))
+(it-sequential "reassociate-empty-input-returns-nil"
+  (expect (cl-cc/optimize::opt-pass-reassociate nil) :to-be-null))
 
-(deftest reassociate-straight-line-no-consts-unchanged
-  "opt-pass-reassociate may return NIL when no reassociation opportunities exist."
+(it-sequential "reassociate-straight-line-no-consts-unchanged"
   (let* ((insts (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret :reg :r2)))
          (result (cl-cc/optimize::opt-pass-reassociate insts)))
-    (assert-true (or (null result) (listp result)))))
+    (expect (or (null result) (listp result)) :to-be-truthy)))
 
-(deftest reassociate-label-clears-env
-  "opt-pass-reassociate should not crash when labels clear the constant environment."
-  ;; After a label, prior const knowledge is flushed.
+(it-sequential "reassociate-label-clears-env"
   (let* ((insts (list (make-vm-const :dst :r0 :value 5)
                       (make-vm-label :name "sep")
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret   :reg :r2)))
          (result (cl-cc/optimize::opt-pass-reassociate insts)))
     ;; Should produce a list (no crash)
-    (assert-true (or (null result) (listp result)))))
+    (expect (or (null result) (listp result)) :to-be-truthy)))
 
-(deftest reassociate-single-const-tracked
-  "opt-pass-reassociate may return NIL when there is no reassociation work despite tracked constants."
+(it-sequential "reassociate-single-const-tracked"
   (let* ((insts (list (make-vm-const :dst :r0 :value 10)
                       (make-vm-ret   :reg :r0)))
          (result (cl-cc/optimize::opt-pass-reassociate insts)))
-    (assert-true (or (null result)
+    (expect (or (null result)
                      (some (lambda (i)
                              (and (typep i 'cl-cc/vm::vm-const)
                                   (= 10 (cl-cc/vm::vm-value i))))
-                           result)))))
+                           result)) :to-be-truthy)))
 
 ;;; ─── opt-pass-batch-concatenate ──────────────────────────────────────────
 
-(deftest batch-concatenate-empty-input-returns-nil
-  "opt-pass-batch-concatenate on empty input returns nil."
-  (assert-null (cl-cc/optimize::opt-pass-batch-concatenate nil)))
+(it-sequential "batch-concatenate-empty-input-returns-nil"
+  (expect (cl-cc/optimize::opt-pass-batch-concatenate nil) :to-be-null))
 
-(deftest batch-concatenate-non-concat-passthrough
-  "opt-pass-batch-concatenate leaves non-concatenate instructions untouched."
+(it-sequential "batch-concatenate-non-concat-passthrough"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-add   :dst :r1 :lhs :r0 :rhs :r0)
                       (make-vm-ret   :reg :r1)))
          (result (cl-cc/optimize::opt-pass-batch-concatenate insts)))
-    (assert-= (length insts) (length result))))
+    (expect (= (length insts) (length result)) :to-be-truthy)))
 
-(deftest batch-concatenate-single-no-chain
-  "opt-pass-batch-concatenate keeps a lone vm-concatenate unchanged."
+(it-sequential "batch-concatenate-single-no-chain"
   (let* ((inst   (make-vm-concatenate :dst :r2 :str1 :r0 :str2 :r1))
          (insts  (list inst (make-vm-ret :reg :r2)))
          (result (cl-cc/optimize::opt-pass-batch-concatenate insts)))
     ;; Lone concat stays as is (1 concat in output)
-    (assert-= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result))))
+    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result)) :to-be-truthy)))
 
-(deftest batch-concatenate-packs-two-chain
-  "opt-pass-batch-concatenate merges two chained vm-concatenate instructions into one
-   with a :parts list covering all source registers."
-  ;; r2 = concat(r0, r1)
-  ;; r4 = concat(r2, r3)   ;; r2 used only once → chainable
-  ;; After packing: single vm-concatenate(r4, parts=(r0 r1 r3))
+(it-sequential "batch-concatenate-packs-two-chain"
   (let* ((c1 (make-vm-concatenate :dst :r2 :str1 :r0 :str2 :r1))
          (c2 (make-vm-concatenate :dst :r4 :str1 :r2 :str2 :r3))
          (ret (make-vm-ret :reg :r4))
          (insts (list c1 c2 ret))
          (result (cl-cc/optimize::opt-pass-batch-concatenate insts)))
     ;; Packed into one concatenate
-    (assert-= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result))
+    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result)) :to-be-truthy)
     ;; The single concat should have parts (r0 r1 r3)
     (let ((packed (find-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result)))
       (when packed
         (let ((parts (cl-cc/vm::vm-parts packed)))
-          (assert-true (listp parts))
-          (assert-= 3 (length parts)))))))
+          (expect (listp parts) :to-be-truthy)
+          (expect (= 3 (length parts)) :to-be-truthy))))))
 
-(deftest batch-concatenate-does-not-pack-when-used-multiple-times
-  "opt-pass-batch-concatenate does not pack when the intermediate register has use-count > 1."
-  ;; r2 is used in both c2 and c3, so the chain is broken at c2.
+(it-sequential "batch-concatenate-does-not-pack-when-used-multiple-times"
   (let* ((c1  (make-vm-concatenate :dst :r2 :str1 :r0 :str2 :r1))
          (c2  (make-vm-concatenate :dst :r3 :str1 :r2 :str2 :r1))
          ;; Use r2 again to make use-count=2
@@ -144,23 +183,30 @@
          (insts (list c1 c2 c3 ret))
          (result (cl-cc/optimize::opt-pass-batch-concatenate insts)))
     ;; Should have at least 2 vm-concatenate (no merging since r2 used twice)
-    (assert-true (>= (count-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result) 2))))
+    (expect (>= (count-if (lambda (i) (typep i 'cl-cc/vm::vm-concatenate)) result) 2) :to-be-truthy)))
 
 ;;; ─── *opt-commutative-binop-table* / opt-reassociate-commutative-p ───────
 
-(deftest commutative-binop-table-coverage
-  "*opt-commutative-binop-table* covers all 7 commutative instruction types."
-  (assert-= 7 (length cl-cc/optimize::*opt-commutative-binop-table*))
+(it-sequential "commutative-binop-table-coverage"
+  (expect (= 7 (length cl-cc/optimize::*opt-commutative-binop-table*)) :to-be-truthy)
   (dolist (type '(vm-add vm-integer-add vm-mul vm-integer-mul
                   vm-logand vm-logior vm-logxor))
-    (assert-true (assoc type cl-cc/optimize::*opt-commutative-binop-table* :test #'eq))))
+    (expect (assoc type cl-cc/optimize::*opt-commutative-binop-table* :test #'eq) :to-be-truthy)))
 
-(deftest-each opt-copy-commutative-binop-cases
-  "opt-copy-commutative-binop returns correct constructor type for each commutative op."
-  :cases (("add"  (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2) 'cl-cc/vm::vm-add)
-          ("mul"  (make-vm-mul  :dst :r0 :lhs :r1 :rhs :r2) 'cl-cc/vm::vm-mul)
-          ("logand" (make-vm-logand :dst :r0 :lhs :r1 :rhs :r2) 'cl-cc/vm::vm-logand))
-  (inst expected-type)
-  (let ((result (cl-cc/optimize::opt-copy-commutative-binop inst :r9 :r1 :r2)))
-    (assert-true (typep result expected-type))
-    (assert-eq :r9 (cl-cc/vm::vm-dst result))))
+(it-sequential "opt-copy-commutative-binop-cases add"
+  (destructuring-bind (inst expected-type) (list (make-vm-add  :dst :r0 :lhs :r1 :rhs :r2) 'cl-cc/vm::vm-add)
+    (let ((result (cl-cc/optimize::opt-copy-commutative-binop inst :r9 :r1 :r2)))
+    (expect (typep result expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst result) :to-be :r9))))
+
+(it-sequential "opt-copy-commutative-binop-cases mul"
+  (destructuring-bind (inst expected-type) (list (make-vm-mul  :dst :r0 :lhs :r1 :rhs :r2) 'cl-cc/vm::vm-mul)
+    (let ((result (cl-cc/optimize::opt-copy-commutative-binop inst :r9 :r1 :r2)))
+    (expect (typep result expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst result) :to-be :r9))))
+
+(it-sequential "opt-copy-commutative-binop-cases logand"
+  (destructuring-bind (inst expected-type) (list (make-vm-logand :dst :r0 :lhs :r1 :rhs :r2) 'cl-cc/vm::vm-logand)
+    (let ((result (cl-cc/optimize::opt-copy-commutative-binop inst :r9 :r1 :r2)))
+    (expect (typep result expected-type) :to-be-truthy)
+    (expect (cl-cc/vm::vm-dst result) :to-be :r9))))

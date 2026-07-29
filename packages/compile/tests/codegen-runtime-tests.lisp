@@ -1,10 +1,7 @@
 ;;;; tests/unit/compile/codegen-runtime-tests.lisp — Codegen runtime semantics tests
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-integration-suite)
-
-(deftest codegen-values-compilation
-  "Compiling ast-values emits vm-values and returns a register."
+(it-sequential "codegen-values-compilation"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-values
                               :forms (list (make-ast-int :value 1)
@@ -12,28 +9,27 @@
                                            (make-ast-int :value 3)
                                            (make-ast-int :value 4)))
                             ctx)))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-values))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values) :to-be-truthy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest codegen-single-value-compilation-skips-mv-instructions
-  "A single-argument VALUES form returns the compiled value register directly."
+(it-sequential "codegen-single-value-compilation-skips-mv-instructions"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-values
                              :forms (list (make-ast-int :value 42)))
                            ctx)))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values-regs))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-regs) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest-each codegen-values-run
-  "values returns correct results for varying argument counts."
-  :cases (("multi-values"  '(1 2 3) "(multiple-value-list (values 1 2 3))")
-          ("single-value"  42       "(values 42)"))
-  (expected form)
-  (assert-equal expected (run-string form)))
+(it-sequential "codegen-values-run multi-values"
+  (destructuring-bind (expected form) (list '(1 2 3) "(multiple-value-list (values 1 2 3))")
+    (expect (run-string form) :to-equal expected)))
 
-(deftest codegen-mvb-compilation-cases
-  "ast-values mvb skips vm-values/vm-mv-bind; non-ast-values mvb uses generic vm-mv-bind path."
+(it-sequential "codegen-values-run single-value"
+  (destructuring-bind (expected form) (list 42 "(values 42)")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "codegen-mvb-compilation-cases"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-bind
                               :vars '(a b)
@@ -42,9 +38,9 @@
                                                          (make-ast-int :value 2)))
                               :body (list (make-ast-var :name 'a)))
                             ctx)))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind))
-    (assert-true (keywordp reg)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy))
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-bind
                              :vars '(a b)
@@ -53,11 +49,10 @@
                                                                      (make-ast-int :value 5)))
                              :body (list (make-ast-var :name 'a)))
                            ctx)))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-truthy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest codegen-single-var-mvb-skips-mv-bind
-  "A single-variable MULTIPLE-VALUE-BIND uses the primary result register directly."
+(it-sequential "codegen-single-var-mvb-skips-mv-bind"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-bind
                              :vars '(a)
@@ -66,39 +61,43 @@
                                                                      (make-ast-int :value 5)))
                              :body (list (make-ast-var :name 'a)))
                            ctx)))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest-each codegen-mvb-run
-  "multiple-value-bind binds values and evaluates body correctly."
-  :cases (("sum-values"  3  "(multiple-value-bind (a b) (values 1 2) (+ a b))")
-          ("first-value" 10 "(multiple-value-bind (x y) (values 10 20) x)"))
-  (expected code)
-  (assert-run= expected code))
+(it-sequential "codegen-mvb-run sum-values"
+  (destructuring-bind (expected code) (list 3 "(multiple-value-bind (a b) (values 1 2) (+ a b))")
+    (assert-run= expected code)))
 
-(deftest-each codegen-mv-call-direct-path
-  "multiple-value-call uses vm-call directly for explicit ast-values and zero-arg cases."
-  :cases (("explicit-values"
-           (cl-cc/ast:make-ast-multiple-value-call
+(it-sequential "codegen-mvb-run first-value"
+  (destructuring-bind (expected code) (list 10 "(multiple-value-bind (x y) (values 10 20) x)")
+    (assert-run= expected code)))
+
+(it-sequential "codegen-mv-call-direct-path explicit-values"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-multiple-value-call
              :func (make-ast-function :name '+)
              :args (list (cl-cc/ast:make-ast-values
                           :forms (list (make-ast-int :value 1)
                                        (make-ast-int :value 2))))))
-          ("no-args"
-           (cl-cc/ast:make-ast-multiple-value-call
-             :func (make-ast-function :name 'list)
-             :args nil)))
-  (ast)
-  (let* ((ctx (make-codegen-ctx))
+    (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast ast ctx)))
-    (assert-true  (codegen-find-inst ctx 'cl-cc/vm::vm-call))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list))
-    (assert-true  (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy))))
 
-(deftest codegen-mv-call-mixed-args-still-uses-apply-path
-  "Non-ast-values arguments keep the generic multiple-value-call path."
+(it-sequential "codegen-mv-call-direct-path no-args"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-multiple-value-call
+             :func (make-ast-function :name 'list)
+             :args nil))
+    (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast ast ctx)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy))))
+
+(it-sequential "codegen-mv-call-mixed-args-still-uses-apply-path"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-call
                              :func (make-ast-function :name '+)
@@ -109,11 +108,10 @@
                                                         :args (list (make-ast-int :value 17)
                                                                     (make-ast-int :value 5)))))
                            ctx)))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-truthy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest codegen-mv-call-the-wrapped-function-keeps-direct-call
-  "multiple-value-call treats ast-the-wrapped function designators transparently."
+(it-sequential "codegen-mv-call-the-wrapped-function-keeps-direct-call"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-call
                              :func (make-ast-the
@@ -121,20 +119,17 @@
                                     :value (make-ast-function :name 'list))
                              :args nil)
                            ctx)))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-apply))
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list))
-    (assert-true (keywordp reg))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest codegen-mv-call-run-cases
-  "multiple-value-call spreads values to lambda; spreads to cons producing dotted pair."
+(it-sequential "codegen-mv-call-run-cases"
   (assert-run= 3
     "(multiple-value-call (lambda (a b) (+ a b)) (values 1 2))")
-  (assert-equal '(1 . 2)
-    (run-string "(multiple-value-call #'cons (values 1 2))")))
+  (expect (run-string "(multiple-value-call #'cons (values 1 2))") :to-equal '(1 . 2)))
 
-(deftest codegen-mv-prog1-compilation
-  "Compiling ast-multiple-value-prog1: returns a register and emits all sub-form constants."
+(it-sequential "codegen-mv-prog1-compilation"
   (let* ((ctx    (make-codegen-ctx))
          (reg    (compile-ast (cl-cc::make-ast-multiple-value-prog1
                                 :first (make-ast-int :value 1)
@@ -143,67 +138,58 @@
                               ctx))
          (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const))
                                 (codegen-instructions ctx))))
-    (assert-true (keywordp reg))
-    (assert-true (>= (length consts) 3))))
+    (expect (keywordp reg) :to-be-truthy)
+    (expect (>= (length consts) 3) :to-be-truthy)))
 
-(deftest codegen-mv-prog1-run-cases
-  "multiple-value-prog1 returns first form's value; evaluates subsequent forms for side effects."
+(it-sequential "codegen-mv-prog1-run-cases"
   (assert-run= 1
     "(multiple-value-prog1 1 2 3)")
   (let ((output (with-output-to-string (*standard-output*)
                   (run-string "(multiple-value-prog1 42 (print 99))"))))
-    (assert-true (search "99" output))))
+    (expect (search "99" output) :to-be-truthy)))
 
-(deftest codegen-unwind-protect-emits-establish-handler
-  "unwind-protect establishes its cleanup with a vm-establish-handler instruction."
+(it-sequential "codegen-unwind-protect-emits-establish-handler"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc/ast:make-ast-unwind-protect
                    :protected (make-ast-int :value 42)
                    :cleanup (list (make-ast-int :value 0)))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler) :to-be-truthy)))
 
-(deftest codegen-handler-case-records-an-exception-table-entry
-  "handler-case protects its form with a PC->handler table entry, not an instruction.
-
-It used to emit vm-establish-handler alongside unwind-protect. compile-ast for
-ast-handler-case now records the protected instruction range in
-*pending-exception-table-entries* instead — zero-cost when no condition is
-signalled — so asserting on the instruction stream tested the old design."
+(it-sequential "codegen-handler-case-records-an-exception-table-entry"
   (let ((ctx (make-codegen-ctx))
         (cl-cc/compile::*pending-exception-table-entries* nil))
     (compile-ast (cl-cc/ast:make-ast-handler-case
                    :form (make-ast-int :value 42)
                    :clauses (list (list 'error 'e (make-ast-int :value 0))))
                  ctx)
-    (assert-false (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler))
-    (assert-true (plusp (length cl-cc/compile::*pending-exception-table-entries*)))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler) :to-be-falsy)
+    (expect (plusp (length cl-cc/compile::*pending-exception-table-entries*)) :to-be-truthy)))
 
-(deftest-each codegen-exception-form-returns-register
-  "Both unwind-protect and handler-case compilation return a register keyword."
-  :cases (("unwind-protect"
-           (cl-cc/ast:make-ast-unwind-protect
+(it-sequential "codegen-exception-form-returns-register unwind-protect"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-unwind-protect
              :protected (make-ast-int :value 7)
              :cleanup (list (make-ast-int :value 0))))
-          ("handler-case"
-           (cl-cc/ast:make-ast-handler-case
-             :form (make-ast-int :value 10)
-             :clauses (list (list 'error nil (make-ast-int :value 0))))))
-  (ast)
-  (let* ((ctx (make-codegen-ctx))
+    (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast ast ctx)))
-    (assert-true (keywordp reg))))
+    (expect (keywordp reg) :to-be-truthy))))
 
-(deftest codegen-unwind-protect-run-cases
-  "unwind-protect returns protected value on normal exit; cleanup form executes."
+(it-sequential "codegen-exception-form-returns-register handler-case"
+  (destructuring-bind (ast) (list (cl-cc/ast:make-ast-handler-case
+             :form (make-ast-int :value 10)
+             :clauses (list (list 'error nil (make-ast-int :value 0)))))
+    (let* ((ctx (make-codegen-ctx))
+         (reg (compile-ast ast ctx)))
+    (expect (keywordp reg) :to-be-truthy))))
+
+(it-sequential "codegen-unwind-protect-run-cases"
   (assert-run= 42
     "(unwind-protect 42 nil)")
   (let ((output (with-output-to-string (*standard-output*)
                   (run-string "(unwind-protect 1 (print 99))"))))
-    (assert-true (search "99" output))))
+    (expect (search "99" output) :to-be-truthy)))
 
-(deftest codegen-handler-case-run-cases
-  "handler-case returns protected value when no condition signaled; catches error correctly."
+(it-sequential "codegen-handler-case-run-cases"
   (assert-run= 42
     "(handler-case 42 (error (e) -1))")
   (assert-run= 99

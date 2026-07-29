@@ -12,7 +12,6 @@
 
 (in-package :cl-cc/pbt)
 
-(in-suite cl-cc-pbt-suite)
 
 (defun %vm-binop-result (make-instruction a b)
   "Load A and B into :R0/:R1, run MAKE-INSTRUCTION's opcode over them, return :R2."

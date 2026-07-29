@@ -1,7 +1,6 @@
 ;;;; loop-macro-advanced-tests.lisp — LOOP: ON/ACROSS/=/hash/WITH/destructuring/accumulation/filtering
 (in-package :cl-cc/test)
 
-(in-suite loop-macro-suite)
 ;;;; Section 4: FOR x ON list (sublist iteration)
 ;;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -64,14 +63,13 @@
      (loop for k being the hash-keys of ht collect k))"
   2)
 
-(deftest loop-hash-values-collect
-  "for v being the hash-values of ht collects all values"
+(it-sequential "loop-hash-values-collect"
   (let ((result (run-string
                   "(let ((ht (make-hash-table)))
                      (setf (gethash 'a ht) 10)
                      (setf (gethash 'b ht) 20)
                      (sort (loop for v being the hash-values of ht collect v) #'<))")))
-    (assert-equal '(10 20) result)))
+    (expect result :to-equal '(10 20))))
 
 (check-loop-equal loop-hash-keys-using-value
   "for k being hash-keys using (hash-value v) can access both key and value"

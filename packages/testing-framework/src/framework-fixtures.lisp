@@ -141,10 +141,14 @@
 ;;; Global cache isolation fixtures
 ;;; ------------------------------------------------------------
 
-(defbefore :each (cl-cc-suite)
+;; Global cl-weave before-each hooks (registered into the root suite at load
+;; time), replacing the old (defbefore :each (cl-cc-suite) ...) fixtures now that
+;; every test lives in cl-weave's root suite rather than the framework's
+;; cl-cc-suite. They keep the same cross-test cache isolation.
+(before-each
   (cl-cc/vm::vm-clear-hash-cons-table))
 
-(defbefore :each (cl-cc-suite)
+(before-each
   (when (boundp 'cl-cc/expand::*macroexpand-step-cache*)
     (clrhash cl-cc/expand::*macroexpand-step-cache*))
   (when (boundp 'cl-cc/expand::*macroexpand-all-cache*)

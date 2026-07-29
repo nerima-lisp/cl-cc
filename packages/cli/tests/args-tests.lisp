@@ -6,7 +6,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-cli-pure-suite)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Helpers
@@ -20,215 +19,299 @@
 ;;; Command detection
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cli-args-empty-argv-yields-nil-command-and-positional
-  "parse-args on empty argv returns nil command and nil positionals."
+(it-sequential "cli-args-empty-argv-yields-nil-command-and-positional"
   (let ((p (cl-cc/cli:parse-args '())))
-    (assert-null (cl-cc/cli:parsed-args-command p))
-    (assert-null (cl-cc/cli:parsed-args-positional p))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-be-null)
+    (expect (cl-cc/cli:parsed-args-positional p) :to-be-null)))
 
-(deftest cli-args-command-only-has-no-positionals
-  "parse-args on a lone command token has no positionals."
+(it-sequential "cli-args-command-only-has-no-positionals"
   (let ((p (cl-cc/cli:parse-args '("run"))))
-    (assert-string= "run" (cl-cc/cli:parsed-args-command p))
-    (assert-null (cl-cc/cli:parsed-args-positional p))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "run")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-be-null)))
 
-(deftest cli-args-command-with-file-puts-file-in-positionals
-  "parse-args on command+file stores the file in positionals."
+(it-sequential "cli-args-command-with-file-puts-file-in-positionals"
   (let ((p (cl-cc/cli:parse-args '("run" "foo.lisp"))))
-    (assert-string= "run" (cl-cc/cli:parsed-args-command p))
-    (assert-equal '("foo.lisp") (cl-cc/cli:parsed-args-positional p))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "run")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-equal '("foo.lisp"))))
 
-(deftest cli-args-multiple-positionals-after-command-all-collected
-  "parse-args collects all tokens after the command as positionals."
+(it-sequential "cli-args-multiple-positionals-after-command-all-collected"
   (let ((p (cl-cc/cli:parse-args '("eval" "(+ 1 2)" "extra"))))
-    (assert-string= "eval" (cl-cc/cli:parsed-args-command p))
-    (assert-equal '("(+ 1 2)" "extra") (cl-cc/cli:parsed-args-positional p))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "eval")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-equal '("(+ 1 2)" "extra"))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Boolean flags
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cli-args-bool-flags
-  "Boolean flags are stored as T when present"
-  :cases (("stdlib"  '("run" "f.lisp" "--stdlib")  "--stdlib")
-          ("debug"   '("compile" "f.lisp" "--debug") "--debug")
-          ("verbose" '("run" "f.lisp" "--verbose") "--verbose")
-          ("pass timings" '("eval" "(+ 1 2)" "--print-pass-timings") "--print-pass-timings")
-          ("time-passes alias" '("eval" "(+ 1 2)" "--time-passes") "--time-passes")
-           ("stats" '("eval" "(+ 1 2)" "--stats") "--stats")
-           ("optimization report" '("eval" "(+ 1 2)" "--optimization-report") "--optimization-report")
-           ("trace-emit" '("eval" "(+ 1 2)" "--trace-emit") "--trace-emit")
-           ("verify-transforms" '("compile" "f.lisp" "--verify-transforms") "--verify-transforms")
-           ("deterministic" '("compile" "f.lisp" "--deterministic") "--deterministic")
-           ("no-timeout" '("eval" "(+ 1 2)" "--no-timeout") "--no-timeout")
-           ("strict"  '("check" "f.lisp" "--strict") "--strict")
-           ("help"    '("--help")                   "--help"))
-  (argv flag-key)
-  (let ((p (cl-cc/cli:parse-args argv)))
-    (assert-true (%flags p flag-key))))
+(it-sequential "cli-args-bool-flags stdlib"
+  (destructuring-bind (argv flag-key) (list '("run" "f.lisp" "--stdlib") "--stdlib")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
 
-(deftest cli-args-bool-flag-absent
-  "An absent boolean flag returns NIL"
+(it-sequential "cli-args-bool-flags debug"
+  (destructuring-bind (argv flag-key) (list '("compile" "f.lisp" "--debug") "--debug")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags verbose"
+  (destructuring-bind (argv flag-key) (list '("run" "f.lisp" "--verbose") "--verbose")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags pass timings"
+  (destructuring-bind (argv flag-key) (list '("eval" "(+ 1 2)" "--print-pass-timings") "--print-pass-timings")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags time-passes alias"
+  (destructuring-bind (argv flag-key) (list '("eval" "(+ 1 2)" "--time-passes") "--time-passes")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags stats"
+  (destructuring-bind (argv flag-key) (list '("eval" "(+ 1 2)" "--stats") "--stats")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags optimization report"
+  (destructuring-bind (argv flag-key) (list '("eval" "(+ 1 2)" "--optimization-report") "--optimization-report")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags trace-emit"
+  (destructuring-bind (argv flag-key) (list '("eval" "(+ 1 2)" "--trace-emit") "--trace-emit")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags verify-transforms"
+  (destructuring-bind (argv flag-key) (list '("compile" "f.lisp" "--verify-transforms") "--verify-transforms")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags deterministic"
+  (destructuring-bind (argv flag-key) (list '("compile" "f.lisp" "--deterministic") "--deterministic")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags no-timeout"
+  (destructuring-bind (argv flag-key) (list '("eval" "(+ 1 2)" "--no-timeout") "--no-timeout")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags strict"
+  (destructuring-bind (argv flag-key) (list '("check" "f.lisp" "--strict") "--strict")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flags help"
+  (destructuring-bind (argv flag-key) (list '("--help") "--help")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-be-truthy))))
+
+(it-sequential "cli-args-bool-flag-absent"
   (let ((p (cl-cc/cli:parse-args '("run" "f.lisp"))))
-    (assert-null (%flags p "--stdlib"))
-    (assert-null (%flags p "--verbose"))))
+    (expect (%flags p "--stdlib") :to-be-null)
+    (expect (%flags p "--verbose") :to-be-null)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; String flags — --key value form
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cli-args-output-long-and-short
-  "parse-args: output flag in long and short form"
-  :cases (("long form" '("compile" "f.lisp" "--output" "out")   "--output" "out")
-          ("short form" '("compile" "f.lisp" "-o" "mybin")       "-o"       "mybin"))
-  (argv flag-key expected)
-  (let ((p (cl-cc/cli:parse-args argv)))
-    (assert-string= expected (%flags p flag-key))))
+(it-sequential "cli-args-output-long-and-short long form"
+  (destructuring-bind (argv flag-key expected) (list '("compile" "f.lisp" "--output" "out") "--output" "out")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
 
-(deftest-each cli-args-string-flags
-  "parse-args: arch and lang string flags (--key value form)"
-  :cases (("arch arm64"  '("compile" "f.lisp" "--arch" "arm64") "--arch" "arm64")
-          ("lang php"    '("run" "f.php"  "--lang" "php")        "--lang" "php")
-          ("lang lisp"   '("run" "f.lisp" "--lang" "lisp")       "--lang" "lisp")
-          ("pass pipeline" '("eval" "(+ 1 2)" "--pass-pipeline" "fold,dce") "--pass-pipeline" "fold,dce")
-          ("opt remarks" '("eval" "(+ 1 2)" "--opt-remarks" "changed") "--opt-remarks" "changed")
-          ("trace json" '("eval" "(+ 1 2)" "--trace-json" "trace.json") "--trace-json" "trace.json")
-          ("build id" '("compile" "f.lisp" "--build-id" "auto") "--build-id" "auto")
-          ("tier" '("eval" "(+ 1 2)" "--tier" "1") "--tier" "1")
-          ("flamegraph" '("eval" "(+ 1 2)" "--flamegraph" "flame.svg") "--flamegraph" "flame.svg"))
-  (argv flag-key expected)
-  (let ((p (cl-cc/cli:parse-args argv)))
-    (assert-string= expected (%flags p flag-key))))
+(it-sequential "cli-args-output-long-and-short short form"
+  (destructuring-bind (argv flag-key expected) (list '("compile" "f.lisp" "-o" "mybin") "-o" "mybin")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
 
-(deftest cli-args-timeout-string-flag
-  "parse-args stores --timeout as a string value; semantic validation happens later."
+(it-sequential "cli-args-string-flags arch arm64"
+  (destructuring-bind (argv flag-key expected) (list '("compile" "f.lisp" "--arch" "arm64") "--arch" "arm64")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags lang php"
+  (destructuring-bind (argv flag-key expected) (list '("run" "f.php"  "--lang" "php") "--lang" "php")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags lang lisp"
+  (destructuring-bind (argv flag-key expected) (list '("run" "f.lisp" "--lang" "lisp") "--lang" "lisp")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags pass pipeline"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--pass-pipeline" "fold,dce") "--pass-pipeline" "fold,dce")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags opt remarks"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--opt-remarks" "changed") "--opt-remarks" "changed")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags trace json"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--trace-json" "trace.json") "--trace-json" "trace.json")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags build id"
+  (destructuring-bind (argv flag-key expected) (list '("compile" "f.lisp" "--build-id" "auto") "--build-id" "auto")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags tier"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--tier" "1") "--tier" "1")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-string-flags flamegraph"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--flamegraph" "flame.svg") "--flamegraph" "flame.svg")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-timeout-string-flag"
   (let ((p (cl-cc/cli:parse-args '("eval" "(+ 1 2)" "--timeout" "7"))))
-    (assert-string= "7" (%flags p "--timeout"))))
+    (expect (%flags p "--timeout") :to-equal "7")))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; String flags — --key=value inline form
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cli-args-equals-form
-  "parse-args: inline --key=value form for output, arch, and lang"
-  :cases (("output=mybin" '("compile" "f.lisp" "--output=mybin") "--output" "mybin")
-          ("arch=arm64"   '("compile" "f.lisp" "--arch=arm64")   "--arch"   "arm64")
-          ("lang=php"     '("run"     "f.php"  "--lang=php")     "--lang"   "php")
-          ("pipeline=fold,dce" '("eval" "(+ 1 2)" "--pass-pipeline=fold,dce") "--pass-pipeline" "fold,dce")
-          ("opt-remarks=missed" '("eval" "(+ 1 2)" "--opt-remarks=missed") "--opt-remarks" "missed")
-          ("trace-json=trace.json" '("eval" "(+ 1 2)" "--trace-json=trace.json") "--trace-json" "trace.json")
-          ("flamegraph=flame.svg" '("eval" "(+ 1 2)" "--flamegraph=flame.svg") "--flamegraph" "flame.svg"))
-  (argv flag-key expected)
-  (let ((p (cl-cc/cli:parse-args argv)))
-    (assert-string= expected (%flags p flag-key))))
+(it-sequential "cli-args-equals-form output=mybin"
+  (destructuring-bind (argv flag-key expected) (list '("compile" "f.lisp" "--output=mybin") "--output" "mybin")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-equals-form arch=arm64"
+  (destructuring-bind (argv flag-key expected) (list '("compile" "f.lisp" "--arch=arm64") "--arch" "arm64")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-equals-form lang=php"
+  (destructuring-bind (argv flag-key expected) (list '("run"     "f.php"  "--lang=php") "--lang" "php")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-equals-form pipeline=fold,dce"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--pass-pipeline=fold,dce") "--pass-pipeline" "fold,dce")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-equals-form opt-remarks=missed"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--opt-remarks=missed") "--opt-remarks" "missed")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-equals-form trace-json=trace.json"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--trace-json=trace.json") "--trace-json" "trace.json")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
+
+(it-sequential "cli-args-equals-form flamegraph=flame.svg"
+  (destructuring-bind (argv flag-key expected) (list '("eval" "(+ 1 2)" "--flamegraph=flame.svg") "--flamegraph" "flame.svg")
+    (let ((p (cl-cc/cli:parse-args argv)))
+    (expect (%flags p flag-key) :to-equal expected))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; flag / flag-or accessor helpers
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cli-flag-helper
-  "flag: returns value for a known flag, nil for absent flag"
+(it-sequential "cli-flag-helper"
   (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "--arch" "x86-64"))))
-    (assert-string= "x86-64" (cl-cc/cli:flag p "--arch"))
-    (assert-null (cl-cc/cli:flag p "--output"))))
+    (expect (cl-cc/cli:flag p "--arch") :to-equal "x86-64")
+    (expect (cl-cc/cli:flag p "--output") :to-be-null)))
 
-(deftest cli-flag-or-long-form-wins-when-present
-  "flag-or returns the long-form value when the long flag is present."
+(it-sequential "cli-flag-or-long-form-wins-when-present"
   (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "--output" "long-out"))))
-    (assert-string= "long-out" (cl-cc/cli:flag-or p "--output" "-o"))))
+    (expect (cl-cc/cli:flag-or p "--output" "-o") :to-equal "long-out")))
 
-(deftest cli-flag-or-falls-back-to-short-form-when-long-absent
-  "flag-or returns the short-form value when only the short flag is present."
+(it-sequential "cli-flag-or-falls-back-to-short-form-when-long-absent"
   (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "-o" "short-out"))))
-    (assert-string= "short-out" (cl-cc/cli:flag-or p "--output" "-o"))))
+    (expect (cl-cc/cli:flag-or p "--output" "-o") :to-equal "short-out")))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Edge cases — special tokens
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cli-args-single-dash-signals-unexpected
-  "parse-args: since the migration onto cl-cli, a lone '-' is an unexpected
-positional (there is no subcommand named '-'), so it signals arg-parse-error
-rather than being accepted as a command."
-  (assert-signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args '("-"))))
+(it-sequential "cli-args-single-dash-signals-unexpected"
+  (signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args '("-"))))
 
-(deftest cli-args-empty-inline-value
-  "parse-args: '--output=' stores the empty string as the value"
+(it-sequential "cli-args-empty-inline-value"
   (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "--output="))))
-    (assert-string= "" (%flags p "--output"))))
+    (expect (%flags p "--output") :to-equal "")))
 
-(deftest cli-args-duplicate-flag-last-wins
-  "parse-args: when the same flag appears twice the last value is kept"
+(it-sequential "cli-args-duplicate-flag-last-wins"
   (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "--arch" "arm64"
                                     "--arch" "x86-64"))))
-    (assert-string= "x86-64" (%flags p "--arch"))))
+    (expect (%flags p "--arch") :to-equal "x86-64")))
 
-(deftest cli-args-value-resembles-flag
-  "parse-args: a string value that starts with '--' is stored verbatim, not parsed as a flag"
-  ;; '--output --verbose' — '--verbose' is the VALUE of --output, not a bool flag
+(it-sequential "cli-args-value-resembles-flag"
   (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "--output" "--verbose"))))
-    (assert-string= "--verbose" (%flags p "--output"))
-    (assert-null (%flags p "--verbose"))))
+    (expect (%flags p "--output") :to-equal "--verbose")
+    (expect (%flags p "--verbose") :to-be-null)))
 
-(deftest cli-args-flags-interleaved-with-positionals
-  "parse-args: flags appearing after the file positional are handled correctly"
-  ;; Common form: cl-cc compile file --arch arm64
+(it-sequential "cli-args-flags-interleaved-with-positionals"
   (let ((p (cl-cc/cli:parse-args '("compile" "foo.lisp" "--arch" "arm64"))))
-    (assert-string= "compile" (cl-cc/cli:parsed-args-command p))
-    (assert-equal '("foo.lisp") (cl-cc/cli:parsed-args-positional p))
-    (assert-string= "arm64" (%flags p "--arch"))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "compile")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-equal '("foo.lisp"))
+    (expect (%flags p "--arch") :to-equal "arm64")))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Error cases
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cli-args-error-cases
-  "Various invalid argv inputs signal arg-parse-error."
-  ;; NOTE: since the migration onto cl-cli, a bare "--" is the standard
-  ;; end-of-options separator (no longer an error); see
-  ;; cli-args-double-dash-separator below.
-  :cases (("unknown-flag"         '("run" "--totally-unknown"))
-          ("bool-with-value"      '("run" "--stdlib=true"))
-          ("triple-dash"          '("run" "---foo"))
-          ("missing-output-long"  '("compile" "f.lisp" "--output"))
-          ("missing-output-short" '("compile" "f.lisp" "-o")))
-  (argv)
-  (assert-signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv)))
+(it-sequential "cli-args-error-cases unknown-flag"
+  (destructuring-bind (argv) (list '("run" "--totally-unknown"))
+    (signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv))))
 
-(deftest cli-args-double-dash-separator
-  "parse-args: a bare '--' is the end-of-options separator (cl-cli semantics),
-yielding an empty parse rather than signalling an error."
+(it-sequential "cli-args-error-cases bool-with-value"
+  (destructuring-bind (argv) (list '("run" "--stdlib=true"))
+    (signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv))))
+
+(it-sequential "cli-args-error-cases triple-dash"
+  (destructuring-bind (argv) (list '("run" "---foo"))
+    (signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv))))
+
+(it-sequential "cli-args-error-cases missing-output-long"
+  (destructuring-bind (argv) (list '("compile" "f.lisp" "--output"))
+    (signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv))))
+
+(it-sequential "cli-args-error-cases missing-output-short"
+  (destructuring-bind (argv) (list '("compile" "f.lisp" "-o"))
+    (signals cl-cc/cli:arg-parse-error (cl-cc/cli:parse-args argv))))
+
+(it-sequential "cli-args-double-dash-separator"
   (let ((p (cl-cc/cli:parse-args '("--"))))
-    (assert-null (cl-cc/cli:parsed-args-command p))
-    (assert-null (cl-cc/cli:parsed-args-positional p))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-be-null)
+    (expect (cl-cc/cli:parsed-args-positional p) :to-be-null)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Combined invocations
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cli-args-full-compile-invocation
-  "parse-args correctly handles a full compile command with arch, output, and verbose flags."
+(it-sequential "cli-args-full-compile-invocation"
   (let ((p (cl-cc/cli:parse-args
             '("compile" "foo.lisp" "--arch" "arm64" "--output=mybin" "--verbose"))))
-    (assert-string= "compile" (cl-cc/cli:parsed-args-command p))
-    (assert-equal  '("foo.lisp") (cl-cc/cli:parsed-args-positional p))
-    (assert-string= "arm64"  (%flags p "--arch"))
-    (assert-string= "mybin"  (%flags p "--output"))
-    (assert-true             (%flags p "--verbose"))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "compile")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-equal '("foo.lisp"))
+    (expect (%flags p "--arch") :to-equal "arm64")
+    (expect (%flags p "--output") :to-equal "mybin")
+    (expect (%flags p "--verbose") :to-be-truthy)))
 
-(deftest cli-args-run-with-php-flags
-  "parse-args correctly handles a run command with PHP lang, stdlib, and verbose flags."
+(it-sequential "cli-args-run-with-php-flags"
   (let ((p (cl-cc/cli:parse-args
             '("run" "script.php" "--lang=php" "--stdlib" "--verbose"))))
-    (assert-string= "run" (cl-cc/cli:parsed-args-command p))
-    (assert-equal  '("script.php") (cl-cc/cli:parsed-args-positional p))
-    (assert-string= "php" (%flags p "--lang"))
-    (assert-true           (%flags p "--stdlib"))
-    (assert-true           (%flags p "--verbose"))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "run")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-equal '("script.php"))
+    (expect (%flags p "--lang") :to-equal "php")
+    (expect (%flags p "--stdlib") :to-be-truthy)
+    (expect (%flags p "--verbose") :to-be-truthy)))
 
-(deftest cli-args-flags-before-command-are-parsed
-  "parse-args correctly handles flags that appear before the command."
+(it-sequential "cli-args-flags-before-command-are-parsed"
   (let ((p (cl-cc/cli:parse-args '("--verbose" "run" "foo.lisp"))))
-    (assert-string= "run" (cl-cc/cli:parsed-args-command p))
-    (assert-equal '("foo.lisp") (cl-cc/cli:parsed-args-positional p))
-    (assert-true (%flags p "--verbose"))))
+    (expect (cl-cc/cli:parsed-args-command p) :to-equal "run")
+    (expect (cl-cc/cli:parsed-args-positional p) :to-equal '("foo.lisp"))
+    (expect (%flags p "--verbose") :to-be-truthy)))

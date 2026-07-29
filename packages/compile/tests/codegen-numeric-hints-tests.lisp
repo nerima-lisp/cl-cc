@@ -4,47 +4,75 @@
 
 (in-package :cl-cc/test)
 
-(in-suite compile-suite)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; %codegen-normalize-contagion-type — alist lookup + complex special case
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each normalize-contagion-type-cases
-  "%codegen-normalize-contagion-type maps all 9 *codegen-contagion-type-map* entries and nil for unknown."
-  :cases (("fixnum"        'fixnum        'integer)
-          ("bignum"        'bignum        'integer)
-          ("integer"       'integer       'integer)
-          ("ratio"         'ratio         'rational)
-          ("rational"      'rational      'rational)
-          ("single-float"  'single-float  'single-float)
-          ("double-float"  'double-float  'double-float)
-          ("float"         'float         'double-float)
-          ("complex"       'complex       'complex)
-          ("complex-cons"  '(complex integer) 'complex)
-          ("unknown"       'unknown       nil))
-  (input expected)
-  (assert-equal expected
-                (cl-cc/compile::%codegen-normalize-contagion-type input)))
+(it-sequential "normalize-contagion-type-cases fixnum"
+  (destructuring-bind (input expected) (list 'fixnum 'integer)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases bignum"
+  (destructuring-bind (input expected) (list 'bignum 'integer)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases integer"
+  (destructuring-bind (input expected) (list 'integer 'integer)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases ratio"
+  (destructuring-bind (input expected) (list 'ratio 'rational)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases rational"
+  (destructuring-bind (input expected) (list 'rational 'rational)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases single-float"
+  (destructuring-bind (input expected) (list 'single-float 'single-float)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases double-float"
+  (destructuring-bind (input expected) (list 'double-float 'double-float)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases float"
+  (destructuring-bind (input expected) (list 'float 'double-float)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases complex"
+  (destructuring-bind (input expected) (list 'complex 'complex)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases complex-cons"
+  (destructuring-bind (input expected) (list '(complex integer) 'complex)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
+
+(it-sequential "normalize-contagion-type-cases unknown"
+  (destructuring-bind (input expected) (list 'unknown nil)
+    (expect (cl-cc/compile::%codegen-normalize-contagion-type input) :to-equal expected)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; codegen-infer-numeric-contagion-type — two-argument contagion
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each infer-numeric-contagion-type-cases
-  "codegen-infer-numeric-contagion-type returns the result type for known operand pairs."
-  :cases (("fixnum*fixnum"        'fixnum       'fixnum       'integer)
-          ("fixnum*single-float"  'fixnum       'single-float 'single-float)
-          ("double-float*complex" 'double-float 'complex      'complex))
-  (left right expected)
-  (assert-equal expected
-                (cl-cc/compile::codegen-infer-numeric-contagion-type left right)))
+(it-sequential "infer-numeric-contagion-type-cases fixnum*fixnum"
+  (destructuring-bind (left right expected) (list 'fixnum 'fixnum 'integer)
+    (expect (cl-cc/compile::codegen-infer-numeric-contagion-type left right) :to-equal expected)))
+
+(it-sequential "infer-numeric-contagion-type-cases fixnum*single-float"
+  (destructuring-bind (left right expected) (list 'fixnum 'single-float 'single-float)
+    (expect (cl-cc/compile::codegen-infer-numeric-contagion-type left right) :to-equal expected)))
+
+(it-sequential "infer-numeric-contagion-type-cases double-float*complex"
+  (destructuring-bind (left right expected) (list 'double-float 'complex 'complex)
+    (expect (cl-cc/compile::codegen-infer-numeric-contagion-type left right) :to-equal expected)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; codegen-inline-arith-dispatch-index — returns non-nil for valid types
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest codegen-inline-arith-dispatch-index-returns-non-nil
-  "codegen-inline-arith-dispatch-index returns a non-nil integer index for fixnum+fixnum with op '+"
+(it-sequential "codegen-inline-arith-dispatch-index-returns-non-nil"
   (let ((index (cl-cc/compile::codegen-inline-arith-dispatch-index '+ 'fixnum 'fixnum)))
-    (assert-true (integerp index))))
+    (expect (integerp index) :to-be-truthy)))

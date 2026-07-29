@@ -8,12 +8,10 @@
 ;;; and available here via shared :cl-cc/test package.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── ir-dominators: deeper chains and loops ─────────────────────────────────
 
-(deftest ir-dominators-deep-chain
-  "In a 4-block linear chain A->B->C->D, idom(C)=B and idom(D)=C."
+(it-sequential "ir-dominators-deep-chain"
   (let* ((fn (cl-cc/ir:ir-make-function 'test-fn))
          (a  (cl-cc/ir:irf-entry fn))
          (b  (cl-cc/ir:ir-new-block fn :b))
@@ -23,13 +21,12 @@
     (cl-cc/ir:ir-add-edge b c)
     (cl-cc/ir:ir-add-edge c d)
     (let ((idom (cl-cc/ir:ir-dominators fn)))
-      (assert-eq a (gethash a idom))
-      (assert-eq a (gethash b idom))
-      (assert-eq b (gethash c idom))
-      (assert-eq c (gethash d idom)))))
+      (expect (gethash a idom) :to-be a)
+      (expect (gethash b idom) :to-be a)
+      (expect (gethash c idom) :to-be b)
+      (expect (gethash d idom) :to-be c))))
 
-(deftest ir-dominators-two-branches-then-merge
-  "In A->{B,C}->D->E: idom(D)=A, idom(E)=D."
+(it-sequential "ir-dominators-two-branches-then-merge"
   (let* ((fn (cl-cc/ir:ir-make-function 'test-fn))
          (a  (cl-cc/ir:irf-entry fn))
          (b  (cl-cc/ir:ir-new-block fn :b))
@@ -42,26 +39,24 @@
     (cl-cc/ir:ir-add-edge c d)
     (cl-cc/ir:ir-add-edge d e)
     (let ((idom (cl-cc/ir:ir-dominators fn)))
-      (assert-eq a (gethash a idom))
-      (assert-eq a (gethash d idom))
-      (assert-eq d (gethash e idom)))))
+      (expect (gethash a idom) :to-be a)
+      (expect (gethash d idom) :to-be a)
+      (expect (gethash e idom) :to-be d))))
 
-(deftest ir-dominators-unreachable-absent
-  "ir-dominators does not include unreachable blocks in the result table."
+(it-sequential "ir-dominators-unreachable-absent"
   (let* ((fn      (cl-cc/ir:ir-make-function 'test-fn))
          (entry   (cl-cc/ir:irf-entry fn))
          (reached (cl-cc/ir:ir-new-block fn :reached))
          (orphan  (cl-cc/ir:ir-new-block fn :orphan)))
     (cl-cc/ir:ir-add-edge entry reached)
     (let ((idom (cl-cc/ir:ir-dominators fn)))
-      (assert-true  (gethash entry   idom))
-      (assert-true  (gethash reached idom))
-      (assert-false (gethash orphan  idom)))))
+      (expect (gethash entry   idom) :to-be-truthy)
+      (expect (gethash reached idom) :to-be-truthy)
+      (expect (gethash orphan  idom) :to-be-falsy))))
 
 ;;; ─── ir-collect-uses with custom operands ────────────────────────────────────
 
-(deftest ir-collect-uses-single-operand
-  "ir-collect-uses records a single use of an ir-value."
+(it-sequential "ir-collect-uses-single-operand"
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (v0    (cl-cc/ir:ir-new-value fn))
@@ -73,12 +68,11 @@
     (cl-cc/ir:ir-emit entry i1)
     (let ((uses (cl-cc/ir:ir-collect-uses fn)))
       ;; v0 is used by i1
-      (assert-true (member i1 (gethash v0 uses) :test #'eq))
+      (expect (member i1 (gethash v0 uses) :test #'eq) :to-be-truthy)
       ;; v1 is not used by anyone
-      (assert-null (gethash v1 uses)))))
+      (expect (gethash v1 uses) :to-be-null))))
 
-(deftest ir-collect-uses-multiple-operands
-  "ir-collect-uses records multiple uses of the same ir-value."
+(it-sequential "ir-collect-uses-multiple-operands"
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (v0    (cl-cc/ir:ir-new-value fn))
@@ -91,12 +85,11 @@
     (cl-cc/ir:ir-emit entry i2)
     (let ((uses (cl-cc/ir:ir-collect-uses fn)))
       (let ((users (gethash v0 uses)))
-        (assert-= 2 (length users))
-        (assert-true (member i1 users :test #'eq))
-        (assert-true (member i2 users :test #'eq))))))
+        (expect (length users) :to-equal 2)
+        (expect (member i1 users :test #'eq) :to-be-truthy)
+        (expect (member i2 users :test #'eq) :to-be-truthy)))))
 
-(deftest ir-collect-uses-across-blocks
-  "ir-collect-uses traverses multiple blocks via RPO."
+(it-sequential "ir-collect-uses-across-blocks"
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (next  (cl-cc/ir:ir-new-block fn :next))
@@ -109,13 +102,11 @@
     (cl-cc/ir:ir-emit entry i0)
     (cl-cc/ir:ir-emit next  i1)
     (let ((uses (cl-cc/ir:ir-collect-uses fn)))
-      (assert-true (member i1 (gethash v0 uses) :test #'eq)))))
+      (expect (member i1 (gethash v0 uses) :test #'eq) :to-be-truthy))))
 
 ;;; ─── ir-verify-ssa: cross-block checks ──────────────────────────────────────
 
-(deftest ir-verify-ssa-cross-block-valid
-  "ir-verify-ssa passes for distinct defs across blocks and for void instructions."
-  ;; distinct values in separate blocks
+(it-sequential "ir-verify-ssa-cross-block-valid"
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (next  (cl-cc/ir:ir-new-block fn :next))
@@ -124,21 +115,18 @@
     (cl-cc/ir:ir-add-edge entry next)
     (cl-cc/ir:ir-emit entry (cl-cc/ir:make-ir-inst :result v0))
     (cl-cc/ir:ir-emit next  (cl-cc/ir:make-ir-inst :result v1))
-    (assert-true (cl-cc/ir:ir-verify-ssa fn)))
-  ;; void instructions (nil result) define no SSA value — still valid
+    (expect (cl-cc/ir:ir-verify-ssa fn) :to-be-truthy))
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (i0    (cl-cc/ir:make-ir-inst))
          (i1    (cl-cc/ir:make-ir-inst)))
     (cl-cc/ir:ir-emit entry i0)
     (cl-cc/ir:ir-emit entry i1)
-    (assert-true (cl-cc/ir:ir-verify-ssa fn))))
+    (expect (cl-cc/ir:ir-verify-ssa fn) :to-be-truthy)))
 
 ;;; ─── ir-write-var / ir-read-var: multiple independent variables ──────────────
 
-(deftest ir-ssa-independent-vars
-  "Different variables are tracked independently, both within and across blocks."
-  ;; within same block: a, b, c remain distinct
+(it-sequential "ir-ssa-independent-vars"
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (va    (cl-cc/ir:ir-new-value fn))
@@ -147,10 +135,9 @@
     (cl-cc/ir:ir-write-var fn 'a entry va)
     (cl-cc/ir:ir-write-var fn 'b entry vb)
     (cl-cc/ir:ir-write-var fn 'c entry vc)
-    (assert-eq va (cl-cc/ir:ir-read-var fn 'a entry))
-    (assert-eq vb (cl-cc/ir:ir-read-var fn 'b entry))
-    (assert-eq vc (cl-cc/ir:ir-read-var fn 'c entry)))
-  ;; across blocks: vars written in entry are both readable from successor
+    (expect (cl-cc/ir:ir-read-var fn 'a entry) :to-be va)
+    (expect (cl-cc/ir:ir-read-var fn 'b entry) :to-be vb)
+    (expect (cl-cc/ir:ir-read-var fn 'c entry) :to-be vc))
   (let* ((fn    (cl-cc/ir:ir-make-function 'test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (next  (cl-cc/ir:ir-new-block fn :next))
@@ -161,5 +148,5 @@
     (cl-cc/ir:ir-seal-block fn next)
     (cl-cc/ir:ir-write-var fn 'a entry va)
     (cl-cc/ir:ir-write-var fn 'b entry vb)
-    (assert-eq va (cl-cc/ir:ir-read-var fn 'a next))
-    (assert-eq vb (cl-cc/ir:ir-read-var fn 'b next))))
+    (expect (cl-cc/ir:ir-read-var fn 'a next) :to-be va)
+    (expect (cl-cc/ir:ir-read-var fn 'b next) :to-be vb)))

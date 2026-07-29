@@ -6,57 +6,63 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-hof-suite
-  :description "Tests for macros-hof.lisp"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite macros-hof-suite)
 ;;; ── HOF macros ───────────────────────────────────────────────────────────────
 
-(deftest-each hof-macro-outer-is-let
-  "Each HOF macro expands to a LET as its outermost form."
-  :cases (("mapcar"        '(mapcar fn lst))
-          ("every"         '(every pred lst))
-          ("some"          '(some pred lst))
-          ("remove-if"     '(remove-if pred lst))
-          ("remove-if-not" '(remove-if-not pred lst)))
-  (form)
-  (assert-eq (car (our-macroexpand-1 form)) 'let))
+(it-sequential "hof-macro-outer-is-let mapcar"
+  (destructuring-bind (form) (list '(mapcar fn lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
 
-(deftest mapcar-body-contains-dolist
-  "MAPCAR's list path iterates with DOLIST, possibly under runtime TYPECASE dispatch."
+(it-sequential "hof-macro-outer-is-let every"
+  (destructuring-bind (form) (list '(every pred lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
+
+(it-sequential "hof-macro-outer-is-let some"
+  (destructuring-bind (form) (list '(some pred lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
+
+(it-sequential "hof-macro-outer-is-let remove-if"
+  (destructuring-bind (form) (list '(remove-if pred lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
+
+(it-sequential "hof-macro-outer-is-let remove-if-not"
+  (destructuring-bind (form) (list '(remove-if-not pred lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
+
+(it-sequential "mapcar-body-contains-dolist"
   (let ((result (our-macroexpand-1 '(mapcar fn lst))))
-    (assert-true (%tree-contains-head-p 'dolist result))))
+    (expect (%tree-contains-head-p 'dolist result) :to-be-truthy)))
 
-(deftest every-short-circuits-on-false
-  "EVERY has a BLOCK NIL short-circuit path containing DOLIST, possibly under TYPECASE."
+(it-sequential "every-short-circuits-on-false"
   (let ((result (our-macroexpand-1 '(every pred lst))))
-    (assert-true (%tree-contains-head-p 'block result))
-    (assert-true (%tree-contains-head-p 'dolist result))))
+    (expect (%tree-contains-head-p 'block result) :to-be-truthy)
+    (expect (%tree-contains-head-p 'dolist result) :to-be-truthy)))
 
-(deftest-each notany-notevery-negation
-  "notany/notevery are simple (not ...) wrappers around some/every."
-  :cases (("notany"   '(notany   pred lst) '(not (some  pred lst)))
-          ("notevery" '(notevery pred lst) '(not (every pred lst))))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "notany-notevery-negation notany"
+  (destructuring-bind (form expected) (list '(notany   pred lst) '(not (some  pred lst)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
 
-(deftest find-no-keys-is-eql-loop
-  "FIND without keyword args generates a fast EQL check loop, possibly under TYPECASE."
+(it-sequential "notany-notevery-negation notevery"
+  (destructuring-bind (form expected) (list '(notevery pred lst) '(not (every pred lst)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "find-no-keys-is-eql-loop"
   (let ((result (our-macroexpand-1 '(find item lst))))
-    (assert-true (%tree-contains-head-p 'block result))
-    (assert-true (%tree-contains-head-p 'dolist result))))
+    (expect (%tree-contains-head-p 'block result) :to-be-truthy)
+    (expect (%tree-contains-head-p 'dolist result) :to-be-truthy)))
 
-(deftest-each sequence-search-macro-outer-is-let
-  "Sequence-search HOF macros (position/count/mapcan) expand to a LET."
-  :cases (("position" '(position item lst))
-          ("count"    '(count item lst))
-          ("mapcan"   '(mapcan fn lst)))
-  (form)
-  (assert-eq (car (our-macroexpand-1 form)) 'let))
+(it-sequential "sequence-search-macro-outer-is-let position"
+  (destructuring-bind (form) (list '(position item lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
 
-(deftest stable-sort-delegates-to-sort
-  "(stable-sort lst pred) → (sort lst pred)"
-  (assert-equal (our-macroexpand-1 '(stable-sort lst pred))
-                '(sort lst pred)))
+(it-sequential "sequence-search-macro-outer-is-let count"
+  (destructuring-bind (form) (list '(count item lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
+
+(it-sequential "sequence-search-macro-outer-is-let mapcan"
+  (destructuring-bind (form) (list '(mapcan fn lst))
+    (expect 'let :to-be (car (our-macroexpand-1 form)))))
+
+(it-sequential "stable-sort-delegates-to-sort"
+  (expect '(sort lst pred) :to-equal (our-macroexpand-1 '(stable-sort lst pred))))

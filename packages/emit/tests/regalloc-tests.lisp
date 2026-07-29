@@ -2,62 +2,72 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; Instruction Def/Use Tests
-(deftest-each regalloc-defs-and-uses
-  "instruction-defs and instruction-uses return correct register sets for each instruction type."
-  :cases (("vm-const"     (make-vm-const     :dst :r0 :value 42)                 '(:r0) nil)
-          ("vm-binop"     (make-vm-add       :dst :r2 :lhs :r0 :rhs :r1)         '(:r2) '(:r0 :r1))
-          ("vm-call"      (make-vm-call      :dst :r3 :func :r0 :args '(:r1 :r2)) '(:r3) '(:r0 :r1 :r2))
-          ("vm-jump-zero" (make-vm-jump-zero :reg :r0 :label "L1")                nil    '(:r0))
-          ("vm-simd-vector-op" (make-vm-simd-vector-op :op :add :dst-array :r3 :lhs-array :r1
+(it-sequential "regalloc-defs-and-uses vm-const"
+  (destructuring-bind (inst expected-defs expected-uses) (list (make-vm-const     :dst :r0 :value 42) '(:r0) nil)
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
+
+(it-sequential "regalloc-defs-and-uses vm-binop"
+  (destructuring-bind (inst expected-defs expected-uses) (list (make-vm-add       :dst :r2 :lhs :r0 :rhs :r1) '(:r2) '(:r0 :r1))
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
+
+(it-sequential "regalloc-defs-and-uses vm-call"
+  (destructuring-bind (inst expected-defs expected-uses) (list (make-vm-call      :dst :r3 :func :r0 :args '(:r1 :r2)) '(:r3) '(:r0 :r1 :r2))
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
+
+(it-sequential "regalloc-defs-and-uses vm-jump-zero"
+  (destructuring-bind (inst expected-defs expected-uses) (list (make-vm-jump-zero :reg :r0 :label "L1") nil '(:r0))
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
+
+(it-sequential "regalloc-defs-and-uses vm-simd-vector-op"
+  (destructuring-bind (inst expected-defs expected-uses) (list (make-vm-simd-vector-op :op :add :dst-array :r3 :lhs-array :r1
                                                         :rhs-array :r2 :index-reg :r4 :lanes 4
-                                                        :element-type :i32)
-           nil '(:r3 :r1 :r2 :r4))
-          ("vm-label"     (make-vm-label     :name "L1")                           nil    nil)
-          ("vm-tail-call" (cl-cc:make-vm-tail-call :dst :r9 :func :r0 :args '(:r1 :r2)) nil '(:r0 :r1 :r2)))
-  (inst expected-defs expected-uses)
-  (assert-equal expected-defs (instruction-defs inst))
-  (assert-equal expected-uses (instruction-uses inst)))
+                                                        :element-type :i32) nil '(:r3 :r1 :r2 :r4))
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
+
+(it-sequential "regalloc-defs-and-uses vm-label"
+  (destructuring-bind (inst expected-defs expected-uses) (list (make-vm-label     :name "L1") nil nil)
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
+
+(it-sequential "regalloc-defs-and-uses vm-tail-call"
+  (destructuring-bind (inst expected-defs expected-uses) (list (cl-cc:make-vm-tail-call :dst :r9 :func :r0 :args '(:r1 :r2)) nil '(:r0 :r1 :r2))
+    (expect (instruction-defs inst) :to-equal expected-defs) (expect (instruction-uses inst) :to-equal expected-uses)))
 
 ;;; Liveness Analysis Tests
 
-(deftest regalloc-liveness-three-overlapping-intervals
-  "Liveness analysis produces 3 intervals with correct start/end positions."
+(it-sequential "regalloc-liveness-three-overlapping-intervals"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-const :dst :r1 :value 2)
                              (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                              (make-vm-halt :reg :r2)))
          (intervals (compute-live-intervals instructions)))
-    (assert-= 3 (length intervals))
+    (expect (= 3 (length intervals)) :to-be-truthy)
     (let ((r0-int (find :r0 intervals :key #'interval-vreg)))
-      (assert-false (null r0-int))
-      (assert-= 0 (interval-start r0-int))
-      (assert-= 2 (interval-end r0-int)))
+      (expect (null r0-int) :to-be-falsy)
+      (expect (= 0 (interval-start r0-int)) :to-be-truthy)
+      (expect (= 2 (interval-end r0-int)) :to-be-truthy))
     (let ((r1-int (find :r1 intervals :key #'interval-vreg)))
-      (assert-false (null r1-int))
-      (assert-= 1 (interval-start r1-int))
-      (assert-= 2 (interval-end r1-int)))
+      (expect (null r1-int) :to-be-falsy)
+      (expect (= 1 (interval-start r1-int)) :to-be-truthy)
+      (expect (= 2 (interval-end r1-int)) :to-be-truthy))
     (let ((r2-int (find :r2 intervals :key #'interval-vreg)))
-      (assert-false (null r2-int))
-      (assert-= 2 (interval-start r2-int))
-      (assert-= 3 (interval-end r2-int)))))
+      (expect (null r2-int) :to-be-falsy)
+      (expect (= 2 (interval-start r2-int)) :to-be-truthy)
+      (expect (= 3 (interval-end r2-int)) :to-be-truthy))))
 
-(deftest regalloc-liveness-disjoint-intervals-do-not-overlap
-  "Disjoint live intervals: r0 ends before r1 begins."
+(it-sequential "regalloc-liveness-disjoint-intervals-do-not-overlap"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-halt :reg :r0)
                              (make-vm-const :dst :r1 :value 2)
                              (make-vm-halt :reg :r1)))
          (intervals (compute-live-intervals instructions)))
-    (assert-= 2 (length intervals))
+    (expect (= 2 (length intervals)) :to-be-truthy)
     (let ((r0-int (find :r0 intervals :key #'interval-vreg))
           (r1-int (find :r1 intervals :key #'interval-vreg)))
-      (assert-true (<= (interval-end r0-int) (interval-start r1-int))))))
+      (expect (<= (interval-end r0-int) (interval-start r1-int)) :to-be-truthy))))
 
-(deftest regalloc-liveness-forward-branch-extends-interval
-  "Forward branch extends r0 interval to cover the jump target at index 4."
+(it-sequential "regalloc-liveness-forward-branch-extends-interval"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-jump-zero :reg :r1 :label "L1")
                              (make-vm-const :dst :r2 :value 2)
@@ -66,50 +76,42 @@
                              (make-vm-halt :reg :r3)))
          (intervals (compute-live-intervals instructions))
          (r0-int (find :r0 intervals :key #'interval-vreg)))
-    (assert-false (null r0-int))
-     (assert-= 0 (interval-start r0-int))
-     (assert-= 4 (interval-end r0-int))))
+    (expect (null r0-int) :to-be-falsy)
+     (expect (= 0 (interval-start r0-int)) :to-be-truthy)
+     (expect (= 4 (interval-end r0-int)) :to-be-truthy)))
 
 ;;; BURS Instruction Selection Tests
 
-(deftest burs-select-instructions-selects-minimum-cost-cover
-  "BURS instruction selection covers the tree bottom-up and chooses the cheapest rule."
+(it-sequential "burs-select-instructions-selects-minimum-cost-cover"
   (let ((cl-cc/emit:*burs-rules* nil))
     (cl-cc/emit:register-burs-rule '(add lhs rhs) '(slow-add lhs rhs) 10)
     (cl-cc/emit:register-burs-rule '(add lhs rhs) '(fast-add lhs rhs) 1)
     (multiple-value-bind (rules cost)
         (cl-cc/emit:burs-select-instructions '(add r1 r2))
-      (assert-= 2001 cost)
-      (assert-equal '((identity r1) (identity r2) (fast-add lhs rhs))
-                    (mapcar #'cl-cc/emit::burs-rule-replacement rules)))))
+      (expect (= 2001 cost) :to-be-truthy)
+      (expect (mapcar #'cl-cc/emit::burs-rule-replacement rules) :to-equal '((identity r1) (identity r2) (fast-add lhs rhs))))))
 
-(deftest burs-select-instructions-prefers-earlier-rule-on-cost-tie
-  "BURS instruction selection tie-breaks equal-cost rules by registration order."
+(it-sequential "burs-select-instructions-prefers-earlier-rule-on-cost-tie"
   (let ((cl-cc/emit:*burs-rules* nil))
     (cl-cc/emit:register-burs-rule '(add lhs rhs) '(first-add lhs rhs) 1)
     (cl-cc/emit:register-burs-rule '(add lhs rhs) '(second-add lhs rhs) 1)
     (multiple-value-bind (rules cost)
         (cl-cc/emit:burs-select-instructions '(add r1 r2))
-      (assert-= 2001 cost)
-      (assert-equal '(first-add lhs rhs)
-                    (cl-cc/emit::burs-rule-replacement (third rules))))))
+      (expect (= 2001 cost) :to-be-truthy)
+      (expect (cl-cc/emit::burs-rule-replacement (third rules)) :to-equal '(first-add lhs rhs)))))
 
-(deftest burs-select-instructions-matches-nested-tile-patterns
-  "BURS instruction selection matches multi-node tiles such as memory operands."
+(it-sequential "burs-select-instructions-matches-nested-tile-patterns"
   (let ((cl-cc/emit:*burs-rules* nil))
     (cl-cc/emit:register-burs-rule '(add (load addr) reg) '(add reg (mem addr)) 2)
     (cl-cc/emit:register-burs-rule '(add reg1 reg2) '(add reg1 reg2) 1)
     (multiple-value-bind (rules cost)
         (cl-cc/emit:burs-select-instructions '(add (load local) r1))
-      (assert-= 2002 cost)
-      (assert-equal '((identity local) (identity r1) (add reg (mem addr)))
-                    (mapcar #'cl-cc/emit::burs-rule-replacement rules)))))
+      (expect (= 2002 cost) :to-be-truthy)
+      (expect (mapcar #'cl-cc/emit::burs-rule-replacement rules) :to-equal '((identity local) (identity r1) (add reg (mem addr)))))))
 
-(deftest burs-select-instructions-signals-on-uncoverable-nonterminal
-  "BURS instruction selection rejects non-leaf trees without any matching rule."
+(it-sequential "burs-select-instructions-signals-on-uncoverable-nonterminal"
   (let ((cl-cc/emit:*burs-rules* nil))
-    (assert-signals error
-      (cl-cc/emit:burs-select-instructions '(unknown r1)))))
+    (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/emit:burs-select-instructions '(unknown r1))) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))))
 
 ;;; FR-068: Post-RA Instruction Scheduling
 
@@ -123,42 +125,38 @@
      :spill-count 0
      :instructions nil)))
 
-(deftest post-ra-scheduler-reorders-independent-instructions
-  "schedule-post-ra reorders independent instructions using physical-register dependencies and pressure/latency priorities."
+(it-sequential "post-ra-scheduler-reorders-independent-instructions"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-mul :dst :r2 :lhs :r3 :rhs :r4)
                       (make-vm-halt :reg :r0)))
          (ra (%test-regalloc-result '((:r0 . :rax) (:r2 . :rdx)
                                       (:r3 . :rbx) (:r4 . :rcx))))
          (scheduled (cl-cc/codegen:schedule-post-ra insts ra)))
-    (assert-true (typep (first scheduled) 'vm-mul))
-    (assert-true (typep (second scheduled) 'vm-const))
-    (assert-true (typep (third scheduled) 'vm-halt))))
+    (expect (typep (first scheduled) 'vm-mul) :to-be-truthy)
+    (expect (typep (second scheduled) 'vm-const) :to-be-truthy)
+    (expect (typep (third scheduled) 'vm-halt) :to-be-truthy)))
 
-(deftest post-ra-scheduler-preserves-raw-dependencies
-  "schedule-post-ra does not move consumers before their physical-register producers."
+(it-sequential "post-ra-scheduler-preserves-raw-dependencies"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-add :dst :r1 :lhs :r0 :rhs :r2)
                       (make-vm-halt :reg :r1)))
          (ra (%test-regalloc-result '((:r0 . :rax) (:r1 . :rcx) (:r2 . :rdx))))
          (scheduled (cl-cc/codegen:schedule-post-ra insts ra)))
-    (assert-true (typep (first scheduled) 'vm-const))
-    (assert-true (typep (second scheduled) 'vm-add))
-    (assert-true (typep (third scheduled) 'vm-halt))))
+    (expect (typep (first scheduled) 'vm-const) :to-be-truthy)
+    (expect (typep (second scheduled) 'vm-add) :to-be-truthy)
+    (expect (typep (third scheduled) 'vm-halt) :to-be-truthy)))
 
-(deftest post-ra-scheduler-preserves-physical-waw-dependencies
-  "schedule-post-ra uses physical registers, so coalesced virtual registers with the same physical register remain ordered."
+(it-sequential "post-ra-scheduler-preserves-physical-waw-dependencies"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-const :dst :r1 :value 2)
                       (make-vm-halt :reg :r1)))
          (ra (%test-regalloc-result '((:r0 . :rax) (:r1 . :rax))))
          (scheduled (cl-cc/codegen:schedule-post-ra insts ra)))
-    (assert-eq :r0 (vm-dst (first scheduled)))
-    (assert-eq :r1 (vm-dst (second scheduled)))
-    (assert-true (typep (third scheduled) 'vm-halt))))
+    (expect (vm-dst (first scheduled)) :to-be :r0)
+    (expect (vm-dst (second scheduled)) :to-be :r1)
+    (expect (typep (third scheduled) 'vm-halt) :to-be-truthy)))
 
-(deftest post-ra-scheduler-treats-unknown-registers-as-barriers
-  "schedule-post-ra preserves original order around unmapped operands with unknown dependencies."
+(it-sequential "post-ra-scheduler-treats-unknown-registers-as-barriers"
   (let* ((unknown (make-vm-const :dst :unknown :value 7))
          (insts (list (make-vm-const :dst :r0 :value 1)
                       unknown
@@ -167,13 +165,12 @@
          (ra (%test-regalloc-result '((:r0 . :rax) (:r2 . :rdx)
                                       (:r3 . :rbx) (:r4 . :rcx))))
          (scheduled (cl-cc/codegen:schedule-post-ra insts ra)))
-    (assert-true (typep (first scheduled) 'vm-const))
-    (assert-eq unknown (second scheduled))
-    (assert-true (typep (third scheduled) 'vm-mul))
-    (assert-true (typep (fourth scheduled) 'vm-halt))))
+    (expect (typep (first scheduled) 'vm-const) :to-be-truthy)
+    (expect (second scheduled) :to-be unknown)
+    (expect (typep (third scheduled) 'vm-mul) :to-be-truthy)
+    (expect (typep (fourth scheduled) 'vm-halt) :to-be-truthy)))
 
-(deftest post-ra-scheduler-integrates-with-native-backends
-  "compile-to-*-bytes runs post-RA scheduling in x86-64, AArch64, and RISC-V pipelines without changing output contracts."
+(it-sequential "post-ra-scheduler-integrates-with-native-backends"
   (let ((program (cl-cc/vm::make-vm-program
                   :instructions (list (make-vm-const :dst :r0 :value 1)
                                       (make-vm-const :dst :r1 :value 2)
@@ -184,11 +181,10 @@
     (dolist (bytes (list (cl-cc/codegen:compile-to-x86-64-bytes program)
                          (cl-cc/codegen:compile-to-aarch64-bytes program)
                          (cl-cc/codegen:compile-to-riscv64-bytes program)))
-      (assert-true (typep bytes '(simple-array (unsigned-byte 8) (*))))
-      (assert-true (plusp (length bytes))))))
+      (expect (typep bytes '(simple-array (unsigned-byte 8) (*))) :to-be-truthy)
+      (expect (plusp (length bytes)) :to-be-truthy))))
 
-(deftest regalloc-interprocedural-hints-detect-leaf-and-leaf-callee-chain
-  "Interprocedural hint oracle marks leaf functions and leaf-callee chains conservatively."
+(it-sequential "regalloc-interprocedural-hints-detect-leaf-and-leaf-callee-chain"
   (let* ((insts (list
                  ;; leaf callee
                  (make-vm-label :name "leaf")
@@ -205,12 +201,11 @@
                  (make-vm-call :dst :r2 :func :g :args nil)
                  (make-vm-ret :reg :r2)))
          (hints (cl-cc/regalloc::regalloc-compute-interprocedural-hints insts)))
-    (assert-true (getf (gethash "leaf" hints) :leaf-p))
-    (assert-true (getf (gethash "caller" hints) :leaf-callee-chain-p))
-    (assert-false (getf (gethash "root" hints) :leaf-callee-chain-p))))
+    (expect (getf (gethash "leaf" hints) :leaf-p) :to-be-truthy)
+    (expect (getf (gethash "caller" hints) :leaf-callee-chain-p) :to-be-truthy)
+    (expect (getf (gethash "root" hints) :leaf-callee-chain-p) :to-be-falsy)))
 
-(deftest regalloc-interprocedural-policy-hook-derives-preferences
-  "Policy hook derives caller/callee-saved bias from interprocedural hints."
+(it-sequential "regalloc-interprocedural-policy-hook-derives-preferences"
   (let* ((insts (list
                  (make-vm-label :name "leaf")
                  (make-vm-const :dst :r0 :value 1)
@@ -226,68 +221,59 @@
          (hints (cl-cc/regalloc::regalloc-compute-interprocedural-hints insts))
          (leaf-policy (cl-cc/regalloc::regalloc-build-allocation-policy-from-hints hints "leaf"))
          (root-policy (cl-cc/regalloc::regalloc-build-allocation-policy-from-hints hints "root")))
-    (assert-true (getf leaf-policy :prefer-caller-saved-p))
-    (assert-false (getf leaf-policy :prefer-callee-saved-p))
-    (assert-true (getf root-policy :prefer-callee-saved-p))
-    (assert-false (getf root-policy :prefer-caller-saved-p))))
+    (expect (getf leaf-policy :prefer-caller-saved-p) :to-be-truthy)
+    (expect (getf leaf-policy :prefer-callee-saved-p) :to-be-falsy)
+    (expect (getf root-policy :prefer-callee-saved-p) :to-be-truthy)
+    (expect (getf root-policy :prefer-caller-saved-p) :to-be-falsy)))
 
 ;;; Linear Scan Allocation Tests
 
-(deftest regalloc-allocate-fits-in-physical-regs-with-distinct-assignments
-  "3-vreg program fits in physical regs: 0 spills; all vregs assigned distinct physical regs."
+(it-sequential "regalloc-allocate-fits-in-physical-regs-with-distinct-assignments"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-const :dst :r1 :value 2)
                              (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                              (make-vm-halt :reg :r2)))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-= 0 (regalloc-spill-count result))
-    (assert-false (null (regalloc-lookup result :r0)))
-    (assert-false (null (regalloc-lookup result :r1)))
-    (assert-false (null (regalloc-lookup result :r2)))
-    (assert-false (eq (regalloc-lookup result :r0)
-                      (regalloc-lookup result :r1)))))
+    (expect (= 0 (regalloc-spill-count result)) :to-be-truthy)
+    (expect (null (regalloc-lookup result :r0)) :to-be-falsy)
+    (expect (null (regalloc-lookup result :r1)) :to-be-falsy)
+    (expect (null (regalloc-lookup result :r2)) :to-be-falsy)
+    (expect (eq (regalloc-lookup result :r0)
+                      (regalloc-lookup result :r1)) :to-be-falsy)))
 
-(deftest regalloc-allocate-coalesces-move-to-same-physical-reg
-  "A vm-move is coalesced: source and destination share the same physical register."
+(it-sequential "regalloc-allocate-coalesces-move-to-same-physical-reg"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-move :dst :r1 :src :r0)
                              (make-vm-halt :reg :r1)))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-eq (regalloc-lookup result :r0)
-               (regalloc-lookup result :r1))))
+    (expect (regalloc-lookup result :r1) :to-be (regalloc-lookup result :r0))))
 
-(deftest regalloc-allocate-zero-spills-with-register-reuse
-  "4-vreg program with move+reuse produces 0 spills."
+(it-sequential "regalloc-allocate-zero-spills-with-register-reuse"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-move :dst :r1 :src :r0)
                              (make-vm-const :dst :r2 :value 2)
                              (make-vm-add :dst :r3 :lhs :r1 :rhs :r2)
                              (make-vm-halt :reg :r3)))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-= 0 (regalloc-spill-count result))))
+    (expect (= 0 (regalloc-spill-count result)) :to-be-truthy)))
 
-(deftest regalloc-allocate-empty-sequence-has-zero-spills
-  "Allocating an empty instruction sequence produces 0 spills."
+(it-sequential "regalloc-allocate-empty-sequence-has-zero-spills"
   (let ((result (allocate-registers nil *x86-64-target*)))
-    (assert-= 0 (regalloc-spill-count result))))
+    (expect (= 0 (regalloc-spill-count result)) :to-be-truthy)))
 
-(deftest regalloc-x86-and-aarch64-convention-properties
-  "Both target descriptors are non-nil with correct GPR counts, return registers, and FP registers."
-  (assert-false (null *x86-64-target*))
-  (assert-false (null *aarch64-target*))
-  (assert-= 13 (length (target-allocatable-regs *x86-64-target*)))
-  (assert-eq :rax (target-ret-reg *x86-64-target*))
-  (assert-eq :r11 (first (target-scratch-regs *x86-64-target*)))
-  (assert-equal '(:xmm0 :xmm1 :xmm2 :xmm3 :xmm4 :xmm5 :xmm6 :xmm7)
-                (target-fp-arg-regs *x86-64-target*))
-  (assert-eq :xmm0 (target-fp-ret-reg *x86-64-target*))
-  (assert-eq :x0 (target-ret-reg *aarch64-target*))
-  (assert-equal '(:v0 :v1 :v2 :v3 :v4 :v5 :v6 :v7)
-                (target-fp-arg-regs *aarch64-target*))
-  (assert-eq :v0 (target-fp-ret-reg *aarch64-target*)))
+(it-sequential "regalloc-x86-and-aarch64-convention-properties"
+  (expect (null *x86-64-target*) :to-be-falsy)
+  (expect (null *aarch64-target*) :to-be-falsy)
+  (expect (= 13 (length (target-allocatable-regs *x86-64-target*))) :to-be-truthy)
+  (expect (target-ret-reg *x86-64-target*) :to-be :rax)
+  (expect (first (target-scratch-regs *x86-64-target*)) :to-be :r11)
+  (expect (target-fp-arg-regs *x86-64-target*) :to-equal '(:xmm0 :xmm1 :xmm2 :xmm3 :xmm4 :xmm5 :xmm6 :xmm7))
+  (expect (target-fp-ret-reg *x86-64-target*) :to-be :xmm0)
+  (expect (target-ret-reg *aarch64-target*) :to-be :x0)
+  (expect (target-fp-arg-regs *aarch64-target*) :to-equal '(:v0 :v1 :v2 :v3 :v4 :v5 :v6 :v7))
+  (expect (target-fp-ret-reg *aarch64-target*) :to-be :v0))
 
-(deftest regalloc-float-vregs-allocated-to-distinct-xmm-registers
-  "Float vregs all get XMM registers; all three are distinct."
+(it-sequential "regalloc-float-vregs-allocated-to-distinct-xmm-registers"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1.0d0)
                              (make-vm-const :dst :r1 :value 2.0d0)
                              (make-vm-float-add :dst :r2 :lhs :r0 :rhs :r1)
@@ -306,37 +292,33 @@
       (let ((p0 (regalloc-lookup result :r0))
             (p1 (regalloc-lookup result :r1))
             (p2 (regalloc-lookup result :r2)))
-        (assert-true (xmm-p p0))
-        (assert-true (xmm-p p1))
-        (assert-true (xmm-p p2))
-        (assert-false (eq p0 p1))))))
+        (expect (xmm-p p0) :to-be-truthy)
+        (expect (xmm-p p1) :to-be-truthy)
+        (expect (xmm-p p2) :to-be-truthy)
+        (expect (eq p0 p1) :to-be-falsy)))))
 
-(deftest regalloc-abi-return-value-prefers-rax
-  "A vreg used only in vm-ret is assigned to the ABI return register :rax."
+(it-sequential "regalloc-abi-return-value-prefers-rax"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 42)
                              (make-vm-ret :reg :r0)))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-eq :rax (regalloc-lookup result :r0))))
+    (expect (regalloc-lookup result :r0) :to-be :rax)))
 
-(deftest regalloc-abi-live-in-params-use-arg-registers
-  "Live-in vregs with no definition are assigned to ABI arg registers :rdi and :rsi."
+(it-sequential "regalloc-abi-live-in-params-use-arg-registers"
   (let* ((instructions (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                              (make-vm-halt :reg :r2)))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-eq :rdi (regalloc-lookup result :r0))
-    (assert-eq :rsi (regalloc-lookup result :r1))))
+    (expect (regalloc-lookup result :r0) :to-be :rdi)
+    (expect (regalloc-lookup result :r1) :to-be :rsi)))
 
-(deftest regalloc-abi-dead-arg-register-is-recycled
-  "An arg register (:rsi) released after its last use is reused for a later vreg."
+(it-sequential "regalloc-abi-dead-arg-register-is-recycled"
   (let* ((instructions (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                              (make-vm-const :dst :r3 :value 7)
                              (make-vm-halt :reg :r3)))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-eq :rsi (regalloc-lookup result :r1))
-    (assert-eq :rsi (regalloc-lookup result :r3))))
+    (expect (regalloc-lookup result :r1) :to-be :rsi)
+    (expect (regalloc-lookup result :r3) :to-be :rsi)))
 
-(deftest regalloc-spill-live-across-call-prefers-callee-saved
-  "A value live across a vm-call is assigned to a callee-saved register."
+(it-sequential "regalloc-spill-live-across-call-prefers-callee-saved"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-call :dst :r2 :func :r3 :args '(:r4))
                              (make-vm-add :dst :r5 :lhs :r0 :rhs :r2)
@@ -344,24 +326,22 @@
          (intervals (compute-live-intervals instructions))
          (r0-int (find :r0 intervals :key #'cl-cc:interval-vreg))
          (result (allocate-registers instructions *x86-64-target*)))
-    (assert-true (cl-cc/regalloc::interval-crosses-call-p r0-int))
-    (assert-true (member (regalloc-lookup result :r0)
+    (expect (cl-cc/regalloc::interval-crosses-call-p r0-int) :to-be-truthy)
+    (expect (member (regalloc-lookup result :r0)
                          (cl-cc/target:target-callee-saved *x86-64-target*)
-                         :test #'eq))))
+                         :test #'eq) :to-be-truthy)))
 
-(deftest regalloc-interprocedural-policy-caller-saved-respects-call-crossing-safety
-  "Caller-saved preference does not override call-crossing safety constraints."
+(it-sequential "regalloc-interprocedural-policy-caller-saved-respects-call-crossing-safety"
   (let* ((interval (make-live-interval :vreg :r0 :start 0 :end 10 :crosses-call-p t))
          (free-regs (copy-list (cl-cc/target:target-caller-saved *x86-64-target*)))
          (cl-cc/regalloc::*current-allocation-policy*
            (list :prefer-callee-saved-p nil :prefer-caller-saved-p t)))
-    (assert-null (cl-cc/regalloc::%hint-policy-preferred-reg
+    (expect (cl-cc/regalloc::%hint-policy-preferred-reg
                   interval
                   *x86-64-target*
-                  free-regs))))
+                  free-regs) :to-be-null)))
 
-(deftest regalloc-interprocedural-policy-end-to-end-keeps-call-crossing-safe
-  "Hint-derived caller preference still keeps call-crossing values on callee-safe paths."
+(it-sequential "regalloc-interprocedural-policy-end-to-end-keeps-call-crossing-safe"
   (let* ((instructions (list (make-vm-label :name 'main)
                              (make-vm-const :dst :r0 :value 1)
                              (make-vm-call :dst :r2 :func :leaf :args '(:r4))
@@ -373,12 +353,11 @@
          (hints (cl-cc/regalloc::regalloc-compute-interprocedural-hints instructions))
          (policy (cl-cc/regalloc::regalloc-build-allocation-policy-from-hints hints 'main))
          (result (allocate-registers instructions *x86-64-target* nil policy)))
-    (assert-true (member (regalloc-lookup result :r0)
+    (expect (member (regalloc-lookup result :r0)
                          (cl-cc/target:target-callee-saved *x86-64-target*)
-                         :test #'eq))))
+                         :test #'eq) :to-be-truthy)))
 
-(deftest regalloc-interprocedural-policy-prefers-callee-saved-on-call-crossing
-  "Hint-derived policy can explicitly keep call-crossing values on callee-saved regs."
+(it-sequential "regalloc-interprocedural-policy-prefers-callee-saved-on-call-crossing"
   (let* ((instructions (list (make-vm-const :dst :r0 :value 1)
                              (make-vm-call :dst :r2 :func :r3 :args '(:r4))
                              (make-vm-add :dst :r5 :lhs :r0 :rhs :r2)
@@ -386,12 +365,11 @@
          (policy (list :prefer-callee-saved-p t
                        :prefer-caller-saved-p nil))
          (result (allocate-registers instructions *x86-64-target* nil policy)))
-    (assert-true (member (regalloc-lookup result :r0)
+    (expect (member (regalloc-lookup result :r0)
                          (cl-cc/target:target-callee-saved *x86-64-target*)
-                         :test #'eq))))
+                         :test #'eq) :to-be-truthy)))
 
-(deftest regalloc-spill-pressure-exceeds-pool-causes-spills
-  "When more vregs than physical registers exist, at least some are spilled."
+(it-sequential "regalloc-spill-pressure-exceeds-pool-causes-spills"
   (let* ((cc (cl-cc/target:make-target-desc
               :name :x86-64
               :gpr-names #(:rdi :rsi :r11)
@@ -409,12 +387,11 @@
                              (make-vm-move :dst :r7 :src :r1)
                              (make-vm-halt :reg :r0)))
          (result (allocate-registers instructions cc)))
-    (assert-false (null (regalloc-lookup result :r0)))
-    (assert-false (null (gethash :r1 (cl-cc:regalloc-spill-map result))))
-    (assert-= 2 (cl-cc:regalloc-spill-count result))))
+    (expect (null (regalloc-lookup result :r0)) :to-be-falsy)
+    (expect (null (gethash :r1 (cl-cc:regalloc-spill-map result))) :to-be-falsy)
+    (expect (= 2 (cl-cc:regalloc-spill-count result)) :to-be-truthy)))
 
-(deftest regalloc-spill-rewrite-two-spilled-srcs-use-distinct-scratch-regs
-  "Two spilled srcs in vm-add get distinct scratch register loads."
+(it-sequential "regalloc-spill-rewrite-two-spilled-srcs-use-distinct-scratch-regs"
   (let* ((assignment (make-hash-table :test #'eq))
          (spill-map (make-hash-table :test #'eq))
          (inst (make-vm-add :dst :r3 :lhs :r1 :rhs :r2)))
@@ -424,12 +401,11 @@
     (let* ((out (cl-cc/regalloc::insert-spill-code (list inst) assignment spill-map *x86-64-target*))
            (loads (remove-if-not #'cl-cc/regalloc::vm-spill-load-p out))
            (rewritten (find-if #'cl-cc:vm-add-p out)))
-      (assert-equal 2 (length loads))
-      (assert-false (eq (cl-cc/regalloc::vm-spill-dst (first loads)) (cl-cc/regalloc::vm-spill-dst (second loads))))
-      (assert-false (eq (vm-lhs rewritten) (vm-rhs rewritten))))))
+      (expect (length loads) :to-equal 2)
+      (expect (eq (cl-cc/regalloc::vm-spill-dst (first loads)) (cl-cc/regalloc::vm-spill-dst (second loads))) :to-be-falsy)
+      (expect (eq (vm-lhs rewritten) (vm-rhs rewritten)) :to-be-falsy))))
 
-(deftest regalloc-spill-rewrite-mul-high-avoids-internal-r11-scratch
-  "Spilled vm-integer-mul-high-u operands never rewrite to the emitter's internal R11 scratch."
+(it-sequential "regalloc-spill-rewrite-mul-high-avoids-internal-r11-scratch"
   (let* ((assignment (make-hash-table :test #'eq))
          (spill-map (make-hash-table :test #'eq))
          (inst (cl-cc:make-vm-integer-mul-high-u :dst :r3 :lhs :r1 :rhs :r2)))
@@ -440,14 +416,13 @@
            (rewritten (find-if (lambda (item)
                                  (typep item 'cl-cc/vm::vm-integer-mul-high-u))
                                out)))
-      (assert-false (null rewritten))
-      (assert-false (eq (vm-lhs rewritten) :r11))
-      (assert-false (eq (vm-rhs rewritten) :r11))
-      (assert-false (eq (vm-dst rewritten) :r11))
-      (assert-false (eq (vm-lhs rewritten) (vm-rhs rewritten))))))
+      (expect (null rewritten) :to-be-falsy)
+      (expect (eq (vm-lhs rewritten) :r11) :to-be-falsy)
+      (expect (eq (vm-rhs rewritten) :r11) :to-be-falsy)
+      (expect (eq (vm-dst rewritten) :r11) :to-be-falsy)
+      (expect (eq (vm-lhs rewritten) (vm-rhs rewritten)) :to-be-falsy))))
 
-(deftest regalloc-spill-rewrite-spilled-src-and-dst-use-separate-scratch
-  "In a spilled vm-move, load scratch and store scratch are different; rewritten src/dst wired correctly."
+(it-sequential "regalloc-spill-rewrite-spilled-src-and-dst-use-separate-scratch"
   (let* ((assignment (make-hash-table :test #'eq))
          (spill-map (make-hash-table :test #'eq))
          (inst (make-vm-move :dst :r2 :src :r1)))
@@ -457,14 +432,13 @@
            (load (find-if #'cl-cc/regalloc::vm-spill-load-p out))
            (store (find-if #'cl-cc/regalloc::vm-spill-store-p out))
            (rewritten (find-if #'cl-cc:vm-move-p out)))
-      (assert-false (null load))
-      (assert-false (null store))
-      (assert-false (eq (cl-cc/regalloc::vm-spill-dst load) (cl-cc/regalloc::vm-spill-src store)))
-      (assert-eq (vm-src rewritten) (cl-cc/regalloc::vm-spill-dst load))
-      (assert-eq (vm-dst rewritten) (cl-cc/regalloc::vm-spill-src store)))))
+      (expect (null load) :to-be-falsy)
+      (expect (null store) :to-be-falsy)
+      (expect (eq (cl-cc/regalloc::vm-spill-dst load) (cl-cc/regalloc::vm-spill-src store)) :to-be-falsy)
+      (expect (cl-cc/regalloc::vm-spill-dst load) :to-be (vm-src rewritten))
+      (expect (cl-cc/regalloc::vm-spill-src store) :to-be (vm-dst rewritten)))))
 
-(deftest regalloc-integration-rematerializes-spilled-constant-as-vm-const
-  "A rematerializable spilled vreg gets a vm-const instead of a spill-load for that vreg."
+(it-sequential "regalloc-integration-rematerializes-spilled-constant-as-vm-const"
   (let* ((assignment (make-hash-table :test #'eq))
          (spill-map (make-hash-table :test #'eq))
          (remat-map (make-hash-table :test #'eq))
@@ -476,86 +450,78 @@
     (let* ((out (cl-cc/regalloc::insert-spill-code (list inst) assignment spill-map *x86-64-target* remat-map))
            (const-inst (find-if #'cl-cc:vm-const-p out))
            (load-inst (find-if #'cl-cc/regalloc::vm-spill-load-p out)))
-      (assert-false (null const-inst))
-      (assert-equal 42 (cl-cc:vm-value const-inst))
-      (assert-false (null load-inst))
-      (assert-false (eq (cl-cc:vm-dst const-inst) (cl-cc/regalloc::vm-spill-dst load-inst))))))
+      (expect (null const-inst) :to-be-falsy)
+      (expect (cl-cc:vm-value const-inst) :to-equal 42)
+      (expect (null load-inst) :to-be-falsy)
+      (expect (eq (cl-cc:vm-dst const-inst) (cl-cc/regalloc::vm-spill-dst load-inst)) :to-be-falsy))))
 
-(deftest regalloc-integration-compile-and-allocate-produces-zero-spills
-  "compile-expression + allocate-registers on (+ 1 2): 0 spills; all vregs assigned."
+(it-sequential "regalloc-integration-compile-and-allocate-produces-zero-spills"
   (let* ((result (compile-expression '(+ 1 2) :target :vm))
          (program (compilation-result-program result))
          (instructions (vm-program-instructions program))
          (alloc (allocate-registers instructions *x86-64-target*)))
-    (assert-= 0 (regalloc-spill-count alloc))
+    (expect (= 0 (regalloc-spill-count alloc)) :to-be-truthy)
     (let ((all-vregs nil))
       (dolist (inst instructions)
         (dolist (v (instruction-defs inst)) (when v (pushnew v all-vregs)))
         (dolist (v (instruction-uses inst)) (when v (pushnew v all-vregs))))
       (dolist (vreg all-vregs)
-        (assert-false (null (regalloc-lookup alloc vreg)))))))
+        (expect (null (regalloc-lookup alloc vreg)) :to-be-falsy)))))
 
 ;;; ─── lsa-state struct + helpers ────────────────────────────────────────────────
 
-(deftest lsa-state-initial-values-are-empty
-  "Freshly created lsa-state has empty assignment/spill-map, zero spill-count, nil active, correct pools."
+(it-sequential "lsa-state-initial-values-are-empty"
   (let ((s (cl-cc/regalloc::make-lsa-state :free-regs '(:rax :rbx) :free-fp-regs '(:xmm0))))
-    (assert-= 0 (hash-table-count (cl-cc/regalloc::lsa-assignment s)))
-    (assert-= 0 (hash-table-count (cl-cc/regalloc::lsa-spill-map s)))
-    (assert-= 0 (cl-cc/regalloc::lsa-spill-count s))
-    (assert-null (cl-cc/regalloc::lsa-active s))
-    (assert-equal '(:rax :rbx) (cl-cc/regalloc::lsa-free-regs s))
-    (assert-equal '(:xmm0) (cl-cc/regalloc::lsa-free-fp-regs s))))
+    (expect (= 0 (hash-table-count (cl-cc/regalloc::lsa-assignment s))) :to-be-truthy)
+    (expect (= 0 (hash-table-count (cl-cc/regalloc::lsa-spill-map s))) :to-be-truthy)
+    (expect (= 0 (cl-cc/regalloc::lsa-spill-count s)) :to-be-truthy)
+    (expect (cl-cc/regalloc::lsa-active s) :to-be-null)
+    (expect (cl-cc/regalloc::lsa-free-regs s) :to-equal '(:rax :rbx))
+    (expect (cl-cc/regalloc::lsa-free-fp-regs s) :to-equal '(:xmm0))))
 
-(deftest lsa-state-pool-selection-and-mutation
-  "%lsa-interval-pool selects gpr vs fp pool; %lsa-set-interval-pool mutates only the correct pool."
+(it-sequential "lsa-state-pool-selection-and-mutation"
   (let ((s     (cl-cc/regalloc::make-lsa-state :free-regs '(:rax) :free-fp-regs '(:xmm0)))
         (i-gpr (cl-cc/regalloc::make-live-interval :vreg :r0))
         (i-fp  (cl-cc/regalloc::make-live-interval :vreg :r1 :fp-p t)))
-    (assert-equal '(:rax)  (cl-cc/regalloc::%lsa-interval-pool s i-gpr))
-    (assert-equal '(:xmm0) (cl-cc/regalloc::%lsa-interval-pool s i-fp))
+    (expect (cl-cc/regalloc::%lsa-interval-pool s i-gpr) :to-equal '(:rax))
+    (expect (cl-cc/regalloc::%lsa-interval-pool s i-fp) :to-equal '(:xmm0))
     (cl-cc/regalloc::%lsa-set-interval-pool s i-gpr '(:rcx))
-    (assert-equal '(:rcx)  (cl-cc/regalloc::lsa-free-regs s))
-    (assert-equal '(:xmm0) (cl-cc/regalloc::lsa-free-fp-regs s))
+    (expect (cl-cc/regalloc::lsa-free-regs s) :to-equal '(:rcx))
+    (expect (cl-cc/regalloc::lsa-free-fp-regs s) :to-equal '(:xmm0))
     (cl-cc/regalloc::%lsa-set-interval-pool s i-fp '(:xmm1))
-    (assert-equal '(:xmm1) (cl-cc/regalloc::lsa-free-fp-regs s))))
+    (expect (cl-cc/regalloc::lsa-free-fp-regs s) :to-equal '(:xmm1))))
 
-(deftest lsa-state-spill-current-increments-count-and-records-slot
-  "%lsa-spill-current increments spill-count and records the slot in the spill-map."
+(it-sequential "lsa-state-spill-current-increments-count-and-records-slot"
   (let ((s   (cl-cc/regalloc::make-lsa-state))
         (int (cl-cc/regalloc::make-live-interval :vreg :r5)))
     (cl-cc/regalloc::%lsa-spill-current s int)
-    (assert-= 1 (cl-cc/regalloc::lsa-spill-count s))
-    (assert-= 1 (gethash :r5 (cl-cc/regalloc::lsa-spill-map s)))))
+    (expect (= 1 (cl-cc/regalloc::lsa-spill-count s)) :to-be-truthy)
+    (expect (= 1 (gethash :r5 (cl-cc/regalloc::lsa-spill-map s))) :to-be-truthy)))
 
-(deftest lsa-state-expire-old-removes-finished-intervals
-  "%lsa-expire-old removes expired intervals from active and returns their physical regs."
+(it-sequential "lsa-state-expire-old-removes-finished-intervals"
   (let ((s    (cl-cc/regalloc::make-lsa-state :free-regs '()))
         (done (cl-cc/regalloc::make-live-interval :vreg :r0 :start 0 :end 2 :phys-reg :rax))
         (live (cl-cc/regalloc::make-live-interval :vreg :r1 :start 0 :end 5 :phys-reg :rbx))
         (cur  (cl-cc/regalloc::make-live-interval :vreg :r2 :start 3 :end 8)))
     (setf (cl-cc/regalloc::lsa-active s) (list done live))
     (cl-cc/regalloc::%lsa-expire-old s cur)
-    (assert-false (member done (cl-cc/regalloc::lsa-active s)))
-    (assert-true  (member live (cl-cc/regalloc::lsa-active s)))
-    (assert-equal '(:rax) (cl-cc/regalloc::lsa-free-regs s))))
+    (expect (member done (cl-cc/regalloc::lsa-active s)) :to-be-falsy)
+    (expect (member live (cl-cc/regalloc::lsa-active s)) :to-be-truthy)
+    (expect (cl-cc/regalloc::lsa-free-regs s) :to-equal '(:rax))))
 
-(deftest lsa-state-best-spill-candidate-returns-live-interval
-  "%lsa-best-spill-candidate returns a live-interval from the active set."
+(it-sequential "lsa-state-best-spill-candidate-returns-live-interval"
   (let* ((cur   (cl-cc/regalloc::make-live-interval :vreg :r2 :start 3 :end 10))
          (near  (cl-cc/regalloc::make-live-interval :vreg :r0 :start 0 :end 8
                                                 :use-positions '(4) :phys-reg :rax))
          (far   (cl-cc/regalloc::make-live-interval :vreg :r1 :start 0 :end 12
                                                 :use-positions '(9) :phys-reg :rbx))
          (s     (cl-cc/regalloc::make-lsa-state :active (list near far))))
-    (assert-type cl-cc/regalloc::live-interval
-                 (cl-cc/regalloc::%lsa-best-spill-candidate s cur))))
+    (expect (typep (cl-cc/regalloc::%lsa-best-spill-candidate s cur) 'cl-cc/regalloc::live-interval) :to-be-truthy)))
 
-(deftest lsa-state-best-spill-candidate-returns-current-when-active-empty
-  "%lsa-best-spill-candidate returns the current interval when active list is empty."
+(it-sequential "lsa-state-best-spill-candidate-returns-current-when-active-empty"
   (let* ((cur (cl-cc/regalloc::make-live-interval :vreg :r0 :start 5 :end 10))
          (s   (cl-cc/regalloc::make-lsa-state :active nil)))
-    (assert-eq cur (cl-cc/regalloc::%lsa-best-spill-candidate s cur))))
+    (expect (cl-cc/regalloc::%lsa-best-spill-candidate s cur) :to-be cur)))
 
 ;;; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ;;; Graph-coloring allocation (regalloc-color.lisp, FR-061 / FR-199)
@@ -577,142 +543,163 @@
 
 ;;; ─── %intervals-overlap-p ──────────────────────────────────────────────
 
-(deftest-each color-intervals-overlap-p
-  "%intervals-overlap-p treats shared or touching ranges as interference and disjoint ranges as clear."
-  :cases (("exact"        0 10 0 10  t)
-          ("partial"      0  8 5 12  t)
-          ("contained"    0 20 5 10  t)
-          ("touching-end" 0 10 10 20 t)
-          ("disjoint"     0  5 6 10  nil))
-  (sa ea sb eb expected)
-  (assert-bool expected
+(it-sequential "color-intervals-overlap-p exact"
+  (destructuring-bind (sa ea sb eb expected) (list 0 10 0 10 t)
+    (assert-bool expected
                (cl-cc/regalloc::%intervals-overlap-p (%rc-interval :a sa ea)
-                                                     (%rc-interval :b sb eb))))
+                                                     (%rc-interval :b sb eb)))))
+
+(it-sequential "color-intervals-overlap-p partial"
+  (destructuring-bind (sa ea sb eb expected) (list 0 8 5 12 t)
+    (assert-bool expected
+               (cl-cc/regalloc::%intervals-overlap-p (%rc-interval :a sa ea)
+                                                     (%rc-interval :b sb eb)))))
+
+(it-sequential "color-intervals-overlap-p contained"
+  (destructuring-bind (sa ea sb eb expected) (list 0 20 5 10 t)
+    (assert-bool expected
+               (cl-cc/regalloc::%intervals-overlap-p (%rc-interval :a sa ea)
+                                                     (%rc-interval :b sb eb)))))
+
+(it-sequential "color-intervals-overlap-p touching-end"
+  (destructuring-bind (sa ea sb eb expected) (list 0 10 10 20 t)
+    (assert-bool expected
+               (cl-cc/regalloc::%intervals-overlap-p (%rc-interval :a sa ea)
+                                                     (%rc-interval :b sb eb)))))
+
+(it-sequential "color-intervals-overlap-p disjoint"
+  (destructuring-bind (sa ea sb eb expected) (list 0 5 6 10 nil)
+    (assert-bool expected
+               (cl-cc/regalloc::%intervals-overlap-p (%rc-interval :a sa ea)
+                                                     (%rc-interval :b sb eb)))))
 
 ;;; ─── %color-build-interference-graph ───────────────────────────────────
 
-(deftest color-build-graph-overlap-adds-mutual-edges
-  "Overlapping intervals become each other's neighbors in the interference graph."
+(it-sequential "color-build-graph-overlap-adds-mutual-edges"
   (let ((g (cl-cc/regalloc::%color-build-interference-graph
             (list (%rc-interval :a 0 10) (%rc-interval :b 5 15)))))
-    (assert-true (member :b (gethash :a g)))
-    (assert-true (member :a (gethash :b g)))))
+    (expect (member :b (gethash :a g)) :to-be-truthy)
+    (expect (member :a (gethash :b g)) :to-be-truthy)))
 
-(deftest color-build-graph-disjoint-has-no-edges
-  "Disjoint intervals share no interference edges."
+(it-sequential "color-build-graph-disjoint-has-no-edges"
   (let ((g (cl-cc/regalloc::%color-build-interference-graph
             (list (%rc-interval :a 0 5) (%rc-interval :b 6 10)))))
-    (assert-null (gethash :a g))
-    (assert-null (gethash :b g))))
+    (expect (gethash :a g) :to-be-null)
+    (expect (gethash :b g) :to-be-null)))
 
-(deftest color-build-graph-skips-nil-vreg
-  "Intervals with a nil vreg are excluded from the interference graph."
+(it-sequential "color-build-graph-skips-nil-vreg"
   (let ((g (cl-cc/regalloc::%color-build-interference-graph
             (list (%rc-interval nil 0 10) (%rc-interval :b 0 10)))))
-    (assert-= 1 (hash-table-count g))
-    (assert-null (gethash nil g))))
+    (expect (= 1 (hash-table-count g)) :to-be-truthy)
+    (expect (gethash nil g) :to-be-null)))
 
 ;;; ─── %color-simplify ───────────────────────────────────────────────────
 
-(deftest color-simplify-no-spill-when-k-sufficient
-  "With k colors >= register pressure, no node is marked as a potential spill."
+(it-sequential "color-simplify-no-spill-when-k-sufficient"
   (let* ((a (%rc-interval :a 0 10))
          (b (%rc-interval :b 5 15))
          (g (cl-cc/regalloc::%color-build-interference-graph (list a b)))
          (imap (cl-cc/regalloc::%interval-map (list a b)))
          (stack (cl-cc/regalloc::%color-simplify g imap 2)))
-    (assert-= 2 (length stack))
-    (assert-true (every (lambda (e) (not (cdr e))) stack))))
+    (expect (= 2 (length stack)) :to-be-truthy)
+    (expect (every (lambda (e) (not (cdr e))) stack) :to-be-truthy)))
 
-(deftest color-simplify-marks-spill-under-pressure
-  "Three mutually interfering intervals with only k=2 colors force a spill mark."
+(it-sequential "color-simplify-marks-spill-under-pressure"
   (let* ((a (%rc-interval :a 0 20 :use-positions '(0 5 10 15)))
          (b (%rc-interval :b 0 20 :use-positions '(1 6 11 16)))
          (c (%rc-interval :c 0 20 :use-positions '(2)))
          (g (cl-cc/regalloc::%color-build-interference-graph (list a b c)))
          (imap (cl-cc/regalloc::%interval-map (list a b c)))
          (stack (cl-cc/regalloc::%color-simplify g imap 2)))
-    (assert-= 3 (length stack))
-    (assert-true (some #'cdr stack))))
+    (expect (= 3 (length stack)) :to-be-truthy)
+    (expect (some #'cdr stack) :to-be-truthy)))
 
 ;;; ─── %color-spill-priority / %color-spill-candidate ────────────────────
 
-(deftest-each color-spill-priority-ml-disabled
-  "%color-spill-priority scores uses/length plus call-cross and return-value bonuses when ML costing is off."
-  :cases (("uses-over-length" 0 10 '(1 2 3 4 5) nil nil 1/2)
-          ("call-cross-bonus" 0 10 '(1)         t   nil 11/10)
-          ("return-bonus"     0 10 '(1)         nil t   11/10)
-          ("length-clamp"     5  5 '(5)         nil nil 1))
-  (start end uses call ret expected)
-  (let ((cl-cc/regalloc::*ml-regalloc-enabled* nil))
-    (assert-= expected
-              (cl-cc/regalloc::%color-spill-priority
+(it-sequential "color-spill-priority-ml-disabled uses-over-length"
+  (destructuring-bind (start end uses call ret expected) (list 0 10 '(1 2 3 4 5) nil nil 1/2)
+    (let ((cl-cc/regalloc::*ml-regalloc-enabled* nil))
+    (expect (= expected (cl-cc/regalloc::%color-spill-priority
                (%rc-interval :v start end :use-positions uses
-                             :crosses-call-p call :return-value-p ret)))))
+                             :crosses-call-p call :return-value-p ret))) :to-be-truthy))))
 
-(deftest color-spill-candidate-picks-lowest-priority
-  "%color-spill-candidate evicts the cheapest (lowest-priority) interval."
+(it-sequential "color-spill-priority-ml-disabled call-cross-bonus"
+  (destructuring-bind (start end uses call ret expected) (list 0 10 '(1) t nil 11/10)
+    (let ((cl-cc/regalloc::*ml-regalloc-enabled* nil))
+    (expect (= expected (cl-cc/regalloc::%color-spill-priority
+               (%rc-interval :v start end :use-positions uses
+                             :crosses-call-p call :return-value-p ret))) :to-be-truthy))))
+
+(it-sequential "color-spill-priority-ml-disabled return-bonus"
+  (destructuring-bind (start end uses call ret expected) (list 0 10 '(1) nil t 11/10)
+    (let ((cl-cc/regalloc::*ml-regalloc-enabled* nil))
+    (expect (= expected (cl-cc/regalloc::%color-spill-priority
+               (%rc-interval :v start end :use-positions uses
+                             :crosses-call-p call :return-value-p ret))) :to-be-truthy))))
+
+(it-sequential "color-spill-priority-ml-disabled length-clamp"
+  (destructuring-bind (start end uses call ret expected) (list 5 5 '(5) nil nil 1)
+    (let ((cl-cc/regalloc::*ml-regalloc-enabled* nil))
+    (expect (= expected (cl-cc/regalloc::%color-spill-priority
+               (%rc-interval :v start end :use-positions uses
+                             :crosses-call-p call :return-value-p ret))) :to-be-truthy))))
+
+(it-sequential "color-spill-candidate-picks-lowest-priority"
   (let* ((cl-cc/regalloc::*ml-regalloc-enabled* nil)
          (low  (%rc-interval :low  0 20 :use-positions '(1)))
          (high (%rc-interval :high 0 10 :use-positions '(0 1 2 3 4 5 6 7 8 9 10)))
          (g (cl-cc/regalloc::%color-build-interference-graph (list low high)))
          (imap (cl-cc/regalloc::%interval-map (list low high))))
-    (assert-eq :low (cl-cc/regalloc::%color-spill-candidate g imap))))
+    (expect (cl-cc/regalloc::%color-spill-candidate g imap) :to-be :low)))
 
 ;;; ─── %color-select-register ────────────────────────────────────────────
 
-(deftest color-select-register-avoids-neighbor-colors
-  "%color-select-register returns the first register not used by a colored neighbor."
+(it-sequential "color-select-register-avoids-neighbor-colors"
   (let* ((a (%rc-interval :a 0 10))
          (b (%rc-interval :b 0 10))
          (g (cl-cc/regalloc::%color-build-interference-graph (list a b)))
          (assign (make-hash-table :test #'eq)))
     (setf (gethash :b assign) :r0)
-    (assert-eq :r1 (cl-cc/regalloc::%color-select-register :a g assign '(:r0 :r1)))))
+    (expect (cl-cc/regalloc::%color-select-register :a g assign '(:r0 :r1)) :to-be :r1)))
 
-(deftest color-select-register-nil-when-all-conflict
-  "%color-select-register returns nil when every candidate register conflicts with a neighbor."
+(it-sequential "color-select-register-nil-when-all-conflict"
   (let* ((a (%rc-interval :a 0 10))
          (b (%rc-interval :b 0 10))
          (g (cl-cc/regalloc::%color-build-interference-graph (list a b)))
          (assign (make-hash-table :test #'eq)))
     (setf (gethash :b assign) :r0)
-    (assert-null (cl-cc/regalloc::%color-select-register :a g assign '(:r0)))))
+    (expect (cl-cc/regalloc::%color-select-register :a g assign '(:r0)) :to-be-null)))
 
 ;;; ─── color-allocate (public Chaitin-Briggs driver) ─────────────────────
 
-(deftest color-allocate-assigns-when-registers-available
-  "color-allocate assigns a physical register to every interval and spills nothing when k suffices."
+(it-sequential "color-allocate-assigns-when-registers-available"
   (multiple-value-bind (assignment spill-map spill-count)
       (cl-cc/regalloc::color-allocate (list (%rc-interval :a 0 10)
                                             (%rc-interval :b 12 20))
                                       '(:r0 :r1))
-    (assert-true (gethash :a assignment))
-    (assert-true (gethash :b assignment))
-    (assert-= 0 (hash-table-count spill-map))
-    (assert-= 0 spill-count)))
+    (expect (gethash :a assignment) :to-be-truthy)
+    (expect (gethash :b assignment) :to-be-truthy)
+    (expect (= 0 (hash-table-count spill-map)) :to-be-truthy)
+    (expect (= 0 spill-count) :to-be-truthy)))
 
-(deftest color-allocate-spills-when-k-exceeded
-  "color-allocate spills exactly one interval when three mutually interfering vregs exceed two registers."
+(it-sequential "color-allocate-spills-when-k-exceeded"
   (multiple-value-bind (assignment spill-map spill-count)
       (cl-cc/regalloc::color-allocate (list (%rc-interval :a 0 20)
                                             (%rc-interval :b 0 20)
                                             (%rc-interval :c 0 20))
                                       '(:r0 :r1))
     (declare (ignore assignment))
-    (assert-= 1 (hash-table-count spill-map))
-    (assert-true (>= spill-count 1))))
+    (expect (= 1 (hash-table-count spill-map)) :to-be-truthy)
+    (expect (>= spill-count 1) :to-be-truthy)))
 
-(deftest color-allocate-empty-intervals
-  "color-allocate returns empty maps and zero spill count for an empty interval list."
+(it-sequential "color-allocate-empty-intervals"
   (multiple-value-bind (assignment spill-map spill-count)
       (cl-cc/regalloc::color-allocate '() '(:r0 :r1))
-    (assert-= 0 (hash-table-count assignment))
-    (assert-= 0 (hash-table-count spill-map))
-    (assert-= 0 spill-count)))
+    (expect (= 0 (hash-table-count assignment)) :to-be-truthy)
+    (expect (= 0 (hash-table-count spill-map)) :to-be-truthy)
+    (expect (= 0 spill-count) :to-be-truthy)))
 
-(deftest color-allocate-for-target-separates-gpr-and-fp
-  "color-allocate-for-target colors GPR and FP intervals in their own register classes without spilling."
+(it-sequential "color-allocate-for-target-separates-gpr-and-fp"
   (let* ((gpr (%rc-interval :gpr 0 10 :fp-p nil))
          (fp  (%rc-interval :fpr 0 10 :fp-p t))
          (cc  (cl-cc/target::make-target-desc
@@ -726,45 +713,40 @@
                :scratch-regs nil)))
     (multiple-value-bind (assignment spill-map spill-count)
         (cl-cc/regalloc::color-allocate-for-target (list gpr fp) cc)
-      (assert-true (gethash :gpr assignment))
-      (assert-true (gethash :fpr assignment))
-      (assert-= 0 (hash-table-count spill-map))
-      (assert-= 0 spill-count))))
+      (expect (gethash :gpr assignment) :to-be-truthy)
+      (expect (gethash :fpr assignment) :to-be-truthy)
+      (expect (= 0 (hash-table-count spill-map)) :to-be-truthy)
+      (expect (= 0 spill-count) :to-be-truthy))))
 
 ;;; ─── stack-slot sharing (color-spill-slots / regalloc-color-spill-slots) ─
 
-(deftest color-spill-slots-non-overlapping-share-slot
-  "color-spill-slots collapses two non-overlapping spilled intervals onto one shared stack slot."
+(it-sequential "color-spill-slots-non-overlapping-share-slot"
   (let ((m (cl-cc/regalloc::color-spill-slots (list (%rc-interval :a 0 5)
                                                     (%rc-interval :b 6 10))
                                               0)))
-    (assert-= (gethash :a m) (gethash :b m))))
+    (expect (= (gethash :a m) (gethash :b m)) :to-be-truthy)))
 
-(deftest color-spill-slots-overlapping-distinct-slots
-  "color-spill-slots assigns distinct slots to two overlapping spilled intervals."
+(it-sequential "color-spill-slots-overlapping-distinct-slots"
   (let ((m (cl-cc/regalloc::color-spill-slots (list (%rc-interval :a 0 10)
                                                     (%rc-interval :b 5 15))
                                               0)))
-    (assert-true (/= (gethash :a m) (gethash :b m)))))
+    (expect (/= (gethash :a m) (gethash :b m)) :to-be-truthy)))
 
-(deftest color-spill-slots-respects-offset
-  "color-spill-slots keeps every assigned slot above the supplied slot offset."
+(it-sequential "color-spill-slots-respects-offset"
   (let ((m (cl-cc/regalloc::color-spill-slots (list (%rc-interval :a 0 5)) 3)))
-    (assert-true (>= (gethash :a m) 4))))
+    (expect (>= (gethash :a m) 4) :to-be-truthy)))
 
-(deftest regalloc-color-spill-slots-passthrough-when-none-spilled
-  "regalloc-color-spill-slots returns the original spill-map unchanged when no interval is spilled."
+(it-sequential "regalloc-color-spill-slots-passthrough-when-none-spilled"
   (let* ((orig (make-hash-table :test #'eq))
          (result (cl-cc/regalloc::regalloc-color-spill-slots
                   (list (%rc-interval :a 0 10)) orig 0)))
-    (assert-eq orig result)))
+    (expect result :to-be orig)))
 
-(deftest regalloc-color-spill-slots-applies-coloring
-  "regalloc-color-spill-slots shares a slot between non-overlapping spilled vregs present in the spill-map."
+(it-sequential "regalloc-color-spill-slots-applies-coloring"
   (let* ((spill-map (let ((ht (make-hash-table :test #'eq)))
                       (setf (gethash :a ht) 1 (gethash :b ht) 2)
                       ht))
          (result (cl-cc/regalloc::regalloc-color-spill-slots
                   (list (%rc-interval :a 0 5) (%rc-interval :b 6 10))
                   spill-map 0)))
-    (assert-= (gethash :a result) (gethash :b result))))
+    (expect (= (gethash :a result) (gethash :b result)) :to-be-truthy)))

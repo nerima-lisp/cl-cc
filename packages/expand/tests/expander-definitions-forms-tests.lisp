@@ -2,32 +2,25 @@
 
 (in-package :cl-cc/test)
 
-(defsuite expander-definitions-forms-suite
-  :description "Definition-form expander unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite expander-definitions-forms-suite)
 
-(deftest expander-defun-expands-body
-  "defun expansion keeps the definition head and expands the body."
+(it-sequential "expander-defun-expands-body"
   (let ((result (cl-cc/expand:compiler-macroexpand-all '(defun foo (x) (1+ x)))))
-    (assert-eq 'defun (car result))
-    (assert-eq 'foo (second result))))
+    (expect (car result) :to-be 'defun)
+    (expect (second result) :to-be 'foo)))
 
-(deftest expander-lambda-expands-typed-params
-  "lambda expansion dispatches through the typed/untyped helper path."
+(it-sequential "expander-lambda-expands-typed-params"
   (let ((result (format nil "~S"
                         (cl-cc/expand:compiler-macroexpand-all
                          '(lambda ((x integer)) (1+ x))))))
-    (assert-true (search "LAMBDA" result))
-    (assert-true (search "TYPEP" result))))
+    (expect (search "LAMBDA" result) :to-be-truthy)
+    (expect (search "TYPEP" result) :to-be-truthy)))
 
-(deftest expander-defclass-and-deftype-expands
-  "defclass registers slots and deftype returns the quoted type name."
+(it-sequential "expander-defclass-and-deftype-expands"
   (let ((class-result (cl-cc/expand:compiler-macroexpand-all
                        '(defclass sample () ((slot :initform (1+ 2))))))
         (type-result (cl-cc/expand:compiler-macroexpand-all
                       '(deftype sample-type () 'integer))))
-    (assert-eq 'defclass (car class-result))
-    (assert-eq 'quote (car type-result))
-    (assert-eq 'sample-type (second type-result))))
+    (expect (car class-result) :to-be 'defclass)
+    (expect (car type-result) :to-be 'quote)
+    (expect (second type-result) :to-be 'sample-type)))

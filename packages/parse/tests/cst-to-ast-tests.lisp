@@ -5,81 +5,96 @@
 
 (in-package :cl-cc/test)
 
-(defsuite cst-to-ast-suite :description "CST-to-AST lowering unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite cst-to-ast-suite)
 ;;; ─── lower-cst-to-ast ──────────────────────────────────────────────────────
 
-(deftest cst-ast-nil-input
-  "lower-cst-to-ast returns nil for nil input."
-  (assert-null (cl-cc/parse:lower-cst-to-ast nil)))
+(it-sequential "cst-ast-nil-input"
+  (expect (cl-cc/parse:lower-cst-to-ast nil) :to-be-null))
 
-(deftest-each cst-ast-token-types
-  "lower-cst-to-ast converts each CST token kind to the correct AST node type"
-  :cases (("integer" :T-INT    42      "42"    #'cl-cc/ast:ast-int-p)
-          ("symbol"  :T-SYMBOL 'hello  "hello" #'cl-cc/ast:ast-node-p)
-          ("string"  :T-STRING "hi"    "\"hi\"" #'cl-cc/ast:ast-quote-p))
-  (kind value source pred)
-  (let* ((cst (cl-cc/parse::make-cst-token :kind kind :value value
+(it-sequential "cst-ast-token-types integer"
+  (destructuring-bind (kind value source pred) (list :T-INT 42 "42" #'cl-cc/ast:ast-int-p)
+    (let* ((cst (cl-cc/parse::make-cst-token :kind kind :value value
                                      :start-byte 0 :end-byte (length source)))
          (ast (cl-cc/parse:lower-cst-to-ast cst :source source)))
-    (assert-true (cl-cc/ast:ast-node-p ast))
-    (assert-true (funcall pred ast))))
+    (expect (cl-cc/ast:ast-node-p ast) :to-be-truthy)
+    (expect (funcall pred ast) :to-be-truthy))))
 
-(deftest cst-ast-source-file-propagation
-  "lower-cst-to-ast propagates source-file to AST."
+(it-sequential "cst-ast-token-types symbol"
+  (destructuring-bind (kind value source pred) (list :T-SYMBOL 'hello "hello" #'cl-cc/ast:ast-node-p)
+    (let* ((cst (cl-cc/parse::make-cst-token :kind kind :value value
+                                     :start-byte 0 :end-byte (length source)))
+         (ast (cl-cc/parse:lower-cst-to-ast cst :source source)))
+    (expect (cl-cc/ast:ast-node-p ast) :to-be-truthy)
+    (expect (funcall pred ast) :to-be-truthy))))
+
+(it-sequential "cst-ast-token-types string"
+  (destructuring-bind (kind value source pred) (list :T-STRING "hi" "\"hi\"" #'cl-cc/ast:ast-quote-p)
+    (let* ((cst (cl-cc/parse::make-cst-token :kind kind :value value
+                                     :start-byte 0 :end-byte (length source)))
+         (ast (cl-cc/parse:lower-cst-to-ast cst :source source)))
+    (expect (cl-cc/ast:ast-node-p ast) :to-be-truthy)
+    (expect (funcall pred ast) :to-be-truthy))))
+
+(it-sequential "cst-ast-source-file-propagation"
   (let* ((cst (cl-cc/parse::make-cst-token :kind :T-INT :value 1
                                       :start-byte 0 :end-byte 1))
          (ast (cl-cc/parse:lower-cst-to-ast cst :source "1" :source-file "test.lisp")))
-    (assert-true (cl-cc/ast:ast-node-p ast))))
+    (expect (cl-cc/ast:ast-node-p ast) :to-be-truthy)))
 
 ;;; ─── lower-cst-list-to-ast ─────────────────────────────────────────────────
 
-(deftest cst-ast-list-empty
-  "lower-cst-list-to-ast returns empty list for empty input."
-  (assert-null (cl-cc/parse:lower-cst-list-to-ast nil)))
+(it-sequential "cst-ast-list-empty"
+  (expect (cl-cc/parse:lower-cst-list-to-ast nil) :to-be-null))
 
-(deftest cst-ast-list-multiple
-  "lower-cst-list-to-ast converts multiple CST nodes."
+(it-sequential "cst-ast-list-multiple"
   (let* ((cst1 (cl-cc/parse::make-cst-token :kind :T-INT :value 1
                                        :start-byte 0 :end-byte 1))
          (cst2 (cl-cc/parse::make-cst-token :kind :T-INT :value 2
                                        :start-byte 2 :end-byte 3))
          (result (cl-cc/parse:lower-cst-list-to-ast (list cst1 cst2) :source "1 2")))
-    (assert-equal 2 (length result))
-    (assert-true (cl-cc/ast:ast-int-p (first result)))
-    (assert-true (cl-cc/ast:ast-int-p (second result)))))
+    (expect (length result) :to-equal 2)
+    (expect (cl-cc/ast:ast-int-p (first result)) :to-be-truthy)
+    (expect (cl-cc/ast:ast-int-p (second result)) :to-be-truthy)))
 
 ;;; ─── parse-and-lower ────────────────────────────────────────────────────────
 
-(deftest-each cst-ast-parse-and-lower-cases
-  "parse-and-lower converts each source form to a correctly-typed AST list"
-  :cases (("integer"  "42"        1 #'cl-cc/ast:ast-int-p)
-          ("string"   "\"hello\"" 1 #'cl-cc/ast:ast-quote-p)
-          ("multiple" "1 2 3"     3 #'cl-cc/ast:ast-node-p)
-          ("list"     "(+ 1 2)"   1 #'cl-cc/ast:ast-node-p))
-  (source expected-len pred)
-  (let ((result (cl-cc/parse:parse-and-lower source)))
-    (assert-equal expected-len (length result))
-    (assert-true (funcall pred (first result)))))
+(it-sequential "cst-ast-parse-and-lower-cases integer"
+  (destructuring-bind (source expected-len pred) (list "42" 1 #'cl-cc/ast:ast-int-p)
+    (let ((result (cl-cc/parse:parse-and-lower source)))
+    (expect (length result) :to-equal expected-len)
+    (expect (funcall pred (first result)) :to-be-truthy))))
 
-(deftest cst-ast-parse-and-lower-source-file
-  "parse-and-lower accepts optional source-file parameter."
+(it-sequential "cst-ast-parse-and-lower-cases string"
+  (destructuring-bind (source expected-len pred) (list "\"hello\"" 1 #'cl-cc/ast:ast-quote-p)
+    (let ((result (cl-cc/parse:parse-and-lower source)))
+    (expect (length result) :to-equal expected-len)
+    (expect (funcall pred (first result)) :to-be-truthy))))
+
+(it-sequential "cst-ast-parse-and-lower-cases multiple"
+  (destructuring-bind (source expected-len pred) (list "1 2 3" 3 #'cl-cc/ast:ast-node-p)
+    (let ((result (cl-cc/parse:parse-and-lower source)))
+    (expect (length result) :to-equal expected-len)
+    (expect (funcall pred (first result)) :to-be-truthy))))
+
+(it-sequential "cst-ast-parse-and-lower-cases list"
+  (destructuring-bind (source expected-len pred) (list "(+ 1 2)" 1 #'cl-cc/ast:ast-node-p)
+    (let ((result (cl-cc/parse:parse-and-lower source)))
+    (expect (length result) :to-equal expected-len)
+    (expect (funcall pred (first result)) :to-be-truthy))))
+
+(it-sequential "cst-ast-parse-and-lower-source-file"
   (let ((result (cl-cc/parse:parse-and-lower "42" "test.lisp")))
-    (assert-equal 1 (length result))))
+    (expect (length result) :to-equal 1)))
 
 ;;; ─── parse-and-lower-one ────────────────────────────────────────────────────
 
-(deftest cst-ast-parse-and-lower-one
-  "parse-and-lower-one returns a single AST node for atomic and list forms"
+(it-sequential "cst-ast-parse-and-lower-one"
   (let ((ast (cl-cc/parse:parse-and-lower-one "42")))
-    (assert-true (cl-cc/ast:ast-int-p ast))
-    (assert-equal 42 (cl-cc/ast:ast-int-value ast)))
+    (expect (cl-cc/ast:ast-int-p ast) :to-be-truthy)
+    (expect (cl-cc/ast:ast-int-value ast) :to-equal 42))
   (let ((ast (cl-cc/parse:parse-and-lower-one "(if t 1 2)")))
-    (assert-true (cl-cc/ast:ast-node-p ast))))
+    (expect (cl-cc/ast:ast-node-p ast) :to-be-truthy)))
 
-(deftest cst-ast-parse-and-lower-one-empty-error
-  "parse-and-lower-one errors on empty source."
-  (assert-signals error (cl-cc/parse:parse-and-lower-one "")))
+(it-sequential "cst-ast-parse-and-lower-one-empty-error"
+  (signals error (cl-cc/parse:parse-and-lower-one "")))

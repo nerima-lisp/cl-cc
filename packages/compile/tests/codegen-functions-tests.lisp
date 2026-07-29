@@ -6,10 +6,6 @@
 ;; paths that consult process-global compiler state during compilation. They
 ;; pass reliably in isolation but have shown parallel-only flakes in the full
 ;; suite, so keep this file on a dedicated serial child suite.
-(defsuite cl-cc-codegen-functions-serial-suite
-  :description "Serial codegen function tests"
-  :parent cl-cc-unit-suite
-  :parallel nil)
 
 (defbefore :each (cl-cc-codegen-functions-serial-suite)
   (setf cl-cc/compile:*labels-boxed-fns* nil
@@ -17,48 +13,70 @@
   (clrhash cl-cc/expand:*function-type-registry*)
   (clrhash cl-cc/expand:*declaim-inline-registry*))
 
-(in-suite cl-cc-codegen-functions-serial-suite)
 
-(deftest codegen-function-ref-returns-register
-  "Compiling #'fn returns a register."
+(it-sequential "codegen-function-ref-returns-register"
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (make-ast-function :name 'car) ctx)))
-    (assert-true (keywordp reg))))
+    (expect (keywordp reg) :to-be-truthy)))
 
-(deftest-each codegen-closure-form-emits-vm-closure
-  "Captured closure-creating forms emit vm-closure; non-capturing defun/lambda use vm-func-ref.
-NOTE: flet is omitted because the noescape-closure optimizer inlines
-flet-bound functions even when #'f is used in the body — the optimizer's
-escape analysis treats (function f) as a direct reference to the known
-in-scope binding rather than a true escape. Forcing vm-closure emission
-from flet would require disabling the optimization specifically for this
-test, which isn't worth the test-quality tradeoff."
-  :cases (("defun"  :func-ref (cl-cc/ast:make-ast-defun
+(it-sequential "codegen-closure-form-emits-vm-closure defun"
+  (destructuring-bind (expected ast) (list :func-ref (cl-cc/ast:make-ast-defun
                                 :name 'my-fn :params '(x)
                                 :body (list (make-ast-var :name 'x))))
-          ("lambda" :func-ref (make-ast-lambda
-                                :params '(x)
-                                :body (list (make-ast-var :name 'x))))
-          ("capturing-lambda" :closure (make-ast-lambda
-                                         :params '(x)
-                                         :body (list (make-ast-var :name 'y))))
-          ("labels" :closure (cl-cc/ast:make-ast-labels
-                               :bindings (list (list 'g '(x) (make-ast-var :name 'x)))
-                               :body (list (make-ast-call :func 'g
-                                                           :args (list (make-ast-int :value 2)))))))
-  (expected ast)
-  (let ((ctx (make-codegen-ctx)))
+    (let ((ctx (make-codegen-ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'y (cl-cc/compile:make-register ctx))))
     (compile-ast ast ctx)
     (ecase expected
       (:closure
-       (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-closure)))
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy))
       (:func-ref
-       (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))
-       (assert-null (codegen-find-inst ctx 'cl-cc/vm::vm-closure))))))
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref) :to-be-truthy)
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null))))))
 
-(deftest codegen-labels-gensym-binding-name-compiles
-  "Labels binding lookup handles compiler-generated function names such as stdlib MAPCAR helpers."
+(it-sequential "codegen-closure-form-emits-vm-closure lambda"
+  (destructuring-bind (expected ast) (list :func-ref (make-ast-lambda
+                                :params '(x)
+                                :body (list (make-ast-var :name 'x))))
+    (let ((ctx (make-codegen-ctx)))
+    (setf (cl-cc/compile:ctx-env ctx) (list (cons 'y (cl-cc/compile:make-register ctx))))
+    (compile-ast ast ctx)
+    (ecase expected
+      (:closure
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy))
+      (:func-ref
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref) :to-be-truthy)
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null))))))
+
+(it-sequential "codegen-closure-form-emits-vm-closure capturing-lambda"
+  (destructuring-bind (expected ast) (list :closure (make-ast-lambda
+                                         :params '(x)
+                                         :body (list (make-ast-var :name 'y))))
+    (let ((ctx (make-codegen-ctx)))
+    (setf (cl-cc/compile:ctx-env ctx) (list (cons 'y (cl-cc/compile:make-register ctx))))
+    (compile-ast ast ctx)
+    (ecase expected
+      (:closure
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy))
+      (:func-ref
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref) :to-be-truthy)
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null))))))
+
+(it-sequential "codegen-closure-form-emits-vm-closure labels"
+  (destructuring-bind (expected ast) (list :closure (cl-cc/ast:make-ast-labels
+                               :bindings (list (list 'g '(x) (make-ast-var :name 'x)))
+                               :body (list (make-ast-call :func 'g
+                                                           :args (list (make-ast-int :value 2))))))
+    (let ((ctx (make-codegen-ctx)))
+    (setf (cl-cc/compile:ctx-env ctx) (list (cons 'y (cl-cc/compile:make-register ctx))))
+    (compile-ast ast ctx)
+    (ecase expected
+      (:closure
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy))
+      (:func-ref
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref) :to-be-truthy)
+       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null))))))
+
+(it-sequential "codegen-labels-gensym-binding-name-compiles"
   (let* ((name (gensym "MAP"))
          (ctx (make-codegen-ctx))
          (ast (cl-cc/ast:make-ast-labels
@@ -66,35 +84,62 @@ test, which isn't worth the test-quality tradeoff."
                :body (list (make-ast-call :func name
                                            :args (list (make-ast-int :value 2)))))))
     (compile-ast ast ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-closure))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy)))
 
-(deftest codegen-defun-registers-global
-  "Compiling defun registers the function name in global-functions."
+(it-sequential "codegen-defun-registers-global"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc/ast:make-ast-defun :name 'my-fn
                                    :params '(x)
                                    :body (list (make-ast-var :name 'x)))
                   ctx)
-    (assert-true (gethash 'my-fn (cl-cc/compile:ctx-global-functions ctx)))))
+    (expect (gethash 'my-fn (cl-cc/compile:ctx-global-functions ctx)) :to-be-truthy)))
 
-(deftest-each codegen-callable-inline-policy-merge-cases
-  "Inline policy helper merges pending/local/global declarations conservatively."
-  :cases (("local-inline" '((inline f)) nil nil :inline)
-          ("global-inline" nil :inline nil :inline)
-          ("pending-inline" nil nil :inline :inline)
-          ("notinline-wins-local-over-global" '((notinline f)) :inline nil :notinline)
-          ("notinline-wins-global-over-pending" nil :notinline :inline :notinline))
-  (declarations global-policy pending-policy expected)
-  (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
+(it-sequential "codegen-callable-inline-policy-merge-cases local-inline"
+  (destructuring-bind (declarations global-policy pending-policy expected) (list '((inline f)) nil nil :inline)
+    (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
     (when global-policy
       (setf (gethash 'f cl-cc/expand:*declaim-inline-registry*) global-policy))
-    (assert-eq expected
-               (cl-cc/compile::%callable-inline-policy declarations
+    (expect (cl-cc/compile::%callable-inline-policy declarations
                                                        :name 'f
-                                                       :pending-policy pending-policy))))
+                                                       :pending-policy pending-policy) :to-be expected))))
 
-(deftest codegen-let-inline-declaration-propagates-to-lambda-closure
-  "(declare (inline f)) on a let-bound lambda annotates the emitted callable reference."
+(it-sequential "codegen-callable-inline-policy-merge-cases global-inline"
+  (destructuring-bind (declarations global-policy pending-policy expected) (list nil :inline nil :inline)
+    (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
+    (when global-policy
+      (setf (gethash 'f cl-cc/expand:*declaim-inline-registry*) global-policy))
+    (expect (cl-cc/compile::%callable-inline-policy declarations
+                                                       :name 'f
+                                                       :pending-policy pending-policy) :to-be expected))))
+
+(it-sequential "codegen-callable-inline-policy-merge-cases pending-inline"
+  (destructuring-bind (declarations global-policy pending-policy expected) (list nil nil :inline :inline)
+    (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
+    (when global-policy
+      (setf (gethash 'f cl-cc/expand:*declaim-inline-registry*) global-policy))
+    (expect (cl-cc/compile::%callable-inline-policy declarations
+                                                       :name 'f
+                                                       :pending-policy pending-policy) :to-be expected))))
+
+(it-sequential "codegen-callable-inline-policy-merge-cases notinline-wins-local-over-global"
+  (destructuring-bind (declarations global-policy pending-policy expected) (list '((notinline f)) :inline nil :notinline)
+    (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
+    (when global-policy
+      (setf (gethash 'f cl-cc/expand:*declaim-inline-registry*) global-policy))
+    (expect (cl-cc/compile::%callable-inline-policy declarations
+                                                       :name 'f
+                                                       :pending-policy pending-policy) :to-be expected))))
+
+(it-sequential "codegen-callable-inline-policy-merge-cases notinline-wins-global-over-pending"
+  (destructuring-bind (declarations global-policy pending-policy expected) (list nil :notinline :inline :notinline)
+    (let ((cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
+    (when global-policy
+      (setf (gethash 'f cl-cc/expand:*declaim-inline-registry*) global-policy))
+    (expect (cl-cc/compile::%callable-inline-policy declarations
+                                                       :name 'f
+                                                       :pending-policy pending-policy) :to-be expected))))
+
+(it-sequential "codegen-let-inline-declaration-propagates-to-lambda-closure"
   (let* ((ctx (make-codegen-ctx))
          (ast (make-ast-let
                :bindings (list (cons 'f (make-ast-lambda
@@ -105,11 +150,10 @@ test, which isn't worth the test-quality tradeoff."
     (compile-ast ast ctx)
     (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
                     (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
-      (assert-true inst)
-      (assert-eq :inline (cl-cc/vm:vm-closure-inline-policy inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy inst) :to-be :inline))))
 
-(deftest codegen-defun-global-inline-policy-propagates-to-closure
-  "Global declaim inline policy is attached to the emitted defun callable metadata."
+(it-sequential "codegen-defun-global-inline-policy-propagates-to-closure"
   (let ((ctx (make-codegen-ctx))
         (cl-cc/expand:*declaim-inline-registry* (make-hash-table :test #'eq)))
     (setf (gethash 'my-fn cl-cc/expand:*declaim-inline-registry*) :inline)
@@ -119,11 +163,10 @@ test, which isn't worth the test-quality tradeoff."
                  ctx)
     (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
                     (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
-      (assert-true inst)
-      (assert-eq :inline (cl-cc/vm:vm-closure-inline-policy inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc/vm:vm-closure-inline-policy inst) :to-be :inline))))
 
-(deftest codegen-defun-self-tail-call-loops
-  "A simple self-tail call in defun compiles to a jump back to the entry label."
+(it-sequential "codegen-defun-self-tail-call-loops"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast
      (cl-cc/ast:make-ast-defun
@@ -147,11 +190,10 @@ test, which isn't worth the test-quality tradeoff."
         (when (and (typep inst 'cl-cc/vm::vm-jump)
                    (string= (cl-cc/vm::vm-label-name inst) loop-label))
           (setf self-jump inst)))
-       (assert-eq nil tail-call)
-       (assert-true self-jump))))
+       (expect tail-call :to-be nil)
+       (expect self-jump :to-be-truthy))))
 
-(deftest codegen-defun-self-tail-call-loop-snapshots-args
-  "Self-tail loop lowering snapshots argument registers before rewriting params."
+(it-sequential "codegen-defun-self-tail-call-loop-snapshots-args"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast
      (cl-cc/ast:make-ast-defun
@@ -179,26 +221,24 @@ test, which isn't worth the test-quality tradeoff."
         (when (and (typep inst 'cl-cc/vm::vm-jump)
                    (string= (cl-cc/vm::vm-label-name inst) loop-label))
           (setf self-jump inst)))
-      (assert-eq nil tail-call)
-      (assert-true self-jump)
+      (expect tail-call :to-be nil)
+      (expect self-jump :to-be-truthy)
       ;; Two snapshot moves + two parameter rewrite moves.
-      (assert-true (>= move-count 4)))))
+      (expect (>= move-count 4) :to-be-truthy))))
 
-(deftest codegen-defvar-compilation
-  "Compiling defvar registers in global-variables and emits vm-const for the value."
+(it-sequential "codegen-defvar-compilation"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc/ast:make-ast-defvar :name 'test-codegen-var
                                    :value (make-ast-int :value 99))
                  ctx)
-    (assert-true (gethash 'test-codegen-var (cl-cc/compile:ctx-global-variables ctx)))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-const))))
+    (expect (gethash 'test-codegen-var (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)))
 
-(deftest codegen-defconstant-inlines-symbol-reference
-  "Compiling a symbol bound by defconstant emits vm-const with the constant value."
+(it-sequential "codegen-defconstant-inlines-symbol-reference"
   (cl-cc/expand::compiler-macroexpand-all '(defconstant codegen-inline-constant 123))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-var :name 'codegen-inline-constant) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
-      (assert-true inst)
-      (assert-equal 123 (cl-cc::vm-const-value inst)))
-    (assert-eq nil (codegen-find-inst ctx 'cl-cc/vm::vm-get-global))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-const-value inst) :to-equal 123))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-get-global) :to-be nil)))

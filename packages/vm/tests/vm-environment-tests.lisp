@@ -8,7 +8,6 @@
 ;;;;   vm-encode-universal-time.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── helpers ─────────────────────────────────────────────────────────────
 
@@ -21,163 +20,146 @@
 
 ;;; ─── vm-boundp ───────────────────────────────────────────────────────────
 
-(deftest vm-boundp-unbound-symbol-returns-nil
-  "vm-boundp returns NIL for a symbol not in the global vars table."
+(it-sequential "vm-boundp-unbound-symbol-returns-nil"
   (let ((result (%env-unary #'cl-cc:make-vm-boundp 'totally-unbound-sym-xyz)))
-    (assert-false result)))
+    (expect result :to-be-falsy)))
 
-(deftest vm-boundp-bound-symbol-returns-t
-  "vm-boundp returns T for a symbol with a value in the global vars table."
+(it-sequential "vm-boundp-bound-symbol-returns-t"
   (let ((s (make-test-vm)))
     (setf (gethash 'my-test-var (cl-cc/vm::vm-global-vars s)) 42)
     (cl-cc:vm-reg-set s 1 'my-test-var)
     (exec1 (cl-cc:make-vm-boundp :dst 0 :src 1) s)
-    (assert-true (cl-cc:vm-reg-get s 0))))
+    (expect (cl-cc:vm-reg-get s 0) :to-be-truthy)))
 
-(deftest vm-boundp-nil-value-still-bound
-  "vm-boundp returns T even when the variable's value is NIL (ANSI semantics)."
+(it-sequential "vm-boundp-nil-value-still-bound"
   (let ((s (make-test-vm)))
     (setf (gethash 'nil-valued-var (cl-cc/vm::vm-global-vars s)) nil)
     (cl-cc:vm-reg-set s 1 'nil-valued-var)
     (exec1 (cl-cc:make-vm-boundp :dst 0 :src 1) s)
-    (assert-true (cl-cc:vm-reg-get s 0))))
+    (expect (cl-cc:vm-reg-get s 0) :to-be-truthy)))
 
 ;;; ─── vm-fboundp ──────────────────────────────────────────────────────────
 
-(deftest vm-fboundp-unregistered-symbol-returns-nil
-  "vm-fboundp returns NIL for a symbol not in the function registry."
+(it-sequential "vm-fboundp-unregistered-symbol-returns-nil"
   (let ((result (%env-unary #'cl-cc:make-vm-fboundp 'no-such-function-xyz)))
-    (assert-false result)))
+    (expect result :to-be-falsy)))
 
-(deftest vm-fboundp-registered-function-returns-t
-  "vm-fboundp returns T for a symbol registered in the VM function table."
+(it-sequential "vm-fboundp-registered-function-returns-t"
   (let ((s (make-test-vm)))
     (setf (gethash 'my-fn (cl-cc/vm::vm-function-registry s)) #'identity)
     (cl-cc:vm-reg-set s 1 'my-fn)
     (exec1 (cl-cc:make-vm-fboundp :dst 0 :src 1) s)
-    (assert-true (cl-cc:vm-reg-get s 0))))
+    (expect (cl-cc:vm-reg-get s 0) :to-be-truthy)))
 
 ;;; ─── vm-makunbound ───────────────────────────────────────────────────────
 
-(deftest vm-makunbound-removes-binding-and-returns-sym
-  "vm-makunbound removes a global variable and returns the symbol name."
+(it-sequential "vm-makunbound-removes-binding-and-returns-sym"
   (let ((s (make-test-vm)))
     (setf (gethash 'to-unbind (cl-cc/vm::vm-global-vars s)) 99)
     (cl-cc:vm-reg-set s 1 'to-unbind)
     (exec1 (cl-cc:make-vm-makunbound :dst 0 :src 1) s)
-    (assert-eq 'to-unbind (cl-cc:vm-reg-get s 0))
-    (assert-false (nth-value 1 (gethash 'to-unbind (cl-cc/vm::vm-global-vars s))))))
+    (expect (cl-cc:vm-reg-get s 0) :to-be 'to-unbind)
+    (expect (nth-value 1 (gethash 'to-unbind (cl-cc/vm::vm-global-vars s))) :to-be-falsy)))
 
-(deftest vm-makunbound-already-unbound-returns-sym
-  "vm-makunbound on an already-unbound symbol still returns the symbol."
+(it-sequential "vm-makunbound-already-unbound-returns-sym"
   (let ((result (%env-unary #'cl-cc:make-vm-makunbound 'never-was-bound)))
-    (assert-eq 'never-was-bound result)))
+    (expect result :to-be 'never-was-bound)))
 
 ;;; ─── vm-fdefinition ──────────────────────────────────────────────────────
 
-(deftest vm-fdefinition-retrieves-registered-function
-  "vm-fdefinition returns the function object for a registered symbol."
+(it-sequential "vm-fdefinition-retrieves-registered-function"
   (let ((s (make-test-vm))
         (fn #'identity))
     (setf (gethash 'my-ident (cl-cc/vm::vm-function-registry s)) fn)
     (cl-cc:vm-reg-set s 1 'my-ident)
     (exec1 (cl-cc:make-vm-fdefinition :dst 0 :src 1) s)
-    (assert-eq fn (cl-cc:vm-reg-get s 0))))
+    (expect (cl-cc:vm-reg-get s 0) :to-be fn)))
 
-(deftest vm-fdefinition-undefined-signals-error
-  "vm-fdefinition signals an error when the symbol has no function binding."
-  (assert-signals error
-    (%env-unary #'cl-cc:make-vm-fdefinition 'undefined-fn-xyz)))
+(it-sequential "vm-fdefinition-undefined-signals-error"
+  (signals error (%env-unary #'cl-cc:make-vm-fdefinition 'undefined-fn-xyz)))
 
 ;;; ─── vm-random ───────────────────────────────────────────────────────────
 
-(deftest vm-random-returns-integer-in-range
-  "vm-random returns a non-negative integer less than the limit."
+(it-sequential "vm-random-returns-integer-in-range"
   (let ((result (%env-unary #'cl-cc:make-vm-random 100)))
-    (assert-true (integerp result))
-    (assert-true (>= result 0))
-    (assert-true (< result 100))))
+    (expect (integerp result) :to-be-truthy)
+    (expect (>= result 0) :to-be-truthy)
+    (expect (< result 100) :to-be-truthy)))
 
-(deftest vm-random-float-limit
-  "vm-random with a float limit returns a float in [0.0, limit)."
+(it-sequential "vm-random-float-limit"
   (let ((result (%env-unary #'cl-cc:make-vm-random 1.0)))
-    (assert-true (floatp result))
-    (assert-true (>= result 0.0))
-    (assert-true (< result 1.0))))
+    (expect (floatp result) :to-be-truthy)
+    (expect (>= result 0.0) :to-be-truthy)
+    (expect (< result 1.0) :to-be-truthy)))
 
 ;;; ─── vm-make-random-state ────────────────────────────────────────────────
 
-(deftest-each vm-make-random-state-cases
-  "vm-make-random-state produces a random-state for T, NIL, and another state."
-  :cases (("fresh"  t)
-          ("copy"   nil))
-  (arg)
-  (let ((result (%env-unary #'cl-cc:make-vm-make-random-state arg)))
-    (assert-true (cl-cc/vm:vm-random-state-p result))))
+(it-sequential "vm-make-random-state-cases fresh"
+  (destructuring-bind (arg) (list t)
+    (let ((result (%env-unary #'cl-cc:make-vm-make-random-state arg)))
+    (expect (cl-cc/vm:vm-random-state-p result) :to-be-truthy))))
+
+(it-sequential "vm-make-random-state-cases copy"
+  (destructuring-bind (arg) (list nil)
+    (let ((result (%env-unary #'cl-cc:make-vm-make-random-state arg)))
+    (expect (cl-cc/vm:vm-random-state-p result) :to-be-truthy))))
 
 ;;; ─── vm-get-universal-time ───────────────────────────────────────────────
 
-(deftest vm-get-universal-time-returns-positive-integer
-  "vm-get-universal-time returns a positive integer (seconds since 1900)."
+(it-sequential "vm-get-universal-time-returns-positive-integer"
   (let ((s (make-test-vm)))
     (exec1 (cl-cc:make-vm-get-universal-time :dst 0) s)
     (let ((result (cl-cc:vm-reg-get s 0)))
-      (assert-true (integerp result))
-      (assert-true (> result 0)))))
+      (expect (integerp result) :to-be-truthy)
+      (expect (> result 0) :to-be-truthy))))
 
 ;;; ─── vm-get-internal-real-time ───────────────────────────────────────────
 
-(deftest vm-get-internal-real-time-returns-non-negative-integer
-  "vm-get-internal-real-time returns a non-negative integer."
+(it-sequential "vm-get-internal-real-time-returns-non-negative-integer"
   (let ((s (make-test-vm)))
     (exec1 (cl-cc:make-vm-get-internal-real-time :dst 0) s)
     (let ((result (cl-cc:vm-reg-get s 0)))
-      (assert-true (integerp result))
-      (assert-true (>= result 0)))))
+      (expect (integerp result) :to-be-truthy)
+      (expect (>= result 0) :to-be-truthy))))
 
 ;;; ─── vm-get-internal-run-time ────────────────────────────────────────────
 
-(deftest vm-get-internal-run-time-returns-non-negative-integer
-  "vm-get-internal-run-time returns a non-negative integer."
+(it-sequential "vm-get-internal-run-time-returns-non-negative-integer"
   (let ((s (make-test-vm)))
     (exec1 (cl-cc:make-vm-get-internal-run-time :dst 0) s)
     (let ((result (cl-cc:vm-reg-get s 0)))
-      (assert-true (integerp result))
-      (assert-true (>= result 0)))))
+      (expect (integerp result) :to-be-truthy)
+      (expect (>= result 0) :to-be-truthy))))
 
 ;;; ─── vm-decode-universal-time ────────────────────────────────────────────
 
-(deftest vm-decode-universal-time-stores-9-values
-  "vm-decode-universal-time stores exactly 9 multiple-values."
+(it-sequential "vm-decode-universal-time-stores-9-values"
   (let ((s (make-test-vm))
         (epoch (encode-universal-time 0 0 0 1 1 2000)))
     (cl-cc:vm-reg-set s 1 epoch)
     (exec1 (cl-cc:make-vm-decode-universal-time :dst 0 :src 1) s)
-    (assert-= 9 (length (cl-cc:vm-values-list s)))))
+    (expect (= 9 (length (cl-cc:vm-values-list s))) :to-be-truthy)))
 
-(deftest vm-decode-universal-time-primary-value-is-seconds
-  "vm-decode-universal-time sets dst to the seconds component."
+(it-sequential "vm-decode-universal-time-primary-value-is-seconds"
   (let ((s (make-test-vm))
         (epoch (encode-universal-time 30 15 12 1 1 2000)))
     (cl-cc:vm-reg-set s 1 epoch)
     (exec1 (cl-cc:make-vm-decode-universal-time :dst 0 :src 1) s)
-    (assert-= 30 (cl-cc:vm-reg-get s 0))))
+    (expect (= 30 (cl-cc:vm-reg-get s 0)) :to-be-truthy)))
 
 ;;; ─── vm-encode-universal-time ────────────────────────────────────────────
 
-(deftest vm-encode-universal-time-round-trips-decode
-  "encode then decode gives back the same components."
+(it-sequential "vm-encode-universal-time-round-trips-decode"
   (let* ((original (encode-universal-time 5 30 10 15 6 2023 0))
          (s (make-test-vm))
          (args (list 5 30 10 15 6 2023 0)))
     (cl-cc:vm-reg-set s 1 args)
     (exec1 (cl-cc:make-vm-encode-universal-time :dst 0 :args-reg 1) s)
-    (assert-= original (cl-cc:vm-reg-get s 0))))
+    (expect (= original (cl-cc:vm-reg-get s 0)) :to-be-truthy)))
 
-(deftest vm-encode-universal-time-without-timezone
-  "vm-encode-universal-time without timezone arg produces an integer."
+(it-sequential "vm-encode-universal-time-without-timezone"
   (let* ((s (make-test-vm))
          (args (list 0 0 12 1 1 2000)))
     (cl-cc:vm-reg-set s 1 args)
     (exec1 (cl-cc:make-vm-encode-universal-time :dst 0 :args-reg 1) s)
-    (assert-true (integerp (cl-cc:vm-reg-get s 0)))))
+    (expect (integerp (cl-cc:vm-reg-get s 0)) :to-be-truthy)))

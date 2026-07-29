@@ -8,7 +8,6 @@
 ;;;;   schedule-pre-ra           — pressure-aware scheduling produces valid orderings
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Test helpers ─────────────────────────────────────────────────────────
 
@@ -18,47 +17,53 @@
 
 ;;; ─── %opt-scheduler-barrier-p ─────────────────────────────────────────────
 
-(deftest-each scheduler-barrier-p-returns-true-for-barrier-types
-  "%opt-scheduler-barrier-p returns T for instructions that must not move."
-  :cases
-  (("vm-call"
-    (make-vm-call :dst :r0 :func :f :args nil))
-   ("vm-apply"
-    (cl-cc:make-vm-apply :dst :r0 :func :f :args '(:r1)))
-   ("vm-set-global"
-    (make-vm-set-global :src :r0 :name 'x))
-   ("vm-signal-error"
-    (cl-cc:make-vm-signal-error :error-reg :r0))
-   ("vm-slot-write"
-    (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r0)))
-  (inst)
-  (assert-true (cl-cc/optimize::%opt-scheduler-barrier-p inst)))
+(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-call"
+  (destructuring-bind (inst) (list (make-vm-call :dst :r0 :func :f :args nil))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
 
-(deftest-each scheduler-barrier-p-returns-false-for-pure-instructions
-  "%opt-scheduler-barrier-p returns NIL for pure/read-only instructions."
-  :cases
-  (("vm-const"
-    (make-vm-const :dst :r0 :value 42))
-   ("vm-move"
-    (make-vm-move :dst :r1 :src :r0))
-   ("vm-add"
-    (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
-   ("vm-mul"
-    (make-vm-mul :dst :r3 :lhs :r0 :rhs :r1))
-   ("vm-sub"
-    (make-vm-sub :dst :r4 :lhs :r2 :rhs :r1))
-   ("vm-get-global"
-    (make-vm-get-global :dst :r5 :name 'x)))
-  (inst)
-  (assert-false (cl-cc/optimize::%opt-scheduler-barrier-p inst)))
+(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-apply"
+  (destructuring-bind (inst) (list (cl-cc:make-vm-apply :dst :r0 :func :f :args '(:r1)))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
+
+(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-set-global"
+  (destructuring-bind (inst) (list (make-vm-set-global :src :r0 :name 'x))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
+
+(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-signal-error"
+  (destructuring-bind (inst) (list (cl-cc:make-vm-signal-error :error-reg :r0))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
+
+(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-slot-write"
+  (destructuring-bind (inst) (list (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r0))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
+
+(it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-const"
+  (destructuring-bind (inst) (list (make-vm-const :dst :r0 :value 42))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-falsy)))
+
+(it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-move"
+  (destructuring-bind (inst) (list (make-vm-move :dst :r1 :src :r0))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-falsy)))
+
+(it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-add"
+  (destructuring-bind (inst) (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-falsy)))
+
+(it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-mul"
+  (destructuring-bind (inst) (list (make-vm-mul :dst :r3 :lhs :r0 :rhs :r1))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-falsy)))
+
+(it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-sub"
+  (destructuring-bind (inst) (list (make-vm-sub :dst :r4 :lhs :r2 :rhs :r1))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-falsy)))
+
+(it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-get-global"
+  (destructuring-bind (inst) (list (make-vm-get-global :dst :r5 :name 'x))
+    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-falsy)))
 
 ;;; ─── opt-pass-schedule-local: basic reordering ────────────────────────────
 
-(deftest schedule-local-raw-chain-produces-valid-topological-order
-  "opt-pass-schedule-local preserves RAW order: CONST must precede ADD."
-  ;; CONST :r0 ← 1   (writes :r0)
-  ;; CONST :r1 ← 2   (writes :r1, independent of :r0)
-  ;; ADD   :r2 ← :r0 + :r1  (RAW on :r0 and :r1)
+(it-sequential "schedule-local-raw-chain-produces-valid-topological-order"
   (let* ((c1  (make-vm-const :dst :r0 :value 1))
          (c2  (make-vm-const :dst :r1 :value 2))
          (add (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1))
@@ -67,137 +72,121 @@
     (let ((idx-c1  (%sched-index result c1))
           (idx-c2  (%sched-index result c2))
           (idx-add (%sched-index result add)))
-      (assert-true (and idx-c1 idx-c2 idx-add))
-      (assert-true (< idx-c1 idx-add))
-      (assert-true (< idx-c2 idx-add)))))
+      (expect (and idx-c1 idx-c2 idx-add) :to-be-truthy)
+      (expect (< idx-c1 idx-add) :to-be-truthy)
+      (expect (< idx-c2 idx-add) :to-be-truthy))))
 
-(deftest schedule-local-independent-instructions-all-preserved
-  "opt-pass-schedule-local emits all instructions even when they can be reordered."
-  ;; Three fully independent CONSTs — any order is valid.
+(it-sequential "schedule-local-independent-instructions-all-preserved"
   (let* ((c0 (make-vm-const :dst :r0 :value 10))
          (c1 (make-vm-const :dst :r1 :value 20))
          (c2 (make-vm-const :dst :r2 :value 30))
          (result (cl-cc/optimize::opt-pass-schedule-local (list c0 c1 c2))))
-    (assert-= 3 (length result))
-    (assert-true (member c0 result :test #'eq))
-    (assert-true (member c1 result :test #'eq))
-    (assert-true (member c2 result :test #'eq))))
+    (expect (= 3 (length result)) :to-be-truthy)
+    (expect (member c0 result :test #'eq) :to-be-truthy)
+    (expect (member c1 result :test #'eq) :to-be-truthy)
+    (expect (member c2 result :test #'eq) :to-be-truthy)))
 
-(deftest schedule-local-deep-raw-chain-preserves-order
-  "opt-pass-schedule-local keeps a deep RAW chain in-order."
-  ;; c0 → add1 (RAW :r0) → add2 (RAW :r1) — must stay in original order.
+(it-sequential "schedule-local-deep-raw-chain-preserves-order"
   (let* ((c0   (make-vm-const :dst :r0 :value 1))
          (add1 (make-vm-add   :dst :r1 :lhs :r0 :rhs :r0))
          (add2 (make-vm-add   :dst :r2 :lhs :r1 :rhs :r1))
          (result (cl-cc/optimize::opt-pass-schedule-local (list c0 add1 add2))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     (let ((idx-c0   (%sched-index result c0))
           (idx-add1 (%sched-index result add1))
           (idx-add2 (%sched-index result add2)))
-      (assert-true (< idx-c0 idx-add1))
-      (assert-true (< idx-add1 idx-add2)))))
+      (expect (< idx-c0 idx-add1) :to-be-truthy)
+      (expect (< idx-add1 idx-add2) :to-be-truthy))))
 
 ;;; ─── opt-pass-schedule-local: barriers stop scheduling ────────────────────
 
-(deftest schedule-local-call-barrier-splits-run
-  "opt-pass-schedule-local never moves instructions across a vm-call barrier."
-  ;; [CONST r0] CALL r1←(f) [ADD r2←r1+r0]
-  ;; The ADD reads r1 (written by CALL) and r0 (pre-call), so it cannot cross
-  ;; the call; the CONST must remain before the call.
+(it-sequential "schedule-local-call-barrier-splits-run"
   (let* ((c0   (make-vm-const :dst :r0 :value 1))
          (call (make-vm-call  :dst :r1 :func :f :args nil))
          (add  (make-vm-add   :dst :r2 :lhs :r1 :rhs :r0))
          (result (cl-cc/optimize::opt-pass-schedule-local (list c0 call add))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     ;; call must appear between c0 and add in the output
     (let ((idx-c0   (%sched-index result c0))
           (idx-call (%sched-index result call))
           (idx-add  (%sched-index result add)))
-      (assert-true (and idx-c0 idx-call idx-add))
-      (assert-true (< idx-c0 idx-call))
-      (assert-true (< idx-call idx-add)))))
+      (expect (and idx-c0 idx-call idx-add) :to-be-truthy)
+      (expect (< idx-c0 idx-call) :to-be-truthy)
+      (expect (< idx-call idx-add) :to-be-truthy))))
 
-(deftest schedule-local-slot-write-barrier-preserved
-  "opt-pass-schedule-local does not move any instruction past a vm-slot-write."
+(it-sequential "schedule-local-slot-write-barrier-preserved"
   (let* ((c0    (make-vm-const :dst :r0 :value 99))
          (write (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r0))
          (c1    (make-vm-const :dst :r1 :value 1))
          (result (cl-cc/optimize::opt-pass-schedule-local (list c0 write c1))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     (let ((idx-write (%sched-index result write)))
-      (assert-true idx-write)
+      (expect idx-write :to-be-truthy)
       ;; c0 must stay before the write
-      (assert-true (< (%sched-index result c0) idx-write))
+      (expect (< (%sched-index result c0) idx-write) :to-be-truthy)
       ;; c1 must stay after the write
-      (assert-true (< idx-write (%sched-index result c1))))))
+      (expect (< idx-write (%sched-index result c1)) :to-be-truthy))))
 
-(deftest schedule-local-multiple-barriers-each-preserved
-  "opt-pass-schedule-local keeps multiple barriers in their original relative order."
+(it-sequential "schedule-local-multiple-barriers-each-preserved"
   (let* ((call1 (make-vm-call :dst :r0 :func :f1 :args nil))
          (call2 (make-vm-call :dst :r1 :func :f2 :args nil))
          (call3 (make-vm-call :dst :r2 :func :f3 :args nil))
          (result (cl-cc/optimize::opt-pass-schedule-local (list call1 call2 call3))))
-    (assert-= 3 (length result))
-    (assert-true (< (%sched-index result call1) (%sched-index result call2)))
-    (assert-true (< (%sched-index result call2) (%sched-index result call3)))))
+    (expect (= 3 (length result)) :to-be-truthy)
+    (expect (< (%sched-index result call1) (%sched-index result call2)) :to-be-truthy)
+    (expect (< (%sched-index result call2) (%sched-index result call3)) :to-be-truthy)))
 
-(deftest schedule-local-set-global-barrier-preserved
-  "opt-pass-schedule-local treats vm-set-global as a barrier."
+(it-sequential "schedule-local-set-global-barrier-preserved"
   (let* ((c0    (make-vm-const :dst :r0 :value 5))
          (store (make-vm-set-global :src :r0 :name 'g))
          (c1    (make-vm-const :dst :r1 :value 6))
          (result (cl-cc/optimize::opt-pass-schedule-local (list c0 store c1))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     (let ((idx-store (%sched-index result store)))
-      (assert-true (< (%sched-index result c0) idx-store))
-      (assert-true (< idx-store (%sched-index result c1))))))
+      (expect (< (%sched-index result c0) idx-store) :to-be-truthy)
+      (expect (< idx-store (%sched-index result c1)) :to-be-truthy))))
 
 ;;; ─── schedule-pre-ra: pressure-aware ordering ─────────────────────────────
 
-(deftest schedule-pre-ra-raw-chain-preserves-topological-order
-  "schedule-pre-ra preserves RAW topological order."
+(it-sequential "schedule-pre-ra-raw-chain-preserves-topological-order"
   (let* ((c0  (make-vm-const :dst :r0 :value 1))
          (c1  (make-vm-const :dst :r1 :value 2))
          (add (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1))
          (result (cl-cc/optimize::schedule-pre-ra (list c0 c1 add))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     (let ((idx-c0  (%sched-index result c0))
           (idx-c1  (%sched-index result c1))
           (idx-add (%sched-index result add)))
-      (assert-true (< idx-c0 idx-add))
-      (assert-true (< idx-c1 idx-add)))))
+      (expect (< idx-c0 idx-add) :to-be-truthy)
+      (expect (< idx-c1 idx-add) :to-be-truthy))))
 
-(deftest schedule-pre-ra-all-instructions-emitted
-  "schedule-pre-ra emits all instructions with no duplicates or omissions."
+(it-sequential "schedule-pre-ra-all-instructions-emitted"
   (let* ((c0  (make-vm-const :dst :r0 :value 10))
          (c1  (make-vm-const :dst :r1 :value 20))
          (mul (make-vm-mul   :dst :r2 :lhs :r0 :rhs :r1))
          (add (make-vm-add   :dst :r3 :lhs :r2 :rhs :r0))
          (all (list c0 c1 mul add))
          (result (cl-cc/optimize::schedule-pre-ra all)))
-    (assert-= 4 (length result))
+    (expect (= 4 (length result)) :to-be-truthy)
     (dolist (inst all)
-      (assert-true (member inst result :test #'eq)))))
+      (expect (member inst result :test #'eq) :to-be-truthy))))
 
-(deftest schedule-pre-ra-call-barrier-not-moved
-  "schedule-pre-ra never moves any instruction across a vm-call."
+(it-sequential "schedule-pre-ra-call-barrier-not-moved"
   (let* ((c0   (make-vm-const :dst :r0 :value 7))
          (call (make-vm-call  :dst :r1 :func :g :args nil))
          (add  (make-vm-add   :dst :r2 :lhs :r1 :rhs :r0))
          (result (cl-cc/optimize::schedule-pre-ra (list c0 call add))))
-    (assert-= 3 (length result))
+    (expect (= 3 (length result)) :to-be-truthy)
     (let ((idx-call (%sched-index result call)))
-      (assert-true (< (%sched-index result c0) idx-call))
-      (assert-true (< idx-call (%sched-index result add))))))
+      (expect (< (%sched-index result c0) idx-call) :to-be-truthy)
+      (expect (< idx-call (%sched-index result add)) :to-be-truthy))))
 
-(deftest schedule-pre-ra-single-instruction-unchanged
-  "schedule-pre-ra with a single instruction returns that instruction unchanged."
+(it-sequential "schedule-pre-ra-single-instruction-unchanged"
   (let* ((c0     (make-vm-const :dst :r0 :value 42))
          (result (cl-cc/optimize::schedule-pre-ra (list c0))))
-    (assert-= 1 (length result))
-    (assert-eq c0 (first result))))
+    (expect (= 1 (length result)) :to-be-truthy)
+    (expect (first result) :to-be c0)))
 
-(deftest schedule-pre-ra-empty-input-returns-empty
-  "schedule-pre-ra with empty input returns an empty list."
+(it-sequential "schedule-pre-ra-empty-input-returns-empty"
   (let ((result (cl-cc/optimize::schedule-pre-ra nil)))
-    (assert-= 0 (length result))))
+    (expect (= 0 (length result)) :to-be-truthy)))

@@ -1,47 +1,42 @@
 (in-package :cl-cc/test)
 
-(defsuite lsp-server-suite
-  :description "LSP tools protocol tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite lsp-server-suite)
 
 (defun lsp-test-get (alist key)
   (cdr (assoc key alist :test #'string=)))
 
-(deftest lsp-server-system-loads
-  "The LSP system is loadable through :cl-cc-tools."
-  :timeout 5
-  (assert-true (asdf:find-system :cl-cc-tools nil))
-  (assert-true (fboundp 'cl-cc/tools/lsp:make-lsp-server))
-  (assert-true (fboundp 'cl-cc/tools/lsp:lsp-server-p))
-  (assert-true (fboundp 'cl-cc/tools/lsp:lsp-server-running-p))
-  (assert-true (fboundp 'cl-cc/tools/lsp:read-jsonrpc-message))
-  (assert-true (cl-cc/tools/lsp:lsp-server-p (cl-cc/tools/lsp:make-lsp-server))))
+(it-sequential "lsp-server-system-loads"
+  :timeout
+  5
+  (expect (asdf:find-system :cl-cc-tools nil) :to-be-truthy)
+  (expect (fboundp 'cl-cc/tools/lsp:make-lsp-server) :to-be-truthy)
+  (expect (fboundp 'cl-cc/tools/lsp:lsp-server-p) :to-be-truthy)
+  (expect (fboundp 'cl-cc/tools/lsp:lsp-server-running-p) :to-be-truthy)
+  (expect (fboundp 'cl-cc/tools/lsp:read-jsonrpc-message) :to-be-truthy)
+  (expect (cl-cc/tools/lsp:lsp-server-p (cl-cc/tools/lsp:make-lsp-server)) :to-be-truthy))
 
-(deftest lsp-jsonrpc-framing-round-trips
-  "FR-796: Content-Length framing and JSON parsing work without network I/O."
-  :timeout 5
+(it-sequential "lsp-jsonrpc-framing-round-trips"
+  :timeout
+  5
   (let* ((payload '(("jsonrpc" . "2.0") ("id" . 7) ("method" . "initialize")
                     ("params" . (("rootUri" . "file:///tmp/cl-cc")))))
          (wire (with-output-to-string (out)
                  (cl-cc/tools/lsp:write-jsonrpc-message out payload))))
-    (assert-true (search "Content-Length:" wire :test #'char=))
+    (expect (search "Content-Length:" wire :test #'char=) :to-be-truthy)
     (let ((decoded (cl-cc/tools/lsp:read-jsonrpc-message (make-string-input-stream wire))))
-      (assert-equal "initialize" (lsp-test-get decoded "method"))
-      (assert-equal 7 (lsp-test-get decoded "id")))))
+      (expect (lsp-test-get decoded "method") :to-equal "initialize")
+      (expect (lsp-test-get decoded "id") :to-equal 7))))
 
-(deftest lsp-initialize-advertises-capabilities
-  "FR-796: initialize returns LSP capabilities."
-  :timeout 5
+(it-sequential "lsp-initialize-advertises-capabilities"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (response (cl-cc/tools/lsp:lsp-handle-request
                     server '(("jsonrpc" . "2.0") ("id" . 1) ("method" . "initialize")))))
-    (assert-equal "2.0" (lsp-test-get response "jsonrpc"))
-    (assert-true (lsp-test-get (lsp-test-get response "result") "capabilities"))))
+    (expect (lsp-test-get response "jsonrpc") :to-equal "2.0")
+    (expect (lsp-test-get (lsp-test-get response "result") "capabilities") :to-be-truthy)))
 
-(deftest lsp-diagnostics-infer-elisp-language-from-uri
-  "LSP diagnostics choose :elisp for .el documents."
+(it-sequential "lsp-diagnostics-infer-elisp-language-from-uri"
   (let ((seen-language nil)
         (orig-compile (symbol-function 'cl-cc:compile-string)))
     (unwind-protect
@@ -55,99 +50,129 @@
            (cl-cc/tools/lsp:lsp-publish-diagnostics
             (cl-cc/tools/lsp:make-lsp-server)
             "file:///tmp/sample.el")
-           (assert-eq :elisp seen-language))
+           (expect seen-language :to-be :elisp))
       (sb-ext:without-package-locks
         (setf (symbol-function 'cl-cc:compile-string) orig-compile)))))
 
 ;; SKIP (Nix sandbox): LSP server requires running process
 
-(deftest lsp-publishes-parenthesis-diagnostics
-  "FR-796: diagnostics are emitted as textDocument/publishDiagnostics notifications."
-  :timeout 5
+(it-sequential "lsp-publishes-parenthesis-diagnostics"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///broken.lisp"))
     (cl-cc/tools/lsp:lsp-open-document server uri "(defun broken (x) (+ x 1)")
     (let* ((notification (cl-cc/tools/lsp:lsp-publish-diagnostics server uri))
            (params (lsp-test-get notification "params")))
-      (assert-equal "textDocument/publishDiagnostics" (lsp-test-get notification "method"))
-      (assert-true (lsp-test-get params "diagnostics")))))
+      (expect (lsp-test-get notification "method") :to-equal "textDocument/publishDiagnostics")
+      (expect (lsp-test-get params "diagnostics") :to-be-truthy))))
 
 ;;;; ---- JSON codec ---------------------------------------------------------
 
-(deftest-each lsp-encode-json-scalars
-  "encode-json renders JSON scalars and literals across all type branches."
-  :cases ((":true"   :true                  "true")
-          (":false"  :false                 "false")
-          ("null"    nil                    "null")
-          ("integer" 42                     "42")
-          ("negative" -7                    "-7")
-          ("string"  "hi"                    "\"hi\"")
-          ("symbol"  'hello                  "\"HELLO\""))
-  (value expected)
-  (assert-equal expected (cl-cc/tools/lsp::encode-json value)))
+(it-sequential "lsp-encode-json-scalars :true"
+  (destructuring-bind (value expected) (list :true "true")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
 
-(deftest lsp-encode-json-escapes-control-characters
-  "encode-json escapes quotes, backslashes and control whitespace."
-  :timeout 5
-  (assert-equal "\"a\\\"b\"" (cl-cc/tools/lsp::encode-json "a\"b"))
-  (assert-equal "\"a\\\\b\"" (cl-cc/tools/lsp::encode-json "a\\b"))
-  (assert-equal "\"a\\nb\"" (cl-cc/tools/lsp::encode-json (format nil "a~%b")))
-  (assert-equal (format nil "\"a\\tb\"") (cl-cc/tools/lsp::encode-json (format nil "a~Ab" #\Tab))))
+(it-sequential "lsp-encode-json-scalars :false"
+  (destructuring-bind (value expected) (list :false "false")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
 
-(deftest lsp-encode-json-arrays-and-objects
-  "encode-json distinguishes alists-with-string-keys (objects) from plain lists (arrays)."
-  :timeout 5
-  (assert-equal "[1,2,3]" (cl-cc/tools/lsp::encode-json '(1 2 3)))
-  (assert-equal "{\"a\":1}" (cl-cc/tools/lsp::encode-json '(("a" . 1))))
-  (assert-equal "{\"a\":[1,2]}" (cl-cc/tools/lsp::encode-json '(("a" . (1 2)))))
-  (assert-equal "{\"nested\":{\"k\":\"v\"}}"
-                (cl-cc/tools/lsp::encode-json '(("nested" . (("k" . "v")))))))
+(it-sequential "lsp-encode-json-scalars null"
+  (destructuring-bind (value expected) (list nil "null")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
 
-(deftest lsp-encode-json-to-supplied-stream-returns-value
-  "encode-json with an explicit stream writes to it and returns the original value."
-  :timeout 5
+(it-sequential "lsp-encode-json-scalars integer"
+  (destructuring-bind (value expected) (list 42 "42")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
+
+(it-sequential "lsp-encode-json-scalars negative"
+  (destructuring-bind (value expected) (list -7 "-7")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
+
+(it-sequential "lsp-encode-json-scalars string"
+  (destructuring-bind (value expected) (list "hi" "\"hi\"")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
+
+(it-sequential "lsp-encode-json-scalars symbol"
+  (destructuring-bind (value expected) (list 'hello "\"HELLO\"")
+    (expect (cl-cc/tools/lsp::encode-json value) :to-equal expected)))
+
+(it-sequential "lsp-encode-json-escapes-control-characters"
+  :timeout
+  5
+  (expect (cl-cc/tools/lsp::encode-json "a\"b") :to-equal "\"a\\\"b\"")
+  (expect (cl-cc/tools/lsp::encode-json "a\\b") :to-equal "\"a\\\\b\"")
+  (expect (cl-cc/tools/lsp::encode-json (format nil "a~%b")) :to-equal "\"a\\nb\"")
+  (expect (cl-cc/tools/lsp::encode-json (format nil "a~Ab" #\Tab)) :to-equal (format nil "\"a\\tb\"")))
+
+(it-sequential "lsp-encode-json-arrays-and-objects"
+  :timeout
+  5
+  (expect (cl-cc/tools/lsp::encode-json '(1 2 3)) :to-equal "[1,2,3]")
+  (expect (cl-cc/tools/lsp::encode-json '(("a" . 1))) :to-equal "{\"a\":1}")
+  (expect (cl-cc/tools/lsp::encode-json '(("a" . (1 2)))) :to-equal "{\"a\":[1,2]}")
+  (expect (cl-cc/tools/lsp::encode-json '(("nested" . (("k" . "v"))))) :to-equal "{\"nested\":{\"k\":\"v\"}}"))
+
+(it-sequential "lsp-encode-json-to-supplied-stream-returns-value"
+  :timeout
+  5
   (let* ((value '(("id" . 1)))
          (out (make-string-output-stream))
          (result (cl-cc/tools/lsp::encode-json value out)))
-    (assert-eq value result)
-    (assert-equal "{\"id\":1}" (get-output-stream-string out))))
+    (expect result :to-be value)
+    (expect (get-output-stream-string out) :to-equal "{\"id\":1}")))
 
-(deftest-each lsp-parse-json-scalars
-  "parse-json decodes JSON scalars and literals."
-  :cases (("true"     "true"    :true)
-          ("false"    "false"   :false)
-          ("null"     "null"    nil)
-          ("integer"  "42"      42)
-          ("negative" "-7"      -7)
-          ("float"    "3.5"     3.5)
-          ("string"   "\"hi\""  "hi"))
-  (text expected)
-  (assert-equal expected (cl-cc/tools/lsp::parse-json text)))
+(it-sequential "lsp-parse-json-scalars true"
+  (destructuring-bind (text expected) (list "true" :true)
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
 
-(deftest lsp-parse-json-string-escapes
-  "parse-json interprets backslash escapes inside strings."
-  :timeout 5
-  (assert-equal (format nil "a~%b") (cl-cc/tools/lsp::parse-json "\"a\\nb\""))
-  (assert-equal (format nil "a~Ab" #\Tab) (cl-cc/tools/lsp::parse-json "\"a\\tb\""))
-  (assert-equal "a/b" (cl-cc/tools/lsp::parse-json "\"a\\/b\""))
-  (assert-equal "a\"b" (cl-cc/tools/lsp::parse-json "\"a\\\"b\"")))
+(it-sequential "lsp-parse-json-scalars false"
+  (destructuring-bind (text expected) (list "false" :false)
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
 
-(deftest lsp-parse-json-arrays-and-objects
-  "parse-json decodes arrays and nested objects into lists and alists."
-  :timeout 5
-  (assert-equal '(1 2 3) (cl-cc/tools/lsp::parse-json "[1,2,3]"))
-  (assert-equal '(("k" . 1)) (cl-cc/tools/lsp::parse-json "{\"k\":1}"))
-  (assert-equal '(("a" . (1 2))) (cl-cc/tools/lsp::parse-json "{\"a\": [1, 2]}"))
-  (assert-null (cl-cc/tools/lsp::parse-json "[]"))
-  (assert-null (cl-cc/tools/lsp::parse-json "{}")))
+(it-sequential "lsp-parse-json-scalars null"
+  (destructuring-bind (text expected) (list "null" nil)
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
 
-(deftest lsp-read-jsonrpc-message-requires-content-length
-  "read-jsonrpc-message signals when the Content-Length header is absent."
-  :timeout 5
-  (assert-signals error
-    (cl-cc/tools/lsp:read-jsonrpc-message
+(it-sequential "lsp-parse-json-scalars integer"
+  (destructuring-bind (text expected) (list "42" 42)
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
+
+(it-sequential "lsp-parse-json-scalars negative"
+  (destructuring-bind (text expected) (list "-7" -7)
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
+
+(it-sequential "lsp-parse-json-scalars float"
+  (destructuring-bind (text expected) (list "3.5" 3.5)
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
+
+(it-sequential "lsp-parse-json-scalars string"
+  (destructuring-bind (text expected) (list "\"hi\"" "hi")
+    (expect (cl-cc/tools/lsp::parse-json text) :to-equal expected)))
+
+(it-sequential "lsp-parse-json-string-escapes"
+  :timeout
+  5
+  (expect (cl-cc/tools/lsp::parse-json "\"a\\nb\"") :to-equal (format nil "a~%b"))
+  (expect (cl-cc/tools/lsp::parse-json "\"a\\tb\"") :to-equal (format nil "a~Ab" #\Tab))
+  (expect (cl-cc/tools/lsp::parse-json "\"a\\/b\"") :to-equal "a/b")
+  (expect (cl-cc/tools/lsp::parse-json "\"a\\\"b\"") :to-equal "a\"b"))
+
+(it-sequential "lsp-parse-json-arrays-and-objects"
+  :timeout
+  5
+  (expect (cl-cc/tools/lsp::parse-json "[1,2,3]") :to-equal '(1 2 3))
+  (expect (cl-cc/tools/lsp::parse-json "{\"k\":1}") :to-equal '(("k" . 1)))
+  (expect (cl-cc/tools/lsp::parse-json "{\"a\": [1, 2]}") :to-equal '(("a" . (1 2))))
+  (expect (cl-cc/tools/lsp::parse-json "[]") :to-be-null)
+  (expect (cl-cc/tools/lsp::parse-json "{}") :to-be-null))
+
+(it-sequential "lsp-read-jsonrpc-message-requires-content-length"
+  :timeout
+  5
+  (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/tools/lsp:read-jsonrpc-message
      (make-string-input-stream (format nil "X-Header: 1~C~C~C~C{}"
-                                       #\Return #\Newline #\Return #\Newline)))))
+                                       #\Return #\Newline #\Return #\Newline)))) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy)))
 
 ;;;; ---- Request dispatch ---------------------------------------------------
 
@@ -156,60 +181,58 @@
    server (append `(("jsonrpc" . "2.0") ("id" . ,id) ("method" . ,method))
                   (and params `(("params" . ,params))))))
 
-(deftest lsp-shutdown-marks-server-and-returns-empty-result
-  "shutdown records the request and returns a null-result response."
-  :timeout 5
+(it-sequential "lsp-shutdown-marks-server-and-returns-empty-result"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (response (lsp-request server "shutdown" nil 9)))
-    (assert-true (cl-cc/tools/lsp:lsp-server-shutdown-requested-p server))
-    (assert-equal 9 (lsp-test-get response "id"))
-    (assert-null (lsp-test-get response "result"))))
+    (expect (cl-cc/tools/lsp:lsp-server-shutdown-requested-p server) :to-be-truthy)
+    (expect (lsp-test-get response "id") :to-equal 9)
+    (expect (lsp-test-get response "result") :to-be-null)))
 
-(deftest lsp-exit-stops-server-and-returns-no-response
-  "exit clears running-p and produces no response payload."
-  :timeout 5
+(it-sequential "lsp-exit-stops-server-and-returns-no-response"
+  :timeout
+  5
   (let ((server (cl-cc/tools/lsp:make-lsp-server)))
     (setf (cl-cc/tools/lsp:lsp-server-running-p server) t)
-    (assert-null (lsp-request server "exit"))
-    (assert-false (cl-cc/tools/lsp:lsp-server-running-p server))))
+    (expect (lsp-request server "exit") :to-be-null)
+    (expect (cl-cc/tools/lsp:lsp-server-running-p server) :to-be-falsy)))
 
-(deftest lsp-unknown-method-returns-null-result
-  "An unrecognized method still yields a well-formed null-result response."
-  :timeout 5
+(it-sequential "lsp-unknown-method-returns-null-result"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (response (lsp-request server "textDocument/unknownThing" nil 3)))
-    (assert-equal 3 (lsp-test-get response "id"))
-    (assert-null (lsp-test-get response "result"))))
+    (expect (lsp-test-get response "id") :to-equal 3)
+    (expect (lsp-test-get response "result") :to-be-null)))
 
-(deftest lsp-did-open-indexes-symbols-and-publishes-diagnostics
-  "textDocument/didOpen stores the document, indexes its symbols and returns diagnostics."
-  :timeout 5
+(it-sequential "lsp-did-open-indexes-symbols-and-publishes-diagnostics"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///a.lisp")
          (notification (lsp-request server "textDocument/didOpen"
                                     `(("textDocument" . (("uri" . ,uri)
                                                          ("text" . "(defun my-func (x) (+ x 1))")))))))
-    (assert-equal "textDocument/publishDiagnostics" (lsp-test-get notification "method"))
-    (assert-equal "(defun my-func (x) (+ x 1))"
-                  (gethash uri (cl-cc/tools/lsp:lsp-server-documents server)))
-    (assert-true (gethash uri (cl-cc/tools/lsp:lsp-server-symbols server)))))
+    (expect (lsp-test-get notification "method") :to-equal "textDocument/publishDiagnostics")
+    (expect (gethash uri (cl-cc/tools/lsp:lsp-server-documents server)) :to-equal "(defun my-func (x) (+ x 1))")
+    (expect (gethash uri (cl-cc/tools/lsp:lsp-server-symbols server)) :to-be-truthy)))
 
-(deftest lsp-did-change-replaces-document-text
-  "textDocument/didChange applies the last content change and re-indexes."
-  :timeout 5
+(it-sequential "lsp-did-change-replaces-document-text"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///b.lisp"))
     (cl-cc/tools/lsp:lsp-open-document server uri "(defun old () 1)")
     (let ((notification (lsp-request server "textDocument/didChange"
                                      `(("textDocument" . (("uri" . ,uri)))
                                        ("contentChanges" . ((("text" . "(defun fresh (y) y)"))))))))
-      (assert-equal "textDocument/publishDiagnostics" (lsp-test-get notification "method"))
-      (assert-equal "(defun fresh (y) y)"
-                    (gethash uri (cl-cc/tools/lsp:lsp-server-documents server))))))
+      (expect (lsp-test-get notification "method") :to-equal "textDocument/publishDiagnostics")
+      (expect (gethash uri (cl-cc/tools/lsp:lsp-server-documents server)) :to-equal "(defun fresh (y) y)"))))
 
-(deftest lsp-completion-includes-keywords-and-document-symbols
-  "textDocument/completion offers built-in keywords plus indexed document symbols."
-  :timeout 5
+(it-sequential "lsp-completion-includes-keywords-and-document-symbols"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///c.lisp"))
     (cl-cc/tools/lsp:lsp-open-document server uri "(defun my-func (x) x)")
@@ -217,13 +240,13 @@
            (result (lsp-test-get response "result"))
            (labels (mapcar (lambda (item) (lsp-test-get item "label"))
                            (lsp-test-get result "items"))))
-      (assert-eq :false (lsp-test-get result "isIncomplete"))
-      (assert-true (member "defun" labels :test #'string=))
-      (assert-true (member "my-func" labels :test #'string=)))))
+      (expect (lsp-test-get result "isIncomplete") :to-be :false)
+      (expect (member "defun" labels :test #'string=) :to-be-truthy)
+      (expect (member "my-func" labels :test #'string=) :to-be-truthy))))
 
-(deftest lsp-hover-returns-markdown-for-word-under-cursor
-  "textDocument/hover formats the identifier at the cursor as markdown."
-  :timeout 5
+(it-sequential "lsp-hover-returns-markdown-for-word-under-cursor"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///d.lisp"))
     (cl-cc/tools/lsp:lsp-open-document server uri "(defun my-func (x) x)")
@@ -231,12 +254,12 @@
                                   `(("textDocument" . (("uri" . ,uri)))
                                     ("position" . (("line" . 0) ("character" . 9))))))
            (contents (lsp-test-get (lsp-test-get response "result") "contents")))
-      (assert-equal "markdown" (lsp-test-get contents "kind"))
-      (assert-equal "`my-func`" (lsp-test-get contents "value")))))
+      (expect (lsp-test-get contents "kind") :to-equal "markdown")
+      (expect (lsp-test-get contents "value") :to-equal "`my-func`"))))
 
-(deftest lsp-definition-resolves-known-symbol-and-misses-unknown
-  "textDocument/definition returns a location for indexed symbols and nil otherwise."
-  :timeout 5
+(it-sequential "lsp-definition-resolves-known-symbol-and-misses-unknown"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///e.lisp"))
     (cl-cc/tools/lsp:lsp-open-document server uri "(defun my-func (x) x)")
@@ -244,16 +267,16 @@
                              `(("textDocument" . (("uri" . ,uri)))
                                ("position" . (("line" . 0) ("character" . 9))))))
            (location (lsp-test-get hit "result")))
-      (assert-equal uri (lsp-test-get location "uri")))
+      (expect (lsp-test-get location "uri") :to-equal uri))
     (cl-cc/tools/lsp:lsp-open-document server uri "(+ 1 2)")
     (let ((miss (lsp-request server "textDocument/definition"
                              `(("textDocument" . (("uri" . ,uri)))
                                ("position" . (("line" . 0) ("character" . 3)))))))
-      (assert-null (lsp-test-get miss "result")))))
+      (expect (lsp-test-get miss "result") :to-be-null))))
 
-(deftest lsp-workspace-symbol-filters-by-query
-  "workspace/symbol returns document symbols whose names match the query substring."
-  :timeout 5
+(it-sequential "lsp-workspace-symbol-filters-by-query"
+  :timeout
+  5
   (let* ((server (cl-cc/tools/lsp:make-lsp-server))
          (uri "file:///f.lisp"))
     (cl-cc/tools/lsp:lsp-open-document
@@ -262,8 +285,8 @@
                          (lsp-test-get (lsp-request server "workspace/symbol"
                                                     '(("query" . "alph")))
                                        "result"))))
-      (assert-equal '("alpha") names))
+      (expect names :to-equal '("alpha")))
     (let ((all (lsp-test-get (lsp-request server "workspace/symbol"
                                           '(("query" . "")))
                              "result")))
-      (assert-= 2 (length all)))))
+      (expect (= 2 (length all)) :to-be-truthy))))

@@ -1,24 +1,20 @@
 (in-package :cl-cc/test)
 
-(in-suite pipeline-native-suite)
 
-(deftest pipeline-perf-map-line-validates-format
-  "FR-553 perf map lines use HEX_ADDR HEX_SIZE SYMBOL_NAME format."
-  (assert-true (cl-cc/pipeline:perf-map-line-valid-p "1000 2A FOO"))
-  (assert-false (cl-cc/pipeline:perf-map-line-valid-p "1000 nope FOO"))
-  (assert-false (cl-cc/pipeline:perf-map-line-valid-p "1000 2A")))
+(it-sequential "pipeline-perf-map-line-validates-format"
+  (expect (cl-cc/pipeline:perf-map-line-valid-p "1000 2A FOO") :to-be-truthy)
+  (expect (cl-cc/pipeline:perf-map-line-valid-p "1000 nope FOO") :to-be-falsy)
+  (expect (cl-cc/pipeline:perf-map-line-valid-p "1000 2A") :to-be-falsy))
 
-(deftest pipeline-write-perf-map-entry-emits-hex-fields
-  "write-perf-map-entry writes perf-compatible hex address and size fields."
+(it-sequential "pipeline-write-perf-map-entry-emits-hex-fields"
   (let ((stream (make-string-output-stream)))
     (cl-cc/pipeline:write-perf-map-entry stream #x1000 #x2a 'sample-function)
     (let ((line (string-trim '(#\Newline #\Return)
                              (get-output-stream-string stream))))
-      (assert-string= "1000 2A SAMPLE-FUNCTION" line)
-      (assert-true (cl-cc/pipeline:perf-map-line-valid-p line)))))
+      (expect line :to-equal "1000 2A SAMPLE-FUNCTION")
+      (expect (cl-cc/pipeline:perf-map-line-valid-p line) :to-be-truthy))))
 
-(deftest pipeline-write-perf-map-for-native-code-appends-map-line
-  "write-perf-map-for-native-code records a map line for native code bytes."
+(it-sequential "pipeline-write-perf-map-for-native-code-appends-map-line"
   (uiop:with-temporary-file (:pathname path :type "map" :keep t)
     (let ((program (cl-cc:make-vm-program
                     :instructions (list (cl-cc:make-vm-const :dst :r0 :value 1)
@@ -28,8 +24,8 @@
         (let ((cl-cc/pipeline:*perf-map-stream* out))
           (cl-cc/pipeline:write-perf-map-for-native-code program bytes :output-file "unit-main")))
       (let ((line (with-open-file (in path :direction :input) (read-line in nil nil))))
-        (assert-true (cl-cc/pipeline:perf-map-line-valid-p line))
-        (assert-true (search "unit-main" line :test #'char-equal))))
+        (expect (cl-cc/pipeline:perf-map-line-valid-p line) :to-be-truthy)
+        (expect (search "unit-main" line :test #'char-equal) :to-be-truthy)))
     (ignore-errors (delete-file path))))
 
 ;;;; ─── FR-500 Link-Time Optimization (pipeline-lto.lisp) ──────────────────
@@ -50,87 +46,78 @@
         when (typep inst 'cl-cc:vm-label)
           collect (cl-cc:vm-name inst)))
 
-(deftest lto-serialize-instructions-round-trips
-  "FR-500: LTO serializes VM instructions to a readable payload and back."
+(it-sequential "lto-serialize-instructions-round-trips"
   (let* ((insts (list (cl-cc:make-vm-const :dst :r0 :value 42)
                       (cl-cc:make-vm-ret :reg :r0)))
          (payload (cl-cc/pipeline::lto-serialize-instructions insts))
          (restored (cl-cc/pipeline::lto-deserialize-instructions payload)))
-    (assert-true (stringp payload))
-    (assert-= 2 (length restored))
-    (assert-true (typep (first restored) 'cl-cc:vm-const))
-    (assert-= 42 (cl-cc:vm-value (first restored)))))
+    (expect (stringp payload) :to-be-truthy)
+    (expect (= 2 (length restored)) :to-be-truthy)
+    (expect (typep (first restored) 'cl-cc:vm-const) :to-be-truthy)
+    (expect (= 42 (cl-cc:vm-value (first restored))) :to-be-truthy)))
 
-(deftest lto-serialize-module-round-trips
-  "FR-500: an LTO module payload preserves name and instructions across a read/print cycle."
+(it-sequential "lto-serialize-module-round-trips"
   (let* ((insts (list (cl-cc:make-vm-const :dst :r0 :value 7)
                       (cl-cc:make-vm-ret :reg :r0)))
          (payload (cl-cc/pipeline:lto-serialize-module "mod" insts))
          (module (cl-cc/pipeline:lto-deserialize-module payload)))
-    (assert-equal "mod" (cl-cc/pipeline::lto-module-name module))
-    (assert-= 2 (length (cl-cc/pipeline::lto-module-instructions module)))
-    (assert-true (typep (first (cl-cc/pipeline::lto-module-instructions module))
-                        'cl-cc:vm-const))))
+    (expect (cl-cc/pipeline::lto-module-name module) :to-equal "mod")
+    (expect (= 2 (length (cl-cc/pipeline::lto-module-instructions module))) :to-be-truthy)
+    (expect (typep (first (cl-cc/pipeline::lto-module-instructions module))
+                        'cl-cc:vm-const) :to-be-truthy)))
 
-(deftest lto-deserialize-module-rejects-invalid-payload
-  "FR-500: deserializing a payload without the module tag signals an error."
-  (assert-signals error (cl-cc/pipeline:lto-deserialize-module "(:not-a-module 1 2)")))
+(it-sequential "lto-deserialize-module-rejects-invalid-payload"
+  (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/pipeline:lto-deserialize-module "(:not-a-module 1 2)")) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy)))
 
-(deftest lto-make-bitcode-section-from-module-and-payload
-  "FR-500: bitcode sections describe an object-file section; raw payloads pass through."
+(it-sequential "lto-make-bitcode-section-from-module-and-payload"
   (let* ((module (cl-cc/pipeline:make-lto-module
                   :name "b"
                   :instructions (list (cl-cc:make-vm-const :dst :r0 :value 1)
                                       (cl-cc:make-vm-ret :reg :r0))))
          (section (cl-cc/pipeline::lto-make-bitcode-section module)))
-    (assert-equal "__bitcode" (getf section :name))
-    (assert-eq :progbits (getf section :type))
-    (assert-true (stringp (getf section :payload))))
+    (expect (getf section :name) :to-equal "__bitcode")
+    (expect (getf section :type) :to-be :progbits)
+    (expect (stringp (getf section :payload)) :to-be-truthy))
   (let ((section (cl-cc/pipeline::lto-make-bitcode-section "rawpayload")))
-    (assert-equal "rawpayload" (getf section :payload))))
+    (expect (getf section :payload) :to-equal "rawpayload")))
 
-(deftest lto-merge-modules-concatenates-instruction-streams
-  "FR-500: merging modules appends their instruction streams in order."
+(it-sequential "lto-merge-modules-concatenates-instruction-streams"
   (let* ((m1 (cl-cc/pipeline:make-lto-module
               :name "a" :instructions (list (cl-cc:make-vm-const :dst :r0 :value 1))))
          (m2 (cl-cc/pipeline:make-lto-module
               :name "b" :instructions (list (cl-cc:make-vm-const :dst :r1 :value 2)
                                             (cl-cc:make-vm-ret :reg :r1))))
          (merged (cl-cc/pipeline:lto-merge-modules (list m1 m2))))
-    (assert-= 3 (length merged))))
+    (expect (= 3 (length merged)) :to-be-truthy)))
 
-(deftest lto-eliminates-unreachable-functions
-  "FR-500: closed-world DCE drops function bodies unreachable from any root."
+(it-sequential "lto-eliminates-unreachable-functions"
   (let* ((instructions (%lto-sample-instructions))
          (graph (cl-cc/pipeline::lto-build-cross-module-call-graph (list instructions)))
          (pruned (cl-cc/pipeline::lto-eliminate-dead-functions instructions graph))
          (labels (%lto-label-names pruned)))
-    (assert-true (member "live" labels :test #'string=))
-    (assert-false (member "dead" labels :test #'string=))))
+    (expect (member "live" labels :test #'string=) :to-be-truthy)
+    (expect (member "dead" labels :test #'string=) :to-be-falsy)))
 
-(deftest lto-optimize-modules-gates-dce-with-run-dce
-  "FR-500: lto-optimize-modules runs DCE only when :RUN-DCE is true and returns the call graph."
+(it-sequential "lto-optimize-modules-gates-dce-with-run-dce"
   (let ((module (cl-cc/pipeline:make-lto-module
                  :name "m" :instructions (%lto-sample-instructions))))
     (multiple-value-bind (pruned graph)
         (cl-cc/pipeline:lto-optimize-modules (list module) :run-ipcp nil :run-dce t)
-      (assert-true (cl-cc/pipeline::lto-call-graph-roots graph))
-      (assert-false (member "dead" (%lto-label-names pruned) :test #'string=)))
+      (expect (cl-cc/pipeline::lto-call-graph-roots graph) :to-be-truthy)
+      (expect (member "dead" (%lto-label-names pruned) :test #'string=) :to-be-falsy))
     (let ((kept (cl-cc/pipeline:lto-optimize-modules
                  (list module) :run-ipcp nil :run-dce nil)))
-      (assert-true (member "dead" (%lto-label-names kept) :test #'string=)))))
+      (expect (member "dead" (%lto-label-names kept) :test #'string=) :to-be-truthy))))
 
-(deftest lto-apply-to-program-passes-through-non-programs
-  "FR-500: lto-apply-to-program only rewrites VM programs; other values pass through."
-  (assert-eq :not-a-program (cl-cc/pipeline::lto-apply-to-program :not-a-program)))
+(it-sequential "lto-apply-to-program-passes-through-non-programs"
+  (expect (cl-cc/pipeline::lto-apply-to-program :not-a-program) :to-be :not-a-program))
 
-(deftest lto-apply-to-program-rewrites-vm-program-and-records-section
-  "FR-500: applying LTO to a program returns a new program and records a bitcode section."
+(it-sequential "lto-apply-to-program-rewrites-vm-program-and-records-section"
   (let* ((program (cl-cc:make-vm-program :instructions (%lto-sample-instructions)))
          (result (cl-cc/pipeline::lto-apply-to-program program :module-name "prog")))
-    (assert-true (typep result 'cl-cc:vm-program))
-    (assert-true (listp (cl-cc:vm-program-instructions result)))
-    (assert-true cl-cc/pipeline::*last-lto-bitcode-section*)))
+    (expect (typep result 'cl-cc:vm-program) :to-be-truthy)
+    (expect (listp (cl-cc:vm-program-instructions result)) :to-be-truthy)
+    (expect cl-cc/pipeline::*last-lto-bitcode-section* :to-be-truthy)))
 
 ;;;; ─── FR-640/641 Incremental compilation + hot reload (pipeline-incremental.lisp) ───
 
@@ -139,36 +126,33 @@
    (merge-pathnames (format nil "clcc-inc-~36R/" (random (expt 36 10)))
                     (uiop:temporary-directory))))
 
-(deftest pipeline-incremental-hash-tracking-lifecycle
-  "FR-640: a new source is dirty, clean after commit, and dirty again once edited."
+(it-sequential "pipeline-incremental-hash-tracking-lifecycle"
   (uiop:with-temporary-file (:pathname source :type "lisp" :keep t)
     (let ((cache (%incremental-temp-cache)))
       (unwind-protect
            (progn
              (with-open-file (o source :direction :output :if-exists :supersede)
                (write-string "(defun f (x) x)" o))
-             (assert-true (cl-cc/pipeline:prepare-incremental-compilation source :cache-dir cache))
-             (assert-true (cl-cc/pipeline:incremental-state-dirty-p))
-             (assert-equal "source hash changed" (cl-cc/pipeline:incremental-state-reason))
+             (expect (cl-cc/pipeline:prepare-incremental-compilation source :cache-dir cache) :to-be-truthy)
+             (expect (cl-cc/pipeline:incremental-state-dirty-p) :to-be-truthy)
+             (expect (cl-cc/pipeline:incremental-state-reason) :to-equal "source hash changed")
              (cl-cc/pipeline:commit-incremental-compilation source :cache-dir cache)
-             (assert-false (cl-cc/pipeline:incremental-state-dirty-p))
-             (assert-false (cl-cc/pipeline:prepare-incremental-compilation source :cache-dir cache))
-             (assert-false (cl-cc/pipeline:incremental-state-dirty-p))
+             (expect (cl-cc/pipeline:incremental-state-dirty-p) :to-be-falsy)
+             (expect (cl-cc/pipeline:prepare-incremental-compilation source :cache-dir cache) :to-be-falsy)
+             (expect (cl-cc/pipeline:incremental-state-dirty-p) :to-be-falsy)
              (with-open-file (o source :direction :output :if-exists :supersede)
                (write-string "(defun f (x) (+ x 1))" o))
-             (assert-true (cl-cc/pipeline:prepare-incremental-compilation source :cache-dir cache)))
+             (expect (cl-cc/pipeline:prepare-incremental-compilation source :cache-dir cache) :to-be-truthy))
         (ignore-errors (uiop:delete-directory-tree cache :validate (constantly t)))
         (ignore-errors (delete-file source))))))
 
-(deftest pipeline-incremental-missing-source-is-clean
-  "FR-640: a source file that does not exist is treated as clean, not dirty."
-  (assert-false (cl-cc/pipeline:prepare-incremental-compilation
-                 "/nonexistent/clcc-definitely-absent.lisp"))
-  (assert-false (cl-cc/pipeline:incremental-state-dirty-p))
-  (assert-equal "source file does not exist" (cl-cc/pipeline:incremental-state-reason)))
+(it-sequential "pipeline-incremental-missing-source-is-clean"
+  (expect (cl-cc/pipeline:prepare-incremental-compilation
+                 "/nonexistent/clcc-definitely-absent.lisp") :to-be-falsy)
+  (expect (cl-cc/pipeline:incremental-state-dirty-p) :to-be-falsy)
+  (expect (cl-cc/pipeline:incremental-state-reason) :to-equal "source file does not exist"))
 
-(deftest pipeline-incremental-dependency-change-dirties-dependent
-  "FR-640: a dependent is dirtied when one of its recorded dependencies changes."
+(it-sequential "pipeline-incremental-dependency-change-dirties-dependent"
   (uiop:with-temporary-file (:pathname dep :type "lisp" :keep t)
     (uiop:with-temporary-file (:pathname main :type "lisp" :keep t)
       (let ((cache (%incremental-temp-cache)))
@@ -181,28 +165,25 @@
                (cl-cc/pipeline:commit-incremental-compilation dep :cache-dir cache)
                (cl-cc/pipeline:commit-incremental-compilation
                 main :dependencies (list (namestring (truename dep))) :cache-dir cache)
-               (assert-false (cl-cc/pipeline:prepare-incremental-compilation main :cache-dir cache))
+               (expect (cl-cc/pipeline:prepare-incremental-compilation main :cache-dir cache) :to-be-falsy)
                (with-open-file (o dep :direction :output :if-exists :supersede)
                  (write-string "(defmacro twice (x) `(* 2 ,x))" o))
-               (assert-true (cl-cc/pipeline:prepare-incremental-compilation main :cache-dir cache))
-               (assert-true (search "dependency" (cl-cc/pipeline:incremental-state-reason))))
+               (expect (cl-cc/pipeline:prepare-incremental-compilation main :cache-dir cache) :to-be-truthy)
+               (expect (search "dependency" (cl-cc/pipeline:incremental-state-reason)) :to-be-truthy))
           (ignore-errors (uiop:delete-directory-tree cache :validate (constantly t)))
           (ignore-errors (delete-file dep))
           (ignore-errors (delete-file main)))))))
 
-(deftest hot-reload-swap-replaces-implementation-single-threaded
-  "FR-641: hot-reload-swap returns the old function and installs the new one when idle."
+(it-sequential "hot-reload-swap-replaces-implementation-single-threaded"
   (let ((entry (cl-cc/pipeline:make-hot-reload-entry 'sample (lambda () :old))))
-    (assert-eq :old (cl-cc/pipeline:hot-reload-call entry))
+    (expect (cl-cc/pipeline:hot-reload-call entry) :to-be :old)
     (let ((old (cl-cc/pipeline:hot-reload-swap entry (lambda () :new))))
-      (assert-eq :old (funcall old))
-      (assert-eq :new (cl-cc/pipeline:hot-reload-call entry)))))
+      (expect (funcall old) :to-be :old)
+      (expect (cl-cc/pipeline:hot-reload-call entry) :to-be :new))))
 
 ;;;; ─── FR-632 Parallel-compilation dependency analysis (pipeline-parallel.lisp) ───
 
-(deftest pipeline-parallel-source-dependency-graph
-  "FR-632: build-source-dependency-graph links a file to in-set LOAD targets;
-independent-source-files excludes files that depend on another."
+(it-sequential "pipeline-parallel-source-dependency-graph"
   (let* ((tmp (uiop:temporary-directory))
          (a0 (merge-pathnames "clcc-par-a.lisp" tmp))
          (b0 (merge-pathnames "clcc-par-b.lisp" tmp)))
@@ -218,8 +199,7 @@ independent-source-files excludes files that depend on another."
                   (b (truename b0))
                   (graph (cl-cc/pipeline::build-source-dependency-graph (list a b)))
                   (independent (cl-cc/pipeline::independent-source-files (list a b) graph)))
-             (assert-= 1 (length independent))
-             (assert-equal (namestring (truename a))
-                           (namestring (truename (first independent))))))
+             (expect (= 1 (length independent)) :to-be-truthy)
+             (expect (namestring (truename (first independent))) :to-equal (namestring (truename a)))))
       (ignore-errors (delete-file a0))
       (ignore-errors (delete-file b0)))))

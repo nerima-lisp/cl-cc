@@ -5,104 +5,125 @@
 ;;; rule registry check.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-coverage-unstable-unit-suite)
 
 ;;; ─── Bitwise: self-identity (logand-self, logior-self) ──────────────────
 
-(deftest-each egraph-bitwise-self-identity-fires
-  "Bitwise self-identity: (op ?x ?x) merges with ?x for logand and logior."
-  :cases (("logand-self" 'cl-cc/optimize::logand)
-          ("logior-self" 'cl-cc/optimize::logior))
-  (op)
-  (let* ((eg (cl-cc/optimize:make-e-graph))
+(it-sequential "egraph-bitwise-self-identity-fires logand-self"
+  (destructuring-bind (op) (list 'cl-cc/optimize::logand)
+    (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (id (cl-cc/optimize:egraph-add eg op x x)))
     (eg-saturate eg)
-    (assert-true (eg-merged-p eg id x))))
+    (expect (eg-merged-p eg id x) :to-be-truthy))))
+
+(it-sequential "egraph-bitwise-self-identity-fires logior-self"
+  (destructuring-bind (op) (list 'cl-cc/optimize::logior)
+    (let* ((eg (cl-cc/optimize:make-e-graph))
+         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
+         (id (cl-cc/optimize:egraph-add eg op x x)))
+    (eg-saturate eg)
+    (expect (eg-merged-p eg id x) :to-be-truthy))))
 
 ;;; ─── Bitwise: logior-zero / logxor-zero (bidirectional zero-identity) ───
 
-(deftest-each egraph-bitwise-zero-identity-fires
-  "Bidirectional zero-identity: both (op ?x (const 0)) and (op (const 0) ?x) merge with ?x."
-  :cases (("logior-zero" 'cl-cc/optimize::logior)
-          ("logxor-zero" 'cl-cc/optimize::logxor))
-  (op)
-  (let* ((eg (cl-cc/optimize:make-e-graph))
+(it-sequential "egraph-bitwise-zero-identity-fires logior-zero"
+  (destructuring-bind (op) (list 'cl-cc/optimize::logior)
+    (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (c0 (make-eg-const eg 0))
          (id (cl-cc/optimize:egraph-add eg op x c0)))
     (eg-saturate eg)
-    (assert-true (eg-merged-p eg id x)))
-  (let* ((eg (cl-cc/optimize:make-e-graph))
+    (expect (eg-merged-p eg id x) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (c0 (make-eg-const eg 0))
          (id (cl-cc/optimize:egraph-add eg op c0 x)))
     (eg-saturate eg)
-    (assert-true (eg-merged-p eg id x))))
+    (expect (eg-merged-p eg id x) :to-be-truthy))))
+
+(it-sequential "egraph-bitwise-zero-identity-fires logxor-zero"
+  (destructuring-bind (op) (list 'cl-cc/optimize::logxor)
+    (let* ((eg (cl-cc/optimize:make-e-graph))
+         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
+         (c0 (make-eg-const eg 0))
+         (id (cl-cc/optimize:egraph-add eg op x c0)))
+    (eg-saturate eg)
+    (expect (eg-merged-p eg id x) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
+         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
+         (c0 (make-eg-const eg 0))
+         (id (cl-cc/optimize:egraph-add eg op c0 x)))
+    (eg-saturate eg)
+    (expect (eg-merged-p eg id x) :to-be-truthy))))
 
 
 ;;; ─── Bitwise: logxor-self / ash-zero-base ───────────────────────────────
 
-(deftest egraph-rule-const-producing-rules-fire
-  "logxor-self and ash-zero-base each produce a const-class result."
+(it-sequential "egraph-rule-const-producing-rules-fire"
   (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (id (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::logxor x x)))
     (eg-saturate eg)
-    (assert-true (eg-class-contains-op-p eg id 'cl-cc/optimize::const)))
+    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))
   (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (c0 (make-eg-const eg 0))
          (id (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::ash c0 x)))
     (eg-saturate eg)
-    (assert-true (eg-class-contains-op-p eg id 'cl-cc/optimize::const))))
+    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy)))
 
 ;;; ─── Strength Reduction Rules — Registration Tests ───────────────────────
 ;;; mul-pow2/mul-pow2-l/div-pow2 use (const ?n) guards that cannot bind ?n
 ;;; via the current pattern-matcher.  Test registration only.
 
-(deftest-each egraph-strength-reduction-rules-registered
-  "Strength-reduction rules (mul-pow2, mul-pow2-l, div-pow2) are registered."
-  :cases (("mul-pow2"   'cl-cc/optimize::mul-pow2)
-          ("mul-pow2-l" 'cl-cc/optimize::mul-pow2-l)
-          ("div-pow2"   'cl-cc/optimize::div-pow2))
-  (rule-name)
-  (assert-true (eg-rule-registered-p rule-name)))
+(it-sequential "egraph-strength-reduction-rules-registered mul-pow2"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::mul-pow2)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
 
-(deftest egraph-rule-mul-pow2-has-when-guard
-  "mul-pow2 rule has a :when guard clause."
+(it-sequential "egraph-strength-reduction-rules-registered mul-pow2-l"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::mul-pow2-l)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
+
+(it-sequential "egraph-strength-reduction-rules-registered div-pow2"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::div-pow2)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
+
+(it-sequential "egraph-rule-mul-pow2-has-when-guard"
   (let ((rule (find 'cl-cc/optimize::mul-pow2
                     (cl-cc/optimize:egraph-builtin-rules)
                     :key (lambda (r) (getf r :name)))))
-    (assert-true (not (null (getf rule :when))))))
+    (expect (not (null (getf rule :when))) :to-be-truthy)))
 
-(deftest egraph-rule-mul-pow2-non-power-of-2-does-not-introduce-ash
-  "mul-pow2: multiplying by a non-power-of-2 constant does not introduce an ash node."
+(it-sequential "egraph-rule-mul-pow2-non-power-of-2-does-not-introduce-ash"
   (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (c7 (make-eg-const eg 7))
          (id (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::mul x c7)))
     (declare (ignore id))
     (eg-saturate eg)
-    (assert-false (eg-any-class-has-op-p eg 'cl-cc/optimize::ash))))
+    (expect (eg-any-class-has-op-p eg 'cl-cc/optimize::ash) :to-be-falsy)))
 
 ;;; ─── Type Predicate Rules — Registration Tests ───────────────────────────
 
-(deftest-each egraph-type-predicate-rules-registered
-  "Type-predicate constant rules are registered."
-  :cases (("null-p-const"    'cl-cc/optimize::null-p-const)
-          ("cons-p-const"    'cl-cc/optimize::cons-p-const)
-          ("number-p-const"  'cl-cc/optimize::number-p-const)
-          ("integer-p-const" 'cl-cc/optimize::integer-p-const))
-  (rule-name)
-  (assert-true (eg-rule-registered-p rule-name)))
+(it-sequential "egraph-type-predicate-rules-registered null-p-const"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::null-p-const)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
+
+(it-sequential "egraph-type-predicate-rules-registered cons-p-const"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::cons-p-const)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
+
+(it-sequential "egraph-type-predicate-rules-registered number-p-const"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::number-p-const)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
+
+(it-sequential "egraph-type-predicate-rules-registered integer-p-const"
+  (destructuring-bind (rule-name) (list 'cl-cc/optimize::integer-p-const)
+    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
 
 ;;; ─── Advanced: mul-neg-neg ───────────────────────────────────────────────
 ;;; mul-neg-neg: (mul (neg ?x) (neg ?y)) → (mul ?x ?y).
 ;;; Use var for x and a const for y so they're in different classes.
 
-(deftest egraph-rule-mul-neg-neg-distinct-vars-merges-with-mul
-  "mul-neg-neg: (mul (neg ?x) (neg ?y)) merges with (mul ?x ?y) for distinct x and y."
+(it-sequential "egraph-rule-mul-neg-neg-distinct-vars-merges-with-mul"
   (let* ((eg   (cl-cc/optimize:make-e-graph))
          (x    (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (y    (make-eg-const eg 3))
@@ -111,23 +132,21 @@
          (mul1 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::mul nx ny))
          (mul2 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::mul x y)))
     (eg-saturate eg)
-    (assert-true (eg-merged-p eg mul1 mul2))))
+    (expect (eg-merged-p eg mul1 mul2) :to-be-truthy)))
 
-(deftest egraph-rule-mul-neg-neg-same-var-also-fires
-  "mul-neg-neg: (mul (neg ?x) (neg ?x)) merges with (mul ?x ?x)."
+(it-sequential "egraph-rule-mul-neg-neg-same-var-also-fires"
   (let* ((eg   (cl-cc/optimize:make-e-graph))
          (x    (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (nx   (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::neg x))
          (mul1 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::mul nx nx))
          (mul2 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::mul x x)))
     (eg-saturate eg)
-    (assert-true (eg-merged-p eg mul1 mul2))))
+    (expect (eg-merged-p eg mul1 mul2) :to-be-truthy)))
 
 ;;; ─── Advanced: neg-sub ───────────────────────────────────────────────────
 ;;; neg-sub: (neg (sub ?x ?y)) → (sub ?y ?x).
 
-(deftest egraph-rule-neg-sub-distinct-vars-merges-with-reversed-sub
-  "neg-sub: (neg (sub ?x ?y)) merges with (sub ?y ?x) for distinct x and y."
+(it-sequential "egraph-rule-neg-sub-distinct-vars-merges-with-reversed-sub"
   (let* ((eg   (cl-cc/optimize:make-e-graph))
          (x    (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (y    (make-eg-const eg 11))
@@ -135,28 +154,26 @@
          (neg  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::neg sub1))
          (sub2 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::sub y x)))
     (eg-saturate eg)
-    (assert-true (eg-merged-p eg neg sub2))))
+    (expect (eg-merged-p eg neg sub2) :to-be-truthy)))
 
-(deftest egraph-rule-neg-sub-same-var-reduces-to-const-via-sub-self
-  "neg-sub with same variable: (neg (sub ?x ?x)) reduces to a const class via sub-self."
+(it-sequential "egraph-rule-neg-sub-same-var-reduces-to-const-via-sub-self"
   (let* ((eg   (cl-cc/optimize:make-e-graph))
          (x    (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (sub1 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::sub x x))
          (neg  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::neg sub1)))
     (declare (ignore neg))
     (eg-saturate eg)
-    (assert-true (eg-class-contains-op-p eg sub1 'cl-cc/optimize::const))))
+    (expect (eg-class-contains-op-p eg sub1 'cl-cc/optimize::const) :to-be-truthy)))
 
 ;;; ─── Rule Registry: All 51 Rules Present ────────────────────────────────
 
-(deftest egraph-rule-registry-complete
-  "Rule registry: >=51 rules, all have :lhs/:rhs, and all expected names are present."
+(it-sequential "egraph-rule-registry-complete"
   (let* ((rules (cl-cc/optimize:egraph-builtin-rules))
          (names (mapcar (lambda (r) (getf r :name)) rules)))
-    (assert-true (>= (length rules) 51))
+    (expect (>= (length rules) 51) :to-be-truthy)
     (dolist (rule rules)
-      (assert-true (getf rule :lhs))
-      (assert-true (not (eq (getf rule :rhs :missing) :missing))))
+      (expect (getf rule :lhs) :to-be-truthy)
+      (expect (not (eq (getf rule :rhs :missing) :missing)) :to-be-truthy))
     (dolist (n '(cl-cc/optimize::fold-add cl-cc/optimize::fold-sub cl-cc/optimize::fold-mul
                  cl-cc/optimize::fold-neg cl-cc/optimize::fold-not
                  cl-cc/optimize::fold-lt cl-cc/optimize::fold-gt cl-cc/optimize::fold-le cl-cc/optimize::fold-ge
@@ -178,12 +195,11 @@
                  cl-cc/optimize::null-p-const cl-cc/optimize::cons-p-const
                  cl-cc/optimize::number-p-const cl-cc/optimize::integer-p-const
                  cl-cc/optimize::mul-neg-neg cl-cc/optimize::neg-sub))
-      (assert-true (member n names)))))
+      (expect (member n names) :to-be-truthy))))
 
 ;;; ─── Idempotency ─────────────────────────────────────────────────────────
 
-(deftest egraph-saturation-idempotent
-  "Running saturation twice on a saturated graph adds no new e-class entries."
+(it-sequential "egraph-saturation-idempotent"
   (let* ((eg (cl-cc/optimize:make-e-graph))
          (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (c0 (make-eg-const eg 0))
@@ -192,12 +208,11 @@
     (eg-saturate eg)
     (let ((n1 (hash-table-count (cl-cc:eg-classes eg))))
       (eg-saturate eg)
-      (assert-true (<= (hash-table-count (cl-cc:eg-classes eg)) n1)))))
+      (expect (<= (hash-table-count (cl-cc:eg-classes eg)) n1) :to-be-truthy))))
 
 ;;; ─── Composition ─────────────────────────────────────────────────────────
 
-(deftest egraph-rule-double-neg-then-identity
-  "Composition: (add (neg (neg ?x)) (const 0)) — double-neg + add-zero-r."
+(it-sequential "egraph-rule-double-neg-then-identity"
   (let* ((eg   (cl-cc/optimize:make-e-graph))
          (x    (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (neg1 (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::neg x))
@@ -208,10 +223,9 @@
     ;; double-neg: neg2 merges with x.
     ;; add-zero-r: add(x, 0) merges with x.
     ;; So add should merge with x.
-    (assert-true (eg-merged-p eg add x))))
+    (expect (eg-merged-p eg add x) :to-be-truthy)))
 
-(deftest egraph-rule-mul-neg1-then-double-neg
-  "Composition: (mul (neg ?x) (const -1)) — mul-neg1-r fires; class contains both mul and neg."
+(it-sequential "egraph-rule-mul-neg1-then-double-neg"
   (let* ((eg  (cl-cc/optimize:make-e-graph))
          (x   (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (nx  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::neg x))
@@ -220,10 +234,9 @@
     (eg-saturate eg)
     ;; mul-neg1-r: mul(neg(x), -1) merges with a neg class.
     ;; The merged class contains both mul and neg nodes.
-    (assert-true (eg-class-contains-op-p eg mul 'cl-cc/optimize::neg))))
+    (expect (eg-class-contains-op-p eg mul 'cl-cc/optimize::neg) :to-be-truthy)))
 
-(deftest egraph-rule-sub-neg-then-add-zero
-  "Composition: (sub ?x (neg (const 0))) — sub-neg fires; class contains both sub and add."
+(it-sequential "egraph-rule-sub-neg-then-add-zero"
   (let* ((eg  (cl-cc/optimize:make-e-graph))
          (x   (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (c0  (make-eg-const eg 0))
@@ -233,10 +246,9 @@
     (eg-saturate eg)
     ;; sub-neg: sub(x, neg(c0)) merges with add(x, c0).
     ;; The sub and add classes should be merged.
-    (assert-true (eg-merged-p eg sub add))))
+    (expect (eg-merged-p eg sub add) :to-be-truthy)))
 
-(deftest egraph-rule-logand-self-then-logior-zero
-  "Composition: (logior (logand ?x ?x) (const 0)) — logand-self + logior-zero."
+(it-sequential "egraph-rule-logand-self-then-logior-zero"
   (let* ((eg  (cl-cc/optimize:make-e-graph))
          (x   (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
          (and (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::logand x x))
@@ -245,4 +257,4 @@
     (eg-saturate eg)
     ;; logand-self: logand(x,x) merges with x.
     ;; logior-zero: logior(x, 0) merges with x.
-    (assert-true (eg-merged-p eg or x))))
+    (expect (eg-merged-p eg or x) :to-be-truthy)))

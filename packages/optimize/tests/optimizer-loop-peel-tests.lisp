@@ -1,11 +1,9 @@
 ;;;; Unit tests for FR-682 loop peeling.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
-(deftest fr-682-loop-peel-peels-array-boundary-first-iteration
-  "FR-682: a counted loop with an array access on the IV is peeled once before the header."
-(let* ((aref (cl-cc:make-vm-aref :dst :elt :array-reg :arr :index-reg :i))
+(it-sequential "fr-682-loop-peel-peels-array-boundary-first-iteration"
+  (let* ((aref (cl-cc:make-vm-aref :dst :elt :array-reg :arr :index-reg :i))
          (insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :limit :value 8)
                       (make-vm-const :dst :one :value 1)
@@ -19,16 +17,15 @@
                       (make-vm-ret :reg :elt)))
          (out (cl-cc/optimize::opt-pass-loop-peel insts))
          (loop-pos (%test-label-position out "loop")))
-    (assert-true loop-pos)
-    (assert-true (> loop-pos 3))
-    (assert-true (typep (nth (- loop-pos 3) out) 'cl-cc/vm::vm-lt))
-    (assert-true (some (lambda (inst)
+    (expect loop-pos :to-be-truthy)
+    (expect (> loop-pos 3) :to-be-truthy)
+    (expect (typep (nth (- loop-pos 3) out) 'cl-cc/vm::vm-lt) :to-be-truthy)
+    (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm::vm-aref)
                               (cl-cc/optimize::opt-bounds-check-eliminable-marked-p inst)))
-                       out))))
+                       out) :to-be-truthy)))
 
-(deftest fr-682-loop-peel-skips-call-bearing-loop
-  "FR-682: loops with calls are not peeled because first-iteration semantics may differ."
+(it-sequential "fr-682-loop-peel-skips-call-bearing-loop"
   (let* ((call (make-vm-call :dst :tmp :func :fn :args (list :i)))
          (insts (list (make-vm-const :dst :i :value 0)
                       (make-vm-const :dst :limit :value 8)
@@ -42,8 +39,7 @@
                       (make-vm-label :name "exit")
                       (make-vm-ret :reg :tmp)))
          (out (cl-cc/optimize::opt-pass-loop-peel insts)))
-    (assert-equal (mapcar #'cl-cc/vm::instruction->sexp insts)
-                  (mapcar #'cl-cc/vm::instruction->sexp out))))
+    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
 
 ;;;; ─── FR-514 loop fusion / fission (optimizer-loop-fusion.lisp) ──────────────
 ;;;;
@@ -54,95 +50,110 @@
 
 ;;; ─── memory-dependence arithmetic helpers ───────────────────────────────────
 
-(deftest-each fr-514-gcd-test-safe-cases
-  "%loop-fr514-gcd-test-safe-p proves independence when the subscript delta is
-   not divisible by gcd(strides); a zero gcd is trivially safe."
-  :cases (("coprime-delta"   '(:stride 2 :offset 0) '(:stride 2 :offset 1) t)
-          ("divisible-delta" '(:stride 2 :offset 0) '(:stride 2 :offset 2) nil)
-          ("zero-strides"    '(:stride 0 :offset 0) '(:stride 0 :offset 5) t))
-  (a b expected)
-  (let ((result (cl-cc/optimize::%loop-fr514-gcd-test-safe-p a b)))
-    (if expected (assert-true result) (assert-false result))))
+(it-sequential "fr-514-gcd-test-safe-cases coprime-delta"
+  (destructuring-bind (a b expected) (list '(:stride 2 :offset 0) '(:stride 2 :offset 1) t)
+    (let ((result (cl-cc/optimize::%loop-fr514-gcd-test-safe-p a b)))
+    (if expected (expect result :to-be-truthy) (expect result :to-be-falsy)))))
 
-(deftest-each fr-514-banerjee-safe-cases
-  "%loop-fr514-banerjee-safe-p excludes overlap when the offset delta falls
-   outside the Banerjee [lo,hi] bound for the trip count."
-  :cases (("far-offset"  '(:stride 1 :offset 100) '(:stride 1 :offset 0) 3 t)
-          ("same-offset" '(:stride 1 :offset 0)   '(:stride 1 :offset 0) 3 nil))
-  (a b trip expected)
-  (let ((result (cl-cc/optimize::%loop-fr514-banerjee-safe-p a b trip)))
-    (if expected (assert-true result) (assert-false result))))
+(it-sequential "fr-514-gcd-test-safe-cases divisible-delta"
+  (destructuring-bind (a b expected) (list '(:stride 2 :offset 0) '(:stride 2 :offset 2) nil)
+    (let ((result (cl-cc/optimize::%loop-fr514-gcd-test-safe-p a b)))
+    (if expected (expect result :to-be-truthy) (expect result :to-be-falsy)))))
+
+(it-sequential "fr-514-gcd-test-safe-cases zero-strides"
+  (destructuring-bind (a b expected) (list '(:stride 0 :offset 0) '(:stride 0 :offset 5) t)
+    (let ((result (cl-cc/optimize::%loop-fr514-gcd-test-safe-p a b)))
+    (if expected (expect result :to-be-truthy) (expect result :to-be-falsy)))))
+
+(it-sequential "fr-514-banerjee-safe-cases far-offset"
+  (destructuring-bind (a b trip expected) (list '(:stride 1 :offset 100) '(:stride 1 :offset 0) 3 t)
+    (let ((result (cl-cc/optimize::%loop-fr514-banerjee-safe-p a b trip)))
+    (if expected (expect result :to-be-truthy) (expect result :to-be-falsy)))))
+
+(it-sequential "fr-514-banerjee-safe-cases same-offset"
+  (destructuring-bind (a b trip expected) (list '(:stride 1 :offset 0) '(:stride 1 :offset 0) 3 nil)
+    (let ((result (cl-cc/optimize::%loop-fr514-banerjee-safe-p a b trip)))
+    (if expected (expect result :to-be-truthy) (expect result :to-be-falsy)))))
 
 ;;; ─── instruction classification helpers ─────────────────────────────────────
 
-(deftest-each fr-514-memory-inst-p-cases
-  "%loop-fr514-memory-inst-p flags array/slot/global accesses only."
-  :cases (("aref"  'aref  t)
-          ("aset"  'aset  t)
-          ("const" 'const nil))
-  (kind expected)
-  (let ((inst (ecase kind
+(it-sequential "fr-514-memory-inst-p-cases aref"
+  (destructuring-bind (kind expected) (list 'aref t)
+    (let ((inst (ecase kind
                 (aref  (make-vm-aref :dst :d :array-reg :a :index-reg :i))
                 (aset  (make-vm-aset :array-reg :a :index-reg :i :val-reg :v))
                 (const (make-vm-const :dst :d :value 1)))))
     (if expected
-        (assert-true (cl-cc/optimize::%loop-fr514-memory-inst-p inst))
-        (assert-false (cl-cc/optimize::%loop-fr514-memory-inst-p inst)))))
+        (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-truthy)
+        (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-falsy)))))
 
-(deftest fr-514-write-inst-p-distinguishes-stores-from-loads
-  "%loop-fr514-write-inst-p is true for aset (store), false for aref (load)."
-  (assert-true (cl-cc/optimize::%loop-fr514-write-inst-p
-                (make-vm-aset :array-reg :a :index-reg :i :val-reg :v)))
-  (assert-false (cl-cc/optimize::%loop-fr514-write-inst-p
-                 (make-vm-aref :dst :d :array-reg :a :index-reg :i))))
+(it-sequential "fr-514-memory-inst-p-cases aset"
+  (destructuring-bind (kind expected) (list 'aset t)
+    (let ((inst (ecase kind
+                (aref  (make-vm-aref :dst :d :array-reg :a :index-reg :i))
+                (aset  (make-vm-aset :array-reg :a :index-reg :i :val-reg :v))
+                (const (make-vm-const :dst :d :value 1)))))
+    (if expected
+        (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-truthy)
+        (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-falsy)))))
 
-(deftest fr-514-pure-core-p-rejects-control-flow
-  "A core of constants is pure; adding a jump makes it impure (unsafe to move)."
-  (assert-true (cl-cc/optimize::%loop-fr514-pure-core-p
+(it-sequential "fr-514-memory-inst-p-cases const"
+  (destructuring-bind (kind expected) (list 'const nil)
+    (let ((inst (ecase kind
+                (aref  (make-vm-aref :dst :d :array-reg :a :index-reg :i))
+                (aset  (make-vm-aset :array-reg :a :index-reg :i :val-reg :v))
+                (const (make-vm-const :dst :d :value 1)))))
+    (if expected
+        (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-truthy)
+        (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-falsy)))))
+
+(it-sequential "fr-514-write-inst-p-distinguishes-stores-from-loads"
+  (expect (cl-cc/optimize::%loop-fr514-write-inst-p
+                (make-vm-aset :array-reg :a :index-reg :i :val-reg :v)) :to-be-truthy)
+  (expect (cl-cc/optimize::%loop-fr514-write-inst-p
+                 (make-vm-aref :dst :d :array-reg :a :index-reg :i)) :to-be-falsy))
+
+(it-sequential "fr-514-pure-core-p-rejects-control-flow"
+  (expect (cl-cc/optimize::%loop-fr514-pure-core-p
                 (list (make-vm-const :dst :a :value 1)
-                      (make-vm-const :dst :b :value 2))))
-  (assert-false (cl-cc/optimize::%loop-fr514-pure-core-p
+                      (make-vm-const :dst :b :value 2))) :to-be-truthy)
+  (expect (cl-cc/optimize::%loop-fr514-pure-core-p
                  (list (make-vm-const :dst :a :value 1)
-                       (make-vm-jump :label "somewhere")))))
+                       (make-vm-jump :label "somewhere"))) :to-be-falsy))
 
 ;;; ─── label + register helpers ───────────────────────────────────────────────
 
-(deftest fr-514-label-name-derives-fresh-keyword
-  "%loop-fr514-label-name joins base and suffix into a keyword."
-  (assert-eq (intern "HEAD__FISSION_A" :keyword)
-             (cl-cc/optimize::%loop-fr514-label-name "HEAD" "FISSION_A")))
+(it-sequential "fr-514-label-name-derives-fresh-keyword"
+  (expect (cl-cc/optimize::%loop-fr514-label-name "HEAD" "FISSION_A") :to-be (intern "HEAD__FISSION_A" :keyword)))
 
-(deftest fr-514-find-label-index-locates-label-or-nil
-  "%loop-fr514-find-label-index returns the index of a matching label, else NIL."
+(it-sequential "fr-514-find-label-index-locates-label-or-nil"
   (let ((vec (vector (make-vm-const :dst :i :value 0)
                      (make-vm-label :name "target")
                      (make-vm-ret :reg :i))))
-    (assert-= 1 (cl-cc/optimize::%loop-fr514-find-label-index vec "target"))
-    (assert-null (cl-cc/optimize::%loop-fr514-find-label-index vec "missing"))))
+    (expect (= 1 (cl-cc/optimize::%loop-fr514-find-label-index vec "target")) :to-be-truthy)
+    (expect (cl-cc/optimize::%loop-fr514-find-label-index vec "missing") :to-be-null)))
 
-(deftest fr-514-build-envs-tracks-constants-and-defs
-  "%loop-fr514-build-envs records integer constants and later non-const defs clear them."
+(it-sequential "fr-514-build-envs-tracks-constants-and-defs"
   (let ((insts (list (make-vm-const :dst :a :value 5)
                      (make-vm-const :dst :b :value 7)
                      (make-vm-add :dst :a :lhs :a :rhs :b))))
     (multiple-value-bind (const-env def-env)
         (cl-cc/optimize::%loop-fr514-build-envs insts 3)
       ;; :a was reassigned by a non-const add → dropped from const-env.
-      (assert-null (gethash :a const-env))
-      (assert-= 7 (gethash :b const-env))
+      (expect (gethash :a const-env) :to-be-null)
+      (expect (= 7 (gethash :b const-env)) :to-be-truthy)
       ;; def-env still records the producing instruction for :a.
-      (assert-true (typep (gethash :a def-env) 'cl-cc/vm::vm-add)))))
+      (expect (typep (gethash :a def-env) 'cl-cc/vm::vm-add) :to-be-truthy))))
 
-(deftest fr-514-register-dependencies-detects-cross-core-use
-  "%loop-fr514-register-dependencies-p is true when one core reads the other's output."
+(it-sequential "fr-514-register-dependencies-detects-cross-core-use"
   (let ((dependent-l (list (make-vm-add :dst :x :lhs :y :rhs :z)))
         (dependent-r (list (make-vm-add :dst :w :lhs :x :rhs :q)))
         (independent-l (list (make-vm-const :dst :x :value 1)))
         (independent-r (list (make-vm-const :dst :y :value 2))))
-    (assert-true (cl-cc/optimize::%loop-fr514-register-dependencies-p
-                  dependent-l dependent-r))
-    (assert-false (cl-cc/optimize::%loop-fr514-register-dependencies-p
-                   independent-l independent-r))))
+    (expect (cl-cc/optimize::%loop-fr514-register-dependencies-p
+                  dependent-l dependent-r) :to-be-truthy)
+    (expect (cl-cc/optimize::%loop-fr514-register-dependencies-p
+                   independent-l independent-r) :to-be-falsy)))
 
 ;;; ─── loop fusion pass ───────────────────────────────────────────────────────
 
@@ -158,8 +169,7 @@
                 (make-vm-jump :label head)
                 (make-vm-label :name exit))))
 
-(deftest fr-514-fusion-merges-adjacent-identical-space-loops
-  "opt-pass-loop-fusion fuses two adjacent pure loops sharing init/limit/step."
+(it-sequential "fr-514-fusion-merges-adjacent-identical-space-loops"
   (let* ((insts (append
                  (list (make-vm-const :dst :i :value 0)
                        (make-vm-const :dst :j :value 0)
@@ -172,16 +182,15 @@
                  (list (make-vm-ret :reg :xa))))
          (out (cl-cc/optimize::opt-pass-loop-fusion insts)))
     ;; Fusion collapses two loop headers into one: fewer instructions, one back-edge.
-    (assert-true (< (length out) (length insts)))
-    (assert-= 1 (count-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out))
+    (expect (< (length out) (length insts)) :to-be-truthy)
+    (expect (= 1 (count-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out)) :to-be-truthy)
     ;; The surviving exit label is the second loop's exit.
-    (assert-true (some (lambda (x)
+    (expect (some (lambda (x)
                          (and (typep x 'cl-cc/vm::vm-label)
                               (equal (cl-cc/vm::vm-name x) "exitB")))
-                       out))))
+                       out) :to-be-truthy)))
 
-(deftest fr-514-fusion-skips-loops-with-different-iteration-spaces
-  "opt-pass-loop-fusion leaves adjacent loops untouched when limits differ."
+(it-sequential "fr-514-fusion-skips-loops-with-different-iteration-spaces"
   (let* ((insts (append
                  (list (make-vm-const :dst :i :value 0)
                        (make-vm-const :dst :j :value 0)
@@ -193,13 +202,11 @@
                  (%fr-514-counted-loop "headB" "exitB" :j :limit2 :one
                                        (list (make-vm-const :dst :xb :value 9)))))
          (out (cl-cc/optimize::opt-pass-loop-fusion insts)))
-    (assert-equal (mapcar #'cl-cc/vm::instruction->sexp insts)
-                  (mapcar #'cl-cc/vm::instruction->sexp out))))
+    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
 
 ;;; ─── loop fission pass ──────────────────────────────────────────────────────
 
-(deftest fr-514-fission-splits-large-independent-pure-loop
-  "opt-pass-loop-fission clones a large independent pure core into two loops."
+(it-sequential "fr-514-fission-splits-large-independent-pure-loop"
   (let* ((core (loop for k from 1 to 8
                      collect (make-vm-const
                               :dst (intern (format nil "C~A" k) :keyword)
@@ -212,17 +219,16 @@
                  (list (make-vm-ret :reg :c1))))
          (out (cl-cc/optimize::opt-pass-loop-fission insts)))
     ;; Fission produces two suffixed loops (FISSION_A / FISSION_B).
-    (assert-true (some (lambda (x)
+    (expect (some (lambda (x)
                          (and (typep x 'cl-cc/vm::vm-label)
                               (search "FISSION_A" (string (cl-cc/vm::vm-name x)))))
-                       out))
-    (assert-true (some (lambda (x)
+                       out) :to-be-truthy)
+    (expect (some (lambda (x)
                          (and (typep x 'cl-cc/vm::vm-label)
                               (search "FISSION_B" (string (cl-cc/vm::vm-name x)))))
-                       out))))
+                       out) :to-be-truthy)))
 
-(deftest fr-514-fission-leaves-small-loops-unchanged
-  "opt-pass-loop-fission does not split a loop whose core is below the size floor."
+(it-sequential "fr-514-fission-leaves-small-loops-unchanged"
   (let* ((insts (append
                  (list (make-vm-const :dst :i :value 0)
                        (make-vm-const :dst :limit :value 8)
@@ -231,5 +237,4 @@
                                        (list (make-vm-const :dst :x :value 1)))
                  (list (make-vm-ret :reg :x))))
          (out (cl-cc/optimize::opt-pass-loop-fission insts)))
-    (assert-equal (mapcar #'cl-cc/vm::instruction->sexp insts)
-                  (mapcar #'cl-cc/vm::instruction->sexp out))))
+    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))

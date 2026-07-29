@@ -7,118 +7,118 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cps-ast-suite)
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; cps-transform* dispatcher
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cps-transform*-dispatch
-  "cps-transform* dispatches to AST transformer for AST nodes and sexp transformer otherwise."
-  :cases (("ast-node" (cl-cc:make-ast-int :value 42))
-          ("sexp"     '(+ 1 2)))
-  (input)
-  (assert-true (is-cps-lambda (cl-cc:cps-transform* input))))
+(it-sequential "cps-transform*-dispatch ast-node"
+  (destructuring-bind (input) (list (cl-cc:make-ast-int :value 42))
+    (expect (is-cps-lambda (cl-cc:cps-transform* input)) :to-be-truthy)))
+
+(it-sequential "cps-transform*-dispatch sexp"
+  (destructuring-bind (input) (list '(+ 1 2))
+    (expect (is-cps-lambda (cl-cc:cps-transform* input)) :to-be-truthy)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; cps-transform-sequence edge cases
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cps-sequence-behavior
-  "cps-transform-sequence: empty→(funcall k nil); single→direct CPS form."
+(it-sequential "cps-sequence-behavior"
   (let ((k-var (gensym "K")))
     ;; empty: calls continuation with nil
     (let ((sexp (cl-cc:cps-transform-sequence nil k-var)))
-      (assert-true (listp sexp))
-      (assert-eq 'funcall (car sexp)))
+      (expect (listp sexp) :to-be-truthy)
+      (expect (car sexp) :to-be 'funcall))
     ;; single form: delegates to cps-transform-ast (still a list)
     (let ((sexp (cl-cc:cps-transform-sequence (list (cl-cc:make-ast-int :value 5)) k-var)))
-      (assert-true (listp sexp)))))
+      (expect (listp sexp) :to-be-truthy))))
 
-(deftest cps-simplify-fixed-point-stops-on-stable-form
-  "%cps-simplify-fixed-point keeps applying a step until the form stabilizes."
+(it-sequential "cps-simplify-fixed-point-stops-on-stable-form"
   (let ((calls 0))
-    (assert-equal 'done
-                  (cl-cc/cps::%cps-simplify-fixed-point
+    (expect (cl-cc/cps::%cps-simplify-fixed-point
                    'start
                    (lambda (form)
                      (incf calls)
-                     (if (eq form 'start) 'done 'done))))
-    (assert-= 2 calls)))
+                     (if (eq form 'start) 'done 'done))) :to-equal 'done)
+    (expect (= 2 calls) :to-be-truthy)))
 
-(deftest cps-dispatch-table-covers-bootstrap-special-forms
-  "The bootstrap CPS dispatch table keeps handlers for every supported special form."
+(it-sequential "cps-dispatch-table-covers-bootstrap-special-forms"
   (dolist (operator '(+ - * if progn let print))
-    (assert-true (functionp (gethash operator cl-cc/cps::*cps-sexp-dispatch-table*)))))
+    (expect (functionp (gethash operator cl-cc/cps::*cps-sexp-dispatch-table*)) :to-be-truthy)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CPS for block / return-from
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest-each cps-control-outer-car
-  "CPS-transformed block/catch nodes produce expected outer form keyword."
-  :cases (("block" (cl-cc:make-ast-block :name 'nil :body (list (cl-cc:make-ast-int :value 1))) 'block)
-          ("catch" (cl-cc:make-ast-catch :tag  (cl-cc:make-ast-quote :value :done)
-                                         :body (list (cl-cc:make-ast-int :value 0)))            'funcall))
-  (node expected-car)
-  (let* ((k      (gensym "K"))
+(it-sequential "cps-control-outer-car block"
+  (destructuring-bind (node expected-car) (list (cl-cc:make-ast-block :name 'nil :body (list (cl-cc:make-ast-int :value 1))) 'block)
+    (let* ((k      (gensym "K"))
          (result (cl-cc/cps::cps-transform-ast node k)))
-    (assert-eq expected-car (car result))))
+    (expect (car result) :to-be expected-car))))
 
-(deftest-each cps-control-contains-token
-  "CPS-transformed return-from/throw contain expected operator tokens in printed output."
-  :cases (("return-from" (cl-cc:make-ast-return-from :name 'nil
-                                                     :value (cl-cc:make-ast-int :value 42))
-                         "RETURN-FROM")
-          ("throw"       (cl-cc:make-ast-throw :tag   (cl-cc:make-ast-quote :value :done)
-                                               :value (cl-cc:make-ast-int :value 99))
-                         "THROW"))
-  (node expected-token)
-  (let* ((k      (gensym "K"))
+(it-sequential "cps-control-outer-car catch"
+  (destructuring-bind (node expected-car) (list (cl-cc:make-ast-catch :tag  (cl-cc:make-ast-quote :value :done)
+                                         :body (list (cl-cc:make-ast-int :value 0))) 'funcall)
+    (let* ((k      (gensym "K"))
+         (result (cl-cc/cps::cps-transform-ast node k)))
+    (expect (car result) :to-be expected-car))))
+
+(it-sequential "cps-control-contains-token return-from"
+  (destructuring-bind (node expected-token) (list (cl-cc:make-ast-return-from :name 'nil
+                                                     :value (cl-cc:make-ast-int :value 42)) "RETURN-FROM")
+    (let* ((k      (gensym "K"))
          (result (format nil "~S" (cl-cc/cps::cps-transform-ast node k))))
-    (assert-true (search expected-token result))))
+    (expect (search expected-token result) :to-be-truthy))))
+
+(it-sequential "cps-control-contains-token throw"
+  (destructuring-bind (node expected-token) (list (cl-cc:make-ast-throw :tag   (cl-cc:make-ast-quote :value :done)
+                                               :value (cl-cc:make-ast-int :value 99)) "THROW")
+    (let* ((k      (gensym "K"))
+         (result (format nil "~S" (cl-cc/cps::cps-transform-ast node k))))
+    (expect (search expected-token result) :to-be-truthy))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CPS for tagbody-section
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cps-tagbody-section-behavior
-  "cps-transform-tagbody-section: empty→continue-form; single form→funcall wrapper."
+(it-sequential "cps-tagbody-section-behavior"
   (let ((continue-form '(go next-tag)))
     ;; empty: returns the continuation form directly
     (let ((result (cl-cc/cps::cps-transform-tagbody-section nil continue-form)))
-      (assert-equal continue-form result))
+      (expect result :to-equal continue-form))
     ;; single form: CPS wrapper is a funcall
     (let ((result (cl-cc/cps::cps-transform-tagbody-section
                    (list (cl-cc:make-ast-int :value 1)) continue-form)))
-      (assert-eq 'funcall (car result)))))
+      (expect (car result) :to-be 'funcall))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CPS for local function bindings (flet/labels helpers)
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cps-fn-binding-structure
-  "cps-transform-fn-binding: produces valid FLET/LABELS binding (name (params k) body)."
+(it-sequential "cps-fn-binding-structure"
   (let* ((k-var 'my-k)
          (binding (list 'my-fn '(a b) (cl-cc:make-ast-int :value 42)))
          (result (cl-cc/cps::cps-transform-fn-binding binding k-var)))
-    (assert-eq 'my-fn (first result))
+    (expect (first result) :to-be 'my-fn)
     (let ((lambda-list (second result)))
-      (assert-eq 'a    (first  lambda-list))
-      (assert-eq 'b    (second lambda-list))
-      (assert-eq 'my-k (third  lambda-list)))))
+      (expect (first  lambda-list) :to-be 'a)
+      (expect (second lambda-list) :to-be 'b)
+      (expect (third  lambda-list) :to-be 'my-k))))
 
-(deftest-each cps-local-fns-outer-is-form-kw
-  "cps-transform-local-fns produces (flet ...) or (labels ...) as the outer form."
-  :cases (("flet"   'flet)
-          ("labels" 'labels))
-  (form-kw)
-  (let* ((k    (gensym "K"))
+(it-sequential "cps-local-fns-outer-is-form-kw flet"
+  (destructuring-bind (form-kw) (list 'flet)
+    (let* ((k    (gensym "K"))
          (body (list (cl-cc:make-ast-int :value 42))))
-    (assert-eq form-kw (first (cl-cc/cps::cps-transform-local-fns form-kw nil body k)))))
+    (expect (first (cl-cc/cps::cps-transform-local-fns form-kw nil body k)) :to-be form-kw))))
 
-(deftest cps-local-fns-bindings-transformed
-  "cps-transform-local-fns applies cps-transform-fn-binding to each binding."
+(it-sequential "cps-local-fns-outer-is-form-kw labels"
+  (destructuring-bind (form-kw) (list 'labels)
+    (let* ((k    (gensym "K"))
+         (body (list (cl-cc:make-ast-int :value 42))))
+    (expect (first (cl-cc/cps::cps-transform-local-fns form-kw nil body k)) :to-be form-kw))))
+
+(it-sequential "cps-local-fns-bindings-transformed"
   (let* ((k (gensym "K"))
          (body (list (cl-cc:make-ast-int :value 1)))
          ;; binding = (f (x) <ast-node>)
@@ -126,22 +126,21 @@
          (result (cl-cc/cps::cps-transform-local-fns
                   'flet (list binding) body k)))
     ;; second element is the binding list: ((f (x K) ...))
-    (assert-eq 'f (first (first (second result))))))
+    (expect (first (first (second result))) :to-be 'f)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CPS for unwind-protect
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(deftest cps-unwind-protect-structure
-  "ast-unwind-protect CPS: outer is (unwind-protect ...) and nil cleanup emits nil."
+(it-sequential "cps-unwind-protect-structure"
   (let ((k (gensym "K")))
     (let* ((node (cl-cc:make-ast-unwind-protect
                   :protected (cl-cc:make-ast-int :value 1)
                   :cleanup   (list (cl-cc:make-ast-int :value 2))))
            (result (cl-cc/cps::cps-transform-ast node k)))
-      (assert-eq 'unwind-protect (first result)))
+      (expect (first result) :to-be 'unwind-protect))
     (let* ((node (cl-cc:make-ast-unwind-protect
                   :protected (cl-cc:make-ast-int :value 1)
                   :cleanup   nil))
            (result (cl-cc/cps::cps-transform-ast node k)))
-      (assert-eq nil (third result)))))
+      (expect (third result) :to-be nil))))

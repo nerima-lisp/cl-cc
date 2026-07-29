@@ -6,11 +6,8 @@
 
 (in-package :cl-cc/test)
 
-(defsuite x86-64-emit-suite :description "x86-64 assembly emit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite x86-64-emit-suite)
 ;;; ─── Helper: emit an instruction to string ─────────────────────────────────────
 
 (defun %x86-emit (target inst)
@@ -25,155 +22,192 @@
 
 ;;; ─── *phys-reg-to-asm-string* table ─────────────────────────────────────────
 
-(deftest x86-phys-reg-table-has-15-entries
-  "Physical register table maps all 15 allocatable x86-64 GP registers including RBP."
-  (assert-equal 15 (length cl-cc/codegen::*phys-reg-to-asm-string*)))
+(it-sequential "x86-phys-reg-table-has-15-entries"
+  (expect (length cl-cc/codegen::*phys-reg-to-asm-string*) :to-equal 15))
 
-(deftest-each x86-phys-reg-table-entries
-  "Physical register table contains correct mappings."
-  :cases (("rax" :rax "rax")
-          ("rcx" :rcx "rcx")
-          ("rdx" :rdx "rdx")
-          ("rbx" :rbx "rbx")
-          ("rbp" :rbp "rbp")
-          ("rsi" :rsi "rsi")
-          ("rdi" :rdi "rdi")
-          ("r8"  :r8  "r8")
-          ("r15" :r15 "r15"))
-  (phys-key expected-str)
-  (assert-equal expected-str (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*))))
+(it-sequential "x86-phys-reg-table-entries rax"
+  (destructuring-bind (phys-key expected-str) (list :rax "rax")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries rcx"
+  (destructuring-bind (phys-key expected-str) (list :rcx "rcx")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries rdx"
+  (destructuring-bind (phys-key expected-str) (list :rdx "rdx")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries rbx"
+  (destructuring-bind (phys-key expected-str) (list :rbx "rbx")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries rbp"
+  (destructuring-bind (phys-key expected-str) (list :rbp "rbp")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries rsi"
+  (destructuring-bind (phys-key expected-str) (list :rsi "rsi")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries rdi"
+  (destructuring-bind (phys-key expected-str) (list :rdi "rdi")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries r8"
+  (destructuring-bind (phys-key expected-str) (list :r8 "r8")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
+
+(it-sequential "x86-phys-reg-table-entries r15"
+  (destructuring-bind (phys-key expected-str) (list :r15 "r15")
+    (expect (cdr (assoc phys-key cl-cc/codegen::*phys-reg-to-asm-string*)) :to-equal expected-str)))
 
 ;;; ─── target-register: fallback (no regalloc) ──────────────────────────────────
 
-(deftest-each x86-target-register-fallback
-  "Fallback target-register maps :R0..:R7 to the naive pool."
-  :cases (("r0" :r0 "rax")
-          ("r1" :r1 "rbx")
-          ("r2" :r2 "rcx")
-          ("r3" :r3 "rdx")
-          ("r4" :r4 "r8")
-          ("r5" :r5 "r9")
-          ("r6" :r6 "r10")
-          ("r7" :r7 "r11"))
-  (vreg expected)
-  (let ((tgt (%make-x86-target)))
-    (assert-equal expected (cl-cc/codegen::target-register tgt vreg))))
+(it-sequential "x86-target-register-fallback r0"
+  (destructuring-bind (vreg expected) (list :r0 "rax")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
 
-(deftest x86-target-register-fallback-signals-error-for-r8-plus
-  "Fallback (no regalloc) signals error for :R8 and above."
-  (let ((tgt (%make-x86-target)))
-    (assert-signals error (cl-cc/codegen::target-register tgt :r8))))
+(it-sequential "x86-target-register-fallback r1"
+  (destructuring-bind (vreg expected) (list :r1 "rbx")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
 
-(deftest x86-target-register-with-regalloc-uses-assignment
-  "With regalloc, known vreg returns mapped string; unknown vreg signals error."
+(it-sequential "x86-target-register-fallback r2"
+  (destructuring-bind (vreg expected) (list :r2 "rcx")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "x86-target-register-fallback r3"
+  (destructuring-bind (vreg expected) (list :r3 "rdx")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "x86-target-register-fallback r4"
+  (destructuring-bind (vreg expected) (list :r4 "r8")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "x86-target-register-fallback r5"
+  (destructuring-bind (vreg expected) (list :r5 "r9")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "x86-target-register-fallback r6"
+  (destructuring-bind (vreg expected) (list :r6 "r10")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "x86-target-register-fallback r7"
+  (destructuring-bind (vreg expected) (list :r7 "r11")
+    (let ((tgt (%make-x86-target)))
+    (expect (cl-cc/codegen::target-register tgt vreg) :to-equal expected))))
+
+(it-sequential "x86-target-register-fallback-signals-error-for-r8-plus"
+  (let ((tgt (%make-x86-target)))
+    (signals error (cl-cc/codegen::target-register tgt :r8))))
+
+(it-sequential "x86-target-register-with-regalloc-uses-assignment"
   (let* ((ht (make-hash-table))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment ht))
          (tgt (make-instance 'cl-cc/codegen::x86-64-target :regalloc ra)))
     (setf (gethash :r0 ht) :rax)
-    (assert-equal "rax" (cl-cc/codegen::target-register tgt :r0))
-    (assert-signals error (cl-cc/codegen::target-register tgt :r99))))
+    (expect (cl-cc/codegen::target-register tgt :r0) :to-equal "rax")
+    (signals error (cl-cc/codegen::target-register tgt :r99))))
 
 ;;; ─── emit-instruction methods ──────────────────────────────────────────────────
 
-(deftest x86-emit-const-emits-mov-with-value
-  "vm-const emits mov to rax with the immediate value 42."
+(it-sequential "x86-emit-const-emits-mov-with-value"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-const :dst :r0 :value 42))))
-    (assert-true (search "mov" asm))
-    (assert-true (search "rax" asm))
-    (assert-true (search "42" asm))))
+    (expect (search "mov" asm) :to-be-truthy)
+    (expect (search "rax" asm) :to-be-truthy)
+    (expect (search "42" asm) :to-be-truthy)))
 
-(deftest x86-emit-move-emits-mov-between-regs
-  "vm-move emits mov from rbx (r1) to rax (r0)."
+(it-sequential "x86-emit-move-emits-mov-between-regs"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-move :dst :r0 :src :r1))))
-    (assert-true (search "mov" asm))
-    (assert-true (search "rax" asm))
-    (assert-true (search "rbx" asm))))
+    (expect (search "mov" asm) :to-be-truthy)
+    (expect (search "rax" asm) :to-be-truthy)
+    (expect (search "rbx" asm) :to-be-truthy)))
 
-(deftest x86-emit-add-emits-mov-and-add-mnemonic
-  "vm-add emits mov followed by add mnemonic."
+(it-sequential "x86-emit-add-emits-mov-and-add-mnemonic"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-add :dst :r0 :lhs :r1 :rhs :r2))))
-    (assert-true (search "mov" asm))
-    (assert-true (search "add" asm))))
+    (expect (search "mov" asm) :to-be-truthy)
+    (expect (search "add" asm) :to-be-truthy)))
 
-(deftest-each x86-emit-arithmetic-mnemonics
-  "vm-sub emits sub mnemonic; vm-mul emits imul mnemonic."
-  :cases (("sub" (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2) "sub")
-          ("mul" (make-vm-mul :dst :r0 :lhs :r1 :rhs :r2) "imul"))
-  (inst expected-mnemonic)
-  (let* ((tgt (%make-x86-target))
+(it-sequential "x86-emit-arithmetic-mnemonics sub"
+  (destructuring-bind (inst expected-mnemonic) (list (make-vm-sub :dst :r0 :lhs :r1 :rhs :r2) "sub")
+    (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt inst)))
-    (assert-true (search expected-mnemonic asm))))
+    (expect (search expected-mnemonic asm) :to-be-truthy))))
 
-(deftest x86-emit-label-emits-align-and-colon-name
-  "vm-label emits .align 4 followed by the label name with colon."
+(it-sequential "x86-emit-arithmetic-mnemonics mul"
+  (destructuring-bind (inst expected-mnemonic) (list (make-vm-mul :dst :r0 :lhs :r1 :rhs :r2) "imul")
+    (let* ((tgt (%make-x86-target))
+         (asm (%x86-emit tgt inst)))
+    (expect (search expected-mnemonic asm) :to-be-truthy))))
+
+(it-sequential "x86-emit-label-emits-align-and-colon-name"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-label :name "loop"))))
-    (assert-true (search ".align 4" asm))
-    (assert-true (search "loop:" asm))))
+    (expect (search ".align 4" asm) :to-be-truthy)
+    (expect (search "loop:" asm) :to-be-truthy)))
 
-(deftest x86-emit-jump-emits-jmp-mnemonic
-  "vm-jump emits jmp with the target label."
+(it-sequential "x86-emit-jump-emits-jmp-mnemonic"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-jump :label "done"))))
-    (assert-true (search "jmp" asm))
-    (assert-true (search "done" asm))))
+    (expect (search "jmp" asm) :to-be-truthy)
+    (expect (search "done" asm) :to-be-truthy)))
 
-(deftest x86-emit-jump-zero-emits-cmp-and-je
-  "vm-jump-zero emits cmp then je with the target label."
+(it-sequential "x86-emit-jump-zero-emits-cmp-and-je"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-jump-zero :reg :r0 :label "else"))))
-    (assert-true (search "cmp" asm))
-    (assert-true (search "je" asm))
-    (assert-true (search "else" asm))))
+    (expect (search "cmp" asm) :to-be-truthy)
+    (expect (search "je" asm) :to-be-truthy)
+    (expect (search "else" asm) :to-be-truthy)))
 
-(deftest x86-emit-halt-emits-mov-rax-and-ret
-  "vm-halt emits mov rax and ret."
+(it-sequential "x86-emit-halt-emits-mov-rax-and-ret"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-halt :reg :r0))))
-    (assert-true (search "mov rax" asm))
-    (assert-true (search "ret" asm))))
+    (expect (search "mov rax" asm) :to-be-truthy)
+    (expect (search "ret" asm) :to-be-truthy)))
 
-(deftest x86-emit-print-calls-rt-print-with-rdi
-  "vm-print emits a call to rt-print with rdi as the argument."
+(it-sequential "x86-emit-print-calls-rt-print-with-rdi"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-print :reg :r0))))
-    (assert-true (search "call rt-print" asm))
-    (assert-true (search "rdi" asm))))
+    (expect (search "call rt-print" asm) :to-be-truthy)
+    (expect (search "rdi" asm) :to-be-truthy)))
 
-(deftest x86-emit-ret-emits-mov-rax-and-ret
-  "vm-ret emits mov rax and ret."
+(it-sequential "x86-emit-ret-emits-mov-rax-and-ret"
   (let* ((tgt (%make-x86-target))
          (asm (%x86-emit tgt (make-vm-ret :reg :r0))))
-    (assert-true (search "mov rax" asm))
-    (assert-true (search "ret" asm))))
+    (expect (search "mov rax" asm) :to-be-truthy)
+    (expect (search "ret" asm) :to-be-truthy)))
 
 ;;; ─── Spill code emission ──────────────────────────────────────────────────────
 
-(deftest x86-emit-spill-operations
-  "vm-spill-store emits mov [rbp-N], reg; vm-spill-load emits mov reg, [rbp-N]."
+(it-sequential "x86-emit-spill-operations"
   (let ((tgt (%make-x86-target)))
     (let ((asm (%x86-emit tgt (make-vm-spill-store :src-reg :rax :slot 2))))
-      (assert-true (search "mov" asm))
-      (assert-true (search "rbp" asm))
-      (assert-true (search "16" asm))
-      (assert-true (search "rax" asm)))
+      (expect (search "mov" asm) :to-be-truthy)
+      (expect (search "rbp" asm) :to-be-truthy)
+      (expect (search "16" asm) :to-be-truthy)
+      (expect (search "rax" asm) :to-be-truthy))
     (let ((asm (%x86-emit tgt (make-vm-spill-load :dst-reg :rbx :slot 3))))
-      (assert-true (search "mov" asm))
-      (assert-true (search "rbx" asm))
-      (assert-true (search "rbp" asm))
-      (assert-true (search "24" asm)))))
+      (expect (search "mov" asm) :to-be-truthy)
+      (expect (search "rbx" asm) :to-be-truthy)
+      (expect (search "rbp" asm) :to-be-truthy)
+      (expect (search "24" asm) :to-be-truthy))))
 
-(deftest x86-emit-spill-operations-rsp-red-zone
-  "vm-spill-store/load use rsp in assembly when the target spill base is red-zone rsp."
+(it-sequential "x86-emit-spill-operations-rsp-red-zone"
   (let ((tgt (make-instance 'cl-cc/codegen::x86-64-target :spill-base-reg :rsp)))
     (let ((asm (%x86-emit tgt (make-vm-spill-store :src-reg :rax :slot 1))))
-      (assert-true (search "rsp" asm))
-      (assert-false (search "rbp" asm))
-      (assert-true (search "8" asm)))
+      (expect (search "rsp" asm) :to-be-truthy)
+      (expect (search "rbp" asm) :to-be-falsy)
+      (expect (search "8" asm) :to-be-truthy))
     (let ((asm (%x86-emit tgt (make-vm-spill-load :dst-reg :rbx :slot 1))))
-      (assert-true (search "rsp" asm))
-      (assert-false (search "rbp" asm))
-      (assert-true (search "rbx" asm)))))
+      (expect (search "rsp" asm) :to-be-truthy)
+      (expect (search "rbp" asm) :to-be-falsy)
+      (expect (search "rbx" asm) :to-be-truthy))))

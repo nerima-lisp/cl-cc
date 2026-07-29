@@ -5,7 +5,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── ast-to-sexp roundtrip ──────────────────────────────────────────────────
 
@@ -13,158 +12,226 @@
   "Lower sexp to AST then convert back to sexp."
   (cl-cc/ast:ast-to-sexp (lower sexp)))
 
-(deftest-each ast-roundtrip-atoms
-  "ast-to-sexp roundtrip: atomic forms preserve integer and symbol identity."
-  :cases (("integer" 42 42)
-          ("symbol"  'x 'x))
-  (input expected)
-  (assert-equal expected (ast-roundtrip input)))
+(it-sequential "ast-roundtrip-atoms integer"
+  (destructuring-bind (input expected) (list 42 42)
+    (expect (ast-roundtrip input) :to-equal expected)))
 
-(deftest ast-roundtrip-wildcard-and-if-structure
-  "ast-to-sexp roundtrip: _ round-trips by name; if preserves condition, then, and else."
-  (assert-string= "_" (symbol-name (ast-roundtrip '_)))
+(it-sequential "ast-roundtrip-atoms symbol"
+  (destructuring-bind (input expected) (list 'x 'x)
+    (expect (ast-roundtrip input) :to-equal expected)))
+
+(it-sequential "ast-roundtrip-wildcard-and-if-structure"
+  (expect (symbol-name (ast-roundtrip '_)) :to-equal "_")
   (let ((result (ast-roundtrip '(if x 1 2))))
-    (assert-eq 'x (second result))
-    (assert-= 1 (third result))
-    (assert-= 2 (fourth result))))
+    (expect (second result) :to-be 'x)
+    (expect (= 1 (third result)) :to-be-truthy)
+    (expect (= 2 (fourth result)) :to-be-truthy)))
 
-(deftest-each ast-roundtrip-control-flow
-  "ast-to-sexp roundtrip: control-flow heads are preserved."
-  :cases (("if"    '(if x 1 2)        'if)
-          ("progn" '(progn 1 2 3)     'progn)
-          ("block" '(block outer 1 2) 'block)
-          ("let"   '(let ((x 10)) x)  'let))
-  (input expected-head)
-  (assert-eq expected-head (first (ast-roundtrip input))))
+(it-sequential "ast-roundtrip-control-flow if"
+  (destructuring-bind (input expected-head) (list '(if x 1 2) 'if)
+    (expect (first (ast-roundtrip input)) :to-be expected-head)))
 
-(deftest lower-named-let-form
-  "lower-sexp-to-ast: named LET lowers to LABELS plus an initial recursive call."
+(it-sequential "ast-roundtrip-control-flow progn"
+  (destructuring-bind (input expected-head) (list '(progn 1 2 3) 'progn)
+    (expect (first (ast-roundtrip input)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-control-flow block"
+  (destructuring-bind (input expected-head) (list '(block outer 1 2) 'block)
+    (expect (first (ast-roundtrip input)) :to-be expected-head)))
+
+(it-sequential "ast-roundtrip-control-flow let"
+  (destructuring-bind (input expected-head) (list '(let ((x 10)) x) 'let)
+    (expect (first (ast-roundtrip input)) :to-be expected-head)))
+
+(it-sequential "lower-named-let-form"
   (let ((node (lower '(let loop ((i 0) (acc 1))
                        (if (= i 3)
                            acc
                            (loop (+ i 1) (* acc 2)))))))
-    (assert-true (cl-cc/ast:ast-labels-p node))
+    (expect (cl-cc/ast:ast-labels-p node) :to-be-truthy)
     (let ((binding (first (cl-cc/ast:ast-labels-bindings node)))
           (body (cl-cc/ast:ast-labels-body node)))
-      (assert-eq 'loop (first binding))
-      (assert-equal '(i acc) (second binding))
-      (assert-true (cl-cc/ast:ast-call-p (first body))))))
+      (expect (first binding) :to-be 'loop)
+      (expect (second binding) :to-equal '(i acc))
+      (expect (cl-cc/ast:ast-call-p (first body)) :to-be-truthy))))
 
-(deftest-each ast-roundtrip-exact-forms
-  "ast-roundtrip preserves the complete sexp for self-roundtripping forms."
-  :cases (("setq"  '(setq x 42))
-          ("quote" '(quote hello)))
-  (form)
-  (assert-equal form (ast-roundtrip form)))
+(it-sequential "ast-roundtrip-exact-forms setq"
+  (destructuring-bind (form) (list '(setq x 42))
+    (expect (ast-roundtrip form) :to-equal form)))
 
-(deftest-each ast-roundtrip-definition-heads
-  "ast-roundtrip preserves head, name, and param-list for definition forms."
-  :cases (("lambda" '(lambda (x y) (+ x y)) 'lambda  nil       '(x y))
-          ("defun"  '(defun add (a b) (+ a b)) 'defun 'add     '(a b))
-          ("defvar" '(defvar *count* 0)          'defvar '*count* nil))
-  (form expected-head expected-name expected-params)
-  (let ((result (ast-roundtrip form)))
-    (assert-eq expected-head (first result))
+(it-sequential "ast-roundtrip-exact-forms quote"
+  (destructuring-bind (form) (list '(quote hello))
+    (expect (ast-roundtrip form) :to-equal form)))
+
+(it-sequential "ast-roundtrip-definition-heads lambda"
+  (destructuring-bind (form expected-head expected-name expected-params) (list '(lambda (x y) (+ x y)) 'lambda nil '(x y))
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
     (when expected-name
-      (assert-eq expected-name (second result)))
+      (expect (second result) :to-be expected-name))
     (when expected-params
-      (assert-equal expected-params (if expected-name (third result) (second result))))))
+      (expect (if expected-name (third result) (second result)) :to-equal expected-params)))))
+
+(it-sequential "ast-roundtrip-definition-heads defun"
+  (destructuring-bind (form expected-head expected-name expected-params) (list '(defun add (a b) (+ a b)) 'defun 'add '(a b))
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (when expected-name
+      (expect (second result) :to-be expected-name))
+    (when expected-params
+      (expect (if expected-name (third result) (second result)) :to-equal expected-params)))))
+
+(it-sequential "ast-roundtrip-definition-heads defvar"
+  (destructuring-bind (form expected-head expected-name expected-params) (list '(defvar *count* 0) 'defvar '*count* nil)
+    (let ((result (ast-roundtrip form)))
+    (expect (first result) :to-be expected-head)
+    (when expected-name
+      (expect (second result) :to-be expected-name))
+    (when expected-params
+      (expect (if expected-name (third result) (second result)) :to-equal expected-params)))))
 
 ;;; ─── sexp-head-to-kind ───────────────────────────────────────────────────────
 
-(deftest-each grammar-sexp-head-to-kind
-  "sexp-head-to-kind maps each special form head to its kind keyword."
-  :cases (("defun"   'defun                   :defun)
-          ("let"     'let                     :let)
-          ("if"      'if                      :if)
-          ("lambda"  'lambda                  :lambda)
-          ("setq"    'setq                    :setq)
-          ("progn"   'progn                   :progn)
-          ("defclass" 'defclass               :defclass)
-          ("unknown" 'completely-unknown-symbol :call))
-  (sym expected)
-  (assert-eq expected (cl-cc/parse:sexp-head-to-kind sym)))
+(it-sequential "grammar-sexp-head-to-kind defun"
+  (destructuring-bind (sym expected) (list 'defun :defun)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind let"
+  (destructuring-bind (sym expected) (list 'let :let)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind if"
+  (destructuring-bind (sym expected) (list 'if :if)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind lambda"
+  (destructuring-bind (sym expected) (list 'lambda :lambda)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind setq"
+  (destructuring-bind (sym expected) (list 'setq :setq)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind progn"
+  (destructuring-bind (sym expected) (list 'progn :progn)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind defclass"
+  (destructuring-bind (sym expected) (list 'defclass :defclass)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
+
+(it-sequential "grammar-sexp-head-to-kind unknown"
+  (destructuring-bind (sym expected) (list 'completely-unknown-symbol :call)
+    (expect (cl-cc/parse:sexp-head-to-kind sym) :to-be expected)))
 
 ;;; ─── Grammar specialized parsers ────────────────────────────────────────────
 
-(deftest-each grammar-parse-cl-form-atoms
-  "parse-cl-form: scalar tokens produce cst-token with correct value."
-  :cases (("integer" "42"        42)
-          ("string"  "\"hello\"" "hello"))
-  (source expected-value)
-  (let* ((tokens (cl-cc:lex-all source))
+(it-sequential "grammar-parse-cl-form-atoms integer"
+  (destructuring-bind (source expected-value) (list "42" 42)
+    (let* ((tokens (cl-cc:lex-all source))
          (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
          (form (cl-cc/parse::parse-cl-form ts)))
-    (assert-true (cl-cc:cst-token-p form))
-    (assert-equal expected-value (cl-cc:cst-token-value form))))
+    (expect (cl-cc:cst-token-p form) :to-be-truthy)
+    (expect (cl-cc:cst-token-value form) :to-equal expected-value))))
 
-(deftest-each grammar-parse-cl-form-lists
-  "parse-cl-form: list -> cst-interior; empty list -> nil children."
-  :cases (("non-empty" "(1 2 3)" 3)
-          ("empty"     "()"      0))
-  (source expected-child-count)
-  (let* ((tokens (cl-cc:lex-all source))
+(it-sequential "grammar-parse-cl-form-atoms string"
+  (destructuring-bind (source expected-value) (list "\"hello\"" "hello")
+    (let* ((tokens (cl-cc:lex-all source))
          (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
          (form (cl-cc/parse::parse-cl-form ts)))
-    (assert-true (cl-cc:cst-interior-p form))
-    (assert-= expected-child-count (length (cl-cc:cst-children form)))))
+    (expect (cl-cc:cst-token-p form) :to-be-truthy)
+    (expect (cl-cc:cst-token-value form) :to-equal expected-value))))
 
-(deftest-each grammar-parse-cl-form-reader-macros
-  "parse-cl-form: reader-macro sugar -> cst-interior node with correct kind."
-  :cases (("quote"    "'foo"  :quote)
-          ("backquote" "`foo" :quasiquote)
-          ("function" "#'foo" :function))
-  (source expected-kind)
-  (let* ((tokens (cl-cc:lex-all source))
+(it-sequential "grammar-parse-cl-form-lists non-empty"
+  (destructuring-bind (source expected-child-count) (list "(1 2 3)" 3)
+    (let* ((tokens (cl-cc:lex-all source))
          (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
          (form (cl-cc/parse::parse-cl-form ts)))
-    (assert-true (cl-cc:cst-interior-p form))
-    (assert-eq expected-kind (cl-cc:cst-node-kind form))))
+    (expect (cl-cc:cst-interior-p form) :to-be-truthy)
+    (expect (= expected-child-count (length (cl-cc:cst-children form))) :to-be-truthy))))
+
+(it-sequential "grammar-parse-cl-form-lists empty"
+  (destructuring-bind (source expected-child-count) (list "()" 0)
+    (let* ((tokens (cl-cc:lex-all source))
+         (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
+         (form (cl-cc/parse::parse-cl-form ts)))
+    (expect (cl-cc:cst-interior-p form) :to-be-truthy)
+    (expect (= expected-child-count (length (cl-cc:cst-children form))) :to-be-truthy))))
+
+(it-sequential "grammar-parse-cl-form-reader-macros quote"
+  (destructuring-bind (source expected-kind) (list "'foo" :quote)
+    (let* ((tokens (cl-cc:lex-all source))
+         (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
+         (form (cl-cc/parse::parse-cl-form ts)))
+    (expect (cl-cc:cst-interior-p form) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind form) :to-be expected-kind))))
+
+(it-sequential "grammar-parse-cl-form-reader-macros backquote"
+  (destructuring-bind (source expected-kind) (list "`foo" :quasiquote)
+    (let* ((tokens (cl-cc:lex-all source))
+         (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
+         (form (cl-cc/parse::parse-cl-form ts)))
+    (expect (cl-cc:cst-interior-p form) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind form) :to-be expected-kind))))
+
+(it-sequential "grammar-parse-cl-form-reader-macros function"
+  (destructuring-bind (source expected-kind) (list "#'foo" :function)
+    (let* ((tokens (cl-cc:lex-all source))
+         (ts (cl-cc/parse::make-token-stream :tokens tokens :source source))
+         (form (cl-cc/parse::parse-cl-form ts)))
+    (expect (cl-cc:cst-interior-p form) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind form) :to-be expected-kind))))
 
 ;;; ─── defmacro lowering ───────────────────────────────────────────────────────
 
-(deftest lower-defmacro-form
-  "lower-sexp-to-ast: defmacro form -> ast-defmacro"
+(it-sequential "lower-defmacro-form"
   (let ((node (lower '(defmacro my-mac (x) `(list ,x)))))
-    (assert-true (cl-cc/ast:ast-defmacro-p node))
-    (assert-eq 'my-mac (cl-cc/ast:ast-defmacro-name node))
-    (assert-equal '(x) (cl-cc/ast:ast-defmacro-lambda-list node))))
+    (expect (cl-cc/ast:ast-defmacro-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-defmacro-name node) :to-be 'my-mac)
+    (expect (cl-cc/ast:ast-defmacro-lambda-list node) :to-equal '(x))))
 
 ;;; ─── defclass lowering ───────────────────────────────────────────────────────
 
-(deftest-each lower-defclass-form
-  "lower-sexp-to-ast: defclass -> ast-defclass with correct name, superclasses, and slot count."
-  :cases (("no-superclass"   '(defclass point () (x y))              'point '()      2)
-          ("with-superclass" '(defclass colored-point (point) (color)) 'colored-point '(point) 1))
-  (form expected-name expected-supers expected-slots)
-  (let ((node (lower form)))
-    (assert-true (cl-cc/ast:ast-defclass-p node))
-    (assert-eq expected-name (cl-cc/ast:ast-defclass-name node))
-    (assert-equal expected-supers (cl-cc/ast:ast-defclass-superclasses node))
-    (assert-= expected-slots (length (cl-cc/ast:ast-defclass-slots node)))))
+(it-sequential "lower-defclass-form no-superclass"
+  (destructuring-bind (form expected-name expected-supers expected-slots) (list '(defclass point () (x y)) 'point '() 2)
+    (let ((node (lower form)))
+    (expect (cl-cc/ast:ast-defclass-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-defclass-name node) :to-be expected-name)
+    (expect (cl-cc/ast:ast-defclass-superclasses node) :to-equal expected-supers)
+    (expect (= expected-slots (length (cl-cc/ast:ast-defclass-slots node))) :to-be-truthy))))
+
+(it-sequential "lower-defclass-form with-superclass"
+  (destructuring-bind (form expected-name expected-supers expected-slots) (list '(defclass colored-point (point) (color)) 'colored-point '(point) 1)
+    (let ((node (lower form)))
+    (expect (cl-cc/ast:ast-defclass-p node) :to-be-truthy)
+    (expect (cl-cc/ast:ast-defclass-name node) :to-be expected-name)
+    (expect (cl-cc/ast:ast-defclass-superclasses node) :to-equal expected-supers)
+    (expect (= expected-slots (length (cl-cc/ast:ast-defclass-slots node))) :to-be-truthy))))
 
 ;;; ─── defgeneric / defmethod lowering ────────────────────────────────────────
 
-(deftest-each lower-generic-dispatch-forms
-  "lower-sexp-to-ast: defgeneric and defmethod produce correct AST nodes."
-  :cases (("defgeneric" '(defgeneric area (shape))
-           #'cl-cc/ast:ast-defgeneric-p #'cl-cc/ast:ast-defgeneric-name #'cl-cc/ast:ast-defgeneric-params
-           'area '(shape))
-          ("defmethod"  '(defmethod area ((s circle)) (* pi (expt (slot-value s 'radius) 2)))
-           #'cl-cc/ast:ast-defmethod-p #'cl-cc/ast:ast-defmethod-name #'cl-cc/ast:ast-defmethod-params
-           'area '(s)))
-  (form pred-p get-name get-params expected-name expected-params)
-  (let ((node (lower form)))
-    (assert-true (funcall pred-p node))
-    (assert-eq expected-name (funcall get-name node))
-    (assert-equal expected-params (funcall get-params node))))
+(it-sequential "lower-generic-dispatch-forms defgeneric"
+  (destructuring-bind (form pred-p get-name get-params expected-name expected-params) (list '(defgeneric area (shape)) #'cl-cc/ast:ast-defgeneric-p #'cl-cc/ast:ast-defgeneric-name #'cl-cc/ast:ast-defgeneric-params 'area '(shape))
+    (let ((node (lower form)))
+    (expect (funcall pred-p node) :to-be-truthy)
+    (expect (funcall get-name node) :to-be expected-name)
+    (expect (funcall get-params node) :to-equal expected-params))))
+
+(it-sequential "lower-generic-dispatch-forms defmethod"
+  (destructuring-bind (form pred-p get-name get-params expected-name expected-params) (list '(defmethod area ((s circle)) (* pi (expt (slot-value s 'radius) 2))) #'cl-cc/ast:ast-defmethod-p #'cl-cc/ast:ast-defmethod-name #'cl-cc/ast:ast-defmethod-params 'area '(s))
+    (let ((node (lower form)))
+    (expect (funcall pred-p node) :to-be-truthy)
+    (expect (funcall get-name node) :to-be expected-name)
+    (expect (funcall get-params node) :to-equal expected-params))))
 
 ;;; ─── make-instance lowering ──────────────────────────────────────────────────
 
-(deftest-each lower-clos-access-forms
-  "lower-sexp-to-ast: make-instance and slot-value produce correct node types."
-  :cases (("make-instance" '(make-instance 'point :x 1 :y 2) #'cl-cc/ast:ast-make-instance-p)
-          ("slot-value"    '(slot-value obj 'name)            #'cl-cc/ast:ast-slot-value-p))
-  (form pred)
-  (let ((node (lower form)))
-    (assert-true (funcall pred node))))
+(it-sequential "lower-clos-access-forms make-instance"
+  (destructuring-bind (form pred) (list '(make-instance 'point :x 1 :y 2) #'cl-cc/ast:ast-make-instance-p)
+    (let ((node (lower form)))
+    (expect (funcall pred node) :to-be-truthy))))
+
+(it-sequential "lower-clos-access-forms slot-value"
+  (destructuring-bind (form pred) (list '(slot-value obj 'name) #'cl-cc/ast:ast-slot-value-p)
+    (let ((node (lower form)))
+    (expect (funcall pred node) :to-be-truthy))))

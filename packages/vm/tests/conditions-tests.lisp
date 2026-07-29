@@ -5,171 +5,166 @@
 
 (in-package :cl-cc/test)
 
-(defsuite conditions-suite
-  :description "VM condition system unit tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite conditions-suite)
 
 ;;; ─── Condition Construction ───────────────────────────────────────────────
 
-(deftest-each vm-condition-constructor-slots
-  "Each VM condition constructor stores the correct slots."
-  :cases (("type-error"
-           (lambda (s) (cl-cc/vm::make-vm-type-error s 'fixnum "hello"))
-           'cl-cc:vm-type-error
-           (lambda (c) (and (equal 'fixnum (type-error-expected-type c))
+(it-sequential "vm-condition-constructor-slots type-error"
+  (destructuring-bind (make-fn expected-type check-slots-fn) (list (lambda (s) (cl-cc/vm::make-vm-type-error s 'fixnum "hello")) 'cl-cc:vm-type-error (lambda (c) (and (equal 'fixnum (type-error-expected-type c))
                             (equal "hello" (type-error-datum c)))))
-          ("unbound-variable"
-           (lambda (s) (cl-cc/vm::make-vm-unbound-variable s 'x))
-           'cl-cc:vm-unbound-variable
-           (lambda (c) (equal 'x (cell-error-name c))))
-          ("undefined-function"
-           (lambda (s) (cl-cc/vm::make-vm-undefined-function s 'foo))
-           'cl-cc:vm-undefined-function
-           (lambda (c) (equal 'foo (cell-error-name c))))
-          ("division-by-zero"
-           (lambda (s) (cl-cc/vm::make-vm-division-by-zero s 42))
-           'cl-cc:vm-division-by-zero
-           (lambda (c) (equal 42 (cl-cc/vm::vm-dividend c)))))
-  (make-fn expected-type check-slots-fn)
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (cond (funcall make-fn state)))
-    (assert-true (typep cond expected-type))
-    (assert-true (funcall check-slots-fn cond))))
+    (expect (typep cond expected-type) :to-be-truthy)
+    (expect (funcall check-slots-fn cond) :to-be-truthy))))
+
+(it-sequential "vm-condition-constructor-slots unbound-variable"
+  (destructuring-bind (make-fn expected-type check-slots-fn) (list (lambda (s) (cl-cc/vm::make-vm-unbound-variable s 'x)) 'cl-cc:vm-unbound-variable (lambda (c) (equal 'x (cell-error-name c))))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+         (cond (funcall make-fn state)))
+    (expect (typep cond expected-type) :to-be-truthy)
+    (expect (funcall check-slots-fn cond) :to-be-truthy))))
+
+(it-sequential "vm-condition-constructor-slots undefined-function"
+  (destructuring-bind (make-fn expected-type check-slots-fn) (list (lambda (s) (cl-cc/vm::make-vm-undefined-function s 'foo)) 'cl-cc:vm-undefined-function (lambda (c) (equal 'foo (cell-error-name c))))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+         (cond (funcall make-fn state)))
+    (expect (typep cond expected-type) :to-be-truthy)
+    (expect (funcall check-slots-fn cond) :to-be-truthy))))
+
+(it-sequential "vm-condition-constructor-slots division-by-zero"
+  (destructuring-bind (make-fn expected-type check-slots-fn) (list (lambda (s) (cl-cc/vm::make-vm-division-by-zero s 42)) 'cl-cc:vm-division-by-zero (lambda (c) (equal 42 (cl-cc/vm::vm-dividend c))))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+         (cond (funcall make-fn state)))
+    (expect (typep cond expected-type) :to-be-truthy)
+    (expect (funcall check-slots-fn cond) :to-be-truthy))))
 
 ;;; ─── Condition Hierarchy ──────────────────────────────────────────────────
 
-(deftest-each condition-inherits-vm-error
-  "Each VM condition subtype is a vm-error."
-  :cases (("type-error"      (lambda (s) (cl-cc/vm::make-vm-type-error s 'fixnum 42)))
-          ("unbound-var"     (lambda (s) (cl-cc/vm::make-vm-unbound-variable s 'x)))
-          ("division-by-zero" (lambda (s) (cl-cc/vm::make-vm-division-by-zero s 42))))
-  (make-cond-fn)
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+(it-sequential "condition-inherits-vm-error type-error"
+  (destructuring-bind (make-cond-fn) (list (lambda (s) (cl-cc/vm::make-vm-type-error s 'fixnum 42)))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (c (funcall make-cond-fn state)))
-    (assert-true (typep c 'cl-cc:vm-error))))
+    (expect (typep c 'cl-cc:vm-error) :to-be-truthy))))
+
+(it-sequential "condition-inherits-vm-error unbound-var"
+  (destructuring-bind (make-cond-fn) (list (lambda (s) (cl-cc/vm::make-vm-unbound-variable s 'x)))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+         (c (funcall make-cond-fn state)))
+    (expect (typep c 'cl-cc:vm-error) :to-be-truthy))))
+
+(it-sequential "condition-inherits-vm-error division-by-zero"
+  (destructuring-bind (make-cond-fn) (list (lambda (s) (cl-cc/vm::make-vm-division-by-zero s 42)))
+    (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+         (c (funcall make-cond-fn state)))
+    (expect (typep c 'cl-cc:vm-error) :to-be-truthy))))
 
 ;;; ─── Condition Report ─────────────────────────────────────────────────────
 
-(deftest type-error-is-printable
-  "vm-type-error can be printed without error."
+(it-sequential "type-error-is-printable"
   (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (cond (cl-cc/vm::make-vm-type-error state 'fixnum "hello"))
          (msg (format nil "~A" cond)))
-    (assert-true (stringp msg))))
+    (expect (stringp msg) :to-be-truthy)))
 
-(deftest vm-conditions-carry-structured-diagnostics
-  "FR-317: VM conditions expose optional error-code and fix-it fields."
+(it-sequential "vm-conditions-carry-structured-diagnostics"
   (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (fix-it (cl-cc/parse:make-fix-it :text "bind x" :span '(0 . 1)))
          (cond (cl-cc/vm::make-vm-type-error state 'fixnum "hello"
                                              :error-code "E1001"
                                              :fix-it fix-it)))
-    (assert-equal "E1001" (cl-cc:vm-condition-error-code cond))
-    (assert-eq fix-it (cl-cc:vm-condition-fix-it cond)))
+    (expect (cl-cc:vm-condition-error-code cond) :to-equal "E1001")
+    (expect (cl-cc:vm-condition-fix-it cond) :to-be fix-it))
   (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (cond (cl-cc/vm::make-vm-unbound-variable state 'x)))
-    (assert-null (cl-cc:vm-condition-error-code cond))
-    (assert-null (cl-cc:vm-condition-fix-it cond))))
+    (expect (cl-cc:vm-condition-error-code cond) :to-be-null)
+    (expect (cl-cc:vm-condition-fix-it cond) :to-be-null)))
 
 ;;; ─── Handler Stack ────────────────────────────────────────────────────────
 
-(deftest handler-stack-fresh-state-is-empty
-  "A fresh vm-io-state has an empty handler stack."
+(it-sequential "handler-stack-fresh-state-is-empty"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
-    (assert-equal nil (cl-cc/vm::vm-get-handler-stack state))))
+    (expect (cl-cc/vm::vm-get-handler-stack state) :to-equal nil)))
 
-(deftest handler-stack-push-pop-roundtrip
-  "vm-push-handler-to-stack / vm-pop-handler-from-stack round-trips the handler type."
+(it-sequential "handler-stack-push-pop-roundtrip"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-error #'identity)
     (let ((handler (cl-cc/vm::vm-pop-handler-from-stack state)))
-      (assert-true (not (null handler)))
-      (assert-equal 'cl-cc:vm-error (cl-cc/vm::vm-handler-type handler)))))
+      (expect (not (null handler)) :to-be-truthy)
+      (expect (cl-cc/vm::vm-handler-type handler) :to-equal 'cl-cc:vm-error))))
 
-(deftest handler-stack-pop-on-empty-returns-nil
-  "vm-pop-handler-from-stack returns NIL when the stack is empty."
+(it-sequential "handler-stack-pop-on-empty-returns-nil"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
-    (assert-equal nil (cl-cc/vm::vm-pop-handler-from-stack state))))
+    (expect (cl-cc/vm::vm-pop-handler-from-stack state) :to-equal nil)))
 
-(deftest handler-stack-lifo-order-preserved
-  "Multiple pushes are popped in last-in-first-out order."
+(it-sequential "handler-stack-lifo-order-preserved"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-error #'identity)
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-warning #'identity)
     (let ((first (cl-cc/vm::vm-pop-handler-from-stack state)))
-      (assert-equal 'cl-cc:vm-warning (cl-cc/vm::vm-handler-type first)))
+      (expect (cl-cc/vm::vm-handler-type first) :to-equal 'cl-cc:vm-warning))
     (let ((second (cl-cc/vm::vm-pop-handler-from-stack state)))
-      (assert-equal 'cl-cc:vm-error (cl-cc/vm::vm-handler-type second)))))
+      (expect (cl-cc/vm::vm-handler-type second) :to-equal 'cl-cc:vm-error))))
 
-(deftest find-handler-behavior
-  "vm-find-handler returns handler on type match; nil when no handler matches."
+(it-sequential "find-handler-behavior"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state))
         (cond-val nil))
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-error #'identity)
     (setf cond-val (cl-cc/vm::make-vm-type-error state 'fixnum 42))
-    (assert-true (not (null (cl-cc/vm::vm-find-handler state cond-val))))
+    (expect (not (null (cl-cc/vm::vm-find-handler state cond-val))) :to-be-truthy)
     ;; replace with non-matching handler
     (cl-cc/vm::vm-pop-handler-from-stack state)
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-warning #'identity)
-    (assert-equal nil (cl-cc/vm::vm-find-handler state cond-val))))
+    (expect (cl-cc/vm::vm-find-handler state cond-val) :to-equal nil)))
 
 ;;; ─── Restart Bindings ─────────────────────────────────────────────────────
 
 
-(deftest vm-restart-operations
-  "Restarts: fresh state has none; add-restart makes findable by name; unknown name returns nil."
+(it-sequential "vm-restart-operations"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
-    (assert-equal nil (cl-cc/vm::vm-get-restarts state)))
+    (expect (cl-cc/vm::vm-get-restarts state) :to-equal nil))
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (cl-cc/vm::vm-add-restart state 'continue #'identity)
     (let ((restart (cl-cc/vm::vm-find-restart state 'continue)))
-      (assert-true (not (null restart)))
-      (assert-equal 'continue (cl-cc/vm::vm-restart-name restart))))
+      (expect (not (null restart)) :to-be-truthy)
+      (expect (cl-cc/vm::vm-restart-name restart) :to-equal 'continue)))
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
-    (assert-equal nil (cl-cc/vm::vm-find-restart state 'nonexistent))))
+    (expect (cl-cc/vm::vm-find-restart state 'nonexistent) :to-equal nil)))
 
 ;;; ─── Signal Dispatch ──────────────────────────────────────────────────────
 
-(deftest signal-condition-dispatch
-  "vm-signal-condition returns (t handler) with a matching handler; (nil nil) without."
+(it-sequential "signal-condition-dispatch"
   (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
          (cond-val (cl-cc/vm::make-vm-type-error state 'fixnum 42)))
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-error #'identity)
     (multiple-value-bind (found handler)
         (cl-cc/vm::vm-signal-condition cond-val state)
-      (assert-true found)
-      (assert-true (not (null handler))))
+      (expect found :to-be-truthy)
+      (expect (not (null handler)) :to-be-truthy))
     ;; remove handler, signal again — no match
     (cl-cc/vm::vm-pop-handler-from-stack state)
     (multiple-value-bind (found handler)
         (cl-cc/vm::vm-signal-condition cond-val state)
-      (assert-equal nil found)
-      (assert-equal nil handler))))
+      (expect found :to-equal nil)
+      (expect handler :to-equal nil))))
 
-(deftest signal-condition-error-p-signals
-  "vm-signal-condition with :error-p t signals when no handler."
+(it-sequential "signal-condition-error-p-signals"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (let ((cond (cl-cc/vm::make-vm-type-error state 'fixnum 42)))
-      (assert-true
-       (handler-case
+      (expect (handler-case
            (progn (cl-cc/vm::vm-signal-condition cond state :error-p t) nil)
-         (cl-cc:vm-type-error () t))))))
+         (cl-cc:vm-type-error () t)) :to-be-truthy))))
 
 ;;; ─── Clear Context ────────────────────────────────────────────────────────
 
-(deftest clear-condition-context
-  "vm-clear-condition-context removes handlers and restarts."
+(it-sequential "clear-condition-context"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (cl-cc/vm::vm-push-handler-to-stack state 'cl-cc:vm-error #'identity)
     (cl-cc/vm::vm-add-restart state 'continue #'identity)
     (cl-cc/vm::vm-clear-condition-context state)
-    (assert-equal nil (cl-cc/vm::vm-get-handler-stack state))
-    (assert-equal nil (cl-cc/vm::vm-get-restarts state))))
+    (expect (cl-cc/vm::vm-get-handler-stack state) :to-equal nil)
+    (expect (cl-cc/vm::vm-get-restarts state) :to-equal nil)))
 
-(deftest vm-sync-handler-regs-shares-snapshot-across-handler-entries
-  "vm-sync-handler-regs creates one snapshot object shared across all handler entries."
+(it-sequential "vm-sync-handler-regs-shares-snapshot-across-handler-entries"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (cl-cc/vm::vm-reg-set state :r1 10)
     (cl-cc/vm::execute-instruction
@@ -183,11 +178,10 @@
     (let* ((entries (cl-cc/vm::vm-handler-stack state))
            (snapshot-a (cl-cc/vm::vm-handler-entry-saved-regs (first entries)))
            (snapshot-b (cl-cc/vm::vm-handler-entry-saved-regs (second entries))))
-      (assert-eq snapshot-a snapshot-b)
-      (assert-= 42 (gethash :r1 snapshot-a)))))
+      (expect snapshot-b :to-be snapshot-a)
+      (expect (= 42 (gethash :r1 snapshot-a)) :to-be-truthy))))
 
-(deftest vm-sync-handler-regs-updates-catch-frame-saved-regs
-  "vm-sync-handler-regs updates the saved-regs snapshot in a catch frame."
+(it-sequential "vm-sync-handler-regs-updates-catch-frame-saved-regs"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (cl-cc/vm::vm-reg-set state :tag 7)
     (cl-cc/vm::vm-reg-set state :r1 99)
@@ -198,11 +192,10 @@
     (cl-cc/vm::execute-instruction (cl-cc:make-vm-sync-handler-regs) state 1 nil)
     (let* ((entry (first (cl-cc/vm::vm-handler-stack state)))
            (snapshot (cl-cc/vm::vm-handler-entry-saved-regs entry)))
-      (assert-true (hash-table-p snapshot))
-      (assert-= 123 (gethash :r1 snapshot)))))
+      (expect (hash-table-p snapshot) :to-be-truthy)
+      (expect (= 123 (gethash :r1 snapshot)) :to-be-truthy))))
 
-(deftest vm-establish-handler-retains-call-and-method-stacks
-  "vm-establish-handler stores call-stack and method-call-stack by shared reference in the entry."
+(it-sequential "vm-establish-handler-retains-call-and-method-stacks"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (setf (cl-cc/vm::vm-call-stack state) '((1 :r0 nil nil)))
     (setf (cl-cc/vm::vm-method-call-stack state) '((gf nil args)))
@@ -210,12 +203,11 @@
      (cl-cc:make-vm-establish-handler :handler-label "h" :result-reg :r0 :error-type 'error)
      state 0 nil)
     (let ((entry (first (cl-cc/vm::vm-handler-stack state))))
-      (assert-eq (fourth entry) (cl-cc/vm::vm-call-stack state))
-      (assert-eq (fifth entry) (cl-cc/vm::vm-handler-entry-saved-regs entry))
-      (assert-eq (sixth entry) (cl-cc/vm::vm-method-call-stack state)))))
+      (expect (cl-cc/vm::vm-call-stack state) :to-be (fourth entry))
+      (expect (cl-cc/vm::vm-handler-entry-saved-regs entry) :to-be (fifth entry))
+      (expect (cl-cc/vm::vm-method-call-stack state) :to-be (sixth entry)))))
 
-(deftest vm-establish-catch-retains-call-and-method-stacks
-  "vm-establish-catch stores call-stack and method-call-stack by shared reference in the entry."
+(it-sequential "vm-establish-catch-retains-call-and-method-stacks"
   (let ((state (make-instance 'cl-cc/vm::vm-io-state)))
     (setf (cl-cc/vm::vm-call-stack state) '((7 :r1 nil nil)))
     (setf (cl-cc/vm::vm-method-call-stack state) '((gf2 nil args2)))
@@ -224,5 +216,5 @@
      (cl-cc:make-vm-establish-catch :tag-reg :tag :handler-label "c" :result-reg :r0)
      state 0 nil)
     (let ((entry (first (cl-cc/vm::vm-handler-stack state))))
-      (assert-eq (fifth entry) (cl-cc/vm::vm-call-stack state))
-      (assert-eq (seventh entry) (cl-cc/vm::vm-method-call-stack state)))))
+      (expect (cl-cc/vm::vm-call-stack state) :to-be (fifth entry))
+      (expect (cl-cc/vm::vm-method-call-stack state) :to-be (seventh entry)))))

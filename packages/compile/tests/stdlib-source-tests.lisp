@@ -1,6 +1,5 @@
 ;;;; tests/unit/compile/stdlib-source-tests.lisp — Standard Library Source tests
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defun %count-substring (needle haystack)
   (let ((count 0)
@@ -12,43 +11,104 @@
             (setf start (+ pos step)))
     count))
 
-(deftest stdlib-source-string-present
-  "The extracted standard library source string exists."
-  (assert-true (stringp cl-cc::*standard-library-source*))
-  (assert-true (> (length cl-cc::*standard-library-source*) 0)))
+(it-sequential "stdlib-source-string-present"
+  (expect (stringp cl-cc::*standard-library-source*) :to-be-truthy)
+  (expect (> (length cl-cc::*standard-library-source*) 0) :to-be-truthy))
 
-(deftest-each stdlib-source-contains-key-defuns
-  "The standard library source keeps representative top-level definitions."
-  :cases (("mapcar"               "(defun mapcar")
-          ("reduce"               "(defun reduce")
-          ("class-precedence-list" "(defun class-precedence-list")
-          ("proclaim"             "(defun proclaim")
-          ("short-site-name"      "(defun short-site-name")
-          ("long-site-name"       "(defun long-site-name")
-          ("with-compilation-unit" "(defmacro with-compilation-unit")
-          ("get-setf-expansion"   "(defun get-setf-expansion")
-          ("eval-when"            "(define-expander-for eval-when")
-          ("symbol-macrolet"      "(define-expander-for symbol-macrolet")
-          ("define-symbol-macro"  "(define-expander-for define-symbol-macro")
-          ("string-left-trim"     "(defun string-left-trim")
-          ("string-right-trim"    "(defun string-right-trim")
-          ("string-upcase"        "(defun string-upcase")
-          ("string-downcase"      "(defun string-downcase")
-          ("string-capitalize"    "(defun string-capitalize")
-          ("nstring-upcase"       "(defun nstring-upcase")
-          ("nstring-downcase"     "(defun nstring-downcase")
-          ("nstring-capitalize"   "(defun nstring-capitalize")
-          ("pathname-match-p"     "(defun pathname-match-p")
-          ("translate-pathname"   "(defun translate-pathname")
-          ("set"                  "(defun set (sym val) (setf (symbol-value sym) val) val)")
-          ("set-fdefinition"      "(defun set-fdefinition"))
-  (needle)
-  (assert-true (search needle cl-cc::*standard-library-source*)))
+(it-sequential "stdlib-source-contains-key-defuns mapcar"
+  (destructuring-bind (needle) (list "(defun mapcar")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
 
-(deftest stdlib-source-has-many-defun-forms
-  "The source string still contains the bulk of the stdlib as defun forms."
-  (assert-true (> (%count-substring "(defun " cl-cc::*standard-library-source*) 20)))
+(it-sequential "stdlib-source-contains-key-defuns reduce"
+  (destructuring-bind (needle) (list "(defun reduce")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
 
-(deftest stdlib-source-omits-sbcl-compatibility-stubs
-  "The stdlib source keeps implementation-specific compatibility outside the core image."
-  (assert-false (search "without-package-locks" cl-cc::*standard-library-source*)))
+(it-sequential "stdlib-source-contains-key-defuns class-precedence-list"
+  (destructuring-bind (needle) (list "(defun class-precedence-list")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns proclaim"
+  (destructuring-bind (needle) (list "(defun proclaim")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns short-site-name"
+  (destructuring-bind (needle) (list "(defun short-site-name")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns long-site-name"
+  (destructuring-bind (needle) (list "(defun long-site-name")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns with-compilation-unit"
+  (destructuring-bind (needle) (list "(defmacro with-compilation-unit")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns get-setf-expansion"
+  (destructuring-bind (needle) (list "(defun get-setf-expansion")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns eval-when"
+  (destructuring-bind (needle) (list "(define-expander-for eval-when")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns symbol-macrolet"
+  (destructuring-bind (needle) (list "(define-expander-for symbol-macrolet")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns define-symbol-macro"
+  (destructuring-bind (needle) (list "(define-expander-for define-symbol-macro")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns string-left-trim"
+  (destructuring-bind (needle) (list "(defun string-left-trim")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns string-right-trim"
+  (destructuring-bind (needle) (list "(defun string-right-trim")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns string-upcase"
+  (destructuring-bind (needle) (list "(defun string-upcase")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns string-downcase"
+  (destructuring-bind (needle) (list "(defun string-downcase")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns string-capitalize"
+  (destructuring-bind (needle) (list "(defun string-capitalize")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns nstring-upcase"
+  (destructuring-bind (needle) (list "(defun nstring-upcase")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns nstring-downcase"
+  (destructuring-bind (needle) (list "(defun nstring-downcase")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns nstring-capitalize"
+  (destructuring-bind (needle) (list "(defun nstring-capitalize")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns pathname-match-p"
+  (destructuring-bind (needle) (list "(defun pathname-match-p")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns translate-pathname"
+  (destructuring-bind (needle) (list "(defun translate-pathname")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns set"
+  (destructuring-bind (needle) (list "(defun set (sym val) (setf (symbol-value sym) val) val)")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-contains-key-defuns set-fdefinition"
+  (destructuring-bind (needle) (list "(defun set-fdefinition")
+    (expect (search needle cl-cc::*standard-library-source*) :to-be-truthy)))
+
+(it-sequential "stdlib-source-has-many-defun-forms"
+  (expect (> (%count-substring "(defun " cl-cc::*standard-library-source*) 20) :to-be-truthy))
+
+(it-sequential "stdlib-source-omits-sbcl-compatibility-stubs"
+  (expect (search "without-package-locks" cl-cc::*standard-library-source*) :to-be-falsy))

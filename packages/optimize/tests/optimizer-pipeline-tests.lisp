@@ -6,36 +6,58 @@
 ;;;;   opt-resolve-pass-pipeline, *opt-pass-registry* data, prolog-rewrite-stage.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── opt-parse-pass-pipeline-string ─────────────────────────────────────────
 
-(deftest-each parse-pass-pipeline-string-cases
-  "opt-parse-pass-pipeline-string correctly tokenises pass name strings."
-  :cases (("single-pass"              "sccp"         1 :SCCP nil  nil)
-          ("multi-pass-comma-separated" "sccp,cse,dce" 3 :SCCP :CSE :DCE)
-          ("trims-whitespace"         " sccp , cse " 2 :SCCP :CSE nil)
-          ("empty-returns-nil"        ""             0 nil   nil  nil))
-  (input expected-len first-kw second-kw third-kw)
-  (let ((result (cl-cc/optimize::opt-parse-pass-pipeline-string input)))
+(it-sequential "parse-pass-pipeline-string-cases single-pass"
+  (destructuring-bind (input expected-len first-kw second-kw third-kw) (list "sccp" 1 :SCCP nil nil)
+    (let ((result (cl-cc/optimize::opt-parse-pass-pipeline-string input)))
     (if (zerop expected-len)
-        (assert-null result)
+        (expect result :to-be-null)
         (progn
-          (assert-= expected-len (length result))
-          (when first-kw  (assert-eq first-kw  (first  result)))
-          (when second-kw (assert-eq second-kw (second result)))
-          (when third-kw  (assert-eq third-kw  (third  result)))))))
+          (expect (= expected-len (length result)) :to-be-truthy)
+          (when first-kw  (expect (first  result) :to-be first-kw))
+          (when second-kw (expect (second result) :to-be second-kw))
+          (when third-kw  (expect (third  result) :to-be third-kw)))))))
+
+(it-sequential "parse-pass-pipeline-string-cases multi-pass-comma-separated"
+  (destructuring-bind (input expected-len first-kw second-kw third-kw) (list "sccp,cse,dce" 3 :SCCP :CSE :DCE)
+    (let ((result (cl-cc/optimize::opt-parse-pass-pipeline-string input)))
+    (if (zerop expected-len)
+        (expect result :to-be-null)
+        (progn
+          (expect (= expected-len (length result)) :to-be-truthy)
+          (when first-kw  (expect (first  result) :to-be first-kw))
+          (when second-kw (expect (second result) :to-be second-kw))
+          (when third-kw  (expect (third  result) :to-be third-kw)))))))
+
+(it-sequential "parse-pass-pipeline-string-cases trims-whitespace"
+  (destructuring-bind (input expected-len first-kw second-kw third-kw) (list " sccp , cse " 2 :SCCP :CSE nil)
+    (let ((result (cl-cc/optimize::opt-parse-pass-pipeline-string input)))
+    (if (zerop expected-len)
+        (expect result :to-be-null)
+        (progn
+          (expect (= expected-len (length result)) :to-be-truthy)
+          (when first-kw  (expect (first  result) :to-be first-kw))
+          (when second-kw (expect (second result) :to-be second-kw))
+          (when third-kw  (expect (third  result) :to-be third-kw)))))))
+
+(it-sequential "parse-pass-pipeline-string-cases empty-returns-nil"
+  (destructuring-bind (input expected-len first-kw second-kw third-kw) (list "" 0 nil nil nil)
+    (let ((result (cl-cc/optimize::opt-parse-pass-pipeline-string input)))
+    (if (zerop expected-len)
+        (expect result :to-be-null)
+        (progn
+          (expect (= expected-len (length result)) :to-be-truthy)
+          (when first-kw  (expect (first  result) :to-be first-kw))
+          (when second-kw (expect (second result) :to-be second-kw))
+          (when third-kw  (expect (third  result) :to-be third-kw)))))))
 
 ;;; ─── opt-converged-p ─────────────────────────────────────────────────────────
 
-(deftest-each opt-converged-p-cases
-  "opt-converged-p correctly detects convergence across nil, same-object, structural-equal, and length-mismatch cases."
-  :cases (("both-nil"           :nil-case   t)
-          ("same-object"        :same-case  t)
-          ("structurally-equal" :equal-case t)
-          ("different-length"   :diff-case  nil))
-  (scenario expected-result)
-  (let* ((i1 (make-vm-const :dst :r0 :value 1))
+(it-sequential "opt-converged-p-cases both-nil"
+  (destructuring-bind (scenario expected-result) (list :nil-case t)
+    (let* ((i1 (make-vm-const :dst :r0 :value 1))
          (i2 (make-vm-ret  :reg :r0))
          (prog (list i1 i2))
          (a    (make-vm-const :dst :r0 :value 1))
@@ -46,109 +68,156 @@
                     (:equal-case (cl-cc/optimize::opt-converged-p (list a) (list b)))
                     (:diff-case  (cl-cc/optimize::opt-converged-p (list i1) (list i1 i2))))))
       (if expected-result
-          (assert-true result)
-          (assert-false result)))))
+          (expect result :to-be-truthy)
+          (expect result :to-be-falsy))))))
+
+(it-sequential "opt-converged-p-cases same-object"
+  (destructuring-bind (scenario expected-result) (list :same-case t)
+    (let* ((i1 (make-vm-const :dst :r0 :value 1))
+         (i2 (make-vm-ret  :reg :r0))
+         (prog (list i1 i2))
+         (a    (make-vm-const :dst :r0 :value 1))
+         (b    (make-vm-const :dst :r0 :value 1)))
+    (let ((result (ecase scenario
+                    (:nil-case   (cl-cc/optimize::opt-converged-p nil nil))
+                    (:same-case  (cl-cc/optimize::opt-converged-p prog prog))
+                    (:equal-case (cl-cc/optimize::opt-converged-p (list a) (list b)))
+                    (:diff-case  (cl-cc/optimize::opt-converged-p (list i1) (list i1 i2))))))
+      (if expected-result
+          (expect result :to-be-truthy)
+          (expect result :to-be-falsy))))))
+
+(it-sequential "opt-converged-p-cases structurally-equal"
+  (destructuring-bind (scenario expected-result) (list :equal-case t)
+    (let* ((i1 (make-vm-const :dst :r0 :value 1))
+         (i2 (make-vm-ret  :reg :r0))
+         (prog (list i1 i2))
+         (a    (make-vm-const :dst :r0 :value 1))
+         (b    (make-vm-const :dst :r0 :value 1)))
+    (let ((result (ecase scenario
+                    (:nil-case   (cl-cc/optimize::opt-converged-p nil nil))
+                    (:same-case  (cl-cc/optimize::opt-converged-p prog prog))
+                    (:equal-case (cl-cc/optimize::opt-converged-p (list a) (list b)))
+                    (:diff-case  (cl-cc/optimize::opt-converged-p (list i1) (list i1 i2))))))
+      (if expected-result
+          (expect result :to-be-truthy)
+          (expect result :to-be-falsy))))))
+
+(it-sequential "opt-converged-p-cases different-length"
+  (destructuring-bind (scenario expected-result) (list :diff-case nil)
+    (let* ((i1 (make-vm-const :dst :r0 :value 1))
+         (i2 (make-vm-ret  :reg :r0))
+         (prog (list i1 i2))
+         (a    (make-vm-const :dst :r0 :value 1))
+         (b    (make-vm-const :dst :r0 :value 1)))
+    (let ((result (ecase scenario
+                    (:nil-case   (cl-cc/optimize::opt-converged-p nil nil))
+                    (:same-case  (cl-cc/optimize::opt-converged-p prog prog))
+                    (:equal-case (cl-cc/optimize::opt-converged-p (list a) (list b)))
+                    (:diff-case  (cl-cc/optimize::opt-converged-p (list i1) (list i1 i2))))))
+      (if expected-result
+          (expect result :to-be-truthy)
+          (expect result :to-be-falsy))))))
 
 ;;; ─── opt-adaptive-max-iterations ─────────────────────────────────────────────
 
-(deftest-each adaptive-max-iterations-regions
-  "opt-adaptive-max-iterations returns the correct budget for each size region."
-  :cases (("tiny"   20  8)   ; < 50 insts: base-20 + (-12) = 8 (clamped to min 6)
-          ("small"  100 14)  ; 50-149: base-20 + (-6) = 14
-          ("medium" 200 20)  ; 150-399: base-20 + 0 = 20
-          ("large"  500 28)  ; 400-799: base-20 + 8 = 28
-          ("huge"   1000 35)) ; >= 800: base-20 + 15 = 35
-  (n-insts expected)
-  (let ((insts (make-list n-insts :initial-element (make-vm-const :dst :r0 :value 1))))
-    (assert-= expected (cl-cc/optimize::opt-adaptive-max-iterations insts))))
+(it-sequential "adaptive-max-iterations-regions tiny"
+  (destructuring-bind (n-insts expected) (list 20 8)
+    (let ((insts (make-list n-insts :initial-element (make-vm-const :dst :r0 :value 1))))
+    (expect (= expected (cl-cc/optimize::opt-adaptive-max-iterations insts)) :to-be-truthy))))
 
-(deftest adaptive-max-iterations-respects-max-cap
-  "opt-adaptive-max-iterations never exceeds :max-iterations.
-For n=2000 insts the natural computed value is base(20) + 15 = 35; pass a
-max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
+(it-sequential "adaptive-max-iterations-regions small"
+  (destructuring-bind (n-insts expected) (list 100 14)
+    (let ((insts (make-list n-insts :initial-element (make-vm-const :dst :r0 :value 1))))
+    (expect (= expected (cl-cc/optimize::opt-adaptive-max-iterations insts)) :to-be-truthy))))
+
+(it-sequential "adaptive-max-iterations-regions medium"
+  (destructuring-bind (n-insts expected) (list 200 20)
+    (let ((insts (make-list n-insts :initial-element (make-vm-const :dst :r0 :value 1))))
+    (expect (= expected (cl-cc/optimize::opt-adaptive-max-iterations insts)) :to-be-truthy))))
+
+(it-sequential "adaptive-max-iterations-regions large"
+  (destructuring-bind (n-insts expected) (list 500 28)
+    (let ((insts (make-list n-insts :initial-element (make-vm-const :dst :r0 :value 1))))
+    (expect (= expected (cl-cc/optimize::opt-adaptive-max-iterations insts)) :to-be-truthy))))
+
+(it-sequential "adaptive-max-iterations-regions huge"
+  (destructuring-bind (n-insts expected) (list 1000 35)
+    (let ((insts (make-list n-insts :initial-element (make-vm-const :dst :r0 :value 1))))
+    (expect (= expected (cl-cc/optimize::opt-adaptive-max-iterations insts)) :to-be-truthy))))
+
+(it-sequential "adaptive-max-iterations-respects-max-cap"
   (let ((insts (make-list 2000 :initial-element (make-vm-const :dst :r0 :value 1))))
-    (assert-= 30 (cl-cc/optimize::opt-adaptive-max-iterations insts :max-iterations 30))))
+    (expect (= 30 (cl-cc/optimize::opt-adaptive-max-iterations insts :max-iterations 30)) :to-be-truthy)))
 
-(deftest adaptive-max-iterations-respects-min-floor
-  "opt-adaptive-max-iterations never returns less than :min-iterations."
+(it-sequential "adaptive-max-iterations-respects-min-floor"
   (let ((insts nil))  ; empty → smallest budget
-    (assert-true (>= (cl-cc/optimize::opt-adaptive-max-iterations insts :min-iterations 6) 6))))
+    (expect (>= (cl-cc/optimize::opt-adaptive-max-iterations insts :min-iterations 6) 6) :to-be-truthy)))
 
-(deftest adaptive-loop-unroll-factor-reacts-to-hotness
-  "opt-adaptive-loop-unroll-factor raises loop budgets for hot functions."
+(it-sequential "adaptive-loop-unroll-factor-reacts-to-hotness"
   (multiple-value-bind (cold-factor cold-trip)
       (cl-cc/optimize::opt-adaptive-loop-unroll-factor nil :call-count 0)
     (multiple-value-bind (hot-factor hot-trip)
         (cl-cc/optimize::opt-adaptive-loop-unroll-factor nil :call-count 100)
-      (assert-true (> hot-factor cold-factor))
-      (assert-true (> hot-trip cold-trip)))))
+      (expect (> hot-factor cold-factor) :to-be-truthy)
+      (expect (> hot-trip cold-trip) :to-be-truthy))))
 
 ;;; ─── opt-verify-instructions ─────────────────────────────────────────────────
 
-(deftest verify-instructions-simple-sequence-passes
-  "opt-verify-instructions returns T for a simple const+ret sequence."
-  (assert-true (cl-cc/optimize:opt-verify-instructions
-                (list (make-vm-const :dst :r0 :value 1) (make-vm-ret :reg :r0)))))
+(it-sequential "verify-instructions-simple-sequence-passes"
+  (expect (cl-cc/optimize:opt-verify-instructions
+                (list (make-vm-const :dst :r0 :value 1) (make-vm-ret :reg :r0))) :to-be-truthy))
 
-(deftest verify-instructions-jump-with-known-label-passes
-  "opt-verify-instructions returns T when a jump target label is defined in the sequence."
-  (assert-true (cl-cc/optimize:opt-verify-instructions
+(it-sequential "verify-instructions-jump-with-known-label-passes"
+  (expect (cl-cc/optimize:opt-verify-instructions
                 (list (make-vm-const :dst :r0 :value 1)
                       (make-vm-jump  :label "target")
                       (make-vm-label :name "target")
-                      (make-vm-ret   :reg :r0)))))
+                      (make-vm-ret   :reg :r0))) :to-be-truthy))
 
-(deftest-each verify-instructions-invalid-cases
-  "opt-verify-instructions signals an error for duplicate labels or unknown jump targets."
-  :cases (("duplicate-label"   (list (make-vm-const :dst :r0 :value 1)
+(it-sequential "verify-instructions-invalid-cases duplicate-label"
+  (destructuring-bind (insts) (list (list (make-vm-const :dst :r0 :value 1)
                                      (make-vm-label :name "dup")
                                      (make-vm-label :name "dup")
                                      (make-vm-ret   :reg :r0)))
-          ("unknown-target"    (list (make-vm-jump :label "ghost")
-                                     (make-vm-ret  :reg :r0))))
-  (insts)
-  (assert-signals error
-    (cl-cc/optimize:opt-verify-instructions insts)))
+    (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/optimize:opt-verify-instructions insts)) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))))
+
+(it-sequential "verify-instructions-invalid-cases unknown-target"
+  (destructuring-bind (insts) (list (list (make-vm-jump :label "ghost")
+                                     (make-vm-ret  :reg :r0)))
+    (let ((%%signaled1 nil)) (handler-case (progn (cl-cc/optimize:opt-verify-instructions insts)) (error () (setf %%signaled1 t))) (expect %%signaled1 :to-be-truthy))))
 
 ;;; ─── opt-delimited-continuations-form ───────────────────────────────────────
 
-(deftest delimited-continuations-reset-unwrapped
-  "opt-delimited-continuations-form returns the lowered body, not the original RESET wrapper."
+(it-sequential "delimited-continuations-reset-unwrapped"
   (let* ((input '(cl-cc/optimize::reset (+ 1 2)))
          (once  (cl-cc/optimize::opt-delimited-continuations-form input))
          (twice (cl-cc/optimize::opt-delimited-continuations-form once)))
-    (assert-equal '(+ 1 2) once)
-    (assert-equal once twice)))
+    (expect once :to-equal '(+ 1 2))
+    (expect twice :to-equal once)))
 
 ;;; ─── opt-resolve-pass-pipeline ───────────────────────────────────────────
 
-(deftest resolve-pass-pipeline-nil-returns-convergence-passes
-  "opt-resolve-pass-pipeline on nil returns *opt-convergence-passes*."
-  (assert-eq cl-cc/optimize::*opt-convergence-passes*
-             (cl-cc/optimize::opt-resolve-pass-pipeline nil)))
+(it-sequential "resolve-pass-pipeline-nil-returns-convergence-passes"
+  (expect (cl-cc/optimize::opt-resolve-pass-pipeline nil) :to-be cl-cc/optimize::*opt-convergence-passes*))
 
-(deftest resolve-pass-pipeline-functions-pass-through-unchanged
-  "opt-resolve-pass-pipeline passes function objects through as-is."
+(it-sequential "resolve-pass-pipeline-functions-pass-through-unchanged"
   (let* ((fn (lambda (x) x))
          (pipeline (list fn)))
-    (assert-eq fn (first (cl-cc/optimize::opt-resolve-pass-pipeline pipeline)))))
+    (expect (first (cl-cc/optimize::opt-resolve-pass-pipeline pipeline)) :to-be fn)))
 
-(deftest resolve-pass-pipeline-keywords-resolve-to-functions
-  "opt-resolve-pass-pipeline resolves keyword pass names to function objects."
+(it-sequential "resolve-pass-pipeline-keywords-resolve-to-functions"
   (let ((result (cl-cc/optimize::opt-resolve-pass-pipeline (list :fold :dce))))
-    (assert-= 2 (length result))
-    (assert-true (every #'functionp result))))
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (every #'functionp result) :to-be-truthy)))
 
-(deftest resolve-pass-pipeline-string-parses-and-resolves
-  "opt-resolve-pass-pipeline on a comma-separated string parses and resolves to functions."
+(it-sequential "resolve-pass-pipeline-string-parses-and-resolves"
   (let ((result (cl-cc/optimize::opt-resolve-pass-pipeline "fold,dce")))
-    (assert-= 2 (length result))
-    (assert-true (every #'functionp result))))
+    (expect (= 2 (length result)) :to-be-truthy)
+    (expect (every #'functionp result) :to-be-truthy)))
 
-(deftest resolve-pass-pipeline-unknown-pass-signals-error
-  "opt-resolve-pass-pipeline signals an error for an unregistered pass keyword."
-  (assert-signals error
-    (cl-cc/optimize::opt-resolve-pass-pipeline (list :nonexistent-pass))))
+(it-sequential "resolve-pass-pipeline-unknown-pass-signals-error"
+  (let ((%%signaled2 nil)) (handler-case (progn (cl-cc/optimize::opt-resolve-pass-pipeline (list :nonexistent-pass))) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy)))
 
 ;;; ─── *opt-convergence-passes* / *opt-pass-registry* data coverage ────────
 
@@ -196,97 +265,122 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
   (assert-true (< (%opt-default-convergence-key-position before)
                   (%opt-default-convergence-key-position after))))
 
-(deftest opt-pass-registry-key-presence
-  "*opt-pass-registry* includes all expected pass keywords."
+(it-sequential "opt-pass-registry-key-presence"
   (dolist (key *opt-pass-registry-presence-keys*)
-    (assert-true (gethash key cl-cc/optimize::*opt-pass-registry*)))
+    (expect (gethash key cl-cc/optimize::*opt-pass-registry*) :to-be-truthy))
   (dolist (binding *opt-pass-registry-function-bindings*)
-    (assert-eq (cdr binding)
-               (gethash (car binding) cl-cc/optimize::*opt-pass-registry*))))
+    (expect (gethash (car binding) cl-cc/optimize::*opt-pass-registry*) :to-be (cdr binding))))
 
-(deftest opt-default-convergence-pass-keys-ordering
-  "*opt-default-convergence-pass-keys* has the expected prefix order and positional invariants."
-  (assert-equal *opt-default-convergence-prefix*
-                (subseq cl-cc/optimize::*opt-default-convergence-pass-keys* 0 6))
+(it-sequential "opt-default-convergence-pass-keys-ordering"
+  (expect (subseq cl-cc/optimize::*opt-default-convergence-pass-keys* 0 6) :to-equal *opt-default-convergence-prefix*)
   (dolist (case *opt-default-convergence-positional-keys*)
     (destructuring-bind (position . expected-key) case
-      (assert-eq expected-key
-                 (nth (1- position) cl-cc/optimize::*opt-default-convergence-pass-keys*))))
-  (assert-true (member :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*))
-  (assert-true (member :fma-recognition cl-cc/optimize::*opt-default-convergence-pass-keys*))
+      (expect (nth (1- position) cl-cc/optimize::*opt-default-convergence-pass-keys*) :to-be expected-key)))
+  (expect (member :pure-call-optimization cl-cc/optimize::*opt-default-convergence-pass-keys*) :to-be-truthy)
+  (expect (member :fma-recognition cl-cc/optimize::*opt-default-convergence-pass-keys*) :to-be-truthy)
   (dolist (edge *opt-default-convergence-ordering-edges*)
     (destructuring-bind (before after) edge
       (%assert-opt-default-convergence-edge before after))))
 
-(deftest opt-convergence-passes-type-invariants
-  "*opt-convergence-passes* is a non-empty function list with expected first element and exclusions."
-  (assert-true (listp cl-cc/optimize::*opt-convergence-passes*))
-  (assert-true (> (length cl-cc/optimize::*opt-convergence-passes*) 10))
-  (assert-true (every #'functionp cl-cc/optimize::*opt-convergence-passes*))
-  (assert-eq #'cl-cc/optimize::%maybe-apply-prolog-rewrite (first cl-cc/optimize::*opt-convergence-passes*))
-  (assert-false (member #'cl-cc/optimize:optimize-with-egraph cl-cc/optimize::*opt-convergence-passes*))
-  (assert-false (member #'cl-cc/optimize::opt-pass-fold cl-cc/optimize::*opt-convergence-passes*))
-  (assert-false (member #'cl-cc/optimize::opt-pass-strength-reduce cl-cc/optimize::*opt-convergence-passes*)))
+(it-sequential "opt-convergence-passes-type-invariants"
+  (expect (listp cl-cc/optimize::*opt-convergence-passes*) :to-be-truthy)
+  (expect (> (length cl-cc/optimize::*opt-convergence-passes*) 10) :to-be-truthy)
+  (expect (every #'functionp cl-cc/optimize::*opt-convergence-passes*) :to-be-truthy)
+  (expect (first cl-cc/optimize::*opt-convergence-passes*) :to-be #'cl-cc/optimize::%maybe-apply-prolog-rewrite)
+  (expect (member #'cl-cc/optimize:optimize-with-egraph cl-cc/optimize::*opt-convergence-passes*) :to-be-falsy)
+  (expect (member #'cl-cc/optimize::opt-pass-fold cl-cc/optimize::*opt-convergence-passes*) :to-be-falsy)
+  (expect (member #'cl-cc/optimize::opt-pass-strength-reduce cl-cc/optimize::*opt-convergence-passes*) :to-be-falsy))
 
 ;;; ─── FR-099 FMA recognition ───────────────────────────────────────────────
 
 (defun %test-count-type (type insts)
   (count-if (lambda (inst) (typep inst type)) insts))
 
-(deftest-each fr-099-fma-recognition-cases
-  "FR-099: opt-pass-fma-recognition fuses/rejects float mul+add patterns as expected."
-  :cases (("mul-plus-accumulator"
-           (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2))
-           1 0 0)
-          ("commuted-add"
-           (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r2 :rhs :r3))
-           1 0 0)
-          ("multiple-consumers-no-fuse"
-           (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)
-                 (cl-cc/vm::make-vm-float-add :dst :r5 :lhs :r3 :rhs :r6))
-           0 1 2)
-          ("integer-arithmetic-no-fuse"
-           (list (make-vm-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (make-vm-add :dst :r4 :lhs :r3 :rhs :r2))
-           0 nil nil)
-          ("cross-block-boundary-no-fuse"
-           (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (make-vm-label :name "next")
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2))
-           ;; No fusion across a basic-block boundary (vm-label): the float-mul
-           ;; (counts as 1 vm-mul) and float-add (1 vm-add) are both preserved.
-           0 1 1))
-  (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add)
-  (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (assert-= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out))
+(it-sequential "fr-099-fma-recognition-cases mul-plus-accumulator"
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 1 0 0)
+    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
     ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
     ;; single typep against the parent already counts both float and integer
     ;; multiplies/adds. Counting the parent type is the correct total — summing
     ;; parent + child would double-count every float instruction.
     (when expected-float-mul-or-mul
-      (assert-= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)))
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
     (when expected-float-add-or-add
-      (assert-= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)))))
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+
+(it-sequential "fr-099-fma-recognition-cases commuted-add"
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r2 :rhs :r3)) 1 0 0)
+    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
+    ;; single typep against the parent already counts both float and integer
+    ;; multiplies/adds. Counting the parent type is the correct total — summing
+    ;; parent + child would double-count every float instruction.
+    (when expected-float-mul-or-mul
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+    (when expected-float-add-or-add
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+
+(it-sequential "fr-099-fma-recognition-cases multiple-consumers-no-fuse"
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)
+                 (cl-cc/vm::make-vm-float-add :dst :r5 :lhs :r3 :rhs :r6)) 0 1 2)
+    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
+    ;; single typep against the parent already counts both float and integer
+    ;; multiplies/adds. Counting the parent type is the correct total — summing
+    ;; parent + child would double-count every float instruction.
+    (when expected-float-mul-or-mul
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+    (when expected-float-add-or-add
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+
+(it-sequential "fr-099-fma-recognition-cases integer-arithmetic-no-fuse"
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (make-vm-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (make-vm-add :dst :r4 :lhs :r3 :rhs :r2)) 0 nil nil)
+    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
+    ;; single typep against the parent already counts both float and integer
+    ;; multiplies/adds. Counting the parent type is the correct total — summing
+    ;; parent + child would double-count every float instruction.
+    (when expected-float-mul-or-mul
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+    (when expected-float-add-or-add
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+
+(it-sequential "fr-099-fma-recognition-cases cross-block-boundary-no-fuse"
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (make-vm-label :name "next")
+                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 0 1 1)
+    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
+    ;; single typep against the parent already counts both float and integer
+    ;; multiplies/adds. Counting the parent type is the correct total — summing
+    ;; parent + child would double-count every float instruction.
+    (when expected-float-mul-or-mul
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+    (when expected-float-add-or-add
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
 
 ;;; ─── *verify-optimizer-instructions* integration ──────────────────────────
 
-(deftest verify-optimizer-flag-runs-verifier-on-valid-input
-  "*verify-optimizer-instructions* T causes opt-verify-instructions to run; valid input succeeds."
+(it-sequential "verify-optimizer-flag-runs-verifier-on-valid-input"
   (let ((cl-cc/optimize:*verify-optimizer-instructions* t)
         (insts (list (make-vm-const :dst :r0 :value 42) (make-vm-ret :reg :r0))))
-    (assert-true (listp (cl-cc/optimize:optimize-instructions insts)))))
+    (expect (listp (cl-cc/optimize:optimize-instructions insts)) :to-be-truthy)))
 
-(deftest verify-optimizer-flag-nil-skips-verifier
-  "*verify-optimizer-instructions* NIL causes optimize-instructions to skip verification."
+(it-sequential "verify-optimizer-flag-nil-skips-verifier"
   (let ((cl-cc/optimize:*verify-optimizer-instructions* nil)
         (insts (list (make-vm-const :dst :r0 :value 1) (make-vm-ret :reg :r0))))
-    (assert-true (listp (cl-cc/optimize:optimize-instructions insts)))))
+    (expect (listp (cl-cc/optimize:optimize-instructions insts)) :to-be-truthy)))
 
-(deftest pure-call-policy-gate-disables-pass
-  "*opt-enable-pure-call-optimization* NIL disables :pure-call-optimization pass execution."
+(it-sequential "pure-call-policy-gate-disables-pass"
   (let* ((callee-label "pure-square")
          (insts (list (make-vm-closure :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label   :name callee-label)
@@ -302,22 +396,19 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                      insts
                      :max-iterations 1
                      :pass-pipeline '(:pure-call-optimization))))
-    (assert-= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) optimized))
-    (assert-false
-     (some (lambda (inst)
+    (expect (= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) optimized)) :to-be-truthy)
+    (expect (some (lambda (inst)
              (and (typep inst 'cl-cc/vm::vm-move)
                   (eq (cl-cc/vm::vm-dst inst) :r4)
                   (eq (cl-cc/vm::vm-src inst) :r3)))
-           optimized))))
+           optimized) :to-be-falsy)))
 
-(deftest optimize-policy-config-speed-threshold
-  "opt-configure-optimization-policy toggles pure-call gate at speed >= 3."
+(it-sequential "optimize-policy-config-speed-threshold"
   (let ((cl-cc/optimize::*opt-enable-pure-call-optimization* t))
-    (assert-false (cl-cc/optimize:opt-configure-optimization-policy :speed 2))
-    (assert-true  (cl-cc/optimize:opt-configure-optimization-policy :speed 3))))
+    (expect (cl-cc/optimize:opt-configure-optimization-policy :speed 2) :to-be-falsy)
+    (expect (cl-cc/optimize:opt-configure-optimization-policy :speed 3) :to-be-truthy)))
 
-(deftest optimize-instructions-speed-keyword-controls-pure-call-pass
-  "optimize-instructions :speed drives pure-call optimization gate behavior."
+(it-sequential "optimize-instructions-speed-keyword-controls-pure-call-pass"
   (let* ((callee-label "pure-square")
          (insts (list (make-vm-closure :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label   :name callee-label)
@@ -332,197 +423,212 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                 insts :max-iterations 1 :speed 2 :pass-pipeline '(:pure-call-optimization)))
          (fast (cl-cc/optimize:optimize-instructions
                 insts :max-iterations 1 :speed 3 :pass-pipeline '(:pure-call-optimization))))
-    (assert-= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) slow))
-    (assert-= 1 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) fast))))
+    (expect (= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) slow)) :to-be-truthy)
+    (expect (= 1 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) fast)) :to-be-truthy)))
 
 ;;; ─── Prolog rewrite stage ──────────────────────────────────────────────────
 
-(deftest prolog-rewrite-stage-disabled-is-identity
-  "%maybe-apply-prolog-rewrite returns the input unchanged when the Prolog hook is disabled."
+(it-sequential "prolog-rewrite-stage-disabled-is-identity"
   (let ((cl-cc/optimize::*enable-prolog-peephole* nil)
         (insts (list (make-vm-const :dst :r0 :value 1)
                      (make-vm-ret :reg :r0))))
-    (assert-eq insts (cl-cc/optimize::%maybe-apply-prolog-rewrite insts))))
+    (expect (cl-cc/optimize::%maybe-apply-prolog-rewrite insts) :to-be insts)))
 
-(deftest prolog-rewrite-stage-invokes-prolog-backends
-  "%maybe-apply-prolog-rewrite returns a list result when enabled."
+(it-sequential "prolog-rewrite-stage-invokes-prolog-backends"
   (let ((cl-cc/optimize::*enable-prolog-peephole* t)
         (insts (list (make-vm-const :dst :r0 :value 1)
                      (make-vm-ret :reg :r0))))
     (let ((result (cl-cc/optimize::%maybe-apply-prolog-rewrite insts)))
-      (assert-true (listp result))
-      (assert-= 2 (length result))
-      (assert-equal (mapcar #'cl-cc/optimize::instruction->sexp insts)
-                    (mapcar #'cl-cc/optimize::instruction->sexp result)))))
+      (expect (listp result) :to-be-truthy)
+      (expect (= 2 (length result)) :to-be-truthy)
+      (expect (mapcar #'cl-cc/optimize::instruction->sexp result) :to-equal (mapcar #'cl-cc/optimize::instruction->sexp insts)))))
 
 ;;; ─── Copy-on-Write helper layer (FR-253 partial) ───────────────────────────
 
-(deftest optimize-cow-copy-is-constant-time-share
-  "opt-cow-copy increments refcount without duplicating payload immediately."
+(it-sequential "optimize-cow-copy-is-constant-time-share"
   (let* ((cow (cl-cc/optimize:make-opt-cow-object :payload '((a . 1)) :refcount 1))
          (shared (cl-cc/optimize:opt-cow-copy cow)))
-    (assert-eq cow shared)
-    (assert-= 2 (cl-cc/optimize:opt-cow-object-refcount cow))))
+    (expect shared :to-be cow)
+    (expect (= 2 (cl-cc/optimize:opt-cow-object-refcount cow)) :to-be-truthy)))
 
-(deftest optimize-cow-write-detaches-when-shared
-  "opt-cow-write detaches payload when refcount > 1 and preserves original payload."
+(it-sequential "optimize-cow-write-detaches-when-shared"
   (let* ((original (cl-cc/optimize:make-opt-cow-object :payload '((a . 1)) :refcount 1))
          (shared (cl-cc/optimize:opt-cow-copy original))
          (written (cl-cc/optimize:opt-cow-write
                    shared
                    (lambda (payload)
                      (setf (cdar payload) 99)))))
-    (assert-false (eq written original))
-    (assert-= 1 (cl-cc/optimize:opt-cow-object-refcount original))
-    (assert-= 1 (cl-cc/optimize:opt-cow-object-refcount written))
-    (assert-equal '((a . 1)) (cl-cc/optimize:opt-cow-object-payload original))
-    (assert-equal '((a . 99)) (cl-cc/optimize:opt-cow-object-payload written))))
+    (expect (eq written original) :to-be-falsy)
+    (expect (= 1 (cl-cc/optimize:opt-cow-object-refcount original)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize:opt-cow-object-refcount written)) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-cow-object-payload original) :to-equal '((a . 1)))
+    (expect (cl-cc/optimize:opt-cow-object-payload written) :to-equal '((a . 99)))))
 
 ;;; ─── Region/bump allocation helpers (FR-254 partial) ───────────────────────
 
-(deftest optimize-bump-region-mark-reset-restores-cursor
-  "opt-bump-mark/opt-bump-reset restore cursor to saved point."
+(it-sequential "optimize-bump-region-mark-reset-restores-cursor"
   (let ((region (cl-cc/optimize:make-opt-bump-region :cursor 0 :limit 64 :marks nil)))
-    (assert-= 0 (cl-cc/optimize:opt-bump-allocate region 8))
-    (assert-= 8 (cl-cc/optimize:opt-bump-mark region))
-    (assert-= 8 (cl-cc/optimize:opt-bump-allocate region 4))
-    (assert-= 12 (cl-cc/optimize:opt-bump-region-cursor region))
+    (expect (= 0 (cl-cc/optimize:opt-bump-allocate region 8)) :to-be-truthy)
+    (expect (= 8 (cl-cc/optimize:opt-bump-mark region)) :to-be-truthy)
+    (expect (= 8 (cl-cc/optimize:opt-bump-allocate region 4)) :to-be-truthy)
+    (expect (= 12 (cl-cc/optimize:opt-bump-region-cursor region)) :to-be-truthy)
     (cl-cc/optimize:opt-bump-reset region)
-    (assert-= 8 (cl-cc/optimize:opt-bump-region-cursor region))))
+    (expect (= 8 (cl-cc/optimize:opt-bump-region-cursor region)) :to-be-truthy)))
 
-(deftest optimize-slab-pool-reuses-freed-object
-  "opt-slab-pool recycles freed objects through freelist."
+(it-sequential "optimize-slab-pool-reuses-freed-object"
   (let* ((pool (cl-cc/optimize:make-opt-slab-pool :object-size 2 :free-list nil :next-id 0 :allocated-count 0))
          (obj1 (cl-cc/optimize:opt-slab-allocate pool)))
     (cl-cc/optimize:opt-slab-free pool obj1)
     (let ((obj2 (cl-cc/optimize:opt-slab-allocate pool)))
-      (assert-equal obj1 obj2))))
+      (expect obj2 :to-equal obj1))))
 
 ;;; ─── Inline cache helper layer (FR-009 / FR-019 partial) ──────────────────
 
-(deftest optimize-ic-resolve-target-prefers-site-local-entry
-  "opt-ic-resolve-target returns site-local target when IC entry exists."
+(it-sequential "optimize-ic-resolve-target-prefers-site-local-entry"
   (let ((site (cl-cc/optimize::make-opt-ic-site :state :monomorphic :entries nil)))
     (cl-cc/optimize::opt-ic-transition site :shape-a :target-a)
     (multiple-value-bind (target source)
         (cl-cc/optimize::opt-ic-resolve-target site :shape-a)
-      (assert-eq :target-a target)
-      (assert-eq :site-local source))))
+      (expect target :to-be :target-a)
+      (expect source :to-be :site-local))))
 
-(deftest optimize-ic-resolve-target-uses-shared-megamorphic-cache
-  "Megamorphic site misses consult shared megamorphic cache as fallback."
+(it-sequential "optimize-ic-resolve-target-uses-shared-megamorphic-cache"
   (let* ((site (cl-cc/optimize::make-opt-ic-site
                 :state :megamorphic :entries nil :max-polymorphic-entries 2))
          (cache (cl-cc/optimize::make-opt-megamorphic-cache :max-size 2)))
     (cl-cc/optimize::opt-mega-cache-put cache :shape-z :target-z)
     (multiple-value-bind (target source)
         (cl-cc/optimize::opt-ic-resolve-target site :shape-z cache)
-      (assert-eq :target-z target)
-      (assert-eq :megamorphic-shared source))))
+      (expect target :to-be :target-z)
+      (expect source :to-be :megamorphic-shared))))
 
 ;;; ─── ThinLTO / Tiered JIT / Deopt helpers (FR-301/310/312 partial) ───────
 
-(deftest optimize-pgo-build-hot-chain-prefers-hottest-successors
-  "PGO layout helper builds a greedy hot successor chain."
+(it-sequential "optimize-pgo-build-hot-chain-prefers-hottest-successors"
   (let ((edges (make-hash-table :test #'equal)))
     (setf (gethash (cons :entry :cold) edges) 1
           (gethash (cons :entry :hot) edges) 10
           (gethash (cons :hot :exit) edges) 5
           (gethash (cons :cold :exit) edges) 1)
-    (assert-equal '(:entry :hot :exit)
-                  (cl-cc/optimize:opt-pgo-build-hot-chain
+    (expect (cl-cc/optimize:opt-pgo-build-hot-chain
                    :entry
                    '((:entry . (:cold :hot))
                      (:hot . (:exit))
                      (:cold . (:exit)))
-                   edges))))
+                   edges) :to-equal '(:entry :hot :exit))))
 
-(deftest optimize-pgo-rotate-loop-places-preferred-exit-at-bottom
-  "Loop rotation helper makes the preferred exit the loop-chain bottom."
-  (assert-equal '(:latch :header :exit)
-                (cl-cc/optimize:opt-pgo-rotate-loop
+(it-sequential "optimize-pgo-rotate-loop-places-preferred-exit-at-bottom"
+  (expect (cl-cc/optimize:opt-pgo-rotate-loop
                  '(:header :exit :latch)
-                 :exit)))
+                 :exit) :to-equal '(:latch :header :exit)))
 
-(deftest optimize-merge-module-summaries-aggregates-exports-and-counts
-  "opt-merge-module-summaries merges module names, deduped exports, and function counts."
+(it-sequential "optimize-merge-module-summaries-aggregates-exports-and-counts"
   (let* ((a (cl-cc/optimize::make-opt-module-summary
              :module :a :exports '(fa fb) :function-count 2 :type-summaries nil))
          (b (cl-cc/optimize::make-opt-module-summary
              :module :b :exports '(fb fc) :function-count 3 :type-summaries nil))
          (merged (cl-cc/optimize::opt-merge-module-summaries (list a b))))
-    (assert-equal '(:a :b) (getf merged :modules))
-    (assert-true (member 'fa (getf merged :exports)))
-    (assert-true (member 'fb (getf merged :exports)))
-    (assert-true (member 'fc (getf merged :exports)))
-    (assert-= 5 (getf merged :function-count))))
+    (expect (getf merged :modules) :to-equal '(:a :b))
+    (expect (member 'fa (getf merged :exports)) :to-be-truthy)
+    (expect (member 'fb (getf merged :exports)) :to-be-truthy)
+    (expect (member 'fc (getf merged :exports)) :to-be-truthy)
+    (expect (= 5 (getf merged :function-count)) :to-be-truthy)))
 
-(deftest optimize-thinlto-import-decision-respects-budget-linkage-and-cycles
-  "ThinLTO import helper accepts only small local non-recursive summaries."
+(it-sequential "optimize-thinlto-import-decision-respects-budget-linkage-and-cycles"
   (let ((candidate (cl-cc/optimize:make-opt-function-summary
                     :name 'callee :inst-count 12 :exported-p nil :importable-p t))
         (exported (cl-cc/optimize:make-opt-function-summary
                    :name 'public :inst-count 12 :exported-p t :importable-p t))
         (too-large (cl-cc/optimize:make-opt-function-summary
                     :name 'big :inst-count 200 :exported-p nil :importable-p t)))
-    (assert-true (cl-cc/optimize:opt-thinlto-should-import-p
-                  candidate '(other) :budget 20))
-    (assert-false (cl-cc/optimize:opt-thinlto-should-import-p
-                   exported '(other) :budget 20))
-    (assert-false (cl-cc/optimize:opt-thinlto-should-import-p
-                   too-large '(other) :budget 20))
-    (assert-false (cl-cc/optimize:opt-thinlto-should-import-p
-                   candidate '(callee) :budget 20))))
+    (expect (cl-cc/optimize:opt-thinlto-should-import-p
+                  candidate '(other) :budget 20) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-thinlto-should-import-p
+                   exported '(other) :budget 20) :to-be-falsy)
+    (expect (cl-cc/optimize:opt-thinlto-should-import-p
+                   too-large '(other) :budget 20) :to-be-falsy)
+    (expect (cl-cc/optimize:opt-thinlto-should-import-p
+                   candidate '(callee) :budget 20) :to-be-falsy)))
 
-(deftest-each adaptive-compilation-threshold-cases
-  "opt-adaptive-compilation-threshold lowers for warmup and increases for pressure/failures."
-  :cases (("warmup"    900 t   nil nil 300)
-          ("pressure"  900 nil 0.8 nil 1800)
-          ("failures"  900 nil nil 2   2700)
-          ("combined"  900 t   0.8 2   1800))
-  (base warmup-p pressure failures expected)
-  (assert-= expected
-            (cl-cc/optimize::opt-adaptive-compilation-threshold
+(it-sequential "adaptive-compilation-threshold-cases warmup"
+  (destructuring-bind (base warmup-p pressure failures expected) (list 900 t nil nil 300)
+    (expect (= expected (cl-cc/optimize::opt-adaptive-compilation-threshold
              :base base
              :warmup-p warmup-p
              :cache-pressure pressure
-             :failures failures)))
+             :failures failures)) :to-be-truthy)))
 
-(deftest-each tier-transition-cases
-  "Tier transition helper promotes interpreter to baseline and baseline to optimized."
-  :cases (("interp-below"    :interpreter 99   100  nil  :interpreter)
-          ("interp-at"       :interpreter 100  100  nil  :baseline)
-          ("baseline-below"  :baseline    999  nil  1000 :baseline)
-          ("baseline-at"     :baseline    1000 nil  1000 :optimized))
-  (tier count bt ot expected)
-  (assert-eq expected
-             (cl-cc/optimize:opt-tier-transition
+(it-sequential "adaptive-compilation-threshold-cases pressure"
+  (destructuring-bind (base warmup-p pressure failures expected) (list 900 nil 0.8 nil 1800)
+    (expect (= expected (cl-cc/optimize::opt-adaptive-compilation-threshold
+             :base base
+             :warmup-p warmup-p
+             :cache-pressure pressure
+             :failures failures)) :to-be-truthy)))
+
+(it-sequential "adaptive-compilation-threshold-cases failures"
+  (destructuring-bind (base warmup-p pressure failures expected) (list 900 nil nil 2 2700)
+    (expect (= expected (cl-cc/optimize::opt-adaptive-compilation-threshold
+             :base base
+             :warmup-p warmup-p
+             :cache-pressure pressure
+             :failures failures)) :to-be-truthy)))
+
+(it-sequential "adaptive-compilation-threshold-cases combined"
+  (destructuring-bind (base warmup-p pressure failures expected) (list 900 t 0.8 2 1800)
+    (expect (= expected (cl-cc/optimize::opt-adaptive-compilation-threshold
+             :base base
+             :warmup-p warmup-p
+             :cache-pressure pressure
+             :failures failures)) :to-be-truthy)))
+
+(it-sequential "tier-transition-cases interp-below"
+  (destructuring-bind (tier count bt ot expected) (list :interpreter 99 100 nil :interpreter)
+    (expect (cl-cc/optimize:opt-tier-transition
               tier count
               :baseline-threshold bt
-              :optimized-threshold ot)))
+              :optimized-threshold ot) :to-be expected)))
 
-(deftest optimize-materialize-deopt-state-maps-machine-registers-to-vm-registers
-  "opt-materialize-deopt-state reconstructs VM register values from machine register snapshot."
+(it-sequential "tier-transition-cases interp-at"
+  (destructuring-bind (tier count bt ot expected) (list :interpreter 100 100 nil :baseline)
+    (expect (cl-cc/optimize:opt-tier-transition
+              tier count
+              :baseline-threshold bt
+              :optimized-threshold ot) :to-be expected)))
+
+(it-sequential "tier-transition-cases baseline-below"
+  (destructuring-bind (tier count bt ot expected) (list :baseline 999 nil 1000 :baseline)
+    (expect (cl-cc/optimize:opt-tier-transition
+              tier count
+              :baseline-threshold bt
+              :optimized-threshold ot) :to-be expected)))
+
+(it-sequential "tier-transition-cases baseline-at"
+  (destructuring-bind (tier count bt ot expected) (list :baseline 1000 nil 1000 :optimized)
+    (expect (cl-cc/optimize:opt-tier-transition
+              tier count
+              :baseline-threshold bt
+              :optimized-threshold ot) :to-be expected)))
+
+(it-sequential "optimize-materialize-deopt-state-maps-machine-registers-to-vm-registers"
   (let* ((frame (cl-cc/optimize::make-opt-deopt-frame
                  :vm-pc 42
                  :register-map '((:rax . :r0) (:rbx . :r1))
                  :inlined-frames nil))
          (machine '((:rax . 11) (:rbx . 22) (:rcx . 33)))
          (state (cl-cc/optimize::opt-materialize-deopt-state frame machine)))
-    (assert-equal '((:r0 . 11) (:r1 . 22)) state)))
+    (expect state :to-equal '((:r0 . 11) (:r1 . 22)))))
 
-(deftest optimize-osr-trigger-p-uses-hotness-threshold
-  "opt-osr-trigger-p fires when hotness reaches threshold."
+(it-sequential "optimize-osr-trigger-p-uses-hotness-threshold"
   (let ((osr (cl-cc/optimize::make-opt-osr-point
               :loop-id :L1
               :vm-pc 77
               :live-registers nil
               :hotness 1200)))
-    (assert-true (cl-cc/optimize::opt-osr-trigger-p osr :threshold 1000))
-    (assert-false (cl-cc/optimize::opt-osr-trigger-p osr :threshold 2000))))
+    (expect (cl-cc/optimize::opt-osr-trigger-p osr :threshold 1000) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-osr-trigger-p osr :threshold 2000) :to-be-falsy)))
 
-(deftest optimize-osr-materialize-entry-maps-machine-to-vm-registers
-  "opt-osr-materialize-entry reconstructs VM register state at OSR entry."
+(it-sequential "optimize-osr-materialize-entry-maps-machine-to-vm-registers"
   (let* ((osr (cl-cc/optimize::make-opt-osr-point
                :loop-id :L2
                :vm-pc 88
@@ -530,25 +636,23 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                :hotness 1500))
          (machine '((:rax . 3) (:r10 . 9) (:rbx . 99)))
          (state (cl-cc/optimize::opt-osr-materialize-entry osr machine)))
-    (assert-equal '((:r0 . 3) (:r7 . 9)) state)))
+    (expect state :to-equal '((:r0 . 3) (:r7 . 9)))))
 
-(deftest optimize-shape-descriptor-slots-map-to-stable-offsets
-  "make-opt-shape-descriptor-for-slots assigns deterministic slot offsets."
+(it-sequential "optimize-shape-descriptor-slots-map-to-stable-offsets"
   (let* ((shape (cl-cc/optimize::make-opt-shape-descriptor-for-slots
                  7 '(name age active))))
-    (assert-= 0 (cl-cc/optimize::opt-shape-slot-offset shape 'name))
-    (assert-= 1 (cl-cc/optimize::opt-shape-slot-offset shape 'age))
-    (assert-= 2 (cl-cc/optimize::opt-shape-slot-offset shape 'active))))
+    (expect (= 0 (cl-cc/optimize::opt-shape-slot-offset shape 'name)) :to-be-truthy)
+    (expect (= 1 (cl-cc/optimize::opt-shape-slot-offset shape 'age)) :to-be-truthy)
+    (expect (= 2 (cl-cc/optimize::opt-shape-slot-offset shape 'active)) :to-be-truthy)))
 
-(deftest optimize-shape-transition-cache-stores-forward-transitions
-  "Shape transition cache stores and resolves forward-only transitions."
+(it-sequential "optimize-shape-transition-cache-stores-forward-transitions"
   (let ((cache (cl-cc/optimize::make-opt-shape-transition-cache :max-size 2)))
     (cl-cc/optimize::opt-shape-transition-put cache 1 'slot-a 2)
     (cl-cc/optimize::opt-shape-transition-put cache 2 'slot-b 3)
     (multiple-value-bind (child found)
         (cl-cc/optimize::opt-shape-transition-get cache 1 'slot-a)
-      (assert-true found)
-      (assert-= 2 child))))
+      (expect found :to-be-truthy)
+      (expect (= 2 child) :to-be-truthy))))
 
 (defparameter *opt-ic-patch-plan-cases*
   '((:site1 :uninitialized :monomorphic :t1 :install-monomorphic)
@@ -561,39 +665,44 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
               (cl-cc/optimize::opt-ic-make-patch-plan
                site current-state next-state target))))
 
-(deftest optimize-ic-make-patch-plan-classifies-state-transitions
-  "opt-ic-make-patch-plan assigns expected patch kinds for IC promotions."
+(it-sequential "optimize-ic-make-patch-plan-classifies-state-transitions"
   (dolist (case *opt-ic-patch-plan-cases*)
     (apply #'%assert-opt-ic-patch-plan-case case)))
 
-(deftest optimize-build-inline-polymorphic-dispatch-builds-guard-chain
-  "opt-build-inline-polymorphic-dispatch returns one guard record per observed shape."
+(it-sequential "optimize-build-inline-polymorphic-dispatch-builds-guard-chain"
   (let* ((entries '((:shape-a . :method-a) (:shape-b . :method-b)))
          (chain (cl-cc/optimize::opt-build-inline-polymorphic-dispatch entries :obj)))
-    (assert-= 2 (length chain))
-    (assert-eq :shape-a (getf (first chain) :shape))
-    (assert-eq :obj (getf (first chain) :receiver))
-    (assert-eq :method-b (getf (second chain) :target))))
+    (expect (= 2 (length chain)) :to-be-truthy)
+    (expect (getf (first chain) :shape) :to-be :shape-a)
+    (expect (getf (first chain) :receiver) :to-be :obj)
+    (expect (getf (second chain) :target) :to-be :method-b)))
 
-(deftest-each wasm-tailcall-opcode-cases
-  "Wasm tail-call helper selects return-call opcodes when enabled at tail position."
-  :cases (("direct-enabled"   t nil t :return-call)
-          ("indirect-enabled" t t   t :return-call-indirect)
-          ("non-tail-disabled" nil nil nil :call))
-  (tail-p indirect-p enabled-p expected)
-  (assert-eq expected
-             (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+(it-sequential "wasm-tailcall-opcode-cases direct-enabled"
+  (destructuring-bind (tail-p indirect-p enabled-p expected) (list t nil t :return-call)
+    (expect (cl-cc/optimize::opt-wasm-select-tailcall-opcode
               :tail-position-p tail-p
               :indirect-p indirect-p
-              :enabled-p enabled-p)))
+              :enabled-p enabled-p) :to-be expected)))
 
-(deftest wasm-tailcall-opcode-disabled-tail-signals
-  "Tail-call opcode selection fails fast when tail calls are requested but disabled."
-  (assert-signals error
-    (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+(it-sequential "wasm-tailcall-opcode-cases indirect-enabled"
+  (destructuring-bind (tail-p indirect-p enabled-p expected) (list t t t :return-call-indirect)
+    (expect (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+              :tail-position-p tail-p
+              :indirect-p indirect-p
+              :enabled-p enabled-p) :to-be expected)))
+
+(it-sequential "wasm-tailcall-opcode-cases non-tail-disabled"
+  (destructuring-bind (tail-p indirect-p enabled-p expected) (list nil nil nil :call)
+    (expect (cl-cc/optimize::opt-wasm-select-tailcall-opcode
+              :tail-position-p tail-p
+              :indirect-p indirect-p
+              :enabled-p enabled-p) :to-be expected)))
+
+(it-sequential "wasm-tailcall-opcode-disabled-tail-signals"
+  (let ((%%signaled3 nil)) (handler-case (progn (cl-cc/optimize::opt-wasm-select-tailcall-opcode
      :tail-position-p t
      :indirect-p nil
-     :enabled-p nil)))
+     :enabled-p nil)) (error () (setf %%signaled3 t))) (expect %%signaled3 :to-be-truthy)))
 
 (defun %opt-wasm-gc-struct-layout (&key (fields '((slot-a . i32)))
                                         (nullable-p t))
@@ -612,88 +721,75 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
 (defun %opt-wasm-gc-bad-array-layout ()
   (%opt-wasm-gc-array-layout :fields '(eqref i32)))
 
-(deftest optimize-build-wasm-gc-layout-preserves-kind-and-fields
-  "Wasm GC helper stores layout kind/fields/nullability deterministically."
+(it-sequential "optimize-build-wasm-gc-layout-preserves-kind-and-fields"
   (let ((layout (%opt-wasm-gc-struct-layout
                  :fields '((slot-a . i32) (slot-b . externref)))))
-    (assert-eq :struct (cl-cc/optimize::opt-wasm-gc-kind layout))
-    (assert-equal '((slot-a . i32) (slot-b . externref))
-                  (cl-cc/optimize::opt-wasm-gc-fields layout))
-    (assert-true (cl-cc/optimize::opt-wasm-gc-nullable-p layout))))
+    (expect (cl-cc/optimize::opt-wasm-gc-kind layout) :to-be :struct)
+    (expect (cl-cc/optimize::opt-wasm-gc-fields layout) :to-equal '((slot-a . i32) (slot-b . externref)))
+    (expect (cl-cc/optimize::opt-wasm-gc-nullable-p layout) :to-be-truthy)))
 
-(deftest optimize-wasm-gc-layout-validates-struct-and-array-shapes
-  "Wasm GC validation helper accepts legal struct/array layouts only."
+(it-sequential "optimize-wasm-gc-layout-validates-struct-and-array-shapes"
   (let ((struct-layout (%opt-wasm-gc-struct-layout
                         :fields '((slot-a . i32) (slot-b . eqref))))
         (array-layout (%opt-wasm-gc-array-layout))
         (bad-array-layout (%opt-wasm-gc-bad-array-layout)))
-    (assert-true (cl-cc/optimize:opt-wasm-gc-layout-valid-p struct-layout))
-    (assert-true (cl-cc/optimize:opt-wasm-gc-layout-valid-p array-layout))
-    (assert-false (cl-cc/optimize:opt-wasm-gc-layout-valid-p bad-array-layout))))
+    (expect (cl-cc/optimize:opt-wasm-gc-layout-valid-p struct-layout) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-wasm-gc-layout-valid-p array-layout) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-wasm-gc-layout-valid-p bad-array-layout) :to-be-falsy)))
 
-(deftest optimize-wasm-gc-runtime-host-compatibility-requires-feature-and-valid-layout
-  "Host-compatibility helper gates lowering on wasm-gc support and layout validity."
+(it-sequential "optimize-wasm-gc-runtime-host-compatibility-requires-feature-and-valid-layout"
   (let ((layout (%opt-wasm-gc-struct-layout))
         (bad-layout (%opt-wasm-gc-bad-array-layout)))
-    (assert-true
-     (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
+    (expect (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
       layout
-      :host-supports-wasm-gc-p t))
-    (assert-false
-     (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
+      :host-supports-wasm-gc-p t) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
       layout
-      :host-supports-wasm-gc-p nil))
-    (assert-false
-     (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
+      :host-supports-wasm-gc-p nil) :to-be-falsy)
+    (expect (cl-cc/optimize:opt-wasm-gc-runtime-host-compatible-p
       bad-layout
-      :host-supports-wasm-gc-p t))))
+      :host-supports-wasm-gc-p t) :to-be-falsy)))
 
-(deftest optimize-wasm-gc-optimization-plan-reflects-layout-kind
-  "Optimization-plan helper enables struct vs array specific lowering hints."
+(it-sequential "optimize-wasm-gc-optimization-plan-reflects-layout-kind"
   (let* ((struct-layout (%opt-wasm-gc-struct-layout))
          (array-layout (%opt-wasm-gc-array-layout))
          (struct-plan (cl-cc/optimize:opt-build-wasm-gc-optimization-plan struct-layout))
          (array-plan (cl-cc/optimize:opt-build-wasm-gc-optimization-plan array-layout)))
-    (assert-true (getf struct-plan :layout-valid-p))
-    (assert-true (getf struct-plan :inline-field-access-p))
-    (assert-false (getf struct-plan :bounds-check-elision-p))
-    (assert-true (getf array-plan :layout-valid-p))
-    (assert-false (getf array-plan :inline-field-access-p))
-    (assert-true (getf array-plan :bounds-check-elision-p))))
+    (expect (getf struct-plan :layout-valid-p) :to-be-truthy)
+    (expect (getf struct-plan :inline-field-access-p) :to-be-truthy)
+    (expect (getf struct-plan :bounds-check-elision-p) :to-be-falsy)
+    (expect (getf array-plan :layout-valid-p) :to-be-truthy)
+    (expect (getf array-plan :inline-field-access-p) :to-be-falsy)
+    (expect (getf array-plan :bounds-check-elision-p) :to-be-truthy)))
 
-(deftest optimize-build-dwarf-line-row-preserves-location-fields
-  "DWARF helper materializes address and source location fields."
+(it-sequential "optimize-build-dwarf-line-row-preserves-location-fields"
   (let* ((loc (cl-cc/optimize::make-opt-debug-loc
                :file "src/foo.lisp" :line 42 :column 7 :symbol 'foo))
          (row (cl-cc/optimize::opt-build-dwarf-line-row #x1000 loc)))
-    (assert-eq #x1000 (getf row :address))
-    (assert-equal "src/foo.lisp" (getf row :file))
-    (assert-= 42 (getf row :line))
-    (assert-= 7 (getf row :column))))
+    (expect (getf row :address) :to-be #x1000)
+    (expect (getf row :file) :to-equal "src/foo.lisp")
+    (expect (= 42 (getf row :line)) :to-be-truthy)
+    (expect (= 7 (getf row :column)) :to-be-truthy)))
 
-(deftest optimize-build-wasm-source-map-entry-preserves-offset-and-source
-  "Wasm source-map helper keeps wasm offset and original source coordinates."
+(it-sequential "optimize-build-wasm-source-map-entry-preserves-offset-and-source"
   (let* ((loc (cl-cc/optimize::make-opt-debug-loc
                :file "src/bar.lisp" :line 10 :column 3 :symbol 'bar))
          (entry (cl-cc/optimize::opt-build-wasm-source-map-entry 128 loc)))
-    (assert-= 128 (getf entry :offset))
-    (assert-equal "src/bar.lisp" (getf entry :source))
-    (assert-= 10 (getf entry :line))
-    (assert-= 3 (getf entry :column))))
+    (expect (= 128 (getf entry :offset)) :to-be-truthy)
+    (expect (getf entry :source) :to-equal "src/bar.lisp")
+    (expect (= 10 (getf entry :line)) :to-be-truthy)
+    (expect (= 3 (getf entry :column)) :to-be-truthy)))
 
-(deftest optimize-format-diagnostic-reason-renders-rpass-like-message
-  "Diagnostic helper formats pass outcome and reason consistently."
-  (assert-equal "inline: skipped (callee too large)"
-                (cl-cc/optimize::opt-format-diagnostic-reason
-                 "inline" "skipped" "callee too large")))
+(it-sequential "optimize-format-diagnostic-reason-renders-rpass-like-message"
+  (expect (cl-cc/optimize::opt-format-diagnostic-reason
+                 "inline" "skipped" "callee too large") :to-equal "inline: skipped (callee too large)"))
 
-(deftest optimize-build-tls-plan-selects-architecture-specific-base-register
-  "TLS helper chooses FS on x86-64 and TPIDR_EL0 on AArch64 for hot accesses."
+(it-sequential "optimize-build-tls-plan-selects-architecture-specific-base-register"
   (let ((x86 (cl-cc/optimize::opt-build-tls-plan :target :x86-64 :hot-access-p t))
         (arm (cl-cc/optimize::opt-build-tls-plan :target :aarch64 :hot-access-p t)))
-    (assert-true (cl-cc/optimize::opt-tls-plan-uses-inline-tls-p x86))
-    (assert-eq :fs (cl-cc/optimize::opt-tls-plan-base-register x86))
-    (assert-eq :tpidr_el0 (cl-cc/optimize::opt-tls-plan-base-register arm))))
+    (expect (cl-cc/optimize::opt-tls-plan-uses-inline-tls-p x86) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-tls-plan-base-register x86) :to-be :fs)
+    (expect (cl-cc/optimize::opt-tls-plan-base-register arm) :to-be :tpidr_el0)))
 
 (defparameter *opt-atomic-opcode-cases*
   '((:x86-64 :incf :acq-rel :lock-xadd)
@@ -708,13 +804,11 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
               :operation operation
               :memory-order memory-order)))
 
-(deftest optimize-select-atomic-opcode-reflects-target-and-operation
-  "Atomic helper picks target-specific representative opcodes for incf/cas."
+(it-sequential "optimize-select-atomic-opcode-reflects-target-and-operation"
   (dolist (case *opt-atomic-opcode-cases*)
     (apply #'%assert-opt-atomic-opcode-case case)))
 
-(deftest optimize-build-htm-plan-enables-lock-elision-only-when-supported-and-low-contention
-  "HTM helper enables lock elision only under support + low-contention preconditions."
+(it-sequential "optimize-build-htm-plan-enables-lock-elision-only-when-supported-and-low-contention"
   (let ((enabled (cl-cc/optimize::opt-build-htm-plan
                   :target :x86-64
                   :supports-htm-p t
@@ -723,54 +817,44 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                    :target :x86-64
                    :supports-htm-p t
                    :low-contention-p nil)))
-    (assert-true (cl-cc/optimize::opt-htm-plan-uses-htm-p enabled))
-    (assert-eq :xbegin (cl-cc/optimize::opt-htm-plan-begin-opcode enabled))
-    (assert-eq :xend (cl-cc/optimize::opt-htm-plan-end-opcode enabled))
-    (assert-eq :xabort (cl-cc/optimize::opt-htm-plan-abort-opcode enabled))
-    (assert-true (cl-cc/optimize::opt-htm-plan-fallback-lock-p enabled))
-    (assert-false (cl-cc/optimize::opt-htm-plan-uses-htm-p disabled))))
+    (expect (cl-cc/optimize::opt-htm-plan-uses-htm-p enabled) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-htm-plan-begin-opcode enabled) :to-be :xbegin)
+    (expect (cl-cc/optimize::opt-htm-plan-end-opcode enabled) :to-be :xend)
+    (expect (cl-cc/optimize::opt-htm-plan-abort-opcode enabled) :to-be :xabort)
+    (expect (cl-cc/optimize::opt-htm-plan-fallback-lock-p enabled) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-htm-plan-uses-htm-p disabled) :to-be-falsy)))
 
-(deftest optimize-build-concurrent-gc-plan-selects-satb-and-short-stw-for-latency-sensitive-mode
-  "Concurrent GC helper selects SATB + short STW phases for latency-sensitive workloads."
+(it-sequential "optimize-build-concurrent-gc-plan-selects-satb-and-short-stw-for-latency-sensitive-mode"
   (let ((concurrent (cl-cc/optimize::opt-build-concurrent-gc-plan
                      :latency-sensitive-p t
                      :heap-size (* 128 1024 1024)))
         (stw (cl-cc/optimize::opt-build-concurrent-gc-plan
               :latency-sensitive-p nil
               :heap-size (* 128 1024 1024))))
-    (assert-true (cl-cc/optimize::opt-conc-gc-plan-concurrent-mark-p concurrent))
-    (assert-eq :satb (cl-cc/optimize::opt-conc-gc-plan-write-barrier concurrent))
-    (assert-true (cl-cc/optimize::opt-conc-gc-plan-mutator-assist-p concurrent))
-    (assert-equal '(:initial-mark :final-remark)
-                  (cl-cc/optimize::opt-conc-gc-plan-stw-phases concurrent))
-    (assert-false (cl-cc/optimize::opt-conc-gc-plan-concurrent-mark-p stw))
-    (assert-eq :incremental-update (cl-cc/optimize::opt-conc-gc-plan-write-barrier stw))
-    (assert-equal '(:full-mark-sweep)
-                  (cl-cc/optimize::opt-conc-gc-plan-stw-phases stw))))
+    (expect (cl-cc/optimize::opt-conc-gc-plan-concurrent-mark-p concurrent) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-conc-gc-plan-write-barrier concurrent) :to-be :satb)
+    (expect (cl-cc/optimize::opt-conc-gc-plan-mutator-assist-p concurrent) :to-be-truthy)
+    (expect (cl-cc/optimize::opt-conc-gc-plan-stw-phases concurrent) :to-equal '(:initial-mark :final-remark))
+    (expect (cl-cc/optimize::opt-conc-gc-plan-concurrent-mark-p stw) :to-be-falsy)
+    (expect (cl-cc/optimize::opt-conc-gc-plan-write-barrier stw) :to-be :incremental-update)
+    (expect (cl-cc/optimize::opt-conc-gc-plan-stw-phases stw) :to-equal '(:full-mark-sweep))))
 
 ;;; ─── FR-209/210/211 Partial Evaluation Helper Layer ────────────────────────
 
-(deftest optimize-specialize-constant-args-builds-residual-body
-  "FR-209 helper substitutes known constant parameters into a residual body."
+(it-sequential "optimize-specialize-constant-args-builds-residual-body"
   (let ((specialization
           (cl-cc/optimize:opt-specialize-constant-args
            'f
            '(x y)
            '((if (= x 0) 0 (* x y)))
            '((x . 0)))))
-    (assert-equal 'f
-                  (cl-cc/optimize:opt-partial-spec-original-name specialization))
-    (assert-equal '((x . 0))
-                  (cl-cc/optimize:opt-partial-spec-signature specialization))
-    (assert-equal '((x . 0))
-                  (cl-cc/optimize:opt-partial-spec-static-args specialization))
-    (assert-equal '(y)
-                  (cl-cc/optimize:opt-partial-spec-dynamic-args specialization))
-    (assert-equal '((if (= 0 0) 0 (* 0 y)))
-                  (cl-cc/optimize:opt-partial-spec-residual-body specialization))))
+    (expect (cl-cc/optimize:opt-partial-spec-original-name specialization) :to-equal 'f)
+    (expect (cl-cc/optimize:opt-partial-spec-signature specialization) :to-equal '((x . 0)))
+    (expect (cl-cc/optimize:opt-partial-spec-static-args specialization) :to-equal '((x . 0)))
+    (expect (cl-cc/optimize:opt-partial-spec-dynamic-args specialization) :to-equal '(y))
+    (expect (cl-cc/optimize:opt-partial-spec-residual-body specialization) :to-equal '((if (= 0 0) 0 (* 0 y))))))
 
-(deftest optimize-specialize-constant-args-respects-lexical-binders-and-quoted-data
-  "FR-209 helper avoids substituting quoted data or lexically shadowed names."
+(it-sequential "optimize-specialize-constant-args-respects-lexical-binders-and-quoted-data"
   (let ((specialization
           (cl-cc/optimize:opt-specialize-constant-args
            'f
@@ -782,16 +866,14 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
              (setq x y)
              (x y))
            '((x . 0) (y . 7)))))
-    (assert-equal '((quote x)
+    (expect (cl-cc/optimize:opt-partial-spec-residual-body specialization) :to-equal '((quote x)
                     (let ((x 7) (z 0)) (+ x z 7))
                     (let* ((z 0) (x 7)) (+ x z 7))
                     (lambda (x) (+ x 7))
                     (setq x 7)
-                    (x 7))
-                  (cl-cc/optimize:opt-partial-spec-residual-body specialization))))
+                    (x 7)))))
 
-(deftest optimize-specialize-constant-args-kills-signature-after-setq
-  "FR-209 helper invalidates stale constant signatures after setq assignment."
+(it-sequential "optimize-specialize-constant-args-kills-signature-after-setq"
   (let ((specialization
           (cl-cc/optimize:opt-specialize-constant-args
            'f
@@ -803,33 +885,26 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
              (setq x y y x)
              (+ x y))
            '((x . 0) (y . 7)))))
-    (assert-equal '((setq x 7)
+    (expect (cl-cc/optimize:opt-partial-spec-residual-body specialization) :to-equal '((setq x 7)
                     (+ x 7)
                     (setq x (+ x 1))
                     (+ x 7)
                     (setq x 7 y x)
-                    (+ x y))
-                  (cl-cc/optimize:opt-partial-spec-residual-body specialization))))
+                    (+ x y)))))
 
-(deftest optimize-sccp-analyze-binding-times-classifies-lattice-values
-  "FR-210 helper maps SCCP lattice constants to static binding-time entries."
+(it-sequential "optimize-sccp-analyze-binding-times-classifies-lattice-values"
   (let* ((analysis
            (cl-cc/optimize:opt-sccp-analyze-binding-times
             '(x y z)
             `((x . ,(cl-cc/optimize:opt-lattice-constant 42))
               (y . ,(cl-cc/optimize:opt-lattice-overdefined))))))
-    (assert-eq :static
-               (cl-cc/optimize:opt-binding-time-kind (first analysis)))
-    (assert-equal 42
-                  (cl-cc/optimize:opt-binding-time-value (first analysis)))
-    (assert-eq :dynamic
-               (cl-cc/optimize:opt-binding-time-kind (second analysis)))
-    (assert-eq :dynamic
-               (cl-cc/optimize:opt-binding-time-kind (third analysis)))
-    (assert-null (cl-cc/optimize:opt-binding-time-lattice (third analysis)))))
+    (expect (cl-cc/optimize:opt-binding-time-kind (first analysis)) :to-be :static)
+    (expect (cl-cc/optimize:opt-binding-time-value (first analysis)) :to-equal 42)
+    (expect (cl-cc/optimize:opt-binding-time-kind (second analysis)) :to-be :dynamic)
+    (expect (cl-cc/optimize:opt-binding-time-kind (third analysis)) :to-be :dynamic)
+    (expect (cl-cc/optimize:opt-binding-time-lattice (third analysis)) :to-be-null)))
 
-(deftest optimize-build-specialization-plan-reuses-cache-for-constant-signature
-  "FR-211 helper requests one clone per callee/signature and reuses cached names."
+(it-sequential "optimize-build-specialization-plan-reuses-cache-for-constant-signature"
   (let* ((cache (make-hash-table :test #'equal))
          (first-plan
            (cl-cc/optimize:opt-build-specialization-plan
@@ -837,21 +912,17 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
          (second-plan
            (cl-cc/optimize:opt-build-specialization-plan
             'f '(x y) '((x . 3)) :cache cache)))
-    (assert-true first-plan)
-    (assert-true second-plan)
-    (assert-true (cl-cc/optimize:opt-specialization-plan-clone-needed-p first-plan))
-    (assert-false (cl-cc/optimize:opt-specialization-plan-cache-hit-p first-plan))
-    (assert-false (cl-cc/optimize:opt-specialization-plan-clone-needed-p second-plan))
-    (assert-true (cl-cc/optimize:opt-specialization-plan-cache-hit-p second-plan))
-    (assert-equal (cl-cc/optimize:opt-specialization-plan-specialized-name first-plan)
-                  (cl-cc/optimize:opt-specialization-plan-specialized-name second-plan))
-    (assert-equal '((x . 3))
-                  (cl-cc/optimize:opt-specialization-plan-signature first-plan))
-    (assert-equal '(y)
-                  (cl-cc/optimize:opt-specialization-plan-dynamic-args first-plan))))
+    (expect first-plan :to-be-truthy)
+    (expect second-plan :to-be-truthy)
+    (expect (cl-cc/optimize:opt-specialization-plan-clone-needed-p first-plan) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-specialization-plan-cache-hit-p first-plan) :to-be-falsy)
+    (expect (cl-cc/optimize:opt-specialization-plan-clone-needed-p second-plan) :to-be-falsy)
+    (expect (cl-cc/optimize:opt-specialization-plan-cache-hit-p second-plan) :to-be-truthy)
+    (expect (cl-cc/optimize:opt-specialization-plan-specialized-name second-plan) :to-equal (cl-cc/optimize:opt-specialization-plan-specialized-name first-plan))
+    (expect (cl-cc/optimize:opt-specialization-plan-signature first-plan) :to-equal '((x . 3)))
+    (expect (cl-cc/optimize:opt-specialization-plan-dynamic-args first-plan) :to-equal '(y))))
 
-(deftest optimize-pgo-build-counter-plan-emits-deterministic-bb-and-edge-ids
-  "FR-295 helper emits deterministic BB/edge IDs for stable CFG input."
+(it-sequential "optimize-pgo-build-counter-plan-emits-deterministic-bb-and-edge-ids"
   (let* ((plan (cl-cc/optimize:opt-pgo-build-counter-plan
                 :entry
                 '((:entry :left :right)
@@ -860,17 +931,15 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                   (:exit))))
          (bb (getf plan :bb-counters))
          (edge (getf plan :edge-counters)))
-    (assert-equal '((:entry . 0) (:left . 1) (:exit . 2) (:right . 3)) bb)
-    (assert-equal '(((:entry . :left) . 0)
+    (expect bb :to-equal '((:entry . 0) (:left . 1) (:exit . 2) (:right . 3)))
+    (expect edge :to-equal '(((:entry . :left) . 0)
                     ((:entry . :right) . 1)
                     ((:left . :exit) . 2)
-                    ((:right . :exit) . 3))
-                  edge)
-    (assert-= 4 (getf plan :total-bb))
-    (assert-= 4 (getf plan :total-edge))))
+                    ((:right . :exit) . 3)))
+    (expect (= 4 (getf plan :total-bb)) :to-be-truthy)
+    (expect (= 4 (getf plan :total-edge)) :to-be-truthy)))
 
-(deftest optimize-pgo-make-profile-template-zero-initializes-counts
-  "FR-295 helper builds zeroed BB/edge counters from a counter plan."
+(it-sequential "optimize-pgo-make-profile-template-zero-initializes-counts"
   (let* ((plan (cl-cc/optimize:opt-pgo-build-counter-plan
                 :entry
                 '((:entry :left :right)
@@ -878,19 +947,16 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                   (:right :exit)
                   (:exit))))
          (profile (cl-cc/optimize:opt-pgo-make-profile-template plan)))
-    (assert-eq :cl-cc-pgo-v1 (getf profile :magic))
-    (assert-equal '((:entry . 0) (:left . 0) (:exit . 0) (:right . 0))
-                  (getf profile :bb-counts))
-    (assert-equal '(((:entry . :left) . 0)
+    (expect (getf profile :magic) :to-be :cl-cc-pgo-v1)
+    (expect (getf profile :bb-counts) :to-equal '((:entry . 0) (:left . 0) (:exit . 0) (:right . 0)))
+    (expect (getf profile :branch-counts) :to-equal '(((:entry . :left) . 0)
                     ((:entry . :right) . 0)
                     ((:left . :exit) . 0)
-                    ((:right . :exit) . 0))
-                  (getf profile :branch-counts))
-    (assert-= (getf plan :total-bb) (getf profile :total-bb))
-    (assert-= (getf plan :total-edge) (getf profile :total-edge))))
+                    ((:right . :exit) . 0)))
+    (expect (= (getf plan :total-bb) (getf profile :total-bb)) :to-be-truthy)
+    (expect (= (getf plan :total-edge) (getf profile :total-edge)) :to-be-truthy)))
 
-(deftest optimize-partial-evaluate-program-propagates-constants-through-call-graph
-  "Program-level partial evaluator propagates constants across direct calls."
+(it-sequential "optimize-partial-evaluate-program-propagates-constants-through-call-graph"
   (let* ((defs
            '((callee :params (:x :y)
               :body ((+ x y)))
@@ -901,12 +967,11 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                   :constant-bindings-by-function '((caller . ((:a . 3))))))
          (reports (cl-cc/optimize::opt-partial-program-function-results result))
          (callee-report (cdr (assoc 'callee reports :test #'equal))))
-    (assert-true callee-report)
-    (assert-true (assoc :y (cl-cc/optimize:opt-partial-eval-signature callee-report) :test #'equal))
-    (assert-equal 7 (cdr (assoc :y (cl-cc/optimize:opt-partial-eval-signature callee-report) :test #'equal)))))
+    (expect callee-report :to-be-truthy)
+    (expect (assoc :y (cl-cc/optimize:opt-partial-eval-signature callee-report) :test #'equal) :to-be-truthy)
+    (expect (cdr (assoc :y (cl-cc/optimize:opt-partial-eval-signature callee-report) :test #'equal)) :to-equal 7)))
 
-(deftest optimize-partial-evaluate-program-uses-offline-bta-to-prune-static-forms
-  "Offline BTA marks static forms and exposes dynamic residual body." 
+(it-sequential "optimize-partial-evaluate-program-uses-offline-bta-to-prune-static-forms"
   (let* ((report (cl-cc/optimize:opt-partial-evaluate-function
                   'f
                   '(x)
@@ -914,12 +979,11 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                   :constant-bindings '((x . 9))))
          (kinds (cl-cc/optimize:opt-partial-eval-form-kinds report))
          (dynamic-body (cl-cc/optimize:opt-partial-eval-dynamic-body report)))
-    (assert-true (listp kinds))
-    (assert-true (member :static kinds))
-    (assert-true (listp dynamic-body))))
+    (expect (listp kinds) :to-be-truthy)
+    (expect (member :static kinds) :to-be-truthy)
+    (expect (listp dynamic-body) :to-be-truthy)))
 
-(deftest opt-pass-specialize-known-args-emits-specialized-clone-and-redirects-call
-  "Specialization pass emits clone label/body and rewrites call args to dynamic subset." 
+(it-sequential "opt-pass-specialize-known-args-emits-specialized-clone-and-redirects-call"
   (let* ((func-label "add2")
          (closure (make-vm-closure :dst :r1 :label func-label :params '(:x :y) :captured nil))
          (body (list (make-vm-label :name func-label)
@@ -939,8 +1003,8 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
                       (and (typep inst 'cl-cc/vm::vm-call)
                            (equal (cl-cc/vm::vm-args inst) '(:r4))))
                     optimized)))
-    (assert-true has-specialized-label)
-    (assert-true rewritten-call)))
+    (expect has-specialized-label :to-be-truthy)
+    (expect rewritten-call :to-be-truthy)))
 
 (defun %opt-canonical-loop-program (body-instructions)
   (append (list (make-vm-const :dst :ri :value 0)
@@ -1008,126 +1072,125 @@ max-iterations of 30 to actually exercise the cap clamping (35 → 30)."
         (make-vm-jump :label :lb)
         (make-vm-label :name :lbx)))
 
-(deftest optimize-affine-loop-summary-builds-descriptor
-  "FR-523: affine-loop analysis helper returns structured summary metadata."
+(it-sequential "optimize-affine-loop-summary-builds-descriptor"
   (let ((summary (cl-cc/optimize::opt-build-affine-loop-summary
                   :induction-vars '(:i)
                   :bounds '((:i 0 100))
                   :accesses '((:a :i)))))
-    (assert-eq :affine-loop-summary (getf summary :kind))
-    (assert-equal '(:i) (getf summary :induction-vars))
-    (assert-equal '((:i 0 100)) (getf summary :bounds))))
+    (expect (getf summary :kind) :to-be :affine-loop-summary)
+    (expect (getf summary :induction-vars) :to-equal '(:i))
+    (expect (getf summary :bounds) :to-equal '((:i 0 100)))))
 
-(deftest-each optimize-loop-interchange-plan-requires-safety
-  "FR-524: loop interchange plan only applies when dependence-safe and beneficial."
-  :cases (("safe"   t   t)
-          ("unsafe" nil nil))
-  (dependence-safe-p expected-applied-p)
-  (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
+(it-sequential "optimize-loop-interchange-plan-requires-safety safe"
+  (destructuring-bind (dependence-safe-p expected-applied-p) (list t t)
+    (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
                :loops '(:i :j)
                :cache-locality-score 3
                :dependence-safe-p dependence-safe-p)))
-    (assert-equal expected-applied-p (not (null (getf plan :applied-p))))))
+    (expect (not (null (getf plan :applied-p))) :to-equal expected-applied-p))))
 
-(deftest optimize-pass-loop-interchange-handles-nested-canonical-loop
-  "FR-524: safe canonical-loop core ops are interchanged (independent swap)."
+(it-sequential "optimize-loop-interchange-plan-requires-safety unsafe"
+  (destructuring-bind (dependence-safe-p expected-applied-p) (list nil nil)
+    (let ((plan (cl-cc/optimize::opt-loop-interchange-plan
+               :loops '(:i :j)
+               :cache-locality-score 3
+               :dependence-safe-p dependence-safe-p)))
+    (expect (not (null (getf plan :applied-p))) :to-equal expected-applied-p))))
+
+(it-sequential "optimize-pass-loop-interchange-handles-nested-canonical-loop"
   (%opt-assert-sortable-loop-pass-reorders
    #'cl-cc/optimize::opt-pass-loop-interchange))
 
-(deftest optimize-pass-loop-interchange-skips-side-effecting-loop
-  "FR-524 safety: side-effecting loop bodies are not interchanged."
+(it-sequential "optimize-pass-loop-interchange-skips-side-effecting-loop"
   (let* ((program (%opt-canonical-loop-program
                    (list (make-vm-set-global :src :r2 :name 'g))))
          (optimized (cl-cc/optimize::opt-pass-loop-interchange program)))
     (%opt-assert-program-unchanged optimized program)))
 
-(deftest optimize-polyhedral-schedule-plan-preserves-objective
-  "FR-525: polyhedral schedule helper keeps statement/constraint/objective payloads."
+(it-sequential "optimize-polyhedral-schedule-plan-preserves-objective"
   (let ((plan (cl-cc/optimize::opt-polyhedral-schedule-plan
                :statements '(:s0 :s1)
                :constraints '((:s0-before :s1))
                :objective :throughput-max)))
-    (assert-eq :polyhedral-schedule (getf plan :kind))
-    (assert-eq :throughput-max (getf plan :objective))
-    (assert-equal '(:s0 :s1) (getf plan :statements))))
+    (expect (getf plan :kind) :to-be :polyhedral-schedule)
+    (expect (getf plan :objective) :to-be :throughput-max)
+    (expect (getf plan :statements) :to-equal '(:s0 :s1))))
 
-(deftest-each optimize-loop-fusion-fission-plan-selects-strategy
-  "FR-526: fusion/fission helper picks strategy from pressure and budget."
-  :cases (("fusion"  16 :fusion)
-          ("fission" 64 :fission))
-  (register-pressure expected-strategy)
-  (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
+(it-sequential "optimize-loop-fusion-fission-plan-selects-strategy fusion"
+  (destructuring-bind (register-pressure expected-strategy) (list 16 :fusion)
+    (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
                :loops '(:l0 :l1)
                :register-pressure register-pressure
                :instruction-budget 20)))
-    (assert-eq expected-strategy (getf plan :strategy))))
+    (expect (getf plan :strategy) :to-be expected-strategy))))
 
-(deftest optimize-ml-inline-score-plan-is-deterministic
-  "FR-527: MLGO-style scoring helper is deterministic for identical features."
+(it-sequential "optimize-loop-fusion-fission-plan-selects-strategy fission"
+  (destructuring-bind (register-pressure expected-strategy) (list 64 :fission)
+    (let ((plan (cl-cc/optimize::opt-loop-fusion-fission-plan
+               :loops '(:l0 :l1)
+               :register-pressure register-pressure
+               :instruction-budget 20)))
+    (expect (getf plan :strategy) :to-be expected-strategy))))
+
+(it-sequential "optimize-ml-inline-score-plan-is-deterministic"
   (let ((a (cl-cc/optimize::opt-ml-inline-score-plan
             :features '(:hot-loop :small-body)
             :model-version "mlgo-v2"))
         (b (cl-cc/optimize::opt-ml-inline-score-plan
             :features '(:hot-loop :small-body)
             :model-version "mlgo-v2")))
-    (assert-eq :ml-inline-score (getf a :kind))
-    (assert-= (getf a :score) (getf b :score))
-    (assert-= 2 (getf a :feature-count))))
+    (expect (getf a :kind) :to-be :ml-inline-score)
+    (expect (= (getf a :score) (getf b :score)) :to-be-truthy)
+    (expect (= 2 (getf a :feature-count)) :to-be-truthy)))
 
-(deftest optimize-learned-codegen-cost-plan-is-target-aware
-  "FR-528: learned codegen cost helper reflects target-specific base costs."
+(it-sequential "optimize-learned-codegen-cost-plan-is-target-aware"
   (let ((x86 (cl-cc/optimize::opt-learned-codegen-cost-plan
               :opcode-features '(:mul :add)
               :target :x86-64))
         (arm (cl-cc/optimize::opt-learned-codegen-cost-plan
               :opcode-features '(:mul :add)
               :target :aarch64)))
-    (assert-eq :learned-codegen-cost (getf x86 :kind))
-    (assert-eq :x86-64 (getf x86 :target))
-    (assert-eq :aarch64 (getf arm :target))
-    (assert-true (/= (getf x86 :predicted-cost)
-                     (getf arm :predicted-cost)))))
+    (expect (getf x86 :kind) :to-be :learned-codegen-cost)
+    (expect (getf x86 :target) :to-be :x86-64)
+    (expect (getf arm :target) :to-be :aarch64)
+    (expect (/= (getf x86 :predicted-cost)
+                     (getf arm :predicted-cost)) :to-be-truthy)))
 
-(deftest optimize-pass-affine-loop-analysis-captures-real-loop-summary
-  "FR-523: affine analysis pass extracts summaries from canonical loop instructions."
+(it-sequential "optimize-pass-affine-loop-analysis-captures-real-loop-summary"
   (let* ((program (%opt-canonical-loop-program
                    (list (make-vm-get-global :dst :r2 :name 'g))))
          (_ (cl-cc/optimize::opt-pass-affine-loop-analysis program))
          (summaries cl-cc/optimize::*opt-last-affine-loop-summaries*)
          (summary (first summaries)))
-    (assert-true (listp summaries))
-    (assert-true summary)
-    (assert-eq :affine-loop-summary (getf summary :kind))
-    (assert-equal '(:ri) (getf summary :induction-vars))
-    (assert-true (some (lambda (access)
+    (expect (listp summaries) :to-be-truthy)
+    (expect summary :to-be-truthy)
+    (expect (getf summary :kind) :to-be :affine-loop-summary)
+    (expect (getf summary :induction-vars) :to-equal '(:ri))
+    (expect (some (lambda (access)
                          (eq (getf access :kind) :read-global))
-                       (getf summary :accesses)))))
+                       (getf summary :accesses)) :to-be-truthy)))
 
-(deftest optimize-pass-polyhedral-schedule-reorders-loop-body
-  "FR-525: schedule pass reorders sortable body ops inside canonical loop."
+(it-sequential "optimize-pass-polyhedral-schedule-reorders-loop-body"
   (%opt-assert-sortable-loop-pass-reorders
    #'cl-cc/optimize::opt-pass-polyhedral-schedule))
 
-(deftest optimize-pass-loop-fusion-fission-fuses-adjacent-loops
-  "FR-526: adjacent compatible pure loops are fused into one canonical loop."
+(it-sequential "optimize-pass-loop-fusion-fission-fuses-adjacent-loops"
   (let* ((program (%opt-adjacent-loop-program))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
     (%opt-assert-program-changed optimized program)
-    (assert-= 1 (%opt-loop-label-count :la optimized))
-    (assert-= 0 (%opt-loop-label-count :lb optimized))))
+    (expect (= 1 (%opt-loop-label-count :la optimized)) :to-be-truthy)
+    (expect (= 0 (%opt-loop-label-count :lb optimized)) :to-be-truthy)))
 
-(deftest optimize-pass-loop-fusion-fission-skips-unsafe-fusion
-  "FR-526 safety: fusion is skipped when iteration spaces are not equivalent."
+(it-sequential "optimize-pass-loop-fusion-fission-skips-unsafe-fusion"
   (let* ((program (%opt-adjacent-loop-program :second-init 1
                                               :second-condition :rc2))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
     (%opt-assert-program-unchanged optimized program)))
 
-(deftest optimize-pass-loop-fusion-fission-splits-oversized-loop
-  "FR-526: oversized pure loops are split into two core regions with a split marker." 
+(it-sequential "optimize-pass-loop-fusion-fission-splits-oversized-loop"
   (let* ((core (loop for idx from 0 below 36
                      collect (make-vm-move :dst :r8 :src :r5)))
          (program (%opt-canonical-loop-program core))
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
     (%opt-assert-program-changed optimized program)
-    (assert-true (some #'%opt-loop-split-marker-p optimized))))
+    (expect (some #'%opt-loop-split-marker-p optimized) :to-be-truthy)))

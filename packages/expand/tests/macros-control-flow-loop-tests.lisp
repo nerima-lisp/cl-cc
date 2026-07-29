@@ -2,68 +2,107 @@
 
 (in-package :cl-cc/test)
 
-(in-suite macros-control-flow-suite)
 
-(deftest-each dolist-expansion-is-block
-  "DOLIST always expands to a (block ...) containing tagbody, regardless of arity."
-  :cases (("basic"          '(dolist (item list) body))
-          ("with-result"    '(dolist (item list result) body))
-          ("multi-body"     '(dolist (item list) body1 body2 body3)))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'block)
-    (assert-true (search "tagbody" (string-downcase (format nil "~S" result))))))
+(it-sequential "dolist-expansion-is-block basic"
+  (destructuring-bind (form) (list '(dolist (item list) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
 
-(deftest-each dotimes-expansion-is-block
-  "DOTIMES always expands to a (block ...) containing tagbody, regardless of arity."
-  :cases (("basic"        '(dotimes (i 10) body))
-          ("with-result"  '(dotimes (i 10 'done) body))
-          ("zero-count"   '(dotimes (i 0) body)))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'block)
-    (assert-true (search "tagbody" (string-downcase (format nil "~S" result))))))
+(it-sequential "dolist-expansion-is-block with-result"
+  (destructuring-bind (form) (list '(dolist (item list result) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
 
-(deftest-each do-expansion-is-block
-  "DO always expands to a (block ...) containing let+tagbody, in all forms."
-  :cases (("basic"        '(do ((i 0 (1+ i))) ((>= i 10) result) body))
-          ("multi-vars"   '(do ((i 0 (1+ i)) (j 10 (1- j))) ((= i j) i) body))
-          ("no-step"      '(do ((x init)) (test result) body))
-          ("multi-body"   '(do ((i 0)) (test) body1 body2 body3)))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'block)
-    (assert-true (search "tagbody" (string-downcase (format nil "~S" result))))))
+(it-sequential "dolist-expansion-is-block multi-body"
+  (destructuring-bind (form) (list '(dolist (item list) body1 body2 body3))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
 
-(deftest-each do*-expansion-uses-let*
-  "DO* uses LET* (sequential binding) and expands to (block ...) with tagbody."
-  :cases (("basic"       '(do* ((i 0 (1+ i)) (j i (1+ j))) ((>= i 10) j) body))
-          ("dep-binding" '(do* ((x 1) (y (+ x 1))) (t y) body)))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'block)
-    (assert-true (search "let*" (string-downcase (format nil "~S" result))))))
+(it-sequential "dotimes-expansion-is-block basic"
+  (destructuring-bind (form) (list '(dotimes (i 10) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
 
-(deftest-each case-expansion-is-let
-  "CASE expands to (let ...) with eql dispatch; body forms wrapped in progn."
-  :cases (("basic"         '(case key (a body-a) (b body-b)))
-          ("list-of-keys"  '(case key ((a b c) body-abc) (d body-d)))
-          ("multi-body"    '(case key (a body1 body2 body3))))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'let)))
+(it-sequential "dotimes-expansion-is-block with-result"
+  (destructuring-bind (form) (list '(dotimes (i 10 'done) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
 
-(deftest-each case-default-clause
-  "CASE with otherwise/t clauses both produce a let including the default body"
-  :cases (("otherwise" '(case key (a body-a) (otherwise default-body)))
-          ("t-clause"  '(case key (a body-a) (t default-body))))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'let)
-    (assert-true (search "default-body" (string-downcase (format nil "~S" result))))))
+(it-sequential "dotimes-expansion-is-block zero-count"
+  (destructuring-bind (form) (list '(dotimes (i 0) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
 
-(deftest case-expands-sparse-integer-keys-into-binary-search
-  "CASE with sparse integer keys lowers to a binary-search-style decision tree."
+(it-sequential "do-expansion-is-block basic"
+  (destructuring-bind (form) (list '(do ((i 0 (1+ i))) ((>= i 10) result) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "do-expansion-is-block multi-vars"
+  (destructuring-bind (form) (list '(do ((i 0 (1+ i)) (j 10 (1- j))) ((= i j) i) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "do-expansion-is-block no-step"
+  (destructuring-bind (form) (list '(do ((x init)) (test result) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "do-expansion-is-block multi-body"
+  (destructuring-bind (form) (list '(do ((i 0)) (test) body1 body2 body3))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "tagbody" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "do*-expansion-uses-let* basic"
+  (destructuring-bind (form) (list '(do* ((i 0 (1+ i)) (j i (1+ j))) ((>= i 10) j) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "let*" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "do*-expansion-uses-let* dep-binding"
+  (destructuring-bind (form) (list '(do* ((x 1) (y (+ x 1))) (t y) body))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'block :to-be (car result))
+    (expect (search "let*" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "case-expansion-is-let basic"
+  (destructuring-bind (form) (list '(case key (a body-a) (b body-b)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result)))))
+
+(it-sequential "case-expansion-is-let list-of-keys"
+  (destructuring-bind (form) (list '(case key ((a b c) body-abc) (d body-d)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result)))))
+
+(it-sequential "case-expansion-is-let multi-body"
+  (destructuring-bind (form) (list '(case key (a body1 body2 body3)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result)))))
+
+(it-sequential "case-default-clause otherwise"
+  (destructuring-bind (form) (list '(case key (a body-a) (otherwise default-body)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result))
+    (expect (search "default-body" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "case-default-clause t-clause"
+  (destructuring-bind (form) (list '(case key (a body-a) (t default-body)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result))
+    (expect (search "default-body" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "case-expands-sparse-integer-keys-into-binary-search"
   (let ((result (our-macroexpand-1
                  '(case key
                     (1 body-1)
@@ -72,12 +111,11 @@
                     (32 body-32)
                     (otherwise default-body)))))
     (let ((printed (string-downcase (format nil "~S" result))))
-      (assert-true (search "integerp" printed))
-      (assert-true (search "<" printed))
-      (assert-true (search "default-body" printed)))))
+      (expect (search "integerp" printed) :to-be-truthy)
+      (expect (search "<" printed) :to-be-truthy)
+      (expect (search "default-body" printed) :to-be-truthy))))
 
-(deftest case-expands-dense-integer-keys-into-table-dispatch
-  "CASE with dense integer keys lowers to a table dispatch."
+(it-sequential "case-expands-dense-integer-keys-into-table-dispatch"
   (let ((result (our-macroexpand-1
                  '(case key
                     (1 body-1)
@@ -86,53 +124,55 @@
                     (4 body-4)
                     (otherwise default-body)))))
     (let ((printed (string-downcase (format nil "~S" result))))
-      (assert-true (search "svref" printed))
-      (assert-true (search "vector" printed))
-      (assert-true (search "br-table" printed))
-      (assert-true (search "(if (integerp" printed))
-      (assert-true (search "default-body" printed)))))
+      (expect (search "svref" printed) :to-be-truthy)
+      (expect (search "vector" printed) :to-be-truthy)
+      (expect (search "br-table" printed) :to-be-truthy)
+      (expect (search "(if (integerp" printed) :to-be-truthy)
+      (expect (search "default-body" printed) :to-be-truthy))))
 
-(deftest-each typecase-expansion-is-let
-  "TYPECASE expands to (let ...) with typep dispatch; body forms wrapped in progn."
-  :cases (("basic"      '(typecase val (string body-string) (integer body-int)))
-          ("multi-body" '(typecase val (string body1 body2))))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'let)))
+(it-sequential "typecase-expansion-is-let basic"
+  (destructuring-bind (form) (list '(typecase val (string body-string) (integer body-int)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result)))))
 
-(deftest-each typecase-default-clause
-  "TYPECASE with otherwise/t clauses both produce a let including the default body"
-  :cases (("otherwise" '(typecase val (string body-string) (otherwise default-body)))
-          ("t-clause"  '(typecase val (string body-string) (t default-body))))
-  (form)
-  (let ((result (our-macroexpand-1 form)))
-    (assert-eq (car result) 'let)
-    (assert-true (search "default-body" (string-downcase (format nil "~S" result))))))
+(it-sequential "typecase-expansion-is-let multi-body"
+  (destructuring-bind (form) (list '(typecase val (string body1 body2)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result)))))
 
-(deftest typecase-prunes-subsumed-later-clause
-  "TYPECASE drops later clauses already covered by an earlier supertype."
+(it-sequential "typecase-default-clause otherwise"
+  (destructuring-bind (form) (list '(typecase val (string body-string) (otherwise default-body)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result))
+    (expect (search "default-body" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "typecase-default-clause t-clause"
+  (destructuring-bind (form) (list '(typecase val (string body-string) (t default-body)))
+    (let ((result (our-macroexpand-1 form)))
+    (expect 'let :to-be (car result))
+    (expect (search "default-body" (string-downcase (format nil "~S" result))) :to-be-truthy))))
+
+(it-sequential "typecase-prunes-subsumed-later-clause"
   (let* ((result (our-macroexpand-1 '(typecase v
                                       (number body-number)
                                       (fixnum body-fixnum)
                                       (otherwise default-body))))
          (printed (string-downcase (format nil "~S" result))))
-    (assert-true (search "body-number" printed))
-    (assert-false (search "body-fixnum" printed))
-    (assert-true (search "default-body" printed))))
+    (expect (search "body-number" printed) :to-be-truthy)
+    (expect (search "body-fixnum" printed) :to-be-falsy)
+    (expect (search "default-body" printed) :to-be-truthy)))
 
-(deftest typecase-expands-disjoint-arms-into-decision-tree
-  "TYPECASE with pairwise-disjoint arms expands to a valid form."
+(it-sequential "typecase-expands-disjoint-arms-into-decision-tree"
   (let* ((result (our-macroexpand-1
                   '(typecase v
                      (string body-string)
                      (symbol body-symbol)
                      (integer body-int)
                      (otherwise body-default)))))
-    (assert-true result)
-    (assert-true (consp result))))
+    (expect result :to-be-truthy)
+    (expect (consp result) :to-be-truthy)))
 
-(deftest typecase-overlapping-arms-use-ordered-decision-tree
-  "TYPECASE with overlapping arms still uses ordered decision-tree dispatch."
+(it-sequential "typecase-overlapping-arms-use-ordered-decision-tree"
   (let* ((result (our-macroexpand-1
                   '(typecase v
                       (number body-number)
@@ -141,75 +181,63 @@
                       (symbol body-symbol)
                       (otherwise body-default))))
          (printed (string-downcase (format nil "~S" result))))
-    (assert-true (search "(or (typep" printed))
-    (assert-true (search "body-number" printed))
-    (assert-true (search "body-default" printed))))
+    (expect (search "(or (typep" printed) :to-be-truthy)
+    (expect (search "body-number" printed) :to-be-truthy)
+    (expect (search "body-default" printed) :to-be-truthy)))
 
 ;;; ─── Direct helper unit tests ──────────────────────────────────────────────
 
-(deftest case-build-eql-chain-empty
-  "%case-build-eql-chain with no cases returns the default form."
-  (assert-equal 'default-body
-                (cl-cc/expand::%case-build-eql-chain '() 'key 'default-body)))
+(it-sequential "case-build-eql-chain-empty"
+  (expect (cl-cc/expand::%case-build-eql-chain '() 'key 'default-body) :to-equal 'default-body))
 
-(deftest-each case-build-eql-chain-single-key
-  "%case-build-eql-chain single-arm: atom and list keys both produce (if (eql ...) ...)."
-  :cases (("atom-key"  '((a body-a)) '(if (eql key 'a) (progn body-a) nil))
-          ("list-keys" '(((a b) body-ab)) '(if (or (eql key 'a) (eql key 'b)) (progn body-ab) nil)))
-  (cases expected)
-  (assert-equal expected
-                (cl-cc/expand::%case-build-eql-chain cases 'key nil)))
+(it-sequential "case-build-eql-chain-single-key atom-key"
+  (destructuring-bind (cases expected) (list '((a body-a)) '(if (eql key 'a) (progn body-a) nil))
+    (expect (cl-cc/expand::%case-build-eql-chain cases 'key nil) :to-equal expected)))
 
-(deftest case-build-eql-chain-otherwise-terminates
-  "%case-build-eql-chain stops at 'otherwise and emits (progn body)."
+(it-sequential "case-build-eql-chain-single-key list-keys"
+  (destructuring-bind (cases expected) (list '(((a b) body-ab)) '(if (or (eql key 'a) (eql key 'b)) (progn body-ab) nil))
+    (expect (cl-cc/expand::%case-build-eql-chain cases 'key nil) :to-equal expected)))
+
+(it-sequential "case-build-eql-chain-otherwise-terminates"
   (let ((result (cl-cc/expand::%case-build-eql-chain
                  '((otherwise fallback)) 'key 'default)))
-    (assert-equal '(progn fallback) result)))
+    (expect result :to-equal '(progn fallback))))
 
-(deftest case-collect-integer-pairs-extracts-default
-  "%case-collect-integer-pairs separates default-form from integer pairs."
+(it-sequential "case-collect-integer-pairs-extracts-default"
   (multiple-value-bind (default pairs integer-only-p)
       (cl-cc/expand::%case-collect-integer-pairs
        '((1 body-1) (2 body-2) (otherwise fallback)))
-    (assert-equal '(progn fallback) default)
-    (assert-= 2 (length pairs))
-    (assert-true integer-only-p)))
+    (expect default :to-equal '(progn fallback))
+    (expect (= 2 (length pairs)) :to-be-truthy)
+    (expect integer-only-p :to-be-truthy)))
 
-(deftest case-collect-integer-pairs-non-integer-flag
-  "%case-collect-integer-pairs clears integer-only-p when a non-integer key appears."
+(it-sequential "case-collect-integer-pairs-non-integer-flag"
   (multiple-value-bind (default pairs integer-only-p)
       (cl-cc/expand::%case-collect-integer-pairs
        '((1 body-1) (foo body-foo)))
     (declare (ignore default pairs))
-    (assert-false integer-only-p)))
+    (expect integer-only-p :to-be-falsy)))
 
-(deftest typecase-build-typep-chain-empty
-  "%typecase-build-typep-chain with no cases returns nil."
-  (assert-null (cl-cc/expand::%typecase-build-typep-chain '() 'val)))
+(it-sequential "typecase-build-typep-chain-empty"
+  (expect (cl-cc/expand::%typecase-build-typep-chain '() 'val) :to-be-null))
 
-(deftest typecase-build-typep-chain-single
-  "%typecase-build-typep-chain single arm produces (if (typep ...) body nil)."
-  (assert-equal '(if (typep val 'string) (progn body-s) nil)
-                (cl-cc/expand::%typecase-build-typep-chain
-                 '((string body-s)) 'val)))
+(it-sequential "typecase-build-typep-chain-single"
+  (expect (cl-cc/expand::%typecase-build-typep-chain
+                 '((string body-s)) 'val) :to-equal '(if (typep val 'string) (progn body-s) nil)))
 
-(deftest typecase-build-typep-chain-otherwise
-  "%typecase-build-typep-chain otherwise arm terminates chain with (progn body)."
-  (assert-equal '(progn fallback)
-                (cl-cc/expand::%typecase-build-typep-chain
-                 '((otherwise fallback)) 'val)))
+(it-sequential "typecase-build-typep-chain-otherwise"
+  (expect (cl-cc/expand::%typecase-build-typep-chain
+                 '((otherwise fallback)) 'val) :to-equal '(progn fallback)))
 
-(deftest typecase-related-types-p-detects-subtype-links
-  "%typecase-related-types-p returns true for known subtype/supertype pairs."
-  (assert-true (cl-cc/expand::%typecase-related-types-p 'integer 'number))
-  (assert-true (cl-cc/expand::%typecase-related-types-p 'number 'integer))
-  (assert-false (cl-cc/expand::%typecase-related-types-p 'string 'symbol)))
+(it-sequential "typecase-related-types-p-detects-subtype-links"
+  (expect (cl-cc/expand::%typecase-related-types-p 'integer 'number) :to-be-truthy)
+  (expect (cl-cc/expand::%typecase-related-types-p 'number 'integer) :to-be-truthy)
+  (expect (cl-cc/expand::%typecase-related-types-p 'string 'symbol) :to-be-falsy))
 
-(deftest typecase-choose-split-index-prefers-low-cross-overlap
-  "%typecase-choose-split-index picks boundary minimizing hierarchy cross-links."
+(it-sequential "typecase-choose-split-index-prefers-low-cross-overlap"
   (let* ((cases '((integer body-int)
                   (number body-num)
                   (string body-str)
                   (symbol body-sym)))
          (idx (cl-cc/expand::%typecase-choose-split-index cases)))
-    (assert-= 2 idx)))
+    (expect (= 2 idx) :to-be-truthy)))

@@ -14,8 +14,6 @@
 ;;;; reads VM-SLOT-READ-DST in six places has one contract gap, not six.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
-
 (defparameter *vm-internal-reference-budget*
   '(("optimize" . 0)
     ("codegen"  . 0)
@@ -77,25 +75,72 @@ back.")
                                 (push (subseq line from to) names))
                               (setf start (max (1+ hit) to))))))))))
 
-(deftest-each vm-internal-reference-count-does-not-grow
-  "No package may reference more distinct cl-cc/vm internals than it does today."
-  :cases (("optimize" "optimize") ("codegen" "codegen") ("compile" "compile")
-          ("pipeline" "pipeline") ("expand" "expand")
-          ("regalloc" "regalloc") ("emit" "emit") ("mir" "mir") ("parse" "parse"))
-  (package-name)
-  (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+(it-sequential "vm-internal-reference-count-does-not-grow optimize" (destructuring-bind (package-name) (list "optimize")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
         (actual (length (%vm-internal-references package-name))))
-    (assert-true budget)
-    (assert-true (<= actual budget))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
 
-(deftest vm-internal-reference-budget-is-not-stale
-  "A package that has been cleaned up must have its ceiling lowered to match.
+(it-sequential "vm-internal-reference-count-does-not-grow codegen"
+  (destructuring-bind (package-name) (list "codegen")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
 
-Without this the budget rots upward-only: someone exports the right symbols,
-the count drops, and the ceiling keeps claiming the old number is acceptable."
+(it-sequential "vm-internal-reference-count-does-not-grow compile"
+  (destructuring-bind (package-name) (list "compile")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-count-does-not-grow pipeline"
+  (destructuring-bind (package-name) (list "pipeline")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-count-does-not-grow expand"
+  (destructuring-bind (package-name) (list "expand")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-count-does-not-grow regalloc"
+  (destructuring-bind (package-name) (list "regalloc")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-count-does-not-grow emit"
+  (destructuring-bind (package-name) (list "emit")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-count-does-not-grow mir"
+  (destructuring-bind (package-name) (list "mir")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-count-does-not-grow parse"
+  (destructuring-bind (package-name) (list "parse")
+    (let ((budget (cdr (assoc package-name *vm-internal-reference-budget* :test #'string=)))
+        (actual (length (%vm-internal-references package-name))))
+    (expect budget :to-be-truthy)
+    (expect (<= actual budget) :to-be-truthy))))
+
+(it-sequential "vm-internal-reference-budget-is-not-stale"
   (let ((slack '()))
     (dolist (entry *vm-internal-reference-budget*)
       (let ((actual (length (%vm-internal-references (car entry)))))
         (when (< actual (cdr entry))
           (push (list (car entry) :budget (cdr entry) :actual actual) slack))))
-    (assert-null slack)))
+    (expect slack :to-be-null)))

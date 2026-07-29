@@ -3,7 +3,6 @@
 ;;;; Verifies FR coverage and evidence file existence.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-documentation-suite)
 
 ;;; ─── FR table ──────────────────────────────────────────────────────────────────
 ;; Each entry: (fr-id (target-files) difficulty)
@@ -269,24 +268,19 @@
 
 ;; ─── Tests ──────────────────────────────────────────────────────────────────────
 
-(deftest tooling-advanced-2-evidence-registry-covers-all-frs
-  "Verify that *tooling-advanced-2-fr-table* contains exactly the 120 FR IDs
-   listed in docs/notes/tooling-advanced-2.md and no extras."
+(it-sequential "tooling-advanced-2-evidence-registry-covers-all-frs"
   (let ((table-ids (mapcar #'car *tooling-advanced-2-fr-table*))
         (expected-ids *tooling-advanced-2-all-fr-ids*))
     ;; Every expected FR is present in the table.
     (dolist (id expected-ids)
-      (assert-true (member id table-ids :test #'string=)))
+      (expect (member id table-ids :test #'string=) :to-be-truthy))
     ;; Every table FR is expected (no extras).
     (dolist (id table-ids)
-      (assert-true (member id expected-ids :test #'string=)))
+      (expect (member id expected-ids :test #'string=) :to-be-truthy))
     ;; Verify total count.
-    (assert-= 120 (length table-ids))))
+    (expect (= 120 (length table-ids)) :to-be-truthy)))
 
-(deftest tooling-advanced-2-evidence-files-exist
-  "Verify that every target file referenced in *tooling-advanced-2-fr-table*
-   exists on disk.  Directories are checked for existence; for new-path
-   entries (no file yet) the existence check is skipped with a warning."
+(it-sequential "tooling-advanced-2-evidence-files-exist"
   (let ((checked 0)
         (skipped 0))
     (dolist (entry *tooling-advanced-2-fr-table*)
@@ -302,12 +296,7 @@
     (format t "~&; evidence-files-exist: ~D checked, ~D skipped (new paths)" checked skipped)
     ;; We do not fail on missing (new) files — this test is informational.
     ;; Zero checked would indicate a problem.
-    (assert-true (> checked 0))))
+    (expect (> checked 0) :to-be-truthy)))
 
-(deftest tooling-advanced-2-both-files-correlate-counts
-  "Verify that the ✅ count in docs/notes/tooling-advanced-2.md header correlates
-   with the audit status.  This is an informational consistency check."
-  ;; The header states: ✅ 120 / ✅ 0 / ✅ 0 — 120 FRs total. FULLY COMPLETE.
-  ;; Audit verified: 120✅ in adv-2 (2026-05-27)
-  ;; This test just confirms the total FR count is correct.
-  (assert-= 120 (length *tooling-advanced-2-all-fr-ids*)))
+(it-sequential "tooling-advanced-2-both-files-correlate-counts"
+  (expect (= 120 (length *tooling-advanced-2-all-fr-ids*)) :to-be-truthy))

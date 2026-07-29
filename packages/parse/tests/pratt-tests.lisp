@@ -6,7 +6,6 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,130 +33,184 @@
 
 ;;; ─── Stream Operations ───────────────────────────────────────────────────────
 
-(deftest pratt-peek-behavior
-  "pratt-peek returns the current token without advancing, and is idempotent"
+(it-sequential "pratt-peek-behavior"
   (let ((ctx (make-test-ctx "42")))
     (let ((tok (cl-cc/parse::pratt-peek ctx)))
-      (assert-true (not (null tok)))
-      (assert-eq :T-INT (cl-cc:lexer-token-type tok))))
+      (expect (not (null tok)) :to-be-truthy)
+      (expect (cl-cc:lexer-token-type tok) :to-be :T-INT)))
   (let ((ctx (make-test-ctx "42")))
     (let ((tok1 (cl-cc/parse::pratt-peek ctx))
           (tok2 (cl-cc/parse::pratt-peek ctx)))
-      (assert-eq tok1 tok2))))
+      (expect tok2 :to-be tok1))))
 
-(deftest pratt-advance-consumes-token
-  "pratt-advance returns current token and moves forward"
+(it-sequential "pratt-advance-consumes-token"
   (let ((ctx (make-test-ctx "1 2")))
     (let ((tok1 (cl-cc/parse::pratt-advance ctx)))
-      (assert-eq :T-INT (cl-cc:lexer-token-type tok1))
-      (assert-= 1 (cl-cc:lexer-token-value tok1)))
+      (expect (cl-cc:lexer-token-type tok1) :to-be :T-INT)
+      (expect (= 1 (cl-cc:lexer-token-value tok1)) :to-be-truthy))
     (let ((tok2 (cl-cc/parse::pratt-advance ctx)))
-      (assert-eq :T-INT (cl-cc:lexer-token-type tok2))
-      (assert-= 2 (cl-cc:lexer-token-value tok2)))))
+      (expect (cl-cc:lexer-token-type tok2) :to-be :T-INT)
+      (expect (= 2 (cl-cc:lexer-token-value tok2)) :to-be-truthy))))
 
-(deftest-each pratt-at-end-p-states
-  "pratt-at-end-p returns the correct value in each parser state"
-  :cases (("empty-source"  "" t   nil)
-          ("non-empty"     "42" nil nil)
-          ("after-advance" "x" t   t))
-  (source expected advance-first)
-  (let ((ctx (make-test-ctx source)))
+(it-sequential "pratt-at-end-p-states empty-source"
+  (destructuring-bind (source expected advance-first) (list "" t nil)
+    (let ((ctx (make-test-ctx source)))
     (when advance-first
       (cl-cc/parse::pratt-advance ctx))
     (if expected
-        (assert-true (cl-cc/parse::pratt-at-end-p ctx))
-        (assert-false (cl-cc/parse::pratt-at-end-p ctx)))))
+        (expect (cl-cc/parse::pratt-at-end-p ctx) :to-be-truthy)
+        (expect (cl-cc/parse::pratt-at-end-p ctx) :to-be-falsy)))))
+
+(it-sequential "pratt-at-end-p-states non-empty"
+  (destructuring-bind (source expected advance-first) (list "42" nil nil)
+    (let ((ctx (make-test-ctx source)))
+    (when advance-first
+      (cl-cc/parse::pratt-advance ctx))
+    (if expected
+        (expect (cl-cc/parse::pratt-at-end-p ctx) :to-be-truthy)
+        (expect (cl-cc/parse::pratt-at-end-p ctx) :to-be-falsy)))))
+
+(it-sequential "pratt-at-end-p-states after-advance"
+  (destructuring-bind (source expected advance-first) (list "x" t t)
+    (let ((ctx (make-test-ctx source)))
+    (when advance-first
+      (cl-cc/parse::pratt-advance ctx))
+    (if expected
+        (expect (cl-cc/parse::pratt-at-end-p ctx) :to-be-truthy)
+        (expect (cl-cc/parse::pratt-at-end-p ctx) :to-be-falsy)))))
 
 ;;; ─── Token Accessors ─────────────────────────────────────────────────────────
 
-(deftest pratt-tok-type-via-context
-  "pratt-tok-type returns type using context's accessor function"
+(it-sequential "pratt-tok-type-via-context"
   (let* ((ctx (make-test-ctx "hello"))
          (tok (cl-cc/parse::pratt-peek ctx)))
-    (assert-eq :T-IDENT (cl-cc/parse::pratt-tok-type ctx tok))))
+    (expect (cl-cc/parse::pratt-tok-type ctx tok) :to-be :T-IDENT)))
 
-(deftest pratt-tok-value-via-context
-  "pratt-tok-value returns value using context's accessor function"
+(it-sequential "pratt-tok-value-via-context"
   (let* ((ctx (make-test-ctx "hello"))
          (tok (cl-cc/parse::pratt-peek ctx)))
-    (assert-string= "HELLO" (string (cl-cc/parse::pratt-tok-value ctx tok)))))
+    (expect (string (cl-cc/parse::pratt-tok-value ctx tok)) :to-equal "HELLO")))
 
-(deftest pratt-tok-type-nil-safe
-  "pratt-tok-type returns nil when tok is nil"
+(it-sequential "pratt-tok-type-nil-safe"
   (let ((ctx (make-test-ctx "")))
-    (assert-eq nil (cl-cc/parse::pratt-tok-type ctx nil))))
+    (expect (cl-cc/parse::pratt-tok-type ctx nil) :to-be nil)))
 
 ;;; ─── Diagnostics: pratt-expect ───────────────────────────────────────────────
 
-(deftest pratt-expect-matching-type
-  "pratt-expect consumes token when type matches"
+(it-sequential "pratt-expect-matching-type"
   (let ((ctx (make-test-ctx "42")))
     (let ((tok (cl-cc/parse::pratt-expect ctx :T-INT "test")))
-      (assert-true (not (null tok)))
-      (assert-eq :T-INT (cl-cc:lexer-token-type tok)))))
+      (expect (not (null tok)) :to-be-truthy)
+      (expect (cl-cc:lexer-token-type tok) :to-be :T-INT))))
 
-(deftest-each pratt-expect-adds-diagnostic-on-failure
-  "pratt-expect adds a diagnostic when the expected token type doesn't match or input is empty."
-  :cases (("type-mismatch" "42" :T-STRING "test")
-          ("eof"           ""   :T-INT    "eof-test"))
-  (source expected-type label)
-  (let ((ctx (make-test-ctx source)))
+(it-sequential "pratt-expect-adds-diagnostic-on-failure type-mismatch"
+  (destructuring-bind (source expected-type label) (list "42" :T-STRING "test")
+    (let ((ctx (make-test-ctx source)))
     (cl-cc/parse::pratt-expect ctx expected-type label)
-    (assert-true (not (null (cl-cc/parse::pratt-context-diagnostics ctx))))))
+    (expect (not (null (cl-cc/parse::pratt-context-diagnostics ctx))) :to-be-truthy))))
 
-(deftest pratt-expect-mismatch-returns-nil
-  "pratt-expect returns nil on type mismatch"
+(it-sequential "pratt-expect-adds-diagnostic-on-failure eof"
+  (destructuring-bind (source expected-type label) (list "" :T-INT "eof-test")
+    (let ((ctx (make-test-ctx source)))
+    (cl-cc/parse::pratt-expect ctx expected-type label)
+    (expect (not (null (cl-cc/parse::pratt-context-diagnostics ctx))) :to-be-truthy))))
+
+(it-sequential "pratt-expect-mismatch-returns-nil"
   (let ((ctx (make-test-ctx "42")))
     (let ((result (cl-cc/parse::pratt-expect ctx :T-STRING)))
-      (assert-eq nil result))))
+      (expect result :to-be nil))))
 
 ;;; ─── parse-cl-source: CST Structure ─────────────────────────────────────────
 
-(deftest-each parse-literal-kind
-  "Parsing each literal type produces a cst-token with the correct kind and value."
-  :cases (("integer"  "42"        :T-INT     42        nil)
-          ("float"    "3.14"      :T-FLOAT   nil       nil)
-          ("symbol"   "foo"       :T-IDENT   nil       nil)
-          ("keyword"  ":foo"      :T-KEYWORD nil       nil)
-          ("string"   "\"hello\"" :T-STRING  nil       "hello"))
-  (source expected-kind expected-num expected-str)
-  (let ((node (parse-one-cst source)))
-    (assert-true (cl-cc:cst-token-p node))
-    (assert-eq expected-kind (cl-cc:cst-node-kind node))
+(it-sequential "parse-literal-kind integer"
+  (destructuring-bind (source expected-kind expected-num expected-str) (list "42" :T-INT 42 nil)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind)
     (when expected-num
-      (assert-= expected-num (cl-cc:cst-token-value node)))
+      (expect (= expected-num (cl-cc:cst-token-value node)) :to-be-truthy))
     (when expected-str
-      (assert-string= expected-str (cl-cc:cst-token-value node)))))
+      (expect (cl-cc:cst-token-value node) :to-equal expected-str)))))
 
-(deftest parse-empty-list-produces-interior
-  "Parsing () produces a cst-interior with :list kind"
+(it-sequential "parse-literal-kind float"
+  (destructuring-bind (source expected-kind expected-num expected-str) (list "3.14" :T-FLOAT nil nil)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind)
+    (when expected-num
+      (expect (= expected-num (cl-cc:cst-token-value node)) :to-be-truthy))
+    (when expected-str
+      (expect (cl-cc:cst-token-value node) :to-equal expected-str)))))
+
+(it-sequential "parse-literal-kind symbol"
+  (destructuring-bind (source expected-kind expected-num expected-str) (list "foo" :T-IDENT nil nil)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind)
+    (when expected-num
+      (expect (= expected-num (cl-cc:cst-token-value node)) :to-be-truthy))
+    (when expected-str
+      (expect (cl-cc:cst-token-value node) :to-equal expected-str)))))
+
+(it-sequential "parse-literal-kind keyword"
+  (destructuring-bind (source expected-kind expected-num expected-str) (list ":foo" :T-KEYWORD nil nil)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind)
+    (when expected-num
+      (expect (= expected-num (cl-cc:cst-token-value node)) :to-be-truthy))
+    (when expected-str
+      (expect (cl-cc:cst-token-value node) :to-equal expected-str)))))
+
+(it-sequential "parse-literal-kind string"
+  (destructuring-bind (source expected-kind expected-num expected-str) (list "\"hello\"" :T-STRING nil "hello")
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind)
+    (when expected-num
+      (expect (= expected-num (cl-cc:cst-token-value node)) :to-be-truthy))
+    (when expected-str
+      (expect (cl-cc:cst-token-value node) :to-equal expected-str)))))
+
+(it-sequential "parse-empty-list-produces-interior"
   (let ((node (parse-one-cst "()")))
-    (assert-true (cl-cc:cst-interior-p node))
-    (assert-eq :list (cl-cc:cst-node-kind node))
-    (assert-= 0 (length (cl-cc:cst-children node)))))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be :list)
+    (expect (= 0 (length (cl-cc:cst-children node))) :to-be-truthy)))
 
-(deftest parse-simple-list-produces-children
-  "Parsing (a b c) produces a 3-child cst-interior"
+(it-sequential "parse-simple-list-produces-children"
   (let ((node (parse-one-cst "(a b c)")))
-    (assert-true (cl-cc:cst-interior-p node))
-    (assert-= 3 (length (cl-cc:cst-children node)))))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (= 3 (length (cl-cc:cst-children node))) :to-be-truthy)))
 
-(deftest parse-nested-list
-  "Parsing (a (b c)) produces nested cst-interiors"
+(it-sequential "parse-nested-list"
   (let ((node (parse-one-cst "(a (b c))")))
-    (assert-true (cl-cc:cst-interior-p node))
-    (assert-= 2 (length (cl-cc:cst-children node)))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (= 2 (length (cl-cc:cst-children node))) :to-be-truthy)
     (let ((inner (second (cl-cc:cst-children node))))
-      (assert-true (cl-cc:cst-interior-p inner))
-      (assert-= 2 (length (cl-cc:cst-children inner))))))
+      (expect (cl-cc:cst-interior-p inner) :to-be-truthy)
+      (expect (= 2 (length (cl-cc:cst-children inner))) :to-be-truthy))))
 
-(deftest-each parse-dispatch-interior-kind
-  "Reader dispatch shorthands produce cst-interior nodes with the correct kind."
-  :cases (("quote"       "'x"      :quote)
-          ("quasiquote"  "`x"      :quasiquote)
-          ("function"    "#'foo"   :function)
-          ("vector"      "#(1 2 3)" :vector))
-  (source expected-kind)
-  (let ((node (parse-one-cst source)))
-    (assert-true (cl-cc:cst-interior-p node))
-    (assert-eq expected-kind (cl-cc:cst-node-kind node))))
+(it-sequential "parse-dispatch-interior-kind quote"
+  (destructuring-bind (source expected-kind) (list "'x" :quote)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-dispatch-interior-kind quasiquote"
+  (destructuring-bind (source expected-kind) (list "`x" :quasiquote)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-dispatch-interior-kind function"
+  (destructuring-bind (source expected-kind) (list "#'foo" :function)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "parse-dispatch-interior-kind vector"
+  (destructuring-bind (source expected-kind) (list "#(1 2 3)" :vector)
+    (let ((node (parse-one-cst source)))
+    (expect (cl-cc:cst-interior-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))

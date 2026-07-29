@@ -5,112 +5,117 @@
 
 (in-package :cl-cc/test)
 
-(defsuite context-suite :description "Compiler context unit tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite context-suite)
 ;;; ─── make-register ──────────────────────────────────────────────────────────
 
-(deftest ctx-make-register-behavior
-  "make-register: first is :R0 keyword; successive calls increment; counter state tracks."
+(it-sequential "ctx-make-register-behavior"
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     ;; first result is :R0, a keyword
     (let ((reg (cl-cc/compile:make-register ctx)))
-      (assert-true (keywordp reg))
-      (assert-equal :R0 reg))
+      (expect (keywordp reg) :to-be-truthy)
+      (expect reg :to-equal :R0))
     ;; subsequent calls yield :R1, :R2
-    (assert-equal :R1 (cl-cc/compile:make-register ctx))
-    (assert-equal :R2 (cl-cc/compile:make-register ctx)))
-  ;; counter state increments on each call
+    (expect (cl-cc/compile:make-register ctx) :to-equal :R1)
+    (expect (cl-cc/compile:make-register ctx) :to-equal :R2))
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (assert-equal 0 (cl-cc/compile:ctx-next-register ctx))
+    (expect (cl-cc/compile:ctx-next-register ctx) :to-equal 0)
     (cl-cc/compile:make-register ctx)
-    (assert-equal 1 (cl-cc/compile:ctx-next-register ctx))))
+    (expect (cl-cc/compile:ctx-next-register ctx) :to-equal 1)))
 
 ;;; ─── make-label ─────────────────────────────────────────────────────────────
 
-(deftest ctx-make-label-behavior
-  "make-label: PREFIX_N format; successive calls increment; all prefixes share one counter."
+(it-sequential "ctx-make-label-behavior"
   (let ((cl-cc/compile:*repl-label-counter* nil))
     (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     ;; format: string with prefix and index
       (let ((lbl (cl-cc/compile:make-label ctx "IF")))
-        (assert-true (stringp lbl))
-        (assert-equal "IF_0" lbl))
+        (expect (stringp lbl) :to-be-truthy)
+        (expect lbl :to-equal "IF_0"))
     ;; same prefix increments
-      (assert-equal "IF_1" (cl-cc/compile:make-label ctx "IF"))))
-  ;; different prefixes share counter
+      (expect (cl-cc/compile:make-label ctx "IF") :to-equal "IF_1")))
   (let ((cl-cc/compile:*repl-label-counter* nil))
     (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-      (assert-equal "IF_0"   (cl-cc/compile:make-label ctx "IF"))
-      (assert-equal "ELSE_1" (cl-cc/compile:make-label ctx "ELSE"))
-      (assert-equal "END_2"  (cl-cc/compile:make-label ctx "END")))))
+      (expect (cl-cc/compile:make-label ctx "IF") :to-equal "IF_0")
+      (expect (cl-cc/compile:make-label ctx "ELSE") :to-equal "ELSE_1")
+      (expect (cl-cc/compile:make-label ctx "END") :to-equal "END_2"))))
 
 ;;; ─── emit ───────────────────────────────────────────────────────────────────
 
-(deftest ctx-emit-behavior
-  "emit: pushes instruction, returns it, and uses LIFO order."
+(it-sequential "ctx-emit-behavior"
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     ;; push + return value
-    (assert-eq :test (cl-cc/compile:emit ctx :test))
-    (assert-equal 1 (length (cl-cc/compile:ctx-instructions ctx)))
-    (assert-eq :test (first (cl-cc/compile:ctx-instructions ctx)))
+    (expect (cl-cc/compile:emit ctx :test) :to-be :test)
+    (expect (length (cl-cc/compile:ctx-instructions ctx)) :to-equal 1)
+    (expect (first (cl-cc/compile:ctx-instructions ctx)) :to-be :test)
     ;; LIFO: second emit becomes first in list
     (cl-cc/compile:emit ctx :second)
-    (assert-eq :second (first (cl-cc/compile:ctx-instructions ctx)))
-    (assert-eq :test   (second (cl-cc/compile:ctx-instructions ctx)))))
+    (expect (first (cl-cc/compile:ctx-instructions ctx)) :to-be :second)
+    (expect (second (cl-cc/compile:ctx-instructions ctx)) :to-be :test)))
 
 ;;; ─── lookup-var ─────────────────────────────────────────────────────────────
 
-(deftest ctx-lookup-var-behavior
-  "lookup-var: returns register when found; signals error for unbound; returns most recent binding when shadowed."
+(it-sequential "ctx-lookup-var-behavior"
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     (push (cons 'x :R0) (cl-cc/compile:ctx-env ctx))
-    (assert-eq :R0 (cl-cc/compile:lookup-var ctx 'x)))
+    (expect (cl-cc/compile:lookup-var ctx 'x) :to-be :R0))
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (assert-signals error (cl-cc/compile:lookup-var ctx 'nonexistent)))
+    (signals error (cl-cc/compile:lookup-var ctx 'nonexistent)))
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
     (push (cons 'x :R0) (cl-cc/compile:ctx-env ctx))
     (push (cons 'x :R5) (cl-cc/compile:ctx-env ctx))
-    (assert-eq :R5 (cl-cc/compile:lookup-var ctx 'x))))
+    (expect (cl-cc/compile:lookup-var ctx 'x) :to-be :R5)))
 
 ;;; ─── initialize-instance ────────────────────────────────────────────────────
 
-(deftest ctx-initialization
-  "Fresh context: top-level=T; no instructions; empty env; builtin specials pre-registered."
+(it-sequential "ctx-initialization"
   (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-    (assert-true (cl-cc/compile:ctx-top-level-p ctx))
-    (assert-null (cl-cc/compile:ctx-instructions ctx))
-    (assert-null (cl-cc/compile:ctx-env ctx))
-    (assert-true (typep (cl-cc/compile:ctx-type-env ctx) 'cl-cc/type:type-env))
-    (assert-null (cl-cc/type::type-env-bindings (cl-cc/compile:ctx-type-env ctx)))
-    (assert-true (gethash '*standard-output* (cl-cc/compile:ctx-global-variables ctx)))
-    (assert-true (gethash '*standard-input* (cl-cc/compile:ctx-global-variables ctx)))
+    (expect (cl-cc/compile:ctx-top-level-p ctx) :to-be-truthy)
+    (expect (cl-cc/compile:ctx-instructions ctx) :to-be-null)
+    (expect (cl-cc/compile:ctx-env ctx) :to-be-null)
+    (expect (typep (cl-cc/compile:ctx-type-env ctx) 'cl-cc/type:type-env) :to-be-truthy)
+    (expect (cl-cc/type::type-env-bindings (cl-cc/compile:ctx-type-env ctx)) :to-be-null)
+    (expect (gethash '*standard-output* (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy)
+    (expect (gethash '*standard-input* (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy)
     ;; *features* is populated at warm-boot time, not at fresh context creation
-    (assert-true (gethash '*package* (cl-cc/compile:ctx-global-variables ctx)))))
+    (expect (gethash '*package* (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy)))
 
 ;;; ─── REPL state ─────────────────────────────────────────────────────────────
 
-(deftest-each ctx-context-find-package-resolution
-  "%context-find-package resolves runtime package descriptors and returns NIL for unknowns."
-  :cases (("cl"       :cl       t)
-          ("cl-user"  :cl-user  t)
-          ("keyword"  :keyword  t)
-          ("unknown"  :totally-nonexistent-package-xyz nil))
-  (name expect-p)
-  (let ((result (cl-cc/compile::%context-find-package name)))
+(it-sequential "ctx-context-find-package-resolution cl"
+  (destructuring-bind (name expect-p) (list :cl t)
+    (let ((result (cl-cc/compile::%context-find-package name)))
     (if expect-p
-        (assert-true (hash-table-p result))
-        (assert-false result))))
+        (expect (hash-table-p result) :to-be-truthy)
+        (expect result :to-be-falsy)))))
 
-(deftest ctx-repl-state-persistence
-  "REPL state: *repl-label-counter* continues label numbering; *repl-global-variables* are merged into context."
+(it-sequential "ctx-context-find-package-resolution cl-user"
+  (destructuring-bind (name expect-p) (list :cl-user t)
+    (let ((result (cl-cc/compile::%context-find-package name)))
+    (if expect-p
+        (expect (hash-table-p result) :to-be-truthy)
+        (expect result :to-be-falsy)))))
+
+(it-sequential "ctx-context-find-package-resolution keyword"
+  (destructuring-bind (name expect-p) (list :keyword t)
+    (let ((result (cl-cc/compile::%context-find-package name)))
+    (if expect-p
+        (expect (hash-table-p result) :to-be-truthy)
+        (expect result :to-be-falsy)))))
+
+(it-sequential "ctx-context-find-package-resolution unknown"
+  (destructuring-bind (name expect-p) (list :totally-nonexistent-package-xyz nil)
+    (let ((result (cl-cc/compile::%context-find-package name)))
+    (if expect-p
+        (expect (hash-table-p result) :to-be-truthy)
+        (expect result :to-be-falsy)))))
+
+(it-sequential "ctx-repl-state-persistence"
   (let ((cl-cc/compile:*repl-label-counter* 100))
     (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-      (assert-equal 100 (cl-cc/compile:ctx-next-label ctx))
-      (assert-equal "L_100" (cl-cc/compile:make-label ctx "L"))))
+      (expect (cl-cc/compile:ctx-next-label ctx) :to-equal 100)
+      (expect (cl-cc/compile:make-label ctx "L") :to-equal "L_100")))
   (let ((cl-cc/compile:*repl-global-variables* (make-hash-table :test #'eq)))
     (setf (gethash 'my-var cl-cc/compile:*repl-global-variables*) t)
     (let ((ctx (make-instance 'cl-cc/compile:compiler-context)))
-      (assert-true (gethash 'my-var (cl-cc/compile:ctx-global-variables ctx))))))
+      (expect (gethash 'my-var (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy))))

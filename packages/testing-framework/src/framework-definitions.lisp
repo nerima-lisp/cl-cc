@@ -100,26 +100,6 @@ checks (e.g. \"does this documented FR anchor name a real test?\") that used
 to query *TEST-REGISTRY* by symbol directly. Values are the cl-weave test
 description string DEFTEST registered them under.")
 
-(defmacro deftest (name &body body)
-  "Define a test, registered under the current suite (see IN-SUITE) via
-cl-weave's CL-WEAVE::REGISTER-TEST. Syntax:
-     (deftest name
-       \"optional docstring\"
-       :timeout 5
-       :depends-on other-test  ; no cl-weave equivalent; accepted, ignored
-       :tags '(:tag1)
-       body-form...)"
-  (multiple-value-bind (docstring timeout depends-on tags body-forms)
-      (%parse-deftest-body body)
-    (declare (ignore depends-on))
-    (let ((description (or docstring (string-downcase (symbol-name name)))))
-      `(progn
-         (setf (gethash ',name *known-test-names*) ,description)
-         (cl-weave::register-test
-          ,description
-          (lambda () ,@body-forms t)
-          :tags ,tags
-          ,@(when timeout `(:timeout-ms ,(round (* timeout 1000)))))))))
 
 ;;; ------------------------------------------------------------
 ;;; Fixtures

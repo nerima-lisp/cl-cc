@@ -1,7 +1,6 @@
 ;;;; Unit tests for FR-601 loop unrolling.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defun %fr601-counted-loop (&key (limit-constant-p t) (limit-value 3))
   "Build a small counted loop in the optimizer's canonical loop shape."
@@ -18,26 +17,24 @@
                 (make-vm-label :name "exit")
                 (make-vm-ret :reg :i))))
 
-(deftest loop-unroll-fr601-full-unrolls-small-constant-trip-count
-  "FR-601: constant trip count <= 8 is fully unrolled and the back-edge is gone."
+(it-sequential "loop-unroll-fr601-full-unrolls-small-constant-trip-count"
   (let* ((out (cl-cc/optimize::opt-pass-loop-unroll
                (%fr601-counted-loop :limit-constant-p t :limit-value 3))))
-    (assert-= 3 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-print)) out))
-    (assert-false (%test-label-position out "loop"))
-    (assert-false (some (lambda (inst)
+    (expect (= 3 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-print)) out)) :to-be-truthy)
+    (expect (%test-label-position out "loop") :to-be-falsy)
+    (expect (some (lambda (inst)
                           (and (typep inst 'cl-cc/vm::vm-jump)
                                (equal (cl-cc/vm::vm-label-name inst) "loop")))
-                        out))
-    (assert-true (%test-label-position out "exit"))))
+                        out) :to-be-falsy)
+    (expect (%test-label-position out "exit") :to-be-truthy)))
 
-(deftest loop-unroll-fr601-partially-unrolls-unknown-bound-with-remainder-loop
-  "FR-601: unknown-bound loops get a factor-4 guarded prefix plus the original loop."
+(it-sequential "loop-unroll-fr601-partially-unrolls-unknown-bound-with-remainder-loop"
   (let* ((out (cl-cc/optimize::opt-pass-loop-unroll
                (%fr601-counted-loop :limit-constant-p nil))))
-    (assert-= 5 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-print)) out))
-    (assert-= 5 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) out))
-    (assert-true (%test-label-position out "loop"))
-    (assert-true (some (lambda (inst)
+    (expect (= 5 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-print)) out)) :to-be-truthy)
+    (expect (= 5 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) out)) :to-be-truthy)
+    (expect (%test-label-position out "loop") :to-be-truthy)
+    (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm::vm-jump)
                               (equal (cl-cc/vm::vm-label-name inst) "loop")))
-                       out))))
+                       out) :to-be-truthy)))

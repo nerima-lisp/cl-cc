@@ -6,7 +6,6 @@
 ;;;;   %ast->compile-time-value, %compile-time-value->ast.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 (defmacro %with-clean-ct-env (&body body)
   "Bind a clean compile-time environment for evaluate-ast tests."
@@ -16,151 +15,176 @@
 
 ;;; ─── %ast-constant-number-value ───────────────────────────────────────────
 
-(deftest-each ast-constant-number-value-extracts-integer
-  "%ast-constant-number-value returns the integer for ast-int and integer ast-quote."
-  :cases (("ast-int"           42   (cl-cc/ast:make-ast-int   :value 42))
-          ("ast-quote-integer" 7    (cl-cc/ast:make-ast-quote :value 7)))
-  (expected node)
-  (assert-= expected (cl-cc/compile::%ast-constant-number-value node)))
+(it-sequential "ast-constant-number-value-extracts-integer ast-int"
+  (destructuring-bind (expected node) (list 42 (cl-cc/ast:make-ast-int   :value 42))
+    (expect (= expected (cl-cc/compile::%ast-constant-number-value node)) :to-be-truthy)))
 
-(deftest ast-constant-number-value-nil-for-non-integer-quote
-  "%ast-constant-number-value returns NIL for an ast-quote wrapping a non-integer."
-  (assert-null (cl-cc/compile::%ast-constant-number-value (cl-cc/ast:make-ast-quote :value "hello"))))
+(it-sequential "ast-constant-number-value-extracts-integer ast-quote-integer"
+  (destructuring-bind (expected node) (list 7 (cl-cc/ast:make-ast-quote :value 7))
+    (expect (= expected (cl-cc/compile::%ast-constant-number-value node)) :to-be-truthy)))
 
-(deftest ast-constant-number-value-nil-for-variable-node
-  "%ast-constant-number-value returns NIL for a variable node."
-  (assert-null (cl-cc/compile::%ast-constant-number-value (cl-cc/ast:make-ast-var :name 'x))))
+(it-sequential "ast-constant-number-value-nil-for-non-integer-quote"
+  (expect (cl-cc/compile::%ast-constant-number-value (cl-cc/ast:make-ast-quote :value "hello")) :to-be-null))
+
+(it-sequential "ast-constant-number-value-nil-for-variable-node"
+  (expect (cl-cc/compile::%ast-constant-number-value (cl-cc/ast:make-ast-var :name 'x)) :to-be-null))
 
 ;;; ─── %ast-constant-node-p ─────────────────────────────────────────────────
 
-(deftest-each ast-constant-node-p-true-for-constants
-  "%ast-constant-node-p is true for ast-int and ast-quote."
-  :cases (("int"   (cl-cc/ast:make-ast-int   :value 1))
-          ("quote" (cl-cc/ast:make-ast-quote :value 'x)))
-  (node)
-  (assert-true (cl-cc/compile::%ast-constant-node-p node)))
+(it-sequential "ast-constant-node-p-true-for-constants int"
+  (destructuring-bind (node) (list (cl-cc/ast:make-ast-int   :value 1))
+    (expect (cl-cc/compile::%ast-constant-node-p node) :to-be-truthy)))
 
-(deftest ast-constant-node-p-false-for-var
-  "%ast-constant-node-p is false for a variable node."
-  (assert-null
-   (cl-cc/compile::%ast-constant-node-p (cl-cc/ast:make-ast-var :name 'x))))
+(it-sequential "ast-constant-node-p-true-for-constants quote"
+  (destructuring-bind (node) (list (cl-cc/ast:make-ast-quote :value 'x))
+    (expect (cl-cc/compile::%ast-constant-node-p node) :to-be-truthy)))
+
+(it-sequential "ast-constant-node-p-false-for-var"
+  (expect (cl-cc/compile::%ast-constant-node-p (cl-cc/ast:make-ast-var :name 'x)) :to-be-null))
 
 ;;; ─── %ast->compile-time-value ─────────────────────────────────────────────
 
-(deftest ast->compile-time-value-extracts-integer-from-ast-int
-  "%ast->compile-time-value returns the integer value from an ast-int node."
-  (assert-= 99 (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-int :value 99))))
+(it-sequential "ast->compile-time-value-extracts-integer-from-ast-int"
+  (expect (= 99 (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-int :value 99))) :to-be-truthy))
 
-(deftest ast->compile-time-value-extracts-list-from-ast-quote
-  "%ast->compile-time-value returns the quoted value from an ast-quote node."
-  (assert-equal '(a b) (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-quote :value '(a b)))))
+(it-sequential "ast->compile-time-value-extracts-list-from-ast-quote"
+  (expect (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-quote :value '(a b))) :to-equal '(a b)))
 
-(deftest ast->compile-time-value-returns-nil-for-variable
-  "%ast->compile-time-value returns NIL for a non-constant variable node."
-  (assert-null (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-var :name 'x))))
+(it-sequential "ast->compile-time-value-returns-nil-for-variable"
+  (expect (cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-var :name 'x)) :to-be-null))
 
-(deftest-each ast-constant-helpers-see-through-ast-the
-  "Constant helpers treat transparent ast-the wrappers as no-ops."
-  :cases (("number-value"
-           #'cl-cc/compile::%ast-constant-number-value
-           (cl-cc/ast:make-ast-the
+(it-sequential "ast-constant-helpers-see-through-ast-the number-value"
+  (destructuring-bind (fn node expected) (list #'cl-cc/compile::%ast-constant-number-value (cl-cc/ast:make-ast-the
             :type 'integer
-            :value (cl-cc/ast:make-ast-quote :value 7))
-           7)
-          ("constant-node-p"
-           #'cl-cc/compile::%ast-constant-node-p
-           (cl-cc/ast:make-ast-the
+            :value (cl-cc/ast:make-ast-quote :value 7)) 7)
+    (if (eq expected t)
+      (expect (funcall fn node) :to-be-truthy)
+      (expect (funcall fn node) :to-equal expected))))
+
+(it-sequential "ast-constant-helpers-see-through-ast-the constant-node-p"
+  (destructuring-bind (fn node expected) (list #'cl-cc/compile::%ast-constant-node-p (cl-cc/ast:make-ast-the
             :type 'integer
-            :value (cl-cc/ast:make-ast-int :value 7))
-           t)
-          ("compile-time-value"
-           #'cl-cc/compile::%ast->compile-time-value
-           (cl-cc/ast:make-ast-the
+            :value (cl-cc/ast:make-ast-int :value 7)) t)
+    (if (eq expected t)
+      (expect (funcall fn node) :to-be-truthy)
+      (expect (funcall fn node) :to-equal expected))))
+
+(it-sequential "ast-constant-helpers-see-through-ast-the compile-time-value"
+  (destructuring-bind (fn node expected) (list #'cl-cc/compile::%ast->compile-time-value (cl-cc/ast:make-ast-the
             :type 'integer
-            :value (cl-cc/ast:make-ast-quote :value '(a b)))
-           '(a b)))
-  (fn node expected)
-  (if (eq expected t)
-      (assert-true (funcall fn node))
-      (assert-equal expected (funcall fn node))))
+            :value (cl-cc/ast:make-ast-quote :value '(a b))) '(a b))
+    (if (eq expected t)
+      (expect (funcall fn node) :to-be-truthy)
+      (expect (funcall fn node) :to-equal expected))))
 
 ;;; ─── %compile-time-value->ast ─────────────────────────────────────────────
 
-(deftest compile-time-value->ast-wraps-integers-and-symbols
-  "%compile-time-value->ast wraps integers as ast-int and other values as ast-quote."
+(it-sequential "compile-time-value->ast-wraps-integers-and-symbols"
   (let* ((proto     (cl-cc/ast:make-ast-int :value 0))
          (int-node  (cl-cc/compile::%compile-time-value->ast 5     proto))
          (sym-node  (cl-cc/compile::%compile-time-value->ast 'hello proto)))
-    (assert-true (typep int-node 'cl-cc::ast-int))
-    (assert-= 5 (cl-cc/ast:ast-int-value int-node))
-    (assert-true (typep sym-node 'cl-cc::ast-quote))
-    (assert-eq 'hello (cl-cc/ast:ast-quote-value sym-node))))
+    (expect (typep int-node 'cl-cc::ast-int) :to-be-truthy)
+    (expect (= 5 (cl-cc/ast:ast-int-value int-node)) :to-be-truthy)
+    (expect (typep sym-node 'cl-cc::ast-quote) :to-be-truthy)
+    (expect (cl-cc/ast:ast-quote-value sym-node) :to-be 'hello)))
 
 ;;; ─── %compile-time-eval-binop ─────────────────────────────────────────────
 
-(deftest-each compile-time-eval-binop-arithmetic
-  "%compile-time-eval-binop correctly evaluates basic arithmetic."
-  :cases (("add" '+  3 4 7)
-          ("sub" '-  9 4 5)
-          ("mul" '*  3 7 21))
-  (op a b expected)
-  (assert-= expected (cl-cc/compile::%compile-time-eval-binop op a b)))
+(it-sequential "compile-time-eval-binop-arithmetic add"
+  (destructuring-bind (op a b expected) (list '+ 3 4 7)
+    (expect (= expected (cl-cc/compile::%compile-time-eval-binop op a b)) :to-be-truthy)))
 
-(deftest-each compile-time-eval-binop-division
-  "%compile-time-eval-binop: division folds only when result is an exact integer."
-  :cases (("exact"    12  3 4)     ; 12/3 = 4 — integer, folds
-          ("non-exact" 7  2 nil)   ; 7/2 = 3.5 — not integer, returns nil
-          ("div-zero"  5  0 nil))  ; division by zero — returns nil
-  (lhs rhs expected)
-  (if expected
-      (assert-= expected (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs))
-      (assert-null (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs))))
+(it-sequential "compile-time-eval-binop-arithmetic sub"
+  (destructuring-bind (op a b expected) (list '- 9 4 5)
+    (expect (= expected (cl-cc/compile::%compile-time-eval-binop op a b)) :to-be-truthy)))
 
-(deftest-each compile-time-eval-binop-unary
-  "%compile-time-eval-binop: 1+ and 1- are unary (rhs must be nil)."
-  :cases (("1+ integer"  '1+  5 nil 6)
-          ("1- integer"  '1-  5 nil 4)
-          ("1+ non-nil-rhs" '1+ 5 99 nil)   ; rhs != nil → not foldable
-          ("1- non-nil-rhs" '1- 5 99 nil))
-  (op lhs rhs expected)
-  (if expected
-      (assert-= expected (cl-cc/compile::%compile-time-eval-binop op lhs rhs))
-      (assert-null (cl-cc/compile::%compile-time-eval-binop op lhs rhs))))
+(it-sequential "compile-time-eval-binop-arithmetic mul"
+  (destructuring-bind (op a b expected) (list '* 3 7 21)
+    (expect (= expected (cl-cc/compile::%compile-time-eval-binop op a b)) :to-be-truthy)))
+
+(it-sequential "compile-time-eval-binop-division exact"
+  (destructuring-bind (lhs rhs expected) (list 12 3 4)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs) :to-be-null))))
+
+(it-sequential "compile-time-eval-binop-division non-exact"
+  (destructuring-bind (lhs rhs expected) (list 7 2 nil)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs) :to-be-null))))
+
+(it-sequential "compile-time-eval-binop-division div-zero"
+  (destructuring-bind (lhs rhs expected) (list 5 0 nil)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop '/ lhs rhs) :to-be-null))))
+
+(it-sequential "compile-time-eval-binop-unary 1+ integer"
+  (destructuring-bind (op lhs rhs expected) (list '1+ 5 nil 6)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop op lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop op lhs rhs) :to-be-null))))
+
+(it-sequential "compile-time-eval-binop-unary 1- integer"
+  (destructuring-bind (op lhs rhs expected) (list '1- 5 nil 4)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop op lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop op lhs rhs) :to-be-null))))
+
+(it-sequential "compile-time-eval-binop-unary 1+ non-nil-rhs"
+  (destructuring-bind (op lhs rhs expected) (list '1+ 5 99 nil)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop op lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop op lhs rhs) :to-be-null))))
+
+(it-sequential "compile-time-eval-binop-unary 1- non-nil-rhs"
+  (destructuring-bind (op lhs rhs expected) (list '1- 5 99 nil)
+    (if expected
+      (expect (= expected (cl-cc/compile::%compile-time-eval-binop op lhs rhs)) :to-be-truthy)
+      (expect (cl-cc/compile::%compile-time-eval-binop op lhs rhs) :to-be-null))))
 
 ;;; ─── %compile-time-lookup ─────────────────────────────────────────────────
 
-(deftest-each compile-time-lookup-cases
-  "%compile-time-lookup: returns value+T for known names; nil+nil for absent names."
-  :cases (("found"     'x '((x . 42) (y . 7)) 42  t)
-          ("not-found" 'z '((x . 1)  (y . 2)) nil nil))
-  (name alist expected-value expected-found)
-  (multiple-value-bind (value found-p)
+(it-sequential "compile-time-lookup-cases found"
+  (destructuring-bind (name alist expected-value expected-found) (list 'x '((x . 42) (y . 7)) 42 t)
+    (multiple-value-bind (value found-p)
       (cl-cc/compile::%compile-time-lookup name alist)
-    (assert-equal expected-value  value)
-    (assert-equal expected-found found-p)))
+    (expect value :to-equal expected-value)
+    (expect found-p :to-equal expected-found))))
+
+(it-sequential "compile-time-lookup-cases not-found"
+  (destructuring-bind (name alist expected-value expected-found) (list 'z '((x . 1)  (y . 2)) nil nil)
+    (multiple-value-bind (value found-p)
+      (cl-cc/compile::%compile-time-lookup name alist)
+    (expect value :to-equal expected-value)
+    (expect found-p :to-equal expected-found))))
 
 ;;; ─── *compile-time-eval-fns* ──────────────────────────────────────────────
 
-(deftest compile-time-eval-fns-registered
-  "*compile-time-eval-fns* has arithmetic (+, -, *, /) and predicate (not, zerop, null, etc.) entries."
+(it-sequential "compile-time-eval-fns-registered"
   (dolist (sym '(+ - * / not zerop null numberp integerp symbolp))
-    (assert-true (gethash sym cl-cc/compile::*compile-time-eval-fns*))))
+    (expect (gethash sym cl-cc/compile::*compile-time-eval-fns*) :to-be-truthy)))
 
-(deftest-each compile-time-eval-fns-evaluation-cases
-  "Entries in *compile-time-eval-fns* correctly evaluate their arguments."
-  :cases (("plus-sum"  '+    '(3 4 5) 12)
-          ("null-nil"  'null '(nil)    t))
-  (fn-name args expected)
-  (let ((fn (gethash fn-name cl-cc/compile::*compile-time-eval-fns*)))
+(it-sequential "compile-time-eval-fns-evaluation-cases plus-sum"
+  (destructuring-bind (fn-name args expected) (list '+ '(3 4 5) 12)
+    (let ((fn (gethash fn-name cl-cc/compile::*compile-time-eval-fns*)))
     (multiple-value-bind (result ok)
         (funcall fn args)
-      (assert-true ok)
-      (assert-equal expected result))))
+      (expect ok :to-be-truthy)
+      (expect result :to-equal expected)))))
+
+(it-sequential "compile-time-eval-fns-evaluation-cases null-nil"
+  (destructuring-bind (fn-name args expected) (list 'null '(nil) t)
+    (let ((fn (gethash fn-name cl-cc/compile::*compile-time-eval-fns*)))
+    (multiple-value-bind (result ok)
+        (funcall fn args)
+      (expect ok :to-be-truthy)
+      (expect result :to-equal expected)))))
 
 ;;; ─── %fold-ast-binop ──────────────────────────────────────────────────────
 
-(deftest fold-ast-binop-folds-integer-literals
-  "%fold-ast-binop returns an ast-int when both operands are integer literals."
+(it-sequential "fold-ast-binop-folds-integer-literals"
   (let* ((node (cl-cc/ast:make-ast-binop
                 :op '+
                 :lhs (cl-cc/ast:make-ast-int :value 0)
@@ -168,11 +192,10 @@
          (lhs  (cl-cc/ast:make-ast-int :value 10))
          (rhs  (cl-cc/ast:make-ast-int :value 32))
          (result (cl-cc/compile::%fold-ast-binop node lhs rhs)))
-    (assert-true (typep result 'cl-cc::ast-int))
-    (assert-= 42 (cl-cc/ast:ast-int-value result))))
+    (expect (typep result 'cl-cc::ast-int) :to-be-truthy)
+    (expect (= 42 (cl-cc/ast:ast-int-value result)) :to-be-truthy)))
 
-(deftest fold-ast-binop-does-not-fold-non-constants
-  "%fold-ast-binop returns a binop unchanged when either operand is not a constant."
+(it-sequential "fold-ast-binop-does-not-fold-non-constants"
   (let* ((node (cl-cc/ast:make-ast-binop
                 :op '+
                 :lhs (cl-cc/ast:make-ast-int :value 0)
@@ -180,21 +203,19 @@
          (lhs  (cl-cc/ast:make-ast-var :name 'x))
          (rhs  (cl-cc/ast:make-ast-int :value 5))
          (result (cl-cc/compile::%fold-ast-binop node lhs rhs)))
-    (assert-true (typep result 'cl-cc::ast-binop))))
+    (expect (typep result 'cl-cc::ast-binop) :to-be-truthy)))
 
-(deftest optimize-ast-folds-literal-intern-call-to-quote
-  "optimize-ast folds literal (intern \"CAR\" :cl) into an AST quote constant."
+(it-sequential "optimize-ast-folds-literal-intern-call-to-quote"
   (%with-clean-ct-env
     (let* ((node (cl-cc/ast:make-ast-call
                   :func (cl-cc/ast:make-ast-var :name 'intern)
                   :args (list (cl-cc/ast:make-ast-quote :value "CAR")
                               (cl-cc/ast:make-ast-quote :value :cl))))
            (result (cl-cc/compile::optimize-ast node)))
-      (assert-true (typep result 'cl-cc::ast-quote))
-      (assert-eq 'cl:car (cl-cc/ast:ast-quote-value result)))))
+      (expect (typep result 'cl-cc::ast-quote) :to-be-truthy)
+      (expect (cl-cc/ast:ast-quote-value result) :to-be 'cl:car))))
 
-(deftest optimize-ast-folds-call-through-ast-the
-  "optimize-ast folds calls whose function position is wrapped in ast-the."
+(it-sequential "optimize-ast-folds-call-through-ast-the"
   (%with-clean-ct-env
     (let* ((node (cl-cc/ast:make-ast-call
                   :func (cl-cc/ast:make-ast-the
@@ -203,25 +224,23 @@
                   :args (list (cl-cc/ast:make-ast-quote :value "CAR")
                               (cl-cc/ast:make-ast-quote :value :cl))))
            (result (cl-cc/compile::optimize-ast node)))
-      (assert-true (typep result 'cl-cc::ast-quote))
-      (assert-eq 'cl:car (cl-cc/ast:ast-quote-value result)))))
+      (expect (typep result 'cl-cc::ast-quote) :to-be-truthy)
+      (expect (cl-cc/ast:ast-quote-value result) :to-be 'cl:car))))
 
-(deftest optimize-ast-folds-call-through-ast-function
-  "optimize-ast folds calls whose function position is an ast-function designator."
+(it-sequential "optimize-ast-folds-call-through-ast-function"
   (%with-clean-ct-env
     (let* ((node (cl-cc/ast:make-ast-call
                   :func (cl-cc/ast:make-ast-function :name 'not)
                   :args (list (cl-cc/ast:make-ast-quote :value nil))))
            (result (cl-cc/compile::optimize-ast node)))
-      (assert-true (typep result 'cl-cc::ast-quote))
-      (assert-true (cl-cc/ast:ast-quote-value result)))))
+      (expect (typep result 'cl-cc::ast-quote) :to-be-truthy)
+      (expect (cl-cc/ast:ast-quote-value result) :to-be-truthy))))
 
-(deftest optimize-ast-folds-call-through-ast-quote
-  "optimize-ast folds calls whose function position is a quoted function symbol."
+(it-sequential "optimize-ast-folds-call-through-ast-quote"
   (%with-clean-ct-env
     (let* ((node (cl-cc/ast:make-ast-call
                   :func (cl-cc/ast:make-ast-quote :value 'not)
                   :args (list (cl-cc/ast:make-ast-quote :value nil))))
            (result (cl-cc/compile::optimize-ast node)))
-      (assert-true (typep result 'cl-cc::ast-quote))
-      (assert-true (cl-cc/ast:ast-quote-value result)))))
+      (expect (typep result 'cl-cc::ast-quote) :to-be-truthy)
+      (expect (cl-cc/ast:ast-quote-value result) :to-be-truthy))))

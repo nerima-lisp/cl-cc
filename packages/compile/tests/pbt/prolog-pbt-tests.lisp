@@ -16,7 +16,6 @@
 
 (in-package :cl-cc/pbt)
 
-(in-suite cl-cc-pbt-suite)
 
 (cl-weave:describe "cl-prolog unification properties"
   (cl-weave:it-property "unify binds a logic variable to an integer"

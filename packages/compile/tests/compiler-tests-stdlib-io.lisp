@@ -1,14 +1,12 @@
 ;;;; compiler-tests-stdlib-io.lisp — Self-hosting eval, string/char, I/O, HOF, array, sort, coerce tests
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
 
 ;;; Self-Hosting Eval Tests — verify macro expansion runs through our-eval
 
-(deftest selfhost-macro-eval-fn-integration
-  "*macro-eval-fn* is callable and can execute a simple form in integration runs."
-  (assert-true (functionp cl-cc:*macro-eval-fn*))
-  (assert-eql 3 (funcall cl-cc:*macro-eval-fn* '(+ 1 2))))
+(it-sequential "selfhost-macro-eval-fn-integration"
+  (expect (functionp cl-cc:*macro-eval-fn*) :to-be-truthy)
+  (expect (funcall cl-cc:*macro-eval-fn* '(+ 1 2)) :to-be 3))
 
 (deftest-compile selfhost-macro-declare-arith-alist
   "Self-hosting macros, declare forms, arithmetic ops, and alist/list ops return expected numeric results."
@@ -124,22 +122,30 @@
            "(let ((order nil)) (format nil (progn (setq order (cons \"control\" order)) \"~A\") (progn (setq order (cons \"arg\" order)) \"x\")) order)"))
   )
 
-(deftest-each io-print-returns-value
-  "princ/prin1/print each return the value they printed (stdout discarded)."
-  :cases (("princ" 42 "(princ 42)")
-          ("prin1" 42 "(prin1 42)")
-          ("print" 42 "(print 42)"))
-  (expected form)
-  (let ((*standard-output* (make-broadcast-stream)))
-    (assert-equal expected (run-string form))))
+(it-sequential "io-print-returns-value princ"
+  (destructuring-bind (expected form) (list 42 "(princ 42)")
+    (let ((*standard-output* (make-broadcast-stream)))
+    (expect (run-string form) :to-equal expected))))
 
-(deftest-each io-returns-nil
-  "terpri and (format t ...) both return nil (stdout discarded)."
-  :cases (("terpri"   nil "(terpri)")
-          ("format-t" nil "(format t \"hello\")"))
-  (expected form)
-  (let ((*standard-output* (make-broadcast-stream)))
-    (assert-equal expected (run-string form))))
+(it-sequential "io-print-returns-value prin1"
+  (destructuring-bind (expected form) (list 42 "(prin1 42)")
+    (let ((*standard-output* (make-broadcast-stream)))
+    (expect (run-string form) :to-equal expected))))
+
+(it-sequential "io-print-returns-value print"
+  (destructuring-bind (expected form) (list 42 "(print 42)")
+    (let ((*standard-output* (make-broadcast-stream)))
+    (expect (run-string form) :to-equal expected))))
+
+(it-sequential "io-returns-nil terpri"
+  (destructuring-bind (expected form) (list nil "(terpri)")
+    (let ((*standard-output* (make-broadcast-stream)))
+    (expect (run-string form) :to-equal expected))))
+
+(it-sequential "io-returns-nil format-t"
+  (destructuring-bind (expected form) (list nil "(format t \"hello\")")
+    (let ((*standard-output* (make-broadcast-stream)))
+    (expect (run-string form) :to-equal expected))))
 
 (deftest-compile io-format-directives
   "format directives for iteration, conditionals, and character output."
@@ -148,10 +154,9 @@
           ("conditional-default" "many"   "(format nil \"~[zero~;one~;two~:;many~]\" 99)"))
   :stdlib t)
 
-(deftest io-write-char-basic
-  "write-char outputs a character and returns it (stdout discarded)."
+(it-sequential "io-write-char-basic"
   (let ((*standard-output* (make-broadcast-stream)))
-    (assert-equal #\A (run-string "(write-char #\\A)"))))
+    (expect (run-string "(write-char #\\A)") :to-equal #\A)))
 
 ;;; Higher-Order Function Tests (require stdlib)
 
@@ -169,12 +174,13 @@
            ("count-if"  2 "(count-if (lambda (x) (> x 2)) (list 1 2 3 4))"))
   :stdlib t)
 
-(deftest-each stdlib-hof-truthy
-  "every/some return truthy values when the predicate matches."
-  :cases (("every-all"  "(every (lambda (x) (> x 0)) (list 1 2 3))")
-          ("some-found" "(some (lambda (x) (> x 2)) (list 1 2 3))"))
-  (form)
-  (assert-true (not (null (run-string form :stdlib t)))))
+(it-sequential "stdlib-hof-truthy every-all"
+  (destructuring-bind (form) (list "(every (lambda (x) (> x 0)) (list 1 2 3))")
+    (expect (not (null (run-string form :stdlib t))) :to-be-truthy)))
+
+(it-sequential "stdlib-hof-truthy some-found"
+  (destructuring-bind (form) (list "(some (lambda (x) (> x 2)) (list 1 2 3))")
+    (expect (not (null (run-string form :stdlib t))) :to-be-truthy)))
 
 (deftest-compile stdlib-hof-nil
   "every/some/find-if/mapcar return nil when there is no match or empty input."
@@ -197,11 +203,10 @@
 
 ;;; Array/Vector Tests
 
-(deftest compile-make-array-basic
-  "make-array creates an array"
+(it-sequential "compile-make-array-basic"
   (let ((result (run-string "(make-array 5)")))
-    (assert-true (vectorp result))
-    (assert-= 5 (length result))))
+    (expect (vectorp result) :to-be-truthy)
+    (expect (= 5 (length result)) :to-be-truthy)))
 
 (deftest-compile compile-array-numeric
   "aref/setf aref/vector-push-extend return the correct numeric values."
@@ -272,14 +277,13 @@ Common Lisp boolean at the call site; see EMIT-BUILTIN-UNARY-PREDICATE."
 
 ;;; Coerce Tests
 
-(deftest compile-coerce
-  "coerce converts between chars/lists/strings/vectors."
-  (assert-string= "abc" (run-string "(coerce (list #\\a #\\b #\\c) 'string)"))
-  (assert-equal '(#\h #\i) (run-string "(coerce \"hi\" 'list)"))
-  (assert-= 65 (run-string "(char-code (character \"A\"))"))
-  (assert-= 66 (run-string "(char-code (coerce \"B\" 'character))"))
-  (assert-= 90 (run-string "(let ((ty 'character)) (char-code (coerce \"Z\" ty)))" :stdlib t))
-  (assert-= 90 (run-string "(char-code (character 'z))"))
+(it-sequential "compile-coerce"
+  (expect (run-string "(coerce (list #\\a #\\b #\\c) 'string)") :to-equal "abc")
+  (expect (run-string "(coerce \"hi\" 'list)") :to-equal '(#\h #\i))
+  (expect (= 65 (run-string "(char-code (character \"A\"))")) :to-be-truthy)
+  (expect (= 66 (run-string "(char-code (coerce \"B\" 'character))")) :to-be-truthy)
+  (expect (= 90 (run-string "(let ((ty 'character)) (char-code (coerce \"Z\" ty)))" :stdlib t)) :to-be-truthy)
+  (expect (= 90 (run-string "(char-code (character 'z))")) :to-be-truthy)
   (let ((result (run-string "(coerce (list 1 2 3) 'vector)")))
-    (assert-true (vectorp result))
-    (assert-= 3 (length result))))
+    (expect (vectorp result) :to-be-truthy)
+    (expect (= 3 (length result)) :to-be-truthy)))

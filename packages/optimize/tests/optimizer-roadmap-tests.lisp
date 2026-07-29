@@ -6,7 +6,6 @@
 ;;;;   sidecar contradictions, and per-cluster implementation evidence.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-documentation-suite)
 
 ;;; ─── Optimize roadmap evidence and helper contracts ───────────────────────
 
@@ -172,66 +171,59 @@ build as a Nix store path, not a sibling directory."
                     contradictions))))))))
 
 ;; SKIP (doc sync): Docs need updating for current FR count and status
-(deftest optimize-roadmap-related-implementation-paths-exist
-  "Backtick paths on `関連実装` lines must point at files in the checkout."
-  (assert-null (%optimizer-doc-related-implementation-missing-paths)))
+(it-sequential "optimize-roadmap-related-implementation-paths-exist"
+  (expect (%optimizer-doc-related-implementation-missing-paths) :to-be-null))
 
-(deftest optimize-roadmap-completed-sidecar-claims-match-heading-status
-  "`完了済みFR` sidecar summaries must only list FR headings marked ✅."
-  (assert-null (%optimizer-doc-completed-sidecar-contradictions)))
+(it-sequential "optimize-roadmap-completed-sidecar-claims-match-heading-status"
+  (expect (%optimizer-doc-completed-sidecar-contradictions) :to-be-null))
 
-(deftest optimizer-roadmap-core-passes-have-evidence
-  "Core optimizer FRs point at concrete pass implementations and tests."
+(it-sequential "optimizer-roadmap-core-passes-have-evidence"
   (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-001")))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (assert-true (member "packages/optimize/src/optimizer.lisp"
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
+    (expect (member "packages/optimize/src/optimizer.lisp"
                          (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=))
-    (assert-true (member 'cl-cc/optimize::opt-pass-fold
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  evidence))))
+                         :test #'string=) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::opt-pass-fold
+                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                  evidence) :to-be-truthy)))
 
-(deftest optimizer-roadmap-inline-and-memory-evidence
-  "Inline, IPA, and memory FRs point at their dedicated optimizer subsystems."
+(it-sequential "optimizer-roadmap-inline-and-memory-evidence"
   (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-051")))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (assert-true (member "packages/optimize/src/optimizer-inline.lisp"
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
+    (expect (member "packages/optimize/src/optimizer-inline.lisp"
                          (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=))
-    (assert-true (member 'cl-cc/optimize::opt-pass-devirtualize
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                   evidence))))
+                         :test #'string=) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::opt-pass-devirtualize
+                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                   evidence) :to-be-truthy)))
 
-(deftest optimizer-roadmap-pic-evidence-is-runtime-backed
-  "FR-023 must point at PIC/runtime helper evidence instead of coarse inline-only markers."
+(it-sequential "optimizer-roadmap-pic-evidence-is-runtime-backed"
   (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-023")))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (assert-true (member "packages/optimize/src/optimizer-pipeline.lisp"
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
+    (expect (member "packages/optimize/src/optimizer-pipeline.lisp"
                          (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=))
-    (assert-true (member 'cl-cc/optimize::opt-ic-transition
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)))
-    (assert-false (member 'cl-cc/optimize::opt-pass-devirtualize
-                          (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  evidence))))
+                         :test #'string=) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::opt-ic-transition
+                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::opt-pass-devirtualize
+                          (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-falsy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                  evidence) :to-be-truthy)))
 
-(deftest optimizer-roadmap-flow-and-ssa-evidence
-  "Flow and SSA FRs point at CFG/SSA/flow pass implementations."
+(it-sequential "optimizer-roadmap-flow-and-ssa-evidence"
   (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-112")))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (assert-true (member "packages/optimize/src/ssa.lisp"
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
+    (expect (member "packages/optimize/src/ssa.lisp"
                          (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=))
-    (assert-true (member 'cl-cc/optimize::cfg-split-critical-edges
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  evidence))))
+                         :test #'string=) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::cfg-split-critical-edges
+                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                  evidence) :to-be-truthy)))
 
-(deftest optimize-roadmap-pipeline-includes-modern-optimization-passes
-  "The default optimizer pipeline exposes the modern backend passes used by roadmap evidence."
+(it-sequential "optimize-roadmap-pipeline-includes-modern-optimization-passes"
   (dolist (key '(:sccp
                  :reassociate
                  :copy-prop
@@ -239,24 +231,22 @@ build as a Nix store path, not a sibling directory."
                  :store-to-load-forward
                  :dead-store-elim
                  :tail-duplication))
-    (assert-true (member key cl-cc/optimize::*opt-default-convergence-pass-keys*))
-    (assert-true (gethash key cl-cc/optimize::*opt-pass-registry*))))
+    (expect (member key cl-cc/optimize::*opt-default-convergence-pass-keys*) :to-be-truthy)
+    (expect (gethash key cl-cc/optimize::*opt-pass-registry*) :to-be-truthy)))
 
-(deftest optimizer-roadmap-code-motion-evidence
-  "Code-motion FRs point at implemented conservative passes and complete evidence."
+(it-sequential "optimizer-roadmap-code-motion-evidence"
   (let ((tail-dup-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-167"))
         (implemented-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-164")))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status tail-dup-evidence))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status implemented-evidence))
-    (assert-true (member 'cl-cc/optimize::opt-pass-tail-duplication
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols tail-dup-evidence)))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  tail-dup-evidence))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  implemented-evidence))))
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status tail-dup-evidence) :to-be :implemented)
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status implemented-evidence) :to-be :implemented)
+    (expect (member 'cl-cc/optimize::opt-pass-tail-duplication
+                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols tail-dup-evidence)) :to-be-truthy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                  tail-dup-evidence) :to-be-truthy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                  implemented-evidence) :to-be-truthy)))
 
-(deftest optimizer-roadmap-callee-saved-evidence-is-native-backed
-  "FR-329 must point at the native backend/regalloc implementation that computes used callee-saved registers."
+(it-sequential "optimizer-roadmap-callee-saved-evidence-is-native-backed"
   (labels ((function-present-p (package-name symbol-name)
              (let* ((pkg (find-package package-name))
                     (sym (and pkg (find-symbol symbol-name pkg))))
@@ -264,44 +254,43 @@ build as a Nix store path, not a sibling directory."
     (let* ((codegen-spec '("CL-CC/CODEGEN" . "X86-64-USED-CALLEE-SAVED-REGS"))
            (regalloc-spec '("CL-CC/REGALLOC" . "COMPUTE-LIVE-INTERVALS"))
            (evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-329")))
-      (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-      (assert-true (member "packages/codegen/src/x86-64-codegen-core.lisp"
+      (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
+      (expect (member "packages/codegen/src/x86-64-codegen-core.lisp"
                            (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=))
-      (assert-true (member "packages/regalloc/src/regalloc.lisp"
+                           :test #'string=) :to-be-truthy)
+      (expect (member "packages/regalloc/src/regalloc.lisp"
                            (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                           :test #'string=))
-      (assert-true (member codegen-spec
+                           :test #'string=) :to-be-truthy)
+      (expect (member codegen-spec
                            (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal))
-      (assert-true (member regalloc-spec
+                           :test #'equal) :to-be-truthy)
+      (expect (member regalloc-spec
                            (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)
-                           :test #'equal))
-      (assert-true (function-present-p :cl-cc/codegen "X86-64-USED-CALLEE-SAVED-REGS"))
-      (assert-true (function-present-p :cl-cc/regalloc "COMPUTE-LIVE-INTERVALS"))
-      (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                     evidence)))))
+                           :test #'equal) :to-be-truthy)
+      (expect (function-present-p :cl-cc/codegen "X86-64-USED-CALLEE-SAVED-REGS") :to-be-truthy)
+      (expect (function-present-p :cl-cc/regalloc "COMPUTE-LIVE-INTERVALS") :to-be-truthy)
+      (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                     evidence) :to-be-truthy))))
 
-(deftest optimizer-roadmap-ssa-phi-elim-evidence
-  "FR-271 (Trivial Phi Elimination) points at ssa-phi-elim.lisp and has test coverage."
+(it-sequential "optimizer-roadmap-ssa-phi-elim-evidence"
   (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-271")))
-    (assert-eq :implemented (cl-cc/optimize::opt-roadmap-evidence-status evidence))
-    (assert-true (member "packages/optimize/src/ssa-phi-elim.lisp"
+    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
+    (expect (member "packages/optimize/src/ssa-phi-elim.lisp"
                          (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=))
-    (assert-true (member "packages/optimize/tests/ssa-tests.lisp"
+                         :test #'string=) :to-be-truthy)
+    (expect (member "packages/optimize/tests/ssa-tests.lisp"
                          (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=))
-    (assert-true (member 'cl-cc/optimize::ssa-eliminate-trivial-phis
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)))
+                         :test #'string=) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::ssa-eliminate-trivial-phis
+                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
     ;; Verify individual test anchors by name (they're CL-CC/OPTIMIZE package symbols)
-    (assert-true (member 'cl-cc/optimize::ssa-phi-elim-all-same-arg-multi-pred
-                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)))
-    (assert-true (member 'cl-cc/optimize::ssa-phi-elim-phi-of-phi-chain-deep
-                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)))
-    (assert-true (member 'cl-cc/optimize::ssa-phi-elim-unused-phi
-                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)))
-    (assert-true (member 'cl-cc/optimize::ssa-phi-elim-idempotent
-                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)))
-    (assert-true (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  evidence))))
+    (expect (member 'cl-cc/optimize::ssa-phi-elim-all-same-arg-multi-pred
+                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::ssa-phi-elim-phi-of-phi-chain-deep
+                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::ssa-phi-elim-unused-phi
+                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)) :to-be-truthy)
+    (expect (member 'cl-cc/optimize::ssa-phi-elim-idempotent
+                         (cl-cc/optimize::opt-roadmap-evidence-test-anchors evidence)) :to-be-truthy)
+    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
+                  evidence) :to-be-truthy)))

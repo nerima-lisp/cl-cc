@@ -7,180 +7,353 @@
 
 (in-package :cl-cc/test)
 
-(defsuite x86-64-codegen-suite :description "x86-64 machine code generation tests"
-  :parent cl-cc-unit-suite)
 
 ;;; Tests that call with-replaced-function on global emit functions must run serially.
-(defsuite x86-64-codegen-serial-suite
-  :description "Serial x86-64 codegen tests (use with-replaced-function)."
-  :parent cl-cc-unit-suite
-  :parallel nil)
 
-(in-suite x86-64-codegen-suite)
 ;;; ─── *vm-reg-map* ───────────────────────────────────────────────────────────
 
-(deftest x86-64-reg-map-lengths
-  "*vm-reg-map* has 8 entries; *phys-reg-to-x86-code* has 15 entries including RBP."
-  (assert-= 8  (length cl-cc/codegen::*vm-reg-map*))
-  (assert-= 15 (length cl-cc/codegen::*phys-reg-to-x86-code*)))
+(it-sequential "x86-64-reg-map-lengths"
+  (expect (= 8 (length cl-cc/codegen::*vm-reg-map*)) :to-be-truthy)
+  (expect (= 15 (length cl-cc/codegen::*phys-reg-to-x86-code*)) :to-be-truthy))
 
-(deftest x86-64-fpe-codegen-target-frees-rbp
-  "Default x86-64 FPE exposes RBP to regalloc; debug opt-out reserves it again."
+(it-sequential "x86-64-fpe-codegen-target-frees-rbp"
   (let ((fpe-target (let ((cl-cc/codegen::*x86-64-omit-frame-pointer* t))
                       (cl-cc/codegen::x86-64-codegen-target)))
         (debug-target (let ((cl-cc/codegen::*x86-64-omit-frame-pointer* nil))
                         (cl-cc/codegen::x86-64-codegen-target))))
-    (assert-true (member :rbp (cl-cc/target:target-allocatable-regs fpe-target)))
-    (assert-true (member :rbp (cl-cc/target:target-callee-saved fpe-target)))
-    (assert-false (member :rbp (cl-cc/target:target-allocatable-regs debug-target)))))
+    (expect (member :rbp (cl-cc/target:target-allocatable-regs fpe-target)) :to-be-truthy)
+    (expect (member :rbp (cl-cc/target:target-callee-saved fpe-target)) :to-be-truthy)
+    (expect (member :rbp (cl-cc/target:target-allocatable-regs debug-target)) :to-be-falsy)))
 
-(deftest-each x86-64-vm-reg-map-entries
-  "*vm-reg-map* maps each VM register to the correct x86-64 code."
-  :cases (("R0→rax" :R0 cl-cc/codegen::+rax+)
-          ("R1→rcx" :R1 cl-cc/codegen::+rcx+)
-          ("R2→rdx" :R2 cl-cc/codegen::+rdx+)
-          ("R3→rbx" :R3 cl-cc/codegen::+rbx+)
-          ("R4→rsi" :R4 cl-cc/codegen::+rsi+)
-          ("R5→rdi" :R5 cl-cc/codegen::+rdi+)
-          ("R6→r8"  :R6 cl-cc/codegen::+r8+)
-          ("R7→r9"  :R7 cl-cc/codegen::+r9+))
-  (vm-reg expected)
-  (assert-= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))))
+(it-sequential "x86-64-vm-reg-map-entries R0→rax"
+  (destructuring-bind (vm-reg expected) (list :R0 cl-cc/codegen::+rax+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R1→rcx"
+  (destructuring-bind (vm-reg expected) (list :R1 cl-cc/codegen::+rcx+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R2→rdx"
+  (destructuring-bind (vm-reg expected) (list :R2 cl-cc/codegen::+rdx+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R3→rbx"
+  (destructuring-bind (vm-reg expected) (list :R3 cl-cc/codegen::+rbx+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R4→rsi"
+  (destructuring-bind (vm-reg expected) (list :R4 cl-cc/codegen::+rsi+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R5→rdi"
+  (destructuring-bind (vm-reg expected) (list :R5 cl-cc/codegen::+rdi+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R6→r8"
+  (destructuring-bind (vm-reg expected) (list :R6 cl-cc/codegen::+r8+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-reg-map-entries R7→r9"
+  (destructuring-bind (vm-reg expected) (list :R7 cl-cc/codegen::+r9+)
+    (expect (= expected (cdr (assoc vm-reg cl-cc/codegen::*vm-reg-map*))) :to-be-truthy)))
 
 ;;; ─── *phys-reg-to-x86-code* ─────────────────────────────────────────────────
 
 
-(deftest-each x86-64-phys-reg-map-entries
-  "*phys-reg-to-x86-code* maps each physical register to the correct code."
-  :cases (("rax"  :rax  cl-cc/codegen::+rax+)
-          ("rcx"  :rcx  cl-cc/codegen::+rcx+)
-           ("rdx"  :rdx  cl-cc/codegen::+rdx+)
-           ("rbx"  :rbx  cl-cc/codegen::+rbx+)
-          ("rbp"  :rbp  cl-cc/codegen::+rbp+)
-           ("rsi"  :rsi  cl-cc/codegen::+rsi+)
-          ("rdi"  :rdi  cl-cc/codegen::+rdi+)
-          ("r8"   :r8   cl-cc/codegen::+r8+)
-          ("r9"   :r9   cl-cc/codegen::+r9+)
-          ("r10"  :r10  cl-cc/codegen::+r10+)
-          ("r11"  :r11  cl-cc/codegen::+r11+)
-          ("r12"  :r12  cl-cc/codegen::+r12+)
-          ("r13"  :r13  cl-cc/codegen::+r13+)
-          ("r14"  :r14  cl-cc/codegen::+r14+)
-          ("r15"  :r15  cl-cc/codegen::+r15+))
-  (phys-reg expected)
-  (assert-= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))))
+(it-sequential "x86-64-phys-reg-map-entries rax"
+  (destructuring-bind (phys-reg expected) (list :rax cl-cc/codegen::+rax+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries rcx"
+  (destructuring-bind (phys-reg expected) (list :rcx cl-cc/codegen::+rcx+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries rdx"
+  (destructuring-bind (phys-reg expected) (list :rdx cl-cc/codegen::+rdx+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries rbx"
+  (destructuring-bind (phys-reg expected) (list :rbx cl-cc/codegen::+rbx+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries rbp"
+  (destructuring-bind (phys-reg expected) (list :rbp cl-cc/codegen::+rbp+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries rsi"
+  (destructuring-bind (phys-reg expected) (list :rsi cl-cc/codegen::+rsi+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries rdi"
+  (destructuring-bind (phys-reg expected) (list :rdi cl-cc/codegen::+rdi+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r8"
+  (destructuring-bind (phys-reg expected) (list :r8 cl-cc/codegen::+r8+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r9"
+  (destructuring-bind (phys-reg expected) (list :r9 cl-cc/codegen::+r9+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r10"
+  (destructuring-bind (phys-reg expected) (list :r10 cl-cc/codegen::+r10+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r11"
+  (destructuring-bind (phys-reg expected) (list :r11 cl-cc/codegen::+r11+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r12"
+  (destructuring-bind (phys-reg expected) (list :r12 cl-cc/codegen::+r12+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r13"
+  (destructuring-bind (phys-reg expected) (list :r13 cl-cc/codegen::+r13+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r14"
+  (destructuring-bind (phys-reg expected) (list :r14 cl-cc/codegen::+r14+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
+
+(it-sequential "x86-64-phys-reg-map-entries r15"
+  (destructuring-bind (phys-reg expected) (list :r15 cl-cc/codegen::+r15+)
+    (expect (= expected (cdr (assoc phys-reg cl-cc/codegen::*phys-reg-to-x86-code*))) :to-be-truthy)))
 
 ;;; ─── vm-reg-to-x86 ──────────────────────────────────────────────────────────
 
-(deftest-each x86-64-vm-reg-to-x86-naive
-  "vm-reg-to-x86 maps VM registers to x86 codes (naive mode, no regalloc)."
-  :cases (("R0" :R0 cl-cc/codegen::+rax+)
-          ("R1" :R1 cl-cc/codegen::+rcx+)
-          ("R2" :R2 cl-cc/codegen::+rdx+)
-          ("R3" :R3 cl-cc/codegen::+rbx+)
-          ("R4" :R4 cl-cc/codegen::+rsi+)
-          ("R5" :R5 cl-cc/codegen::+rdi+)
-          ("R6" :R6 cl-cc/codegen::+r8+)
-          ("R7" :R7 cl-cc/codegen::+r9+))
-  (vm-reg expected)
-  (let ((cl-cc/codegen::*current-regalloc* nil))
-    (assert-= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg))))
+(it-sequential "x86-64-vm-reg-to-x86-naive R0"
+  (destructuring-bind (vm-reg expected) (list :R0 cl-cc/codegen::+rax+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
 
-(deftest x86-64-vm-reg-to-x86-unknown-signals
-  "vm-reg-to-x86 signals error for unknown register."
+(it-sequential "x86-64-vm-reg-to-x86-naive R1"
+  (destructuring-bind (vm-reg expected) (list :R1 cl-cc/codegen::+rcx+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-naive R2"
+  (destructuring-bind (vm-reg expected) (list :R2 cl-cc/codegen::+rdx+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-naive R3"
+  (destructuring-bind (vm-reg expected) (list :R3 cl-cc/codegen::+rbx+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-naive R4"
+  (destructuring-bind (vm-reg expected) (list :R4 cl-cc/codegen::+rsi+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-naive R5"
+  (destructuring-bind (vm-reg expected) (list :R5 cl-cc/codegen::+rdi+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-naive R6"
+  (destructuring-bind (vm-reg expected) (list :R6 cl-cc/codegen::+r8+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-naive R7"
+  (destructuring-bind (vm-reg expected) (list :R7 cl-cc/codegen::+r9+)
+    (let ((cl-cc/codegen::*current-regalloc* nil))
+    (expect (= expected (cl-cc/codegen::vm-reg-to-x86 vm-reg)) :to-be-truthy))))
+
+(it-sequential "x86-64-vm-reg-to-x86-unknown-signals"
   (let ((cl-cc/codegen::*current-regalloc* nil))
-    (assert-signals error (cl-cc/codegen::vm-reg-to-x86 :R99))))
+    (signals error (cl-cc/codegen::vm-reg-to-x86 :R99))))
 
 ;;; ─── vm-const-to-integer ────────────────────────────────────────────────────
 
-(deftest-each x86-64-vm-const-to-integer
-  "vm-const-to-integer coerces VM constant values to integers."
-  :cases (("nil→0"     nil   0)
-          ("t→1"       t     1)
-          ("42→42"     42    42)
-          ("-7→-7"     -7    -7)
-          ("other→0"   :foo  0))
-  (input expected)
-  (assert-= expected (cl-cc/codegen::vm-const-to-integer input)))
+(it-sequential "x86-64-vm-const-to-integer nil→0"
+  (destructuring-bind (input expected) (list nil 0)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-const-to-integer t→1"
+  (destructuring-bind (input expected) (list t 1)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-const-to-integer 42→42"
+  (destructuring-bind (input expected) (list 42 42)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-const-to-integer -7→-7"
+  (destructuring-bind (input expected) (list -7 -7)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
+
+(it-sequential "x86-64-vm-const-to-integer other→0"
+  (destructuring-bind (input expected) (list :foo 0)
+    (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
 
 ;;; ─── *x86-64-instruction-sizes* ─────────────────────────────────────────────
 ;;; Note: hash keys are symbols in the cl-cc package; use cl-cc: prefix.
 
-(deftest-each x86-64-instruction-sizes-spot-checks
-  "Known VM instruction types have correct byte sizes in the size table."
-  :cases (("vm-const"     'cl-cc/vm::vm-const    10)
-           ("vm-move"      'cl-cc/vm::vm-move      3)
-           ("vm-add"       'cl-cc/vm::vm-add       6)
-           ("vm-integer-add" 'cl-cc/vm::vm-integer-add 6)
-           ("vm-sub"       'cl-cc/vm::vm-sub       6)
-           ("vm-integer-sub" 'cl-cc/vm::vm-integer-sub 6)
-           ("vm-mul"       'cl-cc/vm::vm-mul       7)
-           ("vm-integer-mul" 'cl-cc/vm::vm-integer-mul 7)
-           ("vm-integer-mul-high-u" 'cl-cc/vm::vm-integer-mul-high-u 19)
-           ("vm-integer-mul-high-s" 'cl-cc/vm::vm-integer-mul-high-s 19)
-           ("vm-sqrt"      'cl-cc/vm::vm-sqrt      8)
-            ("vm-sin-inst"  'cl-cc/vm::vm-sin-inst  21)
-            ("vm-cos-inst"  'cl-cc/vm::vm-cos-inst  21)
-            ("vm-exp-inst"  'cl-cc/vm::vm-exp-inst  21)
-            ("vm-log-inst"  'cl-cc/vm::vm-log-inst  21)
-            ("vm-tan-inst"  'cl-cc/vm::vm-tan-inst  21)
-            ("vm-asin-inst" 'cl-cc/vm::vm-asin-inst 21)
-            ("vm-acos-inst" 'cl-cc/vm::vm-acos-inst 21)
-            ("vm-atan-inst" 'cl-cc/vm::vm-atan-inst 21)
-           ("vm-bswap"     'cl-cc/vm::vm-bswap     6)
-          ("vm-halt"      'cl-cc/vm::vm-halt      3)
-          ("vm-call"      'cl-cc/vm::vm-call      6)
-          ("vm-tail-call" 'cl-cc/vm::vm-tail-call 3)
-          ("vm-label"     'cl-cc/vm::vm-label     0)
-          ("vm-jump"      'cl-cc/vm::vm-jump      5)
-          ("vm-jump-zero" 'cl-cc/vm::vm-jump-zero 9)
-          ("vm-ret"       'cl-cc/vm::vm-ret       1)
-          ("vm-ash"       'cl-cc/vm::vm-ash      24)
-          ("vm-div"       'cl-cc/vm::vm-div      34)
-          ("vm-mod"       'cl-cc/vm::vm-mod      37)
-          ("vm-abs"       'cl-cc/vm::vm-abs      15)
-          ("vm-min"       'cl-cc/vm::vm-min      10)
-          ("vm-max"       'cl-cc/vm::vm-max      10))
-  (sym expected)
-  (assert-= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)))
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-const"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-const 10)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
 
-(deftest x86-64-instruction-size-checks
-  "Comparison ops → 12; null-p → 11; other predicates → 10; self-move → 0."
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-move"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-move 3)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-add"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-add 6)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-integer-add"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-integer-add 6)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-sub"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-sub 6)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-integer-sub"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-integer-sub 6)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-mul"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-mul 7)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-integer-mul"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-integer-mul 7)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-integer-mul-high-u"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-integer-mul-high-u 19)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-integer-mul-high-s"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-integer-mul-high-s 19)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-sqrt"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-sqrt 8)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-sin-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-sin-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-cos-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-cos-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-exp-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-exp-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-log-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-log-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-tan-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-tan-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-asin-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-asin-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-acos-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-acos-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-atan-inst"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-atan-inst 21)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-bswap"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-bswap 6)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-halt"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-halt 3)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-call"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-call 6)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-tail-call"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-tail-call 3)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-label"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-label 0)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-jump"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-jump 5)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-jump-zero"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-jump-zero 9)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-ret"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-ret 1)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-ash"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-ash 24)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-div"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-div 34)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-mod"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-mod 37)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-abs"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-abs 15)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-min"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-min 10)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-sizes-spot-checks vm-max"
+  (destructuring-bind (sym expected) (list 'cl-cc/vm::vm-max 10)
+    (expect (= expected (gethash sym cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)))
+
+(it-sequential "x86-64-instruction-size-checks"
   (dolist (tp '(cl-cc/vm::vm-lt cl-cc/vm::vm-gt cl-cc/vm::vm-le
                 cl-cc/vm::vm-ge cl-cc/vm::vm-num-eq cl-cc/vm::vm-eq))
-    (assert-= 12 (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*)))
-  (assert-= 11 (gethash 'cl-cc/vm::vm-null-p cl-cc/codegen::*x86-64-instruction-sizes*))
+    (expect (= 12 (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy))
+  (expect (= 11 (gethash 'cl-cc/vm::vm-null-p cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)
   (dolist (tp '(cl-cc/vm::vm-number-p cl-cc/vm::vm-integer-p cl-cc/vm::vm-cons-p
                 cl-cc/vm::vm-symbol-p cl-cc/vm::vm-function-p))
-    (assert-= 10 (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*)))
+    (expect (= 10 (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy))
   (let ((cl-cc/codegen::*current-regalloc* nil))
-    (assert-= 0 (cl-cc/codegen::instruction-size (cl-cc:make-vm-move :dst :R0 :src :R0)))))
+    (expect (= 0 (cl-cc/codegen::instruction-size (cl-cc:make-vm-move :dst :R0 :src :R0))) :to-be-truthy)))
 
 ;;; ─── *x86-64-emitter-entries* / *x86-64-emitter-table* ─────────────────────
 
-(deftest x86-64-emitter-table-integrity
-  "*x86-64-emitter-entries* has at least 84 entries; each entry is registered in *x86-64-emitter-table*."
-  (assert-true (>= (length cl-cc/codegen::*x86-64-emitter-entries*) 84))
+(it-sequential "x86-64-emitter-table-integrity"
+  (expect (>= (length cl-cc/codegen::*x86-64-emitter-entries*) 84) :to-be-truthy)
   (dolist (entry cl-cc/codegen::*x86-64-emitter-entries*)
-    (assert-true (gethash (car entry) cl-cc/codegen::*x86-64-emitter-table*))))
+    (expect (gethash (car entry) cl-cc/codegen::*x86-64-emitter-table*) :to-be-truthy)))
 
-(deftest x86-mul-high-size-and-dispatch-registered
-  "vm-integer-mul-high-{u,s} are present in the x86-64 size table and emitter dispatch table."
+(it-sequential "x86-mul-high-size-and-dispatch-registered"
   (dolist (tp '(cl-cc/vm::vm-integer-mul-high-u cl-cc/vm::vm-integer-mul-high-s))
-    (assert-= 19 (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*))
-    (assert-true (functionp (gethash tp cl-cc/codegen::*x86-64-emitter-table*)))))
+    (expect (= 19 (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*)) :to-be-truthy)
+    (expect (functionp (gethash tp cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
 
-(deftest x86-64-empty-program-minimal-return-byte
-  "Default FPE empty program emits only RET when no spill frame is needed."
+(it-sequential "x86-64-empty-program-minimal-return-byte"
   (let* ((prog (cl-cc/vm::make-vm-program :instructions nil :result-register :R0))
          (bytes (cl-cc/codegen::compile-to-x86-64-bytes prog)))
-    (assert-= 1 (length bytes))
-    (assert-= #xC3 (aref bytes 0))))
+    (expect (= 1 (length bytes)) :to-be-truthy)
+    (expect (= #xC3 (aref bytes 0)) :to-be-truthy)))
 
-(in-suite x86-64-codegen-serial-suite)
 
-(deftest x86-64-sanitizer-flags-enable-stack-protector-policy
-  "Passing sanitizer flags to compile-to-x86-64-bytes enables stack-protector policy during emission."
+(it-sequential "x86-64-sanitizer-flags-enable-stack-protector-policy"
   (let* ((prog (cl-cc/vm::make-vm-program :instructions nil :result-register :R0))
          (saw-stack-protector nil))
     (with-replaced-function (cl-cc/codegen::emit-vm-program
@@ -189,12 +362,10 @@
                                (setf saw-stack-protector cl-cc/codegen::*x86-64-stack-protector-enabled*)
                                nil))
       (cl-cc/codegen::compile-to-x86-64-bytes prog :asan t)
-      (assert-true saw-stack-protector))))
+      (expect saw-stack-protector :to-be-truthy))))
 
-(in-suite x86-64-codegen-suite)
 
-(deftest x86-64-leaf-and-nonleaf-without-spills-share-fpe-layout
-  "Default FPE does not add an RBP frame for leaf or non-leaf programs when no spill frame is needed."
+(it-sequential "x86-64-leaf-and-nonleaf-without-spills-share-fpe-layout"
   (let* ((result (compile-string "(+ 1 2)" :target :x86_64))
          (prog (compilation-result-program result))
          (base (cl-cc/vm::make-vm-program
@@ -203,41 +374,107 @@
                 :leaf-p nil))
          (leaf-bytes    (cl-cc/codegen::compile-to-x86-64-bytes prog))
          (nonleaf-bytes (cl-cc/codegen::compile-to-x86-64-bytes base)))
-    (assert-true (cl-cc/vm::vm-program-leaf-p prog))
-    (assert-= (length leaf-bytes) (length nonleaf-bytes))
-    (assert-true (equalp leaf-bytes nonleaf-bytes))))
+    (expect (cl-cc/vm::vm-program-leaf-p prog) :to-be-truthy)
+    (expect (= (length leaf-bytes) (length nonleaf-bytes)) :to-be-truthy)
+    (expect (equalp leaf-bytes nonleaf-bytes) :to-be-truthy)))
 
-(deftest-each x86-64-emitter-table-spot-checks
-  "Key instructions are present in *x86-64-emitter-table* and are functions."
-  :cases (("vm-const"   'cl-cc/vm::vm-const)
-           ("vm-add"     'cl-cc/vm::vm-add)
-           ("vm-integer-add" 'cl-cc/vm::vm-integer-add)
-            ("vm-float-add" 'cl-cc/vm::vm-float-add)
-            ("vm-float-div" 'cl-cc/vm::vm-float-div)
-             ("vm-sqrt" 'cl-cc/vm::vm-sqrt)
-             ("vm-sin-inst" 'cl-cc/vm::vm-sin-inst)
-             ("vm-cos-inst" 'cl-cc/vm::vm-cos-inst)
-             ("vm-exp-inst" 'cl-cc/vm::vm-exp-inst)
-             ("vm-log-inst" 'cl-cc/vm::vm-log-inst)
-             ("vm-tan-inst" 'cl-cc/vm::vm-tan-inst)
-             ("vm-asin-inst" 'cl-cc/vm::vm-asin-inst)
-             ("vm-acos-inst" 'cl-cc/vm::vm-acos-inst)
-             ("vm-atan-inst" 'cl-cc/vm::vm-atan-inst)
-             ("vm-integer-mul-high-u" 'cl-cc/vm::vm-integer-mul-high-u)
-           ("vm-integer-mul-high-s" 'cl-cc/vm::vm-integer-mul-high-s)
-           ("vm-call"    'cl-cc/vm::vm-call)
-           ("vm-tail-call" 'cl-cc/vm::vm-tail-call)
-           ("vm-lt"      'cl-cc/vm::vm-lt)
-           ("vm-neg"     'cl-cc/vm::vm-neg)
-           ("vm-bswap"   'cl-cc/vm::vm-bswap)
-          ("vm-and"     'cl-cc/vm::vm-and)
-          ("vm-logand"  'cl-cc/vm::vm-logand)
-          ("vm-null-p"  'cl-cc/vm::vm-null-p))
-  (sym)
-  (assert-true (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*))))
+(it-sequential "x86-64-emitter-table-spot-checks vm-const"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-const)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
 
-(deftest x86-64-float-const-add-program-uses-xmm-path
-  "Float const/add/halt emits MOVQ+scalar SSE opcodes instead of integer ALU bytes."
+(it-sequential "x86-64-emitter-table-spot-checks vm-add"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-add)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-integer-add"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-integer-add)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-float-add"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-float-add)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-float-div"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-float-div)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-sqrt"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-sqrt)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-sin-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-sin-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-cos-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-cos-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-exp-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-exp-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-log-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-log-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-tan-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-tan-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-asin-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-asin-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-acos-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-acos-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-atan-inst"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-atan-inst)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-integer-mul-high-u"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-integer-mul-high-u)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-integer-mul-high-s"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-integer-mul-high-s)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-call"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-call)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-tail-call"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-tail-call)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-lt"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-lt)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-neg"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-neg)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-bswap"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-bswap)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-and"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-and)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-logand"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-logand)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-emitter-table-spot-checks vm-null-p"
+  (destructuring-bind (sym) (list 'cl-cc/vm::vm-null-p)
+    (expect (functionp (gethash sym cl-cc/codegen::*x86-64-emitter-table*)) :to-be-truthy)))
+
+(it-sequential "x86-64-float-const-add-program-uses-xmm-path"
   (let* ((prog (cl-cc/vm::make-vm-program
                 :instructions (list (cl-cc:make-vm-const :dst :R0 :value 1.0d0)
                                     (cl-cc:make-vm-const :dst :R1 :value 2.0d0)
@@ -245,23 +482,20 @@
                                     (cl-cc:make-vm-halt :reg :R2))
                 :result-register :R2))
          (bytes (coerce (cl-cc/codegen::compile-to-x86-64-bytes prog) 'list)))
-    (assert-true (search '(#x66 #x49 #x0F #x6E) bytes :test #'eql))
-    (assert-true (search '(#xF2 #x0F #x10) bytes :test #'eql))
-    (assert-true (search '(#xF2 #x0F #x58) bytes :test #'eql))))
+    (expect (search '(#x66 #x49 #x0F #x6E) bytes :test #'eql) :to-be-truthy)
+    (expect (search '(#xF2 #x0F #x10) bytes :test #'eql) :to-be-truthy)
+    (expect (search '(#xF2 #x0F #x58) bytes :test #'eql) :to-be-truthy)))
 
-(deftest x86-64-tls-base-register-uses-fsbase-plan
-  "x86-64 TLS base register is selected via optimizer TLS planning."
-  (assert-eq :fs (cl-cc/codegen::x86-64-tls-base-register)))
+(it-sequential "x86-64-tls-base-register-uses-fsbase-plan"
+  (expect (cl-cc/codegen::x86-64-tls-base-register) :to-be :fs))
 
-(deftest x86-64-atomic-lowering-plan-adds-seq-cst-fences
-  "x86-64 seq-cst atomic lowering adds mfence around selected opcode."
+(it-sequential "x86-64-atomic-lowering-plan-adds-seq-cst-fences"
   (let ((plan (cl-cc/codegen::x86-64-atomic-lowering-plan :incf :seq-cst)))
-    (assert-eq :lock-xadd (getf plan :opcode))
-    (assert-equal '(:mfence) (getf plan :pre-fence))
-    (assert-equal '(:mfence) (getf plan :post-fence))))
+    (expect (getf plan :opcode) :to-be :lock-xadd)
+    (expect (getf plan :pre-fence) :to-equal '(:mfence))
+    (expect (getf plan :post-fence) :to-equal '(:mfence))))
 
-(deftest x86-64-stack-canary-plan-materializes-prologue-and-epilogue
-  "x86-64 stack canary plan exposes backend-neutral prologue/epilogue operations."
+(it-sequential "x86-64-stack-canary-plan-materializes-prologue-and-epilogue"
   (let ((enabled (cl-cc/codegen::x86-64-stack-canary-plan
                   :has-stack-buffer-p t
                   :guard-slot -16
@@ -270,22 +504,19 @@
                    :has-stack-buffer-p nil
                    :guard-slot -16
                    :failure-target 'panic)))
-    (assert-true (getf enabled :enabled-p))
-    (assert-equal -16 (getf enabled :guard-slot))
-    (assert-eq 'panic (getf enabled :failure-target))
-    (assert-equal '((:op :load-canary :source :tls-canary :dst :rax)
-                    (:op :store-canary :src :rax :slot -16))
-                  (getf enabled :prologue))
-    (assert-equal '((:op :load-canary :source -16 :dst :rax)
+    (expect (getf enabled :enabled-p) :to-be-truthy)
+    (expect (getf enabled :guard-slot) :to-equal -16)
+    (expect (getf enabled :failure-target) :to-be 'panic)
+    (expect (getf enabled :prologue) :to-equal '((:op :load-canary :source :tls-canary :dst :rax)
+                    (:op :store-canary :src :rax :slot -16)))
+    (expect (getf enabled :epilogue) :to-equal '((:op :load-canary :source -16 :dst :rax)
                     (:op :compare-canary :left :rax :right :tls-canary)
-                    (:op :branch-if-canary-mismatch :target panic))
-                  (getf enabled :epilogue))
-    (assert-false (getf disabled :enabled-p))
-    (assert-null (getf disabled :prologue))
-    (assert-null (getf disabled :epilogue))))
+                    (:op :branch-if-canary-mismatch :target panic)))
+    (expect (getf disabled :enabled-p) :to-be-falsy)
+    (expect (getf disabled :prologue) :to-be-null)
+    (expect (getf disabled :epilogue) :to-be-null)))
 
-(deftest x86-64-stack-protector-emitter-signature-bytes
-  "Stack protector emitters include FS canary load/compare and mismatch UD2 trap bytes."
+(it-sequential "x86-64-stack-protector-emitter-signature-bytes"
   (let* ((plan (cl-cc/codegen::x86-64-stack-canary-plan
                 :has-stack-buffer-p t
                 :guard-slot -16
@@ -295,68 +526,56 @@
                    (cl-cc/codegen::emit-x86-64-stack-canary-prologue stream plan t)
                    (cl-cc/codegen::emit-x86-64-stack-canary-epilogue stream plan t)))))
     ;; mov rax, qword ptr fs:[0x28]  => 64 48 8B 04 25 28 00 00 00
-    (assert-true (search '(#x64 #x48 #x8B #x04 #x25 #x28 #x00 #x00 #x00) bytes :test #'eql))
+    (expect (search '(#x64 #x48 #x8B #x04 #x25 #x28 #x00 #x00 #x00) bytes :test #'eql) :to-be-truthy)
     ;; cmp rax, qword ptr fs:[0x28]  => 64 48 3B 04 25 28 00 00 00
-    (assert-true (search '(#x64 #x48 #x3B #x04 #x25 #x28 #x00 #x00 #x00) bytes :test #'eql))
+    (expect (search '(#x64 #x48 #x3B #x04 #x25 #x28 #x00 #x00 #x00) bytes :test #'eql) :to-be-truthy)
     ;; mismatch trap path includes UD2 bytes.
-    (assert-true (search '(#x0F #x0B) bytes :test #'eql))))
+    (expect (search '(#x0F #x0B) bytes :test #'eql) :to-be-truthy)))
 
-(deftest x86-64-cfi-plan-enables-endbr64-for-indirect-calls
-  "x86-64 CFI plan emits ENDBR64 marker when indirect calls are present."
+(it-sequential "x86-64-cfi-plan-enables-endbr64-for-indirect-calls"
   (let ((enabled (cl-cc/codegen::x86-64-cfi-plan :has-indirect-calls-p t))
         (disabled (cl-cc/codegen::x86-64-cfi-plan :has-indirect-calls-p nil)))
-    (assert-true (getf enabled :enabled-p))
-    (assert-eq :endbr64 (getf enabled :entry-opcode))
-    (assert-false (getf disabled :enabled-p))
-    (assert-eq :none (getf disabled :entry-opcode))))
+    (expect (getf enabled :enabled-p) :to-be-truthy)
+    (expect (getf enabled :entry-opcode) :to-be :endbr64)
+    (expect (getf disabled :enabled-p) :to-be-falsy)
+    (expect (getf disabled :entry-opcode) :to-be :none)))
 
-(deftest x86-64-cfi-entry-emits-endbr64-bytes
-  "CFI entry emitter serializes ENDBR64 bytes when enabled."
+(it-sequential "x86-64-cfi-entry-emits-endbr64-bytes"
   (let ((bytes (%x86-collect-bytes
                 (lambda (stream)
                   (cl-cc/codegen::emit-x86-64-cfi-entry
                    stream
                    (cl-cc/codegen::x86-64-cfi-plan :has-indirect-calls-p t))))))
-    (assert-equal '(#xF3 #x0F #x1E #xFA) bytes)))
+    (expect bytes :to-equal '(#xF3 #x0F #x1E #xFA))))
 
-(deftest x86-64-program-with-indirect-call-starts-with-endbr64
-  "Full x86-64 program emission inserts ENDBR64 at function entry when indirect call exists."
+(it-sequential "x86-64-program-with-indirect-call-starts-with-endbr64"
   (let* ((program (cl-cc/vm::make-vm-program
                    :instructions (list (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil)
                                        (cl-cc:make-vm-halt :reg :R0))
                    :result-register :R0
                    :leaf-p nil))
          (bytes (coerce (cl-cc/codegen::compile-to-x86-64-bytes program) 'list)))
-    (assert-equal '(#xF3 #x0F #x1E #xFA) (subseq bytes 0 4))))
+    (expect (subseq bytes 0 4) :to-equal '(#xF3 #x0F #x1E #xFA))))
 
-(deftest x86-64-cfi-call-tail-call-size-accounting-matches-guard-bytes
-  "instruction-size accounts for CFI guard bytes on vm-call/vm-tail-call."
+(it-sequential "x86-64-cfi-call-tail-call-size-accounting-matches-guard-bytes"
   (let ((cl-cc/codegen::*x86-64-cfi-enabled* t)
         (cl-cc/codegen::*x86-64-use-retpoline* nil))
-    (assert-= 34
-             (cl-cc/codegen::instruction-size
-              (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil)))
-    (assert-= 31
-             (cl-cc/codegen::instruction-size
-              (cl-cc:make-vm-tail-call :dst :R0 :func :R1 :args nil)))))
+    (expect (= 34 (cl-cc/codegen::instruction-size
+              (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil))) :to-be-truthy)
+    (expect (= 31 (cl-cc/codegen::instruction-size
+              (cl-cc:make-vm-tail-call :dst :R0 :func :R1 :args nil))) :to-be-truthy)))
 
-(deftest x86-64-program-has-stack-buffer-p-detects-array-vector-ops
-  "Stack-buffer detector turns true for array/vector-like VM instructions."
-  (assert-true
-   (cl-cc/codegen::x86-64-program-has-stack-buffer-p
-    (list (cl-cc:make-vm-make-array :dst :R0 :size-reg :R1 :initial-element nil))))
-  (assert-true
-   (cl-cc/codegen::x86-64-program-has-stack-buffer-p
-    (list (cl-cc:make-vm-aset :array-reg :R0 :index-reg :R1 :val-reg :R2))))
-  (assert-true
-   (cl-cc/codegen::x86-64-program-has-stack-buffer-p
-    (list (cl-cc:make-vm-set-fill-pointer :dst :R0 :array-reg :R1 :val-reg :R2))))
-  (assert-false
-   (cl-cc/codegen::x86-64-program-has-stack-buffer-p
-    (list (cl-cc:make-vm-const :dst :R0 :value 1)))))
+(it-sequential "x86-64-program-has-stack-buffer-p-detects-array-vector-ops"
+  (expect (cl-cc/codegen::x86-64-program-has-stack-buffer-p
+    (list (cl-cc:make-vm-make-array :dst :R0 :size-reg :R1 :initial-element nil))) :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-program-has-stack-buffer-p
+    (list (cl-cc:make-vm-aset :array-reg :R0 :index-reg :R1 :val-reg :R2))) :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-program-has-stack-buffer-p
+    (list (cl-cc:make-vm-set-fill-pointer :dst :R0 :array-reg :R1 :val-reg :R2))) :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-program-has-stack-buffer-p
+    (list (cl-cc:make-vm-const :dst :R0 :value 1))) :to-be-falsy))
 
-(deftest x86-64-array-bce-metadata-skips-explicit-guard
-  "x86-64 array lowering consumes BCE metadata and omits compare/jump guard text."
+(it-sequential "x86-64-array-bce-metadata-skips-explicit-guard"
   (let* ((target (make-instance 'cl-cc/codegen::x86-64-target))
          (inst (cl-cc:make-vm-aref :dst :r0 :array-reg :r1 :index-reg :r2))
          (checked (with-output-to-string (s)
@@ -366,42 +585,31 @@
                        (cl-cc/codegen::emit-instruction target inst s))))
       (assert-output-contains checked "cmp")
       (assert-output-contains checked "jae clcc_array_bounds_trap")
-      (assert-false (search "cmp" unchecked))
-      (assert-false (search "jae clcc_array_bounds_trap" unchecked))
+      (expect (search "cmp" unchecked) :to-be-falsy)
+      (expect (search "jae clcc_array_bounds_trap" unchecked) :to-be-falsy)
       (assert-output-contains unchecked "mov"))))
 
-(deftest x86-64-program-has-nonlocal-control-p-detects-condition-handlers
-  "Shadow-stack nonlocal detector turns true for condition/restart VM ops."
-  (assert-true
-   (cl-cc/codegen::x86-64-program-has-nonlocal-control-p
-    (list (cl-cc:make-vm-signal :condition-reg :R0))))
-  (assert-false
-   (cl-cc/codegen::x86-64-program-has-nonlocal-control-p
-    (list (cl-cc:make-vm-const :dst :R0 :value 1)))))
+(it-sequential "x86-64-program-has-nonlocal-control-p-detects-condition-handlers"
+  (expect (cl-cc/codegen::x86-64-program-has-nonlocal-control-p
+    (list (cl-cc:make-vm-signal :condition-reg :R0))) :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-program-has-nonlocal-control-p
+    (list (cl-cc:make-vm-const :dst :R0 :value 1))) :to-be-falsy))
 
-(deftest x86-64-ibrs-token-present-p-detects-common-host-feature-formats
-  "IBRS detector recognizes Linux/Darwin style capability strings."
-  (assert-true
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "flags\t: fpu vme ibrs avx2"))
-  (assert-true
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "machdep.cpu.features: SSE4.2,IBRS,AVX2"))
-  (assert-true
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "machdep.cpu.features: SSE4.2,eIBRS,AVX2"))
-  (assert-false
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "flags\t: fpu vme avx2"))
-  (assert-false
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "flags\t: fpu vme noibrs avx2"))
-  (assert-false
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "flags\t: fpu vme ibrs2 avx2"))
-  (assert-false
-   (cl-cc/codegen::x86-64-ibrs-token-present-p
-    "machdep.cpu.features: SSE4.2,eibrs_disabled,AVX2")))
+(it-sequential "x86-64-ibrs-token-present-p-detects-common-host-feature-formats"
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "flags\t: fpu vme ibrs avx2") :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "machdep.cpu.features: SSE4.2,IBRS,AVX2") :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "machdep.cpu.features: SSE4.2,eIBRS,AVX2") :to-be-truthy)
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "flags\t: fpu vme avx2") :to-be-falsy)
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "flags\t: fpu vme noibrs avx2") :to-be-falsy)
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "flags\t: fpu vme ibrs2 avx2") :to-be-falsy)
+  (expect (cl-cc/codegen::x86-64-ibrs-token-present-p
+    "machdep.cpu.features: SSE4.2,eibrs_disabled,AVX2") :to-be-falsy))
 
 ;;; ─── Byte-collection helper ─────────────────────────────────────────────────
 ;;; Used by x86-64-codegen-emitter-tests and x86-64-codegen-insn-tests,

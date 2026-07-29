@@ -1,22 +1,39 @@
 ;;;; compiler-tests-runtime-string-tests.lisp — String/Symbol, macro expansion, list ops, handler-case, hash-table, defmacro, stdlib HOF
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-integration-suite)
-
 ;;; String/Symbol Builtin Compilation Tests
 
-(deftest-each compile-string-comparison
-  "String comparison operators return truthy for true condition and NIL for false."
-  :cases (("string=-match"    t   "(string= \"hello\" \"hello\")")
-          ("string=-mismatch" nil "(string= \"hello\" \"world\")")
-          ("string<-true"     t   "(string< \"abc\" \"def\")")
-          ("string<-false"    nil "(string< \"def\" \"abc\")")
-          ("string/=-true"    t   "(string/= \"hello\" \"world\")")
-          ("string/=-false"   nil "(string/= \"hello\" \"hello\")")
-          ("string-equal-ci"  t   "(string-equal \"Hello\" \"hello\")")
-          ("string-equal-no"  nil "(string-equal \"hello\" \"world\")"))
-  (expected form)
-  (assert-equal expected (not (null (run-string form)))))
+(it-sequential "compile-string-comparison string=-match"
+  (destructuring-bind (expected form) (list t "(string= \"hello\" \"hello\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string=-mismatch"
+  (destructuring-bind (expected form) (list nil "(string= \"hello\" \"world\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string<-true"
+  (destructuring-bind (expected form) (list t "(string< \"abc\" \"def\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string<-false"
+  (destructuring-bind (expected form) (list nil "(string< \"def\" \"abc\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string/=-true"
+  (destructuring-bind (expected form) (list t "(string/= \"hello\" \"world\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string/=-false"
+  (destructuring-bind (expected form) (list nil "(string/= \"hello\" \"hello\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string-equal-ci"
+  (destructuring-bind (expected form) (list t "(string-equal \"Hello\" \"hello\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
+
+(it-sequential "compile-string-comparison string-equal-no"
+  (destructuring-bind (expected form) (list nil "(string-equal \"hello\" \"world\")")
+    (expect (not (null (run-string form))) :to-equal expected)))
 
 (deftest-compile compile-string-ops-and-type-predicates
   "String ops return numeric results and type predicates return CL booleans."
@@ -43,14 +60,21 @@
           ("or-find"        5  "(or nil nil 5)")
           ("or-first"       1  "(or 1 2 3)")))
 
-(deftest-each compile-control-macros-nil
-  "cond/when/unless/and/or return nil in the false cases."
-  :cases (("when-false"   "(when (= 1 2) 42)")
-          ("unless-true"  "(unless (= 1 1) 99)")
-          ("and-short"    "(and 1 nil 3)")
-          ("or-all-nil"   "(or nil nil nil)"))
-  (form)
-  (assert-run-false form))
+(it-sequential "compile-control-macros-nil when-false"
+  (destructuring-bind (form) (list "(when (= 1 2) 42)")
+    (assert-run-false form)))
+
+(it-sequential "compile-control-macros-nil unless-true"
+  (destructuring-bind (form) (list "(unless (= 1 1) 99)")
+    (assert-run-false form)))
+
+(it-sequential "compile-control-macros-nil and-short"
+  (destructuring-bind (form) (list "(and 1 nil 3)")
+    (assert-run-false form)))
+
+(it-sequential "compile-control-macros-nil or-all-nil"
+  (destructuring-bind (form) (list "(or nil nil nil)")
+    (assert-run-false form)))
 
 (deftest-compile compile-t-nil-constants
   "t and nil are recognized as constants; not inverts truthiness."
@@ -98,39 +122,49 @@ instruction produces, which is no longer what reaches the caller."
           ("nested"         1 "(handler-case (handler-case (error \"inner\") (error (e) 1)) (error (e) 2))"))
   )
 
-(deftest compile-handler-case-error-variable
-  "handler-case binds the error value to the variable"
-  (assert-string= "boom" (run-string "(handler-case (error \"boom\") (error (e) e))")))
+(it-sequential "compile-handler-case-error-variable"
+  (expect (run-string "(handler-case (error \"boom\") (error (e) e))") :to-equal "boom"))
 
-(deftest compile-error-builtin-without-handler
-  "error without handler signals a CL error"
-  (assert-signals error
-    (run-string "(error \"unhandled\")")))
+(it-sequential "compile-error-builtin-without-handler"
+  (let ((%%signaled2 nil)) (handler-case (progn (run-string "(error \"unhandled\")")) (error () (setf %%signaled2 t))) (expect %%signaled2 :to-be-truthy)))
 
 ;;; Hash Table Operation Tests
 
-(deftest-each compile-hash-table-numeric
-  "Hash table operations return the expected numeric values; gethash returns nil when missing with no default."
-  :cases (("gethash-get"    42 "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
-          ("gethash-the-binding" 42 "(let ((ht (the hash-table (make-hash-table)))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
-          ("gethash-default" 99 "(let ((ht (make-hash-table))) (gethash 'missing ht 99))")
-          ("count"           2 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (hash-table-count ht))")
-          ("remhash"         1 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (remhash 'a ht) (hash-table-count ht))")
-          ("setf-returns"  100 "(let ((ht (make-hash-table))) (setf (gethash 'k ht) 100))")
-          ("overwrite"      20 "(let ((ht (make-hash-table))) (setf (gethash 'k ht) 10) (setf (gethash 'k ht) 20) (gethash 'k ht))"))
-  (expected form)
-  (assert-= expected (run-string form))
-  (assert-true (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))"))))
+(it-sequential "compile-hash-table-numeric gethash-get"
+  (destructuring-bind (expected form) (list 42 "(let ((ht (make-hash-table))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
 
-(deftest-each compile-hash-table-p
-  "hash-table-p answers T for a hash table and NIL for anything else."
-  ;; Split out of COMPILE-HASH-TABLE-NUMERIC, whose body is ASSERT-=: the
-  ;; predicate used to answer the VM's 1/0 and now answers a Common Lisp boolean,
-  ;; which ASSERT-= cannot compare.
-  :cases (("hash-table" t "(let ((ht (make-hash-table))) (hash-table-p ht))")
-          ("other"      nil "(hash-table-p 42)"))
-  (expected form)
-  (assert-equal expected (run-string form)))
+(it-sequential "compile-hash-table-numeric gethash-the-binding"
+  (destructuring-bind (expected form) (list 42 "(let ((ht (the hash-table (make-hash-table)))) (setf (gethash 'x ht) 42) (gethash 'x ht))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
+
+(it-sequential "compile-hash-table-numeric gethash-default"
+  (destructuring-bind (expected form) (list 99 "(let ((ht (make-hash-table))) (gethash 'missing ht 99))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
+
+(it-sequential "compile-hash-table-numeric count"
+  (destructuring-bind (expected form) (list 2 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (hash-table-count ht))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
+
+(it-sequential "compile-hash-table-numeric remhash"
+  (destructuring-bind (expected form) (list 1 "(let ((ht (make-hash-table))) (setf (gethash 'a ht) 1) (setf (gethash 'b ht) 2) (remhash 'a ht) (hash-table-count ht))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
+
+(it-sequential "compile-hash-table-numeric setf-returns"
+  (destructuring-bind (expected form) (list 100 "(let ((ht (make-hash-table))) (setf (gethash 'k ht) 100))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
+
+(it-sequential "compile-hash-table-numeric overwrite"
+  (destructuring-bind (expected form) (list 20 "(let ((ht (make-hash-table))) (setf (gethash 'k ht) 10) (setf (gethash 'k ht) 20) (gethash 'k ht))")
+    (expect (= expected (run-string form)) :to-be-truthy) (expect (null (run-string "(let ((ht (make-hash-table))) (gethash 'missing ht))")) :to-be-truthy)))
+
+(it-sequential "compile-hash-table-p hash-table"
+  (destructuring-bind (expected form) (list t "(let ((ht (make-hash-table))) (hash-table-p ht))")
+    (expect (run-string form) :to-equal expected)))
+
+(it-sequential "compile-hash-table-p other"
+  (destructuring-bind (expected form) (list nil "(hash-table-p 42)")
+    (expect (run-string form) :to-equal expected)))
 
 ;;; Defmacro Compilation Tests
 
@@ -141,20 +175,23 @@ instruction produces, which is no longer what reaches the caller."
           ("quasiquote" 15  "(defmacro my-add3 (a b c) `(+ ,a (+ ,b ,c))) (my-add3 3 5 7)")
           ("in-let"     100 "(defmacro my-square (x) `(* ,x ,x)) (let ((n 10)) (my-square n))")))
 
-(deftest compile-defmacro-returns-name
-  "defmacro returns the macro name; symbol-name returns the name string."
-  (assert-string= "my-mac" (string-downcase (symbol-name (run-string "(defmacro my-mac (x) x)"))))
-  (assert-string= "FOO" (run-string "(symbol-name 'foo)")))
+(it-sequential "compile-defmacro-returns-name"
+  (expect (string-downcase (symbol-name (run-string "(defmacro my-mac (x) x)"))) :to-equal "my-mac")
+  (expect (run-string "(symbol-name 'foo)") :to-equal "FOO"))
 
 ;;; Symbol Manipulation Tests
 
-(deftest-each compile-symbol-creation
-  "intern/gensym/make-symbol all create symbols (symbolp returns truthy)."
-  :cases (("intern"      "(symbolp (intern \"TEST-SYM\"))")
-          ("gensym"      "(symbolp (gensym))")
-          ("make-symbol" "(symbolp (make-symbol \"TEMP\"))"))
-  (form)
-  (assert-true (not (null (run-string form)))))
+(it-sequential "compile-symbol-creation intern"
+  (destructuring-bind (form) (list "(symbolp (intern \"TEST-SYM\"))")
+    (expect (not (null (run-string form))) :to-be-truthy)))
+
+(it-sequential "compile-symbol-creation gensym"
+  (destructuring-bind (form) (list "(symbolp (gensym))")
+    (expect (not (null (run-string form))) :to-be-truthy)))
+
+(it-sequential "compile-symbol-creation make-symbol"
+  (destructuring-bind (form) (list "(symbolp (make-symbol \"TEMP\"))")
+    (expect (not (null (run-string form))) :to-be-truthy)))
 
 ;;; Typep and Destructuring Tests
 

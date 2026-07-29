@@ -1,20 +1,22 @@
 (in-package :cl-cc/test)
 
-(defsuite macros-restarts-suite
-  :description "Restart protocol expansion tests"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-restarts-suite)
 
-(deftest-each macros-restarts-control-expansion
-  "Restart control forms expand to their expected top-level operators."
-  :cases (("find-restart"    '(find-restart 'my-restart) 'let)
-          ("invoke-restart"  '(invoke-restart 'my-restart) 'let*)
-          ("abort"           '(abort)                      'let)
-          ("restart-name"    '(restart-name r)             'if))
-  (form expected-car)
-  (assert-eq expected-car (car (our-macroexpand-1 form))))
+(it-sequential "macros-restarts-control-expansion find-restart"
+  (destructuring-bind (form expected-car) (list '(find-restart 'my-restart) 'let)
+    (expect (car (our-macroexpand-1 form)) :to-be expected-car)))
 
-(deftest macros-restarts-compute-restarts-expands
-  "COMPUTE-RESTARTS expands to the active-restarts dynamic variable directly."
-  (assert-eq 'cl-cc/expand::*%active-restarts* (our-macroexpand-1 '(compute-restarts))))
+(it-sequential "macros-restarts-control-expansion invoke-restart"
+  (destructuring-bind (form expected-car) (list '(invoke-restart 'my-restart) 'let*)
+    (expect (car (our-macroexpand-1 form)) :to-be expected-car)))
+
+(it-sequential "macros-restarts-control-expansion abort"
+  (destructuring-bind (form expected-car) (list '(abort) 'let)
+    (expect (car (our-macroexpand-1 form)) :to-be expected-car)))
+
+(it-sequential "macros-restarts-control-expansion restart-name"
+  (destructuring-bind (form expected-car) (list '(restart-name r) 'if)
+    (expect (car (our-macroexpand-1 form)) :to-be expected-car)))
+
+(it-sequential "macros-restarts-compute-restarts-expands"
+  (expect (our-macroexpand-1 '(compute-restarts)) :to-be 'cl-cc/expand::*%active-restarts*))

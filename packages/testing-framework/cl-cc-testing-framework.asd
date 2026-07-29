@@ -13,7 +13,7 @@ every test file)."
   :license "MIT"
   :homepage "https://github.com/nerima-lisp/cl-cc"
   :version "0.2.0"
-  :depends-on (:cl-cc :cl-cc-php :cl-weave)
+  :depends-on (:cl-cc :cl-weave)
   :pathname "src"
   :serial t
   :components

@@ -3,21 +3,23 @@
 
 (in-package :cl-cc/test)
 
-(defsuite macros-basic-list-suite
-  :description "Tests for macros-basic.lisp: list"
-  :parent cl-cc-unit-suite)
 
-(in-suite macros-basic-list-suite)
 
-(deftest list-empty-is-nil
-  "(list) expands to nil — no cons allocation at all"
-  (assert-equal (our-macroexpand-1 '(list)) nil))
+(it-sequential "list-empty-is-nil"
+  (expect nil :to-equal (our-macroexpand-1 '(list))))
 
-(deftest-each list-expands-to-nested-cons
-  "LIST expands to right-associative nested cons cells terminating in nil."
-  :cases (("one-element"    '(list x)     '(cons x nil))
-          ("two-elements"   '(list a b)   '(cons a (cons b nil)))
-          ("three-elements" '(list a b c) '(cons a (cons b (cons c nil))))
-          ("literals"       '(list 1 2 3) '(cons 1 (cons 2 (cons 3 nil)))))
-  (form expected)
-  (assert-equal (our-macroexpand-1 form) expected))
+(it-sequential "list-expands-to-nested-cons one-element"
+  (destructuring-bind (form expected) (list '(list x) '(cons x nil))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "list-expands-to-nested-cons two-elements"
+  (destructuring-bind (form expected) (list '(list a b) '(cons a (cons b nil)))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "list-expands-to-nested-cons three-elements"
+  (destructuring-bind (form expected) (list '(list a b c) '(cons a (cons b (cons c nil))))
+    (expect expected :to-equal (our-macroexpand-1 form))))
+
+(it-sequential "list-expands-to-nested-cons literals"
+  (destructuring-bind (form expected) (list '(list 1 2 3) '(cons 1 (cons 2 (cons 3 nil))))
+    (expect expected :to-equal (our-macroexpand-1 form))))

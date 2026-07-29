@@ -2,49 +2,45 @@
 
 (in-package :cl-cc/test)
 
-(defsuite vm-dispatch-suite
-  :description "Unit tests for vm-dispatch helpers"
-  :parent cl-cc-unit-suite)
 
-(in-suite vm-dispatch-suite)
 
-(deftest-each vm-classify-arg-primitive
-  "Each primitive type is classified by its CL typecase clause."
-  :cases (("integer" 42      'integer)
-          ("string"  "hello" 'string)
-          ("symbol"  'foo    'symbol))
-  (value expected-class)
-  (assert-eq expected-class (cl-cc/vm::vm-classify-arg value nil)))
+(it-sequential "vm-classify-arg-primitive integer"
+  (destructuring-bind (value expected-class) (list 42 'integer)
+    (expect (cl-cc/vm::vm-classify-arg value nil) :to-be expected-class)))
 
-(deftest vm-classify-arg-hash-table-no-class
-  "A plain hash table with no :__class__ key is classified as T (catch-all)."
+(it-sequential "vm-classify-arg-primitive string"
+  (destructuring-bind (value expected-class) (list "hello" 'string)
+    (expect (cl-cc/vm::vm-classify-arg value nil) :to-be expected-class)))
+
+(it-sequential "vm-classify-arg-primitive symbol"
+  (destructuring-bind (value expected-class) (list 'foo 'symbol)
+    (expect (cl-cc/vm::vm-classify-arg value nil) :to-be expected-class)))
+
+(it-sequential "vm-classify-arg-hash-table-no-class"
   (let ((ht (make-hash-table :test #'eq)))
-    (assert-eq t (cl-cc/vm::vm-classify-arg ht nil))))
+    (expect (cl-cc/vm::vm-classify-arg ht nil) :to-be t)))
 
-(deftest vm-classify-arg-hash-table-with-class
-  "A hash table representing a CLOS instance returns the class name."
+(it-sequential "vm-classify-arg-hash-table-with-class"
   (let* ((class-ht (make-hash-table :test #'eq))
          (obj-ht   (make-hash-table :test #'eq)))
     (setf (gethash :__name__ class-ht) 'my-class)
     (setf (gethash :__class__ obj-ht) class-ht)
-    (assert-eq 'my-class (cl-cc/vm::vm-classify-arg obj-ht nil))))
+    (expect (cl-cc/vm::vm-classify-arg obj-ht nil) :to-be 'my-class)))
 
-(deftest-each vm-generic-function-p
-  "vm-generic-function-p recognises generic functions and rejects non-gf values."
-  :cases (("plain-hash-table"
-           (make-hash-table :test #'eq)
-           (lambda (value)
-             (assert-false (cl-cc/vm::vm-generic-function-p value))))
-          ("integer"
-           99
-           (lambda (value)
-             (assert-false (cl-cc/vm::vm-generic-function-p value))))
-          ("hash-with-methods"
-           (let ((ht (make-hash-table :test #'eq)))
+(it-sequential "vm-generic-function-p plain-hash-table"
+  (destructuring-bind (value verify) (list (make-hash-table :test #'eq) (lambda (value)
+             (expect (cl-cc/vm::vm-generic-function-p value) :to-be-falsy)))
+    (funcall verify value)))
+
+(it-sequential "vm-generic-function-p integer"
+  (destructuring-bind (value verify) (list 99 (lambda (value)
+             (expect (cl-cc/vm::vm-generic-function-p value) :to-be-falsy)))
+    (funcall verify value)))
+
+(it-sequential "vm-generic-function-p hash-with-methods"
+  (destructuring-bind (value verify) (list (let ((ht (make-hash-table :test #'eq)))
              (setf (gethash :__methods__ ht)
                    (make-hash-table :test #'equal))
-             ht)
-           (lambda (value)
-             (assert-true (cl-cc/vm::vm-generic-function-p value)))))
-  (value verify)
-  (funcall verify value))
+             ht) (lambda (value)
+             (expect (cl-cc/vm::vm-generic-function-p value) :to-be-truthy)))
+    (funcall verify value)))

@@ -6,34 +6,42 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Tagged Pointers ───────────────────────────────────────────────────────
 
-(deftest-each rt-tag-fixnum
-  "rt-tag-fixnum shifts left by 3 bits; tag is 000 for fixnum."
-  :cases (("zero"       0   0)
-          ("one"        1   8)
-          ("forty-two"  42  336))
-  (n expected)
-  (assert-= expected (cl-cc/runtime:rt-tag-fixnum n)))
+(it-sequential "rt-tag-fixnum zero"
+  (destructuring-bind (n expected) (list 0 0)
+    (expect (= expected (cl-cc/runtime:rt-tag-fixnum n)) :to-be-truthy)))
 
-(deftest rt-untag-fixnum-roundtrip
-  "rt-untag-fixnum reverses rt-tag-fixnum."
+(it-sequential "rt-tag-fixnum one"
+  (destructuring-bind (n expected) (list 1 8)
+    (expect (= expected (cl-cc/runtime:rt-tag-fixnum n)) :to-be-truthy)))
+
+(it-sequential "rt-tag-fixnum forty-two"
+  (destructuring-bind (n expected) (list 42 336)
+    (expect (= expected (cl-cc/runtime:rt-tag-fixnum n)) :to-be-truthy)))
+
+(it-sequential "rt-untag-fixnum-roundtrip"
   (dolist (n '(0 1 42 -7 1000000))
-    (assert-= n (cl-cc/runtime:rt-untag-fixnum (cl-cc/runtime:rt-tag-fixnum n)))))
+    (expect (= n (cl-cc/runtime:rt-untag-fixnum (cl-cc/runtime:rt-tag-fixnum n))) :to-be-truthy)))
 
-(deftest-each rt-tag-bits-extracts-low-3
-  "rt-tag-bits returns the low 3 bits."
-  :cases (("fixnum-8"  8  0)
-          ("cons-9"    9  1)
-          ("max-15"    15 7)
-          ("plain-5"   5  5))
-  (tagged expected-bits)
-  (assert-= expected-bits (cl-cc/runtime:rt-tag-bits tagged)))
+(it-sequential "rt-tag-bits-extracts-low-3 fixnum-8"
+  (destructuring-bind (tagged expected-bits) (list 8 0)
+    (expect (= expected-bits (cl-cc/runtime:rt-tag-bits tagged)) :to-be-truthy)))
 
-(deftest rt-tag-constants-distinct
-  "All 8 tag constants have distinct values 0-7."
+(it-sequential "rt-tag-bits-extracts-low-3 cons-9"
+  (destructuring-bind (tagged expected-bits) (list 9 1)
+    (expect (= expected-bits (cl-cc/runtime:rt-tag-bits tagged)) :to-be-truthy)))
+
+(it-sequential "rt-tag-bits-extracts-low-3 max-15"
+  (destructuring-bind (tagged expected-bits) (list 15 7)
+    (expect (= expected-bits (cl-cc/runtime:rt-tag-bits tagged)) :to-be-truthy)))
+
+(it-sequential "rt-tag-bits-extracts-low-3 plain-5"
+  (destructuring-bind (tagged expected-bits) (list 5 5)
+    (expect (= expected-bits (cl-cc/runtime:rt-tag-bits tagged)) :to-be-truthy)))
+
+(it-sequential "rt-tag-constants-distinct"
   (let ((tags (list cl-cc/runtime:+tag-fixnum+
                     cl-cc/runtime:+rt-tag-cons+
                     cl-cc/runtime:+rt-tag-symbol+
@@ -42,138 +50,204 @@
                     cl-cc/runtime:+tag-array+
                     cl-cc/runtime:+rt-tag-string+
                     cl-cc/runtime:+tag-other+)))
-    (assert-= 8 (length (remove-duplicates tags)))
-    (dolist (tag tags) (assert-true (and (>= tag 0) (<= tag 7))))))
+    (expect (= 8 (length (remove-duplicates tags))) :to-be-truthy)
+    (dolist (tag tags) (expect (and (>= tag 0) (<= tag 7)) :to-be-truthy))))
 
 ;;; ─── Multiple Values Buffer ────────────────────────────────────────────────
 
-(deftest rt-values-buffer-push-ops
-  "rt-values-clear resets to empty; rt-values-push increments count."
+(it-sequential "rt-values-buffer-push-ops"
   (cl-cc/runtime:rt-values-clear)
-  (assert-= 0 (cl-cc/runtime:rt-values-count))
+  (expect (= 0 (cl-cc/runtime:rt-values-count)) :to-be-truthy)
   (cl-cc/runtime:rt-values-push 10)
   (cl-cc/runtime:rt-values-push 20)
-  (assert-= 2 (cl-cc/runtime:rt-values-count)))
+  (expect (= 2 (cl-cc/runtime:rt-values-count)) :to-be-truthy))
 
-(deftest rt-values-buffer-ref
-  "rt-values-ref retrieves by index."
+(it-sequential "rt-values-buffer-ref"
   (cl-cc/runtime:rt-values-clear)
   (cl-cc/runtime:rt-values-push :a)
   (cl-cc/runtime:rt-values-push :b)
   (cl-cc/runtime:rt-values-push :c)
-  (assert-eq :a (cl-cc/runtime:rt-values-ref 0))
-  (assert-eq :b (cl-cc/runtime:rt-values-ref 1))
-  (assert-eq :c (cl-cc/runtime:rt-values-ref 2)))
+  (expect (cl-cc/runtime:rt-values-ref 0) :to-be :a)
+  (expect (cl-cc/runtime:rt-values-ref 1) :to-be :b)
+  (expect (cl-cc/runtime:rt-values-ref 2) :to-be :c))
 
-(deftest rt-values-buffer-to-list
-  "rt-values-to-list returns the full buffer."
+(it-sequential "rt-values-buffer-to-list"
   (cl-cc/runtime:rt-values-clear)
   (cl-cc/runtime:rt-values-push 1)
   (cl-cc/runtime:rt-values-push 2)
-  (assert-equal '(1 2) (cl-cc/runtime:rt-values-to-list)))
+  (expect (cl-cc/runtime:rt-values-to-list) :to-equal '(1 2)))
 
-(deftest-each rt-spread-values-shapes
-  "rt-spread-values: list spreads all elements; atom pushes one."
-  :cases (("list" '(10 20 30) 3 10)
-          ("atom" 42          1 42))
-  (input expected-count expected-first)
-  (cl-cc/runtime:rt-values-clear)
-  (cl-cc/runtime:rt-spread-values input)
-  (assert-= expected-count (cl-cc/runtime:rt-values-count))
-  (assert-= expected-first (cl-cc/runtime:rt-values-ref 0)))
+(it-sequential "rt-spread-values-shapes list"
+  (destructuring-bind (input expected-count expected-first) (list '(10 20 30) 3 10)
+    (cl-cc/runtime:rt-values-clear) (cl-cc/runtime:rt-spread-values input) (expect (= expected-count (cl-cc/runtime:rt-values-count)) :to-be-truthy) (expect (= expected-first (cl-cc/runtime:rt-values-ref 0)) :to-be-truthy)))
 
-(deftest-each rt-ensure-values-behavior
-  "rt-ensure-values pushes val when empty; is a no-op when buffer already has a value."
-  :cases (("empty"     nil 99 1 99)
-          ("non-empty" 1   99 1 1))
-  (pre-val ensure-val expected-count expected-ref0)
-  (cl-cc/runtime:rt-values-clear)
-  (when pre-val (cl-cc/runtime:rt-values-push pre-val))
-  (cl-cc/runtime:rt-ensure-values ensure-val)
-  (assert-= expected-count (cl-cc/runtime:rt-values-count))
-  (assert-= expected-ref0 (cl-cc/runtime:rt-values-ref 0)))
+(it-sequential "rt-spread-values-shapes atom"
+  (destructuring-bind (input expected-count expected-first) (list 42 1 42)
+    (cl-cc/runtime:rt-values-clear) (cl-cc/runtime:rt-spread-values input) (expect (= expected-count (cl-cc/runtime:rt-values-count)) :to-be-truthy) (expect (= expected-first (cl-cc/runtime:rt-values-ref 0)) :to-be-truthy)))
+
+(it-sequential "rt-ensure-values-behavior empty"
+  (destructuring-bind (pre-val ensure-val expected-count expected-ref0) (list nil 99 1 99)
+    (cl-cc/runtime:rt-values-clear) (when pre-val (cl-cc/runtime:rt-values-push pre-val)) (cl-cc/runtime:rt-ensure-values ensure-val) (expect (= expected-count (cl-cc/runtime:rt-values-count)) :to-be-truthy) (expect (= expected-ref0 (cl-cc/runtime:rt-values-ref 0)) :to-be-truthy)))
+
+(it-sequential "rt-ensure-values-behavior non-empty"
+  (destructuring-bind (pre-val ensure-val expected-count expected-ref0) (list 1 99 1 1)
+    (cl-cc/runtime:rt-values-clear) (when pre-val (cl-cc/runtime:rt-values-push pre-val)) (cl-cc/runtime:rt-ensure-values ensure-val) (expect (= expected-count (cl-cc/runtime:rt-values-count)) :to-be-truthy) (expect (= expected-ref0 (cl-cc/runtime:rt-values-ref 0)) :to-be-truthy)))
 
 ;;; ─── Closure Support ───────────────────────────────────────────────────────
 
-(deftest rt-make-closure-creates-struct
-  "rt-make-closure returns an rt-closure-obj."
+(it-sequential "rt-make-closure-creates-struct"
   (let ((c (cl-cc/runtime:rt-make-closure #'identity '(1 2 3))))
-    (assert-true (cl-cc/runtime::rt-closure-obj-p c))))
+    (expect (cl-cc/runtime::rt-closure-obj-p c) :to-be-truthy)))
 
-(deftest rt-closure-ref-accesses-env
-  "rt-closure-ref retrieves captured values by index."
+(it-sequential "rt-closure-ref-accesses-env"
   (let ((c (cl-cc/runtime:rt-make-closure #'identity '(a b c))))
-    (assert-eq 'a (cl-cc/runtime:rt-closure-ref c 0))
-    (assert-eq 'b (cl-cc/runtime:rt-closure-ref c 1))
-    (assert-eq 'c (cl-cc/runtime:rt-closure-ref c 2))))
+    (expect (cl-cc/runtime:rt-closure-ref c 0) :to-be 'a)
+    (expect (cl-cc/runtime:rt-closure-ref c 1) :to-be 'b)
+    (expect (cl-cc/runtime:rt-closure-ref c 2) :to-be 'c)))
 
-(deftest-each rt-call-fn-dispatch
-  "rt-call-fn dispatches uniformly to closures and plain functions."
-  :cases (("closure"  (cl-cc/runtime:rt-make-closure (lambda (x) (* x 2)) nil) '(5)   10)
-          ("plain-fn" #'+                                                         '(3 4)  7))
-  (fn args expected)
-  (assert-= expected (apply #'cl-cc/runtime:rt-call-fn fn args)))
+(it-sequential "rt-call-fn-dispatch closure"
+  (destructuring-bind (fn args expected) (list (cl-cc/runtime:rt-make-closure (lambda (x) (* x 2)) nil) '(5) 10)
+    (expect (= expected (apply #'cl-cc/runtime:rt-call-fn fn args)) :to-be-truthy)))
 
-(deftest-each rt-apply-fn-dispatch
-  "rt-apply-fn applies args list uniformly to closures and plain functions."
-  :cases (("closure"  (cl-cc/runtime:rt-make-closure (lambda (a b) (+ a b)) nil) '(10 5) 15)
-          ("plain-fn" #'*                                                          '(2 3)   6))
-  (fn args expected)
-  (assert-= expected (cl-cc/runtime:rt-apply-fn fn args)))
+(it-sequential "rt-call-fn-dispatch plain-fn"
+  (destructuring-bind (fn args expected) (list #'+ '(3 4) 7)
+    (expect (= expected (apply #'cl-cc/runtime:rt-call-fn fn args)) :to-be-truthy)))
 
-(deftest rt-next-method-absent
-  "With no method stack: rt-next-method-p returns nil; rt-call-next-method signals error."
-  (assert-false  (cl-cc/runtime:rt-next-method-p))
-  (assert-signals error (cl-cc/runtime:rt-call-next-method)))
+(it-sequential "rt-apply-fn-dispatch closure"
+  (destructuring-bind (fn args expected) (list (cl-cc/runtime:rt-make-closure (lambda (a b) (+ a b)) nil) '(10 5) 15)
+    (expect (= expected (cl-cc/runtime:rt-apply-fn fn args)) :to-be-truthy)))
+
+(it-sequential "rt-apply-fn-dispatch plain-fn"
+  (destructuring-bind (fn args expected) (list #'* '(2 3) 6)
+    (expect (= expected (cl-cc/runtime:rt-apply-fn fn args)) :to-be-truthy)))
+
+(it-sequential "rt-next-method-absent"
+  (expect (cl-cc/runtime:rt-next-method-p) :to-be-falsy)
+  (signals error (cl-cc/runtime:rt-call-next-method)))
 
 ;;; ─── Type Predicates (1/0 return convention) ───────────────────────────────
 
-(deftest-each rt-type-predicates
-  "Runtime type predicates return 1 for match, 0 otherwise."
-  :cases (("consp-t"      #'cl-cc/runtime:rt-consp     '(1 . 2)  1)
-          ("consp-f"      #'cl-cc/runtime:rt-consp     42         0)
-          ("null-p-t"     #'cl-cc/runtime:rt-null-p    nil        1)
-          ("null-p-f"     #'cl-cc/runtime:rt-null-p    42         0)
-          ("symbolp-t"    #'cl-cc/runtime:rt-symbolp   'foo       1)
-          ("symbolp-f"    #'cl-cc/runtime:rt-symbolp   42         0)
-          ("numberp-t"    #'cl-cc/runtime:rt-numberp   3.14       1)
-          ("numberp-f"    #'cl-cc/runtime:rt-numberp   "hi"       0)
-          ("integerp-t"   #'cl-cc/runtime:rt-integerp  42         1)
-          ("integerp-f"   #'cl-cc/runtime:rt-integerp  3.14       0)
-          ("floatp-t"     #'cl-cc/runtime:rt-floatp    1.0        1)
-          ("floatp-f"     #'cl-cc/runtime:rt-floatp    1          0)
-          ("stringp-t"    #'cl-cc/runtime:rt-stringp   "hi"       1)
-          ("stringp-f"    #'cl-cc/runtime:rt-stringp   42         0)
-          ("characterp-t" #'cl-cc/runtime:rt-characterp #\a       1)
-          ("characterp-f" #'cl-cc/runtime:rt-characterp 42        0)
-          ("vectorp-t"    #'cl-cc/runtime:rt-vectorp   #(1 2)     1)
-          ("vectorp-f"    #'cl-cc/runtime:rt-vectorp   42         0)
-          ("listp-t"      #'cl-cc/runtime:rt-listp     '(1)       1)
-          ("listp-nil"    #'cl-cc/runtime:rt-listp     nil         1)
-          ("listp-f"      #'cl-cc/runtime:rt-listp     42         0)
-          ("atomp-t"      #'cl-cc/runtime:rt-atomp     42         1)
-          ("atomp-f"      #'cl-cc/runtime:rt-atomp     '(1)       0)
-          ("keywordp-t"   #'cl-cc/runtime:rt-keywordp  :foo       1)
-          ("keywordp-f"   #'cl-cc/runtime:rt-keywordp  'foo       0)
-          ("hash-t"       #'cl-cc/runtime:rt-hash-table-p (make-hash-table) 1)
-          ("hash-f"       #'cl-cc/runtime:rt-hash-table-p 42      0))
-  (pred-fn input expected)
-  (assert-= expected (funcall pred-fn input)))
+(it-sequential "rt-type-predicates consp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-consp '(1 . 2) 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
 
-(deftest rt-functionp-closure
-  "rt-functionp returns 1 for closure objects too."
+(it-sequential "rt-type-predicates consp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-consp 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates null-p-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-null-p nil 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates null-p-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-null-p 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates symbolp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-symbolp 'foo 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates symbolp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-symbolp 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates numberp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-numberp 3.14 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates numberp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-numberp "hi" 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates integerp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-integerp 42 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates integerp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-integerp 3.14 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates floatp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-floatp 1.0 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates floatp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-floatp 1 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates stringp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-stringp "hi" 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates stringp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-stringp 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates characterp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-characterp #\a 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates characterp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-characterp 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates vectorp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-vectorp #(1 2) 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates vectorp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-vectorp 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates listp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-listp '(1) 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates listp-nil"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-listp nil 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates listp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-listp 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates atomp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-atomp 42 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates atomp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-atomp '(1) 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates keywordp-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-keywordp :foo 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates keywordp-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-keywordp 'foo 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates hash-t"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-hash-table-p (make-hash-table) 1)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-type-predicates hash-f"
+  (destructuring-bind (pred-fn input expected) (list #'cl-cc/runtime:rt-hash-table-p 42 0)
+    (expect (= expected (funcall pred-fn input)) :to-be-truthy)))
+
+(it-sequential "rt-functionp-closure"
   (let ((c (cl-cc/runtime:rt-make-closure #'identity nil)))
-    (assert-= 1 (cl-cc/runtime:rt-functionp c))))
+    (expect (= 1 (cl-cc/runtime:rt-functionp c)) :to-be-truthy)))
 
-(deftest-each rt-typep-integer
-  "rt-typep checks CL type by name."
-  :cases (("match"    42   'integer 1)
-          ("no-match" "hi" 'integer 0))
-  (val type expected)
-  (assert-= expected (cl-cc/runtime:rt-typep val type)))
+(it-sequential "rt-typep-integer match"
+  (destructuring-bind (val type expected) (list 42 'integer 1)
+    (expect (= expected (cl-cc/runtime:rt-typep val type)) :to-be-truthy)))
 
-(deftest rt-type-of-integer
-  "rt-type-of returns the CL type."
+(it-sequential "rt-typep-integer no-match"
+  (destructuring-bind (val type expected) (list "hi" 'integer 0)
+    (expect (= expected (cl-cc/runtime:rt-typep val type)) :to-be-truthy)))
+
+(it-sequential "rt-type-of-integer"
   (let ((ty (cl-cc/runtime:rt-type-of 42)))
-    (assert-true (subtypep ty 'integer))))
+    (expect (subtypep ty 'integer) :to-be-truthy)))
 

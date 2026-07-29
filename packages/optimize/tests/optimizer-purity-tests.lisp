@@ -6,7 +6,6 @@
 ;;;; recursive → not pure, two-function chain, multi-hop purity).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,86 +29,72 @@
 
 ;;; ─── opt-function-body-transitively-pure-p ───────────────────────────────────
 
-(deftest opt-body-pure-empty
-  "Empty body is trivially pure."
-  (assert-true
-   (cl-cc/optimize::opt-function-body-transitively-pure-p
+(it-sequential "opt-body-pure-empty"
+  (expect (cl-cc/optimize::opt-function-body-transitively-pure-p
     nil
     (%make-func-defs)
     (make-hash-table :test #'eq)
-    (%make-pure-labels))))
+    (%make-pure-labels)) :to-be-truthy))
 
-(deftest opt-body-pure-arithmetic-only
-  "Body containing only arithmetic + vm-ret is pure."
+(it-sequential "opt-body-pure-arithmetic-only"
   (let ((body (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                     (make-vm-ret :reg :r2))))
-    (assert-true
-     (cl-cc/optimize::opt-function-body-transitively-pure-p
+    (expect (cl-cc/optimize::opt-function-body-transitively-pure-p
       body
       (%make-func-defs)
       (make-hash-table :test #'eq)
-      (%make-pure-labels)))))
+      (%make-pure-labels)) :to-be-truthy)))
 
-(deftest opt-body-pure-const-and-move
-  "Body with vm-const and vm-move is pure."
+(it-sequential "opt-body-pure-const-and-move"
   (let ((body (list (make-vm-const :dst :r0 :value 42)
                     (make-vm-move  :dst :r1 :src :r0)
                     (make-vm-ret   :reg :r1))))
-    (assert-true
-     (cl-cc/optimize::opt-function-body-transitively-pure-p
+    (expect (cl-cc/optimize::opt-function-body-transitively-pure-p
       body
       (%make-func-defs)
       (make-hash-table :test #'eq)
-      (%make-pure-labels)))))
+      (%make-pure-labels)) :to-be-truthy)))
 
-(deftest opt-body-impure-unknown-call
-  "Unknown vm-call (func-reg not tracked) makes body impure."
+(it-sequential "opt-body-impure-unknown-call"
   (let ((body (list (make-vm-call :dst :r1 :func :r0 :args nil)
                     (make-vm-ret  :reg :r1))))
-    (assert-null
-     (cl-cc/optimize::opt-function-body-transitively-pure-p
+    (expect (cl-cc/optimize::opt-function-body-transitively-pure-p
       body
       (%make-func-defs)
       (make-hash-table :test #'eq)
-      (%make-pure-labels)))))
+      (%make-pure-labels)) :to-be-null)))
 
-(deftest opt-body-impure-known-call-not-pure
-  "vm-call to a known callee that is NOT in pure-labels makes body impure."
+(it-sequential "opt-body-impure-known-call-not-pure"
   (let* ((callee-label "callee-fn")
          (closure (make-vm-closure :dst :r0 :label callee-label :params nil :captured nil))
          (call    (make-vm-call :dst :r1 :func :r0 :args nil))
          (ret     (make-vm-ret :reg :r1))
          (fdefs   (%make-func-defs callee-label (list ret))))
-    (assert-null
-     (cl-cc/optimize::opt-function-body-transitively-pure-p
+    (expect (cl-cc/optimize::opt-function-body-transitively-pure-p
       (list closure call ret)
       fdefs
       (make-hash-table :test #'eq)
-      (%make-pure-labels)))))   ; callee NOT in pure-labels
+      (%make-pure-labels)) :to-be-null)))   ; callee NOT in pure-labels
 
-(deftest opt-body-pure-known-call-pure
-  "vm-call to a known callee that IS in pure-labels keeps body pure."
+(it-sequential "opt-body-pure-known-call-pure"
   (let* ((callee-label "pure-callee")
          (closure (make-vm-closure :dst :r0 :label callee-label :params nil :captured nil))
          (call    (make-vm-call :dst :r1 :func :r0 :args nil))
          (ret     (make-vm-ret :reg :r1))
          (fdefs   (%make-func-defs callee-label (list ret))))
-    (assert-true
-     (cl-cc/optimize::opt-function-body-transitively-pure-p
+    (expect (cl-cc/optimize::opt-function-body-transitively-pure-p
       (list closure call ret)
       fdefs
       (make-hash-table :test #'eq)
-      (%make-pure-labels callee-label)))))   ; callee IS in pure-labels
+      (%make-pure-labels callee-label)) :to-be-truthy)))   ; callee IS in pure-labels
 
 ;;; ─── opt-infer-transitive-function-purity ────────────────────────────────────
 
-(deftest opt-infer-purity-empty-program
-  "Empty instruction list yields an empty pure-labels set."
+(it-sequential "opt-infer-purity-empty-program"
   (let ((pure (cl-cc/optimize::opt-infer-transitive-function-purity nil)))
-    (assert-= 0 (hash-table-count pure))))
+    (expect (= 0 (hash-table-count pure)) :to-be-truthy)))
 
-(deftest opt-infer-purity-pure-leaf-function
-  "A single arithmetic-only function is inferred pure."
+(it-sequential "opt-infer-purity-pure-leaf-function"
   (let* ((body   (list (make-vm-add :dst :r1 :lhs :r0 :rhs :r0)
                        (make-vm-ret :reg :r1)))
          (label  "add-fn")
@@ -120,10 +105,9 @@
                        (make-vm-ret   :reg :r1))))
     (declare (ignore body))
     (let ((pure (cl-cc/optimize::opt-infer-transitive-function-purity insts)))
-      (assert-true (gethash label pure)))))
+      (expect (gethash label pure) :to-be-truthy))))
 
-(deftest opt-infer-purity-recursive-not-pure
-  "A directly self-recursive function is NOT inferred pure."
+(it-sequential "opt-infer-purity-recursive-not-pure"
   (let* ((label "rec-fn")
          (insts (list (make-vm-closure :dst :r0 :label label :params '(:r0) :captured nil)
                       (make-vm-label  :name label)
@@ -132,11 +116,9 @@
                       (make-vm-call   :dst :r2 :func :r1 :args nil)
                       (make-vm-ret    :reg :r2))))
     (let ((pure (cl-cc/optimize::opt-infer-transitive-function-purity insts)))
-      (assert-null (gethash label pure)))))
+      (expect (gethash label pure) :to-be-null))))
 
-(deftest opt-infer-purity-callee-then-caller
-  "When callee is pure, caller that only calls callee is also inferred pure."
-  :tags '(:fr-152)
+(it-sequential "opt-infer-purity-callee-then-caller"
   (let* ((callee-label "callee")
          (caller-label "caller")
          (insts (list
@@ -152,12 +134,10 @@
                  (make-vm-call    :dst :r4 :func :r3 :args nil)
                  (make-vm-ret     :reg :r4))))
     (let ((pure (cl-cc/optimize::opt-infer-transitive-function-purity insts)))
-      (assert-true  (gethash callee-label pure))
-      (assert-true  (gethash caller-label pure)))))
+      (expect (gethash callee-label pure) :to-be-truthy)
+      (expect (gethash caller-label pure) :to-be-truthy))))
 
-(deftest fr-152-infer-purity-multi-hop-chain
-  "FR-152: purity propagates transitively across a multi-hop direct-call chain."
-  :tags '(:fr-152)
+(it-sequential "fr-152-infer-purity-multi-hop-chain"
   (let* ((leaf-label "fr152-leaf")
          (middle-label "fr152-middle")
          (root-label "fr152-root")
@@ -180,12 +160,11 @@
                  (make-vm-call    :dst :r5 :func :r4 :args '(:r0))
                  (make-vm-ret     :reg :r5))))
     (let ((pure (cl-cc/optimize::opt-infer-transitive-function-purity insts)))
-      (assert-true (gethash leaf-label pure))
-      (assert-true (gethash middle-label pure))
-      (assert-true (gethash root-label pure)))))
+      (expect (gethash leaf-label pure) :to-be-truthy)
+      (expect (gethash middle-label pure) :to-be-truthy)
+      (expect (gethash root-label pure) :to-be-truthy))))
 
-(deftest opt-infer-purity-mutually-recursive-not-pure
-  "Mutually recursive functions are not inferred pure."
+(it-sequential "opt-infer-purity-mutually-recursive-not-pure"
   (let* ((even-label "even-fn")
          (odd-label  "odd-fn")
          (insts (list
@@ -200,13 +179,12 @@
                  (make-vm-call    :dst :r4 :func :r3 :args nil)
                  (make-vm-ret     :reg :r4))))
     (let ((pure (cl-cc/optimize::opt-infer-transitive-function-purity insts)))
-      (assert-null (gethash even-label pure))
-      (assert-null (gethash odd-label  pure)))))
+      (expect (gethash even-label pure) :to-be-null)
+      (expect (gethash odd-label  pure) :to-be-null))))
 
 ;;; ─── opt-pass-pure-call-optimization ─────────────────────────────────────────
 
-(deftest opt-pass-pure-call-reuses-repeated-known-direct-call
-  "Repeated known-pure direct calls in one straight-line region reuse the first result."
+(it-sequential "opt-pass-pure-call-reuses-repeated-known-direct-call"
   (let* ((callee-label "pure-square")
          (insts (list (make-vm-closure :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label   :name callee-label)
@@ -218,16 +196,14 @@
                       (make-vm-call    :dst :r4 :func :r2 :args '(:r0))
                       (make-vm-ret     :reg :r4)))
          (optimized (cl-cc/optimize::opt-pass-pure-call-optimization insts)))
-    (assert-= 1 (%count-inst-type optimized 'vm-call))
-    (assert-true
-     (some (lambda (inst)
+    (expect (= 1 (%count-inst-type optimized 'vm-call)) :to-be-truthy)
+    (expect (some (lambda (inst)
              (and (typep inst 'vm-move)
                   (eq (vm-dst inst) :r4)
                   (eq (vm-src inst) :r3)))
-           optimized))))
+           optimized) :to-be-truthy)))
 
-(deftest opt-pass-pure-call-keeps-impure-direct-call
-  "Known direct calls are not reused when the callee body is impure."
+(it-sequential "opt-pass-pure-call-keeps-impure-direct-call"
   (let* ((callee-label "impure-fn")
          (insts (list (make-vm-closure    :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label      :name callee-label)
@@ -239,17 +215,14 @@
                       (make-vm-call       :dst :r4 :func :r2 :args '(:r0))
                       (make-vm-ret        :reg :r4)))
          (optimized (cl-cc/optimize::opt-pass-pure-call-optimization insts)))
-    (assert-= 2 (%count-inst-type optimized 'vm-call))
-    (assert-false
-     (some (lambda (inst)
+    (expect (= 2 (%count-inst-type optimized 'vm-call)) :to-be-truthy)
+    (expect (some (lambda (inst)
              (and (typep inst 'vm-move)
                   (eq (vm-dst inst) :r4)
                   (eq (vm-src inst) :r3)))
-           optimized))))
+           optimized) :to-be-falsy)))
 
-(deftest opt-pass-pure-call-removes-dead-known-direct-call
-  "Known-pure direct calls with unused destinations are removed conservatively."
-  :tags '(:fr-152)
+(it-sequential "opt-pass-pure-call-removes-dead-known-direct-call"
   (let* ((callee-label "pure-inc")
          (insts (list (make-vm-closure :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label   :name callee-label)
@@ -260,16 +233,13 @@
                       (make-vm-call    :dst :r3 :func :r2 :args '(:r0))
                       (make-vm-ret     :reg :r0)))
          (optimized (cl-cc/optimize::opt-pass-pure-call-optimization insts)))
-    (assert-= 0 (%count-inst-type optimized 'vm-call))
-    (assert-true
-      (some (lambda (inst)
+    (expect (= 0 (%count-inst-type optimized 'vm-call)) :to-be-truthy)
+    (expect (some (lambda (inst)
               (and (typep inst 'vm-ret)
                    (eq (vm-reg inst) :r0)))
-            optimized))))
+            optimized) :to-be-truthy)))
 
-(deftest fr-152-pure-call-pass-reuses-transitively-pure-caller
-  "FR-152: repeated calls to a caller inferred pure through its callee are CSE'd."
-  :tags '(:fr-152)
+(it-sequential "fr-152-pure-call-pass-reuses-transitively-pure-caller"
   (let* ((callee-label "fr152-pure-callee")
          (caller-label "fr152-pure-caller")
          (insts (list
@@ -291,16 +261,14 @@
                  (make-vm-call    :dst :r4 :func :r2 :args '(:r0))
                  (make-vm-ret     :reg :r4)))
          (optimized (cl-cc/optimize::opt-pass-pure-call-optimization insts)))
-    (assert-= 2 (%count-inst-type optimized 'vm-call))
-    (assert-true
-     (some (lambda (inst)
+    (expect (= 2 (%count-inst-type optimized 'vm-call)) :to-be-truthy)
+    (expect (some (lambda (inst)
              (and (typep inst 'vm-move)
                   (eq (vm-dst inst) :r4)
                   (eq (vm-src inst) :r3)))
-           optimized))))
+           optimized) :to-be-truthy)))
 
-(deftest opt-pass-pure-call-does-not-reuse-when-dst-overwrites-arg-register
-  "A pure direct call is not memoized when its destination overwrites one of its argument registers."
+(it-sequential "opt-pass-pure-call-does-not-reuse-when-dst-overwrites-arg-register"
   (let* ((callee-label "pure-self")
          (insts (list (make-vm-closure :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label   :name callee-label)
@@ -312,16 +280,14 @@
                       (make-vm-call    :dst :r3 :func :r2 :args '(:r0))
                       (make-vm-ret     :reg :r3)))
          (optimized (cl-cc/optimize::opt-pass-pure-call-optimization insts)))
-    (assert-= 2 (%count-inst-type optimized 'vm-call))
-    (assert-false
-     (some (lambda (inst)
+    (expect (= 2 (%count-inst-type optimized 'vm-call)) :to-be-truthy)
+    (expect (some (lambda (inst)
              (and (typep inst 'vm-move)
                   (eq (vm-dst inst) :r3)
                   (eq (vm-src inst) :r0)))
-           optimized))))
+           optimized) :to-be-falsy)))
 
-(deftest optimize-instructions-pass-pipeline-runs-pure-call-optimization
-  "optimize-instructions can run the pure-call pass by keyword pipeline selection."
+(it-sequential "optimize-instructions-pass-pipeline-runs-pure-call-optimization"
   (let* ((callee-label "pure-double")
          (insts (list (make-vm-closure :dst :r9 :label callee-label :params '(:r0) :captured nil)
                       (make-vm-label   :name callee-label)
@@ -336,10 +302,9 @@
                      insts
                      :max-iterations 1
                      :pass-pipeline '(:pure-call-optimization))))
-    (assert-= 1 (%count-inst-type optimized 'vm-call))
-    (assert-true
-     (some (lambda (inst)
+    (expect (= 1 (%count-inst-type optimized 'vm-call)) :to-be-truthy)
+    (expect (some (lambda (inst)
              (and (typep inst 'vm-move)
                   (eq (vm-dst inst) :r4)
                   (eq (vm-src inst) :r3)))
-           optimized))))
+           optimized) :to-be-truthy)))

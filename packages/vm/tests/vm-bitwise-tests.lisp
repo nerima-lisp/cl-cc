@@ -2,11 +2,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite vm-bitwise-suite
-  :description "Unit tests for src/vm/vm-bitwise.lisp"
-  :parent cl-cc-unit-suite)
 
-(in-suite vm-bitwise-suite)
 
 (defun %make-unary (ctor src)
   (let ((s (make-test-vm)))
@@ -28,58 +24,91 @@
     (exec1 (funcall ctor :dst 0 :lhs 1 :rhs 2) s)
     (cl-cc:vm-reg-get s 0)))
 
-(deftest-each vm-bitwise-binary
-  "Bitwise binary operations compute correct results."
-  :cases (("logand"    #'cl-cc:make-vm-logand  #xFF #x0F  #x0F)
-          ("logior"    #'cl-cc:make-vm-logior  #xF0 #x0F  #xFF)
-          ("logxor"    #'cl-cc:make-vm-logxor  #xFF #x0F  #xF0)
-          ("logeqv"    #'cl-cc:make-vm-logeqv  #xFF #xFF  -1)
-          ("ash-left"  #'cl-cc:make-vm-ash     1    4     16)
-          ("ash-right" #'cl-cc:make-vm-ash     16   -2    4)
-          ("expt-2^10" #'cl-cc:make-vm-expt    2    10    1024))
-  (ctor lhs rhs expected)
-  (assert-= expected (%make-binary ctor lhs rhs)))
+(it-sequential "vm-bitwise-binary logand"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logand #xFF #x0F #x0F)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
 
-(deftest-each vm-bitwise-unary
-  "Bitwise unary operations compute correct results."
-  :cases (("lognot-0"    #'cl-cc:make-vm-lognot         0          -1)
-          ("bswap-1234"  #'cl-cc:make-vm-bswap          #x12345678 #x78563412)
-          ("lognot-ff"   #'cl-cc:make-vm-lognot         #xFF       (lognot #xFF))
-          ("logcount-7"  #'cl-cc:make-vm-logcount        7          3)
-          ("logcount-0"  #'cl-cc:make-vm-logcount        0          0)
-          ("intlen-0"    #'cl-cc:make-vm-integer-length  0          0)
-          ("intlen-255"  #'cl-cc:make-vm-integer-length  255        8))
-  (ctor src expected)
-  (assert-= expected (%make-unary ctor src)))
+(it-sequential "vm-bitwise-binary logior"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logior #xF0 #x0F #xFF)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
 
-(deftest-each vm-bitwise-pred
-  "Bitwise predicate instructions return 1/0."
-  :cases (("logtest-true"    #'cl-cc:make-vm-logtest   #xFF #x01  1)
-          ("logtest-false"   #'cl-cc:make-vm-logtest   #xF0 #x0F  0)
-          ("logbitp-set"     #'cl-cc:make-vm-logbitp   0    1      1)
-          ("logbitp-clear"   #'cl-cc:make-vm-logbitp   1    1      0))
-  (ctor lhs rhs expected)
-  (assert-= expected (%make-pred2 ctor lhs rhs)))
+(it-sequential "vm-bitwise-binary logxor"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logxor #xFF #x0F #xF0)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
 
-(deftest vm-mul-high-64-semantics
-  "Multiply-high instructions truncate inputs to 64 bits and return the high 64-bit word with unsigned/signed semantics."
-  (assert-equal 1
-                (%make-binary #'cl-cc:make-vm-integer-mul-high-u
+(it-sequential "vm-bitwise-binary logeqv"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logeqv #xFF #xFF -1)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-binary ash-left"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-ash 1 4 16)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-binary ash-right"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-ash 16 -2 4)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-binary expt-2^10"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-expt 2 10 1024)
+    (expect (= expected (%make-binary ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary lognot-0"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-lognot 0 -1)
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary bswap-1234"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-bswap #x12345678 #x78563412)
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary lognot-ff"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-lognot #xFF (lognot #xFF))
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary logcount-7"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-logcount 7 3)
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary logcount-0"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-logcount 0 0)
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary intlen-0"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-integer-length 0 0)
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-unary intlen-255"
+  (destructuring-bind (ctor src expected) (list #'cl-cc:make-vm-integer-length 255 8)
+    (expect (= expected (%make-unary ctor src)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-pred logtest-true"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logtest #xFF #x01 1)
+    (expect (= expected (%make-pred2 ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-pred logtest-false"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logtest #xF0 #x0F 0)
+    (expect (= expected (%make-pred2 ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-pred logbitp-set"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logbitp 0 1 1)
+    (expect (= expected (%make-pred2 ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-bitwise-pred logbitp-clear"
+  (destructuring-bind (ctor lhs rhs expected) (list #'cl-cc:make-vm-logbitp 1 1 0)
+    (expect (= expected (%make-pred2 ctor lhs rhs)) :to-be-truthy)))
+
+(it-sequential "vm-mul-high-64-semantics"
+  (expect (%make-binary #'cl-cc:make-vm-integer-mul-high-u
                               #xFFFFFFFFFFFFFFFF
-                              2))
-  (assert-equal 0
-                (%make-binary #'cl-cc:make-vm-integer-mul-high-u
+                              2) :to-equal 1)
+  (expect (%make-binary #'cl-cc:make-vm-integer-mul-high-u
                               (ash 1 64)
-                              5))
-  (assert-equal -1
-                (%make-binary #'cl-cc:make-vm-integer-mul-high-s
+                              5) :to-equal 0)
+  (expect (%make-binary #'cl-cc:make-vm-integer-mul-high-s
                               -1
-                              2))
-  (assert-equal -1
-                (%make-binary #'cl-cc:make-vm-integer-mul-high-s
+                              2) :to-equal -1)
+  (expect (%make-binary #'cl-cc:make-vm-integer-mul-high-s
                               #xFFFFFFFFFFFFFFFF
-                              2))
-  (assert-equal -1
-                (%make-binary #'cl-cc:make-vm-integer-mul-high-s
+                              2) :to-equal -1)
+  (expect (%make-binary #'cl-cc:make-vm-integer-mul-high-s
                               (- (ash 1 63))
-                              2)))
+                              2) :to-equal -1))

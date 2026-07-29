@@ -8,7 +8,6 @@
         :cl-cc/bootstrap
         :cl-cc/ast
         :cl-cc/parse
-        :cl-cc/php
         :cl-cc/optimize
         :cl-cc/emit
         :cl-cc/expand

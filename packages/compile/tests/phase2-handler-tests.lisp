@@ -12,34 +12,32 @@
 
 (in-package :cl-cc/test)
 
-(defsuite phase2-handler-suite
-  :description "Phase 2 builtin handler dispatch (AST-introspecting builtins)"
-  :parent cl-cc-codegen-unit-serial-suite)
 
-(in-suite phase2-handler-suite)
 
 ;;; ── MAKE-HASH-TABLE ───────────────────────────────────────────────────────
 
-(deftest-each phase2-make-hash-table-variants
-  "make-hash-table emits vm-make-hash-table across all :test forms"
-  :cases (("no-test"
-           (lambda ()
+(it-sequential "phase2-make-hash-table-variants no-test"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-hash-table) ctx)
-               (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table)))))
-         ("quoted-test"
-           (lambda ()
+               (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table) :to-be-truthy))))
+    (funcall scenario)))
+
+(it-sequential "phase2-make-hash-table-variants quoted-test"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-hash-table
                                        (make-var :test)
                                        (make-quoted 'equal))
                             ctx)
                (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table)))
-                 (assert-true inst)
+                 (expect inst :to-be-truthy)
                  ;; test-reg should be non-nil — a register was allocated for the test sym
-                 (assert-true (cl-cc::vm-make-hash-table-test inst))))))
-          ("var-test"
-            (lambda ()
+                 (expect (cl-cc::vm-make-hash-table-test inst) :to-be-truthy)))))
+    (funcall scenario)))
+
+(it-sequential "phase2-make-hash-table-variants var-test"
+  (destructuring-bind (scenario) (list (lambda ()
               (let ((ctx (make-codegen-ctx)))
                 (compile-ast (make-ast-let
                               :bindings (list (cons 'equal (make-quoted 'equal)))
@@ -48,130 +46,128 @@
                                                      (make-var 'equal))))
                              ctx)
                 (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table)))
-                  (assert-true inst)
-                  (assert-true (cl-cc::vm-make-hash-table-test inst))))))
-         ("function-test"
-           (lambda ()
+                  (expect inst :to-be-truthy)
+                  (expect (cl-cc::vm-make-hash-table-test inst) :to-be-truthy)))))
+    (funcall scenario)))
+
+(it-sequential "phase2-make-hash-table-variants function-test"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-hash-table
                                        (make-var :test)
                                        (make-fn 'equal))
                             ctx)
-               (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table))))))
-  (scenario)
-  (funcall scenario))
+               (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-hash-table) :to-be-truthy))))
+    (funcall scenario)))
 
 ;;; ── GETHASH ───────────────────────────────────────────────────────────────
 
-(deftest phase2-gethash-arities
-  "gethash emits vm-gethash with correct default slot for 2 and 3 args"
+(it-sequential "phase2-gethash-arities"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'gethash (make-quoted 'k) (make-quoted 'ht)) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-gethash)))
-      (assert-true inst)
-      (assert-true (null (cl-cc::vm-gethash-default inst)))))
+      (expect inst :to-be-truthy)
+      (expect (null (cl-cc::vm-gethash-default inst)) :to-be-truthy)))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'gethash
                             (make-quoted 'k) (make-quoted 'ht) (make-int 0))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-gethash)))
-      (assert-true inst)
-      (assert-true (cl-cc::vm-gethash-default inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-gethash-default inst) :to-be-truthy))))
 
 ;;; ── MAPHASH ───────────────────────────────────────────────────────────────
 
-(deftest phase2-maphash-codegen
-  "(maphash fn ht) emits hash-table-keys, a vm-call, and returns nil"
+(it-sequential "phase2-maphash-codegen"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'maphash (make-quoted 'fn) (make-quoted 'ht)) ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-hash-table-keys))
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-call))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-hash-table-keys) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
     ;; Last emitted const before halt should be nil (the return value)
     (let ((consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const))
                                   (codegen-instructions ctx))))
-      (assert-true (some (lambda (i) (null (cl-cc::vm-const-value i))) consts)))))
+      (expect (some (lambda (i) (null (cl-cc::vm-const-value i))) consts) :to-be-truthy))))
 
 ;;; ── MAKE-ARRAY / MAKE-ADJUSTABLE-VECTOR ──────────────────────────────────
 
-(deftest-each phase2-make-array-variants
-  "make-array and make-adjustable-vector emit vm-make-array with correct flags"
-  :cases (("fixed-array-emits-inst"
-           (lambda ()
+(it-sequential "phase2-make-array-variants fixed-array-emits-inst"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-array (make-int 10)) ctx)
-               (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))))
-         ("fixed-array-not-adjustable"
-           (lambda ()
+               (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy))))
+    (funcall scenario)))
+
+(it-sequential "phase2-make-array-variants fixed-array-not-adjustable"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-array (make-int 10)) ctx)
                (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))
-                 (assert-true (null (cl-cc::vm-make-array-fill-pointer inst)))
-                 (assert-true (null (cl-cc::vm-make-array-adjustable inst)))))))
-         ("adjustable-vector-emits-inst"
-           (lambda ()
+                 (expect (null (cl-cc::vm-make-array-fill-pointer inst)) :to-be-truthy)
+                 (expect (null (cl-cc::vm-make-array-adjustable inst)) :to-be-truthy)))))
+    (funcall scenario)))
+
+(it-sequential "phase2-make-array-variants adjustable-vector-emits-inst"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-adjustable-vector (make-int 10)) ctx)
-               (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))))
-         ("adjustable-vector-is-adjustable"
-           (lambda ()
+               (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy))))
+    (funcall scenario)))
+
+(it-sequential "phase2-make-array-variants adjustable-vector-is-adjustable"
+  (destructuring-bind (scenario) (list (lambda ()
              (let ((ctx (make-codegen-ctx)))
                (compile-ast (make-call 'make-adjustable-vector (make-int 10)) ctx)
                (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-array)))
-                 (assert-true (cl-cc::vm-make-array-fill-pointer inst))
-                 (assert-true (cl-cc::vm-make-array-adjustable inst)))))))
-  (scenario)
-  (funcall scenario))
+                 (expect (cl-cc::vm-make-array-fill-pointer inst) :to-be-truthy)
+                 (expect (cl-cc::vm-make-array-adjustable inst) :to-be-truthy)))))
+    (funcall scenario)))
 
 ;;; ── ARRAY-ROW-MAJOR-INDEX ────────────────────────────────────────────────
 
-(deftest phase2-array-row-major-index
-  "array-row-major-index emits the instruction and builds a cons chain for subscripts"
+(it-sequential "phase2-array-row-major-index"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'array-row-major-index (make-int 10) (make-int 0)) ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-array-row-major-index)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-array-row-major-index) :to-be-truthy))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'array-row-major-index
                             (make-int 10) (make-int 0) (make-int 1))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-array-row-major-index)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-array-row-major-index) :to-be-truthy))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'array-row-major-index
                             (make-int 10) (make-int 2) (make-int 3))
                  ctx)
     ;; Subscripts are accumulated via vm-cons cells
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-cons))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)))
 
 ;;; ── ENCODE-UNIVERSAL-TIME ────────────────────────────────────────────────
 
-(deftest phase2-encode-universal-time-six-args
-  "(encode-universal-time s m h d mo y) emits vm-encode-universal-time"
+(it-sequential "phase2-encode-universal-time-six-args"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'encode-universal-time
                             (make-int 0) (make-int 0) (make-int 12)
                             (make-int 1) (make-int 1) (make-int 2024))
                  ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-encode-universal-time))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-encode-universal-time) :to-be-truthy)))
 
-(deftest phase2-encode-universal-time-wrong-arity-falls-through
-  "encode-universal-time with wrong arity (< 6 args) returns nil (falls through)"
+(it-sequential "phase2-encode-universal-time-wrong-arity-falls-through"
   (let ((ctx (make-codegen-ctx)))
     ;; Only 3 args — handler guard fails, falls through to normal call
     (compile-ast (make-call 'encode-universal-time
                             (make-int 0) (make-int 0) (make-int 12))
                  ctx)
-    (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-encode-universal-time)))))
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-encode-universal-time)) :to-be-truthy)))
 
 ;;; ── MAKE-STRING ──────────────────────────────────────────────────────────
 
-(deftest phase2-make-string-variants
-  "make-string emits vm-make-string with correct char slot"
+(it-sequential "phase2-make-string-variants"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'make-string (make-int 5)) ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-make-string)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-string) :to-be-truthy))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'make-string (make-int 5)) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-string)))
-      (assert-true (null (cl-cc::vm-make-string-char inst)))))
+      (expect (null (cl-cc::vm-make-string-char inst)) :to-be-truthy)))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'make-string
                             (make-int 5)
@@ -179,24 +175,23 @@
                             (make-quoted #\x))
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-string)))
-      (assert-true inst)
-      (assert-true (cl-cc::vm-make-string-char inst)))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc::vm-make-string-char inst) :to-be-truthy))))
 
 ;;; ── TYPEP ─────────────────────────────────────────────────────────────────
 
-(deftest phase2-typep-variants
-  "typep emits vm-typep for quoted types and falls through for unquoted"
+(it-sequential "phase2-typep-variants"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'typep (make-int 42) (make-quoted 'integer)) ctx)
-    (assert-true (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'typep (make-int 42) (make-quoted 'string)) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))
-      (assert-eq 'string (cl-cc::vm-typep-type-name inst))))
+      (expect (cl-cc::vm-typep-type-name inst) :to-be 'string)))
   (let ((ctx (make-ctx-with-vars 'integer)))
     ;; Pass unquoted ast-var — handler guard fails
     (compile-ast (make-call 'typep (make-int 42) (make-var 'integer)) ctx)
-    (assert-true (null (codegen-find-inst ctx 'cl-cc/vm::vm-typep)))))
+    (expect (null (codegen-find-inst ctx 'cl-cc/vm::vm-typep)) :to-be-truthy)))
 
 ;;; ── CALL-NEXT-METHOD ─────────────────────────────────────────────────────
 
@@ -204,8 +199,7 @@
 
 ;;; ── Handler table completeness ────────────────────────────────────────────
 
-(deftest phase2-all-handlers-registered
-  "All Phase 2 handlers are in *phase2-builtin-handlers*"
+(it-sequential "phase2-all-handlers-registered"
   (let ((expected '("MAKE-HASH-TABLE" "GETHASH" "MAPHASH"
                     "MAKE-ARRAY" "MAKE-ADJUSTABLE-VECTOR"
                     "ARRAY-ROW-MAJOR-INDEX" "ENCODE-UNIVERSAL-TIME"
@@ -215,4 +209,4 @@
                     "FORMAT" "OPEN" "PEEK-CHAR"
                     "MAKE-STRING-INPUT-STREAM" "CONCATENATE")))
     (dolist (name expected)
-      (assert-true (gethash name cl-cc/compile::*phase2-builtin-handlers*)))))
+      (expect (gethash name cl-cc/compile::*phase2-builtin-handlers*) :to-be-truthy))))

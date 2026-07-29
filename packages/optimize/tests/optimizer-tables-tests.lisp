@@ -16,214 +16,362 @@
 ;;;; are already covered in optimizer-tests.lisp.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── *opt-binary-fold-table* ─────────────────────────────────────────────
 
-(deftest-each binary-fold-table-arithmetic-ops-registered
-  "*opt-binary-fold-table* has all core arithmetic instruction types registered."
-  :cases (("vm-add"        'vm-add)
-          ("vm-integer-add" 'vm-integer-add)
-          ("vm-float-add"  'vm-float-add)
-          ("vm-sub"        'vm-sub)
-          ("vm-mul"        'vm-mul)
-          ("vm-mod"        'vm-mod)
-          ("vm-min"        'vm-min)
-          ("vm-max"        'vm-max)
-          ("vm-logand"     'vm-logand)
-          ("vm-logior"     'vm-logior)
-          ("vm-logxor"     'vm-logxor)
-          ("vm-ash"        'vm-ash)
-          ("vm-div"        'vm-div)
-          ("vm-cl-div"     'cl-cc/vm::vm-cl-div)
-          ("vm-gcd"        'vm-gcd)
-          ("vm-lcm"        'vm-lcm))
-  (type-sym)
-  (assert-true (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-add"
+  (destructuring-bind (type-sym) (list 'vm-add)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
 
-(deftest-each binary-fold-table-function-evaluation-cases
-  "Functions in *opt-binary-fold-table* correctly evaluate arithmetic operations."
-  :cases (("add" 'vm-add 3 4  7)
-          ("sub" 'vm-sub 9 4  5)
-          ("mul" 'vm-mul 6 7 42)
-          ("div-floor" 'vm-div 10 3 3)
-          ("div-rational" 'cl-cc/vm::vm-cl-div 3 4 3/4))
-  (type-sym a b expected)
-  (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
-    (assert-= expected (funcall fn a b))))
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-integer-add"
+  (destructuring-bind (type-sym) (list 'vm-integer-add)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-float-add"
+  (destructuring-bind (type-sym) (list 'vm-float-add)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-sub"
+  (destructuring-bind (type-sym) (list 'vm-sub)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-mul"
+  (destructuring-bind (type-sym) (list 'vm-mul)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-mod"
+  (destructuring-bind (type-sym) (list 'vm-mod)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-min"
+  (destructuring-bind (type-sym) (list 'vm-min)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-max"
+  (destructuring-bind (type-sym) (list 'vm-max)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-logand"
+  (destructuring-bind (type-sym) (list 'vm-logand)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-logior"
+  (destructuring-bind (type-sym) (list 'vm-logior)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-logxor"
+  (destructuring-bind (type-sym) (list 'vm-logxor)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-ash"
+  (destructuring-bind (type-sym) (list 'vm-ash)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-div"
+  (destructuring-bind (type-sym) (list 'vm-div)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-cl-div"
+  (destructuring-bind (type-sym) (list 'cl-cc/vm::vm-cl-div)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-gcd"
+  (destructuring-bind (type-sym) (list 'vm-gcd)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-arithmetic-ops-registered vm-lcm"
+  (destructuring-bind (type-sym) (list 'vm-lcm)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-fold-table-function-evaluation-cases add"
+  (destructuring-bind (type-sym a b expected) (list 'vm-add 3 4 7)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
+    (expect (= expected (funcall fn a b)) :to-be-truthy))))
+
+(it-sequential "binary-fold-table-function-evaluation-cases sub"
+  (destructuring-bind (type-sym a b expected) (list 'vm-sub 9 4 5)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
+    (expect (= expected (funcall fn a b)) :to-be-truthy))))
+
+(it-sequential "binary-fold-table-function-evaluation-cases mul"
+  (destructuring-bind (type-sym a b expected) (list 'vm-mul 6 7 42)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
+    (expect (= expected (funcall fn a b)) :to-be-truthy))))
+
+(it-sequential "binary-fold-table-function-evaluation-cases div-floor"
+  (destructuring-bind (type-sym a b expected) (list 'vm-div 10 3 3)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
+    (expect (= expected (funcall fn a b)) :to-be-truthy))))
+
+(it-sequential "binary-fold-table-function-evaluation-cases div-rational"
+  (destructuring-bind (type-sym a b expected) (list 'cl-cc/vm::vm-cl-div 3 4 3/4)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
+    (expect (= expected (funcall fn a b)) :to-be-truthy))))
 
 ;;; ─── *opt-binary-cmp-fold-table* ─────────────────────────────────────────
 
-(deftest-each binary-cmp-fold-table-ops-registered
-  "*opt-binary-cmp-fold-table* has all comparison instruction types registered."
-  :cases (("vm-lt"     'vm-lt)
-          ("vm-gt"     'vm-gt)
-          ("vm-le"     'vm-le)
-          ("vm-ge"     'vm-ge)
-          ("vm-num-eq" 'vm-num-eq))
-  (type-sym)
-  (assert-true (gethash type-sym cl-cc/optimize::*opt-binary-cmp-fold-table*)))
+(it-sequential "binary-cmp-fold-table-ops-registered vm-lt"
+  (destructuring-bind (type-sym) (list 'vm-lt)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-cmp-fold-table*) :to-be-truthy)))
 
-(deftest binary-cmp-fold-table-lt-function-evaluates-correctly
-  "The vm-lt entry in *opt-binary-cmp-fold-table* correctly compares."
+(it-sequential "binary-cmp-fold-table-ops-registered vm-gt"
+  (destructuring-bind (type-sym) (list 'vm-gt)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-cmp-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-cmp-fold-table-ops-registered vm-le"
+  (destructuring-bind (type-sym) (list 'vm-le)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-cmp-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-cmp-fold-table-ops-registered vm-ge"
+  (destructuring-bind (type-sym) (list 'vm-ge)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-cmp-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-cmp-fold-table-ops-registered vm-num-eq"
+  (destructuring-bind (type-sym) (list 'vm-num-eq)
+    (expect (gethash type-sym cl-cc/optimize::*opt-binary-cmp-fold-table*) :to-be-truthy)))
+
+(it-sequential "binary-cmp-fold-table-lt-function-evaluates-correctly"
   (let ((fn (gethash 'vm-lt cl-cc/optimize::*opt-binary-cmp-fold-table*)))
-    (assert-true (funcall fn 3 5))
-    (assert-false (funcall fn 5 3))))
+    (expect (funcall fn 3 5) :to-be-truthy)
+    (expect (funcall fn 5 3) :to-be-falsy)))
 
 ;;; ─── *opt-unary-fold-table* ──────────────────────────────────────────────
 
-(deftest-each unary-fold-table-ops-registered
-  "*opt-unary-fold-table* has all unary instruction types registered."
-  :cases (("vm-neg"         'vm-neg)
-          ("vm-abs"         'vm-abs)
-          ("vm-inc"         'vm-inc)
-          ("vm-dec"         'vm-dec)
-          ("vm-lognot"      'vm-lognot)
-          ("vm-rational"    'vm-rational)
-          ("vm-rationalize" 'vm-rationalize)
-          ("vm-numerator"   'vm-numerator)
-          ("vm-denominator" 'vm-denominator)
-          ("vm-car"         'vm-car)
-          ("vm-cdr"         'vm-cdr)
-          ("vm-not"         'vm-not))
-  (type-sym)
-  (assert-true (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+(it-sequential "unary-fold-table-ops-registered vm-neg"
+  (destructuring-bind (type-sym) (list 'vm-neg)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
 
-(deftest-each unary-fold-table-function-evaluation-cases
-  "Functions in *opt-unary-fold-table* correctly evaluate unary operations."
-  :cases (("neg" 'vm-neg  7  -7)
-          ("abs" 'vm-abs -5   5)
-          ("rational" 'vm-rational 0.5 1/2)
-          ("numerator" 'vm-numerator 9/12 3)
-          ("denominator" 'vm-denominator 9/12 4)
-          ("car" 'vm-car '(7 . 8) 7)
-          ("cdr" 'vm-cdr '(7 . 8) 8))
-  (type-sym input expected)
-  (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
-    (assert-= expected (funcall fn input))))
+(it-sequential "unary-fold-table-ops-registered vm-abs"
+  (destructuring-bind (type-sym) (list 'vm-abs)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
 
-(deftest unary-fold-table-not-nil-returns-t
-  "The vm-not entry in *opt-unary-fold-table* converts nil→t and t→nil."
+(it-sequential "unary-fold-table-ops-registered vm-inc"
+  (destructuring-bind (type-sym) (list 'vm-inc)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-dec"
+  (destructuring-bind (type-sym) (list 'vm-dec)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-lognot"
+  (destructuring-bind (type-sym) (list 'vm-lognot)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-rational"
+  (destructuring-bind (type-sym) (list 'vm-rational)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-rationalize"
+  (destructuring-bind (type-sym) (list 'vm-rationalize)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-numerator"
+  (destructuring-bind (type-sym) (list 'vm-numerator)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-denominator"
+  (destructuring-bind (type-sym) (list 'vm-denominator)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-car"
+  (destructuring-bind (type-sym) (list 'vm-car)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-cdr"
+  (destructuring-bind (type-sym) (list 'vm-cdr)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-ops-registered vm-not"
+  (destructuring-bind (type-sym) (list 'vm-not)
+    (expect (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)))
+
+(it-sequential "unary-fold-table-function-evaluation-cases neg"
+  (destructuring-bind (type-sym input expected) (list 'vm-neg 7 -7)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-function-evaluation-cases abs"
+  (destructuring-bind (type-sym input expected) (list 'vm-abs -5 5)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-function-evaluation-cases rational"
+  (destructuring-bind (type-sym input expected) (list 'vm-rational 0.5 1/2)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-function-evaluation-cases numerator"
+  (destructuring-bind (type-sym input expected) (list 'vm-numerator 9/12 3)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-function-evaluation-cases denominator"
+  (destructuring-bind (type-sym input expected) (list 'vm-denominator 9/12 4)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-function-evaluation-cases car"
+  (destructuring-bind (type-sym input expected) (list 'vm-car '(7 . 8) 7)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-function-evaluation-cases cdr"
+  (destructuring-bind (type-sym input expected) (list 'vm-cdr '(7 . 8) 8)
+    (let ((fn (gethash type-sym cl-cc/optimize::*opt-unary-fold-table*)))
+    (expect (= expected (funcall fn input)) :to-be-truthy))))
+
+(it-sequential "unary-fold-table-not-nil-returns-t"
   (let ((fn (gethash 'vm-not cl-cc/optimize::*opt-unary-fold-table*)))
-    (assert-true (funcall fn nil))
-    (assert-null (funcall fn t))))
+    (expect (funcall fn nil) :to-be-truthy)
+    (expect (funcall fn t) :to-be-null)))
 
 ;;; ─── *opt-type-pred-fold-table* ──────────────────────────────────────────
 
-(deftest-each type-pred-fold-table-ops-registered
-  "*opt-type-pred-fold-table* has all type-predicate instruction types registered."
-  :cases (("vm-null-p"     'vm-null-p)
-          ("vm-cons-p"     'vm-cons-p)
-          ("vm-symbol-p"   'vm-symbol-p)
-          ("vm-number-p"   'vm-number-p)
-          ("vm-integer-p"  'vm-integer-p)
-          ("vm-function-p" 'vm-function-p))
-  (type-sym)
-  (assert-true (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*)))
+(it-sequential "type-pred-fold-table-ops-registered vm-null-p"
+  (destructuring-bind (type-sym) (list 'vm-null-p)
+    (expect (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy)))
 
-(deftest type-pred-fold-table-null-p-evaluates-correctly
-  "The vm-null-p entry correctly identifies nil."
+(it-sequential "type-pred-fold-table-ops-registered vm-cons-p"
+  (destructuring-bind (type-sym) (list 'vm-cons-p)
+    (expect (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy)))
+
+(it-sequential "type-pred-fold-table-ops-registered vm-symbol-p"
+  (destructuring-bind (type-sym) (list 'vm-symbol-p)
+    (expect (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy)))
+
+(it-sequential "type-pred-fold-table-ops-registered vm-number-p"
+  (destructuring-bind (type-sym) (list 'vm-number-p)
+    (expect (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy)))
+
+(it-sequential "type-pred-fold-table-ops-registered vm-integer-p"
+  (destructuring-bind (type-sym) (list 'vm-integer-p)
+    (expect (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy)))
+
+(it-sequential "type-pred-fold-table-ops-registered vm-function-p"
+  (destructuring-bind (type-sym) (list 'vm-function-p)
+    (expect (gethash type-sym cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy)))
+
+(it-sequential "type-pred-fold-table-null-p-evaluates-correctly"
   (let ((fn (gethash 'vm-null-p cl-cc/optimize::*opt-type-pred-fold-table*)))
-    (assert-true (funcall fn nil))
-    (assert-false (funcall fn 42))))
+    (expect (funcall fn nil) :to-be-truthy)
+    (expect (funcall fn 42) :to-be-falsy)))
 
-(deftest type-pred-fold-table-function-p-always-false-for-constants
-  "The vm-function-p entry always returns nil for constants (functions not known at compile time)."
+(it-sequential "type-pred-fold-table-function-p-always-false-for-constants"
   (let ((fn (gethash 'vm-function-p cl-cc/optimize::*opt-type-pred-fold-table*)))
-    (assert-null (funcall fn 42))
-    (assert-null (funcall fn nil))))
+    (expect (funcall fn 42) :to-be-null)
+    (expect (funcall fn nil) :to-be-null)))
 
 ;;; ─── Derived type lists ───────────────────────────────────────────────────
 
-(deftest foldable-binary-types-contains-arithmetic-types
-  "*opt-foldable-binary-types* includes both arithmetic and comparison types."
-  (assert-true (member 'vm-add cl-cc/optimize::*opt-foldable-binary-types*))
-  (assert-true (member 'vm-lt  cl-cc/optimize::*opt-foldable-binary-types*))
-  (assert-true (member 'vm-mul cl-cc/optimize::*opt-foldable-binary-types*)))
+(it-sequential "foldable-binary-types-contains-arithmetic-types"
+  (expect (member 'vm-add cl-cc/optimize::*opt-foldable-binary-types*) :to-be-truthy)
+  (expect (member 'vm-lt  cl-cc/optimize::*opt-foldable-binary-types*) :to-be-truthy)
+  (expect (member 'vm-mul cl-cc/optimize::*opt-foldable-binary-types*) :to-be-truthy))
 
-(deftest foldable-unary-types-contains-expected-types
-  "*opt-foldable-unary-types* includes both arithmetic and predicate types."
-  (assert-true (member 'vm-neg    cl-cc/optimize::*opt-foldable-unary-types*))
-  (assert-true (member 'vm-car    cl-cc/optimize::*opt-foldable-unary-types*))
-  (assert-true (member 'vm-cdr    cl-cc/optimize::*opt-foldable-unary-types*))
-  (assert-true (member 'vm-null-p cl-cc/optimize::*opt-foldable-unary-types*))
-  (assert-true (member 'vm-abs    cl-cc/optimize::*opt-foldable-unary-types*)))
+(it-sequential "foldable-unary-types-contains-expected-types"
+  (expect (member 'vm-neg    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
+  (expect (member 'vm-car    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
+  (expect (member 'vm-cdr    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
+  (expect (member 'vm-null-p cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
+  (expect (member 'vm-abs    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy))
 
-(deftest binary-zero-guard-types-contains-division-ops
-  "*opt-binary-zero-guard-types* contains division-family instruction types."
-  (assert-true (member 'vm-div cl-cc/optimize::*opt-binary-zero-guard-types*))
-  (assert-true (member 'vm-mod cl-cc/optimize::*opt-binary-zero-guard-types*))
-  (assert-true (member 'vm-rem cl-cc/optimize::*opt-binary-zero-guard-types*)))
+(it-sequential "binary-zero-guard-types-contains-division-ops"
+  (expect (member 'vm-div cl-cc/optimize::*opt-binary-zero-guard-types*) :to-be-truthy)
+  (expect (member 'vm-mod cl-cc/optimize::*opt-binary-zero-guard-types*) :to-be-truthy)
+  (expect (member 'vm-rem cl-cc/optimize::*opt-binary-zero-guard-types*) :to-be-truthy))
 
-(deftest binary-no-fold-types-contains-floor-ceiling
-  "*opt-binary-no-fold-types* contains floor/ceiling/truncate/round instruction types."
-  (assert-true (member 'vm-floor-inst   cl-cc/optimize::*opt-binary-no-fold-types*))
-  (assert-true (member 'vm-ceiling-inst cl-cc/optimize::*opt-binary-no-fold-types*))
-  (assert-true (member 'vm-truncate     cl-cc/optimize::*opt-binary-no-fold-types*))
-  (assert-true (member 'vm-round-inst   cl-cc/optimize::*opt-binary-no-fold-types*)))
+(it-sequential "binary-no-fold-types-contains-floor-ceiling"
+  (expect (member 'vm-floor-inst   cl-cc/optimize::*opt-binary-no-fold-types*) :to-be-truthy)
+  (expect (member 'vm-ceiling-inst cl-cc/optimize::*opt-binary-no-fold-types*) :to-be-truthy)
+  (expect (member 'vm-truncate     cl-cc/optimize::*opt-binary-no-fold-types*) :to-be-truthy)
+  (expect (member 'vm-round-inst   cl-cc/optimize::*opt-binary-no-fold-types*) :to-be-truthy))
 
-(deftest commutative-inst-types-contains-add-and-mul
-  "*opt-commutative-inst-types* includes vm-add, vm-mul, vm-logand, vm-num-eq."
-  (assert-true (member 'vm-add    cl-cc/optimize::*opt-commutative-inst-types*))
-  (assert-true (member 'vm-mul    cl-cc/optimize::*opt-commutative-inst-types*))
-  (assert-true (member 'vm-logand cl-cc/optimize::*opt-commutative-inst-types*))
-  (assert-true (member 'vm-num-eq cl-cc/optimize::*opt-commutative-inst-types*)))
+(it-sequential "commutative-inst-types-contains-add-and-mul"
+  (expect (member 'vm-add    cl-cc/optimize::*opt-commutative-inst-types*) :to-be-truthy)
+  (expect (member 'vm-mul    cl-cc/optimize::*opt-commutative-inst-types*) :to-be-truthy)
+  (expect (member 'vm-logand cl-cc/optimize::*opt-commutative-inst-types*) :to-be-truthy)
+  (expect (member 'vm-num-eq cl-cc/optimize::*opt-commutative-inst-types*) :to-be-truthy))
 
-(deftest commutative-inst-types-excludes-sub-and-div
-  "*opt-commutative-inst-types* does NOT include vm-sub (subtraction is not commutative)."
-  (assert-false (member 'vm-sub cl-cc/optimize::*opt-commutative-inst-types*)))
+(it-sequential "commutative-inst-types-excludes-sub-and-div"
+  (expect (member 'vm-sub cl-cc/optimize::*opt-commutative-inst-types*) :to-be-falsy))
 
 ;;; ─── opt-inst-dst ─────────────────────────────────────────────────────────
 
-(deftest opt-inst-dst-returns-dst-register
-  "opt-inst-dst returns the :dst register for instructions that have one."
-  (assert-eq :r3 (cl-cc/optimize:opt-inst-dst (make-vm-add :dst :r3 :lhs :r1 :rhs :r2))))
+(it-sequential "opt-inst-dst-returns-dst-register"
+  (expect (cl-cc/optimize:opt-inst-dst (make-vm-add :dst :r3 :lhs :r1 :rhs :r2)) :to-be :r3))
 
-(deftest opt-inst-dst-nil-for-no-dst-instruction
-  "opt-inst-dst returns nil for instructions (like vm-jump) that have no destination register."
-  (assert-null (cl-cc/optimize:opt-inst-dst (make-vm-jump :label "end"))))
+(it-sequential "opt-inst-dst-nil-for-no-dst-instruction"
+  (expect (cl-cc/optimize:opt-inst-dst (make-vm-jump :label "end")) :to-be-null))
 
 ;;; ─── opt-inst-read-regs ───────────────────────────────────────────────────
 
-(deftest-each opt-inst-read-regs-single-src-cases
-  "opt-inst-read-regs returns nil for vm-const; (:r0) for vm-move and vm-neg."
-  :cases (("vm-const" (make-vm-const :dst :r0 :value 42) nil)
-          ("vm-move"  (make-vm-move  :dst :r1 :src :r0)  '(:r0))
-          ("vm-neg"   (make-vm-neg   :dst :r1 :src :r0)  '(:r0))
-          ("vm-car"   (make-vm-car   :dst :r1 :src :r0)  '(:r0))
-          ("vm-cdr"   (make-vm-cdr   :dst :r1 :src :r0)  '(:r0)))
-  (inst expected)
-  (assert-equal expected (cl-cc/optimize:opt-inst-read-regs inst)))
+(it-sequential "opt-inst-read-regs-single-src-cases vm-const"
+  (destructuring-bind (inst expected) (list (make-vm-const :dst :r0 :value 42) nil)
+    (expect (cl-cc/optimize:opt-inst-read-regs inst) :to-equal expected)))
 
-(deftest-each opt-inst-read-regs-lhs-rhs-cases
-  "opt-inst-read-regs returns (lhs rhs) for both vm-binop and non-binop binary instructions."
-  :cases (("vm-add" (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
-          ("vm-lt"  (make-vm-lt  :dst :r2 :lhs :r0 :rhs :r1)))
-  (inst)
-  (let ((regs (cl-cc/optimize:opt-inst-read-regs inst)))
-    (assert-true (member :r0 regs))
-    (assert-true (member :r1 regs))))
+(it-sequential "opt-inst-read-regs-single-src-cases vm-move"
+  (destructuring-bind (inst expected) (list (make-vm-move  :dst :r1 :src :r0) '(:r0))
+    (expect (cl-cc/optimize:opt-inst-read-regs inst) :to-equal expected)))
+
+(it-sequential "opt-inst-read-regs-single-src-cases vm-neg"
+  (destructuring-bind (inst expected) (list (make-vm-neg   :dst :r1 :src :r0) '(:r0))
+    (expect (cl-cc/optimize:opt-inst-read-regs inst) :to-equal expected)))
+
+(it-sequential "opt-inst-read-regs-single-src-cases vm-car"
+  (destructuring-bind (inst expected) (list (make-vm-car   :dst :r1 :src :r0) '(:r0))
+    (expect (cl-cc/optimize:opt-inst-read-regs inst) :to-equal expected)))
+
+(it-sequential "opt-inst-read-regs-single-src-cases vm-cdr"
+  (destructuring-bind (inst expected) (list (make-vm-cdr   :dst :r1 :src :r0) '(:r0))
+    (expect (cl-cc/optimize:opt-inst-read-regs inst) :to-equal expected)))
+
+(it-sequential "opt-inst-read-regs-lhs-rhs-cases vm-add"
+  (destructuring-bind (inst) (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
+    (let ((regs (cl-cc/optimize:opt-inst-read-regs inst)))
+    (expect (member :r0 regs) :to-be-truthy)
+    (expect (member :r1 regs) :to-be-truthy))))
+
+(it-sequential "opt-inst-read-regs-lhs-rhs-cases vm-lt"
+  (destructuring-bind (inst) (list (make-vm-lt  :dst :r2 :lhs :r0 :rhs :r1))
+    (let ((regs (cl-cc/optimize:opt-inst-read-regs inst)))
+    (expect (member :r0 regs) :to-be-truthy)
+    (expect (member :r1 regs) :to-be-truthy))))
 
 ;;; ─── %opt-branch-target-labels ───────────────────────────────────────────
 
-(deftest-each branch-target-labels-cases
-  "%opt-branch-target-labels collects labels from vm-jump and vm-jump-zero; ignores others."
-  :cases (("jump-only"       (list (make-vm-jump      :label "a"))          '("a"))
-          ("jump-zero-only"  (list (make-vm-jump-zero :reg :r0 :label "b")) '("b"))
-          ("both-kinds"      (list (make-vm-jump      :label "a")
-                                   (make-vm-jump-zero :reg :r0 :label "b")) '("a" "b"))
-          ("no-jumps"        (list (make-vm-const :dst :r0 :value 1)
-                                   (make-vm-ret   :reg :r0))                '()))
-  (insts expected-labels)
-  (let ((targets (cl-cc/optimize::%opt-branch-target-labels insts)))
-    (assert-= (length expected-labels) (hash-table-count targets))
+(it-sequential "branch-target-labels-cases jump-only"
+  (destructuring-bind (insts expected-labels) (list (list (make-vm-jump      :label "a")) '("a"))
+    (let ((targets (cl-cc/optimize::%opt-branch-target-labels insts)))
+    (expect (= (length expected-labels) (hash-table-count targets)) :to-be-truthy)
     (dolist (lbl expected-labels)
-      (assert-true (gethash lbl targets)))))
+      (expect (gethash lbl targets) :to-be-truthy)))))
+
+(it-sequential "branch-target-labels-cases jump-zero-only"
+  (destructuring-bind (insts expected-labels) (list (list (make-vm-jump-zero :reg :r0 :label "b")) '("b"))
+    (let ((targets (cl-cc/optimize::%opt-branch-target-labels insts)))
+    (expect (= (length expected-labels) (hash-table-count targets)) :to-be-truthy)
+    (dolist (lbl expected-labels)
+      (expect (gethash lbl targets) :to-be-truthy)))))
+
+(it-sequential "branch-target-labels-cases both-kinds"
+  (destructuring-bind (insts expected-labels) (list (list (make-vm-jump      :label "a")
+                                   (make-vm-jump-zero :reg :r0 :label "b")) '("a" "b"))
+    (let ((targets (cl-cc/optimize::%opt-branch-target-labels insts)))
+    (expect (= (length expected-labels) (hash-table-count targets)) :to-be-truthy)
+    (dolist (lbl expected-labels)
+      (expect (gethash lbl targets) :to-be-truthy)))))
+
+(it-sequential "branch-target-labels-cases no-jumps"
+  (destructuring-bind (insts expected-labels) (list (list (make-vm-const :dst :r0 :value 1)
+                                   (make-vm-ret   :reg :r0)) '())
+    (let ((targets (cl-cc/optimize::%opt-branch-target-labels insts)))
+    (expect (= (length expected-labels) (hash-table-count targets)) :to-be-truthy)
+    (dolist (lbl expected-labels)
+      (expect (gethash lbl targets) :to-be-truthy)))))
 
 ;;; ─── %fold-vm-jump-zero ──────────────────────────────────────────────────
 
-(deftest fold-vm-jump-zero-known-false-becomes-unconditional-jump
-  "%fold-vm-jump-zero: known-false condition → unconditional vm-jump."
+(it-sequential "fold-vm-jump-zero-known-false-becomes-unconditional-jump"
   (let ((env (make-hash-table :test #'eq))
         (emitted nil))
     (setf (gethash :r0 env) nil) ; nil is the canonical false value
@@ -231,12 +379,11 @@
      (make-vm-jump-zero :reg :r0 :label "target")
      env
      (lambda (i) (push i emitted)))
-    (assert-= 1 (length emitted))
-    (assert-true (typep (first emitted) 'cl-cc/vm::vm-jump))
-    (assert-equal "target" (cl-cc/vm::vm-label-name (first emitted)))))
+    (expect (= 1 (length emitted)) :to-be-truthy)
+    (expect (typep (first emitted) 'cl-cc/vm::vm-jump) :to-be-truthy)
+    (expect (cl-cc/vm::vm-label-name (first emitted)) :to-equal "target")))
 
-(deftest fold-vm-jump-zero-known-true-eliminates-branch
-  "%fold-vm-jump-zero: known-truthy condition → branch is never taken → emits nothing."
+(it-sequential "fold-vm-jump-zero-known-true-eliminates-branch"
   (let ((env (make-hash-table :test #'eq))
         (emitted nil))
     (setf (gethash :r0 env) 1) ; truthy value
@@ -244,64 +391,81 @@
      (make-vm-jump-zero :reg :r0 :label "target")
      env
      (lambda (i) (push i emitted)))
-    (assert-= 0 (length emitted))))
+    (expect (= 0 (length emitted)) :to-be-truthy)))
 
-(deftest fold-vm-jump-zero-unknown-condition-emits-unchanged
-  "%fold-vm-jump-zero: unknown condition → emits the original instruction unchanged."
+(it-sequential "fold-vm-jump-zero-unknown-condition-emits-unchanged"
   (let ((env (make-hash-table :test #'eq))
         (emitted nil))
     (cl-cc/optimize::%fold-vm-jump-zero
      (make-vm-jump-zero :reg :r0 :label "target")
      env
      (lambda (i) (push i emitted)))
-    (assert-= 1 (length emitted))
-    (assert-true (typep (first emitted) 'cl-cc/vm::vm-jump-zero))))
+    (expect (= 1 (length emitted)) :to-be-truthy)
+    (expect (typep (first emitted) 'cl-cc/vm::vm-jump-zero) :to-be-truthy)))
 
 ;;; ─── %opt-known-constant-p ───────────────────────────────────────────────
 
-(deftest-each opt-known-constant-p-cases
-  "%opt-known-constant-p: numbers are known, :unknown sentinel and symbols are not."
-  :cases (("integer"  42       t)
-          ("zero"     0        t)
-          ("float"    1.5      t)
-          ("unknown"  :unknown nil)
-          ("symbol"   :r0      nil)
-          ("nil"      nil      nil))
-  (val expected)
-  (if expected
-      (assert-true  (cl-cc/optimize::%opt-known-constant-p val))
-      (assert-false (cl-cc/optimize::%opt-known-constant-p val))))
+(it-sequential "opt-known-constant-p-cases integer"
+  (destructuring-bind (val expected) (list 42 t)
+    (if expected
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-falsy))))
+
+(it-sequential "opt-known-constant-p-cases zero"
+  (destructuring-bind (val expected) (list 0 t)
+    (if expected
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-falsy))))
+
+(it-sequential "opt-known-constant-p-cases float"
+  (destructuring-bind (val expected) (list 1.5 t)
+    (if expected
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-falsy))))
+
+(it-sequential "opt-known-constant-p-cases unknown"
+  (destructuring-bind (val expected) (list :unknown nil)
+    (if expected
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-falsy))))
+
+(it-sequential "opt-known-constant-p-cases symbol"
+  (destructuring-bind (val expected) (list :r0 nil)
+    (if expected
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-falsy))))
+
+(it-sequential "opt-known-constant-p-cases nil"
+  (destructuring-bind (val expected) (list nil nil)
+    (if expected
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-truthy)
+      (expect (cl-cc/optimize::%opt-known-constant-p val) :to-be-falsy))))
 
 ;;; ─── %opt-apply-algebraic-action ─────────────────────────────────────────
 
-(deftest opt-apply-algebraic-action-move-lhs
-  "%opt-apply-algebraic-action :move-lhs produces vm-move from lhs register."
+(it-sequential "opt-apply-algebraic-action-move-lhs"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action :move-lhs :r2 :r0 :r1)))
-    (assert-true (typep result 'cl-cc/vm::vm-move))
-    (assert-eq :r2 (vm-dst result))
-    (assert-eq :r0 (vm-src result))))
+    (expect (typep result 'cl-cc/vm::vm-move) :to-be-truthy)
+    (expect (vm-dst result) :to-be :r2)
+    (expect (vm-src result) :to-be :r0)))
 
-(deftest opt-apply-algebraic-action-move-rhs
-  "%opt-apply-algebraic-action :move-rhs produces vm-move from rhs register."
+(it-sequential "opt-apply-algebraic-action-move-rhs"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action :move-rhs :r2 :r0 :r1)))
-    (assert-true (typep result 'cl-cc/vm::vm-move))
-    (assert-eq :r2 (vm-dst result))
-    (assert-eq :r1 (vm-src result))))
+    (expect (typep result 'cl-cc/vm::vm-move) :to-be-truthy)
+    (expect (vm-dst result) :to-be :r2)
+    (expect (vm-src result) :to-be :r1)))
 
-(deftest opt-apply-algebraic-action-const
-  "%opt-apply-algebraic-action (:const V) produces vm-const with value V."
+(it-sequential "opt-apply-algebraic-action-const"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action '(:const 0) :r2 :r0 :r1)))
-    (assert-true (typep result 'cl-cc/vm::vm-const))
-    (assert-eq :r2 (vm-dst result))
-    (assert-= 0 (vm-value result))))
+    (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (vm-dst result) :to-be :r2)
+    (expect (= 0 (vm-value result)) :to-be-truthy)))
 
-(deftest opt-apply-algebraic-action-neg-lhs
-  "%opt-apply-algebraic-action (:neg :lhs) produces vm-neg on lhs register."
+(it-sequential "opt-apply-algebraic-action-neg-lhs"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action '(:neg :lhs) :r2 :r0 :r1)))
-    (assert-true (typep result 'cl-cc/vm::vm-neg))
-    (assert-eq :r2 (vm-dst result))
-    (assert-eq :r0 (vm-src result))))
+    (expect (typep result 'cl-cc/vm::vm-neg) :to-be-truthy)
+    (expect (vm-dst result) :to-be :r2)
+    (expect (vm-src result) :to-be :r0)))
 
-(deftest opt-apply-algebraic-action-unknown-returns-nil
-  "%opt-apply-algebraic-action returns NIL for unrecognized actions."
-  (assert-null (cl-cc/optimize::%opt-apply-algebraic-action :unknown-action :r2 :r0 :r1)))
+(it-sequential "opt-apply-algebraic-action-unknown-returns-nil"
+  (expect (cl-cc/optimize::%opt-apply-algebraic-action :unknown-action :r2 :r0 :r1) :to-be-null))

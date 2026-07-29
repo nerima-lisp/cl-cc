@@ -5,55 +5,49 @@
 ;;; Depends on make-test-fn defined in ir-block-tests.lisp (same package, loads first).
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── ir-collect-uses ────────────────────────────────────────────────────────
 
-(deftest ir-collect-uses-empty
-  "ir-collect-uses on empty function returns empty table."
+(it-sequential "ir-collect-uses-empty"
   (let* ((fn (make-test-fn))
          (uses (cl-cc/ir:ir-collect-uses fn)))
-    (assert-= 0 (hash-table-count uses))))
+    (expect (hash-table-count uses) :to-equal 0)))
 
 ;;; ─── ir-verify-ssa ──────────────────────────────────────────────────────────
 
-(deftest ir-verify-ssa-behavior
-  "ir-verify-ssa: returns T for valid SSA; signals error on duplicate defs."
+(it-sequential "ir-verify-ssa-behavior"
   (let* ((fn (make-test-fn))
          (blk (cl-cc/ir:irf-entry fn))
          (v1 (cl-cc/ir:ir-new-value fn))
          (v2 (cl-cc/ir:ir-new-value fn)))
     (cl-cc/ir:ir-emit blk (cl-cc/ir:make-ir-inst :result v1))
     (cl-cc/ir:ir-emit blk (cl-cc/ir:make-ir-inst :result v2))
-    (assert-true (cl-cc/ir:ir-verify-ssa fn)))
+    (expect (cl-cc/ir:ir-verify-ssa fn) :to-be-truthy))
   (let* ((fn (make-test-fn))
          (blk (cl-cc/ir:irf-entry fn))
          (v1 (cl-cc/ir:ir-new-value fn)))
     (cl-cc/ir:ir-emit blk (cl-cc/ir:make-ir-inst :result v1))
     (cl-cc/ir:ir-emit blk (cl-cc/ir:make-ir-inst :result v1))
-    (assert-true
-     (handler-case (progn (cl-cc/ir:ir-verify-ssa fn) nil)
-       (error () t)))))
+    (expect (handler-case (progn (cl-cc/ir:ir-verify-ssa fn) nil)
+       (error () t)) :to-be-truthy)))
 
 ;;; ─── Braun SSA: ir-write-var / ir-read-var ──────────────────────────────────
 
-(deftest ir-ssa-write-read-same-block
-  "ir-write/read-var in the same block: basic read-back and overwrite behavior."
+(it-sequential "ir-ssa-write-read-same-block"
   (let* ((fn (make-test-fn))
          (blk (cl-cc/ir:irf-entry fn))
          (val (cl-cc/ir:ir-new-value fn)))
     (cl-cc/ir:ir-write-var fn 'x blk val)
-    (assert-eq val (cl-cc/ir:ir-read-var fn 'x blk)))
+    (expect (cl-cc/ir:ir-read-var fn 'x blk) :to-be val))
   (let* ((fn (make-test-fn))
          (blk (cl-cc/ir:irf-entry fn))
          (v1 (cl-cc/ir:ir-new-value fn))
          (v2 (cl-cc/ir:ir-new-value fn)))
     (cl-cc/ir:ir-write-var fn 'x blk v1)
     (cl-cc/ir:ir-write-var fn 'x blk v2)
-    (assert-eq v2 (cl-cc/ir:ir-read-var fn 'x blk))))
+    (expect (cl-cc/ir:ir-read-var fn 'x blk) :to-be v2)))
 
-(deftest ir-ssa-read-propagates-from-predecessor
-  "ir-read-var finds value from single sealed predecessor."
+(it-sequential "ir-ssa-read-propagates-from-predecessor"
   (let* ((fn (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (next (cl-cc/ir:ir-new-block fn :next))
@@ -62,10 +56,9 @@
     (cl-cc/ir:ir-seal-block fn entry)
     (cl-cc/ir:ir-seal-block fn next)
     (cl-cc/ir:ir-write-var fn 'x entry val)
-    (assert-eq val (cl-cc/ir:ir-read-var fn 'x next))))
+    (expect (cl-cc/ir:ir-read-var fn 'x next) :to-be val)))
 
-(deftest ir-ssa-join-creates-block-arg
-  "ir-read-var at join with two predecessors creates a block argument."
+(it-sequential "ir-ssa-join-creates-block-arg"
   (let* ((fn (make-test-fn))
          (entry (cl-cc/ir:irf-entry fn))
          (left (cl-cc/ir:ir-new-block fn :left))
@@ -84,37 +77,41 @@
     (cl-cc/ir:ir-write-var fn 'x left v1)
     (cl-cc/ir:ir-write-var fn 'x right v2)
     (let ((result (cl-cc/ir:ir-read-var fn 'x join)))
-      (assert-true (cl-cc/ir:ir-value-p result))
-      (assert-true (> (length (cl-cc/ir:irb-params join)) 0)))))
+      (expect (cl-cc/ir:ir-value-p result) :to-be-truthy)
+      (expect (> (length (cl-cc/ir:irb-params join)) 0) :to-be-truthy))))
 
-(deftest-each ir-ssa-sealed-block-behavior
-  "ir-seal-block marks block sealed; ir-read-var on sealed orphan with no def returns nil."
-  :cases (("marks-sealed"       :sealed)
-          ("no-def-returns-nil" :read-nil))
-  (scenario)
-  (let* ((fn  (make-test-fn))
+(it-sequential "ir-ssa-sealed-block-behavior marks-sealed"
+  (destructuring-bind (scenario) (list :sealed)
+    (let* ((fn  (make-test-fn))
          (blk (cl-cc/ir:ir-new-block fn :orphan)))
     (cl-cc/ir:ir-seal-block fn blk)
     (ecase scenario
-      (:sealed   (assert-true  (cl-cc/ir:irb-sealed-p blk)))
-      (:read-nil (assert-false (cl-cc/ir:ir-read-var fn 'x blk))))))
+      (:sealed   (expect (cl-cc/ir:irb-sealed-p blk) :to-be-truthy))
+      (:read-nil (expect (cl-cc/ir:ir-read-var fn 'x blk) :to-be-falsy))))))
+
+(it-sequential "ir-ssa-sealed-block-behavior no-def-returns-nil"
+  (destructuring-bind (scenario) (list :read-nil)
+    (let* ((fn  (make-test-fn))
+         (blk (cl-cc/ir:ir-new-block fn :orphan)))
+    (cl-cc/ir:ir-seal-block fn blk)
+    (ecase scenario
+      (:sealed   (expect (cl-cc/ir:irb-sealed-p blk) :to-be-truthy))
+      (:read-nil (expect (cl-cc/ir:ir-read-var fn 'x blk) :to-be-falsy))))))
 
 ;;; ─── ir-new-value / ir-new-block ────────────────────────────────────────────
 
-(deftest ir-new-value-increments-id
-  "ir-new-value allocates values with incrementing IDs."
+(it-sequential "ir-new-value-increments-id"
   (let* ((fn (make-test-fn))
          (v0 (cl-cc/ir:ir-new-value fn))
          (v1 (cl-cc/ir:ir-new-value fn)))
-    (assert-= 0 (cl-cc/ir:irv-id v0))
-    (assert-= 1 (cl-cc/ir:irv-id v1))))
+    (expect (cl-cc/ir:irv-id v0) :to-equal 0)
+    (expect (cl-cc/ir:irv-id v1) :to-equal 1)))
 
-(deftest ir-block-and-function-construction
-  "ir-new-block increments IDs and adds to function; ir-make-function creates entry block."
+(it-sequential "ir-block-and-function-construction"
   (let* ((fn (make-test-fn))
          (b1 (cl-cc/ir:ir-new-block fn :test)))
-    (assert-= 0 (cl-cc/ir:irb-id (cl-cc/ir:irf-entry fn)))
-    (assert-= 1 (cl-cc/ir:irb-id b1))
-    (assert-= 2 (length (cl-cc/ir:irf-blocks fn)))
-    (assert-true (cl-cc/ir:ir-block-p (cl-cc/ir:irf-entry fn)))
-    (assert-eq :entry (cl-cc/ir:irb-label (cl-cc/ir:irf-entry fn)))))
+    (expect (cl-cc/ir:irb-id (cl-cc/ir:irf-entry fn)) :to-equal 0)
+    (expect (cl-cc/ir:irb-id b1) :to-equal 1)
+    (expect (length (cl-cc/ir:irf-blocks fn)) :to-equal 2)
+    (expect (cl-cc/ir:ir-block-p (cl-cc/ir:irf-entry fn)) :to-be-truthy)
+    (expect (cl-cc/ir:irb-label (cl-cc/ir:irf-entry fn)) :to-be :entry)))

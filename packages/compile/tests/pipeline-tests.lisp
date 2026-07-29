@@ -5,119 +5,104 @@
 ;;; run-string-repl, our-eval, and reset-repl-state.
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-integration-serial-suite)
-
 ;;; ─── compile-expression ─────────────────────────────────────────────────
 
-(deftest pipeline-compile-expression-binop-structure
-  "compile-expression returns a well-formed compilation-result for a binop expression."
+(it-sequential "pipeline-compile-expression-binop-structure"
   (let* ((result (compile-expression '(+ 1 2)))
          (prog   (compilation-result-program result))
          (instrs (vm-program-instructions prog))
          (asm    (compilation-result-assembly result))
          (cps    (compilation-result-cps result)))
-    (assert-true (typep result 'cl-cc/compile:compilation-result))
-    (assert-true (typep prog 'cl-cc/vm::vm-program))
-    (assert-true (> (length instrs) 0))
-    (assert-true (stringp asm))
-    (assert-true (or (null cps) (consp cps)))))
+    (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)
+    (expect (typep prog 'cl-cc/vm::vm-program) :to-be-truthy)
+    (expect (> (length instrs) 0) :to-be-truthy)
+    (expect (stringp asm) :to-be-truthy)
+    (expect (or (null cps) (consp cps)) :to-be-truthy)))
 
-(deftest pipeline-compile-expression-constant-halts
-  "compile-expression for a constant ends in vm-halt."
+(it-sequential "pipeline-compile-expression-constant-halts"
   (let* ((result (compile-expression 42))
             (instrs (vm-program-instructions (compilation-result-program result)))
             (cps (compilation-result-cps result)))
       (declare (ignore cps))
-      (assert-true (typep (car (last instrs)) 'cl-cc/vm::vm-halt))))
+      (expect (typep (car (last instrs)) 'cl-cc/vm::vm-halt) :to-be-truthy)))
 
-(deftest pipeline-policy-data-tables-are-populated
-  "Pipeline policy data tables expose the expected bridge and CPS metadata."
-  (assert-true (member 'cl-cc/ast:ast-defun cl-cc::*cps-host-eval-unsafe-ast-types*))
-  (assert-true (member 'cl-cc/ast:ast-node cl-cc/compile:*cps-native-compile-unsupported-ast-types*))
-  (assert-false (member 'cl-cc/ast:ast-setq cl-cc/compile:*cps-compile-unsupported-ast-types*))
-  (assert-false (member 'cl-cc/ast:ast-setq cl-cc/compile:*cps-native-compile-unsupported-ast-types*))
-  (assert-equal '("PARSE-LAMBDA-LIST" . :cl-cc/expand)
-                      (first '(("PARSE-LAMBDA-LIST"            . :cl-cc/expand)
+(it-sequential "pipeline-policy-data-tables-are-populated"
+  (expect (member 'cl-cc/ast:ast-defun cl-cc::*cps-host-eval-unsafe-ast-types*) :to-be-truthy)
+  (expect (member 'cl-cc/ast:ast-node cl-cc/compile:*cps-native-compile-unsupported-ast-types*) :to-be-truthy)
+  (expect (member 'cl-cc/ast:ast-setq cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-falsy)
+  (expect (member 'cl-cc/ast:ast-setq cl-cc/compile:*cps-native-compile-unsupported-ast-types*) :to-be-falsy)
+  (expect (first '(("PARSE-LAMBDA-LIST"            . :cl-cc/expand)
                                ("DESTRUCTURE-LAMBDA-LIST"      . :cl-cc/expand)
                                ("GENERATE-LAMBDA-BINDINGS"     . :cl-cc/expand)
-                               ("LAMBDA-LIST-INFO-ENVIRONMENT" . :cl-cc/expand)))))
+                               ("LAMBDA-LIST-INFO-ENVIRONMENT" . :cl-cc/expand))) :to-equal '("PARSE-LAMBDA-LIST" . :cl-cc/expand)))
 
-(deftest pipeline-policy-data-host-eval-unsafe-forms-cover-control-and-definitions
-  "The host-eval unsafe policy keeps definition and non-local-control AST nodes out of the fast CPS host path."
-  (assert-true (member 'cl-cc/ast:ast-defgeneric cl-cc::*cps-host-eval-unsafe-ast-types*))
-  (assert-true (member 'cl-cc/ast:ast-unwind-protect cl-cc::*cps-host-eval-unsafe-ast-types*))
-  (assert-false (member 'cl-cc/ast:ast-setq cl-cc::*cps-host-eval-unsafe-ast-types*)))
+(it-sequential "pipeline-policy-data-host-eval-unsafe-forms-cover-control-and-definitions"
+  (expect (member 'cl-cc/ast:ast-defgeneric cl-cc::*cps-host-eval-unsafe-ast-types*) :to-be-truthy)
+  (expect (member 'cl-cc/ast:ast-unwind-protect cl-cc::*cps-host-eval-unsafe-ast-types*) :to-be-truthy)
+  (expect (member 'cl-cc/ast:ast-setq cl-cc::*cps-host-eval-unsafe-ast-types*) :to-be-falsy))
 
-(deftest pipeline-maybe-cps-toplevel-forms-rewrites-safe-expression-forms
-  "%maybe-cps-toplevel-forms leaves definition forms alone and rewrites safe expressions into CPS entry forms."
+(it-sequential "pipeline-maybe-cps-toplevel-forms-rewrites-safe-expression-forms"
   (let* ((forms     '((defvar *top* 1) (setq *top* 2)))
          (opts      (cl-cc::%make-pipeline-opts :target :vm))
          (rewritten (cl-cc::%maybe-cps-toplevel-forms forms opts)))
     ;; DEFVAR is a definition form, so it must come back untouched — the previous
     ;; ASSERT-FALSE here demanded the opposite and contradicted this test's own
     ;; description. Only the SETQ is expected to become a CPS entry form.
-    (assert-equal (first forms) (first rewritten))
-    (assert-false (equal (second forms) (second rewritten)))
-    (assert-true (consp (second rewritten)))))
+    (expect (first rewritten) :to-equal (first forms))
+    (expect (equal (second forms) (second rewritten)) :to-be-falsy)
+    (expect (consp (second rewritten)) :to-be-truthy)))
 
-(deftest pipeline-compile-expression-vm-program-uses-raw-stream
-  "compile-expression keeps raw VM instructions executable for :vm targets while preserving optimizer output separately."
+(it-sequential "pipeline-compile-expression-vm-program-uses-raw-stream"
   (let* ((result (compile-expression '(+ 1 2) :target :vm))
           (program-instrs (vm-program-instructions (compilation-result-program result)))
           (raw-instrs (cl-cc:compilation-result-vm-instructions result))
           (optimized-instrs (cl-cc:compilation-result-optimized-instructions result)))
-    (assert-equal program-instrs raw-instrs)
-    (assert-true (> (length raw-instrs) 0))
-    (assert-true (listp optimized-instrs))))
+    (expect raw-instrs :to-equal program-instrs)
+    (expect (> (length raw-instrs) 0) :to-be-truthy)
+    (expect (listp optimized-instrs) :to-be-truthy)))
 
-(deftest pipeline-compile-string-accepts-pgo-speed-kwargs
-  "compile-string accepts PGO-derived :speed plus inline threshold kwargs used by CLI compile paths."
+(it-sequential "pipeline-compile-string-accepts-pgo-speed-kwargs"
   (let ((result (compile-string "(+ 1 2)"
                                 :target :vm
                                 :speed 3
                                 :inline-threshold-scale 2)))
-     (assert-true (typep result 'cl-cc/compile:compilation-result))))
+     (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)))
 
-(deftest pipeline-verify-transforms-flag-is-dynamically-scoped
-  "FR-752: :verify-transforms enables translation validation only during optimizer execution."
+(it-sequential "pipeline-verify-transforms-flag-is-dynamically-scoped"
   (let ((cl-cc/optimize:*translation-validation-enabled* nil))
     (let ((result (compile-string "(+ 1 2)" :target :vm :verify-transforms t)))
-      (assert-true (typep result 'cl-cc/compile:compilation-result))
-      (assert-false cl-cc/optimize:*translation-validation-enabled*))))
+      (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)
+      (expect cl-cc/optimize:*translation-validation-enabled* :to-be-falsy))))
 
-(deftest pipeline-compile-string-emits-pgo-counter-plan
-  "compile-string returns a compilation-result carrying deterministic PGO counter plan metadata."
+(it-sequential "pipeline-compile-string-emits-pgo-counter-plan"
   (let* ((result (compile-string "(+ 1 2)" :target :vm))
          (plan (cl-cc/compile:compilation-result-pgo-counter-plan result)))
-    (assert-true plan)
-    (assert-true (integerp (getf plan :total-bb)))
-    (assert-true (integerp (getf plan :total-edge)))
-    (assert-true (consp (getf plan :bb-counters)))
-    (assert-true (consp (getf plan :edge-counters)))
-    (assert-true (consp (getf plan :bb-runtime-keys)))
-    (assert-true (listp (getf plan :edge-runtime-keys)))))
+    (expect plan :to-be-truthy)
+    (expect (integerp (getf plan :total-bb)) :to-be-truthy)
+    (expect (integerp (getf plan :total-edge)) :to-be-truthy)
+    (expect (consp (getf plan :bb-counters)) :to-be-truthy)
+    (expect (consp (getf plan :edge-counters)) :to-be-truthy)
+    (expect (consp (getf plan :bb-runtime-keys)) :to-be-truthy)
+    (expect (listp (getf plan :edge-runtime-keys)) :to-be-truthy)))
 
-(deftest pipeline-compile-string-with-stdlib-emits-pgo-counter-plan
-  "compile-string-with-stdlib also backfills pgo counter metadata for CLI --stdlib PGO paths."
+(it-sequential "pipeline-compile-string-with-stdlib-emits-pgo-counter-plan"
   (let* ((result (cl-cc:compile-string-with-stdlib "(+ 1 2)" :target :vm))
          (plan (cl-cc/compile:compilation-result-pgo-counter-plan result)))
-    (assert-true plan)
-    (assert-true (integerp (getf plan :total-bb)))
-    (assert-true (consp (getf plan :bb-runtime-keys)))))
+    (expect plan :to-be-truthy)
+    (expect (integerp (getf plan :total-bb)) :to-be-truthy)
+    (expect (consp (getf plan :bb-runtime-keys)) :to-be-truthy)))
 
-(deftest pipeline-tier-0-and-tier-1-are-distinguishable
-  "FR-154: Tier-0 skips optimizer policy while Tier-1 records optimized compilation tier metadata."
+(it-sequential "pipeline-tier-0-and-tier-1-are-distinguishable"
   (let ((tier0 (compile-string "(+ 1 2)" :target :vm :compilation-tier 0))
         (tier1 (compile-string "(+ 1 2)" :target :vm :compilation-tier 1)))
-    (assert-= 0 (cl-cc/vm:vm-program-compilation-tier
-                 (cl-cc/compile:compilation-result-program tier0)))
-    (assert-= 1 (cl-cc/vm:vm-program-compilation-tier
-                 (cl-cc/compile:compilation-result-program tier1)))
-    (assert-true (listp (cl-cc/compile:compilation-result-optimized-instructions tier0)))
-    (assert-true (listp (cl-cc/compile:compilation-result-optimized-instructions tier1)))))
+    (expect (= 0 (cl-cc/vm:vm-program-compilation-tier
+                 (cl-cc/compile:compilation-result-program tier0))) :to-be-truthy)
+    (expect (= 1 (cl-cc/vm:vm-program-compilation-tier
+                 (cl-cc/compile:compilation-result-program tier1))) :to-be-truthy)
+    (expect (listp (cl-cc/compile:compilation-result-optimized-instructions tier0)) :to-be-truthy)
+    (expect (listp (cl-cc/compile:compilation-result-optimized-instructions tier1)) :to-be-truthy)))
 
-(deftest pipeline-maybe-bump-opts-speed-from-ast-defun-declaration
-  "%pipeline-maybe-bump-opts-speed-from-ast picks up local defun optimize speed declaration."
+(it-sequential "pipeline-maybe-bump-opts-speed-from-ast-defun-declaration"
   (let* ((opts (cl-cc::%make-pipeline-opts :target :vm :speed nil))
          (ast (cl-cc/ast:make-ast-defun
                :name 'f
@@ -129,10 +114,9 @@
                :documentation nil
                :body (list (make-ast-var :name 'x)))))
     (cl-cc/pipeline::%pipeline-maybe-bump-opts-speed-from-ast opts ast)
-    (assert-= 3 (cl-cc/pipeline::pipeline-opts-speed opts))))
+    (expect (= 3 (cl-cc/pipeline::pipeline-opts-speed opts)) :to-be-truthy)))
 
-(deftest pipeline-maybe-bump-opts-speed-from-ast-does-not-lower-existing-speed
-  "%pipeline-maybe-bump-opts-speed-from-ast keeps higher existing speed when local speed is lower."
+(it-sequential "pipeline-maybe-bump-opts-speed-from-ast-does-not-lower-existing-speed"
   (let* ((opts (cl-cc::%make-pipeline-opts :target :vm :speed 3))
          (ast (cl-cc/ast:make-ast-defun
                :name 'f
@@ -144,63 +128,65 @@
                :documentation nil
                :body (list (make-ast-var :name 'x)))))
     (cl-cc/pipeline::%pipeline-maybe-bump-opts-speed-from-ast opts ast)
-    (assert-= 3 (cl-cc/pipeline::pipeline-opts-speed opts))))
+    (expect (= 3 (cl-cc/pipeline::pipeline-opts-speed opts)) :to-be-truthy)))
 
-(deftest-each pipeline-compile-toplevel-forms-defvar-type-env
-  "compile-toplevel-forms infers fixnum type for defvar regardless of type-check flag."
-  :cases (("with-type-check"
-           '((defvar *typed-top-level* 42))
-           '*typed-top-level*
-           t)
-          ("without-type-check"
-           '((defvar *typed-top-level-no-check* 42))
-           '*typed-top-level-no-check*
-           nil))
-  (forms lookup-sym type-check)
-  (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
-    (assert-true (typep (cl-cc/compile:compilation-result-type-env result)
-                        'cl-cc/type:type-env))
+(it-sequential "pipeline-compile-toplevel-forms-defvar-type-env with-type-check"
+  (destructuring-bind (forms lookup-sym type-check) (list '((defvar *typed-top-level* 42)) '*typed-top-level* t)
+    (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
+    (expect (typep (cl-cc/compile:compilation-result-type-env result)
+                        'cl-cc/type:type-env) :to-be-truthy)
     (multiple-value-bind (scheme found-p)
         (cl-cc/type::type-env-lookup lookup-sym
                                      (cl-cc/compile:compilation-result-type-env result))
-      (assert-true found-p)
-      (assert-eq 'fixnum (cl-cc/type:type-primitive-name
-                          (cl-cc/type::type-scheme-type scheme))))))
+      (expect found-p :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name
+                          (cl-cc/type::type-scheme-type scheme)) :to-be 'fixnum)))))
 
-(deftest pipeline-compile-toplevel-forms-captures-cps
-  "compile-toplevel-forms may store CPS metadata for top-level input."
+(it-sequential "pipeline-compile-toplevel-forms-defvar-type-env without-type-check"
+  (destructuring-bind (forms lookup-sym type-check) (list '((defvar *typed-top-level-no-check* 42)) '*typed-top-level-no-check* nil)
+    (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
+    (expect (typep (cl-cc/compile:compilation-result-type-env result)
+                        'cl-cc/type:type-env) :to-be-truthy)
+    (multiple-value-bind (scheme found-p)
+        (cl-cc/type::type-env-lookup lookup-sym
+                                     (cl-cc/compile:compilation-result-type-env result))
+      (expect found-p :to-be-truthy)
+      (expect (cl-cc/type:type-primitive-name
+                          (cl-cc/type::type-scheme-type scheme)) :to-be 'fixnum)))))
+
+(it-sequential "pipeline-compile-toplevel-forms-captures-cps"
   (let ((result (cl-cc/compile:compile-toplevel-forms '((+ 1 2) (- 4 1)))))
-    (assert-true (or (null (cl-cc/compile:compilation-result-cps result))
-                     (consp (cl-cc/compile:compilation-result-cps result))))))
+    (expect (or (null (cl-cc/compile:compilation-result-cps result))
+                     (consp (cl-cc/compile:compilation-result-cps result))) :to-be-truthy)))
 
-(deftest pipeline-compile-toplevel-forms-program-uses-raw-stream-for-vm
-  "compile-toplevel-forms keeps raw VM instructions in the program for :vm execution while still recording optimizer output."
+(it-sequential "pipeline-compile-toplevel-forms-program-uses-raw-stream-for-vm"
   (let* ((result (cl-cc/compile:compile-toplevel-forms '((+ 1 2) (- 4 1)) :target :vm))
           (program-instrs (vm-program-instructions (cl-cc/compile:compilation-result-program result)))
           (raw-instrs (cl-cc/compile:compilation-result-vm-instructions result))
           (optimized-instrs (cl-cc/compile:compilation-result-optimized-instructions result)))
-    (assert-equal program-instrs raw-instrs)
-    (assert-true (> (length raw-instrs) 0))
-    (assert-true (listp optimized-instrs))))
+    (expect raw-instrs :to-equal program-instrs)
+    (expect (> (length raw-instrs) 0) :to-be-truthy)
+    (expect (listp optimized-instrs) :to-be-truthy)))
 
-(deftest-each pipeline-compile-toplevel-forms-defun-type-env
-  "compile-toplevel-forms infers function type for defun regardless of type-check flag."
-  :cases (("with-type-check"
-           '((defun typed-id (x) x))
-           'typed-id
-           t)
-          ("without-type-check"
-           '((defun typed-id-no-check (x) x))
-           'typed-id-no-check
-           nil))
-  (forms lookup-sym type-check)
-  (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
+(it-sequential "pipeline-compile-toplevel-forms-defun-type-env with-type-check"
+  (destructuring-bind (forms lookup-sym type-check) (list '((defun typed-id (x) x)) 'typed-id t)
+    (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
     (multiple-value-bind (scheme found-p)
         (cl-cc/type::type-env-lookup lookup-sym
                                      (cl-cc/compile:compilation-result-type-env result))
-      (assert-true found-p)
-      (assert-true (cl-cc/type:type-arrow-p
-                    (cl-cc/type::type-scheme-type scheme))))))
+      (expect found-p :to-be-truthy)
+      (expect (cl-cc/type:type-arrow-p
+                    (cl-cc/type::type-scheme-type scheme)) :to-be-truthy)))))
+
+(it-sequential "pipeline-compile-toplevel-forms-defun-type-env without-type-check"
+  (destructuring-bind (forms lookup-sym type-check) (list '((defun typed-id-no-check (x) x)) 'typed-id-no-check nil)
+    (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
+    (multiple-value-bind (scheme found-p)
+        (cl-cc/type::type-env-lookup lookup-sym
+                                     (cl-cc/compile:compilation-result-type-env result))
+      (expect found-p :to-be-truthy)
+      (expect (cl-cc/type:type-arrow-p
+                    (cl-cc/type::type-scheme-type scheme)) :to-be-truthy)))))
 
 ;;; Additional eval/prescan/stdlib integration tests live in pipeline-eval-tests.lisp.
 
@@ -220,22 +206,19 @@
          (cl-cc:make-vm-ret :reg :R))
    :metadata '(:test :fr-501)))
 
-(deftest fr-501-thin-lto-summaries-are-generated-and-used-for-imports
-  "FR-501: ThinLTO builds serializable summaries and uses them to select hot imports."
+(it-sequential "fr-501-thin-lto-summaries-are-generated-and-used-for-imports"
   (let* ((module (%fr501-thin-lto-hot-module))
          (summary (cl-cc/pipeline::thin-lto-generate-module-summary module))
          (payload (cl-cc/pipeline::thin-lto-serialize-summary summary))
          (summaries (cl-cc/pipeline::thin-lto-read-summaries (list payload))))
-    (assert-string= "thin-hot" (cl-cc/pipeline::thin-lto-module-summary-module-name summary))
-    (assert-true (cl-cc/pipeline::thin-lto-module-summary-functions summary))
-    (assert-equal '("thin-hot" . "hot-fn")
-                  (first (cl-cc/pipeline::thin-lto-select-imports summaries :threshold -1)))
+    (expect (cl-cc/pipeline::thin-lto-module-summary-module-name summary) :to-equal "thin-hot")
+    (expect (cl-cc/pipeline::thin-lto-module-summary-functions summary) :to-be-truthy)
+    (expect (first (cl-cc/pipeline::thin-lto-select-imports summaries :threshold -1)) :to-equal '("thin-hot" . "hot-fn"))
     (multiple-value-bind (optimized used-summaries)
         (cl-cc/pipeline::thin-lto-optimize-modules (list module) :threshold -1)
-      (assert-true (first optimized))
-      (assert-true used-summaries)
-      (assert-equal '("hot-fn")
-                    (getf (cl-cc/pipeline::lto-module-metadata (first optimized)) :imports)))))
+      (expect (first optimized) :to-be-truthy)
+      (expect used-summaries :to-be-truthy)
+      (expect (getf (cl-cc/pipeline::lto-module-metadata (first optimized)) :imports) :to-equal '("hot-fn")))))
 
 (defun %fr660-function-layout-program ()
   (cl-cc:make-vm-program
@@ -263,18 +246,16 @@
                       (string= (cl-cc/vm:vm-name inst) label)))
                instructions))
 
-(deftest fr-660-bolt-flag-triggers-post-link-layout-path
-  "FR-660: :bolt option routes a VM program through the BOLT layout optimizer."
+(it-sequential "fr-660-bolt-flag-triggers-post-link-layout-path"
   (let* ((program (%fr660-function-layout-program))
          (opts '(:bolt t :bolt-profile nil :perf-map nil))
          (optimized (cl-cc:maybe-pipeline-bolt-optimize-program program opts))
          (instructions (cl-cc/vm:vm-program-instructions optimized)))
-    (assert-false (eq program optimized))
-    (assert-true (%label-position instructions "hot-entry"))
-    (assert-true (%label-position instructions "cold-entry"))))
+    (expect (eq program optimized) :to-be-falsy)
+    (expect (%label-position instructions "hot-entry") :to-be-truthy)
+    (expect (%label-position instructions "cold-entry") :to-be-truthy)))
 
-(deftest fr-661-autofdo-profile-guided-layout-moves-cold-blocks-after-hot-blocks
-  "FR-661: profile-guided layout decisions reorder cold labelled blocks after hot code."
+(it-sequential "fr-661-autofdo-profile-guided-layout-moves-cold-blocks-after-hot-blocks"
   (let* ((instructions (list (cl-cc:make-vm-label :name "cold-fn")
                              (cl-cc:make-vm-const :dst :R :value :cold)
                              (cl-cc:make-vm-label :name "hot-fn")
@@ -282,8 +263,8 @@
          (profile-data '(:layout-decisions ((:function "cold-fn" :count 1 :layout :cold)
                                             (:function "hot-fn" :count 99 :layout :hot))))
          (laid-out (cl-cc:autofdo-apply-layout-decisions instructions profile-data)))
-    (assert-true (< (%label-position laid-out "hot-fn")
-                    (%label-position laid-out "cold-fn")))))
+    (expect (< (%label-position laid-out "hot-fn")
+                    (%label-position laid-out "cold-fn")) :to-be-truthy)))
 
 ;;; ─── Backend registration protocol (§5-1 of the repo-split design) ──────────
 
@@ -312,33 +293,19 @@ asserting the new path reproduces it has to still hold the old one."
           (cl-cc/backend-protocol:registered-backend language)))
         #'string< :key #'symbol-name))
 
-(deftest backend-bootstrap-registry-carries-both-backends
-  "PHP and JavaScript both register through the cl-cc/bootstrap registry.
-
-§5-1 was implemented twice. The standalone cl-cc-php and cl-cc-javascript --
-which are what this build compiles -- use the older and wider of the two, in
-cl-cc/bootstrap. The pipeline drains both registries, so which one a backend
-picked is its own business; what has to hold is that its helpers arrive."
+(it-sequential "backend-bootstrap-registry-carries-both-backends"
   (let ((entries (cl-cc/bootstrap:backend-bridge-providers)))
-    (assert-true (plusp (length entries)))
+    (expect (plusp (length entries)) :to-be-truthy)
     (dolist (prefix '("%PHP-" "%JS-"))
-      (assert-true
-       (find-if (lambda (entry)
+      (expect (find-if (lambda (entry)
                   (let ((name (symbol-name (car entry)))
                         (n (length prefix)))
                     (and (>= (length name) n) (string= prefix name :end2 n))))
-                entries)))))
+                entries) :to-be-truthy))))
 
-(deftest backend-bridge-sets-match-the-old-package-scans
-  "The bridged set is what scanning each backend's package directly would give.
-
-The scans moved out of the pipeline and into the packages that own the naming
-conventions, so the orchestrator would stop depending on a backend's package
-name -- the coupling that blocked moving either to its own repository. Same
-predicates, same packages, evaluated from the other side of the boundary, so
-the result has to be identical or the move was not behaviour-preserving."
+(it-sequential "backend-bridge-sets-match-the-old-package-scans"
   (let ((registered (mapcar #'car (cl-cc/bootstrap:backend-bridge-providers))))
     (dolist (spec '((:cl-cc/php "%PHP-") (:cl-cc/javascript "%JS-")))
       (let ((scan (%package-prefixed-function-symbols (first spec) (second spec))))
-        (assert-true (plusp (length scan)))
-        (assert-null (set-difference scan registered))))))
+        (expect (plusp (length scan)) :to-be-truthy)
+        (expect (set-difference scan registered) :to-be-null)))))

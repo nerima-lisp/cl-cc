@@ -6,12 +6,7 @@
 
 (in-package :cl-cc/test)
 
-(defsuite ansi-conformance-package-suite
-  :description "ANSI CL Package System Conformance Tests"
-  :parent cl-cc-conformance-suite
-  :parallel nil)
 
-(in-suite ansi-conformance-package-suite)
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Helper: compile and run a string, capturing stdout
@@ -36,45 +31,33 @@ return the printed representation of the primary result."
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; These test core package registry operations through the cl-cc runtime.
 
-(deftest pkg-find-package-self-host
-  "find-package should work without host SBCL fallback in self-host mode."
-  :timeout 30
-  :tags '(:package :find-package :self-host)
+(it-sequential "pkg-find-package-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     ;; Bootstrap the registry with CL-USER
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-find-package "CL-USER" nil)))
-      (assert-true pkg)
-      (assert-equal "CL-USER" (cl-cc/vm::vm-symbol-name (cl-cc/vm::vm-package-name pkg))))))
+      (expect pkg :to-be-truthy)
+      (expect (cl-cc/vm::vm-symbol-name (cl-cc/vm::vm-package-name pkg)) :to-equal "CL-USER"))))
 
-(deftest pkg-intern-self-host
-  "intern should create symbols in runtime package registry without host CL."
-  :timeout 30
-  :tags '(:package :intern :self-host)
+(it-sequential "pkg-intern-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let* ((pkg (cl-cc/vm::vm-find-package "CL-USER" nil))
            (sym (cl-cc/vm::vm-intern-symbol "MY-TEST-SYM" pkg)))
-      (assert-true sym)
-      (assert-equal "MY-TEST-SYM" (cl-cc/vm::vm-symbol-name sym)))))
+      (expect sym :to-be-truthy)
+      (expect (cl-cc/vm::vm-symbol-name sym) :to-equal "MY-TEST-SYM"))))
 
-(deftest pkg-export-self-host
-  "export should make symbols external in runtime package registry."
-  :timeout 30
-  :tags '(:package :export :self-host)
+(it-sequential "pkg-export-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-find-package "CL-USER" nil)))
       (cl-cc/vm::vm-export (list (cl-cc/vm::vm-intern-symbol "EXPORTED-SYM" pkg)) pkg)
       (multiple-value-bind (sym status)
           (cl-cc/vm::vm-find-symbol "EXPORTED-SYM" pkg)
-        (assert-true sym)
-        (assert-eq :external status)))))
+        (expect sym :to-be-truthy)
+        (expect status :to-be :external)))))
 
-(deftest pkg-import-self-host
-  "import should make symbols accessible in target package."
-  :timeout 30
-  :tags '(:package :import :self-host)
+(it-sequential "pkg-import-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let* ((src (cl-cc/vm::vm-make-package "SRC-PKG"))
@@ -84,13 +67,10 @@ return the printed representation of the primary result."
       (cl-cc/vm::vm-import (list sym) dst)
       (multiple-value-bind (found status)
           (cl-cc/vm::vm-find-symbol "IMPORTED" dst)
-        (assert-true found)
-        (assert-eq :internal status)))))
+        (expect found :to-be-truthy)
+        (expect status :to-be :internal)))))
 
-(deftest pkg-use-package-self-host
-  "use-package should make all exported symbols accessible."
-  :timeout 30
-  :tags '(:package :use-package :self-host)
+(it-sequential "pkg-use-package-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let* ((lib (cl-cc/vm::vm-make-package "LIB-PKG"))
@@ -100,13 +80,10 @@ return the printed representation of the primary result."
       (cl-cc/vm::vm-use-package lib user)
       (multiple-value-bind (found status)
           (cl-cc/vm::vm-find-symbol "LIB-FN" user)
-        (assert-true found)
-        (assert-eq :inherited status)))))
+        (expect found :to-be-truthy)
+        (expect status :to-be :inherited)))))
 
-(deftest pkg-unuse-package-self-host
-  "unuse-package should remove inherited symbols."
-  :timeout 30
-  :tags '(:package :unuse-package :self-host)
+(it-sequential "pkg-unuse-package-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let* ((lib (cl-cc/vm::vm-make-package "UNUSE-LIB"))
@@ -117,12 +94,9 @@ return the printed representation of the primary result."
       (cl-cc/vm::vm-unuse-package lib user)
       (multiple-value-bind (found status)
           (cl-cc/vm::vm-find-symbol "FN" user)
-        (assert-null found)))))
+        (expect found :to-be-null)))))
 
-(deftest pkg-shadow-self-host
-  "shadow should create shadowing symbols in package."
-  :timeout 30
-  :tags '(:package :shadow :self-host)
+(it-sequential "pkg-shadow-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let* ((lib (cl-cc/vm::vm-make-package "SHADOW-LIB"))
@@ -134,67 +108,52 @@ return the printed representation of the primary result."
       ;; After shadowing, FN in user should be internal (not inherited)
       (multiple-value-bind (found status)
           (cl-cc/vm::vm-find-symbol "FN" user)
-        (assert-true found)
-        (assert-eq :internal status)))))
+        (expect found :to-be-truthy)
+        (expect status :to-be :internal)))))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Package Name Operations
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-package-name-self-host
-  "package-name should return the package name string."
-  :timeout 30
-  :tags '(:package :package-name :self-host)
+(it-sequential "pkg-package-name-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-make-package "NAME-TEST-PKG")))
-      (assert-equal "NAME-TEST-PKG" (cl-cc/vm::vm-package-name pkg)))))
+      (expect (cl-cc/vm::vm-package-name pkg) :to-equal "NAME-TEST-PKG"))))
 
-(deftest pkg-package-nicknames-self-host
-  "package-nicknames should return list of nickname strings."
-  :timeout 30
-  :tags '(:package :package-nicknames :self-host)
+(it-sequential "pkg-package-nicknames-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let* ((pkg (cl-cc/vm::vm-make-package "NICK-TEST" :nicknames '("N1" "N2")))
            (nicks (cl-cc/vm::vm-package-nicknames pkg)))
-      (assert-true (member "N1" nicks :test #'equal))
-      (assert-true (member "N2" nicks :test #'equal)))))
+      (expect (member "N1" nicks :test #'equal) :to-be-truthy)
+      (expect (member "N2" nicks :test #'equal) :to-be-truthy))))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Symbol Operations
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-make-symbol-self-host
-  "make-symbol should create uninterned symbols without host CL."
-  :timeout 30
-  :tags '(:package :make-symbol :self-host)
+(it-sequential "pkg-make-symbol-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (let ((sym (cl-cc/vm::vm-make-symbol "UNINTERNED")))
-      (assert-true sym)
-      (assert-equal "UNINTERNED" (cl-cc/vm::vm-symbol-name sym))
+      (expect sym :to-be-truthy)
+      (expect (cl-cc/vm::vm-symbol-name sym) :to-equal "UNINTERNED")
       ;; make-symbol creates uninterned symbols
-      (assert-null (cl-cc/vm::vm-symbol-package sym)))))
+      (expect (cl-cc/vm::vm-symbol-package sym) :to-be-null))))
 
-(deftest pkg-gensym-self-host
-  "gensym should generate unique symbols without host CL."
-  :timeout 30
-  :tags '(:package :gensym :self-host)
+(it-sequential "pkg-gensym-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (let ((g1 (cl-cc/vm::vm-gensym-inst "G" nil))
           (g2 (cl-cc/vm::vm-gensym-inst "G" nil)))
-      (assert-true g1)
-      (assert-true g2)
-      (assert-false (eq g1 g2)))))
+      (expect g1 :to-be-truthy)
+      (expect g2 :to-be-truthy)
+      (expect (eq g1 g2) :to-be-falsy))))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; defpackage Macro (E2E via run-string)
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-defpackage-e2e
-  "defpackage should create usable packages via run-string."
-  :timeout 60
-  :tags '(:package :defpackage :e2e)
+(it-sequential "pkg-defpackage-e2e"
   (let ((result (run-cl-string
                  "(progn
                     (defpackage :e2e-pkg
@@ -205,12 +164,9 @@ return the printed representation of the primary result."
                     (in-package :cl-user)
                     (e2e-pkg:hello-world))"
                  :capture-output t)))
-    (assert-equal "Hello from e2e-pkg" result)))
+    (expect result :to-equal "Hello from e2e-pkg")))
 
-(deftest pkg-defpackage-conflict-detection
-  "defpackage should detect symbol conflicts when using multiple packages."
-  :timeout 60
-  :tags '(:package :defpackage :conflict :e2e)
+(it-sequential "pkg-defpackage-conflict-detection"
   (let ((result (run-cl-string
                  "(progn
                     (defpackage :conflict-a (:export :dup))
@@ -222,16 +178,13 @@ return the printed representation of the primary result."
                       (error (c) :conflict-detected)))"
                  :capture-output t)))
     ;; ANSI CL requires conflict detection on :USE
-    (assert-equal "CONFLICT-DETECTED" result)))
+    (expect result :to-equal "CONFLICT-DETECTED")))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; Package Iteration
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-do-symbols-self-host
-  "do-symbols should iterate over package symbols."
-  :timeout 30
-  :tags '(:package :do-symbols :self-host)
+(it-sequential "pkg-do-symbols-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-make-package "ITER-PKG"))
@@ -240,59 +193,47 @@ return the printed representation of the primary result."
       (cl-cc/vm::vm-intern-symbol "B" pkg)
       (cl-cc/vm::vm-do-symbols (sym pkg)
         (push sym syms))
-      (assert-= 2 (length syms)))))
+      (expect (= 2 (length syms)) :to-be-truthy))))
 
-(deftest pkg-list-all-packages-self-host
-  "list-all-packages should return all registered packages."
-  :timeout 30
-  :tags '(:package :list-all-packages :self-host)
+(it-sequential "pkg-list-all-packages-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkgs (cl-cc/vm::vm-list-all-packages)))
-      (assert-true (>= (length pkgs) 1))
+      (expect (>= (length pkgs) 1) :to-be-truthy)
       ;; CL-USER should be in the list
-      (assert-true (find "CL-USER" pkgs
+      (expect (find "CL-USER" pkgs
                          :test #'equal
-                         :key #'cl-cc/vm::vm-package-name)))))
+                         :key #'cl-cc/vm::vm-package-name) :to-be-truthy))))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; delete-package / rename-package
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-delete-package-self-host
-  "delete-package should remove package from registry."
-  :timeout 30
-  :tags '(:package :delete-package :self-host)
+(it-sequential "pkg-delete-package-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-make-package "TEMP-PKG")))
-      (assert-true (cl-cc/vm::vm-find-package "TEMP-PKG" nil))
+      (expect (cl-cc/vm::vm-find-package "TEMP-PKG" nil) :to-be-truthy)
       (cl-cc/vm::vm-delete-package pkg)
-      (assert-null (cl-cc/vm::vm-find-package "TEMP-PKG" nil)))))
+      (expect (cl-cc/vm::vm-find-package "TEMP-PKG" nil) :to-be-null))))
 
-(deftest pkg-rename-package-self-host
-  "rename-package should change package name."
-  :timeout 30
-  :tags '(:package :rename-package :self-host)
+(it-sequential "pkg-rename-package-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-make-package "OLD-NAME")))
       (cl-cc/vm::vm-rename-package pkg "NEW-NAME")
-      (assert-null (cl-cc/vm::vm-find-package "OLD-NAME" nil))
-      (assert-true (cl-cc/vm::vm-find-package "NEW-NAME" nil)))))
+      (expect (cl-cc/vm::vm-find-package "OLD-NAME" nil) :to-be-null)
+      (expect (cl-cc/vm::vm-find-package "NEW-NAME" nil) :to-be-truthy))))
 
 ;;; ──────────────────────────────────────────────────────────────────────
 ;;; unintern
 ;;; ──────────────────────────────────────────────────────────────────────
 
-(deftest pkg-unintern-self-host
-  "unintern should remove symbol from package."
-  :timeout 30
-  :tags '(:package :unintern :self-host)
+(it-sequential "pkg-unintern-self-host"
   (let ((cl-cc/vm::*vm-self-host-mode* t))
     (cl-cc/vm::vm-bootstrap-package-registry)
     (let ((pkg (cl-cc/vm::vm-make-package "UNINTERN-TEST")))
       (cl-cc/vm::vm-intern-symbol "TEMP-SYM" pkg)
-      (assert-true (cl-cc/vm::vm-find-symbol "TEMP-SYM" pkg))
+      (expect (cl-cc/vm::vm-find-symbol "TEMP-SYM" pkg) :to-be-truthy)
       (cl-cc/vm::vm-unintern (cl-cc/vm::vm-find-symbol "TEMP-SYM" pkg) pkg)
-      (assert-null (cl-cc/vm::vm-find-symbol "TEMP-SYM" pkg)))))
+      (expect (cl-cc/vm::vm-find-symbol "TEMP-SYM" pkg) :to-be-null))))

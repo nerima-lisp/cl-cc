@@ -1,11 +1,7 @@
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
-(deftest fr-586-set-is-core-builtin
-  "FR-586 `set` is registered in the core binary builtin table."
-  (assert-equal 'cl-cc::make-vm-set-symbol-value
-                (cdr (assoc 'set cl-cc/compile::*builtin-binary-entries*))))
+(it-sequential "fr-586-set-is-core-builtin"
+  (expect (cdr (assoc 'set cl-cc/compile::*builtin-binary-entries*)) :to-equal 'cl-cc::make-vm-set-symbol-value))
 
-(deftest fr-586-set-not-in-binary-custom-table
-  "FR-586 `set` is absent from the extended binary-custom table."
-  (assert-false (assoc 'set cl-cc/compile::*builtin-binary-custom-entries*)))
+(it-sequential "fr-586-set-not-in-binary-custom-table"
+  (expect (assoc 'set cl-cc/compile::*builtin-binary-custom-entries*) :to-be-falsy))

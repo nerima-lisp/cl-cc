@@ -10,7 +10,6 @@
 ;;;;   lex-read-form-text — reads balanced forms as raw strings
 
 (in-package :cl-cc/test)
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -39,174 +38,175 @@
 
 ;;; ─── lex-feature-present-p ───────────────────────────────────────────────────
 
-(deftest-each lex-feature-present-p-keyword-lookup
-  "lex-feature-present-p returns T for features in *features*, NIL otherwise."
-  :cases (("present"  :cl-cc-present   t)
-          ("absent"   :no-such-feature nil))
-  (feature expected)
-  (let ((*features* '(:cl-cc-present :common-lisp)))
+(it-sequential "lex-feature-present-p-keyword-lookup present"
+  (destructuring-bind (feature expected) (list :cl-cc-present t)
+    (let ((*features* '(:cl-cc-present :common-lisp)))
     (assert-parse-boolean-case expected
-        (cl-cc/parse::lex-feature-present-p feature))))
+        (cl-cc/parse::lex-feature-present-p feature)))))
 
-(deftest lex-feature-present-p-or-any-present
-  "lex-feature-present-p: :or succeeds when any member is present; fails when none are."
+(it-sequential "lex-feature-present-p-keyword-lookup absent"
+  (destructuring-bind (feature expected) (list :no-such-feature nil)
+    (let ((*features* '(:cl-cc-present :common-lisp)))
+    (assert-parse-boolean-case expected
+        (cl-cc/parse::lex-feature-present-p feature)))))
+
+(it-sequential "lex-feature-present-p-or-any-present"
   (let ((*features* '(:cl-cc-present)))
-      (assert-true (cl-cc/parse::lex-feature-present-p '(:or :cl-cc-present :ccl)))
-      (assert-null (cl-cc/parse::lex-feature-present-p '(:or :ccl :ecl)))))
+      (expect (cl-cc/parse::lex-feature-present-p '(:or :cl-cc-present :ccl)) :to-be-truthy)
+      (expect (cl-cc/parse::lex-feature-present-p '(:or :ccl :ecl)) :to-be-null)))
 
-(deftest lex-feature-present-p-and-all-required
-  "lex-feature-present-p: :and succeeds when all members present; fails when any absent."
+(it-sequential "lex-feature-present-p-and-all-required"
   (let ((*features* '(:cl-cc-present :common-lisp)))
-      (assert-true (cl-cc/parse::lex-feature-present-p '(:and :cl-cc-present :common-lisp)))
-      (assert-null (cl-cc/parse::lex-feature-present-p '(:and :cl-cc-present :ccl)))))
+      (expect (cl-cc/parse::lex-feature-present-p '(:and :cl-cc-present :common-lisp)) :to-be-truthy)
+      (expect (cl-cc/parse::lex-feature-present-p '(:and :cl-cc-present :ccl)) :to-be-null)))
 
-(deftest lex-feature-present-p-not-negates
-  "lex-feature-present-p: :not returns nil for present features and t for absent."
+(it-sequential "lex-feature-present-p-not-negates"
   (let ((*features* '(:cl-cc-present)))
-      (assert-null (cl-cc/parse::lex-feature-present-p '(:not :cl-cc-present)))
-      (assert-true (cl-cc/parse::lex-feature-present-p '(:not :ccl)))))
+      (expect (cl-cc/parse::lex-feature-present-p '(:not :cl-cc-present)) :to-be-null)
+      (expect (cl-cc/parse::lex-feature-present-p '(:not :ccl)) :to-be-truthy)))
 
-(deftest lex-feature-present-p-unknown-returns-nil
-  "lex-feature-present-p: non-list atoms and unknown combinators return nil."
-  (assert-null (cl-cc/parse::lex-feature-present-p 42))
-  (assert-null (cl-cc/parse::lex-feature-present-p '(:unknown :foo))))
+(it-sequential "lex-feature-present-p-unknown-returns-nil"
+  (expect (cl-cc/parse::lex-feature-present-p 42) :to-be-null)
+  (expect (cl-cc/parse::lex-feature-present-p '(:unknown :foo)) :to-be-null))
 
 ;;; ─── lex-read-form-text ──────────────────────────────────────────────────────
 
-(deftest-each lex-read-form-text-cases
-  "lex-read-form-text captures atoms, strings, and balanced lists verbatim."
-  :cases (("integer"     "42"          "42")
-          ("symbol"      "foo"         "foo")
-          ("keyword"     ":bar"        ":bar")
-          ("string"      "\"hello\""   "\"hello\"")
-          ("list"        "(+ 1 2)"     "(+ 1 2)")
-          ("nested-list" "(a (b c) d)" "(a (b c) d)"))
-  (source expected)
-  (assert-string= expected (lexer-dispatch-read-form-text source)))
+(it-sequential "lex-read-form-text-cases integer"
+  (destructuring-bind (source expected) (list "42" "42")
+    (expect (lexer-dispatch-read-form-text source) :to-equal expected)))
 
-(deftest lex-read-form-text-list-with-string
-  "lex-read-form-text handles lists containing strings with parens inside."
+(it-sequential "lex-read-form-text-cases symbol"
+  (destructuring-bind (source expected) (list "foo" "foo")
+    (expect (lexer-dispatch-read-form-text source) :to-equal expected)))
+
+(it-sequential "lex-read-form-text-cases keyword"
+  (destructuring-bind (source expected) (list ":bar" ":bar")
+    (expect (lexer-dispatch-read-form-text source) :to-equal expected)))
+
+(it-sequential "lex-read-form-text-cases string"
+  (destructuring-bind (source expected) (list "\"hello\"" "\"hello\"")
+    (expect (lexer-dispatch-read-form-text source) :to-equal expected)))
+
+(it-sequential "lex-read-form-text-cases list"
+  (destructuring-bind (source expected) (list "(+ 1 2)" "(+ 1 2)")
+    (expect (lexer-dispatch-read-form-text source) :to-equal expected)))
+
+(it-sequential "lex-read-form-text-cases nested-list"
+  (destructuring-bind (source expected) (list "(a (b c) d)" "(a (b c) d)")
+    (expect (lexer-dispatch-read-form-text source) :to-equal expected)))
+
+(it-sequential "lex-read-form-text-list-with-string"
   (let ((text (lexer-dispatch-read-form-text "(f \")\")")))
     ;; The ) inside the string must not close the list
-    (assert-string= "(f \")\")" text)))
+    (expect text :to-equal "(f \")\")")))
 
 ;;; ─── Hash Dispatch: Radix Integers ──────────────────────────────────────────
 
-(deftest-each lexer-dispatch-radix-integers
-  "Lexer correctly parses binary, octal, and hexadecimal integer literals."
-  :cases (("binary"  "#b1010"  10)
-          ("octal"   "#o17"    15)
-          ("hex"     "#xff"    255)
-          ("hex-cap" "#xFF"    255))
-  (source expected)
-  (assert-eq :t-int (first (lexer-dispatch-lex-types source)))
-  (assert-= expected (lexer-dispatch-first-value source)))
+(it-sequential "lexer-dispatch-radix-integers binary"
+  (destructuring-bind (source expected) (list "#b1010" 10)
+    (expect (first (lexer-dispatch-lex-types source)) :to-be :t-int) (expect (= expected (lexer-dispatch-first-value source)) :to-be-truthy)))
+
+(it-sequential "lexer-dispatch-radix-integers octal"
+  (destructuring-bind (source expected) (list "#o17" 15)
+    (expect (first (lexer-dispatch-lex-types source)) :to-be :t-int) (expect (= expected (lexer-dispatch-first-value source)) :to-be-truthy)))
+
+(it-sequential "lexer-dispatch-radix-integers hex"
+  (destructuring-bind (source expected) (list "#xff" 255)
+    (expect (first (lexer-dispatch-lex-types source)) :to-be :t-int) (expect (= expected (lexer-dispatch-first-value source)) :to-be-truthy)))
+
+(it-sequential "lexer-dispatch-radix-integers hex-cap"
+  (destructuring-bind (source expected) (list "#xFF" 255)
+    (expect (first (lexer-dispatch-lex-types source)) :to-be :t-int) (expect (= expected (lexer-dispatch-first-value source)) :to-be-truthy)))
 
 ;;; ─── Hash Dispatch: Function Reference ──────────────────────────────────────
 
-(deftest lexer-dispatch-function-reference
-  "Lexer tokenizes #'foo as :T-FUNCTION + :T-IDENT."
+(it-sequential "lexer-dispatch-function-reference"
   (let ((types (lexer-dispatch-lex-types "#'foo")))
-    (assert-equal '(:t-function :t-ident) types)))
+    (expect types :to-equal '(:t-function :t-ident))))
 
 ;;; ─── Hash Dispatch: Bit Vector ───────────────────────────────────────────────
 
-(deftest lexer-dispatch-bit-vector-with-bits
-  "Lexer: #*101 produces a 3-element bit-vector with values 1, 0, 1."
+(it-sequential "lexer-dispatch-bit-vector-with-bits"
   (let ((val (lexer-dispatch-first-value "#*101")))
-    (assert-true (bit-vector-p val))
-    (assert-= 3 (length val))
-    (assert-= 1 (sbit val 0))
-    (assert-= 0 (sbit val 1))
-    (assert-= 1 (sbit val 2))))
+    (expect (bit-vector-p val) :to-be-truthy)
+    (expect (= 3 (length val)) :to-be-truthy)
+    (expect (= 1 (sbit val 0)) :to-be-truthy)
+    (expect (= 0 (sbit val 1)) :to-be-truthy)
+    (expect (= 1 (sbit val 2)) :to-be-truthy)))
 
-(deftest lexer-dispatch-bit-vector-empty
-  "Lexer: #* produces an empty bit-vector of length 0."
+(it-sequential "lexer-dispatch-bit-vector-empty"
   (let ((val (lexer-dispatch-first-value "#*")))
-    (assert-true (bit-vector-p val))
-    (assert-= 0 (length val))))
+    (expect (bit-vector-p val) :to-be-truthy)
+    (expect (= 0 (length val)) :to-be-truthy)))
 
 ;;; ─── Hash Dispatch: Block Comment ───────────────────────────────────────────
 
-(deftest lexer-dispatch-block-comment-before-integer
-  "Lexer skips #| ... |# block comment; integer token after it is returned."
-  (assert-equal '(:t-int) (lexer-dispatch-lex-types "#| this is a comment |# 42")))
+(it-sequential "lexer-dispatch-block-comment-before-integer"
+  (expect (lexer-dispatch-lex-types "#| this is a comment |# 42") :to-equal '(:t-int)))
 
-(deftest lexer-dispatch-block-comment-before-ident
-  "Lexer skips #| ... |# block comment; identifier token after it is returned."
-  (assert-equal '(:t-ident) (lexer-dispatch-lex-types "#| comment |# symbol")))
+(it-sequential "lexer-dispatch-block-comment-before-ident"
+  (expect (lexer-dispatch-lex-types "#| comment |# symbol") :to-equal '(:t-ident)))
 
 ;;; ─── Hash Dispatch: Feature Conditionals #+/# ──────────────────────────────
 
-(deftest lexer-dispatch-hash-plus-includes-when-feature-present
-  "#+feature includes the next form when the feature is present."
-  (assert-equal '(:t-int)
-                (lexer-dispatch-lex-types-with-features
+(it-sequential "lexer-dispatch-hash-plus-includes-when-feature-present"
+  (expect (lexer-dispatch-lex-types-with-features
                  '(:cl-cc-present)
-                 "#+cl-cc-present 42")))
+                 "#+cl-cc-present 42") :to-equal '(:t-int)))
 
-(deftest lexer-dispatch-hash-plus-skips-when-feature-absent
-  "#+feature skips the first form and includes the second when the feature is absent."
-  (assert-equal '(:t-int)
-                (lexer-dispatch-lex-types-with-features
+(it-sequential "lexer-dispatch-hash-plus-skips-when-feature-absent"
+  (expect (lexer-dispatch-lex-types-with-features
                  '()
-                 "#+no-such-feature 42 99"))
-  (assert-= 99
-            (lexer-dispatch-first-value-with-features
+                 "#+no-such-feature 42 99") :to-equal '(:t-int))
+  (expect (= 99 (lexer-dispatch-first-value-with-features
              '()
-             "#+no-such-feature 42 99")))
+             "#+no-such-feature 42 99")) :to-be-truthy))
 
-(deftest lexer-dispatch-hash-minus-skips-when-feature-present
-  "#-feature skips the first form and includes the second when the feature is present."
-  (assert-equal '(:t-int)
-                (lexer-dispatch-lex-types-with-features
+(it-sequential "lexer-dispatch-hash-minus-skips-when-feature-present"
+  (expect (lexer-dispatch-lex-types-with-features
                  '(:cl-cc-present)
-                 "#-cl-cc-present 42 99"))
-  (assert-= 99
-            (lexer-dispatch-first-value-with-features
+                 "#-cl-cc-present 42 99") :to-equal '(:t-int))
+  (expect (= 99 (lexer-dispatch-first-value-with-features
              '(:cl-cc-present)
-             "#-cl-cc-present 42 99")))
+             "#-cl-cc-present 42 99")) :to-be-truthy))
 
-(deftest lexer-dispatch-hash-minus-includes-when-feature-absent
-  "#-feature includes the next form when the feature is absent."
-  (assert-equal '(:t-int)
-                (lexer-dispatch-lex-types-with-features
+(it-sequential "lexer-dispatch-hash-minus-includes-when-feature-absent"
+  (expect (lexer-dispatch-lex-types-with-features
                  '()
-                 "#-no-such-feature 42")))
+                 "#-no-such-feature 42") :to-equal '(:t-int)))
 
 ;;; ─── Hash Dispatch: Arbitrary Radix #nR ─────────────────────────────────────
 
-(deftest lexer-dispatch-arbitrary-radix
-  "Lexer parses #nR arbitrary-radix integers."
-  (assert-= 255 (lexer-dispatch-first-value "#16rFF"))
-  (assert-= 10  (lexer-dispatch-first-value "#2r1010")))
+(it-sequential "lexer-dispatch-arbitrary-radix"
+  (expect (= 255 (lexer-dispatch-first-value "#16rFF")) :to-be-truthy)
+  (expect (= 10 (lexer-dispatch-first-value "#2r1010")) :to-be-truthy))
 
 ;;; ─── Hash Dispatch: Vector #( ───────────────────────────────────────────────
 
-(deftest lexer-dispatch-vector-start
-  "Lexer tokenizes #( as :T-VECTOR-START."
+(it-sequential "lexer-dispatch-vector-start"
   (let ((types (lexer-dispatch-lex-types "#(1 2)")))
-    (assert-true (member :t-vector-start types))))
+    (expect (member :t-vector-start types) :to-be-truthy)))
 
 ;;; ─── Skip helpers via feature skip (indirect) ───────────────────────────────
 
 ;; For #- skip tests: #-feature skips the form when feature IS PRESENT.
 ;; Bind *features* to contain :skip-me so #-skip-me actually skips.
 
-(deftest-each lex-skip-form-cases
-  "lex-skip-form (via #-skip-me) correctly skips lists, strings, and atoms."
-  :cases (("list"   "#-skip-me (+ 1 2) 99"           99)
-          ("string" "#-skip-me \"hello (world)\" 42"  42)
-          ("atom"   "#-skip-me some-symbol 77"        77))
-  (source expected)
-  (assert-= expected
-            (lexer-dispatch-first-value-with-features '(:skip-me) source)))
+(it-sequential "lex-skip-form-cases list"
+  (destructuring-bind (source expected) (list "#-skip-me (+ 1 2) 99" 99)
+    (expect (= expected (lexer-dispatch-first-value-with-features '(:skip-me) source)) :to-be-truthy)))
 
-(deftest lex-skip-list-with-comment
-  "lex-skip-form handles lists containing ; line comments (body paren after comment)."
-  ;; The ; comment inside the list must not prevent the closing ) from being found
+(it-sequential "lex-skip-form-cases string"
+  (destructuring-bind (source expected) (list "#-skip-me \"hello (world)\" 42" 42)
+    (expect (= expected (lexer-dispatch-first-value-with-features '(:skip-me) source)) :to-be-truthy)))
+
+(it-sequential "lex-skip-form-cases atom"
+  (destructuring-bind (source expected) (list "#-skip-me some-symbol 77" 77)
+    (expect (= expected (lexer-dispatch-first-value-with-features '(:skip-me) source)) :to-be-truthy)))
+
+(it-sequential "lex-skip-list-with-comment"
   (let ((val (lexer-dispatch-first-value-with-features
               '(:skip-me)
               "#-skip-me (foo ; comment
                bar) 55")))
-    (assert-= 55 val)))
+    (expect (= 55 val) :to-be-truthy)))

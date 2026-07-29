@@ -5,146 +5,193 @@
 
 (in-package :cl-cc/test)
 
-(in-suite cl-cc-unit-suite)
 
 ;;; ─── Node Creation ──────────────────────────────────────────────────────────
 
-(deftest cst-token-creation
-  "cst-token: create and read back fields"
+(it-sequential "cst-token-creation"
   (let ((tok (cl-cc:make-cst-token :kind :int :value 42 :start-byte 0 :end-byte 2)))
-    (assert-eq :int (cl-cc:cst-node-kind tok))
-    (assert-= 42 (cl-cc:cst-token-value tok))
-    (assert-= 0 (cl-cc:cst-node-start-byte tok))
-    (assert-= 2 (cl-cc:cst-node-end-byte tok))))
+    (expect (cl-cc:cst-node-kind tok) :to-be :int)
+    (expect (= 42 (cl-cc:cst-token-value tok)) :to-be-truthy)
+    (expect (= 0 (cl-cc:cst-node-start-byte tok)) :to-be-truthy)
+    (expect (= 2 (cl-cc:cst-node-end-byte tok)) :to-be-truthy)))
 
-(deftest cst-interior-creation
-  "cst-interior: create with children list"
+(it-sequential "cst-interior-creation"
   (let* ((child1 (cl-cc:make-cst-token :kind :int :value 1))
          (child2 (cl-cc:make-cst-token :kind :int :value 2))
          (node (cl-cc:make-cst-interior :kind :list :children (list child1 child2))))
-    (assert-eq :list (cl-cc:cst-node-kind node))
-    (assert-= 2 (length (cl-cc:cst-children node)))))
+    (expect (cl-cc:cst-node-kind node) :to-be :list)
+    (expect (= 2 (length (cl-cc:cst-children node))) :to-be-truthy)))
 
-(deftest cst-error-creation
-  "cst-error: create with message"
+(it-sequential "cst-error-creation"
   (let ((err (cl-cc:make-cst-error :message "bad syntax" :start-byte 5 :end-byte 10)))
-    (assert-string= "bad syntax" (cl-cc:cst-error-message err))
-    (assert-= 5 (cl-cc:cst-node-start-byte err))))
+    (expect (cl-cc:cst-error-message err) :to-equal "bad syntax")
+    (expect (= 5 (cl-cc:cst-node-start-byte err)) :to-be-truthy)))
 
 ;;; ─── Predicates ─────────────────────────────────────────────────────────────
 
-(deftest-each cst-type-predicates
-  "cst-token-p, cst-interior-p, and cst-error-p each recognize their own node type."
-  :cases (("token-p-true"    #'cl-cc:cst-token-p    (cl-cc:make-cst-token :kind :int :value 0)       t)
-          ("token-p-false"   #'cl-cc:cst-token-p    (cl-cc:make-cst-interior :kind :list)             nil)
-          ("interior-p-true" #'cl-cc:cst-interior-p (cl-cc:make-cst-interior :kind :list)             t)
-          ("error-p-true"    #'cl-cc:cst-error-p    (cl-cc:make-cst-error :message "err")        t))
-  (pred node expected)
-  (if expected
-      (assert-true  (funcall pred node))
-      (assert-false (funcall pred node))))
+(it-sequential "cst-type-predicates token-p-true"
+  (destructuring-bind (pred node expected) (list #'cl-cc:cst-token-p (cl-cc:make-cst-token :kind :int :value 0) t)
+    (if expected
+      (expect (funcall pred node) :to-be-truthy)
+      (expect (funcall pred node) :to-be-falsy))))
+
+(it-sequential "cst-type-predicates token-p-false"
+  (destructuring-bind (pred node expected) (list #'cl-cc:cst-token-p (cl-cc:make-cst-interior :kind :list) nil)
+    (if expected
+      (expect (funcall pred node) :to-be-truthy)
+      (expect (funcall pred node) :to-be-falsy))))
+
+(it-sequential "cst-type-predicates interior-p-true"
+  (destructuring-bind (pred node expected) (list #'cl-cc:cst-interior-p (cl-cc:make-cst-interior :kind :list) t)
+    (if expected
+      (expect (funcall pred node) :to-be-truthy)
+      (expect (funcall pred node) :to-be-falsy))))
+
+(it-sequential "cst-type-predicates error-p-true"
+  (destructuring-bind (pred node expected) (list #'cl-cc:cst-error-p (cl-cc:make-cst-error :message "err") t)
+    (if expected
+      (expect (funcall pred node) :to-be-truthy)
+      (expect (funcall pred node) :to-be-falsy))))
 
 ;;; ─── cst-child ──────────────────────────────────────────────────────────────
 
-(deftest cst-child-access
-  "cst-child returns the Nth child"
+(it-sequential "cst-child-access"
   (let* ((c0 (cl-cc:make-cst-token :kind :int :value 10))
          (c1 (cl-cc:make-cst-token :kind :int :value 20))
          (node (cl-cc:make-cst-interior :kind :list :children (list c0 c1))))
-    (assert-= 10 (cl-cc:cst-token-value (cl-cc:cst-child node 0)))
-    (assert-= 20 (cl-cc:cst-token-value (cl-cc:cst-child node 1)))))
+    (expect (= 10 (cl-cc:cst-token-value (cl-cc:cst-child node 0))) :to-be-truthy)
+    (expect (= 20 (cl-cc:cst-token-value (cl-cc:cst-child node 1))) :to-be-truthy)))
 
 ;;; ─── cst-walk ───────────────────────────────────────────────────────────────
 
-(deftest cst-walk-behavior
-  "cst-walk visits all nodes in pre-order and calls fn exactly once on a leaf"
+(it-sequential "cst-walk-behavior"
   (let* ((leaf1 (cl-cc:make-cst-token :kind :int :value 1))
          (leaf2 (cl-cc:make-cst-token :kind :int :value 2))
          (inner (cl-cc:make-cst-interior :kind :list :children (list leaf1 leaf2)))
          (visited nil))
     (cl-cc:cst-walk inner (lambda (n) (push n visited)))
-    (assert-= 3 (length visited))
+    (expect (= 3 (length visited)) :to-be-truthy)
     ;; Pre-order: inner first
-    (assert-true (cl-cc:cst-interior-p (car (last visited)))))
+    (expect (cl-cc:cst-interior-p (car (last visited))) :to-be-truthy))
   (let ((count 0)
         (leaf (cl-cc:make-cst-token :kind :int :value 42)))
     (cl-cc:cst-walk leaf (lambda (n) (declare (ignore n)) (incf count)))
-    (assert-= 1 count)))
+    (expect (= 1 count) :to-be-truthy)))
 
 ;;; ─── cst-collect-errors ─────────────────────────────────────────────────────
 
-(deftest cst-collect-errors-finds-errors
-  "cst-collect-errors returns error nodes from a tree"
+(it-sequential "cst-collect-errors-finds-errors"
   (let* ((good (cl-cc:make-cst-token :kind :int :value 1))
          (bad (cl-cc:make-cst-error :message "oops"))
          (tree (cl-cc:make-cst-interior :kind :list :children (list good bad))))
-    (assert-= 1 (length (cl-cc:cst-collect-errors tree)))))
+    (expect (= 1 (length (cl-cc:cst-collect-errors tree))) :to-be-truthy)))
 
 ;;; ─── cst-to-sexp ────────────────────────────────────────────────────────────
 
-(deftest cst-to-sexp-token
-  "cst-to-sexp on a token returns its value"
-  (assert-= 42 (cl-cc:cst-to-sexp (cl-cc:make-cst-token :kind :int :value 42))))
+(it-sequential "cst-to-sexp-token"
+  (expect (= 42 (cl-cc:cst-to-sexp (cl-cc:make-cst-token :kind :int :value 42))) :to-be-truthy))
 
-(deftest cst-to-sexp-list
-  "cst-to-sexp on an interior :list node returns a list"
+(it-sequential "cst-to-sexp-list"
   (let* ((c1 (cl-cc:make-cst-token :kind :int :value 1))
          (c2 (cl-cc:make-cst-token :kind :int :value 2))
          (node (cl-cc:make-cst-interior :kind :list :children (list c1 c2))))
-    (assert-equal '(1 2) (cl-cc:cst-to-sexp node))))
+    (expect (cl-cc:cst-to-sexp node) :to-equal '(1 2))))
 
-(deftest cst-to-sexp-quote
-  "cst-to-sexp on a :quote node returns (quote x)"
+(it-sequential "cst-to-sexp-quote"
   (let* ((inner (cl-cc:make-cst-token :kind :var :value 'foo))
          (node (cl-cc:make-cst-interior :kind :quote :children (list inner))))
-    (assert-equal '(quote foo) (cl-cc:cst-to-sexp node))))
+    (expect (cl-cc:cst-to-sexp node) :to-equal '(quote foo))))
 
-(deftest cst-to-sexp-vector
-  "cst-to-sexp on a :vector node returns a CL vector"
+(it-sequential "cst-to-sexp-vector"
   (let* ((c1 (cl-cc:make-cst-token :kind :int :value 1))
          (c2 (cl-cc:make-cst-token :kind :int :value 2))
          (node (cl-cc:make-cst-interior :kind :vector :children (list c1 c2))))
     (let ((result (cl-cc:cst-to-sexp node)))
-      (assert-true (vectorp result))
-      (assert-= 2 (length result)))))
+      (expect (vectorp result) :to-be-truthy)
+      (expect (= 2 (length result)) :to-be-truthy))))
 
 ;;; ─── sexp-to-cst ────────────────────────────────────────────────────────────
 
-(deftest-each sexp-to-cst-literal-types
-  "sexp-to-cst produces the correct token kind for each literal type"
-  :cases (("integer" 42      :int)
-          ("string"  "hello" :string)
-          ("nil"     nil     :nil)
-          ("keyword" :foo    :keyword))
-  (input expected-kind)
-  (let ((node (cl-cc:sexp-to-cst input)))
-    (assert-true (cl-cc:cst-token-p node))
-    (assert-eq expected-kind (cl-cc:cst-node-kind node))))
+(it-sequential "sexp-to-cst-literal-types integer"
+  (destructuring-bind (input expected-kind) (list 42 :int)
+    (let ((node (cl-cc:sexp-to-cst input)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "sexp-to-cst-literal-types string"
+  (destructuring-bind (input expected-kind) (list "hello" :string)
+    (let ((node (cl-cc:sexp-to-cst input)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "sexp-to-cst-literal-types nil"
+  (destructuring-bind (input expected-kind) (list nil :nil)
+    (let ((node (cl-cc:sexp-to-cst input)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
+
+(it-sequential "sexp-to-cst-literal-types keyword"
+  (destructuring-bind (input expected-kind) (list :foo :keyword)
+    (let ((node (cl-cc:sexp-to-cst input)))
+    (expect (cl-cc:cst-token-p node) :to-be-truthy)
+    (expect (cl-cc:cst-node-kind node) :to-be expected-kind))))
 
 ;;; ─── Roundtrip ──────────────────────────────────────────────────────────────
 
-(deftest-each cst-roundtrip
-  "sexp-to-cst -> cst-to-sexp roundtrips correctly"
-  :cases (("integer"  42)
-          ("string"   "hello")
-          ("symbol"   'foo)
-          ("keyword"  :bar)
-          ("t"        t)
-          ("list"     '(+ 1 2))
-          ("nested"   '(if (> x 0) x (- x)))
-          ("quote"    '(quote a)))
-  (form)
-  (assert-equal form (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form))))
+(it-sequential "cst-roundtrip integer"
+  (destructuring-bind (form) (list 42)
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip string"
+  (destructuring-bind (form) (list "hello")
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip symbol"
+  (destructuring-bind (form) (list 'foo)
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip keyword"
+  (destructuring-bind (form) (list :bar)
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip t"
+  (destructuring-bind (form) (list t)
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip list"
+  (destructuring-bind (form) (list '(+ 1 2))
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip nested"
+  (destructuring-bind (form) (list '(if (> x 0) x (- x)))
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
+
+(it-sequential "cst-roundtrip quote"
+  (destructuring-bind (form) (list '(quote a))
+    (expect (cl-cc:cst-to-sexp (cl-cc:sexp-to-cst form)) :to-equal form)))
 
 ;;; ─── sexp-head-to-kind ──────────────────────────────────────────────────────
 
-(deftest-each cst-head-to-kind
-  "sexp-head-to-kind maps head symbols to CST kinds"
-  :cases (("defun"   'defun    :defun)
-          ("let"     'let      :let)
-          ("if"      'if       :if)
-          ("lambda"  'lambda   :lambda)
-          ("progn"   'progn    :progn)
-          ("unknown" 'my-func  :call))
-  (sym expected-kind)
-  (assert-eq expected-kind (cl-cc:sexp-head-to-kind sym)))
+(it-sequential "cst-head-to-kind defun"
+  (destructuring-bind (sym expected-kind) (list 'defun :defun)
+    (expect (cl-cc:sexp-head-to-kind sym) :to-be expected-kind)))
+
+(it-sequential "cst-head-to-kind let"
+  (destructuring-bind (sym expected-kind) (list 'let :let)
+    (expect (cl-cc:sexp-head-to-kind sym) :to-be expected-kind)))
+
+(it-sequential "cst-head-to-kind if"
+  (destructuring-bind (sym expected-kind) (list 'if :if)
+    (expect (cl-cc:sexp-head-to-kind sym) :to-be expected-kind)))
+
+(it-sequential "cst-head-to-kind lambda"
+  (destructuring-bind (sym expected-kind) (list 'lambda :lambda)
+    (expect (cl-cc:sexp-head-to-kind sym) :to-be expected-kind)))
+
+(it-sequential "cst-head-to-kind progn"
+  (destructuring-bind (sym expected-kind) (list 'progn :progn)
+    (expect (cl-cc:sexp-head-to-kind sym) :to-be expected-kind)))
+
+(it-sequential "cst-head-to-kind unknown"
+  (destructuring-bind (sym expected-kind) (list 'my-func :call)
+    (expect (cl-cc:sexp-head-to-kind sym) :to-be expected-kind)))

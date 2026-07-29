@@ -5,181 +5,207 @@
 
 (in-package :cl-cc/test)
 
-(defsuite elf-suite :description "ELF64 binary format tests"
-  :parent cl-cc-unit-suite)
 
 
-(in-suite elf-suite)
 ;;; ─── ELF Constants ──────────────────────────────────────────────────────
 
-(deftest-each elf-constants
-  "ELF64 constant values match the ELF specification."
-  :cases (("magic-0"       #x7f              cl-cc/binary::+elf-magic-0+)
-          ("magic-1"       (char-code #\E)   cl-cc/binary::+elf-magic-1+)
-          ("magic-2"       (char-code #\L)   cl-cc/binary::+elf-magic-2+)
-          ("magic-3"       (char-code #\F)   cl-cc/binary::+elf-magic-3+)
-          ("class-64"      2                 cl-cc/binary::+elf-class-64+)
-          ("machine-x86"   #x3E              cl-cc/binary::+elf-machine-x86-64+)
-          ("machine-arm64" #xB7              cl-cc/binary::+elf-machine-aarch64+))
-  (expected actual)
-  (assert-equal expected actual))
+(it-sequential "elf-constants magic-0"
+  (destructuring-bind (expected actual) (list #x7f cl-cc/binary::+elf-magic-0+)
+    (expect actual :to-equal expected)))
 
-(deftest-each elf-structure-sizes
-  "ELF64 structure sizes match the ELF specification."
-  :cases (("ehdr" 64 cl-cc/binary::+elf64-ehdr-size+)
-          ("shdr" 64 cl-cc/binary::+elf64-shdr-size+)
-          ("sym"  24 cl-cc/binary::+elf64-sym-size+)
-          ("rela" 24 cl-cc/binary::+elf64-rela-size+))
-  (expected actual)
-  (assert-equal expected actual))
+(it-sequential "elf-constants magic-1"
+  (destructuring-bind (expected actual) (list (char-code #\E) cl-cc/binary::+elf-magic-1+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-constants magic-2"
+  (destructuring-bind (expected actual) (list (char-code #\L) cl-cc/binary::+elf-magic-2+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-constants magic-3"
+  (destructuring-bind (expected actual) (list (char-code #\F) cl-cc/binary::+elf-magic-3+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-constants class-64"
+  (destructuring-bind (expected actual) (list 2 cl-cc/binary::+elf-class-64+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-constants machine-x86"
+  (destructuring-bind (expected actual) (list #x3E cl-cc/binary::+elf-machine-x86-64+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-constants machine-arm64"
+  (destructuring-bind (expected actual) (list #xB7 cl-cc/binary::+elf-machine-aarch64+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-structure-sizes ehdr"
+  (destructuring-bind (expected actual) (list 64 cl-cc/binary::+elf64-ehdr-size+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-structure-sizes shdr"
+  (destructuring-bind (expected actual) (list 64 cl-cc/binary::+elf64-shdr-size+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-structure-sizes sym"
+  (destructuring-bind (expected actual) (list 24 cl-cc/binary::+elf64-sym-size+)
+    (expect actual :to-equal expected)))
+
+(it-sequential "elf-structure-sizes rela"
+  (destructuring-bind (expected actual) (list 24 cl-cc/binary::+elf64-rela-size+)
+    (expect actual :to-equal expected)))
 
 ;;; ─── Buffer Helpers ─────────────────────────────────────────────────────
 
-(deftest elf-make-buffer-empty
-  "elf-make-buffer returns an empty adjustable byte vector."
+(it-sequential "elf-make-buffer-empty"
   (let ((buf (cl-cc/binary::elf-make-buffer)))
-    (assert-equal 0 (length buf))
-    (assert-true (adjustable-array-p buf))))
+    (expect (length buf) :to-equal 0)
+    (expect (adjustable-array-p buf) :to-be-truthy)))
 
-(deftest elf-buf-u8-behavior
-  "elf-buf-u8 appends a single byte and masks values to 8 bits."
+(it-sequential "elf-buf-u8-behavior"
   (let ((buf (cl-cc/binary::elf-make-buffer)))
     (cl-cc/binary::elf-buf-u8 buf #xAB)
-    (assert-equal 1 (length buf))
-    (assert-equal #xAB (aref buf 0)))
+    (expect (length buf) :to-equal 1)
+    (expect (aref buf 0) :to-equal #xAB))
   (let ((buf (cl-cc/binary::elf-make-buffer)))
     (cl-cc/binary::elf-buf-u8 buf #x1FF)
-    (assert-equal #xFF (aref buf 0))))
+    (expect (aref buf 0) :to-equal #xFF)))
 
-(deftest-each elf-buf-little-endian-writes
-  "binary-buffer-write-u16le/u32le/u64le write little-endian: low byte at index 0."
-  :cases (("u16le" #'cl-cc/binary::binary-buffer-write-u16le #x1234             2 '((0 #x34) (1 #x12)))
-          ("u32le" #'cl-cc/binary::binary-buffer-write-u32le #xDEADBEEF         4 '((0 #xEF) (1 #xBE) (2 #xAD) (3 #xDE)))
-          ("u64le" #'cl-cc/binary::binary-buffer-write-u64le #x0102030405060708 8 '((0 #x08) (7 #x01))))
-  (writer value expected-len byte-checks)
-  (let ((buf (cl-cc/binary::elf-make-buffer)))
+(it-sequential "elf-buf-little-endian-writes u16le"
+  (destructuring-bind (writer value expected-len byte-checks) (list #'cl-cc/binary::binary-buffer-write-u16le #x1234 2 '((0 #x34) (1 #x12)))
+    (let ((buf (cl-cc/binary::elf-make-buffer)))
     (funcall writer buf value)
-    (assert-equal expected-len (length buf))
+    (expect (length buf) :to-equal expected-len)
     (loop for (idx expected) in byte-checks
-          do (assert-equal expected (aref buf idx)))))
+          do (expect (aref buf idx) :to-equal expected)))))
 
-(deftest binary-buffer-write-pad-zeros
-  "binary-buffer-write-pad writes N zero bytes."
+(it-sequential "elf-buf-little-endian-writes u32le"
+  (destructuring-bind (writer value expected-len byte-checks) (list #'cl-cc/binary::binary-buffer-write-u32le #xDEADBEEF 4 '((0 #xEF) (1 #xBE) (2 #xAD) (3 #xDE)))
+    (let ((buf (cl-cc/binary::elf-make-buffer)))
+    (funcall writer buf value)
+    (expect (length buf) :to-equal expected-len)
+    (loop for (idx expected) in byte-checks
+          do (expect (aref buf idx) :to-equal expected)))))
+
+(it-sequential "elf-buf-little-endian-writes u64le"
+  (destructuring-bind (writer value expected-len byte-checks) (list #'cl-cc/binary::binary-buffer-write-u64le #x0102030405060708 8 '((0 #x08) (7 #x01)))
+    (let ((buf (cl-cc/binary::elf-make-buffer)))
+    (funcall writer buf value)
+    (expect (length buf) :to-equal expected-len)
+    (loop for (idx expected) in byte-checks
+          do (expect (aref buf idx) :to-equal expected)))))
+
+(it-sequential "binary-buffer-write-pad-zeros"
   (let ((buf (cl-cc/binary::elf-make-buffer)))
     (cl-cc/binary::binary-buffer-write-pad buf 4)
-    (assert-equal 4 (length buf))
-    (assert-true (every #'zerop (coerce buf 'list)))))
+    (expect (length buf) :to-equal 4)
+    (expect (every #'zerop (coerce buf 'list)) :to-be-truthy)))
 
-(deftest-each binary-buffer-write-bytes-input-types
-  "binary-buffer-write-bytes accepts both a byte vector and a plain list, writing 3 bytes."
-  :cases (("vector" (make-array 3 :element-type '(unsigned-byte 8) :initial-contents '(1 2 3)))
-          ("list"   '(#x10 #x20 #x30)))
-  (input)
-  (let ((buf (cl-cc/binary::elf-make-buffer)))
+(it-sequential "binary-buffer-write-bytes-input-types vector"
+  (destructuring-bind (input) (list (make-array 3 :element-type '(unsigned-byte 8) :initial-contents '(1 2 3)))
+    (let ((buf (cl-cc/binary::elf-make-buffer)))
     (cl-cc/binary::binary-buffer-write-bytes buf input)
-    (assert-equal 3 (length buf))
-    (assert-equal (elt input 0) (aref buf 0))
-    (assert-equal (elt input 2) (aref buf 2))))
+    (expect (length buf) :to-equal 3)
+    (expect (aref buf 0) :to-equal (elt input 0))
+    (expect (aref buf 2) :to-equal (elt input 2)))))
 
-(deftest binary-buffer-to-array-returns-simple-array
-  "binary-buffer-to-array returns a simple (unsigned-byte 8) array."
+(it-sequential "binary-buffer-write-bytes-input-types list"
+  (destructuring-bind (input) (list '(#x10 #x20 #x30))
+    (let ((buf (cl-cc/binary::elf-make-buffer)))
+    (cl-cc/binary::binary-buffer-write-bytes buf input)
+    (expect (length buf) :to-equal 3)
+    (expect (aref buf 0) :to-equal (elt input 0))
+    (expect (aref buf 2) :to-equal (elt input 2)))))
+
+(it-sequential "binary-buffer-to-array-returns-simple-array"
   (let ((buf (cl-cc/binary::elf-make-buffer)))
     (cl-cc/binary::elf-buf-u8 buf 42)
     (let ((arr (cl-cc/binary::binary-buffer-to-array buf)))
-      (assert-true (typep arr '(simple-array (unsigned-byte 8) (*))))
-      (assert-equal 1 (length arr))
-      (assert-equal 42 (aref arr 0)))))
+      (expect (typep arr '(simple-array (unsigned-byte 8) (*))) :to-be-truthy)
+      (expect (length arr) :to-equal 1)
+      (expect (aref arr 0) :to-equal 42))))
 
 ;;; ─── String Table Builder ───────────────────────────────────────────────
 
-(deftest elf-strtab-initial-null
-  "Fresh strtab starts with a null byte."
+(it-sequential "elf-strtab-initial-null"
   (let ((st (cl-cc/binary::make-strtab)))
-    (assert-equal 1 (length (cl-cc/binary::strtab-bytes st)))
-    (assert-equal 0 (aref (cl-cc/binary::strtab-bytes st) 0))))
+    (expect (length (cl-cc/binary::strtab-bytes st)) :to-equal 1)
+    (expect (aref (cl-cc/binary::strtab-bytes st) 0) :to-equal 0)))
 
-(deftest elf-strtab-add-behavior
-  "strtab-add: returns offset 1 for first string; deduplicates; distinct strings get distinct offsets."
+(it-sequential "elf-strtab-add-behavior"
   (let* ((st (cl-cc/binary::make-strtab))
          (off (cl-cc/binary::strtab-add st "hello")))
-    (assert-equal 1 off))
+    (expect off :to-equal 1))
   (let* ((st (cl-cc/binary::make-strtab))
          (off1 (cl-cc/binary::strtab-add st "hello"))
          (off2 (cl-cc/binary::strtab-add st "hello")))
-    (assert-equal off1 off2))
+    (expect off2 :to-equal off1))
   (let* ((st (cl-cc/binary::make-strtab))
          (off1 (cl-cc/binary::strtab-add st "foo"))
          (off2 (cl-cc/binary::strtab-add st "bar")))
-    (assert-false (= off1 off2))))
+    (expect (= off1 off2) :to-be-falsy)))
 
-(deftest elf-strtab-bytes-contains-strings
-  "strtab-bytes includes null-terminated strings."
+(it-sequential "elf-strtab-bytes-contains-strings"
   (let ((st (cl-cc/binary::make-strtab)))
     (cl-cc/binary::strtab-add st "hi")
     (let ((bytes (cl-cc/binary::strtab-bytes st)))
       ;; bytes[0]=\0, bytes[1]='h', bytes[2]='i', bytes[3]=\0
-      (assert-true (>= (length bytes) 4))
-      (assert-equal 0 (aref bytes 0))
-      (assert-equal (char-code #\h) (aref bytes 1))
-      (assert-equal (char-code #\i) (aref bytes 2))
-      (assert-equal 0 (aref bytes 3)))))
+      (expect (>= (length bytes) 4) :to-be-truthy)
+      (expect (aref bytes 0) :to-equal 0)
+      (expect (aref bytes 1) :to-equal (char-code #\h))
+      (expect (aref bytes 2) :to-equal (char-code #\i))
+      (expect (aref bytes 3) :to-equal 0))))
 
 ;;; ─── ELF64 Builder ──────────────────────────────────────────────────────
 
-(deftest elf64-builder-fresh
-  "Fresh ELF64 builder has empty text and no symbols."
+(it-sequential "elf64-builder-fresh"
   (let ((b (cl-cc/binary::make-elf64-object)))
-    (assert-equal 0 (cl-cc/binary::elf64-text-size b))
-    (assert-equal 0 (cl-cc/binary::elf64-bss-size b))
-    (assert-null (cl-cc/binary::elf64-symbols b))
-    (assert-null (cl-cc/binary::elf64-rela-entries b))))
+    (expect (cl-cc/binary::elf64-text-size b) :to-equal 0)
+    (expect (cl-cc/binary::elf64-bss-size b) :to-equal 0)
+    (expect (cl-cc/binary::elf64-symbols b) :to-be-null)
+    (expect (cl-cc/binary::elf64-rela-entries b) :to-be-null)))
 
-(deftest elf64-add-bss
-  "add-bss accumulates reserved NOBITS size."
+(it-sequential "elf64-add-bss"
   (let ((b (cl-cc/binary::make-elf64-object)))
     (cl-cc/binary::elf64-add-bss b 16)
     (cl-cc/binary::elf64-add-bss b 8)
-    (assert-equal 24 (cl-cc/binary::elf64-bss-size b))))
+    (expect (cl-cc/binary::elf64-bss-size b) :to-equal 24)))
 
-(deftest elf64-add-text-bytes
-  "add-text-bytes appends machine code."
+(it-sequential "elf64-add-text-bytes"
   (let ((b (cl-cc/binary::make-elf64-object))
         (code (make-array 3 :element-type '(unsigned-byte 8) :initial-contents '(#x48 #x89 #xC0))))
     (cl-cc/binary::elf64-add-text-bytes b code)
-    (assert-equal 3 (cl-cc/binary::elf64-text-size b))))
+    (expect (cl-cc/binary::elf64-text-size b) :to-equal 3)))
 
-(deftest-each elf64-builder-list-accumulation
-  "elf64-add-global-symbol and elf64-add-reloc each register exactly one entry."
-  :cases (("symbol" (lambda (b) (cl-cc/binary::elf64-add-global-symbol b "_main" :section-idx 1 :value 0 :size 10))
-                    #'cl-cc/binary::elf64-symbols)
-          ("reloc"  (lambda (b) (cl-cc/binary::elf64-add-reloc b 4 "printf"))
-                    #'cl-cc/binary::elf64-rela-entries))
-  (add-fn accessor-fn)
-  (let ((b (cl-cc/binary::make-elf64-object)))
+(it-sequential "elf64-builder-list-accumulation symbol"
+  (destructuring-bind (add-fn accessor-fn) (list (lambda (b) (cl-cc/binary::elf64-add-global-symbol b "_main" :section-idx 1 :value 0 :size 10)) #'cl-cc/binary::elf64-symbols)
+    (let ((b (cl-cc/binary::make-elf64-object)))
     (funcall add-fn b)
-    (assert-equal 1 (length (funcall accessor-fn b)))))
+    (expect (length (funcall accessor-fn b)) :to-equal 1))))
 
-(deftest elf64-finalize-produces-bytes
-  "elf64-finalize produces a non-empty byte vector."
+(it-sequential "elf64-builder-list-accumulation reloc"
+  (destructuring-bind (add-fn accessor-fn) (list (lambda (b) (cl-cc/binary::elf64-add-reloc b 4 "printf")) #'cl-cc/binary::elf64-rela-entries)
+    (let ((b (cl-cc/binary::make-elf64-object)))
+    (funcall add-fn b)
+    (expect (length (funcall accessor-fn b)) :to-equal 1))))
+
+(it-sequential "elf64-finalize-produces-bytes"
   (let ((b (cl-cc/binary::make-elf64-object))
         (code (make-array 4 :element-type '(unsigned-byte 8) :initial-contents '(#xC3 0 0 0))))
     (cl-cc/binary::elf64-add-text-bytes b code)
     (cl-cc/binary::elf64-add-global-symbol b "_start" :section-idx 1 :value 0 :size 4)
     (let ((result (cl-cc/binary::elf64-finalize b)))
-      (assert-true (> (length result) 0))
-      (assert-true (typep result '(simple-array (unsigned-byte 8) (*)))))))
+      (expect (> (length result) 0) :to-be-truthy)
+      (expect (typep result '(simple-array (unsigned-byte 8) (*))) :to-be-truthy))))
 
-(deftest elf64-finalize-header-prefix
-  "Finalized ELF: magic \\x7FELF at bytes 0-3; ELFCLASS64=2 at byte 4; ELFDATA2LSB=1 at byte 5."
+(it-sequential "elf64-finalize-header-prefix"
   (let* ((b (cl-cc/binary::make-elf64-object))
          (code (make-array 1 :element-type '(unsigned-byte 8) :initial-contents '(#xC3))))
     (cl-cc/binary::elf64-add-text-bytes b code)
     (cl-cc/binary::elf64-add-global-symbol b "_start" :section-idx 1 :value 0 :size 1)
     (let ((result (cl-cc/binary::elf64-finalize b)))
-      (assert-equal #x7F (aref result 0))
-      (assert-equal (char-code #\E) (aref result 1))
-      (assert-equal (char-code #\L) (aref result 2))
-      (assert-equal (char-code #\F) (aref result 3))
-      (assert-equal 2 (aref result 4))
-      (assert-equal 1 (aref result 5)))))
+      (expect (aref result 0) :to-equal #x7F)
+      (expect (aref result 1) :to-equal (char-code #\E))
+      (expect (aref result 2) :to-equal (char-code #\L))
+      (expect (aref result 3) :to-equal (char-code #\F))
+      (expect (aref result 4) :to-equal 2)
+      (expect (aref result 5) :to-equal 1))))
 
