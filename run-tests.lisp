@@ -88,6 +88,14 @@
 ;;; warm path itself gets exercised as a code path rather than assumed.
 (let* ((args (uiop:command-line-arguments))
        (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
+       (worker-env (uiop:getenv "CL_CC_TEST_WORKERS"))
+       (max-workers
+         (when worker-env
+           (let ((value (parse-integer worker-env)))
+             (unless (plusp value)
+               (error "CL_CC_TEST_WORKERS must be a positive integer, got ~S."
+                      worker-env))
+             value)))
        (warm-stdlib (and (not (member "--no-warm-stdlib" args :test #'string=))
                          (not (and warm-env
                                    (member (string-downcase warm-env)
@@ -104,7 +112,10 @@
         ;; cl-weave is the test engine: registration, execution, reporting and
         ;; concurrency all delegate to it (see
         ;; packages/testing-framework/src/framework-definitions.lisp).
-        (uiop:quit (if (cl-weave:run-all :reporter :spec) 0 1)))
+        (uiop:quit
+         (if (cl-weave:run-all :reporter :spec :max-workers max-workers)
+             0
+             1)))
     (error (e)
       (format t "~&not ok - run-all fatal error: ~A~%" e)
       (format *error-output* "~&FATAL: ~A~%" e)
