@@ -108,7 +108,10 @@
               (format t "# warming stdlib cache~%")
               (cl-cc:warm-stdlib-cache)
               (format t "# stdlib cache ready~%"))
-            (format t "# stdlib cache warm skipped~%"))
+            (progn
+              (format t "# stdlib cache warm skipped~%")
+              (format t "# forcing serial test execution (max-workers=1) because stdlib cache warming is disabled~%")
+              (setf max-workers 1)))
         ;; cl-weave is the test engine: registration, execution, reporting and
         ;; concurrency all delegate to it (see
         ;; packages/testing-framework/src/framework-definitions.lisp).
