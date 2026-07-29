@@ -13,13 +13,18 @@
   "Byte vector: card-table[i] ≠ 0 means card i is dirty.")
 
 (defvar *heap-base* nil
-    "Base address of the managed heap.")
-  (defvar *heap-size* nil
-    "Size in bytes of the managed heap.")
-  (defvar *young-generation-start* nil)
-  (defvar *young-generation-end* nil)
-  (defvar *old-generation-start* nil)
-  (defvar *old-generation-end* nil)
+  "Base address of the managed heap.")
+
+(defvar *heap-size* nil
+  "Size in bytes of the managed heap.")
+
+(defvar *young-generation-start* nil)
+
+(defvar *young-generation-end* nil)
+
+(defvar *old-generation-start* nil)
+
+(defvar *old-generation-end* nil)
 
 (defun card-index (address)
   "Compute the card index for ADDRESS, rejecting unconfigured or out-of-heap addresses."
@@ -119,27 +124,27 @@ Conditions for elision:
 
 ;;; ──── Remembered Set Barrier ────
 ;; Only track Old→Young references (Young→Old doesn't need tracking).
-(defun old-to-young-reference-p (slot-address value)
-  "Return T if writing VALUE to SLOT-ADDRESS creates an Old→Young ref."
-  (and (in-old-generation-p slot-address) (in-young-generation-p value)))
+(defun %write-barrier-address (heap value)
+  "Return the raw address designated by VALUE when it belongs to HEAP."
+  (when (integerp value)
+    (let ((address
+          (if (cl-cc/runtime:val-pointer-p value) (cl-cc/runtime:decode-pointer value)
+            value)))
+      (and (cl-cc/runtime:rt-heap-addr-p heap address) address))))
 
-(defun in-old-generation-p (address)
-  "Return true when ADDRESS is in the configured old-generation half-open range."
-  (and
-    (integerp address)
-    (integerp *old-generation-start*)
-    (integerp *old-generation-end*)
-    (<= *old-generation-start* address)
-    (< address *old-generation-end*)))
+(defun old-to-young-reference-p (heap slot-address value)
+  "Return true if writing VALUE to SLOT-ADDRESS creates an old-to-young reference in HEAP."
+  (and (in-old-generation-p heap slot-address) (in-young-generation-p heap value)))
 
-(defun in-young-generation-p (address)
-  "Return true when ADDRESS is in the configured young-generation half-open range."
-  (and
-    (integerp address)
-    (integerp *young-generation-start*)
-    (integerp *young-generation-end*)
-    (<= *young-generation-start* address)
-    (< address *young-generation-end*)))
+(defun in-old-generation-p (heap value)
+  "Return true when VALUE designates an address in the old space of HEAP."
+  (let ((address (%write-barrier-address heap value)))
+    (and address (cl-cc/runtime:rt-old-addr-p heap address))))
+
+(defun in-young-generation-p (heap value)
+  "Return true when VALUE designates an address in the active young space of HEAP."
+  (let ((address (%write-barrier-address heap value)))
+    (and address (cl-cc/runtime:rt-young-addr-p heap address))))
 
 ;;; ──── Helper ────
 (defun encode-int32 (value)
