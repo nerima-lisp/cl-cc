@@ -87,6 +87,10 @@
 ;;; Skippable with --no-warm-stdlib or CLCC_WARM_STDLIB=0, which is how the
 ;;; warm path itself gets exercised as a code path rather than assumed.
 (let* ((args (uiop:command-line-arguments))
+       (filter (loop for rest on args
+                     when (and (string= (first rest) "--filter")
+                               (second rest))
+                       return (second rest)))
        (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
        (worker-env (uiop:getenv "CL_CC_TEST_WORKERS"))
        (max-workers
@@ -116,7 +120,9 @@
         ;; concurrency all delegate to it (see
         ;; packages/testing-framework/src/framework-definitions.lisp).
         (uiop:quit
-         (if (cl-weave:run-all :reporter :spec :max-workers max-workers)
+         (if (cl-weave:run-all :reporter :spec
+                               :name-filter filter
+                               :max-workers max-workers)
              0
              1)))
     (error (e)
