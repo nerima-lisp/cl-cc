@@ -27,9 +27,19 @@
         (maybe-flag "MAP-ANON")
         (error "SB-POSIX does not expose MAP-ANONYMOUS or MAP-ANON."))))
 
-(defun sb-posix-mprotect (address length protection)
-  "Call SB-POSIX:MPROTECT when the host SB-POSIX provides it."
-  (multiple-value-bind (symbol status) (find-symbol "MPROTECT" :sb-posix)
-    (unless (and status (fboundp symbol))
-      (error "SB-POSIX does not expose MPROTECT on this host."))
-    (funcall (symbol-function symbol) address length protection)))
+(progn
+  (sb-alien:define-alien-routine ("mprotect" %system-mprotect) sb-alien:int
+    (address sb-sys:system-area-pointer)
+    (length sb-alien:unsigned-long)
+    (protection sb-alien:int))
+
+  (defun sb-posix-mprotect (address length protection)
+    "Protect a memory range through SB-POSIX or the host mprotect(2)."
+    (multiple-value-bind (symbol status) (find-symbol "MPROTECT" :sb-posix)
+      (if (and status (fboundp symbol))
+          (funcall (symbol-function symbol) address length protection)
+          (let ((result (%system-mprotect address length protection)))
+            (unless (zerop result)
+              (error "mprotect failed for ~D bytes with protection ~D."
+                     length protection))
+            result)))))

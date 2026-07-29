@@ -347,15 +347,23 @@
       (assert-output-contains set "array.set $eqref_array_t"))))
 
 (it-sequential "wasm-gc-slot-read-write-emitters"
-  (let ((rd (%direct-wasm-emit
-             (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'foo)))
-        (wr (%direct-wasm-emit
-             (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name 'foo :value-reg :r2))))
-    (assert-output-contains rd "struct.get $instance_t 1")
-    (assert-output-contains rd "array.get $eqref_array_t")
-    (assert-output-contains wr "struct.get $instance_t 1")
-    (assert-output-contains wr "array.set $eqref_array_t")
-    (assert-output-contains wr "struct.set $instance_t 1")))
+  (let ((out (%direct-wasm-emit*
+              (list (cl-cc:make-vm-class-def :dst :r9
+                                             :class-name (quote my-class)
+                                             :superclasses nil
+                                             :slot-names (quote (foo))
+                                             :slot-initargs nil
+                                             :slot-initform-regs nil
+                                             :slot-types nil
+                                             :default-initarg-regs nil
+                                             :class-slots nil
+                                             :metaclass-reg nil)
+                    (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name (quote foo))
+                    (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name (quote foo) :value-reg :r2)))))
+    (assert-output-contains out "struct.get $instance_t 1")
+    (assert-output-contains out "array.get $eqref_array_t")
+    (assert-output-contains out "array.set $eqref_array_t")
+    (assert-output-contains out "struct.set $instance_t 1")))
 
 (it-sequential "wasm-gc-slot-read-write-use-class-slot-index-mapping"
   (let ((out (%direct-wasm-emit*

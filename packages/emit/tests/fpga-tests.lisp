@@ -82,18 +82,19 @@
   "fpga-hls-supports-pure-let-bindings"
   (let* ((program
            (cl-cc/emit:lower-fpga-hls
-             (quote square-sum)
+             (quote square_sum)
              (quote
                (lambda (x y)
                  (let ((sum (+ x y)))
                    (* sum sum))))))
          (schedule (cl-cc/emit:fpga-hls-program-schedule program))
-         (multiply-entry (second schedule))
+         (multiply-entry (third schedule))
          (verilog (cl-cc/emit:emit-fpga-verilog program)))
-    (expect (length schedule) :to-equal 2)
+    (expect (length schedule) :to-equal 3)
     (expect (getf multiply-entry :lhs) :to-equal (quote (:value 0)))
-    (expect (getf multiply-entry :rhs) :to-equal (quote (:value 0)))
+    (expect (getf multiply-entry :rhs) :to-equal (quote (:value 1)))
     (expect (search "op_0_reg" verilog) :to-be-truthy)
+    (expect (search "op_1_reg" verilog) :to-be-truthy)
     (expect (search "mul_fu_0_result" verilog) :to-be-truthy)))
 
 (it-sequential
