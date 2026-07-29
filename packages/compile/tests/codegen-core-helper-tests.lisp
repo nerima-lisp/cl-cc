@@ -229,3 +229,16 @@
              (make-ast-quote :value 2.0d0)
              ctx)
             :to-be :f64)))
+
+(it-sequential "compile-ast-emits-specialized-fixnum-binop"
+  (let* ((ctx (make-codegen-ctx))
+         (ast (make-ast-binop :op '+
+                              :lhs (make-ast-the :type 'fixnum
+                                                 :value (make-ast-int :value 3))
+                              :rhs (make-ast-the :type 'fixnum
+                                                 :value (make-ast-int :value 5)))))
+    (compile-ast ast ctx)
+    (expect (find-if (lambda (inst)
+                       (typep inst 'cl-cc/vm::vm-integer-add))
+                     (codegen-instructions ctx))
+            :to-be-truthy)))
