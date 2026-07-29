@@ -85,12 +85,82 @@
                      '(:version "1.0.0" :exports ("FOO") :struct-layouts nil :checksum 0)
                      '(:version "1.0.0" :exports ("BAR") :struct-layouts nil :checksum 0)) :to-equal '(:exports)))))
 
-(it-sequential "fr-318-namespace-cycle-detection-finds-loop"
-  (let ((cl-cc/compile:*namespaces* (make-hash-table :test #'equal)))
-    (cl-cc/compile:define-namespace 'alpha :imports '(beta))
-    (cl-cc/compile:define-namespace 'beta :imports '(alpha))
-    (let ((issues (cl-cc/compile:check-namespace-deps)))
-      (expect (some (lambda (issue)
-                           (and (consp issue)
-                                (eq (first issue) :cycle)))
-                         issues) :to-be-truthy))))
+(progn
+  (it-sequential
+    "fr-318-namespace-cycle-detection-finds-loop"
+    (let ((cl-cc/compile:*namespaces* (make-hash-table :test #'equal)))
+      (cl-cc/compile:define-namespace 'alpha :imports '(beta))
+      (cl-cc/compile:define-namespace 'beta :imports '(alpha))
+      (let ((issues (cl-cc/compile:check-namespace-deps)))
+        (expect
+          (some
+            (lambda (issue)
+              (and (consp issue) (eq (first issue) :cycle)))
+            issues)
+          :to-be-truthy))))
+  (defun write-binary-signature (path bytes)
+    (with-open-file (stream
+        path
+        :direction
+        :output
+        :if-exists
+        :supersede
+        :element-type
+        '(unsigned-byte 8))
+      (write-sequence bytes stream)))
+  (it-sequential
+    "binary-strip-validates-and-signals-unsupported"
+    (uiop:with-temporary-file
+      (:pathname binary :type "bin")
+      (write-binary-signature binary #(127 69 76 70))
+      (let ((cl-cc/compile:*strip-mode* :debug)
+            (condition
+            (handler-case (cl-cc/compile:strip-symbols binary :all)
+              (cl-cc/compile:unsupported-binary-transformation (condition)
+                condition))))
+        (expect condition :to-be-truthy)
+        (expect
+          (cl-cc/compile:binary-transformation-operation condition)
+          :to-equal
+          :strip-symbols)
+        (expect (cl-cc/compile:binary-transformation-format condition) :to-equal :elf)
+        (expect (cl-cc/compile:binary-transformation-mode condition) :to-equal :all)
+        (expect cl-cc/compile:*strip-mode* :to-equal :debug))))
+  (it-sequential
+    "binary-strip-rejects-invalid-mode-before-transforming"
+    (signals
+      cl-cc/compile:binary-transformation-error
+      (cl-cc/compile:strip-symbols #P"missing-binary" :invalid)))
+  (it-sequential
+    "binary-strip-rejects-malformed-magic"
+    (uiop:with-temporary-file
+      (:pathname binary :type "bin")
+      (write-binary-signature binary #(1 2 3 4))
+      (signals
+        cl-cc/compile:malformed-binary
+        (cl-cc/compile:strip-symbols binary :debug))))
+  (it-sequential
+    "binary-strip-rejects-missing-path"
+    (signals
+      cl-cc/compile:binary-transformation-error
+      (cl-cc/compile:strip-symbols #P"missing-binary" :all)))
+  (it-sequential
+    "binary-split-validates-paths-and-signals-unsupported"
+    (uiop:with-temporary-file
+      (:pathname binary :type "bin")
+      (write-binary-signature binary #(77 90 0 0))
+      (let ((condition
+            (handler-case (cl-cc/compile:split-debug-info binary #P"debug-output")
+              (cl-cc/compile:unsupported-binary-transformation (condition)
+                condition))))
+        (expect condition :to-be-truthy)
+        (expect
+          (cl-cc/compile:binary-transformation-operation condition)
+          :to-equal
+          :split-debug-info)
+        (expect (cl-cc/compile:binary-transformation-format condition) :to-equal :pe))))
+  (it-sequential
+    "binary-split-rejects-invalid-debug-path"
+    (signals
+      cl-cc/compile:binary-transformation-error
+      (cl-cc/compile:split-debug-info #P"missing-binary" (make-hash-table)))))

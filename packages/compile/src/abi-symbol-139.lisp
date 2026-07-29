@@ -185,21 +185,94 @@ Returns nil if compatible, or list of breaking changes."
     (nreverse issues)))
 
 ;;; ──── FR-778: Debug Symbol Stripping Modes ────
-(defvar *strip-mode* nil
-  "Symbol stripping mode: nil (keep), :all, :debug, :unneeded.")
+(progn
+  (define-condition binary-transformation-error (error)
+    ((operation :initarg :operation :reader binary-transformation-operation)
+     (binary-path :initarg :binary-path :reader binary-transformation-path)
+     (format :initarg :format :initform nil :reader binary-transformation-format)
+     (reason :initarg :reason :reader binary-transformation-reason)
+     (mode :initarg :mode :initform nil :reader binary-transformation-mode))
+    (:report
+     (lambda (condition stream)
+       (format stream "Binary transformation ~S failed for ~S: ~A"
+               (binary-transformation-operation condition)
+               (binary-transformation-path condition)
+               (binary-transformation-reason condition)))))
+  (define-condition malformed-binary (binary-transformation-error) ())
+  (define-condition unsupported-binary-transformation (binary-transformation-error)
+    ()
+    (:report
+     (lambda (condition stream)
+       (format stream
+               "Binary transformation ~S is unsupported for ~S (~S, mode ~S): ~A"
+               (binary-transformation-operation condition)
+               (binary-transformation-path condition)
+               (binary-transformation-format condition)
+               (binary-transformation-mode condition)
+               (binary-transformation-reason condition)))))
+  (defvar *strip-mode* nil
+    "Symbol stripping mode: nil (keep), :all, :debug, :unneeded.")
+  (defun %transformation-error (condition operation path reason &key format mode)
+    (error condition :operation operation :binary-path path :format format
+                     :mode mode :reason reason))
+  (defun %pathname-designator (path operation role)
+    (handler-case
+        (pathname path)
+      (error ()
+        (%transformation-error 'binary-transformation-error operation path
+                               (format nil "~A must be a pathname designator" role)))))
+  (defun %binary-format (binary-path operation)
+    (let* ((path (%pathname-designator binary-path operation "binary path"))
+           (existing (probe-file path)))
+      (unless existing
+        (%transformation-error 'binary-transformation-error operation path
+                               "binary path does not exist"))
+      (handler-case
+          (with-open-file (stream existing :direction :input
+                                           :element-type '(unsigned-byte 8))
+            (let ((magic (make-array 4 :element-type '(unsigned-byte 8))))
+              (unless (= (read-sequence magic stream) 4)
+                (%transformation-error 'malformed-binary operation existing
+                                       "binary is shorter than its file signature"))
+              (cond
+                ((equalp magic #(127 69 76 70)) :elf)
+                ((and (= (aref magic 0) 77) (= (aref magic 1) 90)) :pe)
+                ((member magic
+                         '(#(254 237 250 206) #(206 250 237 254)
+                           #(254 237 250 207) #(207 250 237 254)
+                           #(202 254 186 190) #(190 186 254 202)
+                           #(202 254 186 191) #(191 186 254 202))
+                         :test #'equalp)
+                 :mach-o)
+                (t
+                 (%transformation-error 'malformed-binary operation existing
+                                        "unrecognized binary file signature")))))
+        (file-error (condition)
+          (%transformation-error 'binary-transformation-error operation existing
+                                 (princ-to-string condition)))))))
 
 (defun strip-symbols (binary-path mode)
-  "Strip symbols from BINARY-PATH using MODE.
-:all → remove all symbols and debug info.
-:debug → remove debug info only (keep public symbols).
-:unneeded → remove only unreferenced symbols."
-  (setf *strip-mode* mode)
-  binary-path)
+  "Validate a request to strip symbols from BINARY-PATH using MODE.
+Signals UNSUPPORTED-BINARY-TRANSFORMATION until a binary rewriter is available."
+  (unless (member mode '(:all :debug :unneeded))
+    (%transformation-error 'binary-transformation-error :strip-symbols binary-path
+                           "mode must be one of :ALL, :DEBUG, or :UNNEEDED"
+                           :mode mode))
+  (let ((format (%binary-format binary-path :strip-symbols)))
+    (%transformation-error 'unsupported-binary-transformation
+                           :strip-symbols binary-path
+                           "no binary symbol rewriter is available"
+                           :format format :mode mode)))
 
 (defun split-debug-info (binary-path debug-path)
-  "Split debug info from BINARY-PATH to DEBUG-PATH (dSYM/.dwp format)."
-  (declare (ignore binary-path debug-path))
-  t)
+  "Validate a request to split debug info from BINARY-PATH to DEBUG-PATH.
+Signals UNSUPPORTED-BINARY-TRANSFORMATION until a binary rewriter is available."
+  (%pathname-designator debug-path :split-debug-info "debug path")
+  (let ((format (%binary-format binary-path :split-debug-info)))
+    (%transformation-error 'unsupported-binary-transformation
+                           :split-debug-info binary-path
+                           "no debug information splitter is available"
+                           :format format)))
 
 ;;; ──── FR-779: Symbol Namespace Management ────
 (defstruct symbol-namespace
@@ -251,5 +324,9 @@ Returns nil if compatible, or list of breaking changes."
 ;; ── Exports ──
 (export '(mangle-function-name demangle-name
           abi-manifest dump-abi-manifest check-abi-compatibility
+          binary-transformation-error unsupported-binary-transformation
+          malformed-binary binary-transformation-operation
+          binary-transformation-path binary-transformation-format
+          binary-transformation-reason binary-transformation-mode
           *strip-mode* strip-symbols split-debug-info
           symbol-namespace *namespaces* define-namespace check-namespace-deps))
