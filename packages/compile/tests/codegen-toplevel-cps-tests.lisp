@@ -41,6 +41,8 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
                   :vm-instructions (list move halt))))
     (expect (cl-cc/compile::%result-vm-instructions-without-halt result) :to-equal (list move))))
 
+(it-sequential "codegen-toplevel-catch-throw-prefers-cps-primary-path" (let* ((source (quote (catch (quote done) (throw (quote done) 7)))) (expanded (cl-cc/expand:compiler-macroexpand-all source)) (ast (cl-cc/compile::%lower-toplevel-form-to-ast expanded)) (captured-expr nil) (compile-ast-called nil)) (expect (cl-cc/compile:%cps-vm-compile-safe-ast-p ast) :to-be-truthy) (with-replaced-function (cl-cc/compile:compile-expression (lambda (expr &rest args) (declare (ignore args)) (setf captured-expr expr) (cl-cc/compile:make-compilation-result :program (cl-cc:make-vm-program :instructions nil :result-register :R-CPS) :vm-instructions (list (cl-cc:make-vm-halt :reg :R-CPS)) :cps (quote (lambda (k) (funcall k 7)))))) (with-replaced-function (cl-cc/compile:compile-ast (lambda (&rest args) (declare (ignore args)) (setf compile-ast-called t) :R-DIRECT)) (cl-cc/compile:compile-toplevel-forms (list source) :target :vm))) (let ((normalized (%unwrap-captured-cps-entry captured-expr))) (expect normalized :to-be-truthy) (expect (car normalized) :to-be (quote lambda))) (expect compile-ast-called :to-be-falsy)))
+
 (it-sequential "codegen-toplevel-block-prefers-cps-primary-path"
   (let* ((source '(block done (return-from done 7) 99))
          (expanded (cl-cc/expand:compiler-macroexpand-all source))
