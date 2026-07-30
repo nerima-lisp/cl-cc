@@ -128,5 +128,13 @@
 ;; Run control flow tests
 ;; ----------------------------------------------------------------------------
 
+(it-sequential "compile-catch-throw-evaluates-operands-once-in-order" (let ((source "(let ((n 0)) (catch (progn (setq n (+ (* 10 n) 1)) (quote done)) (throw (progn (setq n (+ (* 10 n) 2)) (quote done)) (progn (setq n (+ (* 10 n) 3)) n))))")) (expect (= 123 (run-string source)) :to-be-truthy)))
+
+(it-sequential "compile-catch-throw-skips-forms-after-throw" (let ((source "(let ((n 0)) (catch (quote done) (throw (quote done) 7) (setq n 1)) n)")) (expect (= 0 (run-string source)) :to-be-truthy)))
+
+(it-sequential "compile-catch-throw-generates-vm-handler-instructions" (let* ((result (compile-string "(catch (quote done) (throw (quote done) 91))" :target :vm)) (instructions (cl-cc/compile:compilation-result-vm-instructions result))) (expect (find-if (lambda (instruction) (typep instruction (quote cl-cc/vm::vm-establish-catch))) instructions) :to-be-truthy) (expect (find-if (lambda (instruction) (typep instruction (quote cl-cc/vm::vm-throw))) instructions) :to-be-truthy) (expect (member (quote cl-cc/ast:ast-catch) cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-falsy) (expect (member (quote cl-cc/ast:ast-throw) cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-falsy) (expect (member (quote cl-cc/ast:ast-unwind-protect) cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-truthy) (expect (member (quote cl-cc/ast:ast-values) cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-truthy)))
+
+(it-sequential "compile-catch-does-not-catch-later-throw" (signals error (run-string "(progn (catch (quote done) 1) (throw (quote done) 2))")))
+
 (defun run-control-flow-tests ()
   (cl-weave:run 'control-flow-tests :reporter :spec))

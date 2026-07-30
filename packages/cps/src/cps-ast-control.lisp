@@ -107,18 +107,7 @@
 
 ;;; Catch and Throw
 
-(defmethod cps-transform-ast ((node ast-catch) k)
-  "Transform catch with dynamic tag."
-  (let* ((tag-expr (ast-catch-tag node))
-         (body (ast-catch-body node))
-         (tag-v (gensym "TAG"))
-         (result (gensym "RESULT")))
-    (cps-transform-ast tag-expr
-                       (list 'lambda (list tag-v)
-                             (list 'catch tag-v
-                                   (cps-transform-sequence body
-                                                           (list 'lambda (list result)
-                                                                 (list 'funcall k result))))))))
+(defmethod cps-transform-ast ((node ast-catch) k) "Transform catch with dynamic tag." (let* ((tag-expr (ast-catch-tag node)) (body (ast-catch-body node)) (tag-v (gensym "TAG")) (result (gensym "RESULT"))) (cps-transform-ast tag-expr (list (quote lambda) (list tag-v) (list (quote funcall) k (list (quote catch) tag-v (cps-transform-sequence body (list (quote lambda) (list result) result))))))))
 
 (defmethod cps-transform-ast ((node ast-throw) k)
   "Transform throw to unwind to matching catch."

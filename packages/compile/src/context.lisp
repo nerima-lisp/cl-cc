@@ -518,15 +518,13 @@ clobbered. Returns ARG's result register."
     cl-cc/ast:ast-lambda
     cl-cc/ast:ast-apply
     cl-cc/ast:ast-multiple-value-call
-    cl-cc/ast:ast-catch
-    cl-cc/ast:ast-throw
     cl-cc/ast:ast-unwind-protect
     cl-cc/ast:ast-handler-case
     cl-cc/ast:ast-flet
     cl-cc/ast:ast-labels)
   "AST node types excluded from CPS compilation.
-Definition forms, non-local control flow, and dynamic control must run on the
-direct compile path until the VM CPS route proves semantically equivalent.
+These forms remain on the direct compile path until the VM CPS route proves
+semantically equivalent.
 
 The CLOS entries are the allocation and slot accessors as a set --
 AST-MAKE-INSTANCE and AST-SLOT-VALUE alongside AST-DEFCLASS and
@@ -540,10 +538,10 @@ AST-VAR and silently do nothing.
 
 Excluding only the write side was not a deliberate line: with AST-CHILDREN
 returning (NIL) for AST-MAKE-INSTANCE -- it walked the initarg alist as a
-plist -- %CPS-COMPILE-SAFE-AST-P's (TYPEP AST 'AST-NODE) guard rejected every
-program containing one, so the read side never reached CPS and its absence
-here never showed. Fixing AST-CHILDREN alone would have routed CLOS programs
-through CPS and quietly dropped both analyses.")
+plist -- the (TYPEP AST AST-NODE) guard in %CPS-COMPILE-SAFE-AST-P rejected
+every program containing one, so the read side never reached CPS and its
+absence here never showed. Fixing AST-CHILDREN alone would have routed CLOS
+programs through CPS and quietly dropped both analyses.")
 
 (defparameter *cps-native-compile-unsupported-ast-types*
   '(cl-cc/ast:ast-node)
