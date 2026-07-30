@@ -92,6 +92,120 @@
           (expect (= 55 result) :to-be-truthy)
           (expect (= 55 cl-cc-test-setq-var) :to-be-truthy))))))
 
+(it-sequential "cps-ast-block lexical exit semantics"
+  (let* ((early
+           (cl-cc:make-ast-block
+            :name 'b
+            :body (list
+                   (cl-cc:make-ast-return-from
+                    :name 'b
+                    :value (cl-cc:make-ast-int :value 3))
+                   (cl-cc:make-ast-int :value 99))))
+         (continued
+           (cl-cc:make-ast-binop
+            :op '+
+            :lhs early
+            :rhs (cl-cc:make-ast-int :value 4)))
+         (nested
+           (cl-cc:make-ast-block
+            :name 'outer
+            :body (list
+                   (cl-cc:make-ast-block
+                    :name 'inner
+                    :body (list
+                           (cl-cc:make-ast-return-from
+                            :name 'inner
+                            :value (cl-cc:make-ast-int :value 5))))
+                   (cl-cc:make-ast-int :value 20))))
+         (shadowed
+           (cl-cc:make-ast-block
+            :name 'same
+            :body (list
+                   (cl-cc:make-ast-block
+                    :name 'same
+                    :body (list
+                           (cl-cc:make-ast-return-from
+                            :name 'same
+                            :value (cl-cc:make-ast-int :value 6))))
+                   (cl-cc:make-ast-int :value 21))))
+         (nil-block
+           (cl-cc:make-ast-block
+            :name nil
+            :body (list
+                   (cl-cc:make-ast-return-from
+                    :name nil
+                    :value (cl-cc:make-ast-int :value 8)))))
+         (empty
+           (cl-cc:make-ast-block :name 'empty :body nil)))
+    (expect (run-cps-ast
+             (cl-cc:make-ast-block
+              :name 'normal
+              :body (list (cl-cc:make-ast-int :value 2))))
+            :to-equal 2)
+    (expect (run-cps-ast continued) :to-equal 7)
+    (expect (run-cps-ast nested) :to-equal 20)
+    (expect (run-cps-ast shadowed) :to-equal 21)
+    (expect (run-cps-ast nil-block) :to-equal 8)
+    (expect (run-cps-ast empty) :to-be nil)
+    (let* ((cl-cc-test-block-counter 0)
+           (increment
+             (cl-cc:make-ast-setq
+              :var 'cl-cc-test-block-counter
+              :value
+              (cl-cc:make-ast-binop
+               :op '+
+               :lhs (cl-cc:make-ast-var :name 'cl-cc-test-block-counter)
+               :rhs (cl-cc:make-ast-int :value 1))))
+           (node
+             (cl-cc:make-ast-block
+              :name 'effects
+              :body
+              (list
+               (cl-cc:make-ast-return-from :name 'effects :value increment)
+               (cl-cc:make-ast-setq
+                :var 'cl-cc-test-block-counter
+                :value (cl-cc:make-ast-int :value 99))))))
+      (declare (special cl-cc-test-block-counter))
+      (handler-bind ((warning (lambda (condition)
+                                (declare (ignore condition))
+                                (muffle-warning))))
+        (expect (run-cps-ast node) :to-equal 1))
+      (expect cl-cc-test-block-counter :to-equal 1))
+    (let* ((cl-cc-test-block-counter 0)
+           (skipped-inner
+             (cl-cc:make-ast-setq
+              :var 'cl-cc-test-block-counter
+              :value (cl-cc:make-ast-int :value 10)))
+           (skipped-outer
+             (cl-cc:make-ast-setq
+              :var 'cl-cc-test-block-counter
+              :value (cl-cc:make-ast-int :value 20)))
+           (outer
+             (cl-cc:make-ast-block
+              :name 'outer
+              :body
+              (list
+               (cl-cc:make-ast-block
+                :name 'inner
+                :body
+                (list
+                 (cl-cc:make-ast-return-from
+                  :name 'outer
+                  :value (cl-cc:make-ast-int :value 3))
+                 skipped-inner))
+               skipped-outer)))
+           (continued-after-outer
+             (cl-cc:make-ast-binop
+              :op '+
+              :lhs outer
+              :rhs (cl-cc:make-ast-int :value 4))))
+      (declare (special cl-cc-test-block-counter))
+      (handler-bind ((warning (lambda (condition)
+                          (declare (ignore condition))
+                          (muffle-warning))))
+  (expect (run-cps-ast continued-after-outer) :to-equal 7))
+      (expect cl-cc-test-block-counter :to-equal 0))))
+
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; AST CPS — structural ("is it a CPS lambda?")
 ;;; These forms are transformed correctly but cannot be trivially evaluated

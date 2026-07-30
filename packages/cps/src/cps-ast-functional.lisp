@@ -197,7 +197,8 @@ then call the function with all evaluated arguments."
 (defun cps-transform-ast* (node)
   "Transform an AST node to CPS, wrapping in a lambda for the outer continuation.
 Returns a (lambda (k) ...) form ready for evaluation."
-  (let ((k (gensym "K")))
+  (let ((*cps-block-environment* nil)
+        (k (gensym "K")))
     (%cps-lambda (list k)
                  (cps-transform-ast node k))))
 
