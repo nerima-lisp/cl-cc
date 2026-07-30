@@ -170,7 +170,41 @@
                                 (declare (ignore condition))
                                 (muffle-warning))))
         (expect (run-cps-ast node) :to-equal 1))
-      (expect cl-cc-test-block-counter :to-equal 1))))
+      (expect cl-cc-test-block-counter :to-equal 1))
+    (let* ((cl-cc-test-block-counter 0)
+           (skipped-inner
+             (cl-cc:make-ast-setq
+              :var 'cl-cc-test-block-counter
+              :value (cl-cc:make-ast-int :value 10)))
+           (skipped-outer
+             (cl-cc:make-ast-setq
+              :var 'cl-cc-test-block-counter
+              :value (cl-cc:make-ast-int :value 20)))
+           (outer
+             (cl-cc:make-ast-block
+              :name 'outer
+              :body
+              (list
+               (cl-cc:make-ast-block
+                :name 'inner
+                :body
+                (list
+                 (cl-cc:make-ast-return-from
+                  :name 'outer
+                  :value (cl-cc:make-ast-int :value 3))
+                 skipped-inner))
+               skipped-outer)))
+           (continued-after-outer
+             (cl-cc:make-ast-binop
+              :op '+
+              :lhs outer
+              :rhs (cl-cc:make-ast-int :value 4))))
+      (declare (special cl-cc-test-block-counter))
+      (handler-bind ((warning (lambda (condition)
+                          (declare (ignore condition))
+                          (muffle-warning))))
+  (expect (run-cps-ast continued-after-outer) :to-equal 7))
+      (expect cl-cc-test-block-counter :to-equal 0))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; AST CPS — structural ("is it a CPS lambda?")
