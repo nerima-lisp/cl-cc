@@ -78,10 +78,7 @@
     (list 'let (list (list k-var k))
           (cps-transform-ast (ast-if-cond node)
                              (list 'lambda (list v)
-                                    (list 'if (list 'or
-                                                    (list 'null v)
-                                                    (list 'and (list 'numberp v)
-                                                          (list 'zerop v)))
+                                    (list 'if (list 'null v)
                                           (cps-transform-ast (ast-if-else node) k-var)
                                           (cps-transform-ast (ast-if-then node) k-var)))))))
 
