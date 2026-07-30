@@ -134,3 +134,14 @@
                                  (progn (incf count) (setf pos (1+ found)))
                                  (return count)))))))
     (expect (>= lambda-count 2) :to-be-truthy)))
+
+(it-sequential "cps-ast-unsupported-node-signals-dedicated-condition"
+  (let ((node (cl-cc/ast::make-ast-hole)))
+    (handler-case
+        (progn
+          (cl-cc/cps:cps-transform-ast node (quote k))
+          (expect nil :to-be-truthy))
+      (cl-cc/cps:unsupported-cps-ast (condition)
+        (expect (cl-cc/cps:unsupported-cps-ast-node condition) :to-be node)
+        (expect (cl-cc/cps:unsupported-cps-ast-node-type condition)
+                :to-be (type-of node))))))

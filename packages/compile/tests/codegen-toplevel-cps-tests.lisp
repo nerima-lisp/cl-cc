@@ -175,3 +175,19 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
           ("values-primary" 1 "(values 1 2 3)")
           ("multiple-value-bind" 3 "(multiple-value-bind (a b) (values 1 2) (+ a b))"))
   :stdlib nil)
+
+(it-sequential "codegen-toplevel-multiple-values-avoid-cps-route"
+  (dolist (ast (list (cl-cc/ast:make-ast-values :forms nil)
+                     (cl-cc/ast:make-ast-values
+                      :forms (list (cl-cc/ast:make-ast-int :value 1)))
+                     (cl-cc/ast:make-ast-values
+                      :forms (list (cl-cc/ast:make-ast-int :value 1)
+                                   (cl-cc/ast:make-ast-int :value 2)
+                                   (cl-cc/ast:make-ast-int :value 3)))
+                     (cl-cc/ast:make-ast-multiple-value-bind
+                      :vars (quote (a b))
+                      :values-form (cl-cc/ast:make-ast-values
+                                    :forms (list (cl-cc/ast:make-ast-int :value 1)
+                                                 (cl-cc/ast:make-ast-int :value 2)))
+                      :body (list (cl-cc/ast:make-ast-var :name (quote a))))))
+    (expect (cl-cc/compile:%cps-vm-compile-safe-ast-p ast) :to-be-falsy)))

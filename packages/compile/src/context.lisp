@@ -516,6 +516,8 @@ clobbered. Returns ARG's result register."
     cl-cc/ast:ast-make-instance
     cl-cc/ast:ast-slot-value
     cl-cc/ast:ast-set-slot-value
+    cl-cc/ast:ast-values
+    cl-cc/ast:ast-multiple-value-bind
     cl-cc/ast:ast-call
     cl-cc/ast:ast-lambda
     cl-cc/ast:ast-apply

@@ -30,6 +30,8 @@
   (expect (member 'cl-cc/ast:ast-defun cl-cc::*cps-host-eval-unsafe-ast-types*) :to-be-truthy)
   (expect (member 'cl-cc/ast:ast-node cl-cc/compile:*cps-native-compile-unsupported-ast-types*) :to-be-truthy)
   (expect (member 'cl-cc/ast:ast-setq cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-falsy)
+  (expect (member (quote cl-cc/ast:ast-values) cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-truthy)
+  (expect (member (quote cl-cc/ast:ast-multiple-value-bind) cl-cc/compile:*cps-compile-unsupported-ast-types*) :to-be-truthy)
   (expect (member 'cl-cc/ast:ast-setq cl-cc/compile:*cps-native-compile-unsupported-ast-types*) :to-be-falsy)
   (expect (first '(("PARSE-LAMBDA-LIST"            . :cl-cc/expand)
                                ("DESTRUCTURE-LAMBDA-LIST"      . :cl-cc/expand)
