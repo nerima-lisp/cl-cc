@@ -2,29 +2,39 @@
 
 ;;; Block and Return-From
 
+(defvar *cps-block-environment* nil
+  "Lexical block names mapped to their CPS exit continuations.")
+
+(define-condition unbound-cps-block (error)
+  ((name :initarg :name :reader unbound-cps-block-name))
+  (:report (lambda (condition stream)
+             (format stream "CPS RETURN-FROM references unknown block ~S."
+                     (unbound-cps-block-name condition)))))
+
+(defun %lookup-cps-block (name)
+  (or (cdr (assoc name *cps-block-environment* :test #'eq))
+      (error 'unbound-cps-block :name name)))
+
 (defmethod cps-transform-ast ((node ast-block) k)
-  "Transform block with named exit point.
-The block creates a catch tag for return-from."
+  "Transform a lexical block into an explicit exit continuation."
   (let* ((name (ast-block-name node))
          (body (ast-block-body node))
-         (result (gensym "RESULT")))
-    ;; The continuation for the body is a special one that returns from the block
-    (list 'block name
-          (cps-transform-sequence body
-                                  (list 'lambda (list result)
-                                        (list 'return-from name
-                                              (list 'funcall k result)))))))
+         (exit-k (gensym "BLOCK-EXIT"))
+         (*cps-block-environment*
+           (acons name exit-k *cps-block-environment*)))
+    (list 'let (list (list exit-k k))
+          (cps-transform-sequence body exit-k))))
 
 (defmethod cps-transform-ast ((node ast-return-from) k)
-  "Transform return-from to exit the block with a value."
+  "Transform RETURN-FROM by invoking its nearest lexical block continuation."
+  (declare (ignore k))
   (let* ((name (ast-return-from-name node))
+         (exit-k (%lookup-cps-block name))
          (value (ast-return-from-value node))
-         (v (gensym "VAL")))
-    ;; Evaluate the value, then return from the block
-    ;; Note: k is ignored since we're doing a non-local exit
+         (result (gensym "RETURN-VALUE")))
     (cps-transform-ast value
-                       (list 'lambda (list v)
-                             (list 'return-from name v)))))
+                       (list 'lambda (list result)
+                             (list 'funcall exit-k result)))))
 
 ;;; Tagbody and Go
 

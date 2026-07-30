@@ -51,11 +51,15 @@
 ;;; CPS for block / return-from
 ;;; ─────────────────────────────────────────────────────────────────────────
 
-(it-sequential "cps-control-outer-car block"
-  (destructuring-bind (node expected-car) (list (cl-cc:make-ast-block :name 'nil :body (list (cl-cc:make-ast-int :value 1))) 'block)
-    (let* ((k      (gensym "K"))
-         (result (cl-cc/cps::cps-transform-ast node k)))
-    (expect (car result) :to-be expected-car))))
+(it-sequential "cps-control-block-uses-explicit-continuation"
+  (let* ((node (cl-cc:make-ast-block
+                :name nil
+                :body (list (cl-cc:make-ast-return-from
+                             :name nil
+                             :value (cl-cc:make-ast-int :value 1)))))
+         (form (cl-cc:cps-transform-ast* node)))
+    (expect (%cps-form-contains-p form 'block) :to-be-falsy)
+    (expect (%cps-form-contains-p form 'return-from) :to-be-falsy)))
 
 (it-sequential "cps-control-outer-car catch"
   (destructuring-bind (node expected-car) (list (cl-cc:make-ast-catch :tag  (cl-cc:make-ast-quote :value :done)
@@ -64,12 +68,16 @@
          (result (cl-cc/cps::cps-transform-ast node k)))
     (expect (car result) :to-be expected-car))))
 
-(it-sequential "cps-control-contains-token return-from"
-  (destructuring-bind (node expected-token) (list (cl-cc:make-ast-return-from :name 'nil
-                                                     :value (cl-cc:make-ast-int :value 42)) "RETURN-FROM")
-    (let* ((k      (gensym "K"))
-         (result (format nil "~S" (cl-cc/cps::cps-transform-ast node k))))
-    (expect (search expected-token result) :to-be-truthy))))
+(it-sequential "cps-control-unbound-return-from-signals-before-value-transform"
+  (let ((node (cl-cc:make-ast-return-from
+               :name nil
+               :value (cl-cc/ast::make-ast-hole))))
+    (handler-case
+        (progn
+          (cl-cc:cps-transform-ast* node)
+          (error "Expected unbound CPS block error"))
+      (cl-cc/cps::unbound-cps-block (condition)
+        (expect (cl-cc/cps::unbound-cps-block-name condition) :to-be nil)))))
 
 (it-sequential "cps-control-contains-token throw"
   (destructuring-bind (node expected-token) (list (cl-cc:make-ast-throw :tag   (cl-cc:make-ast-quote :value :done)

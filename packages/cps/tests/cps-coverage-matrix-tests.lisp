@@ -73,10 +73,15 @@
     (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
 (it-sequential "cps-ast-coverage ast-return-from"
-  (destructuring-bind (label node) (list "ast-return-from" (cl-cc/ast:make-ast-return-from
-     :name 'done
-     :value (%cps-coverage-int 1)))
-    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
+  (destructuring-bind (label node)
+      (list "ast-return-from"
+            (cl-cc/ast:make-ast-block
+             :name 'done
+             :body (list (cl-cc/ast:make-ast-return-from
+                          :name 'done
+                          :value (%cps-coverage-int 1)))))
+    (declare (ignore label))
+    (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
 (it-sequential "cps-ast-coverage ast-tagbody"
   (destructuring-bind (label node) (list "ast-tagbody" (cl-cc/ast:make-ast-tagbody
