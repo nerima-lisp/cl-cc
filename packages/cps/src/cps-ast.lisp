@@ -17,10 +17,21 @@
 ;;;   cps-ast-functional.lisp — quote, the, values, mvb, apply, mvc, mvprog1,
 ;;;                             ast-call, entry points
 
+(define-condition unsupported-cps-ast (error)
+  ((node :initarg :node :reader unsupported-cps-ast-node)
+   (node-type :initarg :node-type :reader unsupported-cps-ast-node-type))
+  (:report
+   (lambda (condition stream)
+     (format stream
+             "CPS transformation does not support AST node type ~S."
+             (unsupported-cps-ast-node-type condition)))))
+
 (defgeneric cps-transform-ast (node k)
-  (:documentation "Transform an AST node to continuation-passing style.
-NODE is an AST node, K is the continuation (a symbol or lambda expression).
-Returns a CPS-transformed S-expression."))
+  (:documentation "Transform an AST node to CPS form. K is a continuation function."))
+
+(defmethod cps-transform-ast ((node ast-node) k)
+  (declare (ignore k))
+  (error (quote unsupported-cps-ast) :node node :node-type (type-of node)))
 
 ;;; Helper: Transform a sequence of forms, passing result to continuation
 (defun %cps-transform-sequence-step (forms k empty-result)

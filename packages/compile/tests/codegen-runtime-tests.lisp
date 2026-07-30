@@ -194,3 +194,16 @@
     "(handler-case 42 (error (e) -1))")
   (assert-run= 99
     "(handler-case (error \"boom\") (error (e) 99))"))
+
+(it-sequential "codegen-values-run-cardinality-and-mvb-semantics"
+  (expect (run-string "(multiple-value-list (values))") :to-equal nil)
+  (expect (run-string "(multiple-value-list (values 1))") :to-equal (quote (1)))
+  (expect (run-string "(multiple-value-list (values 1 2))") :to-equal (quote (1 2)))
+  (expect (run-string "(multiple-value-list (values 1 2 3))") :to-equal (quote (1 2 3)))
+  (expect (run-string "(multiple-value-list (values 1 2 3 4))") :to-equal (quote (1 2 3 4)))
+  (expect (run-string "(multiple-value-bind (a b c) (values 1 2) (list a b c))")
+          :to-equal (quote (1 2 nil)))
+  (expect (run-string "(multiple-value-bind (a b) (values 1 2 3 4) (list a b))")
+          :to-equal (quote (1 2)))
+  (expect (run-string "(let ((x 0)) (multiple-value-bind (a b c) (values (progn (incf x) x) (progn (incf x) x) (progn (incf x) x)) (+ (* 1000 x) (+ (* 100 a) (+ (* 10 b) c)))))")
+          :to-equal 3123))

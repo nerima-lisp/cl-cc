@@ -11,6 +11,9 @@
    #:cps-transform
    #:cps-transform*
    #:cps-transform-ast
+   #:unsupported-cps-ast
+   #:unsupported-cps-ast-node
+   #:unsupported-cps-ast-node-type
    #:cps-transform-ast*
    #:cps-transform-sequence
      #:cps-transform-eval
