@@ -253,3 +253,27 @@
      :table (cl-cc/ast:make-ast-var :name 'table)
      :value (%cps-coverage-int 1)))
     (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
+
+(defun %cps-if-result-and-output (condition)
+  (let* ((node (make-ast-if
+                :cond (make-ast-quote :value condition)
+                :then (make-ast-print :expr (%cps-coverage-int 11))
+                :else (make-ast-print :expr (%cps-coverage-int 22))))
+         (function (eval (cl-cc/cps:cps-transform-ast* node)))
+         (result nil)
+         (output (with-output-to-string (*standard-output*)
+                   (setf result (funcall function (function identity))))))
+    (values result output)))
+
+(it-sequential "fr-373-cps-if uses Common Lisp truthiness"
+  (dolist (case (list (cons nil 22)
+                      (cons 0 11)
+                      (cons 0.0 11)
+                      (cons (complex 0 0) 11)
+                      (cons :non-nil 11)))
+    (destructuring-bind (condition . expected) case
+      (multiple-value-bind (result output)
+          (%cps-if-result-and-output condition)
+        (expect (= expected result) :to-be-truthy)
+        (expect (string= (format nil "~%~S " expected) output)
+                :to-be-truthy)))))

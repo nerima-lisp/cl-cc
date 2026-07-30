@@ -152,3 +152,19 @@
                   :cleanup   nil))
            (result (cl-cc/cps::cps-transform-ast node k)))
       (expect (third result) :to-be nil))))
+
+(it-sequential "fr-373-bootstrap-sexp-cps-if uses Common Lisp truthiness"
+  (dolist (case (list (list nil 22)
+                      (list 0 11)
+                      (list 0.0 11)
+                      (list (complex 0 0) 11)
+                      (list :non-nil 11)))
+    (destructuring-bind (condition expected) case
+      (let* ((input (list 'if condition '(print 11) '(print 22)))
+             (transformed (cl-cc:cps-transform* input))
+             (result nil)
+             (output (with-output-to-string (*standard-output*)
+                       (setf result
+                             (funcall (eval transformed) #'identity)))))
+        (expect result :to-equal expected)
+        (expect output :to-equal (format nil "~%~S " expected))))))
