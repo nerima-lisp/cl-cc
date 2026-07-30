@@ -169,11 +169,9 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
           ("call-bearing-form" 6 "(defun add1 (x) (+ x 1)) (add1 5)"))
   :stdlib nil)
 
-(deftest-compile codegen-toplevel-cps-multi-value-semantics
-  "Top-level CPS routing preserves apply/values/multiple-value-bind behavior for supported forms."
-  :cases (("apply" 6 "(apply #'+ (list 1 2 3))")
-          ("values-primary" 1 "(values 1 2 3)")
-          ("multiple-value-bind" 3 "(multiple-value-bind (a b) (values 1 2) (+ a b))"))
+(deftest-compile codegen-toplevel-cps-apply-semantics
+  "Top-level CPS routing preserves APPLY behavior."
+  :cases (("apply" 6 "(apply (function +) (list 1 2 3))"))
   :stdlib nil)
 
 (it-sequential "codegen-toplevel-multiple-values-avoid-cps-route"
