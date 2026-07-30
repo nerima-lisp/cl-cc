@@ -263,14 +263,7 @@ are left unchanged to avoid changing call semantics."
                 (list 'let (list (list sym tmp))
                       (%cps-sexp-let-bindings (cdr bindings) body k)))))))
 
-(defun %cps-falsep (value)
-  "Return true when VALUE is falsy in the bootstrap CPS language.
-
-Bootstrap CPS follows the language-level truthiness used by compiled code:
-both NIL and numeric zero are false."
-  (or (null value)
-      (and (numberp value)
-           (zerop value))))
+(defun %cps-falsep (value) "Return true when VALUE is false under Common Lisp truth semantics.\n\nOnly NIL is false; all other values, including numeric zero, are true." (null value))
 
 (defun %cps-sexp-if (node k)
   "CPS-transform an IF form represented by NODE."
@@ -330,7 +323,7 @@ runtime while preserving the data-driven dispatch shape."
 (defun %cps-sexp-node (node k)
   "CPS-transform a single bootstrap S-expression NODE with continuation K."
   (cond
-    ((integerp node) (list 'funcall k node))
+    ((numberp node) (list 'funcall k node))
     ((symbolp  node) (list 'funcall k node))
     ((consp node)
      (let ((handler (gethash (car node) *cps-sexp-dispatch-table*)))
