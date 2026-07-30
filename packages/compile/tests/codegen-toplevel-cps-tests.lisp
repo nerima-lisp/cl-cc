@@ -196,3 +196,36 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
                                                  (cl-cc/ast:make-ast-int :value 2)))
                       :body (list (cl-cc/ast:make-ast-var :name (quote a))))))
     (expect (cl-cc/compile:%cps-vm-compile-safe-ast-p ast) :to-be-falsy)))
+
+(it-sequential "fr-371-codegen-toplevel-tagbody-prefers-cps-primary-path"
+  (let* ((source (quote (tagbody start (go done) done)))
+         (expanded (cl-cc/expand:compiler-macroexpand-all source))
+         (ast (cl-cc/compile::%lower-toplevel-form-to-ast expanded))
+         (captured-expr nil)
+         (compile-ast-called nil))
+    (expect (cl-cc/compile:%cps-vm-compile-safe-ast-p ast) :to-be-truthy)
+    (with-replaced-function (cl-cc/compile:compile-expression
+                             (lambda (expr &rest args)
+                               (declare (ignore args))
+                               (setf captured-expr expr)
+                               (cl-cc/compile:make-compilation-result
+                                :program (cl-cc:make-vm-program
+                                          :instructions nil
+                                          :result-register :R-CPS)
+                                :vm-instructions
+                                (list (cl-cc:make-vm-halt :reg :R-CPS))
+                                :cps (quote (lambda (k) (funcall k nil))))))
+      (with-replaced-function (cl-cc/compile:compile-ast
+                               (lambda (&rest args)
+                                 (declare (ignore args))
+                                 (setf compile-ast-called t)
+                                 :R-DIRECT))
+        (cl-cc/compile:compile-toplevel-forms (list source) :target :vm)))
+    (let ((normalized (%unwrap-captured-cps-entry captured-expr)))
+      (expect normalized :to-be-truthy)
+      (expect (car normalized) :to-be (quote lambda)))
+    (expect compile-ast-called :to-be-falsy)))
+(deftest-compile fr-371-codegen-toplevel-tagbody-real-vm-backend
+  "CPS local tag continuations compile and execute through the real VM backend."
+  :cases (("backward-go-side-effect" 2 "(let ((counter 0)) (tagbody loop (setq counter (+ counter 1)) (if (< counter 2) (go loop))) counter)"))
+  :stdlib nil)

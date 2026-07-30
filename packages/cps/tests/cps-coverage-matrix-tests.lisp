@@ -89,8 +89,14 @@
     (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
 (it-sequential "cps-ast-coverage ast-go"
-  (destructuring-bind (label node) (list "ast-go" (cl-cc/ast:make-ast-go :tag 'start))
-    (declare (ignore label)) (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
+  (destructuring-bind (label node)
+      (list "ast-go"
+            (cl-cc/ast:make-ast-tagbody
+             :tags (list (cons (quote start)
+                               (list (cl-cc/ast:make-ast-go
+                                      :tag (quote start)))))))
+    (declare (ignore label))
+    (expect (%cps-transform-succeeds-p node) :to-be-truthy)))
 
 (it-sequential "cps-ast-coverage ast-catch"
   (destructuring-bind (label node) (list "ast-catch" (cl-cc/ast:make-ast-catch

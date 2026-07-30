@@ -236,7 +236,9 @@
     (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
 (it-sequential "cps-ast-structural-shape go"
-  (destructuring-bind (ast) (list (cl-cc:make-ast-go :tag 'tag1))
+  (let ((ast (cl-cc:make-ast-tagbody
+              :tags (list (cons (quote tag1)
+                                (list (cl-cc:make-ast-go :tag (quote tag1))))))))
     (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
 (it-sequential "cps-ast-structural-shape catch"
@@ -272,3 +274,78 @@
      :bindings (list (list 'id '(x) (cl-cc:make-ast-var :name 'x)))
      :body (list (cl-cc:make-ast-int :value 1))))
     (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
+
+(it-sequential "fr-371-cps-tagbody-local-jump-semantics"
+  (labels ((int (value) (cl-cc:make-ast-int :value value))
+           (var () (cl-cc:make-ast-var :name (quote cl-cc-test-tag-counter)))
+           (set-counter (value)
+             (cl-cc:make-ast-setq :var (quote cl-cc-test-tag-counter) :value value))
+           (add (value)
+             (cl-cc:make-ast-binop :op (quote +) :lhs (var) :rhs (int value)))
+           (run-with-counter (node expected)
+             (let ((cl-cc-test-tag-counter 0))
+               (declare (special cl-cc-test-tag-counter))
+               (handler-bind ((warning (lambda (condition)
+                                         (declare (ignore condition))
+                                         (muffle-warning))))
+                 (expect (run-cps-ast node) :to-be nil))
+               (expect cl-cc-test-tag-counter :to-equal expected))))
+    (expect (run-cps-ast (cl-cc:make-ast-tagbody :tags nil)) :to-be nil)
+    (expect (run-cps-ast
+             (cl-cc:make-ast-tagbody
+              :tags (list (cons (quote final)
+                                (list (int 42))))))
+            :to-be nil)
+    (run-with-counter
+     (cl-cc:make-ast-tagbody
+      :tags (list
+             (cons (quote start)
+                   (list (set-counter (int 1))
+                         (cl-cc:make-ast-go :tag (quote done))
+                         (set-counter (int 99))))
+             (cons (quote done)
+                   (list (set-counter (add 2))))))
+     3)
+    (run-with-counter
+     (cl-cc:make-ast-tagbody
+      :tags (list
+             (cons (quote first) (list (set-counter (int 1))))
+             (cons (quote second) (list (set-counter (add 2))))))
+     3)
+    (run-with-counter
+     (cl-cc:make-ast-tagbody
+      :tags (list
+             (cons (quote loop)
+                   (list (set-counter (add 1))
+                         (cl-cc:make-ast-if
+                          :cond (cl-cc:make-ast-binop
+                                 :op (quote <) :lhs (var) :rhs (int 2))
+                          :then (cl-cc:make-ast-go :tag (quote loop))
+                          :else (int 0))))))
+     2)
+    (run-with-counter
+     (cl-cc:make-ast-tagbody
+      :tags (list
+             (cons (quote outer-start)
+                   (list
+                    (cl-cc:make-ast-tagbody
+                     :tags (list
+                            (cons (quote inner-start)
+                                  (list (cl-cc:make-ast-go :tag (quote same))))
+                            (cons (quote same)
+                                  (list (set-counter (int 10))))))))
+             (cons (quote same) (list (set-counter (add 1))))))
+     11)
+    (run-with-counter
+     (cl-cc:make-ast-tagbody
+      :tags (list
+             (cons (quote outer-start)
+                   (list
+                    (cl-cc:make-ast-tagbody
+                     :tags (list
+                            (cons (quote inner-start)
+                                  (list (cl-cc:make-ast-go
+                                         :tag (quote outer-end))))))))
+             (cons (quote skipped) (list (set-counter (int 99))))
+             (cons (quote outer-end) (list (set-counter (int 7))))))
+     7)))
