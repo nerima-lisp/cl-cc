@@ -225,3 +225,7 @@ Accept either a raw (lambda (k) ...) form or a singleton list containing it."
       (expect normalized :to-be-truthy)
       (expect (car normalized) :to-be (quote lambda)))
     (expect compile-ast-called :to-be-falsy)))
+(deftest-compile fr-371-codegen-toplevel-tagbody-real-vm-backend
+  "CPS local tag continuations compile and execute through the real VM backend."
+  :cases (("backward-go-side-effect" 2 "(let ((counter 0)) (tagbody loop (setq counter (+ counter 1)) (if (< counter 2) (go loop))) counter)"))
+  :stdlib nil)
