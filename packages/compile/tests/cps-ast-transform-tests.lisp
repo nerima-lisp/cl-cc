@@ -91,14 +91,23 @@
 ;;; ─────────────────────────────────────────────────────────────────────────
 
 (it-sequential "cps-tagbody-section-behavior"
-  (let ((continue-form '(go next-tag)))
-    ;; empty: returns the continuation form directly
-    (let ((result (cl-cc/cps::cps-transform-tagbody-section nil continue-form)))
-      (expect result :to-equal continue-form))
-    ;; single form: CPS wrapper is a funcall
+  (let ((continue-form (quote (funcall next-tag))))
     (let ((result (cl-cc/cps::cps-transform-tagbody-section
-                   (list (cl-cc:make-ast-int :value 1)) continue-form)))
-      (expect (car result) :to-be 'funcall))))
+                   nil continue-form)))
+      (expect result :to-equal continue-form))
+    (let* ((expression (cl-cc/ast:make-ast-int :value 7))
+           (result (cl-cc/cps::cps-transform-tagbody-section
+                    (list expression) continue-form)))
+      (expect result :to-equal
+              (list (quote funcall) (second result) continue-form)))
+    (let* ((first (cl-cc/ast:make-ast-int :value 1))
+           (second (cl-cc/ast:make-ast-int :value 2))
+           (result (cl-cc/cps::cps-transform-tagbody-section
+                    (list first second) continue-form)))
+      (expect result :to-equal
+              (list (quote funcall) (second result)
+                    (list (quote funcall) (second (third result))
+                          continue-form))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CPS for local function bindings (flet/labels helpers)
@@ -168,3 +177,25 @@
                              (funcall (eval transformed) #'identity)))))
         (expect result :to-equal expected)
         (expect output :to-equal (format nil "~%~S " expected))))))
+
+(it-sequential "fr-371-cps-tagbody-uses-only-local-continuations"
+  (let* ((node (cl-cc:make-ast-tagbody
+                :tags (list (cons (quote start)
+                                  (list (cl-cc:make-ast-go :tag (quote done))))
+                            (cons (quote done)
+                                  (list (cl-cc:make-ast-int :value 1))))))
+         (form (cl-cc:cps-transform-ast* node)))
+    (expect (%cps-form-contains-p form (quote tagbody)) :to-be-falsy)
+    (expect (%cps-form-contains-p form (quote go)) :to-be-falsy)
+    (expect (%cps-form-contains-p form (quote labels)) :to-be-truthy)
+    (expect (%cps-form-contains-p form (quote funcall)) :to-be-truthy)))
+
+(it-sequential "fr-371-cps-go-unknown-tag-fails-before-continuation-use"
+  (let ((node (cl-cc:make-ast-go :tag (quote missing))))
+    (handler-case
+        (progn
+          (cl-cc:cps-transform-ast* node)
+          (error "Expected unbound CPS tag error"))
+      (cl-cc/cps::unbound-cps-tag (condition)
+        (expect (cl-cc/cps::unbound-cps-tag-tag condition)
+                :to-be (quote missing))))))
