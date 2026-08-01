@@ -70,6 +70,14 @@
       url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
       flake = false;
     };
+    cl-regex-kit = {
+      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
+      flake = false;
+    };
+    cl-host-kit = {
+      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
+      flake = false;
+    };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
     # repository. Injected into the internal system graph under their original
     # names by nix/asdf-systems.nix, so every `deps = [ "cl-cc-ast" ... ]`
@@ -297,6 +305,19 @@
             systems = [ "cl-tty-kit" ];
             lispLibs = [ clProlog ];
           };
+          clRegexKit = sbcl.buildASDFSystem {
+            pname = "cl-regex-kit";
+            version = siblingVersion "cl-regex-kit";
+            src = inputs.cl-regex-kit;
+            systems = [ "cl-regex-kit" ];
+            lispLibs = [ clParserKit ];
+          };
+          clHostKit = sbcl.buildASDFSystem {
+            pname = "cl-host-kit";
+            version = siblingVersion "cl-host-kit";
+            src = inputs.cl-host-kit;
+            systems = [ "cl-host-kit" ];
+          };
           # Subsystems split out of this repository. clCcAst is a
           # dependency-free leaf; clCcType depends on it.
           #
@@ -364,6 +385,9 @@
             lispLibs = [
               clCcBootstrap
               clCcRuntime
+              clRegexKit
+              clTtyKit
+              clHostKit
             ];
           };
           clCcMir = sbcl.buildASDFSystem {
