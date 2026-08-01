@@ -215,7 +215,7 @@
      (:file "cps-ast-transform-tests")
      (:file "cps-ast-extended-tests")
       (:file "cps-ast-functional-tests")
-      ("cps-package-tests"
+      (:module "cps-package-tests"
        :pathname "../../cps/tests"
        :serial t
        :components
