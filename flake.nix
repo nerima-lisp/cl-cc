@@ -154,6 +154,14 @@
       url = "github:nerima-lisp/cl-json-kit/v1.0.0";
       flake = false;
     };
+    cl-date-kit = {
+      url = "github:nerima-lisp/cl-date-kit/040f6bf936c0dd946a0049eaa715e4c1c6a40eb5";
+      flake = false;
+    };
+    cl-concurrent-kit = {
+      url = "github:nerima-lisp/cl-concurrent-kit/c129a0b4be03ef2b1671ab208f9b390573eb0412";
+      flake = false;
+    };
   };
 
   # Plain `outputs` with `forAllSystems`, not flake-parts. The whole flake is
@@ -360,6 +368,18 @@
             src = inputs.cl-json-kit;
             systems = [ "cl-json-kit" ];
           };
+          clDateKit = sbcl.buildASDFSystem {
+            pname = "cl-date-kit";
+            version = siblingVersion "cl-date-kit";
+            src = inputs.cl-date-kit;
+            systems = [ "cl-date-kit" ];
+          };
+          clConcurrentKit = sbcl.buildASDFSystem {
+            pname = "cl-concurrent-kit";
+            version = siblingVersion "cl-concurrent-kit";
+            src = inputs.cl-concurrent-kit;
+            systems = [ "cl-concurrent-kit" ];
+          };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
             version = siblingVersion "cl-cc-runtime";
@@ -497,6 +517,10 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clDateKit
+              clJsonKit
+              clConcurrentKit
+              clHostKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
