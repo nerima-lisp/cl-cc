@@ -289,6 +289,23 @@
         "type": "github"
       }
     },
+    "cl-host-kit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785433376,
+        "narHash": "sha256-sivxc+tzylWHzkRhIn6yAj8CFCTsoG+gFx7B2q6aBT4=",
+        "owner": "nerima-lisp",
+        "repo": "cl-host-kit",
+        "rev": "e1b5bd199c93bc083e8dee58d0a70c233d1d9e86",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "ref": "v0.2.1",
+        "repo": "cl-host-kit",
+        "type": "github"
+      }
+    },
     "cl-json-kit": {
       "flake": false,
       "locked": {
@@ -373,6 +390,23 @@
         "type": "github"
       }
     },
+    "cl-regex-kit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785550158,
+        "narHash": "sha256-0W3ZmNlo0AuiZODm7YiV7/LPtC1kIfhSSLUCEkJIGYo=",
+        "owner": "nerima-lisp",
+        "repo": "cl-regex-kit",
+        "rev": "d7d1a0e4d5a15765b1f781993949ae2e3cb796f9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nerima-lisp",
+        "repo": "cl-regex-kit",
+        "rev": "d7d1a0e4d5a15765b1f781993949ae2e3cb796f9",
+        "type": "github"
+      }
+    },
     "cl-tty-kit": {
       "flake": false,
       "locked": {
@@ -442,11 +476,13 @@
         "cl-cc-vm": "cl-cc-vm",
         "cl-cli": "cl-cli",
         "cl-dataflow": "cl-dataflow",
+        "cl-host-kit": "cl-host-kit",
         "cl-json-kit": "cl-json-kit",
         "cl-log-kit": "cl-log-kit",
         "cl-parser-kit": "cl-parser-kit",
         "cl-process-kit": "cl-process-kit",
         "cl-prolog": "cl-prolog",
+        "cl-regex-kit": "cl-regex-kit",
         "cl-tty-kit": "cl-tty-kit",
         "cl-weave": "cl-weave",
         "nixpkgs": "nixpkgs",
