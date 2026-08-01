@@ -18,12 +18,12 @@
   clCcRuntime,
   clCcBootstrap,
   clCcVm,
-  clCcIr,
   clCcMir,
   clCcTarget,
-  clCcBytecode,
   clCcOptimize,
   clCcParse,
+  clCcCps,
+  clCcExpand,
   clCcPhp,
   clCcJavascript,
   clCcRegalloc,
@@ -86,21 +86,6 @@ let
       extraLispLibs = [
         clProlog
         clParserKit
-      ];
-    };
-    cl-cc-expand = {
-      src = "packages/expand";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-type"
-        "cl-cc-vm"
-      ];
-    };
-    cl-cc-cps = {
-      src = "packages/cps";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-ast"
       ];
     };
     cl-cc-compile = {
@@ -218,8 +203,9 @@ let
       # leafNames covers only what is still built from packages/. Every system
       # that has moved to its own repository is listed here instead, so the
       # umbrella closure still pulls it. Most would arrive transitively through
-      # a dependent that stayed, but not all -- cl-cc-bytecode has none, and
-      # dropping it out of leafSpec silently removed it from the closure.
+      # a dependent that stayed, but not all, so this list cannot simply be
+      # inferred from leafSpec's own deps.
+      #
       deps = leafNames ++ [
         "cl-cc-ast"
         "cl-cc-type"
@@ -227,10 +213,8 @@ let
         "cl-cc-vm"
         "cl-cc-binary"
         "cl-cc-runtime"
-        "cl-cc-ir"
         "cl-cc-mir"
         "cl-cc-target"
-        "cl-cc-bytecode"
         "cl-cc-optimize"
         "cl-cc-regalloc"
         "cl-cc-codegen"
@@ -283,12 +267,12 @@ let
     cl-cc-runtime = clCcRuntime;
     cl-cc-bootstrap = clCcBootstrap;
     cl-cc-vm = clCcVm;
-    cl-cc-ir = clCcIr;
     cl-cc-mir = clCcMir;
     cl-cc-target = clCcTarget;
-    cl-cc-bytecode = clCcBytecode;
     cl-cc-optimize = clCcOptimize;
     cl-cc-parse = clCcParse;
+    cl-cc-cps = clCcCps;
+    cl-cc-expand = clCcExpand;
     cl-cc-php = clCcPhp;
     cl-cc-javascript = clCcJavascript;
     cl-cc-regalloc = clCcRegalloc;

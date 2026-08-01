@@ -24,7 +24,7 @@ AST (CLOS defstructs)                                     packages/ast
     │      the preferred lowering path for supported forms
     ▼
 Codegen -> VM Bytecode                                    packages/codegen
-    │   register-based, ~220 instruction types            packages/bytecode
+    │   register-based, ~220 instruction types            packages/vm
     │
     ├──► VM Interpreter                                   packages/vm
     │      SBCL-hosted; meta-circular eval
@@ -55,13 +55,11 @@ The PHP and JavaScript frontends join at the AST stage: they produce the same
 | `cl-cc-type`      | Hindley–Milner type inference |
 | `cl-cc-optimize`  | optimization passes |
 | `cl-cc-prolog`    | Prolog optimization backend |
-| `cl-cc-ir`        | intermediate representation |
 | `cl-cc-mir`       | MIR / SSA representation |
 | `cl-cc-regalloc`  | register allocation |
 | `cl-cc-codegen`   | code generation |
 | `cl-cc-emit`      | native code emission |
 | `cl-cc-target`    | target architectures (x86-64, AArch64, Wasm) |
-| `cl-cc-bytecode`  | bytecode definitions |
 | `cl-cc-binary`    | binary format |
 | `cl-cc-vm`        | VM interpreter |
 | `cl-cc-runtime`   | runtime (GC, FFI, concurrency) |

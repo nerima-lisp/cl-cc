@@ -81,18 +81,15 @@ Computed at call time so the result is path-independent across compile/load cont
   (append
    (%asdf-source-files :cl-cc-bootstrap  "packages/bootstrap/")
    (%asdf-source-files :cl-cc-ast        "packages/ast/")
-   (%asdf-source-files :cl-cc-ir         "packages/ir/")
    (%asdf-source-files :cl-cc-mir        "packages/mir/")
    (%asdf-source-files :cl-cc-binary     "packages/binary/")
    (%asdf-source-files :cl-cc-runtime    "packages/runtime/")
-   (%asdf-source-files :cl-cc-bytecode   "packages/bytecode/")
    (%asdf-source-files :cl-cc-parse      "packages/parse/")
    (%asdf-source-files :cl-cc-type       "packages/type/")
    (%asdf-source-files :cl-cc-vm         "packages/vm/")
    (%asdf-source-files :cl-cc-optimize   "packages/optimize/")
    (%asdf-source-files :cl-cc-emit       "packages/emit/")
-   (%asdf-source-files :cl-cc-expand     "packages/expand/")
-    (%asdf-source-files :cl-cc-compile    "packages/compile/")
+   (%asdf-source-files :cl-cc-compile    "packages/compile/")
     (%asdf-source-files :cl-cc-stdlib    "packages/stdlib/")
     (list "packages/umbrella-src/package.lisp")
     (%asdf-source-files :cl-cc-pipeline   "packages/pipeline/")))
@@ -100,7 +97,6 @@ Computed at call time so the result is path-independent across compile/load cont
 (defparameter *selfhost-representative-files*
   '("packages/parse/src/cst.lisp"
     "packages/parse/src/lexer.lisp"
-    "packages/cps/src/cps.lisp"
     "packages/optimize/src/optimizer.lisp"
     "packages/type/src/package.lisp"
     "packages/type/src/kind.lisp"

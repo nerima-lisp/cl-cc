@@ -45,14 +45,6 @@
   (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-runtime :cl-cc/runtime "RT-CONS")
     (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
 
-(it-sequential "standalone-sibling-systems-loaded cl-cc-bytecode"
-  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-bytecode :cl-cc/bytecode "ENCODE-ADD")
-    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
-
-(it-sequential "standalone-sibling-systems-loaded cl-cc-ir"
-  (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-ir :cl-cc/ir "IR-MAKE-FUNCTION")
-    (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))
-
 (it-sequential "standalone-sibling-systems-loaded cl-cc-mir"
   (destructuring-bind (system-name package-name representative-symbol) (list :cl-cc-mir :cl-cc/mir "MIR-MAKE-FUNCTION")
     (expect (%standalone-find-system system-name) :to-be-truthy) (expect (find-package package-name) :to-be-truthy) (expect (%standalone-symbol-present-p representative-symbol package-name) :to-be-truthy)))

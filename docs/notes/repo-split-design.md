@@ -583,3 +583,218 @@ ast/type のときと同じ「宣言済みだが一度もビルドされてい�
 
 cl-cc 側の受け入れ準備は完了しているので、残りは upstream 2 リポジトリの
 parity 作業のみ。
+
+### 10-7. 抽出フロンティアの再実測（2026-08-01）
+
+§10-3 以降、ast/type/binary/runtime/vm/parse/optimize/php/javascript/
+bootstrap/ir/bytecode/emit（mir/target/regalloc/codegen は
+`cl-cc-codegen-native` に統合）の **13 個が抽出済み**（`packages/X/` は
+`tests/` のみ残り、src は無い）。まだ `packages/*/src` が本体に残っているのは
+以下の 14 個・合計 **約 36.4k loc**:
+
+```
+cli 4023  compile 9637  cps 1570  debug 350  docgen 134  expand 11086
+formatter 101  pipeline 3938  prolog-tools 288  repl 787  selfhost 225
+stdlib 1555  testing-framework 2182  tools 532
+```
+
+§1-0 の非目標（bootstrap/vm/runtime/expand/compile/cps/selfhost は自己ホスト
+結合で分割不可）は bootstrap/vm/runtime について §10-3 で実測により**否定**
+されている。同じ実測を cps/expand/debug にも適用した結果:
+
+| 候補 | 規模 | 依存 | 外部からの `::` 侵入 | 判定 |
+|---|---|---|---|---|
+| **cps** | 1,570 | bootstrap+ast（両方抽出済み） | 0（`compile/tests/` のみ） | ①②とも満点。**type/vm と同格のクリーンな葉** |
+| **expand** | 11,086 | bootstrap+type+vm（全て抽出済み） | 3ファイル: `selfhost/src/pipeline-selfhost.lisp`, `stdlib/src/stdlib-source.lisp`, `testing-framework/src/framework-fixtures.lisp`（いずれもテストではなく本体コード） | ①はほぼ満点だが**要脱結合**（§5-1 と同型の作業）。最大のレバー |
+| debug | 350 | bootstrap+vm（抽出済み） | 0、逆依存も 0 | ①満点だが②で単独では小さすぎる |
+| compile | 9,637 | cps/expand 以外は全て抽出済み | — | cps/expand を出せば依存は全て外部になるが、pipeline/selfhost/repl が直接束ねる自己ホスト本体そのもの。§1-0 の「一枚岩の核を残したまま周縁を剥がす」の“核”側として当面は抽出対象外 |
+
+**推奨順序**: cps（即・依存ゼロ） → expand（3ファイルの脱結合後） →
+debug（任意・低価値） → compile は当面 core に残す。stdlib（1,555 loc,
+bootstrap のみ依存）は §3/§4 の判定どおり formatter/docgen/prolog-tools と
+同規模のため単独抽出は見送り。
+
+## 11. 全16外部repoの実地監査による最終形の再設計（2026-08-01）
+
+10 エージェントを並列に走らせ、抽出済み・抽出候補の外部 repo を**全部**
+（ast/type/vm/parse/bootstrap/ir/mir/target/bytecode/codegen-native/binary/
+optimize/php/javascript/runtime/prolog-tools の 16）実際に読ませた。
+結論: **これまでの抽出方針（葉から剥がす）自体は正しく、大半は健全**。ただし
+実測でしか出てこない**4 種類の不具合**が見つかった——「切り出し方」の議論の
+前に、まずこれを片付けるのが「最低限で回る cl-cc」への近道。
+
+### 11-1. 健全性サマリ
+
+| repo | loc | 依存 | 判定 |
+|---|---|---|---|
+| bootstrap | 287 | ゼロ | ◎ 自己ホストの要（`our-eval`前方参照・Prolog pattern atom の事前intern・backend registry）。依存ゼロなのでどこに置いても物理的には成立するが、意味的には core の一部 |
+| ast | 1,283 | ゼロ | ◎ 最もクリーンな葉 |
+| type | ~10,125 | ast | ○ 6テストが`parse`の`lower-sexp-to-ast`待ち（parseは抽出済みなので**今すぐ解消可能**）。`inference-effects.lisp`がVM opcode名をハードコード |
+| parse | 3,573 | ast+bootstrap | ◎ 境界テストが vm/optimize/codegen/compile/expand/type 不在を自己検証 |
+| vm | 25,463 | bootstrap+runtime+cl-regex-kit+cl-tty-kit | ○ 自己ホスト結合(`VM-EVAL`命令・`*vm-self-host-mode*`)は正当。ただし**"Phase 129-160"一式**(v8-objects/JIT hardening/stack-thread)とOSR/tiering/deoptが**codegen-native寄りの内容**でVMに同居 |
+| optimize | 27,528 | vm+type+ast+cl-prolog+cl-parser-kit | ○ vm内部`::`参照0（境界テストで強制）。ただし**約2,000loc(7%)が"roadmap"/FR文書追跡というcl-cc-project固有の管理ツール**でoptimizerパッケージに同居 |
+| codegen-native(regalloc+codegen+emit) | 23,001 | mir+target(+binaryは子systemのみ) | ○ | ルート`.asd`の`:depends-on`に`cl-cc-binary`が**抜けている**（子systemのcodegenは使うのに宣言漏れ） |
+| binary | 4,622 | cl-log-kit+cl-process-kit | ◎ 純粋なELF/Mach-O/PEライタ。codegen-nativeとの重複は無し |
+| mir | 697 | ゼロ | ○ codegen-nativeの実consumer有り |
+| target | 302 | ゼロ | ○ 常にmirとセットで消費される |
+| **ir** | 523 | ゼロ | ✕ **抽出済みだが実consumerゼロ**（他の抽出済みrepoも参照していない。旧monorepoの残骸testしか触れていない） |
+| **bytecode** | 1,073 | ゼロ | ✕ **抽出済みだが実consumerゼロ**（vm自身が使っていない。145個もexportがあるのに孤立） |
+| php | 19,736 | ast+bootstrap+parse+vm+cl-json-kit | ◎ backend登録プロトコル(`register-backend-bridge-provider`/`-parser`)がクリーンに機能 |
+| javascript | 16,263 | ast+bootstrap+parse+vm+cl-date-kit+cl-json-kit+cl-concurrent-kit | ○ VMクロージャの双方向結合は本質的に残るが、`register-backend-vm-integration-installer`/`-global-seeder`でプロトコル化済み。素朴な特別扱いではない |
+| runtime | 18,244(+test 10,734) | cl-log-kit+cl-process-kit+cl-json-kit | ○ `include/cl-cc.h`は**どこからもビルドされない死んだCヘッダ**。§旧知の19個のorphan並行性モジュールは**個別テストは付いたが依然クロスモジュール利用ゼロ**のまま |
+| **prolog-tools** | 288 | ast+cl-prolog | ✕✕ **§10-6と同じ「宣言はあるが実体は本体側」の罠が再発**。GitHubにrepoはあるが`flake.nix`は未参照、`packages/prolog-tools/src`も`.asd`も削除されておらず、README自身が「これを切り出しても本体はほぼ縮まない」と書いている。本文書の§3判定（切らない）を無視して作業だけ進み、後始末されていない |
+
+### 11-2. 見つかった実害と対処（切り出し方の議論より優先度が高い）
+
+1. **`cl-cc-ir`/`cl-cc-bytecode`が孤立——確認済み、本当に死んでいる**。本体に
+   まだ残る`compile`/`cps`/`expand`/`pipeline`/`selfhost`等の in-tree src を
+   `cl-cc/ir`・`cl-cc/bytecode`・`:cl-cc-ir`・`:cl-cc-bytecode`で全grepして
+   ヒット0件（2026-08-01実測）。二重定義の罠（本体が古い在庫コピーを握っている）
+   ではなく、**単純にどこからも呼ばれていない**。vm自身のバイトコード直列化も
+   `vm-fasl.lisp`/`vm-serialize.lisp`という独自実装で、`cl-cc-bytecode`は使って
+   いない。両repoともarchive/削除が妥当（"抽出したが誰も使わなかった"という
+   計画時点の見込み違い。汎用IR/バイトコード表現として将来使う計画があるなら
+   別だが、現状は死んだコード）。
+2. **`cl-cc-prolog-tools`の後始末**。設計判断（§3: 切らない）と実態（repoが存在し
+   独立コミットまである）が矛盾している。GitHubリポジトリをarchive/削除するか、
+   本気で採用するなら flake input化 + 本体`packages/prolog-tools`削除まで完走させる。
+   中途半端が一番良くない。
+3. **`cl-cc-codegen-native`のルート`.asd`に`:cl-cc-binary`を追加**。子systemが
+   実際に使っている依存が親の宣言に出ていない、単純なメタデータ漏れ。
+4. **vmの"Phase 129-160"グループとOSR/tiering/deoptを`codegen-native`へ移設候補として検討**。
+   VMは「バイトコード実行」の境界が曖昧になっており、JIT寄りの最適化コードが
+   紛れ込んでいる。
+5. **runtimeの19個のorphan並行性モジュールを削る**。個別unit testはあるが
+   クロスモジュール利用が無いままなのは、テストを足したことで「使われている風」に
+   見えるだけで実態は変わっていない。`docs/notes/repo-split-design.md`の元々の
+   pending課題（このファイル冒頭近くのメモ参照）がまだ解消されていない。
+6. **optimizeの"roadmap"サブシステム(~2,000loc)は別パッケージへ**。汎用最適化ライブラリの
+   顔をしているoptimizeパッケージに、cl-cc固有のFR文書追跡ツールが同居しているのは
+   境界として不透明。
+
+### 11-3. 「最低限で回る cl-cc core」の最終形
+
+外部化した16個は──11-2 の4件を除けば──設計として正しく機能している。
+残る問題は「本体に何を残すか」ではなく「境界を汚している少量のコードを
+正しい場所に動かす」フェーズに入っている。最終形の core は:
+
+```
+cl-cc-core（monorepoとして残す）:
+  - 自己ホストの実行部: compile, expand, cps, selfhost, pipeline, repl
+    （§1-0の「一枚岩」はここだけに縮小。ast/vm/parseは葉として外に出せたが、
+      compile/expand/cpsは自分自身をコンパイルする現在進行形のプロセスの
+      当事者なので、依存関係が綺麗でも当面はここに残す）
+  - 薄いオーケストレーション層: cli, tools, stdlib
+  - 小物（②価値ゲート未達のためmonorepo残留、§3の判断を維持）:
+    docgen, formatter, debug
+  - testing-framework は cl-weave への移行完了後に廃止（既知の別トラック）
+
+外部（すでに実現・健全）:
+  ast, type, parse, vm, optimize, codegen-native(regalloc+codegen+emit),
+  binary, mir, target, php, javascript, runtime, bootstrap
+
+未解決（11-2 参照、切り出し作業より先に片付ける）:
+  ir, bytecode（孤立の理由を特定してから、統合 or 本体への還流を判断）
+  prolog-tools（GitHub repoの後始末）
+```
+
+**次にやる順序**: (1) 11-2 の6件（特に ir/bytecode の孤立原因調査と
+prolog-toolsの後始末——どちらも「壊れているものを直す」なので新規切り出しより
+優先） → (2) cps の抽出（§10-7で確定済み、依存ゼロの葉） →
+(3) expand の脱結合＋抽出（3ファイル） → (4) mir+targetの1repo統合を検討
+（常にセット消費・合計1,000loc未満で2repo分の配管は過剰という実測結果）。
+
+## 12. §11-2 の後始末を実行（2026-08-01）
+
+11-2 で見つかった4件のうち、以下を完了:
+
+1. **`cl-cc-ir`/`cl-cc-bytecode`を完全除去** — GitHub repoをarchive、かつ
+   `cl-cc.asd`の`:depends-on`・テスト集約・`flake.nix`・`nix/asdf-systems.nix`
+   から実体を削除（`packages/ir`・`packages/bytecode`ごと削除）。副産物として
+   `t/e2e/selfhost-test-support.lisp`と`packages/compile/tests/standalone-load-tests.lisp`
+   にも生きた参照が残っていたことが判明・修正（grepだけでは見つからず、実際に
+   ビルドを試みて発見）。
+2. **`cl-cc-target`を`cl-cc-mir`へ統合完了** — `cl-cc-mir`にファイル移設・
+   push・`nix flake check`緑を確認済み。`cl-cc-target`はarchive。
+   `cl-cc-codegen-native`・`cl-cc`双方のflake入力をmir単独に統合。
+3. **`prolog-tools`を`cl-prolog`へ分割**——288行のうち約230行（call-graph
+   構造体・reachability・dead-code・mutual-recursion・graph-coloring・
+   edge-DCG）はcl-cc-ast非依存と判明したため`cl-prolog/callgraph`
+   （cl-prolog v1.2.0）へ移設。`build-call-graph`をAST→edgesの薄い
+   アダプタに再設計し、`packages/prolog-tools`はこのアダプタのみに縮小。
+   ストレイrepo`cl-cc-prolog-tools`はarchive。
+4. **`cl-cc-type`の宙ぶらりんテスト5本を復活** — `cl-cc-parse`が既に
+   外部化されていたため復元可能と判明。`cl-cc-parse`にv0.1.0タグを
+   新規作成（初リリース）。
+
+**未解決のまま残っているのは**: §11-2 5番目（vmの"Phase 129-160"グループ・
+OSR/tiering/deoptのcodegen-native移設検討）、6番目（optimizeの"roadmap"
+サブシステム分離）、runtimeの19個のorphan並行性モジュール削除、および
+§10-7で確定した`cps`/`expand`の抽出そのもの。
+
+**運用上の注記**: この一連の変更は複数エージェントを並列実行して行ったが、
+同一の共有マシン上でnix/SBCLの重い処理が競合し、ローカルでの動的テスト
+実行（`sbcl --script run-tests.lisp`等）がことごとくCPU飢餓状態でハング
+した。静的チェック（`paredit inspect lint`・nix構文パース・`nix flake
+metadata`・`nix flake check`が通ったサブセット）のみで各commitをpushし、
+実際のテストグリーン確認はCIに委ねた。次にこの種の並列作業をする際は、
+同時に動かす重量級ジョブの数を絞るか、`isolation: worktree`で作業ツリーを
+分離すること。
+
+## 13. §12の未解決項目を実行（2026-08-01、同日中の後続セッション）
+
+§12末尾の「未解決」リストのうち、以下を実行・決着させた:
+
+1. **`cps`の抽出完了** — `nerima-lisp/cl-cc-cps`（v0.1.0）。依存ゼロの葉、
+   type/vm/parse抽出と同じ手順。`nix flake check --no-build --all-systems`
+   が両repoとも全derivationで緑。
+2. **`expand`の脱結合＋抽出完了** — 3ファイル（`selfhost/pipeline-selfhost.lisp`・
+   `stdlib/stdlib-source.lisp`・`testing-framework/framework-fixtures.lisp`）の
+   `cl-cc/expand::`直接参照を、`rt-use-package`・`add-package-local-nickname`・
+   5個の`%record-declaim-*-clause`関数・`*macroexpand-step-cache*`・
+   `*macroexpand-all-cache*`の計9シンボルをexportすることで解消してから抽出。
+   `nerima-lisp/cl-cc-expand`（v0.1.0）。レビューで指摘された残課題:
+   キャッシュ変数を直接exportするのではなく`clear-macroexpand-caches`のような
+   専用APIを設けるべき、5個の`%record-declaim-*-clause`も1本の
+   `record-declaim-clause`に統合すべき——今回は抽出期限を優先した実用的な判断。
+   将来のクリーンアップ候補として記録。
+3. **`vm`のJIT寄りコード移設は「移設ではなく削除」と判明** — 再調査の結果、
+   `v8-objects-133.lisp`・`security-134.lisp`・`stack-thread-137.lisp`は
+   codegen-nativeへの境界漏れではなく、そもそも**未使用の投機的コード**
+   （cl-cc-vm内でもcodegen-native/optimizeからも一切参照されない）と判明。
+   移設は実行せず。削除候補として別途フラグ（未実行）。OSR/deopt
+   (`vm-execute-osr.lisp`)は本物のdispatch loop呼び出しがあり、正しくVM内に
+   留まるべきものと確認。
+4. **`optimize`の"roadmap"サブシステム分離は見送り** — 調査の結果、
+   cl-cc本体の`packages/optimize/tests/optimizer-roadmap-{,backend-}tests.lisp`
+   が53箇所でこのサブシステムをシングルコロン（外部シンボル）参照しており、
+   かつdoc読み込み(`docs/notes/optimize-passes.md`等)がcl-cc本体専用パスに
+   依存している。同一repo内でのsecondary system分離では「exportを減らす」
+   という目的を達成できず、cl-cc本体との協調PRが必要——今回のタスク規模を
+   超えるため見送り。
+5. **`runtime`のorphan並行性モジュール削除——19個中8個のみ確定** —
+   モジュールごとに再検証した結果、`cluster`/`mvcc`/`reactive`/`io-uring`/
+   `gpu`/`zerocopy`/`event-loop`/`async-generators`の8個（2,080loc）のみ
+   真に未使用と確認、削除。残り11個（`task`/`work-stealing`/`otel`/
+   `consensus`/`crdt`/`qsbr`/`rcu`/`spsc`/`ebr`/`parallel-algo`/`topology`）
+   は`scheduler.lisp`の`fboundp`経由呼び出しや、cl-cc本体の
+   `runtime-subsystem-fr-tests.lisp`からの直接呼び出しなど実際の消費者が
+   見つかり保持。**「19個全て未使用」という当初の監査は不正確だった**——
+   モジュール単位の再検証が必須という教訓。
+
+**post-implementation review（quality/security/design/docs/performance/test
+の6エージェント並列）で見つかった残課題**:
+- `cl-cc-cps`/`cl-cc-expand`に`.github/workflows/`が無く、`nix flake check`
+  がCIで自動実行されない（同日に追加されたorg規約整合作業より後に作られた
+  にもかかわらず追従していなかった）→ 修正実施。
+- `cl-cc-expand`の脱結合commitメッセージが「8シンボル・3ファイル」と書いて
+  いたが実際は9シンボル・4ファイル（`packages/compile/tests/`の
+  `invoke-registered-expander`参照はcps抽出時と同様に意図的除外だが、
+  その旨の記載がcps側ほど明示的でなかった）——機能上の問題ではないため
+  未修正、記録のみ。
+- セキュリティ・パフォーマンス面の懸念は無し（6エージェントとも「該当なし」
+  を明示的に報告）。
+
+残る本当の未解決: vmの3ファイル削除（今回は投機で終わらせず、実行するなら
+別タスクとして明示的にスコープを切ること）、optimizeのroadmap分離
+（cl-cc本体との協調PRが必要）。

@@ -34,7 +34,7 @@
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
       ;; cl-cc-bootstrap, cl-cc-vm, cl-cc-ast, cl-cc-type, cl-cc-binary,
-      ;; cl-cc-runtime, cl-cc-ir, cl-cc-mir, cl-cc-target and cl-cc-bytecode
+      ;; cl-cc-runtime, cl-cc-mir and cl-cc-target
       ;; are deliberately absent. They live in the standalone repositories of the same name under
       ;; nerima-lisp and reach this build as flake.nix inputs.
       ;;
@@ -45,8 +45,6 @@
       ;; repositories were never compiled, and the two definitions had drifted
       ;; apart in the meantime. Removing the in-tree copies is what makes the
       ;; resolution unambiguous.
-      (ensure-system-asd :cl-cc-expand "packages/expand/cl-cc-expand.asd" here)
-      (ensure-system-asd :cl-cc-cps "packages/cps/cl-cc-cps.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
@@ -63,7 +61,7 @@
   :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-binary
-                :cl-cc-runtime :cl-cc-bytecode :cl-cc-ir :cl-cc-mir :cl-cc-target
+                :cl-cc-runtime :cl-cc-mir :cl-cc-target
                 :cl-cc-type :cl-cc-optimize :cl-cc-regalloc :cl-cc-emit :cl-cc-expand
                 :cl-cc-compile :cl-cc-cps :cl-cc-codegen :cl-cc-vm :cl-cc-stdlib
                  :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl :cl-cc-php :cl-cc-javascript)
@@ -207,106 +205,6 @@
    ;; php85-tests-registration.lisp dropped: it meta-tested the removed
       ;; homegrown *test-registry*/persist-* registration mechanism's own
       ;; internals directly, which has no cl-weave equivalent to preserve.
-   (:module "expand-tests"
-    :pathname "packages/expand/tests"
-    :serial t
-    :components
-    ((:file "macro-tests")
-     (:file "macro-definition-tests")
-     (:file "macro-assignment-tests")
-     (:file "macro-multiple-value-tests")
-     (:file "macros-control-flow-tests")
-     (:file "macros-control-flow-loop-tests")
-     (:file "macro-lambda-list-tests")
-     (:file "expander-lambda-list-defaults-tests")
-     (:file "expander-core-tests")
-     (:file "expander-data-tests")
-     (:file "expander-test-support")
-     (:file "expander-basic-tests")
-     (:file "macros-basic-check-type-tests")
-     (:file "macros-basic-list-tests")
-     (:file "macros-basic-setf-tests")
-     (:file "expander-setf-tests")
-     (:file "expander-setf-places-tests")
-     (:file "expander-control-tests")
-     (:file "expander-array-tests")
-     (:file "expander-typed-tests")
-     (:file "expander-typed-params-tests")
-     (:file "expander-defclass-tests")
-     (:file "expander-binding-tests")
-     (:file "expander-control-helpers-tests")
-     (:file "expander-definitions-function-tests")
-     (:file "expander-definitions-forms-tests")
-     (:file "expander-definitions-type-tests")
-     (:file "expander-definitions-rounding-tests")
-     (:file "expander-definitions-constant-tests")
-     (:file "expander-definitions-tests")
-     (:file "expander-numeric-tests")
-     (:file "expander-comparison-tests")
-     (:file "expander-definitions-helpers-tests")
-     (:file "expander-helpers-tests")
-     (:file "expander-sequence-tests")
-     (:file "expander-setf-places-helpers-tests")
-     (:file "expander-tail-tests")
-     (:file "defstruct-tests")
-     (:file "expander-defstruct-typed-tests")
-     (:file "loop-tests")
-     (:file "loop-data-tests")
-     (:file "loop-parser-tests")
-     (:file "loop-emitters-tests")
-     (:file "macro-rotatef-tests")
-     (:file "macro-psetf-tests")
-     (:file "macro-shiftf-tests")
-     (:file "macro-ecase-tests")
-     (:file "macro-etypecase-tests")
-     (:file "macro-progv-tests")
-     (:file "macro-define-modify-macro-tests")
-     (:file "macros-cxr-tests")
-     (:file "macros-introspection-tests")
-     (:file "macros-list-utils-tests")
-     (:file "macros-restarts-tests")
-     (:file "macros-setops-tests")
-     (:file "macros-stdlib-core-tests")
-     (:file "macros-stdlib-tests")
-     (:file "macros-stdlib-bind-error-tests")
-     (:file "macros-stdlib-sequence-map-tests")
-     (:file "macros-stdlib-io-tests")
-     (:file "macros-stdlib-ansi-tests")
-     (:file "macros-stdlib-utils-tests")
-     (:file "macros-filesystem-tests")
-     (:file "array-predicate-expansion-tests")
-     (:file "macros-runtime-support-tests")
-     (:file "macros-clos-protocol-tests")
-     (:file "macros-plist-tests")
-     (:file "macros-sequence-helpers-tests")
-     (:file "macros-hof-tests")
-     (:file "macros-hof-search-tests")
-     (:file "macros-sequence-tests")
-     (:file "loop-macro-tests")
-     (:file "loop-macro-advanced-tests")
-     (:file "loop-macro-runtime-tests")
-     (:file "loop-macro-runtime-clauses-tests")
-     (:file "loop-macro-runtime-ext-tests")
-     (:file "loop-macro-runtime-edge-tests")
-     (:file "macros-basic-mvb-tests")
-     (:file "macros-mutation-tests")
-     (:file "macros-sequence-fold-tests")
-     (:file "macros-stdlib-list-set-tests")
-      (:file "fr-555-copy-structure-tests")
-       (:file "syntax-rules-tests")
-        (:file "runtime-stdlib-2-expand-tests")
-        (:file "runtime-stdlib-3-expander-tests")
-        (:file "runtime-stdlib-3-sequence-tests")))
-   (:module "ir-tests"
-    :pathname "packages/ir/tests"
-    :serial t
-    :components
-    ((:file "ir-types-tests")
-     (:file "ir-block-tests")
-     (:file "ir-block-ssa-tests")
-     (:file "ir-ssa-advanced-tests")
-     (:file "ir-ssa-dominator-tests")
-     (:file "ir-printer-tests")))
    (:module "compile-tests"
     :pathname "packages/compile/tests"
     :serial t
@@ -317,7 +215,7 @@
      (:file "cps-ast-transform-tests")
      (:file "cps-ast-extended-tests")
       (:file "cps-ast-functional-tests")
-      (:module "cps-package-tests"
+      ("cps-package-tests"
        :pathname "../../cps/tests"
        :serial t
        :components
@@ -580,14 +478,7 @@
        (:file "value-tests")
        (:file "dynlib-tests")
        (:file "frame-tests")))
-   (:module "bytecode-tests"
-    :pathname "packages/bytecode/tests"
-    :serial t
-    :components
-    ((:file "encode-tests")
-     (:file "encode-ops-objects-tests")
-     (:file "decode-tests")))
-    (:module "migration-safety"
+   (:module "migration-safety"
      :pathname "packages/umbrella-tests"
      :components
      ((:file "migration-safety-tests")))

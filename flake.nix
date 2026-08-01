@@ -99,20 +99,16 @@
       url = "github:nerima-lisp/cl-cc-vm/b0d5bdf23e62bdb3269529c36b70be02f1571b89";
       flake = false;
     };
-    cl-cc-ir = {
-      url = "github:nerima-lisp/cl-cc-ir/7b7d388bc8504b3aa9ac14e9e3521792011140ec";
-      flake = false;
-    };
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/96034e6bb8629e9a30636bb92204d3dc20d69efd";
+      url = "github:nerima-lisp/cl-cc-mir/9679e3a471df1bea446df9b22cb26a32e85c42c8";
       flake = false;
     };
-    cl-cc-target = {
-      url = "github:nerima-lisp/cl-cc-target/e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1";
+    cl-cc-cps = {
+      url = "github:nerima-lisp/cl-cc-cps/b09fdc12f8a181946319ac7a4cd2794466617db4";
       flake = false;
     };
-    cl-cc-bytecode = {
-      url = "github:nerima-lisp/cl-cc-bytecode/24db21897a34c5c7874bd1f1da8b151b78c694d4";
+    cl-cc-expand = {
+      url = "github:nerima-lisp/cl-cc-expand/ee743ff480dfa5c9526ba293e075521c9bee3220";
       flake = false;
     };
     cl-cc-optimize = {
@@ -367,12 +363,6 @@
               clCcRuntime
             ];
           };
-          clCcIr = sbcl.buildASDFSystem {
-            pname = "cl-cc-ir";
-            version = siblingVersion "cl-cc-ir";
-            src = inputs.cl-cc-ir;
-            systems = [ "cl-cc-ir" ];
-          };
           clCcMir = sbcl.buildASDFSystem {
             pname = "cl-cc-mir";
             version = siblingVersion "cl-cc-mir";
@@ -381,15 +371,30 @@
           };
           clCcTarget = sbcl.buildASDFSystem {
             pname = "cl-cc-target";
-            version = siblingVersion "cl-cc-target";
-            src = inputs.cl-cc-target;
+            version = siblingVersion "cl-cc-mir";
+            src = inputs.cl-cc-mir;
             systems = [ "cl-cc-target" ];
           };
-          clCcBytecode = sbcl.buildASDFSystem {
-            pname = "cl-cc-bytecode";
-            version = siblingVersion "cl-cc-bytecode";
-            src = inputs.cl-cc-bytecode;
-            systems = [ "cl-cc-bytecode" ];
+          clCcCps = sbcl.buildASDFSystem {
+            pname = "cl-cc-cps";
+            version = siblingVersion "cl-cc-cps";
+            src = inputs.cl-cc-cps;
+            systems = [ "cl-cc-cps" ];
+            lispLibs = [
+              clCcBootstrap
+              clCcAst
+            ];
+          };
+          clCcExpand = sbcl.buildASDFSystem {
+            pname = "cl-cc-expand";
+            version = siblingVersion "cl-cc-expand";
+            src = inputs.cl-cc-expand;
+            systems = [ "cl-cc-expand" ];
+            lispLibs = [
+              clCcBootstrap
+              clCcType
+              clCcVm
+            ];
           };
           clCcOptimize = sbcl.buildASDFSystem {
             pname = "cl-cc-optimize";
@@ -507,10 +512,10 @@
               clCcRuntime
               clCcBootstrap
               clCcVm
-              clCcIr
               clCcMir
               clCcTarget
-              clCcBytecode
+              clCcCps
+              clCcExpand
               clCcOptimize
               clCcRegalloc
               clCcCodegen
