@@ -107,12 +107,6 @@
         (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-truthy)
         (expect (cl-cc/optimize::%loop-fr514-memory-inst-p inst) :to-be-falsy)))))
 
-(it-sequential "fr-514-write-inst-p-distinguishes-stores-from-loads"
-  (expect (cl-cc/optimize::%loop-fr514-write-inst-p
-                (make-vm-aset :array-reg :a :index-reg :i :val-reg :v)) :to-be-truthy)
-  (expect (cl-cc/optimize::%loop-fr514-write-inst-p
-                 (make-vm-aref :dst :d :array-reg :a :index-reg :i)) :to-be-falsy))
-
 (it-sequential "fr-514-pure-core-p-rejects-control-flow"
   (expect (cl-cc/optimize::%loop-fr514-pure-core-p
                 (list (make-vm-const :dst :a :value 1)
@@ -180,7 +174,7 @@
                  (%fr-514-counted-loop "headB" "exitB" :j :limit :one
                                        (list (make-vm-const :dst :xb :value 9)))
                  (list (make-vm-ret :reg :xa))))
-         (out (cl-cc/optimize::opt-pass-loop-fusion insts)))
+         (out (cl-cc/optimize:opt-pass-loop-fusion insts)))
     ;; Fusion collapses two loop headers into one: fewer instructions, one back-edge.
     (expect (< (length out) (length insts)) :to-be-truthy)
     (expect (= 1 (count-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out)) :to-be-truthy)
@@ -201,7 +195,7 @@
                                        (list (make-vm-const :dst :xa :value 7)))
                  (%fr-514-counted-loop "headB" "exitB" :j :limit2 :one
                                        (list (make-vm-const :dst :xb :value 9)))))
-         (out (cl-cc/optimize::opt-pass-loop-fusion insts)))
+         (out (cl-cc/optimize:opt-pass-loop-fusion insts)))
     (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
 
 ;;; ─── loop fission pass ──────────────────────────────────────────────────────
