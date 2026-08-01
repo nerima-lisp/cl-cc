@@ -162,7 +162,7 @@
                  (format *error-output* "[diagnostic] block merge source: ~A~%"
                          (asdf:component-pathname component))
                  (format *error-output* "[diagnostic] block merge FASL: ~{~A~^, ~}~%"
-                         (asdf:output-files component :compile))
+                         (asdf:output-files 'asdf:compile-op component))
                  #+sbcl (sb-debug:print-backtrace :stream *error-output*)
                  (finish-output *error-output*))))))
       (expect (run-string expr) :to-equal expected))))
