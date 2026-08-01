@@ -168,9 +168,18 @@
       # x86_64-darwin are not declared because nothing runs them (ADR-0078).
       # `ci.yml` deliberately omits --all-systems: the runner is x86_64-linux
       # and would fail evaluating the darwin derivations.
+      # Only what is verified, and CI verifies exactly one platform:
+      # x86_64-linux. aarch64-darwin was dropped in the 2026-08-01 revision of
+      # PACKAGE_STANDARD.md -- its only gate was the maintainer remembering to
+      # run `nix flake check` locally, and a gate nobody can observe being
+      # skipped is not a gate.
+      #
+      # Consequence, accepted deliberately: every per-system output --
+      # packages, checks, apps AND devShells -- is generated from this one
+      # list, so `nix develop` and `nix build` do not work on macOS.
+      # Development happens on Linux.
       systems = [
         "x86_64-linux"
-        "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 

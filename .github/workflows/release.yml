@@ -50,26 +50,24 @@ jobs:
       - name: Verify the tagged tree
         run: nix flake check --print-build-logs
 
-      # Extracts this version's CHANGELOG section as the release body. Requires
-      # the Keep a Changelog heading format `## [X.Y.Z] - YYYY-MM-DD`.
-      - name: Extract release notes
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { found = 1; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md > release-notes.md
-          if [[ ! -s release-notes.md ]]; then
-            echo "::error::CHANGELOG.md has no section for [$version]" >&2
-            exit 1
-          fi
-
+      # Creates the release as an empty draft. This workflow produces no release
+      # body at all.
+      #
+      # As of the 2026-08-01 revision the GitHub Release description is the only
+      # canonical changelog in this org; there is no CHANGELOG.md to read from.
+      # See RELEASE_STANDARD.md. After this job goes green the maintainer fills
+      # the body in and publishes:
+      #
+      #   gh release edit "$GITHUB_REF_NAME" --notes-file <file> --draft=false
+      #
+      # `draft: true` is load-bearing. Publishing straight away would make "the
+      # maintainer forgot the notes" a user-visible state. A draft appears
+      # neither under "Latest release" nor in the default output of
+      # `gh release list`, so an unfinished release never reaches downstream.
       # Every `uses:` in this org references a 40-character SHA, never a mutable
       # tag. Re-resolve before bumping, and do not copy a SHA you have not
       # resolved yourself:
       #   gh api repos/softprops/action-gh-release/git/ref/tags/v2 --jq .object.sha
       - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          body_path: release-notes.md
+          draft: true
