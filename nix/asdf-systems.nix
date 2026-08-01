@@ -8,6 +8,7 @@
   clBoundaryKit,
   clCli,
   clTtyKit,
+  clRegexKit,
   # cl-cc-ast / cl-cc-type were split into their own repos. They are supplied
   # here as prebuilt external derivations and injected into the internal
   # system graph under their original names (see externalCcSystems below), so
@@ -402,6 +403,7 @@ let
       '';
 
       lispLibs = with productionAsdfSystems; [
+        clRegexKit
         cl-cc
         cl-cc-cli
         cl-cc-testing-framework

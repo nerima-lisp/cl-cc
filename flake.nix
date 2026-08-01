@@ -31,7 +31,7 @@
     # achieves that outcome more completely, since no second nixpkgs enters the
     # lock at all. treefmt-nix, the one real flake input, carries `follows`.
     cl-prolog = {
-      url = "github:nerima-lisp/cl-prolog/v1.0.1";
+      url = "github:nerima-lisp/cl-prolog/v1.2.0";
       flake = false;
     };
     cl-weave = {
@@ -68,6 +68,14 @@
     };
     cl-tty-kit = {
       url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
+      flake = false;
+    };
+    cl-regex-kit = {
+      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
+      flake = false;
+    };
+    cl-host-kit = {
+      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
@@ -108,15 +116,15 @@
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/ee743ff480dfa5c9526ba293e075521c9bee3220";
+      url = "github:nerima-lisp/cl-cc-expand/e010e3b749fa23c7c104161031eaf01531e95ced";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/ec79c80fd8939ec8c1b4fcf0592da902bb7c4411";
+      url = "github:nerima-lisp/cl-cc-optimize/87f9bd848658c88e26a932d6027be94feb54ad85";
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/26c294ea9a65ec8f61e287d680940f931b43fe45";
+      url = "github:nerima-lisp/cl-cc-codegen-native/0dbccd135f500d9d5f4014f144d38f4e396205c9";
       flake = false;
     };
     cl-cc-parse = {
@@ -144,6 +152,14 @@
     };
     cl-json-kit = {
       url = "github:nerima-lisp/cl-json-kit/v1.0.0";
+      flake = false;
+    };
+    cl-date-kit = {
+      url = "github:nerima-lisp/cl-date-kit/040f6bf936c0dd946a0049eaa715e4c1c6a40eb5";
+      flake = false;
+    };
+    cl-concurrent-kit = {
+      url = "github:nerima-lisp/cl-concurrent-kit/c129a0b4be03ef2b1671ab208f9b390573eb0412";
       flake = false;
     };
   };
@@ -242,7 +258,10 @@
             pname = "cl-prolog";
             version = siblingVersion "cl-prolog";
             src = inputs.cl-prolog;
-            systems = [ "cl-prolog" ];
+            systems = [
+              "cl-prolog"
+              "cl-prolog/callgraph"
+            ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
@@ -294,6 +313,19 @@
             systems = [ "cl-tty-kit" ];
             lispLibs = [ clProlog ];
           };
+          clRegexKit = sbcl.buildASDFSystem {
+            pname = "cl-regex-kit";
+            version = siblingVersion "cl-regex-kit";
+            src = inputs.cl-regex-kit;
+            systems = [ "cl-regex-kit" ];
+            lispLibs = [ clParserKit ];
+          };
+          clHostKit = sbcl.buildASDFSystem {
+            pname = "cl-host-kit";
+            version = siblingVersion "cl-host-kit";
+            src = inputs.cl-host-kit;
+            systems = [ "cl-host-kit" ];
+          };
           # Subsystems split out of this repository. clCcAst is a
           # dependency-free leaf; clCcType depends on it.
           #
@@ -336,6 +368,18 @@
             src = inputs.cl-json-kit;
             systems = [ "cl-json-kit" ];
           };
+          clDateKit = sbcl.buildASDFSystem {
+            pname = "cl-date-kit";
+            version = siblingVersion "cl-date-kit";
+            src = inputs.cl-date-kit;
+            systems = [ "cl-date-kit" ];
+          };
+          clConcurrentKit = sbcl.buildASDFSystem {
+            pname = "cl-concurrent-kit";
+            version = siblingVersion "cl-concurrent-kit";
+            src = inputs.cl-concurrent-kit;
+            systems = [ "cl-concurrent-kit" ];
+          };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
             version = siblingVersion "cl-cc-runtime";
@@ -361,20 +405,21 @@
             lispLibs = [
               clCcBootstrap
               clCcRuntime
+              clRegexKit
+              clTtyKit
+              clHostKit
             ];
           };
           clCcMir = sbcl.buildASDFSystem {
             pname = "cl-cc-mir";
             version = siblingVersion "cl-cc-mir";
             src = inputs.cl-cc-mir;
-            systems = [ "cl-cc-mir" ];
+            systems = [
+              "cl-cc-mir"
+              "cl-cc-target"
+            ];
           };
-          clCcTarget = sbcl.buildASDFSystem {
-            pname = "cl-cc-target";
-            version = siblingVersion "cl-cc-mir";
-            src = inputs.cl-cc-mir;
-            systems = [ "cl-cc-target" ];
-          };
+          clCcTarget = clCcMir;
           clCcCps = sbcl.buildASDFSystem {
             pname = "cl-cc-cps";
             version = siblingVersion "cl-cc-cps";
@@ -484,6 +529,10 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clDateKit
+              clJsonKit
+              clConcurrentKit
+              clHostKit
             ];
           };
           clCcBinary = sbcl.buildASDFSystem {
@@ -506,6 +555,7 @@
               clBoundaryKit
               clCli
               clTtyKit
+              clRegexKit
               clCcAst
               clCcType
               clCcBinary
