@@ -126,36 +126,6 @@
         (expect (cl-cc/optimize::%cfg-block-cold-p blk) :to-be-truthy)
         (expect (cl-cc/optimize::%cfg-block-cold-p blk) :to-be-falsy)))))
 
-(it-sequential "cfg-block-hotter-p-cold-vs-warm"
-  (let ((cold (%make-test-basic-block))
-        (warm (%make-test-basic-block)))
-    (setf (cl-cc/optimize:bb-instructions cold) (list (make-vm-signal-error :error-reg :r0))
-          (cl-cc/optimize:bb-instructions warm) (list (make-vm-const :dst :r0 :value 1)))
-    (expect (cl-cc/optimize::%cfg-block-hotter-p cold warm) :to-be-falsy)
-    (expect (cl-cc/optimize::%cfg-block-hotter-p warm cold) :to-be-truthy)))
-
-(it-sequential "cfg-block-hotter-p-loop-depth"
-  (let ((deep    (%make-test-basic-block))
-        (shallow (%make-test-basic-block)))
-    (setf (cl-cc/optimize:bb-loop-depth  deep)    3
-          (cl-cc/optimize:bb-loop-depth  shallow) 1
-          (cl-cc/optimize:bb-instructions deep)    nil
-          (cl-cc/optimize:bb-instructions shallow) nil)
-    (expect (cl-cc/optimize::%cfg-block-hotter-p deep shallow) :to-be-truthy)
-    (expect (cl-cc/optimize::%cfg-block-hotter-p shallow deep) :to-be-falsy)))
-
-(it-sequential "cfg-block-hotter-p-rpo-index-tiebreaker"
-  (let ((first  (%make-test-basic-block))
-        (second (%make-test-basic-block)))
-    (setf (cl-cc/optimize:bb-loop-depth first)   1
-          (cl-cc/optimize:bb-loop-depth second)  1
-          (cl-cc/optimize:bb-rpo-index  first)   0
-          (cl-cc/optimize:bb-rpo-index  second)  1
-          (cl-cc/optimize:bb-instructions first)  nil
-          (cl-cc/optimize:bb-instructions second) nil)
-    (expect (cl-cc/optimize::%cfg-block-hotter-p first second) :to-be-truthy)
-    (expect (cl-cc/optimize::%cfg-block-hotter-p second first) :to-be-falsy)))
-
 (it-sequential "branch-correlation-propagates-through-forwarder"
   (let* ((pred   (make-vm-label :name "pred"))
          (p1     (cl-cc:make-vm-integer-p :dst :r1 :src :r0))

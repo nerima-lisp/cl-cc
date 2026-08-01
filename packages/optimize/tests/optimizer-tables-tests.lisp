@@ -4,7 +4,6 @@
 ;;;; Covers the data tables:
 ;;;;   *opt-binary-fold-table*, *opt-binary-cmp-fold-table*,
 ;;;;   *opt-unary-fold-table*, *opt-type-pred-fold-table*,
-;;;;   *opt-foldable-binary-types*, *opt-foldable-unary-types*,
 ;;;;   *opt-binary-zero-guard-types*, *opt-binary-no-fold-types*,
 ;;;;   *opt-commutative-inst-types*, *opt-binary-lhs-rhs-types*,
 ;;;;   *opt-unary-src-types*, *opt-read-regs-table*
@@ -261,19 +260,19 @@
     (expect (funcall fn 42) :to-be-null)
     (expect (funcall fn nil) :to-be-null)))
 
-;;; ─── Derived type lists ───────────────────────────────────────────────────
+;;; ─── Table coverage and derived type lists ─────────────────────────────────
 
-(it-sequential "foldable-binary-types-contains-arithmetic-types"
-  (expect (member 'vm-add cl-cc/optimize::*opt-foldable-binary-types*) :to-be-truthy)
-  (expect (member 'vm-lt  cl-cc/optimize::*opt-foldable-binary-types*) :to-be-truthy)
-  (expect (member 'vm-mul cl-cc/optimize::*opt-foldable-binary-types*) :to-be-truthy))
+(it-sequential "binary-fold-tables-register-arithmetic-and-comparison-ops"
+  (expect (gethash 'vm-add cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)
+  (expect (gethash 'vm-mul cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)
+  (expect (gethash 'vm-lt cl-cc/optimize::*opt-binary-cmp-fold-table*) :to-be-truthy))
 
-(it-sequential "foldable-unary-types-contains-expected-types"
-  (expect (member 'vm-neg    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
-  (expect (member 'vm-car    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
-  (expect (member 'vm-cdr    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
-  (expect (member 'vm-null-p cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy)
-  (expect (member 'vm-abs    cl-cc/optimize::*opt-foldable-unary-types*) :to-be-truthy))
+(it-sequential "unary-fold-tables-register-fold-and-predicate-ops"
+  (expect (gethash 'vm-neg cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)
+  (expect (gethash 'vm-car cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)
+  (expect (gethash 'vm-cdr cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)
+  (expect (gethash 'vm-abs cl-cc/optimize::*opt-unary-fold-table*) :to-be-truthy)
+  (expect (gethash 'vm-null-p cl-cc/optimize::*opt-type-pred-fold-table*) :to-be-truthy))
 
 (it-sequential "binary-zero-guard-types-contains-division-ops"
   (expect (member 'vm-div cl-cc/optimize::*opt-binary-zero-guard-types*) :to-be-truthy)
