@@ -449,29 +449,45 @@ call to such a predicate and nothing shadows the name."
   "Compile an IF condition, retaining raw VM booleans only for predicates.
 
 VM-JUMP-ZERO treats numeric 0 and NIL alike, while Common Lisp IF treats only
-NIL as false.  A known unary type predicate already produces a raw 1/0 value,
-so it can feed the branch directly.  Every other condition is converted into
-an explicit 0/1 branch value using VM-NULL-P, preserving Common Lisp
-truthiness without changing the VM condition contract."
-  (let ((entry (%if-condition-unary-predicate-entry cond-ast ctx)))
-    (if entry
-        (let ((arg-reg (compile-ast (first (ast-call-args cond-ast)) ctx))
-              (predicate-reg (make-register ctx)))
-          (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
-          predicate-reg)
-        (let* ((condition-reg (compile-ast cond-ast ctx))
-               (nil-p-reg (make-register ctx))
-               (branch-reg (make-register ctx))
-               (truthy-label (make-label ctx "if_condition_truthy"))
-               (end-label (make-label ctx "if_condition_end")))
-          (emit ctx (make-vm-null-p :dst nil-p-reg :src condition-reg))
-          (emit ctx (make-vm-jump-zero :reg nil-p-reg :label truthy-label))
-          (%emit-constant ctx 0 :dst branch-reg)
-          (emit ctx (make-vm-jump :label end-label))
-          (emit ctx (make-vm-label :name truthy-label))
-          (%emit-constant ctx 1 :dst branch-reg)
-          (emit ctx (make-vm-label :name end-label))
-          branch-reg))))
+NIL as false. Builtin predicates that emit raw 1/0 values can feed the branch
+directly; this includes quoted two-argument TYPEP calls produced by TYPECASE.
+Every other condition is converted into an explicit 0/1 branch value using
+VM-NULL-P, preserving Common Lisp truthiness without changing the VM condition
+contract."
+  (let* ((entry (%if-condition-unary-predicate-entry cond-ast ctx))
+         (callable (and (typep cond-ast 'ast-call)
+                        (%callable-designator-node (ast-call-func cond-ast))))
+         (sym (cond ((symbolp callable) callable)
+                    ((typep callable 'ast-var) (ast-var-name callable))
+                    (t nil)))
+         (raw-typep-p (and (typep cond-ast 'ast-call)
+                           (= 2 (length (ast-call-args cond-ast)))
+                           sym
+                           (string-equal (symbol-name sym) "TYPEP")
+                           (not (%ast-var-function-value-p sym ctx))
+                           (typep (second (ast-call-args cond-ast)) 'ast-quote))))
+    (cond
+     (entry
+      (let ((arg-reg (compile-ast (first (ast-call-args cond-ast)) ctx))
+            (predicate-reg (make-register ctx)))
+        (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
+        predicate-reg))
+     (raw-typep-p
+      (compile-ast cond-ast ctx))
+     (t
+      (let* ((condition-reg (compile-ast cond-ast ctx))
+             (nil-p-reg (make-register ctx))
+             (branch-reg (make-register ctx))
+             (truthy-label (make-label ctx "if_condition_truthy"))
+             (end-label (make-label ctx "if_condition_end")))
+        (emit ctx (make-vm-null-p :dst nil-p-reg :src condition-reg))
+        (emit ctx (make-vm-jump-zero :reg nil-p-reg :label truthy-label))
+        (%emit-constant ctx 0 :dst branch-reg)
+        (emit ctx (make-vm-jump :label end-label))
+        (emit ctx (make-vm-label :name truthy-label))
+        (%emit-constant ctx 1 :dst branch-reg)
+        (emit ctx (make-vm-label :name end-label))
+        branch-reg)))))
 
 (defun %compile-normal-call (func-expr func-sym args result-reg tail ctx)
   "Emit a normal (non-special-cased) function call."
