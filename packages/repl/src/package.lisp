@@ -18,7 +18,7 @@
         :cl-cc/selfhost)
   (:shadowing-import-from :cl-cc/expand
     #:define-syntax)
-  (:shadowing-import-from :cl-cc/vm
+  (:shadowing-import-from :cl-cc/vm #:vm-simd-vector-op-p
     #:get-universal-time #:get-internal-real-time #:get-internal-run-time
     #:internal-time-units-per-second #:sleep #:time
     #:encode-universal-time #:decode-universal-time
