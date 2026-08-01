@@ -104,15 +104,15 @@
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/b09fdc12f8a181946319ac7a4cd2794466617db4";
+      url = "github:nerima-lisp/cl-cc-cps/d7879bae953a6b197e4996d5dd017ff90ba610f1";
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/ee743ff480dfa5c9526ba293e075521c9bee3220";
+      url = "github:nerima-lisp/cl-cc-expand/477a071140e0be806d7b5f8b1221dc93dc2bcdcf";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/ec79c80fd8939ec8c1b4fcf0592da902bb7c4411";
+      url = "github:nerima-lisp/cl-cc-optimize/87f9bd848658c88e26a932d6027be94feb54ad85";
       flake = false;
     };
     cl-cc-codegen-native = {
