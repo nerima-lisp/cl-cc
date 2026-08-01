@@ -124,7 +124,7 @@
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/171f3c9ce8d5429b0e1732af3cef70e8fdca6f0c";
+      url = "github:nerima-lisp/cl-cc-codegen-native/505e7edf23744fb1abb66dbbb563bf5fccb5eee6";
       flake = false;
     };
     cl-cc-parse = {
