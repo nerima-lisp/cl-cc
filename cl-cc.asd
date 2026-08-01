@@ -18,6 +18,14 @@
 ;;;; System name designators are strings, not keywords or uninterned symbols,
 ;;;; so that reading this file does not depend on the reader's package state.
 
+;;;; This form comes FIRST, before any other form. ASDF binds *package* to
+;;;; ASDF-USER only for a file it loads itself; read any other way -- a REPL
+;;;; `load`, an editor evaluating the buffer, flake.nix parsing :version -- the
+;;;; file is read in whatever package happens to be current, and an unqualified
+;;;; `defsystem` then fails to read at all. Saying it makes the file
+;;;; self-contained. See PACKAGE_STANDARD.md "asd の書き方".
+(in-package #:asdf-user)
+
 (eval-when (:load-toplevel :execute)
   (require :asdf)
   (flet ((ensure-system-asd (system-name relative-asd here)
@@ -60,7 +68,11 @@
                 :cl-cc-compile :cl-cc-cps :cl-cc-codegen :cl-cc-vm :cl-cc-stdlib
                  :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl :cl-cc-php :cl-cc-javascript)
   :components
-  ((:module "src" :pathname "src" :serial t :components ((:file "package"))) (:module "ffi-dynlib" :pathname "src/ffi/" :components ((:file "dynlib"))) (:module "fpga-hls" :pathname "packages/emit/src" :serial t :components ((:file "fpga")))))
+  ((:module "src" :pathname "src" :serial t :components ((:file "package"))) (:module "ffi-dynlib" :pathname "src/ffi/" :components ((:file "dynlib"))) (:module "fpga-hls" :pathname "packages/emit/src" :serial t :components ((:file "fpga"))))
+  ;; So `asdf:test-system "cl-cc"` runs the suite. Only the canonical unit
+  ;; suite is chained: "cl-cc/test/e2e" is the self-hosting regression run and
+  ;; is invoked deliberately, not as a side effect of testing the umbrella.
+  :in-order-to ((test-op (test-op "cl-cc/test"))))
 
 (eval-when (:load-toplevel :execute)
   (require :asdf)
