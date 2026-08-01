@@ -387,6 +387,7 @@
               clCcRuntime
               clHostKit
               clRegexKit
+              clTtyKit
             ];
           };
           clCcMir = sbcl.buildASDFSystem {
