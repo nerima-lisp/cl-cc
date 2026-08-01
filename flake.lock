@@ -71,17 +71,17 @@
     "cl-cc-codegen-native": {
       "flake": false,
       "locked": {
-        "lastModified": 1785574950,
-        "narHash": "sha256-pCRj4SE6V8ChjQvUgojSq8ih8fKTN01Rvc1chXG+RKA=",
+        "lastModified": 1785591381,
+        "narHash": "sha256-6nvHevCBttt0PAP2r7wNUvrYtBPuF0XmX0vTaJ22Sp4=",
         "owner": "nerima-lisp",
         "repo": "cl-cc-codegen-native",
-        "rev": "26c294ea9a65ec8f61e287d680940f931b43fe45",
+        "rev": "0dbccd135f500d9d5f4014f144d38f4e396205c9",
         "type": "github"
       },
       "original": {
         "owner": "nerima-lisp",
         "repo": "cl-cc-codegen-native",
-        "rev": "26c294ea9a65ec8f61e287d680940f931b43fe45",
+        "rev": "0dbccd135f500d9d5f4014f144d38f4e396205c9",
         "type": "github"
       }
     },
