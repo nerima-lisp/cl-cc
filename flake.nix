@@ -45,7 +45,7 @@
     # behind packages/cli, and cl-tty-kit provides the ANSI/screen/input
     # primitives for the interactive REPL.
     cl-parser-kit = {
-      url = "github:nerima-lisp/cl-parser-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-parser-kit/v1.0.1";
       flake = false;
     };
     cl-dataflow = {
@@ -67,7 +67,17 @@
       flake = false;
     };
     cl-tty-kit = {
-      url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-tty-kit/v1.0.3";
+      flake = false;
+    };
+    # cl-cc-vm depends directly on cl-regex-kit and cl-host-kit. Keep their
+    # pins aligned with the VM's own flake so its ASDF graph is reproducible.
+    cl-regex-kit = {
+      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
+      flake = false;
+    };
+    cl-host-kit = {
+      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
@@ -267,6 +277,19 @@
             src = inputs.cl-parser-kit;
             systems = [ "cl-parser-kit" ];
           };
+          clRegexKit = sbcl.buildASDFSystem {
+            pname = "cl-regex-kit";
+            version = siblingVersion "cl-regex-kit";
+            src = inputs.cl-regex-kit;
+            systems = [ "cl-regex-kit" ];
+            lispLibs = [ clParserKit ];
+          };
+          clHostKit = sbcl.buildASDFSystem {
+            pname = "cl-host-kit";
+            version = siblingVersion "cl-host-kit";
+            src = inputs.cl-host-kit;
+            systems = [ "cl-host-kit" ];
+          };
           clDataflow = sbcl.buildASDFSystem {
             pname = "cl-dataflow";
             version = siblingVersion "cl-dataflow";
@@ -368,6 +391,9 @@
             lispLibs = [
               clCcBootstrap
               clCcRuntime
+              clRegexKit
+              clTtyKit
+              clHostKit
             ];
           };
           clCcMir = sbcl.buildASDFSystem {
