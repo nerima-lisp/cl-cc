@@ -221,23 +221,6 @@
         "type": "github"
       }
     },
-    "cl-cc-target": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1785091875,
-        "narHash": "sha256-toU9HKXkljw2jFPwYyHuCk1T0dsXlRL2vLuZHsxIBVI=",
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-target",
-        "rev": "e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-target",
-        "rev": "e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1",
-        "type": "github"
-      }
-    },
     "cl-cc-type": {
       "flake": false,
       "locked": {
@@ -524,7 +507,6 @@
         "cl-cc-parse": "cl-cc-parse",
         "cl-cc-php": "cl-cc-php",
         "cl-cc-runtime": "cl-cc-runtime",
-        "cl-cc-target": "cl-cc-target",
         "cl-cc-type": "cl-cc-type",
         "cl-cc-vm": "cl-cc-vm",
         "cl-cli": "cl-cli",
