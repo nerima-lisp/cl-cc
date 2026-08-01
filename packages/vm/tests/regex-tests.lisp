@@ -30,11 +30,11 @@
            (cl-regex-kit:scan (cl-regex-kit:regex "\\w+") "!foo_bar!")
            "!foo_bar!")
           :to-equal "foo_bar")
-  (let ((text (concatenate 'string "x " (string #\\Tab) " y")))
+  (let ((text (concatenate 'string "x " (string #\Tab) " y")))
     (expect (cl-regex-kit:match-string
              (cl-regex-kit:scan (cl-regex-kit:regex "\\s+") text)
              text)
-            :to-equal (concatenate 'string " " (string #\\Tab) " ")))
+            :to-equal (concatenate 'string " " (string #\Tab) " ")))
   (expect (cl-regex-kit:match-string
            (cl-regex-kit:scan (cl-regex-kit:regex "[^0-9]+") "123xy9")
            "123xy9")
