@@ -246,7 +246,10 @@
             pname = "cl-prolog";
             version = siblingVersion "cl-prolog";
             src = inputs.cl-prolog;
-            systems = [ "cl-prolog" "cl-prolog/callgraph" ];
+            systems = [
+              "cl-prolog"
+              "cl-prolog/callgraph"
+            ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
