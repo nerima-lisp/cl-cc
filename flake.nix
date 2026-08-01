@@ -31,7 +31,7 @@
     # achieves that outcome more completely, since no second nixpkgs enters the
     # lock at all. treefmt-nix, the one real flake input, carries `follows`.
     cl-prolog = {
-      url = "github:nerima-lisp/cl-prolog/v1.0.1";
+      url = "github:nerima-lisp/cl-prolog/v1.2.0";
       flake = false;
     };
     cl-weave = {
@@ -246,7 +246,7 @@
             pname = "cl-prolog";
             version = siblingVersion "cl-prolog";
             src = inputs.cl-prolog;
-            systems = [ "cl-prolog" ];
+            systems = [ "cl-prolog" "cl-prolog/callgraph" ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
