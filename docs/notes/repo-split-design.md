@@ -703,3 +703,40 @@ prolog-toolsの後始末——どちらも「壊れているものを直す」�
 優先） → (2) cps の抽出（§10-7で確定済み、依存ゼロの葉） →
 (3) expand の脱結合＋抽出（3ファイル） → (4) mir+targetの1repo統合を検討
 （常にセット消費・合計1,000loc未満で2repo分の配管は過剰という実測結果）。
+
+## 12. §11-2 の後始末を実行（2026-08-01）
+
+11-2 で見つかった4件のうち、以下を完了:
+
+1. **`cl-cc-ir`/`cl-cc-bytecode`を完全除去** — GitHub repoをarchive、かつ
+   `cl-cc.asd`の`:depends-on`・テスト集約・`flake.nix`・`nix/asdf-systems.nix`
+   から実体を削除（`packages/ir`・`packages/bytecode`ごと削除）。副産物として
+   `t/e2e/selfhost-test-support.lisp`と`packages/compile/tests/standalone-load-tests.lisp`
+   にも生きた参照が残っていたことが判明・修正（grepだけでは見つからず、実際に
+   ビルドを試みて発見）。
+2. **`cl-cc-target`を`cl-cc-mir`へ統合完了** — `cl-cc-mir`にファイル移設・
+   push・`nix flake check`緑を確認済み。`cl-cc-target`はarchive。
+   `cl-cc-codegen-native`・`cl-cc`双方のflake入力をmir単独に統合。
+3. **`prolog-tools`を`cl-prolog`へ分割**——288行のうち約230行（call-graph
+   構造体・reachability・dead-code・mutual-recursion・graph-coloring・
+   edge-DCG）はcl-cc-ast非依存と判明したため`cl-prolog/callgraph`
+   （cl-prolog v1.2.0）へ移設。`build-call-graph`をAST→edgesの薄い
+   アダプタに再設計し、`packages/prolog-tools`はこのアダプタのみに縮小。
+   ストレイrepo`cl-cc-prolog-tools`はarchive。
+4. **`cl-cc-type`の宙ぶらりんテスト5本を復活** — `cl-cc-parse`が既に
+   外部化されていたため復元可能と判明。`cl-cc-parse`にv0.1.0タグを
+   新規作成（初リリース）。
+
+**未解決のまま残っているのは**: §11-2 5番目（vmの"Phase 129-160"グループ・
+OSR/tiering/deoptのcodegen-native移設検討）、6番目（optimizeの"roadmap"
+サブシステム分離）、runtimeの19個のorphan並行性モジュール削除、および
+§10-7で確定した`cps`/`expand`の抽出そのもの。
+
+**運用上の注記**: この一連の変更は複数エージェントを並列実行して行ったが、
+同一の共有マシン上でnix/SBCLの重い処理が競合し、ローカルでの動的テスト
+実行（`sbcl --script run-tests.lisp`等）がことごとくCPU飢餓状態でハング
+した。静的チェック（`paredit inspect lint`・nix構文パース・`nix flake
+metadata`・`nix flake check`が通ったサブセット）のみで各commitをpushし、
+実際のテストグリーン確認はCIに委ねた。次にこの種の並列作業をする際は、
+同時に動かす重量級ジョブの数を絞るか、`isolation: worktree`で作業ツリーを
+分離すること。
