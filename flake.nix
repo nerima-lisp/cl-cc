@@ -31,7 +31,7 @@
     # achieves that outcome more completely, since no second nixpkgs enters the
     # lock at all. treefmt-nix, the one real flake input, carries `follows`.
     cl-prolog = {
-      url = "github:nerima-lisp/cl-prolog/v1.2.0";
+      url = "github:nerima-lisp/cl-prolog/v1.0.1";
       flake = false;
     };
     cl-weave = {
@@ -45,7 +45,7 @@
     # behind packages/cli, and cl-tty-kit provides the ANSI/screen/input
     # primitives for the interactive REPL.
     cl-parser-kit = {
-      url = "github:nerima-lisp/cl-parser-kit/v1.0.1";
+      url = "github:nerima-lisp/cl-parser-kit/v1.0.0";
       flake = false;
     };
     cl-dataflow = {
@@ -67,17 +67,7 @@
       flake = false;
     };
     cl-tty-kit = {
-      url = "github:nerima-lisp/cl-tty-kit/v1.0.3";
-      flake = false;
-    };
-    # cl-cc-vm depends directly on cl-regex-kit and cl-host-kit. Keep their
-    # pins aligned with the VM's own flake so its ASDF graph is reproducible.
-    cl-regex-kit = {
-      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
-      flake = false;
-    };
-    cl-host-kit = {
-      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
+      url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
@@ -114,15 +104,15 @@
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/d7879bae953a6b197e4996d5dd017ff90ba610f1";
+      url = "github:nerima-lisp/cl-cc-cps/b09fdc12f8a181946319ac7a4cd2794466617db4";
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/477a071140e0be806d7b5f8b1221dc93dc2bcdcf";
+      url = "github:nerima-lisp/cl-cc-expand/ee743ff480dfa5c9526ba293e075521c9bee3220";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/87f9bd848658c88e26a932d6027be94feb54ad85";
+      url = "github:nerima-lisp/cl-cc-optimize/ec79c80fd8939ec8c1b4fcf0592da902bb7c4411";
       flake = false;
     };
     cl-cc-codegen-native = {
@@ -147,22 +137,13 @@
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
     # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
-    # cl-log-kit, both already above; the remaining toolkit systems below are
-    # direct cl-cc-javascript dependencies and are self-contained.
+    # cl-log-kit, both already above; cl-json-kit is self-contained.
     cl-process-kit = {
       url = "github:nerima-lisp/cl-process-kit/v1.0.1";
       flake = false;
     };
     cl-json-kit = {
       url = "github:nerima-lisp/cl-json-kit/v1.0.0";
-      flake = false;
-    };
-    cl-date-kit = {
-      url = "github:nerima-lisp/cl-date-kit/v0.2.0";
-      flake = false;
-    };
-    cl-concurrent-kit = {
-      url = "github:nerima-lisp/cl-concurrent-kit/v0.2.0";
       flake = false;
     };
   };
@@ -261,10 +242,7 @@
             pname = "cl-prolog";
             version = siblingVersion "cl-prolog";
             src = inputs.cl-prolog;
-            systems = [
-              "cl-prolog"
-              "cl-prolog/callgraph"
-            ];
+            systems = [ "cl-prolog" ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
@@ -281,19 +259,6 @@
             version = siblingVersion "cl-parser-kit";
             src = inputs.cl-parser-kit;
             systems = [ "cl-parser-kit" ];
-          };
-          clRegexKit = sbcl.buildASDFSystem {
-            pname = "cl-regex-kit";
-            version = siblingVersion "cl-regex-kit";
-            src = inputs.cl-regex-kit;
-            systems = [ "cl-regex-kit" ];
-            lispLibs = [ clParserKit ];
-          };
-          clHostKit = sbcl.buildASDFSystem {
-            pname = "cl-host-kit";
-            version = siblingVersion "cl-host-kit";
-            src = inputs.cl-host-kit;
-            systems = [ "cl-host-kit" ];
           };
           clDataflow = sbcl.buildASDFSystem {
             pname = "cl-dataflow";
@@ -371,18 +336,6 @@
             src = inputs.cl-json-kit;
             systems = [ "cl-json-kit" ];
           };
-          clDateKit = sbcl.buildASDFSystem {
-            pname = "cl-date-kit";
-            version = siblingVersion "cl-date-kit";
-            src = inputs.cl-date-kit;
-            systems = [ "cl-date-kit" ];
-          };
-          clConcurrentKit = sbcl.buildASDFSystem {
-            pname = "cl-concurrent-kit";
-            version = siblingVersion "cl-concurrent-kit";
-            src = inputs.cl-concurrent-kit;
-            systems = [ "cl-concurrent-kit" ];
-          };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
             version = siblingVersion "cl-cc-runtime";
@@ -408,21 +361,20 @@
             lispLibs = [
               clCcBootstrap
               clCcRuntime
-              clRegexKit
-              clTtyKit
-              clHostKit
             ];
           };
           clCcMir = sbcl.buildASDFSystem {
             pname = "cl-cc-mir";
             version = siblingVersion "cl-cc-mir";
             src = inputs.cl-cc-mir;
-            systems = [
-              "cl-cc-mir"
-              "cl-cc-target"
-            ];
+            systems = [ "cl-cc-mir" ];
           };
-          clCcTarget = clCcMir;
+          clCcTarget = sbcl.buildASDFSystem {
+            pname = "cl-cc-target";
+            version = siblingVersion "cl-cc-mir";
+            src = inputs.cl-cc-mir;
+            systems = [ "cl-cc-target" ];
+          };
           clCcCps = sbcl.buildASDFSystem {
             pname = "cl-cc-cps";
             version = siblingVersion "cl-cc-cps";
@@ -520,8 +472,6 @@
               clCcBootstrap
               clCcParse
               clCcVm
-              clJsonKit
-              clHostKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
@@ -534,10 +484,6 @@
               clCcBootstrap
               clCcParse
               clCcVm
-              clDateKit
-              clJsonKit
-              clConcurrentKit
-              clHostKit
             ];
           };
           clCcBinary = sbcl.buildASDFSystem {
@@ -556,7 +502,6 @@
               clProlog
               clWeave
               clParserKit
-              clRegexKit
               clDataflow
               clBoundaryKit
               clCli

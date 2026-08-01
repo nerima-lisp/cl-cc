@@ -105,7 +105,7 @@
   :homepage "https://github.com/nerima-lisp/cl-cc"
   :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
-  :depends-on (:cl-cc :cl-cc-jit :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools :cl-cc-formatter :cl-regex-kit)
+  :depends-on (:cl-cc :cl-cc-jit :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools :cl-cc-formatter)
   :serial t
   :components
   (;; Unit tests — each module now lives in its workspace's tests/ dir
@@ -215,7 +215,13 @@
      (:file "cps-ast-transform-tests")
      (:file "cps-ast-extended-tests")
       (:file "cps-ast-functional-tests")
-      (:file "builtin-registry-tests")
+      ("cps-package-tests"
+       :pathname "../../cps/tests"
+       :serial t
+       :components
+       ((:file "cps-coverage-matrix-tests")
+        (:file "cps-trmc-tests")))
+        (:file "builtin-registry-tests")
        (:file "builtin-registry-data-tests")
        (:file "fr-586-set-tests")
        (:file "fr-316-benchmark-tests")
