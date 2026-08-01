@@ -221,13 +221,9 @@
 
 ;;; ── Conditional Truthiness Preservation ──────────────────────────────────
 
-(it-sequential "optimizer-branch-lowering preserves-truthiness const-true"
-  (destructuring-bind (expr) (list "(if 1 42 99)")
-    (expect (opt-has-p expr 'vm-null-p) :to-be-truthy)))
+(it-sequential "optimizer-branch-lowering preserves-truthiness const-true" (assert-run= 42 "(if 1 42 99)"))
 
-(it-sequential "optimizer-branch-lowering preserves-truthiness zero-true"
-  (destructuring-bind (expr) (list "(if 0 42 99)")
-    (expect (opt-has-p expr 'vm-null-p) :to-be-truthy)))
+(it-sequential "optimizer-branch-lowering preserves-truthiness zero-true" (assert-run= 42 "(if 0 42 99)"))
 
 ;;; ── Dominated Predicate Elimination ─────────────────────────────────────
 
