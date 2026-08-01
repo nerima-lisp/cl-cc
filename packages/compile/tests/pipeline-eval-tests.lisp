@@ -149,7 +149,23 @@
 
 (it-sequential "pipeline-run-string-list-regressions dolist-sum"
   (destructuring-bind (expected expr) (list 6 "(let ((acc 0)) (dolist (x (list 1 2 3) acc) (setq acc (+ acc x))))")
-    (expect (run-string expr) :to-equal expected)))
+    (handler-bind
+        ((error
+           (lambda (condition)
+             (ignore-errors
+               (let* ((system (asdf:find-system :cl-cc-optimize))
+                      (component (asdf:find-component system "optimizer-flow-block-merge")))
+                 (format *error-output* "~&[diagnostic] input: ~A~%" expr)
+                 (format *error-output* "[diagnostic] condition: ~A~%" condition)
+                 (format *error-output* "[diagnostic] optimize system: ~A~%"
+                         (asdf:component-pathname system))
+                 (format *error-output* "[diagnostic] block merge source: ~A~%"
+                         (asdf:component-pathname component))
+                 (format *error-output* "[diagnostic] block merge FASL: ~{~A~^, ~}~%"
+                         (asdf:output-files component :compile))
+                 #+sbcl (sb-debug:print-backtrace :stream *error-output*)
+                 (finish-output *error-output*))))))
+      (expect (run-string expr) :to-equal expected))))
 
 (it-sequential "pipeline-run-string-list-regressions labels-simple"
   (destructuring-bind (expected expr) (list 3 "(labels ((f (x) (if (= x 0) 0 (+ 1 (f (- x 1)))))) (f 3))")
