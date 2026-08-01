@@ -526,10 +526,6 @@
               clCcBootstrap
               clCcParse
               clCcVm
-              clDateKit
-              clJsonKit
-              clConcurrentKit
-              clHostKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
@@ -542,6 +538,10 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clDateKit
+              clJsonKit
+              clConcurrentKit
+              clHostKit
             ];
           };
           clCcBinary = sbcl.buildASDFSystem {
