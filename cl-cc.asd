@@ -33,7 +33,7 @@
     (let ((here (make-pathname :defaults (or *load-pathname* *compile-file-pathname*)
                                :name nil :type nil)))
       ;; cl-cc-bootstrap, cl-cc-vm, cl-cc-ast, cl-cc-type, cl-cc-binary,
-      ;; cl-cc-runtime, cl-cc-ir, cl-cc-mir, cl-cc-target and cl-cc-bytecode
+      ;; cl-cc-runtime, cl-cc-mir and cl-cc-target
       ;; are deliberately absent. They live in the standalone repositories of the same name under
       ;; nerima-lisp and reach this build as flake.nix inputs.
       ;;
@@ -48,6 +48,10 @@
       ;; packages/{ast,type}/tests stay: those are cl-cc's own integration tests
       ;; over whichever system provides the packages, and they are not duplicated
       ;; by the repositories' own t/ suites, which test module boundaries.
+      ;;
+      ;; cl-cc-ir and cl-cc-bytecode were removed entirely 2026-08-01: the
+      ;; 2026-08-01 audit found zero consumers anywhere in the build (see
+      ;; docs/notes/repo-split-design.md §11 for the full reasoning).
       (ensure-system-asd :cl-cc-expand "packages/expand/cl-cc-expand.asd" here)
       (ensure-system-asd :cl-cc-cps "packages/cps/cl-cc-cps.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
@@ -66,7 +70,7 @@
   :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
   :depends-on (:cl-cc-bootstrap :cl-cc-ast :cl-cc-parse :cl-cc-binary
-                :cl-cc-runtime :cl-cc-bytecode :cl-cc-ir :cl-cc-mir :cl-cc-target
+                :cl-cc-runtime :cl-cc-mir :cl-cc-target
                 :cl-cc-type :cl-cc-optimize :cl-cc-regalloc :cl-cc-emit :cl-cc-expand
                 :cl-cc-compile :cl-cc-cps :cl-cc-codegen :cl-cc-vm :cl-cc-stdlib
                  :cl-cc-pipeline :cl-cc-selfhost :cl-cc-repl :cl-cc-php :cl-cc-javascript)
@@ -441,16 +445,6 @@
      (:file "inference-forms-tests")
      (:file "inference-effect-tests")
      (:file "exhaustiveness-tests")))
-   (:module "ir-tests"
-    :pathname "packages/ir/tests"
-    :serial t
-    :components
-    ((:file "ir-types-tests")
-     (:file "ir-block-tests")
-     (:file "ir-block-ssa-tests")
-     (:file "ir-ssa-advanced-tests")
-     (:file "ir-ssa-dominator-tests")
-     (:file "ir-printer-tests")))
    (:module "compile-tests"
     :pathname "packages/compile/tests"
     :serial t
@@ -723,13 +717,6 @@
        (:file "value-tests")
        (:file "dynlib-tests")
        (:file "frame-tests")))
-   (:module "bytecode-tests"
-    :pathname "packages/bytecode/tests"
-    :serial t
-    :components
-    ((:file "encode-tests")
-     (:file "encode-ops-objects-tests")
-     (:file "decode-tests")))
     (:module "migration-safety"
      :pathname "packages/umbrella-tests"
      :components

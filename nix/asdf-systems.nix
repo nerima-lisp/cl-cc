@@ -18,10 +18,8 @@
   clCcRuntime,
   clCcBootstrap,
   clCcVm,
-  clCcIr,
   clCcMir,
   clCcTarget,
-  clCcBytecode,
   clCcOptimize,
   clCcParse,
   clCcPhp,
@@ -209,8 +207,13 @@ let
       # leafNames covers only what is still built from packages/. Every system
       # that has moved to its own repository is listed here instead, so the
       # umbrella closure still pulls it. Most would arrive transitively through
-      # a dependent that stayed, but not all -- cl-cc-bytecode has none, and
-      # dropping it out of leafSpec silently removed it from the closure.
+      # a dependent that stayed, but not all, so this list cannot simply be
+      # inferred from leafSpec's own deps.
+      #
+      # cl-cc-ir and cl-cc-bytecode used to be listed here (and had no
+      # dependent to arrive transitively through). They were removed
+      # 2026-08-01 along with the rest of their closure: the audit found zero
+      # consumers anywhere in the build (docs/notes/repo-split-design.md §11).
       deps = leafNames ++ [
         "cl-cc-ast"
         "cl-cc-type"
@@ -218,10 +221,8 @@ let
         "cl-cc-vm"
         "cl-cc-binary"
         "cl-cc-runtime"
-        "cl-cc-ir"
         "cl-cc-mir"
         "cl-cc-target"
-        "cl-cc-bytecode"
         "cl-cc-optimize"
         "cl-cc-regalloc"
         "cl-cc-codegen"
@@ -273,10 +274,8 @@ let
     cl-cc-runtime = clCcRuntime;
     cl-cc-bootstrap = clCcBootstrap;
     cl-cc-vm = clCcVm;
-    cl-cc-ir = clCcIr;
     cl-cc-mir = clCcMir;
     cl-cc-target = clCcTarget;
-    cl-cc-bytecode = clCcBytecode;
     cl-cc-optimize = clCcOptimize;
     cl-cc-parse = clCcParse;
     cl-cc-php = clCcPhp;

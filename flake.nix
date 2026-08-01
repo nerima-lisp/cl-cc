@@ -31,7 +31,7 @@
     # achieves that outcome more completely, since no second nixpkgs enters the
     # lock at all. treefmt-nix, the one real flake input, carries `follows`.
     cl-prolog = {
-      url = "github:nerima-lisp/cl-prolog/v1.0.1";
+      url = "github:nerima-lisp/cl-prolog/v1.2.0";
       flake = false;
     };
     cl-weave = {
@@ -99,20 +99,13 @@
       url = "github:nerima-lisp/cl-cc-vm/e1ea6bc28b80366cd814afa4a375f438604037ce";
       flake = false;
     };
-    cl-cc-ir = {
-      url = "github:nerima-lisp/cl-cc-ir/7b7d388bc8504b3aa9ac14e9e3521792011140ec";
-      flake = false;
-    };
+    # Also provides cl-cc-target (folded in 2026-08-01: the two were always
+    # co-consumed as a pair -- by cl-cc-codegen-native's regalloc/codegen
+    # subsystems and by this repo's own cl-cc.asd -- and combined under 1000
+    # loc). No separate cl-cc-target input any more; both systems are built
+    # from this one source tree below (clCcMir / clCcTarget).
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/96034e6bb8629e9a30636bb92204d3dc20d69efd";
-      flake = false;
-    };
-    cl-cc-target = {
-      url = "github:nerima-lisp/cl-cc-target/e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1";
-      flake = false;
-    };
-    cl-cc-bytecode = {
-      url = "github:nerima-lisp/cl-cc-bytecode/24db21897a34c5c7874bd1f1da8b151b78c694d4";
+      url = "github:nerima-lisp/cl-cc-mir/9679e3a471df1bea446df9b22cb26a32e85c42c8";
       flake = false;
     };
     cl-cc-optimize = {
@@ -247,7 +240,16 @@
             pname = "cl-prolog";
             version = siblingVersion "cl-prolog";
             src = inputs.cl-prolog;
-            systems = [ "cl-prolog" ];
+            # "cl-prolog/callgraph" is the generic call-graph/reachability/
+            # dead-code/FD-coloring/edge-DCG analysis extracted out of
+            # cl-cc's own packages/prolog-tools; cl-cc-prolog-tools now
+            # depends on it (see cl-cc-prolog-tools / -test below), so it is
+            # built as a second system out of this same source derivation
+            # rather than a derivation of its own.
+            systems = [
+              "cl-prolog"
+              "cl-prolog/callgraph"
+            ];
           };
           clWeave = sbcl.buildASDFSystem {
             pname = "cl-weave";
@@ -368,29 +370,22 @@
               clCcRuntime
             ];
           };
-          clCcIr = sbcl.buildASDFSystem {
-            pname = "cl-cc-ir";
-            version = siblingVersion "cl-cc-ir";
-            src = inputs.cl-cc-ir;
-            systems = [ "cl-cc-ir" ];
-          };
           clCcMir = sbcl.buildASDFSystem {
             pname = "cl-cc-mir";
             version = siblingVersion "cl-cc-mir";
             src = inputs.cl-cc-mir;
             systems = [ "cl-cc-mir" ];
           };
+          # Same source tree as clCcMir above (cl-cc-target folded into the
+          # cl-cc-mir repo 2026-08-01), built as its own derivation so
+          # dependents keep naming the system they use -- mirrors clCcRegalloc
+          # / clCcCodegen / clCcEmit below, which do the same for
+          # cl-cc-codegen-native's three systems.
           clCcTarget = sbcl.buildASDFSystem {
             pname = "cl-cc-target";
-            version = siblingVersion "cl-cc-target";
-            src = inputs.cl-cc-target;
+            version = siblingVersion "cl-cc-mir";
+            src = inputs.cl-cc-mir;
             systems = [ "cl-cc-target" ];
-          };
-          clCcBytecode = sbcl.buildASDFSystem {
-            pname = "cl-cc-bytecode";
-            version = siblingVersion "cl-cc-bytecode";
-            src = inputs.cl-cc-bytecode;
-            systems = [ "cl-cc-bytecode" ];
           };
           clCcOptimize = sbcl.buildASDFSystem {
             pname = "cl-cc-optimize";
@@ -508,10 +503,8 @@
               clCcRuntime
               clCcBootstrap
               clCcVm
-              clCcIr
               clCcMir
               clCcTarget
-              clCcBytecode
               clCcOptimize
               clCcRegalloc
               clCcCodegen

@@ -81,11 +81,9 @@ Computed at call time so the result is path-independent across compile/load cont
   (append
    (%asdf-source-files :cl-cc-bootstrap  "packages/bootstrap/")
    (%asdf-source-files :cl-cc-ast        "packages/ast/")
-   (%asdf-source-files :cl-cc-ir         "packages/ir/")
    (%asdf-source-files :cl-cc-mir        "packages/mir/")
    (%asdf-source-files :cl-cc-binary     "packages/binary/")
    (%asdf-source-files :cl-cc-runtime    "packages/runtime/")
-   (%asdf-source-files :cl-cc-bytecode   "packages/bytecode/")
    (%asdf-source-files :cl-cc-parse      "packages/parse/")
    (%asdf-source-files :cl-cc-type       "packages/type/")
    (%asdf-source-files :cl-cc-vm         "packages/vm/")

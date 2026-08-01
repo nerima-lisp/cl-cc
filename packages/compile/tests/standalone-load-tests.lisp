@@ -38,8 +38,6 @@ exists, and a representative symbol resolves in that package."
    ("cl-cc-parse"   :cl-cc-parse   :cl-cc/parse   "PARSE-CL-SOURCE")
    ("cl-cc-binary"   :cl-cc-binary   :cl-cc/binary   "MACH-O-BUILDER")
    ("cl-cc-runtime"  :cl-cc-runtime  :cl-cc/runtime  "RT-CONS")
-   ("cl-cc-bytecode" :cl-cc-bytecode :cl-cc/bytecode "ENCODE-ADD")
-   ("cl-cc-ir"       :cl-cc-ir       :cl-cc/ir       "IR-MAKE-FUNCTION")
    ("cl-cc-mir"      :cl-cc-mir      :cl-cc/mir      "MIR-MAKE-FUNCTION")
    ("cl-cc-type"     :cl-cc-type     :cl-cc/type     "TYPE-TO-STRING")
    ("cl-cc-optimize" :cl-cc-optimize :cl-cc/optimize "OPTIMIZE-INSTRUCTIONS")

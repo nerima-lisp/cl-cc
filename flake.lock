@@ -68,23 +68,6 @@
         "type": "github"
       }
     },
-    "cl-cc-bytecode": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1785091961,
-        "narHash": "sha256-L0d8Y+kPfDVJ0kv/S2YS3bbDAiv9rxzy+YXbzH0QnVI=",
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-bytecode",
-        "rev": "24db21897a34c5c7874bd1f1da8b151b78c694d4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-bytecode",
-        "rev": "24db21897a34c5c7874bd1f1da8b151b78c694d4",
-        "type": "github"
-      }
-    },
     "cl-cc-codegen-native": {
       "flake": false,
       "locked": {
@@ -99,23 +82,6 @@
         "owner": "nerima-lisp",
         "repo": "cl-cc-codegen-native",
         "rev": "ca82ba30a874e51e00dcc3a603ab024e341a81f0",
-        "type": "github"
-      }
-    },
-    "cl-cc-ir": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1785091764,
-        "narHash": "sha256-3TYwRRH5vUBIniRKVllKBH84Z36at/IR5/2koOmLhKI=",
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-ir",
-        "rev": "7b7d388bc8504b3aa9ac14e9e3521792011140ec",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-ir",
-        "rev": "7b7d388bc8504b3aa9ac14e9e3521792011140ec",
         "type": "github"
       }
     },
@@ -139,17 +105,17 @@
     "cl-cc-mir": {
       "flake": false,
       "locked": {
-        "lastModified": 1785091823,
-        "narHash": "sha256-Y8DxZhu0ZzLbL/323rqo+xp3KjneNc7RscuNlaUKCvE=",
+        "lastModified": 1785568792,
+        "narHash": "sha256-TPtKQmnBievSF9/YGwF82zvaPWzAWSrS0CGnL1yYk1c=",
         "owner": "nerima-lisp",
         "repo": "cl-cc-mir",
-        "rev": "96034e6bb8629e9a30636bb92204d3dc20d69efd",
+        "rev": "9679e3a471df1bea446df9b22cb26a32e85c42c8",
         "type": "github"
       },
       "original": {
         "owner": "nerima-lisp",
         "repo": "cl-cc-mir",
-        "rev": "96034e6bb8629e9a30636bb92204d3dc20d69efd",
+        "rev": "9679e3a471df1bea446df9b22cb26a32e85c42c8",
         "type": "github"
       }
     },
@@ -218,23 +184,6 @@
         "owner": "nerima-lisp",
         "repo": "cl-cc-runtime",
         "rev": "095a8649254650dd7fc2f697473101bf21418ba6",
-        "type": "github"
-      }
-    },
-    "cl-cc-target": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1785091875,
-        "narHash": "sha256-toU9HKXkljw2jFPwYyHuCk1T0dsXlRL2vLuZHsxIBVI=",
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-target",
-        "rev": "e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nerima-lisp",
-        "repo": "cl-cc-target",
-        "rev": "e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1",
         "type": "github"
       }
     },
@@ -377,16 +326,16 @@
     "cl-prolog": {
       "flake": false,
       "locked": {
-        "lastModified": 1785003722,
-        "narHash": "sha256-cL5wNd5TDZEIFxvhbBGTFYZOL+YB+boUBPK0yRV66r8=",
+        "lastModified": 1785573228,
+        "narHash": "sha256-bihPczcEz3WovpEQALfq+6lr6q3x1tdFZN3o0YH0XGk=",
         "owner": "nerima-lisp",
         "repo": "cl-prolog",
-        "rev": "a1352cee259b5476193255f21d8e56630f9893a9",
+        "rev": "ef798f9f669546acb4dfe75492fbd7658909571a",
         "type": "github"
       },
       "original": {
         "owner": "nerima-lisp",
-        "ref": "v1.0.1",
+        "ref": "v1.2.0",
         "repo": "cl-prolog",
         "type": "github"
       }
@@ -447,16 +396,13 @@
         "cl-cc-ast": "cl-cc-ast",
         "cl-cc-binary": "cl-cc-binary",
         "cl-cc-bootstrap": "cl-cc-bootstrap",
-        "cl-cc-bytecode": "cl-cc-bytecode",
         "cl-cc-codegen-native": "cl-cc-codegen-native",
-        "cl-cc-ir": "cl-cc-ir",
         "cl-cc-javascript": "cl-cc-javascript",
         "cl-cc-mir": "cl-cc-mir",
         "cl-cc-optimize": "cl-cc-optimize",
         "cl-cc-parse": "cl-cc-parse",
         "cl-cc-php": "cl-cc-php",
         "cl-cc-runtime": "cl-cc-runtime",
-        "cl-cc-target": "cl-cc-target",
         "cl-cc-type": "cl-cc-type",
         "cl-cc-vm": "cl-cc-vm",
         "cl-cli": "cl-cli",
