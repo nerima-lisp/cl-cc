@@ -4,6 +4,7 @@
   clProlog,
   clWeave,
   clParserKit,
+  clRegexKit,
   clDataflow,
   clBoundaryKit,
   clCli,
@@ -407,7 +408,7 @@ let
         cl-cc-testing-framework
         cl-cc-tools
         cl-cc-formatter
-      ];
+      ] ++ [ clRegexKit ];
     };
     "cl-cc-javascript-test" = sbcl.buildASDFSystem {
       pname = "cl-cc-javascript-test";

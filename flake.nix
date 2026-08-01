@@ -556,6 +556,7 @@
               clProlog
               clWeave
               clParserKit
+              clRegexKit
               clDataflow
               clBoundaryKit
               clCli
