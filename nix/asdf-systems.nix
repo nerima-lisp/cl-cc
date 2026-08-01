@@ -23,6 +23,7 @@
   clCcOptimize,
   clCcParse,
   clCcCps,
+  clCcExpand,
   clCcPhp,
   clCcJavascript,
   clCcRegalloc,
@@ -85,14 +86,6 @@ let
       extraLispLibs = [
         clProlog
         clParserKit
-      ];
-    };
-    cl-cc-expand = {
-      src = "packages/expand";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-type"
-        "cl-cc-vm"
       ];
     };
     cl-cc-compile = {
@@ -273,6 +266,7 @@ let
     cl-cc-optimize = clCcOptimize;
     cl-cc-parse = clCcParse;
     cl-cc-cps = clCcCps;
+    cl-cc-expand = clCcExpand;
     cl-cc-php = clCcPhp;
     cl-cc-javascript = clCcJavascript;
     cl-cc-regalloc = clCcRegalloc;

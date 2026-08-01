@@ -56,7 +56,9 @@
       ;; §10-7): it now lives in the standalone nerima-lisp/cl-cc-cps
       ;; repository under nix/asdf-systems.nix's externalCcSystems, the same
       ;; way cl-cc-ast, cl-cc-type and cl-cc-parse do above.
-      (ensure-system-asd :cl-cc-expand "packages/expand/cl-cc-expand.asd" here)
+      ;; cl-cc-expand was extracted the same day, same section: it now lives
+      ;; in the standalone nerima-lisp/cl-cc-expand repository, same
+      ;; mechanism.
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
@@ -323,96 +325,14 @@
       (:file "js-runtime-symbol-tests")
       (:file "js-runtime-typed-array-methods-tests")
       (:file "js-runtime-misc-tests")))
-   (:module "expand-tests"
-    :pathname "packages/expand/tests"
-    :serial t
-    :components
-    ((:file "macro-tests")
-     (:file "macro-definition-tests")
-     (:file "macro-assignment-tests")
-     (:file "macro-multiple-value-tests")
-     (:file "macros-control-flow-tests")
-     (:file "macros-control-flow-loop-tests")
-     (:file "macro-lambda-list-tests")
-     (:file "expander-lambda-list-defaults-tests")
-     (:file "expander-core-tests")
-     (:file "expander-data-tests")
-     (:file "expander-test-support")
-     (:file "expander-basic-tests")
-     (:file "macros-basic-check-type-tests")
-     (:file "macros-basic-list-tests")
-     (:file "macros-basic-setf-tests")
-     (:file "expander-setf-tests")
-     (:file "expander-setf-places-tests")
-     (:file "expander-control-tests")
-     (:file "expander-array-tests")
-     (:file "expander-typed-tests")
-     (:file "expander-typed-params-tests")
-     (:file "expander-defclass-tests")
-     (:file "expander-binding-tests")
-     (:file "expander-control-helpers-tests")
-     (:file "expander-definitions-function-tests")
-     (:file "expander-definitions-forms-tests")
-     (:file "expander-definitions-type-tests")
-     (:file "expander-definitions-rounding-tests")
-     (:file "expander-definitions-constant-tests")
-     (:file "expander-definitions-tests")
-     (:file "expander-numeric-tests")
-     (:file "expander-comparison-tests")
-     (:file "expander-definitions-helpers-tests")
-     (:file "expander-helpers-tests")
-     (:file "expander-sequence-tests")
-     (:file "expander-setf-places-helpers-tests")
-     (:file "expander-tail-tests")
-     (:file "defstruct-tests")
-     (:file "expander-defstruct-typed-tests")
-     (:file "loop-tests")
-     (:file "loop-data-tests")
-     (:file "loop-parser-tests")
-     (:file "loop-emitters-tests")
-     (:file "macro-rotatef-tests")
-     (:file "macro-psetf-tests")
-     (:file "macro-shiftf-tests")
-     (:file "macro-ecase-tests")
-     (:file "macro-etypecase-tests")
-     (:file "macro-progv-tests")
-     (:file "macro-define-modify-macro-tests")
-     (:file "macros-cxr-tests")
-     (:file "macros-introspection-tests")
-     (:file "macros-list-utils-tests")
-     (:file "macros-restarts-tests")
-     (:file "macros-setops-tests")
-     (:file "macros-stdlib-core-tests")
-     (:file "macros-stdlib-tests")
-     (:file "macros-stdlib-bind-error-tests")
-     (:file "macros-stdlib-sequence-map-tests")
-     (:file "macros-stdlib-io-tests")
-     (:file "macros-stdlib-ansi-tests")
-     (:file "macros-stdlib-utils-tests")
-     (:file "macros-filesystem-tests")
-     (:file "array-predicate-expansion-tests")
-     (:file "macros-runtime-support-tests")
-     (:file "macros-clos-protocol-tests")
-     (:file "macros-plist-tests")
-     (:file "macros-sequence-helpers-tests")
-     (:file "macros-hof-tests")
-     (:file "macros-hof-search-tests")
-     (:file "macros-sequence-tests")
-     (:file "loop-macro-tests")
-     (:file "loop-macro-advanced-tests")
-     (:file "loop-macro-runtime-tests")
-     (:file "loop-macro-runtime-clauses-tests")
-     (:file "loop-macro-runtime-ext-tests")
-     (:file "loop-macro-runtime-edge-tests")
-     (:file "macros-basic-mvb-tests")
-     (:file "macros-mutation-tests")
-     (:file "macros-sequence-fold-tests")
-     (:file "macros-stdlib-list-set-tests")
-      (:file "fr-555-copy-structure-tests")
-       (:file "syntax-rules-tests")
-        (:file "runtime-stdlib-2-expand-tests")
-        (:file "runtime-stdlib-3-expander-tests")
-        (:file "runtime-stdlib-3-sequence-tests")))
+   ;; The ~86 files that used to live here as a nested "expand-tests" module
+   ;; pointed at ../../expand/tests tested cl-cc/expand's own internals
+   ;; directly (not through the compile pipeline), so per the ownership rule
+   ;; (source and tests for an externalized package both live in the
+   ;; external repository) they moved wholesale to cl-cc-expand's own t/
+   ;; during the 2026-08-01 extraction, via the same cl-cc-type shim
+   ;; (deftest/deftest-each/assert-* re-expressed on cl-weave) cl-cc-type
+   ;; itself used for its own monorepo-deftest suite.
    (:module "type-tests"
     :pathname "packages/type/tests"
     :serial t

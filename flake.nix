@@ -128,6 +128,13 @@
       url = "github:nerima-lisp/cl-cc-cps/7ff8044c8cfe0b6d4cbd2023ba10be78cdb6cbc1";
       flake = false;
     };
+    # cl-cc-expand had cut a v0.1.0 tag at extraction time, so this is
+    # pinned to that tag's commit directly, the same convention as
+    # cl-cc-cps above.
+    cl-cc-expand = {
+      url = "github:nerima-lisp/cl-cc-expand/4e3eee0681bbf018a2383dd62a0cad0527fc77d6";
+      flake = false;
+    };
     cl-cc-php = {
       url = "github:nerima-lisp/cl-cc-php/f7ee5d7d09a1f24da7ad630be6ddcd0178342f06";
       flake = false;
@@ -471,6 +478,21 @@
               clCcAst
             ];
           };
+          # cl-cc-expand.asd's :depends-on is (:cl-cc-bootstrap :cl-cc-type
+          # :cl-cc-vm); clCcType and clCcVm above already carry their own
+          # resolved lispLibs (clCcAst; clCcBootstrap+clCcRuntime), so
+          # nothing further needs threading in here.
+          clCcExpand = sbcl.buildASDFSystem {
+            pname = "cl-cc-expand";
+            version = siblingVersion "cl-cc-expand";
+            src = inputs.cl-cc-expand;
+            systems = [ "cl-cc-expand" ];
+            lispLibs = [
+              clCcBootstrap
+              clCcType
+              clCcVm
+            ];
+          };
           clCcPhp = sbcl.buildASDFSystem {
             pname = "cl-cc-php";
             version = siblingVersion "cl-cc-php";
@@ -529,6 +551,7 @@
               clCcEmit
               clCcParse
               clCcCps
+              clCcExpand
               clCcPhp
               clCcJavascript
               ;
