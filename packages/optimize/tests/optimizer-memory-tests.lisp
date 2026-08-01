@@ -3,7 +3,7 @@
 ;;;;
 ;;;; Covers: opt-heap-root-inst-p, opt-heap-root-kind,
 ;;;;   opt-compute-heap-aliases, opt-compute-points-to,
-;;;;   opt-interval-* arithmetic, opt-compute-constant-intervals,
+;;;;   opt-interval-* arithmetic, opt-compute-value-ranges,
 ;;;;   cfg-value-ranges, simple-induction-variable detection.
 
 (in-package :cl-cc/test)
@@ -283,11 +283,11 @@
     (expect (= expected-lo (cl-cc/optimize::opt-interval-lo r)) :to-be-truthy)
     (expect (= expected-hi (cl-cc/optimize::opt-interval-hi r)) :to-be-truthy))))
 
-;;; ─── opt-compute-constant-intervals ─────────────────────────────────────
+;;; ─── opt-compute-value-ranges ──────────────────────────────────────────
 
 (it-sequential "constant-intervals-integer-const-yields-singleton"
   (let* ((insts (list (make-vm-const :dst :r0 :value 5)))
-         (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
+         (ivals (cl-cc/optimize:opt-compute-value-ranges insts)))
     (let ((iv (gethash :r0 ivals)))
       (expect iv :to-be-truthy)
       (expect (= 5 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy)
@@ -295,14 +295,14 @@
 
 (it-sequential "constant-intervals-float-const-yields-no-entry"
   (let* ((insts (list (make-vm-const :dst :r0 :value 3.14)))
-         (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
+         (ivals (cl-cc/optimize:opt-compute-value-ranges insts)))
     (expect (nth-value 1 (gethash :r0 ivals)) :to-be-falsy)))
 
 (it-sequential "constant-intervals-add-two-known-yields-sum-interval"
   (let* ((insts (list (make-vm-const :dst :r0 :value 2)
                       (make-vm-const :dst :r1 :value 3)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)))
-         (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
+         (ivals (cl-cc/optimize:opt-compute-value-ranges insts)))
     (let ((iv (gethash :r2 ivals)))
       (expect iv :to-be-truthy)
       (expect (= 5 (cl-cc/optimize::opt-interval-lo iv)) :to-be-truthy))))
@@ -652,5 +652,5 @@
 (it-sequential "constant-intervals-unknown-operand-kills-dst"
   (let* ((insts (list (make-vm-const :dst :r0 :value 2)
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r99)))
-         (ivals (cl-cc/optimize::opt-compute-constant-intervals insts)))
+         (ivals (cl-cc/optimize:opt-compute-value-ranges insts)))
     (expect (nth-value 1 (gethash :r2 ivals)) :to-be-falsy)))

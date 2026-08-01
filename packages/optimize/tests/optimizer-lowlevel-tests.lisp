@@ -172,16 +172,19 @@
     (expect (cl-cc/optimize:opt-may-alias-by-type-p :r0 :r4 points-to heap-kinds) :to-be-falsy)
     (expect (cl-cc/optimize:opt-may-alias-by-type-p :r0 :r9 points-to heap-kinds) :to-be-truthy)))
 
-(it-sequential "constant-interval-helper-propagates-basic-arithmetic"
+(it-sequential "value-range-helper-propagates-basic-arithmetic"
   (let* ((c1 (make-vm-const :dst :r0 :value 3))
          (c2 (make-vm-const :dst :r1 :value 5))
          (a  (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
          (s  (make-vm-sub :dst :r3 :lhs :r2 :rhs :r0))
          (m  (make-vm-mul :dst :r4 :lhs :r3 :rhs :r1))
-         (intervals (cl-cc/optimize::opt-compute-constant-intervals (list c1 c2 a s m))))
-    (expect (gethash :r2 intervals) :to-equal '(8 . 8))
-    (expect (gethash :r3 intervals) :to-equal '(5 . 5))
-    (expect (gethash :r4 intervals) :to-equal '(25 . 25))))
+         (intervals (cl-cc/optimize:opt-compute-value-ranges (list c1 c2 a s m))))
+    (expect (cl-cc/optimize::opt-interval-lo (gethash :r2 intervals)) :to-equal 8)
+    (expect (cl-cc/optimize::opt-interval-hi (gethash :r2 intervals)) :to-equal 8)
+    (expect (cl-cc/optimize::opt-interval-lo (gethash :r3 intervals)) :to-equal 5)
+    (expect (cl-cc/optimize::opt-interval-hi (gethash :r3 intervals)) :to-equal 5)
+    (expect (cl-cc/optimize::opt-interval-lo (gethash :r4 intervals)) :to-equal 25)
+    (expect (cl-cc/optimize::opt-interval-hi (gethash :r4 intervals)) :to-equal 25)))
 
 ;;; ─── opt-inst-read-regs ──────────────────────────────────────────────────────
 
