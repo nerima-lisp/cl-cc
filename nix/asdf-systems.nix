@@ -402,13 +402,16 @@ let
         find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
       '';
 
-      lispLibs = with productionAsdfSystems; [
-        cl-cc
-        cl-cc-cli
-        cl-cc-testing-framework
-        cl-cc-tools
-        cl-cc-formatter
-      ] ++ [ clRegexKit ];
+      lispLibs =
+        with productionAsdfSystems;
+        [
+          cl-cc
+          cl-cc-cli
+          cl-cc-testing-framework
+          cl-cc-tools
+          cl-cc-formatter
+        ]
+        ++ [ clRegexKit ];
     };
     "cl-cc-javascript-test" = sbcl.buildASDFSystem {
       pname = "cl-cc-javascript-test";
