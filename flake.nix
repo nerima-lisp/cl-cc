@@ -120,6 +120,14 @@
       url = "github:nerima-lisp/cl-cc-parse/7316dd82137290082fa1fe03300d3aa388d84117";
       flake = false;
     };
+    # cl-cc-cps had cut a v0.1.0 tag at extraction time, so this is pinned to
+    # that tag's commit directly -- functionally identical to `/v0.1.0`, but
+    # consistent with every other sibling entry in this block, which pins by
+    # commit rather than by tag name.
+    cl-cc-cps = {
+      url = "github:nerima-lisp/cl-cc-cps/7ff8044c8cfe0b6d4cbd2023ba10be78cdb6cbc1";
+      flake = false;
+    };
     cl-cc-php = {
       url = "github:nerima-lisp/cl-cc-php/f7ee5d7d09a1f24da7ad630be6ddcd0178342f06";
       flake = false;
@@ -453,6 +461,16 @@
               clCcBootstrap
             ];
           };
+          clCcCps = sbcl.buildASDFSystem {
+            pname = "cl-cc-cps";
+            version = siblingVersion "cl-cc-cps";
+            src = inputs.cl-cc-cps;
+            systems = [ "cl-cc-cps" ];
+            lispLibs = [
+              clCcBootstrap
+              clCcAst
+            ];
+          };
           clCcPhp = sbcl.buildASDFSystem {
             pname = "cl-cc-php";
             version = siblingVersion "cl-cc-php";
@@ -510,6 +528,7 @@
               clCcCodegen
               clCcEmit
               clCcParse
+              clCcCps
               clCcPhp
               clCcJavascript
               ;

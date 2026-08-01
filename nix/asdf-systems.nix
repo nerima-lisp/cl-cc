@@ -22,6 +22,7 @@
   clCcTarget,
   clCcOptimize,
   clCcParse,
+  clCcCps,
   clCcPhp,
   clCcJavascript,
   clCcRegalloc,
@@ -92,13 +93,6 @@ let
         "cl-cc-bootstrap"
         "cl-cc-type"
         "cl-cc-vm"
-      ];
-    };
-    cl-cc-cps = {
-      src = "packages/cps";
-      deps = [
-        "cl-cc-bootstrap"
-        "cl-cc-ast"
       ];
     };
     cl-cc-compile = {
@@ -278,6 +272,7 @@ let
     cl-cc-target = clCcTarget;
     cl-cc-optimize = clCcOptimize;
     cl-cc-parse = clCcParse;
+    cl-cc-cps = clCcCps;
     cl-cc-php = clCcPhp;
     cl-cc-javascript = clCcJavascript;
     cl-cc-regalloc = clCcRegalloc;

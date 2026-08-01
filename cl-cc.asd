@@ -52,8 +52,11 @@
       ;; cl-cc-ir and cl-cc-bytecode were removed entirely 2026-08-01: the
       ;; 2026-08-01 audit found zero consumers anywhere in the build (see
       ;; docs/notes/repo-split-design.md §11 for the full reasoning).
+      ;; cl-cc-cps was extracted 2026-08-01 (docs/notes/repo-split-design.md
+      ;; §10-7): it now lives in the standalone nerima-lisp/cl-cc-cps
+      ;; repository under nix/asdf-systems.nix's externalCcSystems, the same
+      ;; way cl-cc-ast, cl-cc-type and cl-cc-parse do above.
       (ensure-system-asd :cl-cc-expand "packages/expand/cl-cc-expand.asd" here)
-      (ensure-system-asd :cl-cc-cps "packages/cps/cl-cc-cps.asd" here)
       (ensure-system-asd :cl-cc-compile "packages/compile/cl-cc-compile.asd" here)
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
@@ -455,12 +458,13 @@
      (:file "cps-ast-transform-tests")
      (:file "cps-ast-extended-tests")
       (:file "cps-ast-functional-tests")
-      (:module "cps-package-tests"
-       :pathname "../../cps/tests"
-       :serial t
-       :components
-       ((:file "cps-coverage-matrix-tests")
-        (:file "cps-trmc-tests")))
+      ;; cps-coverage-matrix-tests and cps-trmc-tests used to live here as a
+      ;; nested "cps-package-tests" module pointed at ../../cps/tests. They
+      ;; tested cl-cc/cps's own internals directly (not through the compile
+      ;; pipeline), so per the ownership rule (source and tests for an
+      ;; externalized package both live in the external repository) they
+      ;; moved wholesale to cl-cc-cps's own t/ during the 2026-08-01
+      ;; extraction, adapted to cl-weave's describe-sequential/it/it-each.
         (:file "builtin-registry-tests")
        (:file "builtin-registry-data-tests")
        (:file "fr-586-set-tests")
