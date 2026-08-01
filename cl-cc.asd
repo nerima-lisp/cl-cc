@@ -18,6 +18,13 @@
 ;;;; System name designators are strings, not keywords or uninterned symbols,
 ;;;; so that reading this file does not depend on the reader's package state.
 
+;;; This form comes first, before the eval-when and before any defsystem. ASDF
+;;; binds *package* to ASDF-USER only for a file it loads itself; read any other
+;;; way -- a REPL `load`, an editor evaluating the buffer, flake.nix parsing
+;;; :version -- the file is read in whatever package happens to be current.
+;;; Saying it makes the file self-contained.
+(in-package #:asdf-user)
+
 (eval-when (:load-toplevel :execute)
   (require :asdf)
   (flet ((ensure-system-asd (system-name relative-asd here)
@@ -72,7 +79,12 @@
    (:module "ffi-dynlib"
     :pathname "src/ffi/"
     :components
-    ((:file "dynlib")))))
+    ((:file "dynlib"))))
+  ;; Delegates to "cl-cc/test", the canonical unit suite defined below, so that
+  ;; (asdf:test-system "cl-cc") runs tests instead of silently succeeding.
+  ;; "cl-cc/test/e2e" is deliberately not chained here: it is the self-hosting
+  ;; end-to-end regression suite and is invoked separately.
+  :in-order-to ((test-op (test-op "cl-cc/test"))))
 
 (eval-when (:load-toplevel :execute)
   (require :asdf)
