@@ -75,8 +75,8 @@
   (destructuring-bind (code expected) (list "(if 1 ((lambda (x) x) 42) 0)" 42)
     (expect (= expected (run-string code)) :to-be-truthy)))
 
-(it-sequential "basic-call-return in-if-else"
-  (destructuring-bind (code expected) (list "(if 0 1 ((lambda (x) x) 42))" 42)
+(it-sequential "basic-call-return in-if-then-with-zero"
+  (destructuring-bind (code expected) (list "(if 0 ((lambda (x) x) 42) 1)" 42)
     (expect (= expected (run-string code)) :to-be-truthy)))
 
 ;;; Multiple Argument Tests
@@ -198,8 +198,8 @@
   (destructuring-bind (code expected) (list "(if 1 ((lambda (x) x) 1) 0)" 1)
     (expect (= expected (run-string code)) :to-be-truthy)))
 
-(it-sequential "tail-call-positions if-else"
-  (destructuring-bind (code expected) (list "(if 0 0 ((lambda (x) x) 1))" 1)
+(it-sequential "tail-call-positions if-then-with-zero"
+  (destructuring-bind (code expected) (list "(if 0 ((lambda (x) x) 1) 0)" 1)
     (expect (= expected (run-string code)) :to-be-truthy)))
 
 (it-sequential "tail-call-positions progn-last"
