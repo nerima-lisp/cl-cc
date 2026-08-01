@@ -526,6 +526,8 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clJsonKit
+              clHostKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
