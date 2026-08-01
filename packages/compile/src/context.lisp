@@ -507,8 +507,10 @@ clobbered. Returns ARG's result register."
 (defparameter *cps-compile-unsupported-ast-types*
   '(cl-cc/ast:ast-hole
     cl-cc/ast:ast-slot-def
+    cl-cc/ast:ast-defun
     cl-cc/ast:ast-defvar
     cl-cc/ast:ast-defclass
+    cl-cc/ast:ast-defmethod
     cl-cc/ast:ast-make-instance
     cl-cc/ast:ast-slot-value
     cl-cc/ast:ast-set-slot-value
