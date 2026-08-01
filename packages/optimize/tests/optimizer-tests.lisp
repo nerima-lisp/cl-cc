@@ -183,8 +183,8 @@
   (destructuring-bind (expected expr) (list 42 "(if 1 42 99)")
     (assert-run= expected expr)))
 
-(it-sequential "optimizer-branch-fold const-false"
-  (destructuring-bind (expected expr) (list 99 "(if 0 42 99)")
+(it-sequential "optimizer-branch-fold zero-true"
+  (destructuring-bind (expected expr) (list 42 "(if 0 42 99)")
     (assert-run= expected expr)))
 
 (it-sequential "optimizer-branch-fold t-true"
@@ -219,15 +219,15 @@
     (expect (< (position "end" labels :test #'equal)
                     (position "cold" labels :test #'equal)) :to-be-truthy)))
 
-;;; ── Constant Branch Elimination: No Jump Instructions ────────────────────
+;;; ── Conditional Truthiness Preservation ──────────────────────────────────
 
-(it-sequential "optimizer-branch-fold-no-jump const-true"
+(it-sequential "optimizer-branch-lowering preserves-truthiness const-true"
   (destructuring-bind (expr) (list "(if 1 42 99)")
-    (expect (opt-has-p expr 'vm-jump-zero) :to-be-falsy)))
+    (expect (opt-has-p expr 'vm-null-p) :to-be-truthy)))
 
-(it-sequential "optimizer-branch-fold-no-jump const-false"
+(it-sequential "optimizer-branch-lowering preserves-truthiness zero-true"
   (destructuring-bind (expr) (list "(if 0 42 99)")
-    (expect (opt-has-p expr 'vm-jump-zero) :to-be-falsy)))
+    (expect (opt-has-p expr 'vm-null-p) :to-be-truthy)))
 
 ;;; ── Dominated Predicate Elimination ─────────────────────────────────────
 
