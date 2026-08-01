@@ -5,56 +5,124 @@
 
 
 (it-sequential "regex-scan-literals-and-quantifiers"
-  (let ((match (regex:scan "ab+c.{2,3}" "xx abbbcXYZ yy")))
+  (let* ((text "xx abbbcXYZ yy")
+         (match (cl-regex-kit:scan (cl-regex-kit:compile-regex "ab+c.{2,3}") text)))
     (expect match :to-be-truthy)
-    (expect (regex:match-start match) :to-equal 3)
-    (expect (regex:match-string match) :to-equal "abbbcXYZ"))
-  (expect (regex:match-string (regex:scan "colou?r" "color")) :to-equal "color")
-  (expect (regex:match-string (regex:scan "colou?r" "colour")) :to-equal "colour"))
+    (expect (cl-regex-kit:match-start match) :to-equal 3)
+    (expect (cl-regex-kit:match-string match text) :to-equal "abbbcXYZ"))
+  (let ((text "color"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "colou?r") text)
+             text)
+            :to-equal "color"))
+  (let ((text "colour"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "colou?r") text)
+             text)
+            :to-equal "colour")))
 
 (it-sequential "regex-scan-classes-escapes-and-anchors"
-  (expect (regex:match-string (regex:scan "^[a-z]+\\d+$" "abc123")) :to-equal "abc123")
-  (expect (regex:match-string (regex:scan "\\w+" "!foo_bar!")) :to-equal "foo_bar")
-  (expect (regex:match-string
-                 (regex:scan "\\s+"
-                             (concatenate 'string "x " (string #\Tab) " y"))) :to-equal (concatenate 'string " " (string #\Tab) " "))
-  (expect (regex:match-string (regex:scan "[^0-9]+" "123xy9")) :to-equal "xy"))
+  (let ((text "abc123"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "^[a-z]+\\d+$") text)
+             text)
+            :to-equal "abc123"))
+  (let ((text "!foo_bar!"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "\\w+") text)
+             text)
+            :to-equal "foo_bar"))
+  (let ((text (concatenate 'string "x " (string #\Tab) " y")))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "\\s+") text)
+             text)
+            :to-equal (concatenate 'string " " (string #\Tab) " ")))
+  (let ((text "123xy9"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "[^0-9]+") text)
+             text)
+            :to-equal "xy")))
 
 (it-sequential "regex-all-matches"
-  (expect (mapcar #'regex:match-string
-                        (regex:all-matches "[a-z]\\d+" "a1 b22 c333")) :to-equal '("a1" "b22" "c333")))
+  (let ((text "a1 b22 c333"))
+    (expect (mapcar (lambda (match)
+                      (cl-regex-kit:match-string match text))
+                    (cl-regex-kit:all-matches
+                     (cl-regex-kit:compile-regex "[a-z]\\d+")
+                     text))
+            :to-equal '("a1" "b22" "c333"))))
 
 (it-sequential "regex-capture-groups"
-  (let ((match (regex:scan "([a-z]+)-(\\d+)" "id abc-123 done")))
+  (let* ((text "id abc-123 done")
+         (match (cl-regex-kit:scan
+                 (cl-regex-kit:compile-regex "([a-z]+)-(\\d+)")
+                 text)))
     (expect match :to-be-truthy)
-    (expect (regex:match-group match 0) :to-equal "abc-123")
-    (expect (regex:match-group match 1) :to-equal "abc")
-    (expect (regex:match-group match 2) :to-equal "123")
-    (expect (length (regex:match-groups match)) :to-equal 3)))
+    (expect (cl-regex-kit:match-group-string match 0 text) :to-equal "abc-123")
+    (expect (cl-regex-kit:match-group-string match 1 text) :to-equal "abc")
+    (expect (cl-regex-kit:match-group-string match 2 text) :to-equal "123")
+    (expect (length (cl-regex-kit:match-captures match text)) :to-equal 3)))
 
 (it-sequential "regex-replace-first-and-all"
-  (expect (regex:regex-replace "([a-z]+)" "<\\1>" "x abc y def" :start 2) :to-equal "x <abc> y def")
-  (expect (regex:regex-replace-all "\\d+" "#" "1 22 333") :to-equal "# # #"))
+  (expect (cl-regex-kit:replace-first
+           (cl-regex-kit:compile-regex "([a-z]+)")
+           "x abc y def"
+           "<$1>"
+           :start 2)
+          :to-equal "x <abc> y def")
+  (expect (cl-regex-kit:replace-all
+           (cl-regex-kit:compile-regex "\\d+")
+           "1 22 333"
+           "#")
+          :to-equal "# # #"))
 
-(it-sequential "regex-compiler-builds-nfa-and-dfa"
-  (let ((compiled (regex:compile "a+b")))
-    (expect (regex:compiled-regex-pattern compiled) :to-equal "a+b")
-    (expect (regex:compiled-regex-ast compiled) :to-be-truthy)
-    (expect (regex:compiled-regex-nfa compiled) :to-be-truthy)
-    (expect (regex:compiled-regex-dfa compiled) :to-be-truthy)))
+(it-sequential "regex-compiler-builds-public-regex"
+  (let ((compiled (cl-regex-kit:compile-regex "(a+)b")))
+    (expect (cl-regex-kit:regex-p compiled) :to-be-truthy)
+    (expect (cl-regex-kit:regex-source compiled) :to-equal "(a+)b")
+    (expect (cl-regex-kit:regex-group-count compiled) :to-equal 1)
+    (expect (cl-regex-kit:regex-capture-count compiled) :to-equal 2)))
 
 (it-sequential "regex-unicode-decimal-and-word-classes"
   (let ((arabic-three (string (code-char #x0663)))
         (connector (string (code-char #x203F))))
-    (expect (regex:match-string (regex:scan "\\d+" (concatenate 'string "x" arabic-three "y"))) :to-equal arabic-three)
-    (expect (regex:match-string
-                   (regex:scan "\\w+" (concatenate 'string "!λ" connector "9!"))) :to-equal (concatenate 'string "λ" connector "9"))))
+    (let ((text (concatenate 'string "x" arabic-three "y")))
+      (expect (cl-regex-kit:match-string
+               (cl-regex-kit:scan (cl-regex-kit:compile-regex "\\d+") text)
+               text)
+              :to-equal arabic-three))
+    (let ((text (concatenate 'string "!λ" connector "9!")))
+      (expect (cl-regex-kit:match-string
+               (cl-regex-kit:scan (cl-regex-kit:compile-regex "\\w+") text)
+               text)
+              :to-equal (concatenate 'string "λ" connector "9")))))
 
 (it-sequential "regex-unicode-property-escapes"
-  (expect (regex:match-string (regex:scan "\\p{Letter}+" "1λ!")) :to-equal "λ")
-  (expect (regex:match-string (regex:scan "\\p{Connector_Punctuation}" "a_b")) :to-equal "_")
-  (expect (regex:match-string (regex:scan "\\p{Nd}+" "x3y")) :to-equal "3"))
+  (let ((text "1λ!"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "\\p{Letter}+") text)
+             text)
+            :to-equal "λ"))
+  (let ((text "a_b"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan
+              (cl-regex-kit:compile-regex "\\p{Connector_Punctuation}") text)
+             text)
+            :to-equal "_"))
+  (let ((text "x3y"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "\\p{Nd}+") text)
+             text)
+            :to-equal "3")))
 
 (it-sequential "regex-unicode-case-insensitive"
-  (expect (regex:match-string (regex:scan "(?i)é" "xxÉyy")) :to-equal "É")
-  (expect (regex:match-string (regex:scan "(?i)Λ" "αλω")) :to-equal "λ"))
+  (let ((text "xxÉyy"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "(?i)é") text)
+             text)
+            :to-equal "É"))
+  (let ((text "αλω"))
+    (expect (cl-regex-kit:match-string
+             (cl-regex-kit:scan (cl-regex-kit:compile-regex "(?i)Λ") text)
+             text)
+            :to-equal "λ")))

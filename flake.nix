@@ -555,6 +555,7 @@
               clBoundaryKit
               clCli
               clTtyKit
+              clRegexKit
               clCcAst
               clCcType
               clCcBinary
