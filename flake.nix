@@ -417,7 +417,10 @@
             pname = "cl-cc-mir";
             version = siblingVersion "cl-cc-mir";
             src = inputs.cl-cc-mir;
-            systems = [ "cl-cc-mir" "cl-cc-target" ];
+            systems = [
+              "cl-cc-mir"
+              "cl-cc-target"
+            ];
           };
           clCcTarget = clCcMir;
           clCcCps = sbcl.buildASDFSystem {
