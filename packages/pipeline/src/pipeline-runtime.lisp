@@ -58,8 +58,17 @@ distinct tags and are safe to normalize at the run-string boundary."
            value)))
     (t value)))
 
+(defun %seed-condition-runtime-bindings (state)
+  "Ensure dynamic condition and restart registries are bound in STATE."
+  (let ((globals (vm-global-vars state)))
+    (dolist (name (list "*%CONDITION-HANDLERS*" "*%ACTIVE-RESTARTS*"))
+      (let ((symbol (intern name :cl-cc)))
+        (unless (nth-value 1 (gethash symbol globals))
+          (setf (gethash symbol globals) nil))))))
+
 (defun %run-compiled-for-run-string (program state)
   "Run PROGRAM and normalize VM boxed results as they leave RUN-STRING."
+  (%seed-condition-runtime-bindings state)
   (%normalize-vm-boundary-value state (run-compiled program :state state)))
 
 (defun run-string (source &key stdlib pass-pipeline print-pass-timings timing-stream print-opt-remarks opt-remarks-stream (opt-remarks-mode :all) print-pass-stats stats-stream trace-json-stream (inline-threshold-scale 1))
