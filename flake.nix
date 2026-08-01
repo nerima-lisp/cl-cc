@@ -103,6 +103,10 @@
       url = "github:nerima-lisp/cl-cc-mir/9679e3a471df1bea446df9b22cb26a32e85c42c8";
       flake = false;
     };
+    cl-cc-target = {
+      url = "github:nerima-lisp/cl-cc-target/e5edaec0c34336ddbbe0f44c9d4b8ba8bda1dfc1";
+      flake = false;
+    };
     cl-cc-cps = {
       url = "github:nerima-lisp/cl-cc-cps/d7879bae953a6b197e4996d5dd017ff90ba610f1";
       flake = false;
@@ -371,8 +375,8 @@
           };
           clCcTarget = sbcl.buildASDFSystem {
             pname = "cl-cc-target";
-            version = siblingVersion "cl-cc-mir";
-            src = inputs.cl-cc-mir;
+            version = siblingVersion "cl-cc-target";
+            src = inputs.cl-cc-target;
             systems = [ "cl-cc-target" ];
           };
           clCcCps = sbcl.buildASDFSystem {
