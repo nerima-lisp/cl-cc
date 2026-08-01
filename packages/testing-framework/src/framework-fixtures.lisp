@@ -145,10 +145,10 @@
   (cl-cc/vm::vm-clear-hash-cons-table))
 
 (defbefore :each (cl-cc-suite)
-  (when (boundp 'cl-cc/expand::*macroexpand-step-cache*)
-    (clrhash cl-cc/expand::*macroexpand-step-cache*))
-  (when (boundp 'cl-cc/expand::*macroexpand-all-cache*)
-    (clrhash cl-cc/expand::*macroexpand-all-cache*)))
+  (when (boundp 'cl-cc/expand:*macroexpand-step-cache*)
+    (clrhash cl-cc/expand:*macroexpand-step-cache*))
+  (when (boundp 'cl-cc/expand:*macroexpand-all-cache*)
+    (clrhash cl-cc/expand:*macroexpand-all-cache*)))
 
 ;;; ------------------------------------------------------------
 ;;; Test fixtures

@@ -25,11 +25,11 @@
     ;; ANSI CL proclamations and compilation units.
     "(defun proclaim (declaration-spec)
    (when (consp declaration-spec)
-     (cl-cc/expand::%record-declaim-inline-clause declaration-spec)
-     (cl-cc/expand::%record-declaim-optimize-clause declaration-spec)
-     (cl-cc/expand::%record-declaim-type-clause declaration-spec)
-     (cl-cc/expand::%record-declaim-ftype-clause declaration-spec)
-     (cl-cc/expand::%record-declaim-special-clause declaration-spec))
+     (cl-cc/expand:%record-declaim-inline-clause declaration-spec)
+     (cl-cc/expand:%record-declaim-optimize-clause declaration-spec)
+     (cl-cc/expand:%record-declaim-type-clause declaration-spec)
+     (cl-cc/expand:%record-declaim-ftype-clause declaration-spec)
+     (cl-cc/expand:%record-declaim-special-clause declaration-spec))
    declaration-spec)"
 
     "(defun short-site-name ()

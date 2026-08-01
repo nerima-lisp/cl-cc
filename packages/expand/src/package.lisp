@@ -45,6 +45,8 @@
     #:lookup-deftransform
     #:deftransform
     #:define-deftransform
+    #:*macroexpand-step-cache*
+    #:*macroexpand-all-cache*
 
     ;; --- macro-lambda-list.lisp --- lambda-list helpers ----------------
    #:parse-lambda-list
@@ -101,4 +103,23 @@
     #:*binary-builtins-table*
     #:*unary-builtins-table*
     #:*variadic-fold-builtins-table*
-    #:*variadic-fold-or-list-table*))
+    #:*variadic-fold-or-list-table*
+
+   ;; --- macros-package-system.lisp --- package-system runtime bridge ----
+   ;; Reached (as cl-cc/expand::rt-use-package /
+   ;; cl-cc/expand::add-package-local-nickname) from
+   ;; packages/selfhost/src/pipeline-selfhost.lisp's host-bridge
+   ;; registration table.
+   #:rt-use-package
+   #:add-package-local-nickname
+
+   ;; --- macros-runtime-support.lisp / runtime-stdlib-3-expander.lisp ---
+   ;; declaim-clause recording, reached (as cl-cc/expand::%record-declaim-*)
+   ;; from packages/stdlib/src/stdlib-source.lisp's self-hosted PROCLAIM
+   ;; definition. Prefix kept as-is; these are still implementation
+   ;; details, just visible ones.
+   #:%record-declaim-inline-clause
+   #:%record-declaim-optimize-clause
+   #:%record-declaim-type-clause
+   #:%record-declaim-ftype-clause
+   #:%record-declaim-special-clause))
