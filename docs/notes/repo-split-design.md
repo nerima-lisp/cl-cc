@@ -740,3 +740,61 @@ metadata`・`nix flake check`が通ったサブセット）のみで各commitを
 実際のテストグリーン確認はCIに委ねた。次にこの種の並列作業をする際は、
 同時に動かす重量級ジョブの数を絞るか、`isolation: worktree`で作業ツリーを
 分離すること。
+
+## 13. §12の未解決項目を実行（2026-08-01、同日中の後続セッション）
+
+§12末尾の「未解決」リストのうち、以下を実行・決着させた:
+
+1. **`cps`の抽出完了** — `nerima-lisp/cl-cc-cps`（v0.1.0）。依存ゼロの葉、
+   type/vm/parse抽出と同じ手順。`nix flake check --no-build --all-systems`
+   が両repoとも全derivationで緑。
+2. **`expand`の脱結合＋抽出完了** — 3ファイル（`selfhost/pipeline-selfhost.lisp`・
+   `stdlib/stdlib-source.lisp`・`testing-framework/framework-fixtures.lisp`）の
+   `cl-cc/expand::`直接参照を、`rt-use-package`・`add-package-local-nickname`・
+   5個の`%record-declaim-*-clause`関数・`*macroexpand-step-cache*`・
+   `*macroexpand-all-cache*`の計9シンボルをexportすることで解消してから抽出。
+   `nerima-lisp/cl-cc-expand`（v0.1.0）。レビューで指摘された残課題:
+   キャッシュ変数を直接exportするのではなく`clear-macroexpand-caches`のような
+   専用APIを設けるべき、5個の`%record-declaim-*-clause`も1本の
+   `record-declaim-clause`に統合すべき——今回は抽出期限を優先した実用的な判断。
+   将来のクリーンアップ候補として記録。
+3. **`vm`のJIT寄りコード移設は「移設ではなく削除」と判明** — 再調査の結果、
+   `v8-objects-133.lisp`・`security-134.lisp`・`stack-thread-137.lisp`は
+   codegen-nativeへの境界漏れではなく、そもそも**未使用の投機的コード**
+   （cl-cc-vm内でもcodegen-native/optimizeからも一切参照されない）と判明。
+   移設は実行せず。削除候補として別途フラグ（未実行）。OSR/deopt
+   (`vm-execute-osr.lisp`)は本物のdispatch loop呼び出しがあり、正しくVM内に
+   留まるべきものと確認。
+4. **`optimize`の"roadmap"サブシステム分離は見送り** — 調査の結果、
+   cl-cc本体の`packages/optimize/tests/optimizer-roadmap-{,backend-}tests.lisp`
+   が53箇所でこのサブシステムをシングルコロン（外部シンボル）参照しており、
+   かつdoc読み込み(`docs/notes/optimize-passes.md`等)がcl-cc本体専用パスに
+   依存している。同一repo内でのsecondary system分離では「exportを減らす」
+   という目的を達成できず、cl-cc本体との協調PRが必要——今回のタスク規模を
+   超えるため見送り。
+5. **`runtime`のorphan並行性モジュール削除——19個中8個のみ確定** —
+   モジュールごとに再検証した結果、`cluster`/`mvcc`/`reactive`/`io-uring`/
+   `gpu`/`zerocopy`/`event-loop`/`async-generators`の8個（2,080loc）のみ
+   真に未使用と確認、削除。残り11個（`task`/`work-stealing`/`otel`/
+   `consensus`/`crdt`/`qsbr`/`rcu`/`spsc`/`ebr`/`parallel-algo`/`topology`）
+   は`scheduler.lisp`の`fboundp`経由呼び出しや、cl-cc本体の
+   `runtime-subsystem-fr-tests.lisp`からの直接呼び出しなど実際の消費者が
+   見つかり保持。**「19個全て未使用」という当初の監査は不正確だった**——
+   モジュール単位の再検証が必須という教訓。
+
+**post-implementation review（quality/security/design/docs/performance/test
+の6エージェント並列）で見つかった残課題**:
+- `cl-cc-cps`/`cl-cc-expand`に`.github/workflows/`が無く、`nix flake check`
+  がCIで自動実行されない（同日に追加されたorg規約整合作業より後に作られた
+  にもかかわらず追従していなかった）→ 修正実施。
+- `cl-cc-expand`の脱結合commitメッセージが「8シンボル・3ファイル」と書いて
+  いたが実際は9シンボル・4ファイル（`packages/compile/tests/`の
+  `invoke-registered-expander`参照はcps抽出時と同様に意図的除外だが、
+  その旨の記載がcps側ほど明示的でなかった）——機能上の問題ではないため
+  未修正、記録のみ。
+- セキュリティ・パフォーマンス面の懸念は無し（6エージェントとも「該当なし」
+  を明示的に報告）。
+
+残る本当の未解決: vmの3ファイル削除（今回は投機で終わらせず、実行するなら
+別タスクとして明示的にスコープを切ること）、optimizeのroadmap分離
+（cl-cc本体との協調PRが必要）。
