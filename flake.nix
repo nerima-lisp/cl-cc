@@ -151,13 +151,22 @@
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
     # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
-    # cl-log-kit, both already above; cl-json-kit is self-contained.
+    # cl-log-kit, both already above; the remaining toolkit systems below are
+    # direct cl-cc-javascript dependencies and are self-contained.
     cl-process-kit = {
       url = "github:nerima-lisp/cl-process-kit/v1.0.1";
       flake = false;
     };
     cl-json-kit = {
       url = "github:nerima-lisp/cl-json-kit/v1.0.0";
+      flake = false;
+    };
+    cl-date-kit = {
+      url = "github:nerima-lisp/cl-date-kit/v0.2.0";
+      flake = false;
+    };
+    cl-concurrent-kit = {
+      url = "github:nerima-lisp/cl-concurrent-kit/v0.2.0";
       flake = false;
     };
   };
@@ -366,6 +375,18 @@
             src = inputs.cl-json-kit;
             systems = [ "cl-json-kit" ];
           };
+          clDateKit = sbcl.buildASDFSystem {
+            pname = "cl-date-kit";
+            version = siblingVersion "cl-date-kit";
+            src = inputs.cl-date-kit;
+            systems = [ "cl-date-kit" ];
+          };
+          clConcurrentKit = sbcl.buildASDFSystem {
+            pname = "cl-concurrent-kit";
+            version = siblingVersion "cl-concurrent-kit";
+            src = inputs.cl-concurrent-kit;
+            systems = [ "cl-concurrent-kit" ];
+          };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
             version = siblingVersion "cl-cc-runtime";
@@ -505,6 +526,10 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clDateKit
+              clJsonKit
+              clConcurrentKit
+              clHostKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
