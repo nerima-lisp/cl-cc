@@ -505,25 +505,26 @@ clobbered. Returns ARG's result register."
 ;;; ─── CPS Safety Guards ───────────────────────────────────────────────────────
 
 (defparameter *cps-compile-unsupported-ast-types*
-  '(cl-cc/ast:ast-hole
-    cl-cc/ast:ast-slot-def
-    cl-cc/ast:ast-defun
-    cl-cc/ast:ast-defvar
-    cl-cc/ast:ast-defclass
-    cl-cc/ast:ast-defmethod
-    cl-cc/ast:ast-make-instance
-    cl-cc/ast:ast-slot-value
-    cl-cc/ast:ast-set-slot-value
-    cl-cc/ast:ast-values
-    cl-cc/ast:ast-multiple-value-bind
-    cl-cc/ast:ast-call
-    cl-cc/ast:ast-lambda
-    cl-cc/ast:ast-apply
-    cl-cc/ast:ast-multiple-value-call
-    cl-cc/ast:ast-unwind-protect
-    cl-cc/ast:ast-handler-case
-    cl-cc/ast:ast-flet
-    cl-cc/ast:ast-labels)
+  (quote (cl-cc/ast:ast-hole
+          cl-cc/ast:ast-slot-def
+          cl-cc/ast:ast-defun
+          cl-cc/ast:ast-defvar
+          cl-cc/ast:ast-defclass
+          cl-cc/ast:ast-defmethod
+          cl-cc/ast:ast-make-instance
+          cl-cc/ast:ast-slot-value
+          cl-cc/ast:ast-set-slot-value
+          cl-cc/ast:ast-values
+          cl-cc/ast:ast-multiple-value-bind
+          cl-cc/ast:ast-call
+          cl-cc/ast:ast-lambda
+          cl-cc/ast:ast-apply
+          cl-cc/ast:ast-multiple-value-call
+          cl-cc/ast:ast-unwind-protect
+          cl-cc/ast:ast-handler-case
+          cl-cc/ast:ast-return-from
+          cl-cc/ast:ast-flet
+          cl-cc/ast:ast-labels))
   "AST node types excluded from CPS compilation.
 These forms remain on the direct compile path until the VM CPS route proves
 semantically equivalent.
