@@ -330,14 +330,38 @@ Returns a compilation-result or NIL when AST should stay on the direct path."
                 (ctx-diagnostics ctx))))
 
 (defun %lower-toplevel-form-to-ast (form)
-  "Expand FORM and lower it into an optimized AST node."
-  (let* ((expanded (if (typep form 'ast-node)
-                       form
-                       (cl-cc/expand:compiler-macroexpand-all form)))
-         (ast (if (typep expanded 'ast-node)
-                  expanded
-                  (lower-sexp-to-ast expanded))))
-    (optimize-ast ast)))
+  "Expand FORM without evaluating LOAD-TIME-VALUE forms."
+  (labels ((load-time-value-form-p (candidate)
+             (and (consp candidate)
+                  (symbolp (car candidate))
+                  (member (symbol-name (car candidate))
+                          (quote ("LOAD-TIME-VALUE" "%LOAD-TIME-VALUE"))
+                          :test (function string=))))
+           (load-time-value-heads (candidate)
+             (cond
+               ((atom candidate) nil)
+               ((and (symbolp (car candidate))
+                     (string= (symbol-name (car candidate)) "QUOTE"))
+                nil)
+               ((load-time-value-form-p candidate)
+                (list (car candidate)))
+               (t
+                (mapcan (function load-time-value-heads) candidate))))
+           (expand-preserving-load-time-value (candidate)
+             (let ((head-table (copy-hash-table cl-cc/expand::*expander-head-table*)))
+               (dolist (head (cons (quote load-time-value)
+                                   (load-time-value-heads candidate)))
+                 (setf (gethash head head-table)
+                       (lambda (call-form) call-form)))
+               (let ((cl-cc/expand::*expander-head-table* head-table))
+                 (cl-cc/expand:compiler-macroexpand-all candidate)))))
+    (let* ((expanded (if (typep form (quote ast-node))
+                         form
+                         (expand-preserving-load-time-value form)))
+           (ast (if (typep expanded (quote ast-node))
+                    expanded
+                    (lower-sexp-to-ast expanded))))
+      (optimize-ast ast))))
 
 (defun %declare-form-forward-references (form ctx)
   "Declare any forward references found in FORM and return T when handled."
