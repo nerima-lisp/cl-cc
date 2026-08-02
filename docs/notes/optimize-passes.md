@@ -805,7 +805,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **根拠**: SBCL / ECL / CCL / ABCL 全実装済み。de facto標準のCL拡張。CDR-10
 - **難易度**: Medium
 
-- **関連実装/検証**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/symbols.lisp` に `vm-add-package-local-nickname` / `vm-remove-package-local-nickname` 命令、`packages/expand/src/macros-package-system.lisp` に `defpackage :local-nicknames` サポート、`packages/vm/tests/symbols-tests.lisp` に `SYM-VM-FIND-PACKAGE-USES-LOCAL-NICKNAME` テストを実装済み。resolver は host CL API 経由で動作し、self-host 用の rt- 層 registry は将来拡張。
+- **関連実装/検証**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/symbols.lisp` に `vm-add-package-local-nickname` / `vm-remove-package-local-nickname` 命令、外部リポジトリ `nerima-lisp/cl-cc-expand` の `src/macros-package-system.lisp` に `defpackage :local-nicknames` サポート、`packages/vm/tests/symbols-tests.lisp` に `SYM-VM-FIND-PACKAGE-USES-LOCAL-NICKNAME` テストを実装済み。resolver は host CL API 経由で動作し、self-host 用の rt- 層 registry は将来拡張。
 
 ---
 
@@ -903,7 +903,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **根拠**: CPS変換の完全性要件
 - **難易度**: Medium
 
-- **関連実装**: `packages/cps/src/cps-ast.lisp` に `ast-values` / `ast-multiple-value-bind` / `ast-apply` / `ast-defvar` / `ast-handler-case` / `ast-make-instance` / `ast-slot-value` / `ast-set-slot-value` / `ast-defclass` / `ast-defgeneric` / `ast-defmethod` / `ast-set-gethash` の保守的 CPS メソッドを追加済み。現状は host `multiple-value-call` / `multiple-value-bind` / `apply` / `defparameter` / `handler-case` / `make-instance` / `slot-value` / `setf` / `defclass` / `defgeneric` / `defmethod` / `gethash` を用いて対応 AST 範囲を広げている。全 13 ノード網羅や高精度な多値意味保存の完成版は未実装。
+- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-cps` の `src/cps-ast.lisp` に `ast-values` / `ast-multiple-value-bind` / `ast-apply` / `ast-defvar` / `ast-handler-case` / `ast-make-instance` / `ast-slot-value` / `ast-set-slot-value` / `ast-defclass` / `ast-defgeneric` / `ast-defmethod` / `ast-set-gethash` の保守的 CPS メソッドを追加済み。現状は host `multiple-value-call` / `multiple-value-bind` / `apply` / `defparameter` / `handler-case` / `make-instance` / `slot-value` / `setf` / `defclass` / `defgeneric` / `defmethod` / `gethash` を用いて対応 AST 範囲を広げている。全 13 ノード網羅や高精度な多値意味保存の完成版は未実装。
 
 #### FR-371: CPS Host Control Flow Elimination (CPSホスト制御フロー除去) ✅
 

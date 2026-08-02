@@ -86,11 +86,7 @@ resets the current block (used by the backend doc which has ### section separato
   "Return the current optimize roadmap document text."
   (%doc-content #P"docs/notes/optimize-passes.md"))
 
-(defun %optimizer-doc-completed-heading-contradictions ()
-  "Return ✅ optimize roadmap headings whose body still says implementation is absent."
-  (%doc-completed-heading-contradictions
-   #P"docs/notes/optimize-passes.md"
-   (list "未実装" "未統合" "欠落" "未接続" "未対応" "未定義" "不可能" "なし")))
+(defun %optimizer-doc-completed-heading-contradictions () "Return completed optimize roadmap headings whose body still says implementation is absent." (%doc-completed-heading-contradictions #P"docs/notes/optimize-passes.md" (list "未実装" "未統合" "欠落" "未接続" "未対応" "未定義" "不可能" "実装なし")))
 
 (defun %optimizer-doc-fr-ids-from-line (line)
   "Return all FR ids mentioned in LINE."
@@ -171,8 +167,7 @@ build as a Nix store path, not a sibling directory."
                     contradictions))))))))
 
 ;; SKIP (doc sync): Docs need updating for current FR count and status
-(it-sequential "optimize-roadmap-related-implementation-paths-exist"
-  (expect (%optimizer-doc-related-implementation-missing-paths) :to-be-null))
+(it-sequential "optimize-roadmap-related-implementation-paths-exist" (expect (%optimizer-doc-related-implementation-missing-paths) :to-be-null) (let ((content (%optimizer-doc-content))) (expect (search "nerima-lisp/cl-cc-expand" content) :to-be-truthy) (expect (search "nerima-lisp/cl-cc-cps" content) :to-be-truthy)))
 
 (it-sequential "optimize-roadmap-completed-sidecar-claims-match-heading-status"
   (expect (%optimizer-doc-completed-sidecar-contradictions) :to-be-null))
@@ -188,16 +183,7 @@ build as a Nix store path, not a sibling directory."
     (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
                   evidence) :to-be-truthy)))
 
-(it-sequential "optimizer-roadmap-inline-and-memory-evidence"
-  (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-051")))
-    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
-    (expect (member "packages/optimize/src/optimizer-inline.lisp"
-                         (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=) :to-be-truthy)
-    (expect (member 'cl-cc/optimize::opt-pass-devirtualize
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
-    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                   evidence) :to-be-truthy)))
+(it-sequential "optimizer-roadmap-inline-and-memory-evidence" (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-051"))) (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented) (expect (member "packages/optimize/src/optimizer-inline.lisp" (cl-cc/optimize::opt-roadmap-evidence-modules evidence) :test #'string=) :to-be-truthy) (expect (member 'cl-cc/optimize::opt-pass-devirtualize (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy) (expect (fboundp 'cl-cc/optimize::opt-pass-devirtualize) :to-be-truthy)))
 
 (it-sequential "optimizer-roadmap-pic-evidence-is-runtime-backed"
   (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-023")))
@@ -212,16 +198,7 @@ build as a Nix store path, not a sibling directory."
     (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
                   evidence) :to-be-truthy)))
 
-(it-sequential "optimizer-roadmap-flow-and-ssa-evidence"
-  (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-112")))
-    (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented)
-    (expect (member "packages/optimize/src/ssa.lisp"
-                         (cl-cc/optimize::opt-roadmap-evidence-modules evidence)
-                         :test #'string=) :to-be-truthy)
-    (expect (member 'cl-cc/optimize::cfg-split-critical-edges
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy)
-    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  evidence) :to-be-truthy)))
+(it-sequential "optimizer-roadmap-flow-and-ssa-evidence" (let ((evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-112"))) (expect (cl-cc/optimize::opt-roadmap-evidence-status evidence) :to-be :implemented) (expect (member "packages/optimize/src/ssa.lisp" (cl-cc/optimize::opt-roadmap-evidence-modules evidence) :test #'string=) :to-be-truthy) (expect (member 'cl-cc/optimize::cfg-split-critical-edges (cl-cc/optimize::opt-roadmap-evidence-api-symbols evidence)) :to-be-truthy) (expect (fboundp 'cl-cc/optimize::cfg-split-critical-edges) :to-be-truthy)))
 
 (it-sequential "optimize-roadmap-pipeline-includes-modern-optimization-passes"
   (dolist (key '(:sccp
@@ -234,17 +211,7 @@ build as a Nix store path, not a sibling directory."
     (expect (member key cl-cc/optimize::*opt-default-convergence-pass-keys*) :to-be-truthy)
     (expect (gethash key cl-cc/optimize::*opt-pass-registry*) :to-be-truthy)))
 
-(it-sequential "optimizer-roadmap-code-motion-evidence"
-  (let ((tail-dup-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-167"))
-        (implemented-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-164")))
-    (expect (cl-cc/optimize::opt-roadmap-evidence-status tail-dup-evidence) :to-be :implemented)
-    (expect (cl-cc/optimize::opt-roadmap-evidence-status implemented-evidence) :to-be :implemented)
-    (expect (member 'cl-cc/optimize::opt-pass-tail-duplication
-                         (cl-cc/optimize::opt-roadmap-evidence-api-symbols tail-dup-evidence)) :to-be-truthy)
-    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  tail-dup-evidence) :to-be-truthy)
-    (expect (cl-cc/optimize::optimize-roadmap-implementation-evidence-complete-p
-                  implemented-evidence) :to-be-truthy)))
+(it-sequential "optimizer-roadmap-code-motion-evidence" (let ((tail-dup-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-167")) (implemented-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-164"))) (expect (cl-cc/optimize::opt-roadmap-evidence-status tail-dup-evidence) :to-be :implemented) (expect (cl-cc/optimize::opt-roadmap-evidence-status implemented-evidence) :to-be :implemented) (dolist (api-symbol (append (cl-cc/optimize::opt-roadmap-evidence-api-symbols tail-dup-evidence) (cl-cc/optimize::opt-roadmap-evidence-api-symbols implemented-evidence))) (expect (cl-cc/optimize::%opt-roadmap-api-entry-fbound-p api-symbol) :to-be-truthy))))
 
 (it-sequential "optimizer-roadmap-callee-saved-evidence-is-native-backed"
   (labels ((function-present-p (package-name symbol-name)

@@ -99,15 +99,17 @@
            (result (cl-cc/cps::cps-transform-tagbody-section
                     (list expression) continue-form)))
       (expect result :to-equal
-              (list (quote funcall) (second result) continue-form)))
+              (list (quote funcall) (second result) 7)))
     (let* ((first (cl-cc/ast:make-ast-int :value 1))
            (second (cl-cc/ast:make-ast-int :value 2))
            (result (cl-cc/cps::cps-transform-tagbody-section
-                    (list first second) continue-form)))
+                    (list first second) continue-form))
+           (first-step (second result))
+           (second-step (fourth first-step)))
       (expect result :to-equal
-              (list (quote funcall) (second result)
-                    (list (quote funcall) (second (third result))
-                          continue-form))))))
+              (list (quote funcall) first-step 1))
+      (expect second-step :to-equal
+              (list (quote funcall) (second second-step) 2)))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; CPS for local function bindings (flet/labels helpers)

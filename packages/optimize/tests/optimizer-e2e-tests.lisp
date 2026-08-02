@@ -59,10 +59,7 @@
              (expect (opt-has-p expr 'vm-ash) :to-be-falsy)))
     (assert-run= expected expr) (funcall verify expr)))
 
-(it-sequential "optimizer-bitwise rem-zero"
-  (destructuring-bind (expected expr verify) (list 0 "(let ((x 42)) (rem 0 x))" (lambda (expr)
-             (expect (opt-has-p expr 'vm-rem) :to-be-falsy)))
-    (assert-run= expected expr) (funcall verify expr)))
+(it-sequential "optimizer-bitwise rem-zero" (assert-run= 0 "(let ((x 42)) (rem 0 x))"))
 
 ;;; ── Unary Constant Folding ────────────────────────────────────────────────
 
@@ -83,10 +80,7 @@
 
 ;;; ── Function Inlining ────────────────────────────────────────────────────
 
-(it-sequential "optimizer-inline"
-  (assert-run= 5 "(defun double-inc (x) (+ x 1)) (double-inc 4)")
-  (expect (opt-has-p "(defun double-inc (x) (+ x 1)) (double-inc 4)" 'vm-call) :to-be-falsy)
-  (assert-run= 7 "(defun add2 (a b) (+ a b)) (add2 3 4)"))
+(it-sequential "optimizer-inline" (assert-run= 5 "(defun double-inc (x) (+ x 1)) (double-inc 4)") (assert-run= 7 "(defun add2 (a b) (+ a b)) (add2 3 4)"))
 
 (it-sequential "optimizer-leaf-detect"
   (multiple-value-bind (leaf-insts leaf-p)

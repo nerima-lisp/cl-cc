@@ -198,7 +198,10 @@
     (expect (run-string form) :to-equal expected)))
 
 (it-sequential "etypecase-dispatch-runtime"
-  (expect (run-string "(etypecase 42 (string \"S\") (integer \"I\"))") :to-equal "I"))
+               (expect (run-string "(etypecase 42 (string \"S\") (integer \"I\"))") :to-equal "I"))
+
+(it-sequential "typep-two-argument-condition-preserves-false"
+  (expect (run-string "(if (typep 42 'string) :wrong :right)") :to-be :right))
 
 ;;; Property-Based Differential Tests
 ;;;

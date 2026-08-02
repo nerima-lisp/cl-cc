@@ -214,6 +214,28 @@ up to 11 sequential TYPEP calls per AST node visit."
     (ast-the         (%optimize-ast-the-node node lexical-bound))
     (t               nil)))
 
+(defun %float-constant-node-p (node)
+  (let ((node (%transparent-ast-node node)))
+    (and (typep node 'ast-quote)
+         (floatp (ast-quote-value node)))))
+
+(defun %callable-function-name (node)
+  (let ((callable (%compile-time-callable-func-node node)))
+    (typecase callable
+      (symbol callable)
+      (ast-var (ast-var-name callable))
+      (ast-function (ast-function-name callable))
+      (t nil))))
+
+(defun %load-time-value-call-p (func)
+  (let ((name (%callable-function-name func)))
+    (and name
+         (member (symbol-name name)
+                 (quote ("LOAD-TIME-VALUE" "%LOAD-TIME-VALUE"))
+                 :test (function string=)))))
+
+(defun %preserve-float-arithmetic-call-p (node) (let ((name (%callable-function-name (ast-call-func node))) (args (ast-call-args node))) (and name (member (symbol-name name) (quote ("+" "-" "*" "/")) :test (function string=)) args (every #'%float-constant-node-p args))))
+
 (defun optimize-ast (node &optional lexical-bound)
   "Fold small pure constant expressions before VM lowering."
   (typecase node
@@ -223,16 +245,22 @@ up to 11 sequential TYPEP calls per AST node visit."
                       (optimize-ast (ast-binop-rhs node) lexical-bound)))
     (ast-call
      (let* ((func (optimize-ast (ast-call-func node) lexical-bound))
-            (args (%optimize-ast-list (ast-call-args node) lexical-bound))
-            (call-node (%clone-source node #'make-ast-call :func func :args args)))
-       (typecase (%compile-time-callable-func-node func)
-         ((or ast-var ast-function ast-lambda ast-quote)
-          (multiple-value-bind (value ok)
-              (let ((*compile-time-value-env* *compile-time-value-env*)
-                    (*compile-time-function-env* *compile-time-function-env*))
-                (%evaluate-ast call-node *compile-time-eval-depth-limit*))
-            (if ok (%compile-time-value->ast value node) call-node)))
-         (t call-node))))
+            (args (if (%load-time-value-call-p func)
+                      (ast-call-args node)
+                      (%optimize-ast-list (ast-call-args node) lexical-bound)))
+            (call-node (%clone-source node (function make-ast-call) :func func :args args)))
+       (if (%load-time-value-call-p func)
+           call-node
+           (typecase (%compile-time-callable-func-node func)
+             ((or ast-var ast-function ast-lambda ast-quote)
+              (multiple-value-bind (value ok)
+                  (let ((*compile-time-value-env* *compile-time-value-env*)
+                        (*compile-time-function-env* *compile-time-function-env*))
+                    (%evaluate-ast call-node *compile-time-eval-depth-limit*))
+                (if (and ok (not (%preserve-float-arithmetic-call-p call-node)))
+                    (%compile-time-value->ast value node)
+                    call-node)))
+             (t call-node)))))
     (ast-var
      (%optimize-ast-var-node node lexical-bound))
     (t

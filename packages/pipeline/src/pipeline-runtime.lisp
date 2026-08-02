@@ -58,8 +58,17 @@ distinct tags and are safe to normalize at the run-string boundary."
            value)))
     (t value)))
 
+(defun %seed-condition-runtime-bindings (state)
+  "Ensure dynamic condition and restart registries are bound in STATE."
+  (let ((globals (vm-global-vars state)))
+    (dolist (name (list "*%CONDITION-HANDLERS*" "*%ACTIVE-RESTARTS*"))
+      (let ((symbol (intern name :cl-cc)))
+        (unless (nth-value 1 (gethash symbol globals))
+          (setf (gethash symbol globals) nil))))))
+
 (defun %run-compiled-for-run-string (program state)
   "Run PROGRAM and normalize VM boxed results as they leave RUN-STRING."
+  (%seed-condition-runtime-bindings state)
   (%normalize-vm-boundary-value state (run-compiled program :state state)))
 
 (defun run-string (source &key stdlib pass-pipeline print-pass-timings timing-stream print-opt-remarks opt-remarks-stream (opt-remarks-mode :all) print-pass-stats stats-stream trace-json-stream (inline-threshold-scale 1))
@@ -88,8 +97,9 @@ arguments are forwarded to COMPILE-STRING or COMPILE-STRING-WITH-STDLIB."
            (let* ((*accessor-slot-map*       (%copy-snapshot-ht *stdlib-accessor-slot-map*))
                   (*defstruct-read-only-accessor-map* (%copy-snapshot-ht *stdlib-defstruct-read-only-accessor-map*))
                   (*defstruct-slot-registry* (%copy-snapshot-ht *stdlib-defstruct-slot-registry*))
-                   (*defstruct-type-registry* (%copy-snapshot-ht *stdlib-defstruct-type-registry*))
-                   (*setf-compound-place-handlers* (%copy-snapshot-ht *stdlib-setf-compound-place-handlers*))
+                  (*defstruct-type-registry* (%copy-snapshot-ht *stdlib-defstruct-type-registry*))
+                  (*defstruct-predicate-registry* (%copy-snapshot-ht *stdlib-defstruct-predicate-registry*))
+                  (*setf-compound-place-handlers* (%copy-snapshot-ht *stdlib-setf-compound-place-handlers*))
                    (result  (apply #'compile-string source compile-kwargs))
                    (program (compilation-result-program result))
                    (state   (clone-vm-state *stdlib-vm-snapshot*)))
@@ -98,6 +108,7 @@ arguments are forwarded to COMPILE-STRING or COMPILE-STRING-WITH-STDLIB."
                    (*defstruct-read-only-accessor-map* (make-hash-table :test #'eq))
                    (*defstruct-slot-registry* (make-hash-table :test #'eq))
                    (*defstruct-type-registry* (make-hash-table :test #'eq))
+                   (*defstruct-predicate-registry* (make-hash-table :test #'eq))
                    (*setf-compound-place-handlers* (%copy-snapshot-ht *setf-compound-place-handlers*))
                    (compile-fn (if stdlib #'compile-string-with-stdlib #'compile-string))
                   (result     (apply compile-fn source compile-kwargs))

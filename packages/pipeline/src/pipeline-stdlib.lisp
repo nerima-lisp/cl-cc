@@ -91,6 +91,11 @@ defined by the stdlib is available during user-form compilation.")
 Copied into each run-string :stdlib t call so copy-structure and typed
 defstruct metadata remain available during user-form compilation.")
 
+(defparameter *stdlib-defstruct-predicate-registry* nil
+  "Snapshot of *defstruct-predicate-registry* after stdlib compilation.
+Copied into each run-string :stdlib t call so generated defstruct predicates
+retain their VM boolean branch convention during user-form compilation.")
+
 (defparameter *stdlib-setf-compound-place-handlers* nil
   "Snapshot of *setf-compound-place-handlers* after stdlib compilation.
 Copied into each run-string :stdlib t call to preserve built-in and stdlib
@@ -129,7 +134,7 @@ SETF places while isolating per-source typed defstruct accessors.")
 (defun %stdlib-cache-payload-valid-p (payload)
   "Return T when PAYLOAD is a readable stdlib cache payload."
   (and (consp payload)
-       (eq (getf payload :format) :cl-cc-stdlib-expanded-cache-v1)
+       (eq (getf payload :format) :cl-cc-stdlib-expanded-cache-v2)
        (listp (getf payload :forms))))
 
 (defun %read-stdlib-expanded-cache-from-disk ()
@@ -156,7 +161,7 @@ Returns NIL on any cache miss or malformed cache."
                                :if-does-not-exist :create)
             (write-line
              (write-to-string
-              (list :format :cl-cc-stdlib-expanded-cache-v1
+              (list :format :cl-cc-stdlib-expanded-cache-v2
                     :source-newest-write-date (%stdlib-source-newest-write-date)
                     :forms forms)
               :readably t

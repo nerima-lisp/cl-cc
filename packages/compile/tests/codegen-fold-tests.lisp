@@ -244,3 +244,13 @@
            (result (cl-cc/compile::optimize-ast node)))
       (expect (typep result 'cl-cc::ast-quote) :to-be-truthy)
       (expect (cl-cc/ast:ast-quote-value result) :to-be-truthy))))
+
+(it-sequential "optimize-ast-preserves-raw-symbol-float-arithmetic-call"
+  (%with-clean-ct-env
+    (let* ((node (cl-cc/ast:make-ast-call
+                  :func '+
+                  :args (list (cl-cc/ast:make-ast-quote :value 1.0d0)
+                              (cl-cc/ast:make-ast-quote :value 2.0d0))))
+           (result (cl-cc/compile::optimize-ast node)))
+      (expect (typep result 'cl-cc::ast-call) :to-be-truthy)
+      (expect (eq (cl-cc/ast:ast-call-func result) '+) :to-be-truthy))))

@@ -117,61 +117,6 @@
    ;; cl-weave is the engine (cl-weave has its own 615-test self-suite covering
    ;; the same ground for cl-weave's own internals).
     (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests")))
-    (:module "vm-tests"
-    :pathname "packages/vm/tests"
-    :serial t
-    :components
-    ((:file "vm-instructions-tests")
-     (:file "list-tests")
-     (:file "list-alist-tests")
-     (:file "list-coerce-tests")
-     (:file "array-tests")
-     (:file "vm-execute-tests")
-     (:file "vm-execute-tests-2")
-      (:file "vm-call-tests")
-      (:file "primitives-tests")
-      (:file "primitives-typep-tests")
-      (:file "vm-bignum-tests")
-      (:file "vm-transcendental-tests")
-     (:file "vm-numeric-tests")
-     (:file "vm-extensions-tests")
-     (:file "vm-bitwise-tests")
-     (:file "vm-clos-tests")
-     (:file "vm-clos-execute-tests")
-     (:file "vm-run-tests")
-     (:file "vm-run-vm2-tests")
-     (:file "vm-run-fusion-tests")
-     (:file "vm-dispatch-tests")
-     (:file "vm-dispatch-gf-tests")
-     (:file "vm-dispatch-gf-multi-tests")
-     (:file "vm-bridge-tests")
-     (:file "vm-opcodes-tests")
-     (:file "vm-opcodes-defs-tests")
-     (:file "vm-tests")
-     (:file "vm-public-api-lint-tests")
-     (:file "package-tests")
-     (:file "vm-environment-tests")
-     (:file "conditions-tests")
-     (:file "hash-tests")
-     (:file "symbols-tests")
-     (:file "strings-tests")
-     (:file "vm-sequence-tests")
-     (:file "format-tests")
-      (:file "io-tests")
-      (:file "io-runners-tests")
-      (:file "string-builder-tests")
-      (:file "persistent-tests")
-      (:file "json-tests")
-      (:file "regex-tests")
-       (:file "runtime-stdlib-2-vm-tests")
-       (:file "runtime-stdlib-2-completion-tests")
-       (:file "runtime-stdlib-3-tests")
-       (:file "runtime-stdlib-3-numeric-tests")
-       (:file "runtime-stdlib-3-debug-tests")
-       (:file "runtime-stdlib-3-io-tests")
-       (:file "crash-report-tests")
-       (:file "vm-mop-tests")
- (:file "vm-mop-remaining-features-tests")))
     (:module "parse-tests"
     :pathname "packages/parse/tests"
     :serial t
@@ -492,8 +437,7 @@
      :pathname "t/conformance"
      :serial t
      :components
-     (      (:file "package-conformance-tests")
-      (:file "package-smoke-tests")
+     (      (:file "package-smoke-tests")
       (:file "format-conformance-tests")
       (:file "number-conformance-tests")
       (:file "native-io-conformance-tests"))))

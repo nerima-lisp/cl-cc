@@ -59,6 +59,7 @@ runs:
 
     - name: Configure Cachix (pull-only)
       if: ${{ inputs.cachix-cache != '' && steps.cachix-mode.outputs.push != 'true' }}
+      continue-on-error: true
       uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
       with:
         name: ${{ inputs.cachix-cache }}
@@ -67,6 +68,7 @@ runs:
 
     - name: Configure Cachix (push-enabled)
       if: ${{ inputs.cachix-cache != '' && steps.cachix-mode.outputs.push == 'true' }}
+      continue-on-error: true
       uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
       with:
         name: ${{ inputs.cachix-cache }}

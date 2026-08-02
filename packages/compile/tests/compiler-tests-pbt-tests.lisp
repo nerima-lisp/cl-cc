@@ -50,19 +50,20 @@
           (incf passes))))
     (expect (>= (/ passes trials) 0.90) :to-be-truthy))))
 
-(it-sequential "pbt-if-always-returns-one-branch"
+(it-sequential "pbt-if-uses-common-lisp-truthiness"
   (let ((passes 0)
         (trials 50))
     (dotimes (_ trials)
       (declare (ignore _))
-      (let* ((cond-val (random 2))
+      (let* ((nil-condition-p (zerop (random 2)))
+             (condition-source (if nil-condition-p "nil" "0"))
              (then-val (random 100))
              (else-val (random 100))
-             (result   (handler-case
-                           (run-string (format nil "(if ~D ~D ~D)" cond-val then-val else-val))
-                         (error () nil))))
-        (when (or (and (= cond-val 0)  (and result (= result else-val)))
-                  (and (/= cond-val 0) (and result (= result then-val))))
+             (expected (if nil-condition-p else-val then-val))
+             (result (handler-case
+                         (run-string (format nil "(if ~A ~D ~D)" condition-source then-val else-val))
+                       (error () nil))))
+        (when (and result (= result expected))
           (incf passes))))
     (expect (>= (/ passes trials) 0.90) :to-be-truthy)))
 

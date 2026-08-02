@@ -445,25 +445,63 @@ call to such a predicate and nothing shadows the name."
           (when (and entry (eq (be-convention entry) :unary-predicate))
             entry))))))
 
+(defun %if-condition-defstruct-predicate-p (cond-ast ctx)
+  "Return true when COND-AST calls an unshadowed generated DEFSTRUCT predicate."
+  (when (and (typep cond-ast 'ast-call)
+             (= 1 (length (ast-call-args cond-ast))))
+    (let* ((callable (%callable-designator-node (ast-call-func cond-ast)))
+           (sym (cond ((symbolp callable) callable)
+                      ((typep callable 'ast-var) (ast-var-name callable))
+                      (t nil))))
+      (and sym
+           (not (%ast-var-function-value-p sym ctx))
+           (nth-value 1
+                      (gethash sym cl-cc/expand:*defstruct-predicate-registry*))))))
+
 (defun %compile-if-condition (cond-ast ctx)
-  "Compile an IF condition, keeping a type predicate's raw VM boolean.
+  "Compile an IF condition, retaining raw VM booleans only for predicates.
 
-VM-JUMP-ZERO decides with VM-FALSEP, which reads numeric 0 and NIL alike, so a
-predicate whose value only feeds the branch does not need its 1/0 turned into
-T/NIL first. That conversion is two constants, two labels and two jumps, and it
-would land on (if (consp x) ...) -- among the most common shapes there is. The
-predicate still materialises a proper Common Lisp boolean everywhere the value
-can escape the branch; this is the one position where it provably cannot.
-
-Nothing earlier in %TRY-COMPILE-CALL-FAST-PATHS claims a plain one-argument
-predicate call, so going straight to the constructor skips no other lowering."
-  (let ((entry (%if-condition-unary-predicate-entry cond-ast ctx)))
-    (if entry
-        (let ((arg-reg (compile-ast (first (ast-call-args cond-ast)) ctx))
-              (predicate-reg (make-register ctx)))
-          (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
-          predicate-reg)
-        (compile-ast cond-ast ctx))))
+VM-JUMP-ZERO treats numeric 0 and NIL alike, while Common Lisp IF treats only
+NIL as false. Builtin predicates that emit raw 1/0 values can feed the branch
+directly; this includes quoted two-argument TYPEP calls produced by TYPECASE.
+Registered generated DEFSTRUCT predicates also emit raw 1/0 values.
+Every other condition is converted into an explicit 0/1 branch value using
+VM-NULL-P, preserving Common Lisp truthiness without changing the VM condition
+contract."
+  (let* ((entry (%if-condition-unary-predicate-entry cond-ast ctx))
+         (callable (and (typep cond-ast 'ast-call)
+                        (%callable-designator-node (ast-call-func cond-ast))))
+         (sym (cond ((symbolp callable) callable)
+                    ((typep callable 'ast-var) (ast-var-name callable))
+                    (t nil)))
+         (raw-typep-p (and (typep cond-ast 'ast-call)
+                           (= 2 (length (ast-call-args cond-ast)))
+                           sym
+                           (string-equal (symbol-name sym) "TYPEP")
+                           (not (%ast-var-function-value-p sym ctx))
+                           (typep (second (ast-call-args cond-ast)) 'ast-quote))))
+    (cond
+     (entry
+      (let ((arg-reg (compile-ast (first (ast-call-args cond-ast)) ctx))
+            (predicate-reg (make-register ctx)))
+        (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
+        predicate-reg))
+     ((or raw-typep-p (%if-condition-defstruct-predicate-p cond-ast ctx))
+      (compile-ast cond-ast ctx))
+     (t
+      (let* ((condition-reg (compile-ast cond-ast ctx))
+             (nil-p-reg (make-register ctx))
+             (branch-reg (make-register ctx))
+             (truthy-label (make-label ctx "if_condition_truthy"))
+             (end-label (make-label ctx "if_condition_end")))
+        (emit ctx (make-vm-null-p :dst nil-p-reg :src condition-reg))
+        (emit ctx (make-vm-jump-zero :reg nil-p-reg :label truthy-label))
+        (%emit-constant ctx 0 :dst branch-reg)
+        (emit ctx (make-vm-jump :label end-label))
+        (emit ctx (make-vm-label :name truthy-label))
+        (%emit-constant ctx 1 :dst branch-reg)
+        (emit ctx (make-vm-label :name end-label))
+        branch-reg)))))
 
 (defun %compile-normal-call (func-expr func-sym args result-reg tail ctx)
   "Emit a normal (non-special-cased) function call."
@@ -519,22 +557,35 @@ Each handler form must return RESULT-REG on success or NIL to continue."
 
 (defmethod compile-ast ((node ast-call) ctx)
   "Compile a function call via priority-ordered fast-path dispatch.
-Each %try-compile-* returns RESULT-REG on success, NIL to fall through."
+Two-argument calls with float literals are normalized to AST-BINOP so they use
+the numeric type-driven instruction selection without changing generic calls."
   (let ((tail (ctx-tail-position ctx)))
     (%call-with-no-tail-position
      ctx
      (lambda ()
        (let* ((func-expr (ast-call-func node))
               (callable-expr (%callable-designator-node func-expr))
-              (func-sym  (cond ((symbolp callable-expr) callable-expr)
-                               ((and (typep callable-expr 'ast-var)
-                                     (not (%ast-var-function-value-p (ast-var-name callable-expr) ctx)))
-                                (ast-var-name callable-expr))
-                               (t nil)))
-              (args       (ast-call-args node))
-              (result-reg (make-register ctx)))
-         (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
-             (%compile-normal-call          callable-expr func-sym args result-reg tail ctx)))))))
+              (func-sym
+               (cond ((symbolp callable-expr) callable-expr)
+      ((typep callable-expr 'ast-function)
+       (ast-function-name callable-expr))
+      ((and (typep callable-expr 'ast-quote)
+            (symbolp (ast-quote-value callable-expr)))
+       (ast-quote-value callable-expr))
+      ((and (typep callable-expr 'ast-var)
+            (not (%ast-var-function-value-p
+                  (ast-var-name callable-expr) ctx)))
+       (ast-var-name callable-expr))
+      (t nil)))
+              (args (ast-call-args node)))
+         (if (and (= (length args) 2)
+                  (and func-sym (member (symbol-name func-sym) (quote ("+" "-" "*" "/")) :test (function string=)))
+                  (every #'%float-constant-node-p args))
+             (compile-ast (make-ast-binop :op (find-symbol (symbol-name func-sym) :cl) :lhs (first args) :rhs (second args))
+                          ctx)
+             (let ((result-reg (make-register ctx)))
+               (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
+                   (%compile-normal-call callable-expr func-sym args result-reg tail ctx)))))))))
 
 (defmethod compile-ast ((node ast-list) ctx)
   "Compile a runtime list-construction AST node through the normal LIST call path."

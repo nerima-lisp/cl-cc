@@ -6,6 +6,8 @@
 
 (in-package :cl-cc/test)
 
+(defvar *load-time-value-hit* 0)
+
 
 
 
@@ -542,10 +544,10 @@ stable, isolated context."
           (expect (cl-cc/vm::vm-load-time-value-cell-value cell) :to-equal '(1 2 3))))))
   (let ((*load-time-value-hit* 0))
     (let* ((result (cl-cc/compile:compile-toplevel-forms
-                    '((load-time-value
-                        (progn
-                          (incf *load-time-value-hit*)
-                          *load-time-value-hit*)))
+                    (quote ((load-time-value
+                             (progn
+                               (incf *load-time-value-hit*)
+                               *load-time-value-hit*))))
                     :target :vm))
            (program (cl-cc/compile:compilation-result-program result)))
       (expect (= 0 *load-time-value-hit*) :to-be-truthy)

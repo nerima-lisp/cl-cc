@@ -110,6 +110,7 @@
     #:*stdlib-defstruct-read-only-accessor-map*
     #:*stdlib-defstruct-slot-registry*
     #:*stdlib-defstruct-type-registry*
+    #:*stdlib-defstruct-predicate-registry*
     #:*stdlib-setf-compound-place-handlers*
      #:*stdlib-expanded-cache*
     #:*stdlib-expanded-cache-source*

@@ -225,9 +225,15 @@
     (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
 (it-sequential "cps-ast-structural-shape return-from"
-  (destructuring-bind (ast) (list (cl-cc:make-ast-return-from
-     :name 'b
-     :value (cl-cc:make-ast-int :value 1)))
+  (destructuring-bind (ast)
+      (list
+       (cl-cc:make-ast-block
+        :name (quote b)
+        :body
+        (list
+         (cl-cc:make-ast-return-from
+          :name (quote b)
+          :value (cl-cc:make-ast-int :value 1)))))
     (expect (is-cps-lambda (cl-cc:cps-transform-ast* ast)) :to-be-truthy)))
 
 (it-sequential "cps-ast-structural-shape tagbody"

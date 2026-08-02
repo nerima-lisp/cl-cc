@@ -26,6 +26,9 @@ Accumulates defstruct slot accessor mappings across form evaluations.")
 (defvar *repl-defstruct-type-registry* nil
   "Persistent defstruct representation registry for the REPL.")
 
+(defvar *repl-defstruct-predicate-registry* nil
+  "Persistent defstruct predicate registry for the REPL.")
+
 (defvar *repl-setf-compound-place-handlers* nil
   "Persistent SETF compound-place handlers for the REPL.
 Starts with the built-in handler table and accumulates typed defstruct accessors
@@ -75,6 +78,7 @@ Accumulates slot info across form evaluations so :include works across calls.")
         *repl-accessor-map* nil
         *repl-defstruct-read-only-accessor-map* nil
         *repl-defstruct-type-registry* nil
+        *repl-defstruct-predicate-registry* nil
         *repl-setf-compound-place-handlers* nil
         *repl-pool-instructions* nil
         *repl-pool-labels* nil
@@ -97,6 +101,7 @@ disturbing any enclosing REPL session."
                  (*repl-accessor-map* nil)
                  (*repl-defstruct-read-only-accessor-map* nil)
                  (*repl-defstruct-type-registry* nil)
+                 (*repl-defstruct-predicate-registry* nil)
                  (*repl-setf-compound-place-handlers* nil)
                  (*repl-pool-instructions* nil)
                  (*repl-pool-labels* nil)
@@ -120,6 +125,8 @@ disturbing any enclosing REPL session."
     (setf *repl-defstruct-read-only-accessor-map* (make-hash-table :test #'eq)))
   (unless *repl-defstruct-type-registry*
     (setf *repl-defstruct-type-registry* (make-hash-table :test #'eq)))
+  (unless *repl-defstruct-predicate-registry*
+    (setf *repl-defstruct-predicate-registry* (make-hash-table :test #'eq)))
   (unless *repl-setf-compound-place-handlers*
     (setf *repl-setf-compound-place-handlers*
           (cl-cc/pipeline::%copy-snapshot-ht *setf-compound-place-handlers*)))
@@ -331,6 +338,7 @@ Example:
            (*defstruct-read-only-accessor-map* *repl-defstruct-read-only-accessor-map*)
            (*defstruct-slot-registry* *repl-defstruct-registry*)
            (*defstruct-type-registry* *repl-defstruct-type-registry*)
+           (*defstruct-predicate-registry* *repl-defstruct-predicate-registry*)
            (*setf-compound-place-handlers* *repl-setf-compound-place-handlers*)
            (*labels-boxed-fns* nil)
           (*repl-global-variables* *repl-global-vars-persistent*)
