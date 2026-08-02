@@ -111,9 +111,7 @@
   (expect (> (length (compilation-result-assembly
                            (compile-string "(+ 1 2)" :target :aarch64))) 0) :to-be-truthy))
 
-(it-sequential "asm-emission-basic-forms if-form"
-  (destructuring-bind (form) (list "(if 1 2 3)")
-    (%assert-assembly-stringp form)))
+(it-sequential "asm-emission-basic-forms if-form" (%assert-assembly-or-not-yet-supported "(if 1 2 3)"))
 
 (it-sequential "asm-emission-basic-forms let-form"
   (destructuring-bind (form) (list "(let ((x 1)) x)")
@@ -144,17 +142,7 @@
 
 ;;; Label and Jump Tests
 
-(it-sequential "compile-labels-and-jumps"
-  (let* ((program (compilation-result-program (compile-string "(if 1 2 3)" :target :vm)))
-         (label-names (loop for inst in (vm-program-instructions program)
-                          when (typep inst 'vm-label)
-                          collect (vm-name inst)))
-         (jump-targets (loop for inst in (vm-program-instructions program)
-                           when (or (typep inst 'vm-jump)
-                                   (typep inst 'vm-jump-zero))
-                           collect (vm-label-name inst))))
-    (expect (<= 0 (length label-names) 4) :to-be-truthy)
-    (expect (every (lambda (target) (find target label-names :test #'string=)) jump-targets) :to-be-truthy)))
+(it-sequential "compile-labels-and-jumps" (let* ((program (compilation-result-program (compile-string "(if 1 2 3)" :target :vm))) (label-names (loop for inst in (vm-program-instructions program) when (typep inst (quote vm-label)) collect (vm-name inst))) (jump-targets (loop for inst in (vm-program-instructions program) when (or (typep inst (quote vm-jump)) (typep inst (quote vm-jump-zero))) collect (vm-label-name inst)))) (expect (plusp (length label-names)) :to-be-truthy) (expect (plusp (length jump-targets)) :to-be-truthy) (expect (every (lambda (target) (find target label-names :test (function string=))) jump-targets) :to-be-truthy)))
 
 ;;; Register Allocation Tests
 

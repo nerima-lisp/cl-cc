@@ -234,12 +234,7 @@ up to 11 sequential TYPEP calls per AST node visit."
                  (quote ("LOAD-TIME-VALUE" "%LOAD-TIME-VALUE"))
                  :test (function string=)))))
 
-(defun %preserve-float-arithmetic-call-p (node)
-  (let ((name (%callable-function-name (ast-call-func node)))
-        (args (ast-call-args node)))
-    (and (member name '(+ - * /) :test #'eq)
-         args
-         (every #'%float-constant-node-p args))))
+(defun %preserve-float-arithmetic-call-p (node) (let ((name (%callable-function-name (ast-call-func node))) (args (ast-call-args node))) (and name (member (symbol-name name) (quote ("+" "-" "*" "/")) :test (function string=)) args (every #'%float-constant-node-p args))))
 
 (defun optimize-ast (node &optional lexical-bound)
   "Fold small pure constant expressions before VM lowering."
