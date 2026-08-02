@@ -145,7 +145,7 @@
 ;;; Label and Jump Tests
 
 (it-sequential "compile-labels-and-jumps"
-  (let* ((program (compilation-result-program (compile-string "(if 1 2 3)")))
+  (let* ((program (compilation-result-program (compile-string "(if 1 2 3)" :target :vm)))
          (label-names (loop for inst in (vm-program-instructions program)
                           when (typep inst 'vm-label)
                           collect (vm-name inst)))
