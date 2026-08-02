@@ -347,3 +347,12 @@
                  ctx)
     (expect (codegen-find-inst ctx 'cl-cc/vm::vm-float-add) :to-be-truthy)
     (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+(it-sequential "codegen-call-quoted-function-designator-float-add-emits-vm-float-add"
+  (let* ((ctx (make-codegen-ctx))
+         (floats (list (make-ast-quote :value 1.0)
+                       (make-ast-quote :value 2.0))))
+    (compile-ast (make-ast-call :func (make-ast-quote :value '+)
+                                :args floats)
+                 ctx)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-float-add) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))

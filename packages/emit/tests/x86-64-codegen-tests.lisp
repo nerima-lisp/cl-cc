@@ -486,6 +486,16 @@
     (expect (search '(#xF2 #x0F #x10) bytes :test #'eql) :to-be-truthy)
     (expect (search '(#xF2 #x0F #x58) bytes :test #'eql) :to-be-truthy)))
 
+(it-sequential "x86-64-float-div-program-emits-divsd"
+  (let* ((prog (cl-cc/vm::make-vm-program
+                :instructions (list (cl-cc:make-vm-const :dst :R0 :value 10.0d0)
+                                    (cl-cc:make-vm-const :dst :R1 :value 4.0d0)
+                                    (cl-cc/vm::make-vm-float-div :dst :R2 :lhs :R0 :rhs :R1)
+                                    (cl-cc:make-vm-halt :reg :R2))
+                :result-register :R2))
+         (bytes (coerce (cl-cc/codegen::compile-to-x86-64-bytes prog) 'list)))
+    (expect (search '(#xF2 #x0F #x5E) bytes :test #'eql) :to-be-truthy)))
+
 (it-sequential "x86-64-tls-base-register-uses-fsbase-plan"
   (expect (cl-cc/codegen::x86-64-tls-base-register) :to-be :fs))
 
