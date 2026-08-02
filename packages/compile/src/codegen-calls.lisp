@@ -557,22 +557,29 @@ Each handler form must return RESULT-REG on success or NIL to continue."
 
 (defmethod compile-ast ((node ast-call) ctx)
   "Compile a function call via priority-ordered fast-path dispatch.
-Each %try-compile-* returns RESULT-REG on success, NIL to fall through."
+Two-argument unshadowed numeric calls are normalized to AST-BINOP so they share
+the numeric type-driven instruction selection used by parser-produced binops."
   (let ((tail (ctx-tail-position ctx)))
     (%call-with-no-tail-position
      ctx
      (lambda ()
        (let* ((func-expr (ast-call-func node))
               (callable-expr (%callable-designator-node func-expr))
-              (func-sym  (cond ((symbolp callable-expr) callable-expr)
-                               ((and (typep callable-expr 'ast-var)
-                                     (not (%ast-var-function-value-p (ast-var-name callable-expr) ctx)))
-                                (ast-var-name callable-expr))
-                               (t nil)))
-              (args       (ast-call-args node))
-              (result-reg (make-register ctx)))
-         (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
-             (%compile-normal-call          callable-expr func-sym args result-reg tail ctx)))))))
+              (func-sym (cond ((symbolp callable-expr) callable-expr)
+                              ((and (typep callable-expr 'ast-var)
+                                    (not (%ast-var-function-value-p (ast-var-name callable-expr) ctx)))
+                               (ast-var-name callable-expr))
+                              (t nil)))
+              (args (ast-call-args node)))
+         (if (and (= (length args) 2)
+                  (member func-sym '(+ - * /) :test #'eq))
+             (compile-ast (make-ast-binop :op func-sym
+                                          :lhs (first args)
+                                          :rhs (second args))
+                          ctx)
+             (let ((result-reg (make-register ctx)))
+               (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
+                   (%compile-normal-call callable-expr func-sym args result-reg tail ctx)))))))))
 
 (defmethod compile-ast ((node ast-list) ctx)
   "Compile a runtime list-construction AST node through the normal LIST call path."
