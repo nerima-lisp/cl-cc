@@ -348,7 +348,7 @@ Returns a compilation-result or NIL when AST should stay on the direct path."
                (t
                 (mapcan (function load-time-value-heads) candidate))))
            (expand-preserving-load-time-value (candidate)
-             (let ((head-table (copy-hash-table cl-cc/expand::*expander-head-table*)))
+             (let ((head-table (cl:copy-hash-table cl-cc/expand::*expander-head-table*)))
                (dolist (head (cons (quote load-time-value)
                                    (load-time-value-heads candidate)))
                  (setf (gethash head head-table)
