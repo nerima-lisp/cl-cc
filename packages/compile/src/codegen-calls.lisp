@@ -557,8 +557,8 @@ Each handler form must return RESULT-REG on success or NIL to continue."
 
 (defmethod compile-ast ((node ast-call) ctx)
   "Compile a function call via priority-ordered fast-path dispatch.
-Two-argument unshadowed numeric calls are normalized to AST-BINOP so they share
-the numeric type-driven instruction selection used by parser-produced binops."
+Two-argument calls with float literals are normalized to AST-BINOP so they use
+the numeric type-driven instruction selection without changing generic calls."
   (let ((tail (ctx-tail-position ctx)))
     (%call-with-no-tail-position
      ctx
@@ -571,8 +571,9 @@ the numeric type-driven instruction selection used by parser-produced binops."
                                (ast-var-name callable-expr))
                               (t nil)))
               (args (ast-call-args node)))
-         (if (and (= (length args) 2)
-                  (member func-sym '(+ - * /) :test #'eq))
+        (if (and (= (length args) 2)
+                 (member func-sym '(+ - * /) :test #'eq)
+                 (every #'%float-constant-node-p args))
              (compile-ast (make-ast-binop :op func-sym
                                           :lhs (first args)
                                           :rhs (second args))
