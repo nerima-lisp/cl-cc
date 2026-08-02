@@ -91,6 +91,11 @@ defined by the stdlib is available during user-form compilation.")
 Copied into each run-string :stdlib t call so copy-structure and typed
 defstruct metadata remain available during user-form compilation.")
 
+(defparameter *stdlib-defstruct-predicate-registry* nil
+  "Snapshot of *defstruct-predicate-registry* after stdlib compilation.
+Copied into each run-string :stdlib t call so generated defstruct predicates
+retain their VM boolean branch convention during user-form compilation.")
+
 (defparameter *stdlib-setf-compound-place-handlers* nil
   "Snapshot of *setf-compound-place-handlers* after stdlib compilation.
 Copied into each run-string :stdlib t call to preserve built-in and stdlib

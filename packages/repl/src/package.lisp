@@ -62,6 +62,7 @@
     #:*repl-accessor-map*
     #:*repl-defstruct-read-only-accessor-map*
     #:*repl-defstruct-type-registry*
+    #:*repl-defstruct-predicate-registry*
     #:*repl-setf-compound-place-handlers*
     #:*repl-pool-instructions*
     #:*repl-pool-labels*

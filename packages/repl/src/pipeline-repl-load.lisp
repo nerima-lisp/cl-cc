@@ -213,6 +213,7 @@ Returns two values: result and handled-p."
            (*defstruct-read-only-accessor-map* *repl-defstruct-read-only-accessor-map*)
            (*defstruct-slot-registry* *repl-defstruct-registry*)
            (*defstruct-type-registry* *repl-defstruct-type-registry*)
+           (*defstruct-predicate-registry* *repl-defstruct-predicate-registry*)
            (*setf-compound-place-handlers* *repl-setf-compound-place-handlers*)
            (*labels-boxed-fns* nil)
           (*repl-global-variables* *repl-global-vars-persistent*)

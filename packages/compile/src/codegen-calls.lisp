@@ -445,12 +445,26 @@ call to such a predicate and nothing shadows the name."
           (when (and entry (eq (be-convention entry) :unary-predicate))
             entry))))))
 
+(defun %if-condition-defstruct-predicate-p (cond-ast ctx)
+  "Return true when COND-AST calls an unshadowed generated DEFSTRUCT predicate."
+  (when (and (typep cond-ast 'ast-call)
+             (= 1 (length (ast-call-args cond-ast))))
+    (let* ((callable (%callable-designator-node (ast-call-func cond-ast)))
+           (sym (cond ((symbolp callable) callable)
+                      ((typep callable 'ast-var) (ast-var-name callable))
+                      (t nil))))
+      (and sym
+           (not (%ast-var-function-value-p sym ctx))
+           (nth-value 1
+                      (gethash sym cl-cc/expand:*defstruct-predicate-registry*))))))
+
 (defun %compile-if-condition (cond-ast ctx)
   "Compile an IF condition, retaining raw VM booleans only for predicates.
 
 VM-JUMP-ZERO treats numeric 0 and NIL alike, while Common Lisp IF treats only
 NIL as false. Builtin predicates that emit raw 1/0 values can feed the branch
 directly; this includes quoted two-argument TYPEP calls produced by TYPECASE.
+Registered generated DEFSTRUCT predicates also emit raw 1/0 values.
 Every other condition is converted into an explicit 0/1 branch value using
 VM-NULL-P, preserving Common Lisp truthiness without changing the VM condition
 contract."
@@ -472,7 +486,7 @@ contract."
             (predicate-reg (make-register ctx)))
         (emit ctx (funcall (be-ctor entry) :dst predicate-reg :src arg-reg))
         predicate-reg))
-     (raw-typep-p
+     ((or raw-typep-p (%if-condition-defstruct-predicate-p cond-ast ctx))
       (compile-ast cond-ast ctx))
      (t
       (let* ((condition-reg (compile-ast cond-ast ctx))
