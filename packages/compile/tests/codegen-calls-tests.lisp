@@ -329,6 +329,7 @@
     (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-truthy)
     (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
 
+
 (it-sequential "codegen-call-dispatch-gf-emits-generic-call"
   (let* ((ctx (make-codegen-ctx))
          (gf-reg (cl-cc/compile:make-register ctx)))
@@ -337,3 +338,12 @@
                                 :args (list (make-ast-int :value 1)))
                  ctx)
     (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-truthy)))
+
+(it-sequential "codegen-call-ast-function-float-add-emits-vm-float-add"
+  (let ((ctx (make-codegen-ctx)))
+    (compile-ast (make-ast-call :func (make-ast-function :name '+)
+                                :args (list (make-ast-quote :value 1.0)
+                                            (make-ast-quote :value 2.0)))
+                 ctx)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-float-add) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
