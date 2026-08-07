@@ -30,4 +30,21 @@ every test file)."
    (:file "framework-advanced")
    (:file "framework-compiler-run-string")
    (:file "framework-compiler")
-   (:file "framework-meta")))
+   (:file "framework-meta"))
+  :in-order-to ((asdf:test-op (asdf:test-op :cl-cc-testing-framework/tests))))
+
+(asdf:defsystem :cl-cc-testing-framework/tests
+  :description "Regression tests for the CL-CC testing framework"
+  :author "takeokunn"
+  :license "MIT"
+  :homepage "https://github.com/nerima-lisp/cl-cc"
+  :version "0.2.0"
+  :depends-on (:cl-cc-testing-framework :cl-weave)
+  :pathname "t"
+  :serial t
+  :components
+  ((:file "defexpected-contract"))
+  :perform (asdf:test-op (op c)
+             (declare (ignore op c))
+             (unless (uiop:symbol-call :cl-weave :run-all :reporter :spec)
+               (error "cl-cc-testing-framework tests failed."))))

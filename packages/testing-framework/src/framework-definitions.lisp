@@ -190,9 +190,8 @@ description string DEFTEST registered them under.")
 
 (defmacro defexpected (name &body body)
   "Define a test that is EXPECTED TO FAIL (due to an unimplemented feature).
-Catches any error from BODY and treats it as a pass; an unexpected clean
-pass is also accepted (cl-weave has no XPASS-detection equivalent to the
-original framework's :expected-fail tag machinery).
+Catches cl-weave:ASSERTION-FAILURE from BODY and treats it as a pass;
+an unexpected clean pass signals an XPASS assertion failure.
 Syntax:
    (defexpected name
      \"docstring\"
@@ -205,5 +204,13 @@ Syntax:
        ,(or docstring (format nil "EXPECTED-FAIL: ~A" name))
        :timeout ,(or timeout 60)
        :depends-on ,depends-on
-       (ignore-errors (progn ,@body-forms))
-       t)))
+       (let ((failure-signaled-p nil))
+         (handler-case
+             (progn ,@body-forms)
+           (cl-weave:assertion-failure ()
+             (setf failure-signaled-p t)))
+         (if failure-signaled-p
+             t
+             (cl-weave:fail
+              "XPASS: expected-failure test ~S passed unexpectedly."
+              (quote ,name)))))))
