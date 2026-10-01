@@ -438,23 +438,44 @@ let
       ];
     };
   };
+
+  # nix-cl's withPackages install phase passes a trailing ':' inside both
+  # --prefix values. Newer makeWrapper rejects that as an empty PATH-like
+  # segment; --prefix already supplies the separator, so remove only the
+  # redundant suffix while retaining nix-cl's wrapper behavior.
+  withPackages =
+    packages:
+    (sbcl.withPackages packages).overrideAttrs (old: {
+      installPhase = lib.replaceStrings
+        [
+          ''"$CL_SOURCE_REGISTRY''${CL_SOURCE_REGISTRY:+:}"''
+          ''"$CL_SOURCE_REGISTRY:"''
+          ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g):"''
+        ]
+        [
+          ''"$CL_SOURCE_REGISTRY"''
+          ''"$CL_SOURCE_REGISTRY"''
+          ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g)"''
+        ]
+        old.installPhase;
+    });
 in
 {
   inherit productionAsdfSystems testAsdfSystems;
   inherit cl-cc-prolog-tools cl-cc-prolog-tools-test;
-  sbclWithCLCC = sbcl.withPackages (_: lib.attrValues productionAsdfSystems);
+  sbclWithCLCC = withPackages (_: lib.attrValues productionAsdfSystems);
   # The test derivation goes FIRST: both it and productionAsdfSystems.cl-cc ship
   # a cl-cc.asd, and only the test one has pre-built FASLs for the test
   # components. ASDF takes the first match on the registry, so ordering here is
   # the difference between loading those FASLs and recompiling the whole suite
   # on every run.
-  sbclWithTests = sbcl.withPackages (
+  sbclWithTests = withPackages (
     _: [ testAsdfSystems."cl-cc/test" ] ++ (lib.attrValues productionAsdfSystems)
   );
-  sbclWithJitTests = sbcl.withPackages (
+  sbclWithJitTests = withPackages (
     _: [ testAsdfSystems."cl-cc-jit/tests" ] ++ (lib.attrValues productionAsdfSystems)
   );
-  sbclWithJavascriptTests = sbcl.withPackages (
+  sbclWithJavascriptTests = withPackages (
     _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-javascript-test" ]
   );
 }
