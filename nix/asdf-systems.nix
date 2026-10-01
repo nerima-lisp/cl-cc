@@ -97,7 +97,6 @@ let
         "cl-cc-parse"
         "cl-cc-type"
         "cl-cc-optimize"
-        "cl-cc-parse"
         "cl-cc-vm"
         "cl-cc-expand"
         "cl-cc-cps"
@@ -117,9 +116,6 @@ let
         "cl-cc-bootstrap"
         "cl-cc-ast"
         "cl-cc-parse"
-        "cl-cc-php"
-        "cl-cc-javascript"
-        "cl-cc-javascript"
         "cl-cc-type"
         "cl-cc-optimize"
         "cl-cc-vm"
@@ -127,6 +123,8 @@ let
         "cl-cc-emit"
         "cl-cc-stdlib"
         "cl-cc-binary"
+        "cl-cc-mir"
+        "cl-cc-codegen"
         "cl-cc-compile"
       ];
     };
@@ -221,6 +219,8 @@ let
         "cl-cc-codegen"
         "cl-cc-emit"
         "cl-cc-jit"
+        "cl-cc-php"
+        "cl-cc-javascript"
       ];
     };
     cl-cc-cli = {
@@ -245,7 +245,6 @@ let
       src = "packages/testing-framework";
       deps = [
         "cl-cc"
-        "cl-cc-php"
       ];
       extraLispLibs = [ clWeave ];
     };
@@ -416,6 +415,7 @@ let
       version = "0.1.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc-javascript-test" ];
+      # cl-cc-javascript is the pinned external production system used by local JS tests.
       lispLibs = with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
