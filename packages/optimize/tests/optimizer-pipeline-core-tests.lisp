@@ -8,6 +8,10 @@
 
 (in-package :cl-cc/test)
 
+;;; The former %opt-trim-whitespace cases were removed with that private helper
+;;; from the pinned cl-cc-optimize system; the parser tests below cover the
+;;; current pipeline-string behavior instead.
+
 ;;; ─── opt-parse-pass-pipeline-string ─────────────────────────────────────────
 
 (it-sequential "parse-pass-pipeline-string-cases single-pass"

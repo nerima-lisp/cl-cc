@@ -16,6 +16,9 @@
   (position instruction instructions :test #'eq))
 
 ;;; ─── %opt-scheduler-barrier-p ─────────────────────────────────────────────
+;;; Direct vm-set-global/vm-slot-write cases were consolidated into the
+;;; schedule-local ordering tests below, which exercise the barrier property
+;;; in the scheduling operation rather than only its predicate.
 
 (it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-call"
   (destructuring-bind (inst) (list (make-vm-call :dst :r0 :func :f :args nil))
