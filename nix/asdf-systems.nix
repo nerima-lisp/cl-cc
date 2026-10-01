@@ -446,18 +446,19 @@ let
   withPackages =
     packages:
     (sbcl.withPackages packages).overrideAttrs (old: {
-      installPhase = lib.replaceStrings
-        [
-          ''"$CL_SOURCE_REGISTRY''${CL_SOURCE_REGISTRY:+:}"''
-          ''"$CL_SOURCE_REGISTRY:"''
-          ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g):"''
-        ]
-        [
-          ''"$CL_SOURCE_REGISTRY"''
-          ''"$CL_SOURCE_REGISTRY"''
-          ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g)"''
-        ]
-        old.installPhase;
+      installPhase =
+        lib.replaceStrings
+          [
+            ''"$CL_SOURCE_REGISTRY''${CL_SOURCE_REGISTRY:+:}"''
+            ''"$CL_SOURCE_REGISTRY:"''
+            ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g):"''
+          ]
+          [
+            ''"$CL_SOURCE_REGISTRY"''
+            ''"$CL_SOURCE_REGISTRY"''
+            ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g)"''
+          ]
+          old.installPhase;
     });
 in
 {
