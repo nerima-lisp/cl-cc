@@ -27,7 +27,7 @@ Long-running suites（integration / e2e）は `slow` という名前に依存せ
 
 - skip / pending / serial-only suites の有無は current run artifacts から確認してください。
 - serial suite 化した領域は shared mutable state を持つ suite であり、deterministic boundary として分離されています。
-- 高リスク修正と focused regression の対応は `docs/test-quality-verification.md` を参照してください。
+- 高リスク修正と focused regression の対応は `docs/notes/test-quality-verification.md` を参照してください。
 
 ## Env Vars
 
@@ -36,12 +36,12 @@ Runner-observed environment variables:
 - `CLCC_TIMINGS_FILE` — TSV output path for per-test timings.
   Default `./test-timings.tsv`. Validated: `..` segments and paths outside
   `(uiop:getcwd)` are rejected with a warning and the default is used.
-  Source: `packages/testing-framework/src/framework-tap.lisp` (`%timings-output-path`).
+  Source: runner implementation path must be refreshed before this artifact is treated as evidence.
 - `CLCC_TEST_TRACE=1` — When set, every test prints
   `# [trace] running <name>` to `*error-output*` before dispatch (hang diagnosis).
   Source: `packages/testing-framework/src/framework-runner.lisp:116-118`.
 - `CLCC_TEST_TIMEOUT` — Overrides the default per-test wall-clock timeout in seconds.
-  Framework default is `10` (`packages/testing-framework/src/framework-timeouts.lisp` `%default-test-timeout`),
+  The framework default timeout path must be refreshed before this artifact is treated as evidence,
   and the canonical Nix entrypoints (`nix run .#test`, `checks.tests`) export `CLCC_TEST_TIMEOUT=10`
   via `nix/apps.nix` so hung unit tests fail fast. Values must be positive integer seconds; invalid,
   zero, or negative values are ignored and fall back to `10`. A positive per-test `:timeout`
@@ -52,7 +52,7 @@ Runner-observed environment variables:
   canonical Nix entrypoints export `CLCC_SUITE_TIMEOUT=600` via `nix/apps.nix` unless the caller
   already set it. Values must be positive integer seconds; invalid, zero, or negative values are
   ignored and fall back to `600`.
-  Source: `packages/testing-framework/src/framework-parallel-runner.lisp` (`%default-suite-timeout`, `*suite-killer-exit-fn*`).
+  The parallel-runner source path must be refreshed before this artifact is treated as evidence.
 - External helper commands also have explicit timeouts: CPU detection uses
   `*cpu-detect-command-timeout-seconds*`, native compilation helper commands use
   `cl-cc/pipeline:*native-command-timeout-seconds*`, and x86-64 host feature probing uses
@@ -84,7 +84,7 @@ Example row:
 CL-CC-UNIT-SUITE	TIMING-PASS-CASE	123456	passed	3
 ```
 
-Source: `packages/testing-framework/src/framework-tap.lisp` (`%write-timings-tsv`).
+The timings writer source path must be refreshed before this artifact is treated as evidence.
 
 ## TAP Extensions
 

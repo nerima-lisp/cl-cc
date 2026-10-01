@@ -1,6 +1,6 @@
 # Native Backend: Advanced Optimization & Platform
 
-> **Status**: ✅ 64 verified, ⚠️ 1 partial (FR-620 Concurrent GC), ⬜ 82 pending — 147 FRs total. Verified include: LTO/ThinLTO/IPCP/devirt, polyhedral/escape/MemorySSA, tiered/JIT/OSR/deopt, VRP/BCE/overflow/bitwidth, tail-dup/DAE/ICF, stack canary/clash/CFI, TLS/atomics/perf-map/sanitizers, NUMA/arena/LOS/huge-pages, IR verify/remarks/incremental/hot-reload, loop-rotate/dead-loop/W^X/flamegraph. See `docs/README.md` for overall progress.
+> **Status**: 147 FRs are listed: 64 marked ✅, 5 marked 🔶, and 78 have no status marker and are therefore treated as ⬜ pending. Verified status is not established until cited paths and tests are refreshed. See `docs/README.md` for overall progress.
 
 LTO, advanced optimization passes, staged compilation, security hardening, GC integration, debug info, zero-cost exceptions, modern ISA, ML-driven optimization, WASM edge runtime, value range analysis, threading, developer experience, binary hardening, post-link optimization, functional language optimization, standard optimization passes, target/platform completion, profiling, modern IR, code quality, GC lifecycle, advanced concurrency, formal verification, tooling/IDE, security completion.
 
@@ -473,7 +473,7 @@ LTO, advanced optimization passes, staged compilation, security hardening, GC in
 - **根拠**: Intel APX Architecture Specification (2023). レジスタ圧力を大幅削減しスピルを削減
 - **難易度**: Hard
 
-#### ⚠️ FR-576: RISC-V Zicond (Integer Conditional Operations)
+#### 🔶 FR-576: RISC-V Zicond (Integer Conditional Operations)
 
 - **対象**: `packages/codegen/src/riscv64-codegen.lisp`
 - **内容**:
@@ -554,7 +554,7 @@ LTO, advanced optimization passes, staged compilation, security hardening, GC in
 - **根拠**: WebAssembly SIMD Proposal (ratified 2021). Node.js 16+ / Chrome 91+ で利用可能
 - **難易度**: Medium
 
-#### ⚠️ FR-593: Wasm Relaxed SIMD (リラックスSIMD)
+#### 🔶 FR-593: Wasm Relaxed SIMD (リラックスSIMD)
 
 - **対象**: `packages/codegen/src/wasm.lisp`
 - **内容**:
@@ -740,7 +740,7 @@ LTO, advanced optimization passes, staged compilation, security hardening, GC in
 
 ### Phase 102 — GC高度化・メモリ管理
 
-#### ⚠️ FR-620: Concurrent GC — 並行マーキング (Shenandoah / ZGC スタイル)
+#### 🔶 FR-620: Concurrent GC — 並行マーキング (Shenandoah / ZGC スタイル)
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**:
@@ -1315,7 +1315,7 @@ CL・Scheme・ML 系コンパイラ特有の最適化。汎用コンパイラド
 - **根拠**: Brendan Gregg FlameGraph (2013). プロファイリング結果の最も直感的な可視化手法
 - **難易度**: Easy
 
-#### ⚠️ FR-703: Compiler Self-Profiling / Build Analytics (コンパイラ自己プロファイリング)
+#### 🔶 FR-703: Compiler Self-Profiling / Build Analytics (コンパイラ自己プロファイリング)
 
 - **対象**: `packages/pipeline/src/pipeline.lisp`, `packages/optimize/src/optimizer.lisp`
 - **内容**:
@@ -1447,7 +1447,7 @@ CL・Scheme・ML 系コンパイラ特有の最適化。汎用コンパイラド
 - **根拠**: LLVM `MemCpyOpt` / GCC memory access combining. メモリ帯域利用率を改善
 - **難易度**: Medium
 
-#### ⚠️ FR-724: Constant Pool / Literal Deduplication (定数プール重複除去)
+#### 🔶 FR-724: Constant Pool / Literal Deduplication (定数プール重複除去)
 
 - **対象**: `packages/binary/src/elf.lisp`, `packages/binary/src/macho.lisp`
 - **内容**:

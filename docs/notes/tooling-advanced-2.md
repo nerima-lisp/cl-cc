@@ -1,6 +1,6 @@
 # Tooling: Advanced Compilation II
 
-> **Status**: 実装状況を再監査中（120 FRを索引化）。少なくともFR-553/558/559/560/561/562は部分実装であり、全件完了・検証済みではありません。
+> **Status**: ✅ 111 / 🔶 9 / ⬜ 0 — 120 FRを索引化。🔶は部分実装であり、全件完了・検証済みではありません。
 >
 > **検証範囲**: `t/tooling-advanced-2-evidence-tests.lisp` はFR IDの索引網羅性と、参照ファイルまたはディレクトリの存在を確認する情報的テストです。各FRの挙動、CLI導線、VM/JIT統合、ネイティブコード生成の完成を検証するものではありません。
 
@@ -18,7 +18,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: スタックマップなしでMoving GCは実装不可能。JITコンパイラとGCの連携の要
 - **難易度**: Hard
 
-#### 🟡 FR-551: Safepoints (セーフポイント)
+#### 🔶 FR-551: Safepoints (セーフポイント)
 
 - **対象**: `packages/vm/src/vm-run.lisp`, `packages/emit/src/x86-64-codegen.lisp`, FR-420（Concurrent GC）前提
 - **現状**: ポーリングページの確保と保護状態の切り替えは実装済み。ただし機械語へのポーリング命令生成は安全なバックエンド統合が未完了のため明示的にunsupportedとなり、JITコードへの挿入導線も未実装
@@ -26,7 +26,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: Concurrent GCがスタックスキャンを行う唯一安全な方法。ランタイムの根幹インフラ
 - **難易度**: Hard
 
-#### 🟡 FR-552: Write Barrier Optimization (書き込みバリア最適化)
+#### 🔶 FR-552: Write Barrier Optimization (書き込みバリア最適化)
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **現状**: カードテーブルと世代範囲判定は実装済み。ただし機械語へのwrite barrier生成は安全なバックエンド統合が未完了のため明示的にunsupportedとなり、barrier elisionとSATBも未実装
@@ -34,7 +34,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: write barrierは頻繁に実行されるコード（スロット書き込み毎）。最適化なしでは5〜10%オーバーヘッドが常に発生
 - **難易度**: Hard
 
-#### 🟡 FR-553: Lazy JIT Compilation / Call Stubs (遅延JITコンパイル)
+#### 🔶 FR-553: Lazy JIT Compilation / Call Stubs (遅延JITコンパイル)
 
 - **対象**: `src/jit/baseline.lisp`, `packages/vm/src/vm.lisp`
 - **現状**: JIT（FR-330〜331）は呼び出しカウント到達時にコンパイル開始。初回呼び出し時の遅延コンパイルなし
@@ -63,16 +63,16 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 
 ### Phase 105 — JIT高度化
 
-#### 🟡 FR-558: Trace JIT / Hot Trace Recording (トレースJIT)
+#### 🔶 FR-558: Trace JIT / Hot Trace Recording (トレースJIT)
 
 - **対象**: `src/jit/`, `packages/vm/src/vm-run.lisp`
 - **現状**: JIT（FR-330〜334）はメソッド（関数）単位のコンパイル。ホットトレース（パス）単位のコンパイルなし
 - **要件**: **トレース記録**: ループバックエッジのホットカウント到達時に実行パスを**線形命令列（トレース）**として記録。呼び出し先関数も含めてインライン化した超長直線コードを生成。**ガード命令**: トレースが想定した型・分岐方向と異なる場合に脱出（side exit）するガード挿入。**トレースツリー**: 複数のsideexitから派生するトレースをツリー構造で管理。LuaJIT / Mozilla TraceMonkey (Firefox 3.5〜) / PyPy
 - **実装状況**: 部分実装。`src/jit/trace-jit.lisp` に記録状態とトレースツリーの骨格はあるが、`compile-trace` はネイティブ命令生成とW^Xメモリ統合が未実装として失敗する。VMのバックエッジからの記録、ネイティブトレース実行、ガードとside exitのend-to-end統合は未完了
-- **根拠**: LuaJITがトレースJITで他のLuaより10〜50x高速化を実現。メソッドJITより呼び出しオーバーヘッドがなく、ループ集中型ワークロードに特に有効
+- **根拠**: LuaJITを参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Very Hard
 
-#### 🟡 FR-559: Type Feedback Collection (型フィードバック収集)
+#### 🔶 FR-559: Type Feedback Collection (型フィードバック収集)
 
 - **対象**: `packages/vm/src/vm-clos.lisp`, `src/jit/baseline.lisp`
 - **現状**: PIC（FR-334）はメソッドキャッシュのみ。汎用な型フィードバック（引数型・戻り値型の実行時観測）なし
@@ -81,7 +81,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: PICだけではカバーできない「変数の型」の観測。型フィードバックはJIT投機的最適化の全ての基盤
 - **難易度**: Hard
 
-#### 🟡 FR-560: Speculative Inlining with Guards (ガード付き投機的インライン化)
+#### 🔶 FR-560: Speculative Inlining with Guards (ガード付き投機的インライン化)
 
 - **対象**: `src/jit/`, FR-559（型フィードバック）前提
 - **現状**: インライン化（ML-guided FR-372）は静的サイズ閾値。型フィードバックに基づく動的インライン化なし
@@ -90,7 +90,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: 一般的なCLOSコードで呼び出しの95%以上が同一型。投機的インライン化でgeneric dispatch overhead完全除去
 - **難易度**: Hard
 
-#### 🟡 FR-561: Megamorphic IC Handling (メガモーフィックICハンドリング)
+#### 🔶 FR-561: Megamorphic IC Handling (メガモーフィックICハンドリング)
 
 - **対象**: `packages/vm/src/vm-clos.lisp`, `src/jit/baseline.lisp`, FR-334（PIC）の拡張
 - **現状**: PIC（FR-334）は最大4エントリでオーバーフロー後はグローバルキャッシュにフォールバック
@@ -99,7 +99,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: GCキャラクタリゼーション的コード（多相コレクション操作）では避けられないメガモーフィック状態。専用ハンドリングで未最適化フォールバックを回避
 - **難易度**: Hard
 
-#### 🟡 FR-562: JIT Warmup / AOT Pre-warming (JITウォームアップ最適化)
+#### 🔶 FR-562: JIT Warmup / AOT Pre-warming (JITウォームアップ最適化)
 
 - **対象**: `src/jit/`, `packages/cli/src/main.lisp`
 - **現状**: JIT（FR-330〜331）はcall countが閾値到達後に初めてコンパイル。最初の数千回呼び出しはインタープリタ
@@ -220,7 +220,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **根拠**: SBCL REPLでの探索的開発の結果をテストに変換するワークフロー。バグ再現セッションの共有にも有効
 - **難易度**: Medium
 
-#### 🟡 FR-580: GC Safepoint-Free Regions (GCセーフポイントフリー領域)
+#### 🔶 FR-580: GC Safepoint-Free Regions (GCセーフポイントフリー領域)
 
 - **対象**: `packages/runtime/src/gc.lisp`, FR-551（Safepoints）の拡張
 - **現状**: 前提となるFR-551のポーリング命令生成とJITコードへの挿入が未統合であり、セーフポイントフリー領域も未実装
@@ -269,7 +269,7 @@ Runtime infrastructure, JIT, object layout optimization, ecosystem/diagnostics, 
 - **対象**: 新規`src/concurrent/padded.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: 並列スレッドが同一キャッシュライン内の異なる変数を更新した場合の偽共有問題への対策なし
 - **内容**: `(cl-cc:defpadded-var *counter* 0)` で隣接変数と別キャッシュラインに強制配置（64バイトパディング）。スレッドローカルストレージ（TLS）との連携: `(cl-cc:thread-local *local-count* 0)` で変数をスレッドローカルに。**False sharing detector**: Thread Sanitizer（FR-399）拡張で同一キャッシュラインへの競合アクセスを警告。Linux `perf c2c`（Cache to Cache）相当の分析
-- **根拠**: マルチコア並列コードの主要なパフォーマンス罠。並列カウンタ・並列アロケータで実測5〜30x減速事例あり
+- **根拠**: マルチコア並列コードの設計上の注意点。cl-ccでの影響は未測定。
 - **難易度**: Medium
 
 #### ✅ FR-587: GOT/PLT Lazy Binding Optimization (GOT/PLT遅延バインディング最適化)

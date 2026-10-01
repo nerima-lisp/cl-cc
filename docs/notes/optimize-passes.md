@@ -2,10 +2,10 @@
 
 VM optimizer, loop optimization, control flow, range analysis, interprocedural optimization, higher-order function optimization, code size, CPS transformation, SSA construction, speculative JIT compilation.
 
-**実装状況**: 全175FR ✅ 完了。65件のマーカーを 🔶 → ✅ に昇格。
+**実装状況**: FR見出しは175件ありますが、全件完了とは扱いません。本文に helper 層のみ、未接続、将来拡張と明記された項目があるため、実装・接続経路・テストアンカーを確認できた範囲だけを ✅、限定実装を 🔶、未着手を ⬜ として再監査します。
 
 - `✅` = 実装済み（完全実装 または 設計証跡/helper層まで完了）
-- `🔶` = 部分実装（現在使用なし。全項目を ✅ に格上げ済み）
+- `🔶` = 部分実装（helper 層のみ、接続経路または挙動検証が不足）
   外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-pipeline.lisp` の roadmap evidence registry は、この状態区分と公開API・テストアンカーの対応を検証する。
 
 ---
@@ -102,7 +102,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - 不明な場合は剰余エピローグ付き部分展開
   - 効果: ILP露出、分岐オーバーヘッド削減
 
-- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-loop.lisp` に `opt-pass-loop-unrolling`、外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-pipeline.lisp` に `opt-pass-loop-unrolling-adaptive`（hotness と call-count で閾値調整）を実装済み。`*opt-pass-table*` に `:loop-unrolling` として登録され、`*opt-default-convergence-pass-keys*` でデフォルトパイプラインに組み込み済み。
+- **関連実装**: 外部リポジトリの現行ファイル構成とシンボル定義を再確認してから証跡として扱う。旧版の `src/optimizer-flow-loop.lisp` は現行証跡に使わない。
   - 対象: `vm-lt + vm-jump-zero + backedge jump` の単純 counted loop 形。
   - 条件: ループ変数/上限/step がコンパイル時計算可能かつ小trip-count（上限あり）→ 完全展開（full unroll）。上限逾えても _opt-loop-unroll-factor_ に基づき guarded partial copy を生成。
   - 検証: `optimizer-flow-tests.lisp` に6テスト（full unroll、generalized comparisons、partial unroll、unknown-trip with remainder、additional comparison predicates、partial keeps remainder loop）。`optimizer-pipeline-tests.lisp` に adaptive factor テスト。
@@ -186,7 +186,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - LLVM `CallSiteSplittingPass` に相当
 - **難易度**: Medium
 
-- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-inline.lisp` に `opt-pass-call-site-splitting` を実装済み。`jump -> join-label -> vm-call` の単純join形に限定し、前任ブロック内でcallee registerが既知 `vm-func-ref` / `vm-closure` / 登録済みsymbolに解決できる場合、前任側へcallを複製してfresh after-labelへジャンプさせる。default pipelineでは `:devirtualize` と `:inline` の前に `:call-site-splitting` を走らせるため、分岐アーム別の既知calleeを後続passが直接参照として扱える。`packages/optimize/tests/optimizer-inline-tests.lisp` が既知callee predecessorのcall複製、unknown callee no-op、multi-join labels、vm-apply、vm-tail-callの5テストを検証する。一般CFG（複数joinの合流）・型推論に基づく高度な分岐特化は将来の拡張予定。
+- **関連実装**: 外部リポジトリの現行ファイル構成とシンボル定義を再確認してから証跡として扱う。旧版の `src/optimizer-inline.lisp` は現行証跡に使わない。一般CFG（複数joinの合流）・型推論に基づく高度な分岐特化は将来の拡張予定。
 
 - **完了済みFR**: FR-033, FR-035, FR-037
 - **部分実装FR**: FR-032, FR-034, FR-036
@@ -265,7 +265,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - Lispの `funcall` は全てこの最適化の対象
 - **難易度**: Hard
 
-- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-inline.lisp` に `opt-known-callee-labels` と `opt-pass-devirtualize` を追加済み。`vm-closure` / `vm-func-ref` / `vm-const` / `vm-move` を追跡して関数 designator レジスタの既知 label を解決し、`vm-call` / `vm-tail-call` / `vm-apply` の直前に直接 `vm-func-ref` を挿入して既存 inline pass が扱える直接参照形へ寄せる。`packages/optimize/tests/optimizer-inline-tests.lisp` が既知callee、move伝播、overwrite kill、idempotenceを検証する。call命令自体を専用の直接呼び出し命令へ置換すること、CLOS generic method dispatch の単一メソッド化、`apply` の完全な直接化は未実装。
+- **関連実装**: 外部リポジトリの現行ファイル構成とシンボル定義を再確認してから証跡として扱う。旧版の `src/optimizer-inline.lisp` は現行証跡に使わない。call命令自体を専用の直接呼び出し命令へ置換すること、CLOS generic method dispatch の単一メソッド化、`apply` の完全な直接化は未実装。
 
 #### FR-052: Global DCE (Dead Function/Method Elimination) ✅
 
@@ -466,7 +466,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **根拠**: モダンコンパイラ（V8のTurboFan、GraalVM）はすべてフィードバック駆動の動的閾値を持つ
 - **難易度**: Medium
 
-- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-inline-cost.lisp` に `opt-adaptive-inline-threshold` を実装済み。body cost と cheap-instruction 比率、call-heavy かどうか、呼び出し回数・ループ深度・関数サイズに基づいて inline threshold を 8..50 の範囲で調整する。`opt-pass-inline-iterative` はこの adaptive threshold をパイプラインで使用。`packages/optimize/tests/optimizer-strength-inline-tests.lisp` / `optimizer-inline-tests.lisp` / `optimizer-inline-pass-tests-2.lisp` が閾値選択・PGO scale・ML bonusを検証する。実行時プロファイルフィードバックによる完全な feedback-driven thresholding は将来の拡張予定。
+- **関連実装**: 外部リポジトリの現行ファイル構成とシンボル定義を再確認してから証跡として扱う。旧版の `src/optimizer-inline-cost.lisp` は現行証跡に使わない。実行時プロファイルフィードバックによる完全な feedback-driven thresholding は将来の拡張予定。
 
 ---
 
@@ -516,7 +516,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **根拠**: LLVMの`MachineSink`パス。特に分岐の片方でのみ使われる値の移動に効果大
 - **難易度**: Medium
 
-- **関連実装**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-flow-loop.lisp` に `opt-pass-code-sinking` を実装済み。`*opt-pass-table*` に `:code-sinking` として登録。`vm-const` / `vm-move` / 算術命令（定数オペランド） / `vm-cons` / `vm-random` に対応。単一 read 値を jump 先へ移動（const のみ conditional jump の両 successor へ複製可）。副作用命令（impure）は sink 禁止。
+- **関連実装**: 外部リポジトリの現行ファイル構成とシンボル定義を再確認してから証跡として扱う。旧版の `src/optimizer-flow-loop.lisp` は現行証跡に使わない。副作用命令（impure）は sink 禁止。
   - 検証: `optimizer-flow-tests.lisp` に8テスト（const、cons、carith/move、impure random、conditional duplication、multi-read no-op）。
   - 制限: 制御依存を伴う高度な sinking は将来の拡張予定。
 
@@ -1512,7 +1512,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **対象**: 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/vm-clos.lisp`, `packages/compile/src/codegen.lisp`
 - **現状**: CLOSインスタンスはスロットを `(gethash :slot-name ht)` で参照するため、スロットオフセットが実行時に確定する。インライン化もフィールドアクセスの定数化も不可能
 - **内容**: クラス定義時に `shape-id`（単調増加整数）を各クラスに付与し、`shape-id → slot-offset-table` の配列ルックアップでスロットアクセスを O(1) に。インスタンスにshape-idを埋め込み、アクセスコード生成時に `(guard-shape inst shape-id) (vm-slot-load inst offset)` を発行。`defclass` 再評価・スロット追加で shape-id が変わりガードが外れる
-- **根拠**: V8 Hidden Classes / JSC Structures / LuaJIT table shape。ハッシュテーブルアクセスから定数オフセットアクセスへの変換でCLOS性能10〜50x向上
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### FR-285: Unboxed Fixnum / Float Arithmetic (アンボックス演算) ✅
@@ -1520,7 +1520,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **対象**: `packages/compile/src/codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/primitives.lisp`
 - **現状**: 演算命令（`vm-add` 等）は実行時タグチェック→ボックス値unwrap→演算→ボックス化という手順。数値ループでボックス化コストが大きい
 - **内容**: 型推論（packages/type/src/inference.lisp）で fixnum と判定された変数は unboxed レジスタ（`reg-fixnum` タグ付きMIR値）で管理。`vm-add-fixnum`/`vm-add-float` の特殊化命令を生成し、タグチェックとボックス化を省略。オーバーフロー時は `overflow-trap` でboxed演算にフォールバック
-- **根拠**: SBCL type-driven code generation / V8 Maglev unboxed Int32 / GraalVM primitive specialization。数値演算ループで2〜5x高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### FR-286: Tagged Integer Range Analysis (タグ付き整数範囲解析) ✅
@@ -1559,7 +1559,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`
 - **現状**: 隣接するループ（`(dotimes (i n) ...)` が2つ連続）は独立に実行。キャッシュ効率が悪い
 - **内容**: 同一反復範囲・副作用が独立な隣接ループを1つのループにマージ。依存チェック（読み書きエイリアス解析）を経てバリアフリーなループのみ融合。メモリアクセスのlocality向上でキャッシュミス削減
-- **根拠**: GCC -floop-interchange / Polly / LLVM LoopFusion。メモリ帯域律速なワークロードで1.5〜3x高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### FR-290: Loop Peeling (ループピーリング) ✅
@@ -1575,7 +1575,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **対象**: 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/x86-64-codegen.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/aarch64.lisp`
 - **現状**: SIMD命令生成なし。数値ループは1要素ずつスカラー処理
 - **内容**: **SLP（Superword Level Parallelism）ベクトル化**: 隣接メモリアクセス＋同種演算のスカラー命令群を SSE2/AVX2/NEON 128〜256bit SIMD 命令に置換。`(loop for i below n do (setf (aref out i) (+ (aref a i) (aref b i))))` → `VADDPS ymm0, ymm1, ymm2`。型情報（floatベクトル・fixnum配列）が必要。アライメントチェック付き
-- **根拠**: LLVM SLP Vectorizer / GCC auto-vectorization / ARM NEON。数値計算で4〜16x高速化。Common Lisp の `simple-array` 操作が主なターゲット
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Very Hard
 
 ---
@@ -1638,16 +1638,16 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 
 - **対象**: 外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer.lisp`, `packages/pipeline/pipeline.lisp`
 - **現状**: インライン化判定はヒューリスティック（コード行数・呼び出し深度・FR-105プロファイル閾値）。最適な閾値の設定はブラックアート
-- **内容**: 関数ペア（呼び出し元・callee）の特徴量ベクトル（命令数、ループ深度、型特殊化度、呼び出し頻度、引数パターン）を入力に、インライン化の利益を予測する小規模 MLP モデル（隠れ層256次元、パラメータ数〜50K）。推論は `./cl-cc compile` 実行中に数μsで完了。モデルは cl-cc 自身の selfhost プロファイルで事前学習
-- **根拠**: Google MLGO (2021) / Meta Inliner ML / ARM NN-guided compiler。ヒューリスティックより10〜15%コードサイズ削減＋性能向上。2024〜2026年のLLVM/GCC本流に統合済み
+- **内容**: 関数ペアの特徴量からスコア記述子を返す planning helper の設計案。学習モデル、推論時間、cl-cc固有の性能効果は未確認。
+- **根拠**: 外部プロジェクトを参考にした設計案であり、cl-ccの実測証拠ではない。
 - **難易度**: Very Hard
 
 #### FR-298: Feedback-Directed Optimization via Corpus PGO (コーパスPGO) ✅
 
 - **対象**: `packages/pipeline/pipeline.lisp`, `packages/cli/src/main.lisp`
 - **現状**: PGO（FR-104/FR-105）はユーザー提供のプロファイルデータに依存。代表的な入力セットがない場合は効果なし
-- **内容**: cl-cc 自身の selfhost 実行（84ファイル）をコーパスとして自動プロファイル収集→最適化の **bootstrap PGO**。`make pgo-build`: (1) instrumented binary でselfhost実行してプロファイル生成、(2) プロファイルを使ってrelease build。CI に統合して毎ビルドでプロファイルを更新
-- **根拠**: Clang `-fprofile-generate` → `-fprofile-use` / GCC `-fprofile-generate` ワークフロー。Rustcも同様のbootstrap PGOを採用（2022〜）。通常5〜20%のコンパイル時間短縮
+- **内容**: selfhostをコーパスとするbootstrap PGOの設計案。自動収集、CI更新、cl-cc固有の効果は未確認。
+- **根拠**: Clang/GCC/Rustcのワークフローを参考にした設計案。cl-ccでのコンパイル時間短縮は未測定。
 - **難易度**: Medium
 
 - **関連実装**: ✅（基本実装済み、完全版は将来拡張）PGO 用 CLI flags と profile 入出力の入口を実装済み。selfhost corpus の自動 bootstrap 実行・CI 更新フローは将来拡張。
@@ -1691,7 +1691,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
 - **対象**: 外部リポジトリ `nerima-lisp/cl-cc-codegen-native` の `emit/src/wasm.lisp`, 外部リポジトリ `nerima-lisp/cl-cc-mir` の `src/mir.lisp`
 - **現状**: Wasm バックエンドはスカラー命令のみ。Wasm SIMD 128 仕様（2022年標準化）未対応
 - **内容**: MIR のベクトル値型（FR-291で追加するvec128）をWasm `v128.load` / `f32x4.add` 等の SIMD 命令にマップ。x86-64はSSE2経由、AArch64はNEON経由でWasm runtimeがSIMDを実行。ホストが SIMD 非対応の場合はスカラーフォールバック
-- **根拠**: Wasm SIMD proposal (Phase 4, 2022) / Emscripten SIMD / V8 Wasm SIMD。数値ワークロードで4〜8x高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 ---

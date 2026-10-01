@@ -2,7 +2,9 @@
 
 Partial evaluation, memory analysis, numeric optimization, string/control flow, CL-specific argument optimization, register allocation, PGO, LTO, JIT, security, WASM, debug info, concurrency, modern architecture, compiler quality, algebraic optimization, frontend optimization, CL declarations, CL runtime semantics, FFI, stack frame/ABI.
 
-**実装状況**: 完了。全FRを実装済みで、各FR見出しの `✅` は実装根拠と対応する。
+**実装状況**: FR見出しは232件あります。各 `✅` は実装本体・接続経路・対応テストを確認できた場合に限り有効とし、設計または planning helper のみの項目は 🔶、対象パスが存在しない項目は ⬜ として再監査します。本文の全FR完了宣言は更新しません。
+
+現行checkoutにない `packages/*` パスは証跡として扱いません。外部リポジトリの証跡を使う場合は、リポジトリ名・現行パス・対応テストを明記します。
 
 ---
 
@@ -572,7 +574,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **対象**: `packages/vm/src/primitives.lisp`, `packages/compile/src/codegen.lisp`, `packages/type/src/inference.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
 - **内容**: 型推論で float と確定したローカル変数を SSE2 の XMM レジスタに保持。`double` を整数レジスタのタグ付き値として持ち回さず、`XMM0`..`XMM7` に直接格納。float-only の内部ループではボクシングコストがゼロ
-- **根拠**: SBCL float unboxing / GHC unboxed Double#。数値計算コードで 3〜10x の高速化。FR-056 (Worker/Wrapper) と連携して再帰関数への拡張
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。FR-056 (Worker/Wrapper) と連携して再帰関数への拡張
 - **難易度**: Hard
 
 - **関連実装**: `packages/emit/tests/regalloc-tests.lisp` の `regalloc-float-vregs-allocated-to-distinct-xmm-registers` が、float vreg を GPR ではなく XMM レジスタへ割り当てる経路を検証する。
@@ -704,7 +706,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/vm/src/primitives.lisp`
 - **現状**: ✅ 完了 — 実装・検証・証拠登録済み（詳細は関連実装/検証を参照）。
 - **内容**: float 型が確定した演算に対して SSE2 命令 (`ADDSD`, `SUBSD`, `MULSD`, `DIVSD`, `SQRTSD`) を直接エミット。FR-008 (Float Unboxing) と連携して XMM レジスタでのフルパイプライン演算を実現。AVX2 拡張として 256-bit `VADDPD` / `VMULPD` によるベクトル化
-- **根拠**: SBCL `sb-vm::double-float-add-vop` / GCC SSE2 expansion。スカラー float 演算を 4〜8x 高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### FR-229: Auto-Vectorization — SLP (Superword Level Parallelism) ✅
@@ -719,7 +721,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/optimize/src/cfg.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **依存**: FR-021 (SCEV), FR-039 (BCE), FR-017 (Alias Analysis)
 - **内容**: 単純な `dotimes` ループで、ボディが独立した連続メモリ操作である場合に SIMD 版ループを生成。(1) 依存解析でベクトル化可能性チェック、(2) 正規化ループを検出、(3) ベクトル幅 (128/256/512 bit) を決定、(4) スカラーエピローグを付加。AArch64 では NEON/SVE を使用
-- **根拠**: LLVM `LoopVectorize` pass / GCC `-O3` auto-vectorization。数値配列処理で 4〜16x の高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Very Hard
 
 #### FR-231: RISC-V Vector Extension (RVV) Codegen ✅
@@ -946,7 +948,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **対象**: Wasm バックエンド
 - **内容**: WebAssembly SIMD Proposal (Phase 4, 2022 以降全主要実装で有効) の命令を使用。`v128.load`/`f64x2.add`/`i32x4.mul` 等の Wasm SIMD 命令で float/int 配列演算を加速。FR-229 (SLP) の Wasm 版として数値演算コードのベクトル化
-- **根拠**: Wasm SIMD は Chrome/Firefox/Safari/Node.js で有効。数値計算コードで 2〜4x の高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### FR-323: Wasm Exception Handling (Wasm 例外処理) ✅
@@ -1057,7 +1059,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **対象**: `packages/emit/src/aarch64.lisp`
 - **内容**: Apple M3/M4 (Avalanche + Blizzard コア) 向け最適化。(1) AMX (Apple Matrix eXtension) コプロセッサへの行列演算オフロード、(2) P コア / E コア の GCD キューアウェアなコードレイアウト、(3) Unified Memory の帯域幅最適化 (ストリーミングアクセスパターン)、(4) MTE (Memory Tagging Extension) を使用したランタイム型検査
-- **根拠**: Apple Instruments / XCode の Performance Guide。M4 は単コア性能で x86-64 競合比 1.5〜2x
+- **根拠**: 外部資料を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Very Hard
 
 #### FR-341: AMD Zen 5 / Intel Arrow Lake 最適化 ✅
@@ -1142,7 +1144,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **対象**: `packages/parse/src/lexer.lisp`
 - **内容**: 字句解析に使用する DFA を Hopcroft アルゴリズムで最小化して状態数を削減。さらに DFA テーブル参照方式から「直接コード」方式（各状態がコードブロック、遷移が `goto`）に変換してキャッシュ効率を向上。CL の reader macro ディスパッチをジャンプテーブルで実装
-- **根拠**: re2c / LLVM `tablegen`。直接コード DFA はテーブル方式より 2〜4x 高速
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Medium
 
 #### FR-354: インクリメンタルパーシング ✅
@@ -1371,7 +1373,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **対象**: `packages/compile/src/codegen.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **内容**: 現在 `libffi` 経由のFFI 呼び出しを、コンパイル時に引数型・戻り値型が確定している場合は直接 System V AMD64 ABI コードに変換。`libffi` のインタープリタオーバーヘッドをゼロに。`(cffi:foreign-funcall "malloc" :size size :pointer)` → 直接 `CALL malloc` の x86-64 命令列生成
-- **根拠**: SBCL alien-funcall direct emission。libffi より 5〜20x 高速
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 ---
@@ -1708,21 +1710,21 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 ### Phase 84 — 異種計算 (Heterogeneous Computing)（実装済み）
 
-#### FR-438: GPU オフロードコンパイル (CUDA/ROCm) ✅
+#### FR-438: GPU オフロードコンパイル (CUDA/ROCm) ⬜
 
 - **対象**: 新規 `packages/emit/src/gpu.lisp`
 - **内容**: 数値計算ループを GPU カーネルとしてコンパイル。(1) アフィンループ解析 (FR-523) で並列化可能ループを検出、(2) スレッド階層マッピング（グリッド/ブロック/ワープ）、(3) shared memory ティリング最適化、(4) CUDA PTX / ROCm AMDGPU IR 生成。`(parallel-loop :target :gpu ...)` アノテーションで有効化
 - **根拠**: MLIR GPU dialect / Triton (OpenAI)。CL の数値計算コードを GPU で実行する実験的パス
 - **難易度**: Very Hard
 
-#### FR-439: Apple Neural Engine / Core ML オフロード ✅
+#### FR-439: Apple Neural Engine / Core ML オフロード ⬜
 
 - **対象**: 新規 `packages/emit/src/apple-ane.lisp`
-- **内容**: 行列積・畳み込み・アクティベーション関数を Apple ANE (Neural Engine) にオフロード。`(matmul a b)` → Core ML `MLModel` 経由の ANE 実行。Python Core ML Tools の CL バインディング生成。M シリーズ Mac での ML 推論の大幅高速化 (CPU 比 10〜100x)
+- **内容**: 行列積・畳み込み・アクティベーション関数を Apple ANE (Neural Engine) にオフロードする設計案。cl-ccでの性能効果は未測定。
 - **根拠**: Apple Core ML / ANE仕様。2025 年以降の Mac でのローカル LLM 推論に必要
 - **難易度**: Very Hard
 
-#### FR-440: eBPF コード生成 ✅
+#### FR-440: eBPF コード生成 ⬜
 
 - **対象**: 新規 `packages/emit/src/ebpf.lisp`
 - **内容**: Linux カーネル内で実行される eBPF プログラムへのコンパイル。制約: (1) ループは検証器が終了証明可能なもののみ、(2) ヒープ割り当て不可（スタックと BPF マップのみ）、(3) 関数呼び出しは BPF helper 関数のみ。ネットワークパケット処理・性能トレース・セキュリティフィルタの CL 実装
@@ -2131,7 +2133,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **対象**: `packages/cli/src/main.lisp`, コンパイルパイプライン
 - **内容**: SBCL `save-lisp-and-die` / Node.js V8 Snapshot に相当する CL ヒープのシリアライゼーション。コンパイル済み関数・マクロ・クラス定義を含む「起動イメージ」をファイルに保存。次回起動時はイメージをメモリにマップするだけで即座に実行可能な状態へ。起動時間 O(コード量) → O(1) に短縮
-- **根拠**: SBCL core dumps / Racket places / Node.js `--snapshot-blob`。大規模 CL アプリケーションの起動時間を 10〜100x 改善
+- **根拠**: SBCL core dumps / Racket places / Node.js `--snapshot-blob` を参考にした設計案。cl-ccでの起動時間効果は未測定。
 - **難易度**: Hard
 
 #### FR-496: Lazy Compilation（遅延コンパイル） ✅
@@ -2177,5 +2179,5 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 - **対象**: `packages/runtime/src/heap.lisp`, `packages/vm/src/vm.lisp`
 - **内容**: 異なるスレッドが同一キャッシュライン（64 バイト）内の独立したデータを競合して読み書きする「偽共有」を除去。(1) スレッドローカルなカウンタ・ポインタを 64 バイト境界にアライン（パディング挿入）、(2) GC の世代別カウンタをスレッドローカルバッファにバッチ更新、(3) `alignas(64)` 相当のアノテーションをコンパイラが自動挿入
-- **根拠**: Intel / AMD 最適化マニュアル。マルチコアの並行アクセスで偽共有は 10〜100x のスローダウンを引き起こす
+- **根拠**: Intel / AMD 最適化マニュアルを参考にした設計案。cl-ccでの偽共有の影響は未測定。
 - **難易度**: Medium

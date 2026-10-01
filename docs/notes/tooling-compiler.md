@@ -2,6 +2,8 @@
 
 Compiler frontend optimization, isolated infrastructure, binary/link/FFI, compiler quality, security hardening, diagnostics, compiler pass infrastructure.
 
+> **Status**: FR見出し上は ✅ 24件、未完了または計画扱い14件です。現行ツリーで対象パス、接続経路、対応テストを再確認するまで、✅をリリース完了の主張として扱いません。
+
 ---
 
 ### Phase 21 — コンパイラ・言語フロントエンド最適化

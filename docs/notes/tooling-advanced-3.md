@@ -1,5 +1,7 @@
 # Tooling: Advanced Compilation III
 
+> **Status**: 128 FRs are listed as design/roadmap items. No completion marker is added here without an existing implementation path, reachable integration, and reproducible test evidence.
+
 GC enhancements, string/symbol/numeric optimization, pattern matching, register allocation, V8-style objects, security, static analysis, GHC-style transforms, stack/thread management, SIMD, ABI/symbol management, Lisp-specific optimization, compiler robustness, frontend extensions, debug/profiling, I/O/OS integration, macros/metaprogramming, REPL, FFI, library/distribution, documentation/quality tools.
 
 ---
@@ -119,7 +121,7 @@ GC enhancements, string/symbol/numeric optimization, pattern matching, register 
 - **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/mir/src/mir.lisp`
 - **現状**: コード生成後に`MOVE r1, r2`命令が多数残存。レジスタ割り当て後の冗長コピー除去なし
 - **内容**: `(move dst src)` 命令を除去するため `dst` と `src` の live range を合体。**コンサーバティブ合体**: Chaitin-Briggs: 合体後の干渉グラフが彩色可能な場合のみ合体（着色数を増やさない）。**アグレッシブ合体**: George-Appel: 干渉がなければ無条件合体。合体後スピル増加を許容する場合は後退。FR-MIR層（FR-626 MLIR）のSSA形式とのBriggs/Cooper SSA-aware coalescing統合
-- **根拠**: selfhostingコード生成後のコピー命令を50〜70%削減（実測値）。コンパイラ内でのレジスタスラッシング排除
+- **根拠**: コピー命令削減を狙う設計案。cl-ccでの削減量は未測定。
 - **難易度**: Hard
 
 #### FR-735: Rematerialization (再実体化)
@@ -351,7 +353,7 @@ GC enhancements, string/symbol/numeric optimization, pattern matching, register 
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **現状**: 命令スケジューリング（FR-033）は基本ブロック単位。ループカーネルの反復間命令オーバーラップなし
 - **内容**: **ソフトウェアパイプライニングのカーネル生成**: 複数ループ反復の命令を **インターリーブ**して実行ユニット利用率を最大化。II（Initiation Interval）= `max(ResourceII, RecurrenceII)` を計算。Modulo Instruction Scheduling（MIS）アルゴリズムでprolog/kernel/epilogのコード生成。`(declare (cl-cc:software-pipeline))` で明示指定。FR-036（Software Pipelining）の精度向上版：完全なモジュロスケジューラ
-- **根拠**: 数値計算ループでFPユニット・ロードユニットを同時フル活用。実測で2〜4倍のループスループット向上（レイテンシ隠蔽）
+- **根拠**: 数値計算ループでレイテンシ隠蔽を狙う設計案。cl-ccでのスループットは未測定。
 - **難易度**: Very Hard
 
 #### FR-773: Instruction Throughput vs Latency Optimization (スループット・レイテンシトレードオフ最適化)
@@ -847,7 +849,7 @@ GC enhancements, string/symbol/numeric optimization, pattern matching, register 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: RC（FR-229）は全ての参照変化で即座にカウンタ更新。スタック上の一時参照でも毎回インクリメント/デクリメントが発生
 - **内容**: **Deutsch-Bobrow 方式**: スタックフレーム（ローカル変数）からの参照変化を **遅延**し、ヒープからヒープへの参照変化のみ即座に更新。スタック参照のRCはGCサイクル時に一括処理（安全点でスタックスキャン）。RC更新オーバーヘッドを70〜90%削減。「Zero Count Table」（ZCT）でRC=0になったオブジェクトを遅延回収。Levanoni-Petrank（PLDI 2001）のRC最適化と組み合わせ
-- **根拠**: Pythonの主要GCボトルネックはRC更新（全代入で2操作）。遅延RC でインタプリタ比30%高速化の実測値あり
+- **根拠**: 遅延参照カウントを狙う設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### FR-856: Pinned Objects for FFI (FFI用ピン留めオブジェクト)
@@ -883,7 +885,7 @@ GC enhancements, string/symbol/numeric optimization, pattern matching, register 
 - **対象**: `packages/optimize/src/optimizer.lisp`
 - **現状**: 各最適化パスが実行されると全ての解析結果（エイリアス解析・支配木・live range）が無効化され再計算。不要な再計算が多い
 - **内容**: 各パスが「保存する解析」を宣言: `(define-opt-pass licm :preserves (alias-analysis dominance-tree))`. パスマネージャが宣言を追跡し、保存されている解析を再計算なしに後続パスへ渡す。「解析の依存グラフ」で何が何を必要とするかを自動管理。`--print-preserved-analyses` でどの解析が有効かをダンプ。LLVM `PreservedAnalyses` / GCC `PROP_cfg` と同等
-- **根拠**: 大規模プログラムのコンパイルでエイリアス解析・支配木の再計算コストが無視できない。保存追跡でコンパイル時間20〜40%削減の実測値あり
+- **根拠**: 解析結果の再利用を狙う設計案。cl-ccでのコンパイル時間効果は未測定。
 - **難易度**: Medium
 
 #### FR-862: Value Profiling (値プロファイリング)
