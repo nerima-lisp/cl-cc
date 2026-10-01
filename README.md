@@ -48,13 +48,13 @@ than follow the default branch.
 
 - [Getting started](https://nerima-lisp.github.io/cl-cc/getting-started/) —
   install, first program, building from source
-- [Core concepts](https://nerima-lisp.github.io/cl-cc/guide/concepts/) — the
+- [Core concepts](https://nerima-lisp.github.io/cl-cc/concepts/) — the
   ANSI Common Lisp surface cl-cc implements
-- [CLI reference](https://nerima-lisp.github.io/cl-cc/reference/api/) — every
+- [CLI reference](https://nerima-lisp.github.io/cl-cc/api-reference/) — every
   command and flag
-- [Architecture](https://nerima-lisp.github.io/cl-cc/reference/architecture/) —
+- [Architecture](https://nerima-lisp.github.io/cl-cc/architecture/) —
   the pipeline, the packages, and how self-hosting works
-- [Compatibility](https://nerima-lisp.github.io/cl-cc/reference/compatibility/) —
+- [Compatibility](https://nerima-lisp.github.io/cl-cc/compatibility/) —
   ANSI conformance status, known limitations, security scope
 
 ## Development
@@ -66,6 +66,11 @@ nix build            # standalone binary at ./result/bin/cl-cc
 nix fmt              # format Nix sources (treefmt)
 nix flake check      # tests + formatting + docs, the same gate CI uses
 ```
+
+The flake currently declares only `x86_64-linux` (`flake.nix:193-195`). On
+macOS and other undeclared systems, `nix run .#test` and `nix build` fail
+because those attributes are not generated; use a supported Linux system for
+these commands.
 
 Tests live in `t/` and run under
 [cl-weave](https://github.com/nerima-lisp/cl-weave), the org's test framework;
