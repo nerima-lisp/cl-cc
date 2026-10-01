@@ -46,7 +46,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-045: Tail Recursion Modulo Cons (TRMC) ❓
 
-- **対象**: `packages/cps/src/cps.lisp`, `packages/optimize/src/optimizer-trmc.lisp`, `packages/optimize/src/optimizer-pipeline.lisp`, `packages/expand/src/pattern-opt-131.lisp`
+- **対象**: `外部: cl-cc-cps/src/cps.lisp`, `packages/optimize/src/optimizer-trmc.lisp`, `packages/optimize/src/optimizer-pipeline.lisp`, `外部: cl-cc-expand/src/pattern-opt-131.lisp`
 - **内容**:
   - 末尾位置の `(cons x (self ...))` / cons-chain を検出し、`labels` 内部ワーカー + アキュムレータへ変換
   - CPS層は `if` / `progn` / `block` / `let` / `let*` ラッパをまたいだ自己再帰 cons-chain を処理
@@ -66,7 +66,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-047: Format String Compile-Time Processing ❓
 
-- **対象**: `packages/vm/src/io.lisp:247-251`, `packages/compile/src/codegen.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp:247-251`, `packages/compile/src/codegen.lisp`
 - **内容**:
   - 定数フォーマット文字列 `"~A~%"` をコンパイル時に解析してバイトコードへ変換
   - 実行時の `format` 文字列パースを除去
@@ -128,7 +128,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 - **対象**: `packages/vm/src/vm.lisp`, `packages/runtime/src/value.lisp`
 - **内容**: `:key`/`nil`/`t`/`quote`等の頻出シンボルをヒープポインタでなく即値インデックスとしてエンコード
-- **根拠**: `nil`/`t`は既に即値実装済み(`+val-nil+`, `+val-t+`)。パーサ内ループの`vm-intern-symbol`コストを削減
+- **根拠**: `nil`/`t`は既に即値実装主張（未確認）(`+val-nil+`, `+val-t+`)。パーサ内ループの`vm-intern-symbol`コストを削減
 - **難易度**: Hard
 
 #### FR-141: Self-Hosting Profile Feedback ❓
@@ -144,7 +144,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-154: Tiered Compilation基盤 ❓ (CLI wired, pipeline foundation)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/optimize/src/optimizer.lisp`
 - **現状**: 単一最適化パスのみ（フル最適化）。高頻度呼び出し前の起動コストが大きい
 - **内容**: Tier-0（最適化なし、高速コンパイル）とTier-1（フル最適化）の2段構成。初回呼び出しはTier-0で実行し、呼び出しカウンタが閾値超過でTier-1にエスカレート
 - **根拠**: V8・HotSpot・PyPy等の現代JITはすべてtiered。単一最適化パスは起動遅延を引き起こす
@@ -188,7 +188,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-179: Sequence Operation Fusion ❓ (map+filter → single loop)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/optimize/src/optimizer.lisp`
 - **現状**: `mapcar`（`macros-stdlib.lisp:352`）は`dolist+cons+nreverse`に展開。`map`（line 632）は`(coerce (mapcar fn (coerce seq 'list)) result-type)` で3重走査
 - **内容**: 連鎖するシーケンス操作（mapcar→remove-if→mapcar等）をマクロ展開時または最適化パスで単一ループに融合。中間リスト割り当てを除去
 - **根拠**: GHCのstream fusion / Rustのiterator fusion。cl-ccでは`(mapcar f (mapcar g xs))`が2回走査
@@ -204,7 +204,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-181: Constant Pool / Literal Deduplication ❓
 
-- **対象**: `packages/compile/src/codegen-core.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: `packages/compile/src/codegen-core.lisp`, `旧対象パス（現行実装位置未特定）`
 - **現状**: 各リテラルが個別の`vm-const`命令として生成（`codegen-core.lisp:44`）。同一値の重複排除なし
 - **内容**: コンパイル単位ごとの定数プールを構築し、同一値のリテラル（整数、浮動小数点、文字列、シンボル）を共有。FR-137の文字列プールを汎化
 - **根拠**: JVM/CLR/Python VMはすべて定数プールを持つ。cl-ccでは`42`が10箇所で使われると10個の`vm-const`が生成される
@@ -216,7 +216,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-182: Demand Analysis / Strictness Analysis ❓
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/type/src/inference.lisp`
+- **対象**: `packages/optimize/src/optimizer.lisp`, `外部: cl-cc-type/src/inference.lisp`
 - **現状**: 値の使用パターン解析なし。すべての式が即時評価される前提
 - **内容**: 関数の各引数について「必ず使用される(strict)」「条件付き使用(lazy)」「未使用(absent)」を判定。strictな引数はunbox可能、absentな引数は計算省略可能
 - **根拠**: GHCのdemand analyzer。CPS形式のcl-ccでは特に継続の使用パターン解析が効果的
@@ -309,7 +309,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 #### FR-339: Hash Table Size/Rehash Control ❓ (ハッシュテーブルサイズ/再ハッシュ制御)
 
 - **対象**: `packages/vm/src/hash.lisp`, `packages/vm/src/hash-execute.lisp`, `packages/compile/src/codegen-hash-table.lisp`
-- **現状**: 実装済みと記載されているが、現行ツリーでの証跡は未検証。`vm-make-hash-table` は `:test` / `:size` / `:rehash-size` / `:rehash-threshold` / `:weakness` を受理し、`hash-table-size` / `hash-table-rehash-size` / `hash-table-rehash-threshold` / `hash-table-count` も VM 命令として実装済み
+- **現状**: 実装主張（未確認）と記載されているが、現行ツリーでの証跡は未検証。`vm-make-hash-table` は `:test` / `:size` / `:rehash-size` / `:rehash-threshold` / `:weakness` を受理し、`hash-table-size` / `hash-table-rehash-size` / `hash-table-rehash-threshold` / `hash-table-count` も VM 命令として実装主張（未確認）
 - **内容**: 既存の hash-table 支援を維持しつつ、`make-hash-table` のサイズヒントと各アクセサが ANSI CL 18.1 相当として利用できることを明記
 - **根拠**: `packages/compile/src/builtin-registry-data-ext.lisp` で対応する builtin が登録済み。`docs/notes/ansi-cl-stdlib.md` の hash-table support matrix と整合
 - **難易度**: Easy
@@ -324,7 +324,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-341: HOF Macro Vector Path ❓ (高階関数マクロのベクタパス)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: `mapcar`（`macros-stdlib.lisp:352`）・`every`（`382`）・`some`（`392`）・`find`（`431`）・`position`（`463`）・`count-if`（`487`）等が全て`dolist`専用。ベクタ引数での動作不可または非効率
 - **内容**: マクロ展開時にtypecase分岐: リスト→`dolist`、ベクタ→`dotimes`+`aref`。ANSI CLシーケンス関数はリスト/ベクタ両対応必須。FR-274（拡張可能シーケンス）のユーザー定義型とは別に、標準型の基本対応
 - **根拠**: ANSI CL 17.3 — シーケンス関数はリスト/ベクタ両方で動作必須。SBCL/CCL全実装
@@ -340,7 +340,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-343: Set Operations Hash Acceleration ❓ (集合演算ハッシュ高速化)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: `remove-duplicates`（`macros-stdlib.lisp:509-515`）が`(member x acc)`でO(n²)。`union`（`518-530`）・`intersection`（`543-552`）・`set-difference`（`533-541`）も同様のO(n²)
 - **内容**: 閾値長超過時にハッシュテーブルベースのメンバーシップテストに切り替え（全体O(n)）。SBCL内部実装と同等
 - **根拠**: SBCL internal hash-based set ops。大リストでの集合演算O(n²)→O(n)
@@ -360,7 +360,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-440: sort/stable-sort :key Support ❓ (sort :keyサポート)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: `sort`が`(list predicate)`のみ受け付け。`:key`引数なし(`macros-stdlib.lisp:597`)
 - **内容**: `:key`引数を受け付け、比較時に各要素にkey関数を適用
 - **根拠**: ANSI CL 17.3 — sort, stable-sort
@@ -368,7 +368,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-441: sort/stable-sort Vector Support ❓ (sortベクタ対応)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: `sort`/`stable-sort`(`macros-stdlib.lisp:597-627`)が`car`/`cdr`/`cons`専用。ベクタソート不可
 - **内容**: ベクタ入力時にインプレースソート（quicksort/mergesort on vector）
 - **根拠**: ANSI CL 17.3 — sort accepts sequence, not just list
@@ -392,7 +392,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-444: copy-seq Vector Support ❓ (copy-seqベクタ対応)
 
-- **対象**: `packages/expand/src/macros-sequence.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-sequence.lisp`
 - **現状**: `macros-sequence.lisp:7-8` — `copy-seq`が`copy-list`に展開。ベクタ非対応
 - **内容**: 入力型に応じてリストはcopy-list、ベクタはベクタコピー
 - **根拠**: ANSI CL 17.3 — copy-seq
@@ -400,7 +400,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-445: fill/replace :start/:end Support ❓ (fill/replace境界引数)
 
-- **対象**: `packages/expand/src/macros-sequence.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-sequence.lisp`
 - **現状**: `macros-sequence.lisp:11-47` — `fill`/`replace`が`:start`/`:end`キーワードを黙って無視
 - **内容**: `:start`/`:end`キーワードの処理。部分範囲への操作を可能にする
 - **根拠**: ANSI CL 17.3 — fill, replace
@@ -408,7 +408,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-446: defstruct :copier Option ❓ (defstruct :copierオプション)
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **現状**: `expander-defstruct.lisp:66-123` — `copy-<name>`関数が未生成。`:copier nil`も未処理
 - **内容**: デフォルトで`copy-<name>`関数を生成（構造体の浅いコピー）。`:copier nil`で抑制
 - **根拠**: ANSI CL 8.1 — defstruct :copier
@@ -416,7 +416,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-447: defstruct :print-function / :print-object ❓ (defstruct印刷オプション)
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **現状**: `expander-defstruct.lisp:66-123` — `:print-function`/`:print-object`オプションを黙って無視
 - **内容**: `:print-object`指定時にprint-objectメソッド生成。`:print-function`は旧互換
 - **根拠**: ANSI CL 8.1 — defstruct print options
@@ -425,7 +425,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-448: defstruct :type list/vector ❓ (defstruct型指定)
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **現状**: `expander-defstruct.lisp:66-123` — `:type`オプション未実装
 - **内容**: `(:type list)` — 構造体をリスト表現。`(:type vector)` — ベクタ表現。`:named`オプションと組み合わせ
 - **根拠**: ANSI CL 8.1 — defstruct :type
@@ -433,7 +433,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-449: defstruct :read-only Slot Option ❓ (defstruct :read-onlyスロット)
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **現状**: `expander-defstruct.lisp:94-96` — `:read-only`スロットオプション未パース・未強制
 - **内容**: `:read-only t`指定時にsetfアクセサを生成しない。コンパイル時にsetf使用を検出してエラー
 - **根拠**: ANSI CL 8.1 — defstruct slot options
@@ -441,7 +441,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-450: Sequence Function :key/:test/:test-not ❓ (シーケンス関数キーワード引数)
 
-- **対象**: `packages/expand/src/macros-sequence.lisp`, `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-sequence.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: `find`, `count`, `position`, `remove`, `delete`, `substitute`, `mismatch`等が`&rest keys`を受け取るが全て黙って無視
 - **内容**: `:key`, `:test`, `:test-not`, `:start`, `:end`, `:from-end`キーワードの実処理
 - **根拠**: ANSI CL 17.3 — Sequence Functions
@@ -449,7 +449,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-451: search General Sequence ❓ (汎用searchシーケンス検索)
 
-- **対象**: `packages/expand/src/macros-sequence.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-sequence.lisp`
 - **現状**: `rt-search-string`(`runtime.lisp:352`)のみ。汎用シーケンスのsearch未実装
 - **内容**: `(search sequence1 sequence2 &key test key start1 end1 start2 end2)` — 部分シーケンス検索
 - **根拠**: ANSI CL 17.3 — search
@@ -457,7 +457,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-452: merge :key Support ❓ (merge :keyサポート)
 
-- **対象**: `packages/expand/src/macros-sequence.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-sequence.lisp`
 - **現状**: `merge`マクロ(`macros-sequence.lisp:245-281`)が`&rest keys`を黙って無視
 - **内容**: `:key`引数の処理。マージ比較時にkey関数適用
 - **根拠**: ANSI CL 17.3 — merge
@@ -465,7 +465,7 @@ Runtime system, data structure operations, string/symbol handling, and sequence 
 
 #### FR-453: map-into Multi-Source ❓ (map-into複数ソース)
 
-- **対象**: `packages/expand/src/macros-sequence.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-sequence.lisp`
 - **現状**: `map-into`(`macros-sequence.lisp:222-242`)が複数ソースの場合`(progn dest)`(no-op)にフォールスルー
 - **内容**: 複数ソースシーケンスから並列にマッピング。最短ソースで停止
 - **根拠**: ANSI CL 17.3 — map-into

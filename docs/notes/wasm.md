@@ -152,7 +152,7 @@ Modern Wasm compiler features (2026 coverage):
 
 #### FR-217: Wasm JS Promise Integration — CL `async`/`await`
 
-- **対象（予定）**: `packages/emit/src/wasm-trampoline.lisp`, `packages/expand/src/macros-stdlib.lisp`
+- **対象（予定）**: `packages/emit/src/wasm-trampoline.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **計画上の前提**: Wasmから非同期JSコール（fetch/setTimeout等）を行うにはコールバック地獄か手動コルーチン
 - **内容**: Wasm JS Promise Integration（Chrome 123+ 出荷済み）の `WebAssembly.promising` / `WebAssembly.suspending` を利用。CL の `cl:async-handler` / `cl:await` マクロをWasm Stack Switching で実装し、JSの `Promise` を `await` で待機可能に。`(await (js-fetch url))` → `(resume (cont.new $await_cont))` に変換
 - **根拠**: Wasm Stack Switching 本体（FR-205）より先に実用化可能な非同期パス。ブラウザCL REPLの実装に必要
@@ -508,7 +508,7 @@ Modern Wasm compiler features (2026 coverage):
 
 #### FR-257: WASI 0.3 — Async-first システムインターフェース
 
-- **対象（予定）**: `packages/emit/src/wasm.lisp`, `packages/vm/src/io.lisp`
+- **対象（予定）**: `packages/emit/src/wasm.lisp`, `外部: cl-cc-vm/src/io.lisp`
 - **計画上の前提**: FR-207 は WASI 0.2（同期 capability-based I/O）対応。WASI 0.3 は async-first 設計で全 I/O が非同期
 - **内容**: WASI 0.3（2025年提案中）の async-first インターフェースに対応。`wasi:io/streams` の非同期 read/write を Stack Switching（FR-205）の `suspend`/`resume` でラップ。`(with-open-file (f path) ...)` が async I/O として透過的に動作。CL の `read-char`/`write-char` が WASI 0.3 非同期ストリームにマップ
 - **根拠**: WASI 0.3 はWASI 0.2 の後継。サーバーサイド CL の高並行性（N:M スレッドモデル）に対応するために必要
@@ -640,7 +640,7 @@ Modern Wasm compiler features (2026 coverage):
 
 #### FR-274: WASI Worlds 完全対応 — `wasi:nn` / `wasi:http` / `wasi:cli`
 
-- **対象（予定）**: `packages/emit/src/wasm.lisp`, `packages/vm/src/io.lisp`, `packages/cli/src/main.lisp`
+- **対象（予定）**: `packages/emit/src/wasm.lisp`, `外部: cl-cc-vm/src/io.lisp`, `packages/cli/src/main.lisp`
 - **計画上の前提**: FR-207 は `wasi:filesystem`/`wasi:sockets`/`wasi:clocks` を列挙。`wasi:nn`（Neural Network）・`wasi:http`（HTTP クライアント）・`wasi:cli`（標準 CLI world）が未対応
 - **内容**: (1) **`wasi:nn`**: WASI Neural Network Interface（wasi-nn 0.2）の `load`/`init_execution_context`/`set_input`/`compute`/`get_output` を CL バインディングとして公開。`(wasi:nn-infer model inputs)` API。(2) **`wasi:http`**: HTTP/1.1・HTTP/2 クライアント（`wasi:http/outgoing-handler`）を `(http-request :get url)` として実装。(3) **`wasi:cli`**: argv・環境変数・stdin/stdout/stderr の標準 CLI world。`./cl-cc compile --world cli` で CLI アプリ生成
 - **根拠**: `wasi:nn` は ONNX モデルの CL 推論に必要。`wasi:http` は Quicklisp のパッケージダウンロードを WASI 環境で実現。`wasi:cli` は `wasmtime run` での標準実行形式
@@ -820,7 +820,7 @@ Modern Wasm compiler features (2026 coverage):
 
 #### FR-296: WASI Extended Worlds — `wasi:keyvalue` / `wasi:messaging` / `wasi:sql`
 
-- **対象（予定）**: `packages/emit/src/wasm.lisp`, `packages/vm/src/io.lisp`
+- **対象（予定）**: `packages/emit/src/wasm.lisp`, `外部: cl-cc-vm/src/io.lisp`
 - **計画上の前提**: FR-274 は `wasi:nn`/`wasi:http`/`wasi:cli` を記載。Key-Value ストア・メッセージング・SQL インターフェースが未対応
 - **内容**: (1) **`wasi:keyvalue`**（WASI 0.2 標準化済み）: `get`/`set`/`delete`/`exists` を `(kv-get store key)` として CL バインディング。Redis/Cloudflare KV/NATS KV に対応。(2) **`wasi:messaging`**（提案中）: パブサブメッセージング。`(messaging-publish topic payload)` で Kafka/NATS へ送信。(3) **`wasi:sql`**（提案中）: SQL クエリインターフェース。`(sql-query conn "SELECT ...")` で CL から直接 DB アクセス。`wasi:http` + `wasi:keyvalue` でサーバーレス CL Web アプリを構築
 - **根拠**: Cloudflare Workers・Fastly Compute 等のエッジ環境では `wasi:keyvalue` が標準 KV アクセス手段。CL の `cl-redis`/`cl-dbi` の Wasm バックエンドとして活用
@@ -1238,7 +1238,7 @@ Modern Wasm compiler features (2026 coverage):
 
 #### FR-207: WASI 0.2 / WASIp2 (次世代システムインターフェース)
 
-- **対象（予定）**: `packages/emit/src/wasm.lisp`, `packages/vm/src/io.lisp`
+- **対象（予定）**: `packages/emit/src/wasm.lisp`, `外部: cl-cc-vm/src/io.lisp`
 - **計画上の前提**: WASI 0.1（preview 1）相当の `fd_write`/`fd_read` のみ想定。capability-based セキュリティモデル未対応
 - **内容**: WASI 0.2 (Preview 2) の capability-based インターフェース対応。`wasi:filesystem`/`wasi:sockets`/`wasi:clocks`/`wasi:http` の WIT インターフェース経由でのシステムコール。`./cl-cc compile --target wasm32-wasi` で WASI 0.2 準拠バイナリ生成
 - **根拠**: WASI 0.2 は 2024 年 1 月リリース。`wasmtime`/`wasmer` の標準実行環境。WASI 0.1 との後方互換なし

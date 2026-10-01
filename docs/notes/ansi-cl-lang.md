@@ -1,10 +1,10 @@
-# ✅ ANSI CL: Language Core — ✅ 720 / — 0
+# ANSI CL: Language Core
 
 > 状態判定は `docs/notes/fr-status.md` の語彙に従う。対象欄のパスが現行ツリーに存在しないFRは、設計記述として扱い完了とは判定しない。
 
 Evaluation/compilation, lambda lists, types/classes, data/control flow, iteration, CLOS (object system), structures, conditions/restarts, symbols, packages, numbers, characters.
 
-このチェックマークは**文書の整備完了**を示します。各節の `✅` / `—` は cl-cc 実装状況または repo で確認できた根拠の有無を表します。
+各節の `✅` は、現行ツリーで実装と根拠を確認できた項目を表します。未確認の項目は完了扱いにしません。
 
 ---
 
@@ -48,7 +48,7 @@ Evaluation/compilation, lambda lists, types/classes, data/control flow, iteratio
 | `*macroexpand-hook*`                                         | ✅   | FR-429: `stdlib-source.lisp` で defvar 定義                                                                   |
 | `with-compilation-unit`                                      | ✅   | ANSI 互換の最小実装を追加: `locally` で本体を包み、警告集約オプションは無視                                   |
 | `compile` (関数)                                             | ✅   | FR-512: ホストブリッジ経由で委譲                                                                              |
-| `compile-file`                                               | ✅   | `packages/expand/src/macros-stdlib.lisp: compile-file` shim; `our-load` を呼び、3値を返す                     |
+| `compile-file`                                               | ✅   | `外部: cl-cc-expand/src/macros-stdlib.lisp: compile-file` shim; `our-load` を呼び、3値を返す                     |
 | `constantp` / `special-operator-p`                           | ✅   | FR-538: `stdlib-source.lisp` で実装                                                                           |
 | `fdefinition` / `(setf fdefinition)`                         | ✅   | FR-548: `fdefinition` (読み取り) + `set-fdefinition` (書き込み) 両方 `stdlib-source.lisp` で実装              |
 | `function-lambda-expression`                                 | ✅   | FR-549: `stdlib-source.lisp` で実装 (常に nil 返却)                                                           |
@@ -91,7 +91,7 @@ Evaluation/compilation, lambda lists, types/classes, data/control flow, iteratio
 | `lambda-parameters-limit` 定数        | ✅   | FR-551: `stdlib-source.lisp` で実装                                                                      |
 | `lambda-list-keywords` 変数           | ✅   | FR-551: `stdlib-source.lisp` で実装                                                                      |
 
-#### FR-551: ラムダリスト定数・変数 — ✅ COMPLETE
+#### FR-551: ラムダリスト定数・変数 — ✅ Verified implementation
 
 - **対象**: `packages/vm/src/vm.lisp`
 - **実装**: `call-arguments-limit` / `lambda-parameters-limit` / `multiple-values-limit` / `lambda-list-keywords` は起動時に VM global として登録済み。
@@ -232,7 +232,7 @@ ANSI CL の型システムは原子型だけでなく合成型指定子をサポ
 
 #### FR-583: the による多値型宣言
 
-- **対象**: `packages/compile/src/codegen-core-control.lisp`, `packages/vm/src/vm-execute-mv.lisp`, `packages/vm/src/vm-instructions.lisp`, `packages/ast/src/ast.lisp`
+- **対象**: `packages/compile/src/codegen-core-control.lisp`, `packages/vm/src/vm-execute-mv.lisp`, `packages/vm/src/vm-instructions.lisp`, `外部: cl-cc-ast/src/ast.lisp`
 - **内容**: `(the (values integer float) ...)` のような多値型宣言を AST で保持し、`vm-values-typep-check` が required / optional / rest の値列を実行時検証する。
 - **根拠**: ANSI CL 3.4.3 — THE with values
 - **難易度**: Medium
@@ -285,7 +285,7 @@ ANSI CL の型システムは原子型だけでなく合成型指定子をサポ
 
 #### FR-543: loop initially 句
 
-- **対象**: `packages/expand/src/loop.lisp`
+- **対象**: `外部: cl-cc-expand/src/loop.lisp`
 - **内容**: `initially` 句の本体をループ開始前に実行。`finalize-loop-state` の先頭に追加
 - **根拠**: ANSI CL 6.1.7 — loop initially
 - **難易度**: Easy
@@ -618,7 +618,7 @@ cl-cc は `method-combination` 軽量クラスを公開し、GF の method-combi
 (define-method-combination max :operator max :identity-with-one-argument t)
 ```
 
-cl-cc の短形式は `packages/expand/src/macros-clos-protocol.lisp` の登録 macro として `(quote name)` へ展開する。これはコンビネーション型を登録したことを表す副作用値であり、公開 `method-combination` class の instance そのものを返す API ではない。
+cl-cc の短形式は `外部: cl-cc-expand/src/macros-clos-protocol.lisp` の登録 macro として `(quote name)` へ展開する。これはコンビネーション型を登録したことを表す副作用値であり、公開 `method-combination` class の instance そのものを返す API ではない。
 
 | 機能                          | cl-cc     | SBCL | 備考                                     |
 | ----------------------------- | --------- | ---- | ---------------------------------------- |
@@ -884,7 +884,7 @@ cl-cc 側では継承済みスロットの観測と通常の `slot-value` / acce
 
 ## 14. `defstruct` との統合
 
-cl-cc は `defstruct` を `defclass` への変換として実装 (`packages/expand/src/expander-defstruct.lisp`)。
+cl-cc は `defstruct` を `defclass` への変換として実装 (`外部: cl-cc-expand/src/expander-defstruct.lisp`)。
 SBCL は別の `structure-class` メタクラスを使う点で異なる。
 
 **cl-cc の変換方式:**
@@ -1441,27 +1441,27 @@ funcallable-standard-object  (MOP)
 
 #### FR-544: defstruct コンストラクタ・コピー・述語オプション
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **内容**: ANSI CL 8.1.5〜8.1.7 の defstruct オプション処理
 - **難易度**: Medium
 
 #### FR-545: defstruct :include 継承 — 子スロットアクセサ生成バグ
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **内容**: `:include` 継承の構造体定義を完全にサポートする
 - **根拠**: ANSI CL 8.1.5.5
 - **難易度**: Low
 
 #### FR-546: defstruct :type / :conc-name / スロットオプション
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **内容**: `:type list`/`:type vector`、`:conc-name`、スロット `:type`/`:read-only`
 - **根拠**: ANSI CL 8.1.5
 - **難易度**: Medium
 
 #### FR-555: copy-structure
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`
 - **内容**: `(copy-structure structure-object)` — 全スロットをシャローコピーした新インスタンスを返す
 - **根拠**: ANSI CL 8.1.6 — copy-structure
 - **難易度**: Easy
@@ -1540,7 +1540,7 @@ funcallable-standard-object  (MOP)
 
 #### FR-585: handler-case :no-error 節
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **実装**: `handler-case` は `:no-error` 節を受理し、正常終了時の多値を束縛できる
 - **内容**: フォームがシグナルなしに完了した場合のみ `success-body` を実行する
 - **根拠**: ANSI CL 9.1.3 — handler-case :no-error
@@ -1816,11 +1816,13 @@ cl-cc は内部で全浮動小数点を NaN-boxing double-float に統一。ユ�
 
 | Status         | Count   | Details                                                                                                                                              |
 | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ✅ Complete    | 720     | ANSI CL language core features implemented and documented                                                                                            |
-| — Not in cl-cc | 0       | —                                                                                                                                                    |
-| **Total**      | **720** | ANSI CL Ch.3–13: Evaluation, Lambda Lists, Types, Data/Control Flow, Iteration, CLOS, Structures, Conditions, Symbols, Packages, Numbers, Characters |
+| 状態           | 判定基準                                  |
+| -------------- | ----------------------------------------- |
+| ✅             | 実装と現行ツリーの根拠を確認済み          |
+| ❓             | 実装または根拠が未検証                    |
+| ⬜             | 設計または未着手                          |
 
-**Note**: 2026-05-19 — All 17 remaining MOP/SBCL features implemented:
+**Note**: The following MOP/SBCL items remain tracked as individual requirements; their status is determined by the evidence attached to each item:
 
 - Effective slot metadata model (F1: `compute-effective-slot-definition` VM instruction)
 - `:initarg` union / `:initform` priority (F2: inherited initarg merge, most-specific initform wins)

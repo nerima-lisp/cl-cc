@@ -176,7 +176,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-525: Number Tower Rationalization (数値タワー整理)
 
-- **対象**: `packages/vm/src/primitives.lisp`, `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `packages/vm/src/primitives.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: `ratio`/`complex`型はホストCLに完全委譲。VM内での数値タワー一貫処理なし
 - **内容**:
   - `ratio`: `(/ 3 4)` → VM内 ratio オブジェクト（分子/分母2ワード）
@@ -356,7 +356,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-560: JIT Code Cache Management (JITコードキャッシュ管理)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/cli/src/main.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/cli/src/main.lisp`
 - **現状**: コンパイル済みVM命令列はメモリ上に保持されるが容量上限なし。再コンパイル時の古いコード回収なし
 - **内容**:
   - コードキャッシュサイズ上限（デフォルト256MB）を設定
@@ -367,7 +367,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-561: Lazy Module Loading (遅延モジュールロード)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/cli/src/main.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/cli/src/main.lisp`
 - **内容**:
   - `(require "module")` を遅延実行：参照時点でコンパイル・ロード
   - モジュール依存グラフの構築と循環依存検出
@@ -377,7 +377,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-562: Hot Code Reload (ホットコードリロード)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/vm/src/vm.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/vm/src/vm.lisp`
 - **内容**:
   - `(reload-function 'foo)` — 実行中プロセスの関数定義を差し替え
   - 実行中フレームの古い定義への参照を新定義にリダイレクト（Erlang hot_code_replace相当）
@@ -397,7 +397,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-564: Incremental Compilation Cache (増分コンパイルキャッシュ)
 
-- **対象**: `packages/pipeline/pipeline.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`
 - **現状**: `./cl-cc selfhost`が毎回全84ファイルを再コンパイル（フルビルド）
 - **内容**:
   - ファイルレベルのコンテンツハッシュ（SHA-256）で変更検出
@@ -515,7 +515,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-584: Profile-Guided Optimization (PGO)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/optimize/src/optimizer.lisp`
 - **依存**: FR-541（サンプリングプロファイラ）, FR-503（TFV）
 - **内容**:
   - Tier-1コンパイル時にTFVのプロファイルデータを参照して最適化判断
@@ -526,7 +526,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-585: Concurrent Compilation (並列コンパイル)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/cli/src/main.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/cli/src/main.lisp`
 - **現状**: selfhostが84ファイルをシリアルにコンパイル
 - **内容**:
   - ASDF依存グラフのトポロジカルソートから並列化可能なファイルセットを抽出
@@ -616,7 +616,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-595: ANSI CL Pathname System (パスネームシステム)
 
-- **対象**: `packages/vm/src/io.lisp` (新ファイル `packages/vm/src/pathname.lisp`)
+- **対象**: `外部: cl-cc-vm/src/io.lisp` (新ファイル `packages/vm/src/pathname.lisp`)
 - **現状**: ファイルパスをそのまま文字列として扱う。`pathname`型なし
 - **内容**:
   - `pathname` オブジェクト: `host`/`device`/`directory`/`name`/`type`/`version` コンポーネント
@@ -641,7 +641,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-597: Filesystem Operations (ファイルシステム操作)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **現状**: `open`/`close`/`read`/`write`は部分実装。ディレクトリ操作なし
 - **内容**:
   - `probe-file` — ファイル存在確認
@@ -658,7 +658,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-600: ANSI CL Stream Types (ストリーム型完全実装)
 
-- **対象**: `packages/vm/src/io.lisp` (新ファイル `packages/vm/src/stream.lisp`)
+- **対象**: `外部: cl-cc-vm/src/io.lisp` (新ファイル `packages/vm/src/stream.lisp`)
 - **現状**: ファイルストリームと文字列ストリームの部分実装のみ
 - **内容**:
   - `broadcast-stream` — 複数ストリームへの同時書き込み (`make-broadcast-stream`)
@@ -698,7 +698,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-605: ANSI CL Pretty Printer (プリティプリンタ)
 
-- **対象**: `packages/vm/src/io.lisp` (新ファイル `packages/vm/src/pprint.lisp`)
+- **対象**: `外部: cl-cc-vm/src/io.lisp` (新ファイル `packages/vm/src/pprint.lisp`)
 - **現状**: `print`/`princ`/`prin1` は基本実装のみ。インデント・改行なし
 - **内容**:
   - `pprint-logical-block` / `pprint-indent` / `pprint-newline` / `pprint-tab`
@@ -711,7 +711,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-606: Print Control Variables (印刷制御変数)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/vm/src/vm.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/vm/src/vm.lisp`
 - **現状**: `*print-escape*` のみ部分実装。循環検出・深さ制限なし
 - **内容**:
   - `*print-level*` — 構造の最大深さ（超えたら `#` を出力）
@@ -788,7 +788,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 #### FR-615: Full Proper Tail Calls (完全末尾呼び出し最適化)
 
 - **対象**: `packages/compile/src/cps.lisp`, `packages/compile/src/codegen.lisp`
-- **現状**: FR-045 (TRMC) は自己再帰の cons-chain / `list*` パターンをCPS層とoptimizer層で実装済み。ただし相互再帰 `(f → g → f)` のTRMC/TCOはまだ限定的で、FR-615の完全末尾呼び出し最適化の対象として残る
+- **現状**: FR-045 (TRMC) は自己再帰の cons-chain / `list*` パターンをCPS層とoptimizer層で実装主張（未確認）。ただし相互再帰 `(f → g → f)` のTRMC/TCOはまだ限定的で、FR-615の完全末尾呼び出し最適化の対象として残る
 - **内容**:
   - CPS変換後の全末尾位置を検出（`ast-tail-position-p`述語）
   - 末尾呼び出し位置の `vm-call` → `vm-tail-call` 命令に変換
@@ -885,7 +885,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-626: Format Directive Completeness (formatディレクティブ完全化)
 
-- **対象**: `packages/vm/src/format.lisp` (または `packages/vm/src/io.lisp`)
+- **対象**: `packages/vm/src/format.lisp` (または `外部: cl-cc-vm/src/io.lisp`)
 - **現状**: `~A`/`~S`/`~%`/`~&`/`~T` の基本実装のみ
 - **内容**:
   - 数値系: `~D`(10進) / `~B`(2進) / `~O`(8進) / `~X`(16進) / `~R`(任意基数/英語序数)
@@ -983,7 +983,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-638: Read Operations Completeness (read系操作完全化)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/vm/src/format.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/vm/src/format.lisp`
 - **現状**: `read-char`は部分実装。`unread-char`/`peek-char`/`read-line`/`read-sequence`なし
 - **内容**:
   - `read-char &optional stream eof-error-p eof-value recursive-p`
@@ -998,7 +998,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-639: Write Operations Completeness (write系操作完全化)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/vm/src/format.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/vm/src/format.lisp`
 - **内容**:
   - `write-sequence sequence stream &key start end` — バッファ一括書き込み
   - `write-char character &optional stream` — 単一文字出力
@@ -1011,7 +1011,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-640: with-open-file Full Options (with-open-fileオプション完全化)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **現状**: `:input`/`:output`の基本モードのみ。`:if-exists`/`:if-does-not-exist`を無視
 - **内容**:
   - `:direction` — `:input`/`:output`/`:io`/`:probe`
@@ -1087,7 +1087,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-646: Condition Report / Print-Object Integration
 
-- **対象**: `packages/vm/src/conditions.lisp`, `packages/vm/src/io.lisp`
+- **対象**: `packages/vm/src/conditions.lisp`, `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - `define-condition` の `:report` オプション — condition→文字列の変換関数
   - `print-object` メソッドで `#<ERROR: message>` 形式のデフォルト出力
@@ -1115,7 +1115,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 #### FR-651: Character Name Functions (文字名関数)
 
 - **対象**: `packages/vm/src/strings.lisp`, `packages/parse/src/cl/lexer.lisp`
-- **現状**: `#\Space`/`#\Newline` 等のリードは実装済みだが、`char-name`/`name-char`なし
+- **現状**: `#\Space`/`#\Newline` 等のリードは実装主張（未確認）だが、`char-name`/`name-char`なし
 - **内容**:
   - `char-name character` → 名前文字列 (`#\Space` → `"Space"`, `#\A` → `nil`)
   - `name-char name` → 文字 (`"Space"` → `#\Space`, `"Newline"` → `#\Newline`)
@@ -1167,7 +1167,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 #### FR-190: Concurrent / Incremental GC
 
 - **対象**: `packages/runtime/src/gc.lisp`
-- **現状**: Stop-the-world GC（minor: `gc.lisp:200-263`、major: `gc.lisp:331-392`）。SATBバリアは実装済みだが並行マーキング未対応
+- **現状**: Stop-the-world GC（minor: `gc.lisp:200-263`、major: `gc.lisp:331-392`）。SATBバリアは実装主張（未確認）だが並行マーキング未対応
 - **内容**: major GCのマーキングフェーズを並行化。SATB事前書き込みバリア（既存`gc.lisp:282-289`）を活用してミューテータと並行してマーク。スイープも並列化可能
 - **根拠**: Go/JVM/ZGC はすべて並行GC。STWポーズ時間がヒープサイズに比例する現状は大規模プログラムで致命的
 - **難易度**: Very Hard
@@ -1246,7 +1246,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-281: Async/Await（非同期構文）
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, `packages/vm/src/vm.lisp`, 新規`packages/runtime/src/async.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/vm/src/vm.lisp`, 新規`packages/runtime/src/async.lisp`
 - **現状**: 同期実行のみ。CPS変換（`packages/compile/src/cps.lisp`）はあるが非同期スケジューリングと未接続
 - **内容**: `async`/`await`マクロ。`async`はFuture/Promiseオブジェクトを返すタスクとしてコンパイル。`await`は現在のタスクをサスペンドしスケジューラに制御を返す。CLのCPS変換基盤を流用してコールバック地獄を回避
 - **根拠**: Rust async/await / JavaScript ES2017 / Python asyncio。I/Oバウンドな並行性の標準パターン
@@ -1386,7 +1386,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-332: Parallel Array Operations（並列配列操作）
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, 新規`packages/runtime/src/parallel.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, 新規`packages/runtime/src/parallel.lisp`
 - **現状**: `map`/`reduce`/`dotimes`は逐次
 - **内容**: `pmap`/`preduce`（自動並列化版）。`parallel-for`マクロ（ループ本体がデータ並列）。チャンク分割→ワーカースレッド投入→結果統合。閾値以下は逐次フォールバック。FR-258（work-stealing scheduler）活用
 - **根拠**: Java parallel streams / Rust rayon / Haskell `par`/`pseq`。関数型並列性の標準インターフェース
@@ -1406,7 +1406,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-341: Stackless Coroutines（スタックレスコルーチン）
 
-- **対象**: `packages/compile/src/cps.lisp`, `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `packages/compile/src/cps.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **現状**: CPS変換基盤あり。`yield`を生成する構文なし
 - **内容**: `generator`マクロ: `yield`を含む関数を状態機械にCPS変換。状態は固定サイズのクロージャ（スタック不要）。`next`で再開。FR-281（async/await）の`await`ポイントもスタックレスコルーチンとしてコンパイル可能
 - **根拠**: Python `yield` / C++20 coroutines / Kotlin suspend fun。スタックレスでメモリ効率が高い
@@ -1482,7 +1482,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-346: Memory Ordering Fences (メモリオーダリングフェンス)
 
-- **対象**: `packages/mir/src/target.lisp`, `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64-codegen.lisp`
+- **対象**: `外部: cl-cc-mir/src/target.lisp`, `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64-codegen.lisp`
 - **現状**: フェンス/バリア命令なし。`target-desc`の`features`（`target.lisp:38-41`）にメモリモデル記述なし
 - **内容**: `vm-fence`命令（`:acquire`/`:release`/`:seq-cst`セマンティクス）。x86-64 `MFENCE`/`LFENCE`/`SFENCE`。AArch64 `DMB`/`DSB`/`ISB`。FR-345（アトミック操作）と相補的
 - **根拠**: C++11 memory model / Java Memory Model。弱順序アーキテクチャ（AArch64）での正確性保証
@@ -1530,7 +1530,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-352: Hot Code Reloading (ホットコードリロード)
 
-- **対象**: `packages/vm/src/vm.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: `packages/vm/src/vm.lisp`, `旧対象パス（現行実装位置未特定）`
 - **現状**: `vm-register-function`（`vm.lisp:988`）はベアな`(setf (gethash ...))`で、バージョニング・ロールバック・アトミックスワップなし
 - **内容**: アトミック関数置換（旧バージョン保持）。実行中呼び出しの完了待ち後のスワップ。モジュールレベルのホットリロード（依存追跡付き）
 - **根拠**: Erlang hot code loading / SBCL interactive redefinition。ライブシステムの更新
@@ -1574,7 +1574,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-373: Once / Lazy Initialization（一度だけの初期化）
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, `packages/runtime/src/sync.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/runtime/src/sync.lisp`
 - **現状**: グローバル変数の遅延初期化はシングルスレッド前提（`defvar`の初期化フォームは非保護）
 - **内容**: `make-once`/`once-call fn`（fnを最大一度だけ実行、他スレッドは完了まで待機）。`define-lazy var init-form`マクロ（初アクセス時にスレッドセーフ初期化）。ダブルチェックロッキングの安全実装（FR-346メモリフェンスで保証）。`call_once`相当のFAST PATH: アトミックフラグでロックを回避
 - **根拠**: C++ `std::call_once` / Go `sync.Once` / Java `volatile` double-checked locking。シングルトン・キャッシュの安全な遅延初期化
@@ -1622,15 +1622,15 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-390: Ownership-Based Concurrency Safety（所有権ベース並行安全性）
 
-- **対象**: `packages/type/src/`, `packages/compile/src/codegen.lisp`, `packages/expand/src/expander.lisp`
-- **現状**: 型システム（`packages/type/src/`）はHindley-Milner型推論だがSend/Sync相当の並行性マーカーなし。スレッド境界を跨ぐ値の型チェックなし
+- **対象**: `外部: cl-cc-type/src/`, `packages/compile/src/codegen.lisp`, `外部: cl-cc-expand/src/expander.lisp`
+- **現状**: 型システム（`外部: cl-cc-type/src/`）はHindley-Milner型推論だがSend/Sync相当の並行性マーカーなし。スレッド境界を跨ぐ値の型チェックなし
 - **内容**: `Send`トレイト相当: 「別スレッドへ転送可能な型」マーカー（デフォルトは推論、ミュータブル共有参照は非Send）。`Sync`トレイト相当: 「複数スレッドから安全に共有参照可能な型」マーカー。`spawn`/`chan-send`のシグネチャに`Send`境界を要求。型エラーメッセージに「スレッド安全でない型をスレッド境界を跨いで使用」の診断
 - **根拠**: Rust `Send`/`Sync` / Pony reference capabilities。コンパイル時にデータ競合を証明可能に排除
 - **難易度**: Very Hard
 
 #### FR-391: Session Types for Channels（チャネルセッション型）
 
-- **対象**: `packages/type/src/`, `packages/vm/src/vm.lisp`（FR-282チャネル依存）
+- **対象**: `外部: cl-cc-type/src/`, `packages/vm/src/vm.lisp`（FR-282チャネル依存）
 - **現状**: FR-282のチャネルは型なし。通信プロトコルの順序保証がない
 - **内容**: セッション型: `!Int . ?String . End`（IntをSendしてStringをReceiveして終了）の型でチャネルを型付け。デュアル型: 送信端の型が受信端の型の双対になることを型チェッカーが検証。`session-new`が送受信ペアを生成。プロトコル違反はコンパイルエラー。型レベルでデッドロックフリーを部分的に保証
 - **根拠**: Frank Pfenning/Luís Caires Session Types / Rust `async-session`. プロトコル違反によるデッドロックをコンパイル時に防止
@@ -1638,8 +1638,8 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-392: Algebraic Effects / Effect Handlers（代数的エフェクト）
 
-- **対象**: `packages/compile/src/cps.lisp`, `packages/expand/src/macros-stdlib.lisp`, `packages/vm/src/vm.lisp`
-- **現状**: CPS変換基盤あり。限定継続（FR-221）で再開可能な継続が実装済み。しかしエフェクトシステムとしての統合なし
+- **対象**: `packages/compile/src/cps.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/vm/src/vm.lisp`
+- **現状**: CPS変換基盤あり。限定継続（FR-221）で再開可能な継続が実装主張（未確認）。しかしエフェクトシステムとしての統合なし
 - **内容**: `define-effect`マクロ（エフェクト宣言: `(define-effect Async (await promise))`）。`perform`（エフェクト発動: サスペンドして継続をハンドラへ渡す）。`with-handler`（エフェクトに対応する解釈器を定義: 再開・中断・変換）。async/awaitをエフェクトで再実装可能（FR-281との統合）。例外・状態・非決定性もエフェクトで表現
 - **根拠**: OCaml 5 multicore effects / Koka / Eff言語。単一の機構でasync/例外/コルーチン/STMを統一的に表現できる
 - **難易度**: Very Hard
@@ -1678,7 +1678,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-411: Async Generators / Async Iterators（非同期ジェネレーター）
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, `packages/compile/src/cps.lisp`（FR-341スタックレスコルーチン・FR-281 async依存）
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/compile/src/cps.lisp`（FR-341スタックレスコルーチン・FR-281 async依存）
 - **現状**: FR-341の`generator`マクロは同期`yield`のみ。非同期ソース（I/O、タイマー）からの逐次生産なし
 - **内容**: `async-generator`マクロ: 本体で`yield`と`await`を混在可能。`async-for`マクロ: 非同期イテレータを`await`しながら逐次消費。`aiter`プロトコル（`next`がFutureを返す）。変換オペレーター: `async-map`/`async-filter`/`async-take`/`async-collect`。FR-310（io_uring）との統合: ファイル行を非同期にストリーム
 - **根拠**: Python `async for` / JavaScript `AsyncIterator` / Rust `Stream`。I/Oバウンドなデータパイプラインのコルーチン的記述
@@ -1698,7 +1698,7 @@ Inline caches, safepoints, numeric tower, FFI, debugging/profiling, concurrent r
 
 #### FR-420: Parallel Compilation（並列コンパイル）
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/cli/src/main.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/cli/src/main.lisp`
 - **現状**: `our-load`によるファイルのシリアル処理（`pipeline.lisp`）。依存関係解析なし
 - **内容**: ASCFビルドグラフ解析でファイル間依存関係を抽出。依存のないファイルをワーカースレッドプールで並列コンパイル。`*compilation-mutex*`でグローバルレジストリへの書き込みを保護。`make -jN`相当: `--parallel N`フラグ。インクリメンタルビルドキャッシュ（タイムスタンプ+コンテンツハッシュ）
 - **根拠**: Rust cargo parallel codegen / GCC `make -j` / Bazel。中規模プロジェクトで壁時計時間を1/Nに短縮

@@ -213,7 +213,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-309: Memory Access Pattern Analysis (メモリアクセスパターン解析) ❓
 
-- **対象**: `packages/optimize/src/optimizer.lisp`, `packages/mir/src/mir.lisp`
+- **対象**: `packages/optimize/src/optimizer.lisp`, `外部: cl-cc-mir/src/mir.lisp`
 - **現状**: オプティマイザの8パス（`*opt-convergence-passes*`、`optimizer.lisp:1020-1031`）は全てレジスタレベル。メモリアクセス追跡なし。エイリアス解析なし（FR-017として計画のみ）。MIRに`:load`/`:store`演算（`mir.lisp:142-143`）あるが解析パスなし
 - **内容**: `vm-slot-read`/`vm-slot-write`・配列操作を追跡し、シーケンシャル・ストライド・ランダムのアクセスパターンを検出。FR-289（プリフェッチ挿入）とFR-287（ループタイリング）のデータソース
 - **根拠**: LLVM MemorySSA / GCC alias oracle。メモリレベル最適化の基盤解析
@@ -336,7 +336,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **証跡（未確認）**: `packages/runtime/src/gc-tlab.lisp` (345行): `rt-tlab`構造体, `rt-gc-tlab-alloc`, `%rt-gc-tlab-refill`, `%rt-gc-tlab-retire`, `rt-gc-tlab-retire-all`
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**: 各スレッドがヒープの専有チャンク（TLAB）を保有し、TLABが枯渇するまでロックフリーで割り当て。TLABサイズはスレッドの割り当てレートに応じて動的調整（最小1KB〜最大512KB）。TLAB外の大オブジェクトはグローバルロック経由。GC時はすべてのTLABを一斉リタイア
-- **Pure CL**: 完全なPure CL実装（バンプポインタ、リフィル、リタイア）。SB-THREAD利用時はmutexベースのリフィルロック。ネイティブバックエンドでCAS不要のロックフリー割り当てに置換可能
+- **Pure CL**: Pure CL実装案（バンプポインタ、リフィル、リタイア）。SB-THREAD利用時はmutexベースのリフィルロック。ネイティブバックエンドでCAS不要のロックフリー割り当てに置換可能
 - **テスト**: `packages/runtime/tests/gc-fr-tests.lisp` (`fr-343-tlab-alloc-bumps-private-buffer`)
 - **根拠**: HotSpot TLAB / GraalVM TLAB / Go `mcache`。スレッドあたり割り当てコストをほぼゼロに（CAS不要）
 - **難易度**: Medium
@@ -491,7 +491,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-360: Arena / Region Allocator for Compiler Passes (コンパイラパス用アリーナ) ❓
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/expand/src/expander.lisp`, `packages/compile/src/cps.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, `外部: cl-cc-expand/src/expander.lisp`, `packages/compile/src/cps.lisp`
 - **内容**: コンパイル1パス中に生成されるAST・MIR・VM命令列をアリーナ（単調増加バンプポインタ）から割り当て。パス完了後にアリーナ全体を一括解放（個別GCコストなし）。中間表現の寿命が明確なためスコープ付きアリーナが最適
 - **根拠**: LLVM BumpPtrAllocator / GCC obstack / Clang ASTContext arena。コンパイラ内中間データ構造のGCプレッシャー排除
 - **難易度**: Easy
@@ -586,7 +586,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-370: Stack Map Generation (スタックマップ生成) ❓
 
-- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/mir/src/mir.lisp`
+- **対象**: `packages/emit/src/x86-64-codegen.lisp`, `外部: cl-cc-mir/src/mir.lisp`
 - **現状**: GCルートはグローバル`rt-heap-roots`リストのみ。コールスタック上のローカル変数はスキャン対象外（保守的GCに頼るか未サポート）
 - **内容**: 各safepointでのスタックフレームレイアウトを記録したスタックマップテーブルを生成。GCレジスタ（ポインタ保持レジスタ）のビットマスクをprogram counter毎に記録。GCルートスキャン時にコールスタックを逆順にwalknしてすべてのスタック上ポインタを精確にスキャン
 - **根拠**: HotSpot OopMap / LLVM StackMaps / GHC info tables。精確GCの前提条件でスタック変数のポインタを保守的にスキャンするコストを排除
@@ -604,7 +604,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-372: ⬜: Deoptimization Stack Maps (非最適化スタックマップ)
 
-- **対象**: `packages/mir/src/mir.lisp`, `packages/optimize/src/optimizer.lisp`
+- **対象**: `外部: cl-cc-mir/src/mir.lisp`, `packages/optimize/src/optimizer.lisp`
 - **内容**: 投機的最適化（型特殊化・インライン化等）が無効化される際にJIT最適化フレームを未最適化フレームに変換するためのスタックマップ。各deoptポイントで「物理レジスタ → 論理変数名」のマッピングを保持。deopt時に仮想マシン状態を再構成
 - **根拠**: HotSpot C2 Deoptimization / V8 Deoptimizer / GraalVM deopt。speculative JIT（FR-specculative）の前提
 - **難易度**: Very Hard
@@ -1251,7 +1251,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-442: ⬜: GC-Aware Type Inference Integration (GC-型推論統合)
 
-- **対象**: `packages/runtime/src/gc.lisp`, `packages/type/src/` (HMシステム)
+- **対象**: `packages/runtime/src/gc.lisp`, `外部: cl-cc-type/src/` (HMシステム)
 - **内容**: 型システム（FR: HM gradual typing）からの型情報をGCが活用。型が`fixnum`と確定したスロットはGCポインタとして追跡しない。`(cons fixnum fixnum)` 型のconsセルはcar/cdrスキャン不要。型情報→GCスキャンマップの自動生成でスキャン量を削減
 - **根拠**: GHC GC with type-based scavenging / MLton GC with type-precise heap。型情報とGCの統合で精確かつ高速なスキャン
 - **難易度**: Hard
@@ -1512,7 +1512,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 #### FR-471: Open Stream / Port as GC Finalizable Resource (オープンストリームのGC管理) ❓
 
 - **証跡（未確認）**: package.lisp で `rt-register-finalizer`, `rt-unregister-finalizer`, `rt-register-stream-finalizer` をエクスポート (FR-459/460/471)
-- **対象**: `packages/vm/src/io.lisp`, `packages/runtime/src/gc.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: `(open ...)` で作成したストリームオブジェクトが到達不能になったときに自動`close`を実行するファイナライザを登録。ファイルディスクリプタリーク防止。ただし`close`のタイミングは非決定的なため、`with-open-file`の使用を推奨する警告機構も追加。ファイナライザ経由でcloseされたストリームをリソース統計に記録
 - **根拠**: SBCL stream finalization / CPython `ResourceWarning` / Java `FileInputStream.finalize()`。GCによるリソースリーク防止の最後の砦
 - **難易度**: Easy
@@ -1527,7 +1527,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 #### FR-471: ⬜: Open Stream / Port as GC Finalizable Resource (オープンストリームのGC管理)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/runtime/src/gc.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: `(open ...)` で作成したストリームオブジェクトが到達不能になったときに自動`close`を実行するファイナライザを登録。ファイルディスクリプタリーク防止。ただし`close`のタイミングは非決定的なため、`with-open-file`の使用を推奨する警告機構も追加。ファイナライザ経由でcloseされたストリームをリソース統計に記録
 - **根拠**: SBCL stream finalization / CPython `ResourceWarning` / Java `FileInputStream.finalize()`。GCによるリソースリーク防止の最後の砦
 - **難易度**: Easy
