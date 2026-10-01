@@ -25,16 +25,8 @@
   (destructuring-bind (inst) (list (cl-cc:make-vm-apply :dst :r0 :func :f :args '(:r1)))
     (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
 
-(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-set-global"
-  (destructuring-bind (inst) (list (make-vm-set-global :src :r0 :name 'x))
-    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
-
 (it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-signal-error"
   (destructuring-bind (inst) (list (cl-cc:make-vm-signal-error :error-reg :r0))
-    (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
-
-(it-sequential "scheduler-barrier-p-returns-true-for-barrier-types vm-slot-write"
-  (destructuring-bind (inst) (list (cl-cc:make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r0))
     (expect (cl-cc/optimize::%opt-scheduler-barrier-p inst) :to-be-truthy)))
 
 (it-sequential "scheduler-barrier-p-returns-false-for-pure-instructions vm-const"

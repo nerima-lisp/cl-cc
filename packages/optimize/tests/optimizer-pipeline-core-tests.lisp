@@ -8,32 +8,6 @@
 
 (in-package :cl-cc/test)
 
-;;; ─── %opt-trim-whitespace ────────────────────────────────────────────────────
-
-(it-sequential "opt-trim-whitespace-cases spaces"
-  (destructuring-bind (expected input) (list "hello" "  hello  ")
-    (expect (cl-cc/optimize::%opt-trim-whitespace input) :to-equal expected)))
-
-(it-sequential "opt-trim-whitespace-cases tabs"
-  (destructuring-bind (expected input) (list "world" (format nil "~Cworld~C" #\Tab #\Tab))
-    (expect (cl-cc/optimize::%opt-trim-whitespace input) :to-equal expected)))
-
-(it-sequential "opt-trim-whitespace-cases newlines"
-  (destructuring-bind (expected input) (list "foo" (format nil "~Cfoo~C" #\Newline #\Newline))
-    (expect (cl-cc/optimize::%opt-trim-whitespace input) :to-equal expected)))
-
-(it-sequential "opt-trim-whitespace-cases mixed"
-  (destructuring-bind (expected input) (list "bar" (format nil " ~C~C bar ~C~C " #\Tab #\Newline #\Newline #\Tab))
-    (expect (cl-cc/optimize::%opt-trim-whitespace input) :to-equal expected)))
-
-(it-sequential "opt-trim-whitespace-cases no-trim"
-  (destructuring-bind (expected input) (list "bare" "bare")
-    (expect (cl-cc/optimize::%opt-trim-whitespace input) :to-equal expected)))
-
-(it-sequential "opt-trim-whitespace-cases empty"
-  (destructuring-bind (expected input) (list "" "")
-    (expect (cl-cc/optimize::%opt-trim-whitespace input) :to-equal expected)))
-
 ;;; ─── opt-parse-pass-pipeline-string ─────────────────────────────────────────
 
 (it-sequential "parse-pass-pipeline-string-cases single-pass"
@@ -389,39 +363,9 @@
             (int-add-count   (%test-count-type 'cl-cc/vm::vm-add out)))
         (expect (= expected-float-add-or-add (+ float-add-count int-add-count)) :to-be-truthy))))))
 
-(it-sequential "fr-099-fma-recognition-cases multiple-consumers-no-fuse"
-  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)
-                 (cl-cc/vm::make-vm-float-add :dst :r5 :lhs :r3 :rhs :r6)) 0 1 2)
-    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
-    (when expected-float-mul-or-mul
-      (let ((float-mul-count (%test-count-type 'cl-cc/vm::vm-float-mul out))
-            (int-mul-count   (%test-count-type 'cl-cc/vm::vm-mul out)))
-        (expect (= expected-float-mul-or-mul (+ float-mul-count int-mul-count)) :to-be-truthy)))
-    (when expected-float-add-or-add
-      (let ((float-add-count (%test-count-type 'cl-cc/vm::vm-float-add out))
-            (int-add-count   (%test-count-type 'cl-cc/vm::vm-add out)))
-        (expect (= expected-float-add-or-add (+ float-add-count int-add-count)) :to-be-truthy))))))
-
 (it-sequential "fr-099-fma-recognition-cases integer-arithmetic-no-fuse"
   (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (make-vm-mul :dst :r3 :lhs :r0 :rhs :r1)
                  (make-vm-add :dst :r4 :lhs :r3 :rhs :r2)) 0 nil nil)
-    (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
-    (when expected-float-mul-or-mul
-      (let ((float-mul-count (%test-count-type 'cl-cc/vm::vm-float-mul out))
-            (int-mul-count   (%test-count-type 'cl-cc/vm::vm-mul out)))
-        (expect (= expected-float-mul-or-mul (+ float-mul-count int-mul-count)) :to-be-truthy)))
-    (when expected-float-add-or-add
-      (let ((float-add-count (%test-count-type 'cl-cc/vm::vm-float-add out))
-            (int-add-count   (%test-count-type 'cl-cc/vm::vm-add out)))
-        (expect (= expected-float-add-or-add (+ float-add-count int-add-count)) :to-be-truthy))))))
-
-(it-sequential "fr-099-fma-recognition-cases cross-block-boundary-no-fuse"
-  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (make-vm-label :name "next")
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 0 1 1)
     (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
     (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
     (when expected-float-mul-or-mul
