@@ -307,22 +307,15 @@
             :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-reconciled-fr-statuses-match-doc"
-  (let ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features)))
-    (dolist (case '(("FR-438" :planned)
-                    ("FR-439" :planned)
-                    ("FR-440" :planned)))
-      (let ((feature (find (first case) features
-                           :key #'cl-cc/optimize::opt-roadmap-feature-id
-                           :test #'string=)))
-        (expect feature :to-be-truthy)
-        (expect (%optimize-backend-evidence-status-for-feature feature)
-                :to-be (second case))
-        (let ((evidence
-                (cl-cc/optimize:lookup-opt-backend-roadmap-evidence
-                 (first case))))
-          (expect evidence :to-be-truthy)
-          (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
-                  :to-be (second case)))))))
+  (dolist (feature (cl-cc/optimize:optimize-backend-roadmap-doc-features))
+    (unless (eq (cl-cc/optimize::opt-roadmap-feature-status feature)
+                :implemented)
+      (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature))
+             (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence
+                        feature-id)))
+        (expect evidence :to-be-truthy)
+        (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
+                :to-be (%optimize-backend-evidence-status-for-feature feature))))))
 
 (it-sequential "optimize-backend-roadmap-fr-ids-by-status-partitions-document"
   (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))
