@@ -116,7 +116,7 @@
    ;; internals directly; there is no equivalent to port them to now that
    ;; cl-weave is the engine (cl-weave has its own 615-test self-suite covering
    ;; the same ground for cl-weave's own internals).
-    (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests")))
+    (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests") (:file "script-mode-tests")))
     (:module "parse-tests"
     :pathname "packages/parse/tests"
     :serial t
@@ -303,12 +303,22 @@
       (:file "optimizer-jump-threading-tests")
       (:file "optimizer-loop-peel-tests")
       (:file "optimizer-loop-rotate-tests")
+      (:file "optimizer-loop-transforms-tests")
       (:file "optimizer-loop-unroll-tests")
       (:file "optimizer-loop-unswitch-tests")
       (:file "optimizer-dead-loop-tests")
       (:file "optimizer-dae-tests")
       (:file "optimizer-div-const-tests")
       (:file "optimizer-strength-reduce-tests")
+      (:file "optimizer-peval-loop-tests")
+      (:file "optimizer-pipeline-core-tests")
+      (:file "optimizer-pipeline-loop-transform-tests")
+      (:file "optimizer-pipeline-peval-tests")
+      (:file "optimizer-pipeline-pgo-tests")
+      (:file "optimizer-pipeline-security-tests")
+      (:file "optimizer-scheduler-tests")
+      (:file "optimizer-sinking-layout-tests")
+      (:file "optimizer-speculative-jit-tests")
       (:file "optimizer-idiom-tests")))
    (:module "emit-tests"
     :pathname "packages/emit/tests"
@@ -371,7 +381,8 @@
        :serial t
        :components
        ((:file "perfmap-tests")
-        (:file "pipeline-incremental-hot-parallel-tests")))
+        (:file "pipeline-incremental-hot-parallel-tests")
+        (:file "pipeline-pgo-tests")))
      (:module "tools-tests"
       :pathname "packages/tools/tests"
       :serial t
@@ -412,6 +423,7 @@
          (:file "runtime-stdlib-2-runtime-tests")
          (:file "runtime-stdlib-3-os-tests")
          (:file "runtime-stdlib-3-image-tests")
+         (:file "runtime-crypto-compress-tests")
         (:file "continuous-profile-tests")
         (:file "deadlock-tests")
        (:file "value-tests")
