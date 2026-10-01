@@ -252,7 +252,7 @@
                                         directory
                                         (file-namestring pathname))
                                 root)))
-                            (list (cdddr parts) (cddddr parts)))))))
+                            (list (cddr parts) (cdddr parts) (cddddr parts)))))))
          (api-entry-exists-p (entry)
            (if (consp entry)
                (multiple-value-bind (symbol found)
@@ -261,10 +261,19 @@
                (and (symbolp entry) (or (fboundp entry) (boundp entry)))))
          (test-anchor-exists-p (entry)
            (and (symbolp entry)
-                (loop for registered being the hash-keys
-                        of cl-cc/test::*known-test-names*
-                      thereis (string= (symbol-name registered)
-                                       (symbol-name entry))))))
+                (or (loop for registered being the hash-keys
+                            of cl-cc/test::*known-test-names*
+                          thereis (string= (symbol-name registered)
+                                           (symbol-name entry)))
+                    (let ((found nil))
+                      (cl-cc/test::%map-cl-weave-tests
+                       (lambda (test suite)
+                         (declare (ignore suite))
+                         (when (string-equal
+                                (symbol-name entry)
+                                (cl-weave::test-case-name test))
+                           (setf found t))))
+                      found))))))
     (dolist (module (or modules
                         (cl-cc/optimize:opt-roadmap-evidence-modules evidence)))
       (expect (module-exists-p module) :to-be-truthy))
