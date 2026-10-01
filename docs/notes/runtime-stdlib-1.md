@@ -1,5 +1,8 @@
 # Runtime: Standard Library — Core Runtime (Phase 111-137, 75 FRs)
 
+**Status: ⚠️ Partial / planned.** The entries below are not a local completion
+claim unless their cited implementation and test evidence exists here.
+
 Lambda lists, dynamic variables, numeric I/O, regex, source location, serialization, debugger/SLIME, memory-mapped I/O, floating point, external formats, terminal/readline, dynamic library loading, GC finalization, CLOS dispatch cache, closure optimization, crypto/compression, AOT compilation, persistent data structures, type specifier runtime, function objects, environment API, async I/O, STM, CSP, pattern matching.
 
 ---

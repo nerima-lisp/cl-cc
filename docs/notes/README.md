@@ -18,24 +18,18 @@ current FR tally.
 Reader-facing documentation lives in `docs/src/` and is linked from the site
 nav in `docs/mkdocs.yml`.
 
-## Four specification documents are still at `docs/` top level
+## Specification documents and evidence paths
 
-`optimize-passes.md`, `optimize-backend.md`, `type-advanced.md`, and `wasm.md`
-belong here with the rest, but they cannot be moved yet: the test suite reads
-them by literal relative path and asserts that every `FR-` heading has matching
-implementation evidence in the Lisp registry.
+All specification documents tracked by this index live under `docs/notes/`.
+Evidence paths below are repository-relative and must exist before they are
+used as local implementation evidence.
 
 | Document | Read by | Guarded |
 |---|---|---|
-| `docs/optimize-passes.md` | `packages/optimize/tests/optimizer-roadmap-tests.lisp` | no |
-| `docs/optimize-backend.md` | `packages/optimize/tests/optimizer-roadmap-backend-tests.lisp` | no |
-| `docs/type-advanced.md` | `packages/type/tests/type-2026-advanced-registry-tests.lisp` | no |
-| `docs/wasm.md` | `packages/emit/tests/wasm-features-tests.lisp` | `probe-file` |
+| `docs/notes/optimize-passes.md` | `packages/optimize/tests/optimizer-roadmap-tests.lisp` | no |
+| `docs/notes/optimize-backend.md` | `packages/optimize/tests/optimizer-roadmap-backend-tests.lisp` | no |
+| `docs/notes/type-advanced.md` | external `cl-cc-type` clone | no |
+| `docs/notes/wasm.md` | no verified local implementation evidence | no |
 
-`nix/checks.nix` includes `../docs` in the `checks.tests` source fileset, so
-the files reach the sandbox. Moving them without updating those path literals
-makes the unguarded reads error and the guarded one pass vacuously.
-
-To finish the move, update the path literals to `docs/notes/...` in the four
-test files above, then `mv` the documents into this directory in the same
-change.
+When a path or test is not present in this checkout, describe it as external or
+unverified instead of presenting it as local implementation evidence.

@@ -1,20 +1,18 @@
 # Memory Management & GC
 
-**実装状況**: 166 FR 中 71 実装完了 (✅), 17 スタブ (⚠️), 78 延期 (⏸️)。Pure CL制約下で全84の直接実装対象FR（✅+⚠️）の実装が完了。OS/ハード統合が必要な⏸️ FRは設計仕様として明記。全⚠️ FRはPure CL fallbackインターフェースを提供。
-**テスト**: 7,745 passed / 1 failed (pre-existing)
-**最終更新**: 2026-05-18 (監査日: 2026-05-18)
+**状態**: ⚠️ このノートの実装主張は未検証です。現ツリーに対応する `packages/*/src/` 実装証跡がない項目は完了扱いにしません。
 
-> **完了基準**: 67件の✅ FRは実コード＋テスト証跡あり。17件の⚠️ FRはPure CL制約下でインターフェース定義＋移植可能フォールバックまで完了。82件の⏸️ FRはOS統合(Linux/Windows NUMA, mmap, huge pages)、ハードウェア拡張(ARM MTE, SIMD)、アーキテクチャ変更(colored pointers, region-based GC, ARC, ZGC-style collectors)が必要なため意図的延期。
+> **判定基準**: ✅ は実装と証跡が確認できる場合だけ使用し、証跡がない項目は ⚠️ または ⏸️ とします。
 >
 > **scope**: 本ドキュメントのFR範囲はPure Common Lispで実装可能な範囲に加え、ネイティブバックエンドで必要となる高度なメモリ管理機能を含む。
-> ⚠️ マークのFRはPure CL制約下で到達可能な範囲（インターフェース定義と逐次フォールバック）まで実装完了。
+> ⚠️ マークのFRは、実装と証跡の確認が完了していない項目です。
 > ⏸️ マークのFRは設計仕様としての位置づけであり、Pure CL実装の完了条件には含まれない。
 
 Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### 実装ステータス凡例
 
-- ✅ = 実装完了（Pure CL 実装としてテスト済み。OS/ネイティブ資源を伴う意味論は範囲外）
+- ✅ = 実装と証跡を確認済み（定義は `docs/notes/fr-status.md` に集約）
 - ⚠️ = スタブ実装（Pure CL制約下でインターフェース定義＋逐次フォールバックまで完了。本番動作にはネイティブバックエンド/OS統合が必要）
 - ⏸️ = 意図的延期（OS統合・ハードウェア拡張・ネイティブバックエンド・大規模ランタイム再設計が必要。設計仕様として明記）
 - ❌ = 未着手
@@ -23,7 +21,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 5 — メモリ・GC最適化
 
-#### FR-17: ✅: Alias Analysis / Memory Disambiguation
+#### FR-17: Alias Analysis / Memory Disambiguation ⚠️
 
 - **対象**: `packages/optimize/src/optimizer.lisp` + `packages/optimize/src/cfg.lisp`
 - **内容**:
@@ -52,7 +50,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
   - HotSpot C2・GHC GCが同様の最適化を実施
   - 効果: 頻繁なコンス操作ループでのGCオーバーヘッド大幅削減
 
-#### FR-20: ✅: Allocation Sinking (割り当てシンキング)
+#### FR-20: Allocation Sinking (割り当てシンキング) ⚠️
 
 - **対象**: `packages/optimize/src/optimizer.lisp`
 - **内容**:
@@ -64,60 +62,60 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 15 — GC・メモリシステム最適化
 
-#### FR-84: ✅: Card Table Summarization
+#### FR-84: Card Table Summarization ⚠️
 
 - **対象**: `packages/runtime/src/gc-minor.lisp` + `packages/runtime/src/heap-trace.lisp`
-- **実装**: `rt-card-summary-clean-block-p` (heap-trace.lisp), `%gc-scan-dirty-cards` (gc-minor.lisp)
+- **証跡（未確認）**: `rt-card-summary-clean-block-p` (heap-trace.lisp), `%gc-scan-dirty-cards` (gc-minor.lisp)
 - **内容**: カードテーブルの1レベルビットマップサマリを追加し、クリーンカードのスキャンをスキップ
 - **根拠**: 現状 `%gc-scan-dirty-cards` は全 `num-cards` を毎回イテレート
 - **難易度**: Easy
 
-#### FR-85: ✅: Dynamic GC Age Threshold Tuning
+#### FR-85: Dynamic GC Age Threshold Tuning ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: `*gc-tenuring-threshold*` をプロモーション率・旧世代占有に基づいて動的調整
 - **根拠**: 現状ハードコード値3; 動的チューニングでGC品質向上
 - **難易度**: Easy
 
-#### FR-86: ✅: Large Object Space (LOS)
+#### FR-86: Large Object Space (LOS) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: 閾値超オブジェクトを独立管理領域に直接割り当てNursery迂回
 - **難易度**: Easy
 
-#### FR-87: ✅: rt-heap Field Reordering
+#### FR-87: rt-heap Field Reordering ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: `young-free` をホットフィールド群 (`young-from-base`, `young-limit`) と同一キャッシュラインに配置
 - **難易度**: Easy
 
-#### FR-88: ✅: Incremental GC Marking
+#### FR-88: Incremental GC Marking ⚠️
 
 - **対象**: `packages/runtime/src/gc-major.lisp`
-- **実装**: `rt-gc-incremental-mark-step`, `*gc-incremental-mark-enabled*`
+- **証跡（未確認）**: `rt-gc-incremental-mark-step`, `*gc-incremental-mark-enabled*`
 - **内容**: メジャーGCのマークフェーズをミューテータ作業とインタリーブして一時停止を短縮
 - **根拠**: SATB インフラが既に存在するため自然な拡張
 - **難易度**: Medium
 
-#### FR-89: ✅: Compacting Old Space
+#### FR-89: Compacting Old Space ⚠️
 
 - **対象**: `packages/runtime/src/gc-major.lisp`
-- **実装**: `rt-gc-compact-old-space` (4-phase sliding compaction)
+- **証跡（未確認）**: `rt-gc-compact-old-space` (4-phase sliding compaction)
 - **内容**: マーク後にスライディングコンパクションで旧世代のフラグメンテーション解消
 - **難易度**: Hard
 
-#### FR-90: ✅: Safepoint Dominance Pruning
+#### FR-90: Safepoint Dominance Pruning ⚠️
 
 - **対象**: `packages/optimize/src/optimizer-memory-interval.lisp`
-- **実装**: `opt-prune-dominated-safepoints`
+- **証跡（未確認）**: `opt-prune-dominated-safepoints`
 - **内容**: 同一ルートセットを持つ支配されたsafepointを除去
 - **根拠**: MIRに `:safepoint` ノードが存在するが冗長性解析なし
 - **難易度**: Medium
 
-#### FR-91: ✅: Safepoint Hoisting to Loop Back-Edges
+#### FR-91: Safepoint Hoisting to Loop Back-Edges ⚠️
 
 - **対象**: `packages/optimize/src/optimizer-memory-interval.lisp`
-- **実装**: `opt-hoist-safepoints-to-back-edges`
+- **証跡（未確認）**: `opt-hoist-safepoints-to-back-edges`
 - **内容**: ループボディのsafepointをバックエッジにのみ移動、ポーリング頻度削減
 - **難易度**: Medium
 
@@ -125,7 +123,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 41 — GC高度化 (ピン・コンパクション)
 
-#### FR-212: ✅: Object Pinning (オブジェクトピン)
+#### FR-212: Object Pinning (オブジェクトピン) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: Cheney copying GC（`gc.lisp:200-263`）が全オブジェクトを移動。FFI呼び出し中のオブジェクトアドレス安定性保証なし
@@ -133,7 +131,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM JEP 423 / .NET pinned objects / SBCL with-pinned-objects。FFI安全性に必須
 - **難易度**: Hard
 
-#### FR-213: ✅: GC Compaction / Defragmentation (ヒープコンパクション)
+#### FR-213: GC Compaction / Defragmentation (ヒープコンパクション) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: major GC（`gc.lisp:331-392`）はマーク&スイープのみ。`gc.lisp:158`のfree-listは未使用。解放後のフラグメンテーション対策なし
@@ -145,7 +143,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 53 — GC高度化 (Ephemeron・Unwind)
 
-#### FR-246: ✅: Ephemerons (エフェメロン)
+#### FR-246: Ephemerons (エフェメロン) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: FR-184で弱参照・ファイナライザを定義しているが、エフェメロン（キーが到達不能になった場合のみ値も回収されるkey-valueペア）は未定義。`gc.lisp`に弱参照トラッキングなし
@@ -153,7 +151,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: Racket / Java WeakHashMap / JavaScript WeakRef+FinalizationRegistry。SBCL sb-ext:make-ephemeron。シンボルテーブル・キャッシュの正確なGC
 - **難易度**: Hard
 
-#### FR-247: ✅: Unwind Tables / .eh_frame Generation (アンワインドテーブル)
+#### FR-247: Unwind Tables / .eh_frame Generation (アンワインドテーブル) ⚠️
 
 - **対象**: `packages/binary/src/elf.lisp`, `packages/binary/src/macho.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **現状**: ELF出力（`elf.lisp`）は`.text`, `.rela.text`, `.symtab`, `.strtab`, `.shstrtab`のみ。Mach-O出力にも例外テーブルセクションなし。FR-195（DWARF debug info）は定義済みだがアンワインド情報は別
@@ -197,9 +195,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: Intel VTune false sharing detection / perf c2c。並行プログラムの性能劣化の主因
 - **難易度**: Hard
 
-#### FR-307: ✅: Object Co-Location Hints (オブジェクト近接配置ヒント)
+#### FR-307: Object Co-Location Hints (オブジェクト近接配置ヒント) ⚠️
 
-- **実装**: `packages/runtime/src/gc-tlab.lisp` (`rt-gc-co-locate`, `%rt-gc-copy-co-located-neighbor`), Cheneyコピー時に co-locate ヒントを消費し隣接オブジェクトを優先的に近接配置。双方向ヒントを `rt-heap-co-location-hints` ハッシュテーブルで管理
+- **証跡（未確認）**: `packages/runtime/src/gc-tlab.lisp` (`rt-gc-co-locate`, `%rt-gc-copy-co-located-neighbor`), Cheneyコピー時に co-locate ヒントを消費し隣接オブジェクトを優先的に近接配置。双方向ヒントを `rt-heap-co-location-hints` ハッシュテーブルで管理
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**: 割り当てサイトカラーリングまたは`co-locate(a, b)`ヒントで関連オブジェクトを同一キャッシュライン/隣接ラインに配置。GCコピー時にアフィニティを維持。CLOSインスタンスとそのクラス記述子の近接配置
 - **根拠**: HotSpot TLAB (Thread-Local Allocation Buffers) / Zing C4 co-location。親子オブジェクトの空間的局所性確保
@@ -213,7 +211,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: V8 hidden class + inline slots / SpiderMonkey NativeObject。ポインタ追跡回避で10x高速化
 - **難易度**: Hard
 
-#### FR-309: ✅: Memory Access Pattern Analysis (メモリアクセスパターン解析)
+#### FR-309: Memory Access Pattern Analysis (メモリアクセスパターン解析) ⚠️
 
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/mir/src/mir.lisp`
 - **現状**: オプティマイザの8パス（`*opt-convergence-passes*`、`optimizer.lisp:1020-1031`）は全てレジスタレベル。メモリアクセス追跡なし。エイリアス解析なし（FR-017として計画のみ）。MIRに`:load`/`:store`演算（`mir.lisp:142-143`）あるが解析パスなし
@@ -225,7 +223,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 70 — GC高度化（追加）
 
-#### FR-331: ✅: Old-Space Free-List Allocation Reuse (旧世代フリーリスト再利用)
+#### FR-331: Old-Space Free-List Allocation Reuse (旧世代フリーリスト再利用) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: `%gc-sweep-old-space`（`gc.lisp:301-329`）がメジャーGCスイープ時にフリーリストを構築。`rt-gc-alloc`（`gc.lisp:23-44`）はヤング空間バンプポインタのみ使用。旧空間昇格（`gc.lisp:78-82`）もバンプポインタ（`old-free`）で`rt-heap-free-list`を完全無視
@@ -233,7 +231,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM CMS free-list / G1 region-based allocation。メジャーGC後のメモリ再利用
 - **難易度**: Easy
 
-#### FR-332: ✅: Precise GC Root Scanning (正確GCルートスキャニング)
+#### FR-332: Precise GC Root Scanning (正確GCルートスキャニング) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/vm/src/vm.lisp`
 - **現状**: `rt-gc-add-root`（`gc.lisp:50-54`）は全ルートを型情報なしの不透明consセルとして扱う。`gc.lisp:232-236`のルートスキャンは`(integerp val)`チェックのみ。NaN-boxing（`value.lisp`）の型述語を活用せず
@@ -241,7 +239,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: HotSpot OopMap / V8 tagged pointer root scanning。GCルートスキャン高速化
 - **難易度**: Medium
 
-#### FR-333: ✅: Nursery Sizing Heuristics (ナーサリサイズヒューリスティクス)
+#### FR-333: Nursery Sizing Heuristics (ナーサリサイズヒューリスティクス) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **現状**: `*gc-young-size-words*`=128Kワード（1MB）、`*gc-old-size-words*`=512Kワード（4MB）がハードコード（`heap.lisp:30-34`）。ランタイムリサイズなし。GC統計（`gc.lisp:398-421`）は収集するが消費なし
@@ -249,7 +247,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: HotSpot adaptive sizing / Go GC pacer。GCオーバーヘッドの自動最適化
 - **難易度**: Medium
 
-#### FR-334: ✅: Memory Pressure Callbacks (メモリ逼迫コールバック)
+#### FR-334: Memory Pressure Callbacks (メモリ逼迫コールバック) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: ヤング空間枯渇時（`gc.lisp:40-42`）と旧空間枯渇時（`gc.lisp:80-81`）にハードエラー。OOM前にユーザーコードがキャッシュ解放等の対応を行うフックなし
@@ -257,7 +255,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: .NET GC.RegisterForFullGCNotification / Android onTrimMemory。OOM回避のユーザーフック
 - **難易度**: Easy
 
-#### FR-335: ✅: Write Barrier Young-to-Young Elision (Young→Youngストアバリア省略)
+#### FR-335: Write Barrier Young-to-Young Elision (Young→Youngストアバリア省略) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **現状**: `rt-gc-write-barrier`（`gc.lisp:269-295`）が毎ストアで旧空間チェック。Young→Youngストアはカードマーキング不要だがチェックコストを支払う
@@ -265,7 +263,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: G1 GC / ZGC young-gen skip。バリアオーバーヘッド削減
 - **難易度**: Easy
 
-#### FR-336: ✅: GC-NaN-Boxing Integration (GCとNaN-Boxing値表現の統合)
+#### FR-336: GC-NaN-Boxing Integration (GCとNaN-Boxing値表現の統合) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/value.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: 3つの独立した値表現: (1) `value.lisp` NaN-boxing、(2) `heap.lisp`ヘッダベースタグ、(3) `vm.lisp`ハッシュテーブルヒープ+CLオブジェクト。GCは`(integerp val)`でポインタ判定（`gc.lisp:145-148, 232-234`）。`value.lisp:132-140`の`val-pointer-p`を使わない
@@ -273,7 +271,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: V8 tagged pointer GC / SpiderMonkey NaN-boxing GC。GCスキャン精度向上
 - **難易度**: Medium
 
-#### FR-337: ✅: Finalizer Ordering Guarantees (ファイナライザ実行順序保証)
+#### FR-337: Finalizer Ordering Guarantees (ファイナライザ実行順序保証) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **現状**: FR-184がファイナライゼーションキュー概念を定義するが、順序セマンティクスなし。現在`gc.lisp`にファイナライザインフラ自体が未実装
@@ -285,38 +283,38 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 72 — 並列・並行GC
 
-#### FR-338: ✅: Parallel GC Worker Threads (並列GCワーカースレッド)
+#### FR-338: Parallel GC Worker Threads (並列GCワーカースレッド) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
-- **実装状況**: 基盤実装完了。`*gc-worker-count*`, `%rt-gc-run-worker-tasks`, `%rt-gc-partition-list`, `rt-gc-parallel-root-scan`, `rt-gc-parallel-mark`, `rt-gc-parallel-sweep` 実装済み。SB-THREAD利用可能時のみ並列実行、Pure CLでは逐次フォールバック。
+- **実装状況**: 基盤実装主張（未確認）。`*gc-worker-count*`, `%rt-gc-run-worker-tasks`, `%rt-gc-partition-list`, `rt-gc-parallel-root-scan`, `rt-gc-parallel-mark`, `rt-gc-parallel-sweep` 実装主張（未確認）。SB-THREAD利用可能時のみ並列実行、Pure CLでは逐次フォールバック。
 - **現状**: minor GC（Cheney copying）およびmajor GC（tri-color mark-sweep）はシングルスレッド逐次実行（デフォルト）。SB-THREAD環境では`*gc-worker-count*`設定で並列化可能
 - **内容**: GCフェーズをタスクキューで分割し複数ワーカースレッドで並列化。ルートスキャン並列化（各スレッドのルートセットを独立スキャン）。マークフェーズのwork-stealing: `%gc-mark-grey` キューをN分割しワーカーが盗む。スイープフェーズの領域分割並列化
 - **根拠**: HotSpot Parallel GC / G1 Parallel Marking / Go GC parallel marking (GOMAXPROCS workers)。マルチコア環境でGC停止時間をコア数に反比例させる標準技術
 - **難易度**: Hard
 
-#### FR-339: ✅: Concurrent Marking with Tri-Color Invariant (並行マーキング・三色不変式)
+#### FR-339: Concurrent Marking with Tri-Color Invariant (並行マーキング・三色不変式) ⚠️
 
 - **対象**: `packages/runtime/src/gc-major.lisp`, `packages/runtime/src/gc-write-barrier.lisp`
-- **実装**: `*rt-concurrent-gc-enabled-p*`, `rt-gc-configure-concurrent-mode`, `rt-gc-concurrent-assist` (gc-major.lisp). 4-phaseプロトコル (initial-mark STW → concurrent-mark → final-remark STW → sweep). SATB per-thread queues (gc-write-barrier.lisp)
-- **現状**: SATBバリア実装済み、並行マーク基盤あり
+- **証跡（未確認）**: `*rt-concurrent-gc-enabled-p*`, `rt-gc-configure-concurrent-mode`, `rt-gc-concurrent-assist` (gc-major.lisp). 4-phaseプロトコル (initial-mark STW → concurrent-mark → final-remark STW → sweep). SATB per-thread queues (gc-write-barrier.lisp)
+- **現状**: SATBバリア実装主張（未確認）、並行マーク基盤あり
 - **内容**: マーキングをミューテータ実行中に行うConcurrent Mark。スナップショット対象はGC開始時点の生存オブジェクト集合（SATB保証）。マーキング完了後にSTW remark フェーズ（短時間）でSATBキューをドレイン。`*gc-satb-queue*` をper-thread化してロック不要にする
 - **根拠**: G1 GC Concurrent Mark / ZGC Concurrent Mark / CMS。STWポーズをremark+cleanup（数ms）まで短縮
 - **難易度**: Very Hard
 
-#### FR-340: ✅: Concurrent Sweeping (並行スイープ)
+#### FR-340: Concurrent Sweeping (並行スイープ) ⚠️
 
 - **対象**: `packages/runtime/src/gc-major.lisp`
-- **実装**: `*gc-lazy-sweep-enabled*`, `rt-gc-lazy-sweep-step`, lazy-sweep-cursor/lazy-sweep-limit (rt-heap slots)
-- **現状**: Lazy sweep基盤実装済み。ページ単位のオンデマンドスイープ対応
+- **証跡（未確認）**: `*gc-lazy-sweep-enabled*`, `rt-gc-lazy-sweep-step`, lazy-sweep-cursor/lazy-sweep-limit (rt-heap slots)
+- **現状**: Lazy sweep基盤実装主張（未確認）。ページ単位のオンデマンドスイープ対応
 - **内容**: スイープをミューテータ再開後に並行実行。未スイープ領域への割り当て要求はオンデマンドスイープ（lazy sweep）でカバー。スイープ完了前に当該領域が必要になった場合のみ同期スイープ。フリーリスト構築も並行化
 - **根拠**: Go GC concurrent sweep / CMS concurrent sweep。スイープ時間をほぼゼロに短縮
 - **難易度**: Hard
 
-#### FR-341: ✅: GC Pause Time Goals / SLO (GC停止時間SLO)
+#### FR-341: GC Pause Time Goals / SLO (GC停止時間SLO) ⚠️
 
 - **対象**: `packages/runtime/src/gc-major.lisp`, `packages/runtime/src/gc.lisp`
-- **実装**: `*gc-max-pause-ms*` (default 200ms), `%rt-gc-note-pause` (pause accounting), `rt-heap-pause-exceeded-count` (SLO violation tracking). Incremental marking budgets based on pause targets.
-- **現状**: パラメータとアカウンティング基盤実装済み
+- **証跡（未確認）**: `*gc-max-pause-ms*` (default 200ms), `%rt-gc-note-pause` (pause accounting), `rt-heap-pause-exceeded-count` (SLO violation tracking). Incremental marking budgets based on pause targets.
+- **現状**: パラメータとアカウンティング基盤実装主張（未確認）
 - **内容**: `*gc-max-pause-ms*` 目標値（デフォルト200ms）を設定。Concurrent/Incremental GCの作業量を停止時間測定（`get-internal-real-time`）でスライス。目標超過時に作業を中断しミューテータに制御を返す。Adaptive Sized Regions（G1方式）で目標達成精度を向上
 - **根拠**: G1 `-XX:MaxGCPauseMillis` / Shenandoah pause target。低レイテンシアプリケーションの要件
 - **難易度**: Hard
@@ -333,9 +331,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 73 — スレッドローカル割り当て (TLAB)
 
-#### FR-343: ⚠️: Thread-Local Allocation Buffers (TLAB)
+#### FR-343: Thread-Local Allocation Buffers (TLAB) ⚠️
 
-- **実装**: `packages/runtime/src/gc-tlab.lisp` (345行): `rt-tlab`構造体, `rt-gc-tlab-alloc`, `%rt-gc-tlab-refill`, `%rt-gc-tlab-retire`, `rt-gc-tlab-retire-all`
+- **証跡（未確認）**: `packages/runtime/src/gc-tlab.lisp` (345行): `rt-tlab`構造体, `rt-gc-tlab-alloc`, `%rt-gc-tlab-refill`, `%rt-gc-tlab-retire`, `rt-gc-tlab-retire-all`
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**: 各スレッドがヒープの専有チャンク（TLAB）を保有し、TLABが枯渇するまでロックフリーで割り当て。TLABサイズはスレッドの割り当てレートに応じて動的調整（最小1KB〜最大512KB）。TLAB外の大オブジェクトはグローバルロック経由。GC時はすべてのTLABを一斉リタイア
 - **Pure CL**: 完全なPure CL実装（バンプポインタ、リフィル、リタイア）。SB-THREAD利用時はmutexベースのリフィルロック。ネイティブバックエンドでCAS不要のロックフリー割り当てに置換可能
@@ -343,9 +341,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: HotSpot TLAB / GraalVM TLAB / Go `mcache`。スレッドあたり割り当てコストをほぼゼロに（CAS不要）
 - **難易度**: Medium
 
-#### FR-344: ⚠️: TLAB Waste Minimization (TLABウェイスト最小化)
+#### FR-344: TLAB Waste Minimization (TLABウェイスト最小化) ⚠️
 
-- **実装**: `*gc-tlab-retire-fill*`, `%rt-gc-tlab-retire`内のダミーフィル (`packages/runtime/src/gc-tlab.lisp:242-253`), `rt-tlab-waste-bytes`追跡
+- **証跡（未確認）**: `*gc-tlab-retire-fill*`, `%rt-gc-tlab-retire`内のダミーフィル (`packages/runtime/src/gc-tlab.lisp:242-253`), `rt-tlab-waste-bytes`追跡
 - **対象**: `packages/runtime/src/heap.lisp`
 - **依存**: FR-343
 - **内容**: TLAB残余領域の「Dummy Fill」: TLABリタイア時に残余をダミーオブジェクトで埋めてヒープ走査可能状態に保つ。統計ベースのTLABサイズ予測（EMA）で残余ウェイストを最小化。`gc-tlab-waste-limit`を超えたTLABは早期リタイア
@@ -353,9 +351,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: HotSpot TLAB refill waste heuristics。ヒープ線形走査の正確性維持
 - **難易度**: Easy
 
-#### FR-345: ✅: Bump-Pointer Allocation with SIMD Zeroing (SIMD高速ゼロ初期化)
+#### FR-345: Bump-Pointer Allocation with SIMD Zeroing (SIMD高速ゼロ初期化) ⚠️
 
-- **実装**: `rt-gc-simd-zero-fill` (`packages/runtime/src/gc-tlab.lisp:289-308`), `rt-gc-tlab-alloc` 内で呼び出し
+- **証跡（未確認）**: `rt-gc-simd-zero-fill` (`packages/runtime/src/gc-tlab.lisp:289-308`), `rt-gc-tlab-alloc` 内で呼び出し
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **内容**: 新規割り当てオブジェクトのゼロ初期化をSIMD命令（`VMOVDQA`/`VMOVNTDQ`）で実施。16バイトアライメント保証の上で32〜64バイト/命令の高スループット初期化。Non-temporal storeでキャッシュ汚染を回避
 - **Pure CL**: ヒープストレージは simple-vector で既にゼロ初期化済みのため、`rt-gc-simd-zero-fill` は引数検証のみの文書化された no-op。ネイティブバックエンドでは SIMD ゼロフィル命令に置換される単一書換ポイントを提供
@@ -375,9 +373,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: SBCL/Clozure CL lowtag system / Racket immediate values / Ruby VALUE。型ディスパッチのゼロコスト化
 - **難易度**: Very Hard
 
-#### FR-347: ⚠️: Compressed Object References (ポインタ圧縮)
+#### FR-347: Compressed Object References (ポインタ圧縮) ⚠️
 
-- **実装**: `packages/runtime/src/value.lisp` (圧縮ポインタ定数・`val-compressed-pointer-p`), `packages/runtime/src/value-codec.lisp` (`encode-compressed-pointer`, `decode-compressed-pointer`), `packages/runtime/src/heap-core.lisp` (`rt-compress-object-ref`, `rt-decompress-object-ref`, `%rt-ensure-compressed-pointer-range`, `*compressed-pointers-enabled*`)
+- **証跡（未確認）**: `packages/runtime/src/value.lisp` (圧縮ポインタ定数・`val-compressed-pointer-p`), `packages/runtime/src/value-codec.lisp` (`encode-compressed-pointer`, `decode-compressed-pointer`), `packages/runtime/src/heap-core.lisp` (`rt-compress-object-ref`, `rt-decompress-object-ref`, `%rt-ensure-compressed-pointer-range`, `*compressed-pointers-enabled*`)
 - **対象**: `packages/runtime/src/heap.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **内容**: ヒープを最大32GBに制限し、ヒープ内参照を32bitオフセットで表現（`heap_base + offset`）。ロード時に`LEA rax, [heap_base + r32*1]`で復元。スロット密度が2倍に向上しキャッシュ効率改善。GCも32bitオフセットで移動量を記録
 - **Pure CL**: 完全なオフセットコーデック（NaN-boxingフラグビット統合、4GBヒープリージョンモデル、範囲検証）。ネイティブバックエンドで `LEA` 命令に置換
@@ -484,28 +482,28 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 77 — スラブ・アリーナアロケータ
 
-#### FR-359: ✅: Slab Allocator for Fixed-Size Objects (固定サイズスラブアロケータ)
+#### FR-359: Slab Allocator for Fixed-Size Objects (固定サイズスラブアロケータ) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: cons・symbol・closure等の頻出固定サイズオブジェクト専用のスラブプール。各スラブクラスにフリーリストを持ち、同サイズオブジェクトが連続配置される。GCスキャン高速化（同一スラブ内は同型なのでスキャンコード共有）。外部フラグメンテーション最小化
 - **根拠**: Linux SLAB/SLUB allocator / jemalloc size-class bins / tcmalloc。cons操作が支配的なLispワークロードに特に有効
 - **難易度**: Medium
 
-#### FR-360: ✅: Arena / Region Allocator for Compiler Passes (コンパイラパス用アリーナ)
+#### FR-360: Arena / Region Allocator for Compiler Passes (コンパイラパス用アリーナ) ⚠️
 
 - **対象**: `packages/compile/src/codegen.lisp`, `packages/expand/src/expander.lisp`, `packages/compile/src/cps.lisp`
 - **内容**: コンパイル1パス中に生成されるAST・MIR・VM命令列をアリーナ（単調増加バンプポインタ）から割り当て。パス完了後にアリーナ全体を一括解放（個別GCコストなし）。中間表現の寿命が明確なためスコープ付きアリーナが最適
 - **根拠**: LLVM BumpPtrAllocator / GCC obstack / Clang ASTContext arena。コンパイラ内中間データ構造のGCプレッシャー排除
 - **難易度**: Easy
 
-#### FR-361: ✅: Pool Allocator with Object Recycling (オブジェクトリサイクルプール)
+#### FR-361: Pool Allocator with Object Recycling (オブジェクトリサイクルプール) ⚠️
 
 - **対象**: `packages/vm/src/vm.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: `vm-call-frame`等の短命オブジェクトをフリープールから再利用。解放時にゼロ初期化してプールへ返却。コールフレームは関数呼び出しのたびに生成・破棄されるため、プールによりalloc/GCコストを排除。プールサイズ上限を設けGC圧力と再利用コストのバランスを取る
 - **根拠**: HotSpot JNI handle pools / SBCL stack-allocated binding frames。短命オブジェクトのGCプレッシャー削減
 - **難易度**: Easy
 
-#### FR-362: ✅: Segregated Free Lists by Size Class (サイズクラス別フリーリスト)
+#### FR-362: Segregated Free Lists by Size Class (サイズクラス別フリーリスト) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: 旧空間フリーリスト（`rt-heap-free-list`）を単一リストから16サイズクラス別（8B/16B/32B/.../32KB/large）に分離。first-fit探索O(N)→O(1)ルックアップ。サイズクラスは2倍刻みの指数分布。jemalloc/tcmalloc方式のbin管理
@@ -516,9 +514,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 78 — NUMA対応メモリ管理
 
-#### FR-363: ⚠️: NUMA-Aware Heap Allocation (NUMA対応ヒープ割り当て)
+#### FR-363: NUMA-Aware Heap Allocation (NUMA対応ヒープ割り当て) ⚠️
 
-- **実装**: `rt-numa-local-alloc`, `rt-numa-node-of-thread`, `*rt-numa-enabled*` (`packages/runtime/src/heap-core.lisp:693-713`)
+- **証跡（未確認）**: `rt-numa-local-alloc`, `rt-numa-node-of-thread`, `*rt-numa-enabled*` (`packages/runtime/src/heap-core.lisp:693-713`)
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: `numa_alloc_local()`（Linux）/ `VirtualAllocExNuma()`（Windows）でヒープ領域をNUMAノードローカルに確保。スレッドのNUMAノードをOSに照会し（`sched_getcpu()` + `/sys/devices/system/cpu/cpuN/node`）、TLABをローカルNUMAノードのページから割り当て。cross-NUMAアクセスのメモリ帯域幅競合を排除
 - **Pure CL**: 全スレッドをノード0にマップする移植可能フォールバック。ノードメタデータを記録し既存のGCバンプアロケータに委譲。ネイティブバックエンドで `numa_alloc_local()` に置換
@@ -526,9 +524,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM NUMA-Aware Allocator (`-XX:+UseNUMA`) / Go NUMA hints。8ソケット以上のサーバーで2-5x帯域幅向上
 - **難易度**: Hard
 
-#### FR-364: ⚠️: NUMA-Local GC (NUMAローカルGC)
+#### FR-364: NUMA-Local GC (NUMAローカルGC) ⚠️
 
-- **実装**: `rt-gc-numa-affinity` (`packages/runtime/src/heap-core.lisp:715-727`), `rt-heap-numa-gc-schedule` スロット
+- **証跡（未確認）**: `rt-gc-numa-affinity` (`packages/runtime/src/heap-core.lisp:715-727`), `rt-heap-numa-gc-schedule` スロット
 - **対象**: `packages/runtime/src/gc.lisp`
 - **依存**: FR-363
 - **内容**: GCワーカースレッドをオブジェクトの所在NUMAノードに配置してリモートアクセスを排除。Minor GCをNUMAノード単位で独立実行。オブジェクト移動先もソースと同一NUMAノードを優先
@@ -537,9 +535,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM NUMA-Aware GC / GraalVM NUMA GC。GCスループットのNUMAスケーラビリティ
 - **難易度**: Hard
 
-#### FR-365: ⚠️: Memory Interleaving for Shared Data (共有データのメモリインタリーブ)
+#### FR-365: Memory Interleaving for Shared Data (共有データのメモリインタリーブ) ⚠️
 
-- **実装**: `rt-heap-interleave` (`packages/runtime/src/heap-core.lisp:729-739`), `rt-heap-interleaved-regions` スロット
+- **証跡（未確認）**: `rt-heap-interleave` (`packages/runtime/src/heap-core.lisp:729-739`), `rt-heap-interleaved-regions` スロット
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: 全スレッドから頻繁にアクセスされるグローバルデータ（シンボルテーブル・メソッドキャッシュ・コードキャッシュ）を`mbind(MPOL_INTERLEAVE)`でNUMAノード間にインタリーブ配置。特定ノードへのホットスポットを分散
 - **Pure CL**: リージョンメタデータ（開始/終了/ポリシー）を記録。ネイティブバックエンドで `mbind(MPOL_INTERLEAVE)` に変換
@@ -551,16 +549,16 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 79 — ヒーププロファイリング・観測可能性
 
-#### FR-366: ✅: Sampling Heap Profiler (サンプリングヒーププロファイラ)
+#### FR-366: Sampling Heap Profiler (サンプリングヒーププロファイラ) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/cli/src/main.lisp`
 - **内容**: 割り当て毎に一定確率（デフォルト: 512KB毎に1回）でコールスタックをサンプリング。Poisson samplingで統計的に正確なオブジェクト割り当て量推定。`--heap-profile=output.pb`でpprof互換フォーマット出力。Flameグラフ生成対応
 - **根拠**: Go `pprof` heap profiler / Chromium v8 heap profiler / JVM JFR heap sampling。本番環境でも1%以下のオーバーヘッドで割り当てホットスポット特定
 - **難易度**: Medium
 
-#### FR-367: ⚠️: Allocation Tracing with DTrace/eBPF (割り当てトレーシング)
+#### FR-367: Allocation Tracing with DTrace/eBPF (割り当てトレーシング) ⚠️
 
-- **実装**: `*gc-probes-enabled*`, `rt-gc-probe-alloc`, `rt-gc-probe-gc-start`, `rt-gc-probe-gc-end` (`packages/runtime/src/gc-major-sweep.lisp:519-560`)
+- **証跡（未確認）**: `*gc-probes-enabled*`, `rt-gc-probe-alloc`, `rt-gc-probe-gc-start`, `rt-gc-probe-gc-end` (`packages/runtime/src/gc-major-sweep.lisp:519-560`)
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: USDT（User Statically-Defined Tracing）プローブを`rt-gc-alloc`・GCフェーズ開始/終了・TLAB refillに挿入。`dtrace -n 'cl_cc*:::alloc'`でゼロオーバーヘッド計装。eBPF uprobe対応でLinuxの`perf`からも観測可能
 - **Pure CL**: `*gc-probes-enabled*` が真の場合 `*trace-output*` にフォールバック出力。ネイティブバックエンドで SDT/eBPF uprobe に置換
@@ -568,14 +566,14 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM DTrace probes / Ruby USDT probes / Node.js tracing。プロダクション計装の標準
 - **難易度**: Medium
 
-#### FR-368: ✅: Live Heap Snapshot (ライブヒープスナップショット)
+#### FR-368: Live Heap Snapshot (ライブヒープスナップショット) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/vm/src/vm.lisp`
 - **内容**: GCルートから到達可能なオブジェクトを全列挙しJSONまたはバイナリ形式でスナップショット出力。オブジェクトタイプ・サイズ・参照先・割り当てサイト情報を記録。差分スナップショット比較でメモリリーク特定
 - **根拠**: JVM `-XX:+HeapDumpOnOutOfMemoryError` / V8 `--heapsnapshot`。メモリリーク調査の標準ツール
 - **難易度**: Medium
 
-#### FR-369: ✅: GC Metrics Export (GCメトリクスエクスポート)
+#### FR-369: GC Metrics Export (GCメトリクスエクスポート) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: GCイベントをPrometheus互換メトリクスとして公開。`gc_pause_seconds`, `gc_collections_total`, `heap_used_bytes`, `heap_available_bytes`, `gc_promoted_bytes` 等の標準メトリクス。Prometheus `/metrics` HTTP エンドポイント or OpenTelemetry OTLP出力
@@ -586,7 +584,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 80 — スタックマップ・精確GCルートスキャン
 
-#### FR-370: ✅: Stack Map Generation (スタックマップ生成)
+#### FR-370: Stack Map Generation (スタックマップ生成) ⚠️
 
 - **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/mir/src/mir.lisp`
 - **現状**: GCルートはグローバル`rt-heap-roots`リストのみ。コールスタック上のローカル変数はスキャン対象外（保守的GCに頼るか未サポート）
@@ -594,9 +592,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: HotSpot OopMap / LLVM StackMaps / GHC info tables。精確GCの前提条件でスタック変数のポインタを保守的にスキャンするコストを排除
 - **難易度**: Very Hard
 
-#### FR-371: ⚠️: GC Safepoints: Signal-Based vs Polling (GCセーフポイント実装)
+#### FR-371: GC Safepoints: Signal-Based vs Polling (GCセーフポイント実装) ⚠️
 
-- **実装**: `packages/runtime/src/gc-safepoints.lisp` (227行): `rt-gc-safepoint-check`, `rt-gc-enter-safe-region`, `rt-gc-leave-safe-region`, `rt-gc-all-threads-safe-p`, `with-gc-function-entry-safepoint`, `with-gc-loop-backedge-safepoint`, `with-gc-safe-region`, `with-gc-signal-inhibit`
+- **証跡（未確認）**: `packages/runtime/src/gc-safepoints.lisp` (227行): `rt-gc-safepoint-check`, `rt-gc-enter-safe-region`, `rt-gc-leave-safe-region`, `rt-gc-all-threads-safe-p`, `with-gc-function-entry-safepoint`, `with-gc-loop-backedge-safepoint`, `with-gc-safe-region`, `with-gc-signal-inhibit`
 - **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: 2実装の選択: (1) Polling方式: ループバックエッジ・関数入口にセーフポイントポーリング命令（`test [safept_page], 0`）挿入。GC開始時にページをreadonly→SIGSEGV → シグナルハンドラで全スレッドをSTW。(2) シグナル方式: POSIX `pthread_kill`で各スレッドにUSR1を送りシグナルハンドラで停止。Polling方式がJVM/Go/V8の標準
 - **根拠**: JVM safepoint polling page / Go signal-based async preemption (1.14+)。STW協調の基盤機構
@@ -615,9 +613,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 81 — メモリ安全性・タギング
 
-#### FR-373: ⚠️: Address Space Layout Randomization for Heap (ヒープASLR)
+#### FR-373: Address Space Layout Randomization for Heap (ヒープASLR) ⚠️
 
-- **実装**: `rt-heap-randomize-base`, `*rt-heap-randomize*` (`packages/runtime/src/heap-core.lisp`)
+- **証跡（未確認）**: `rt-heap-randomize-base`, `*rt-heap-randomize*` (`packages/runtime/src/heap-core.lisp`)
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: ヒープ割り当てアドレスを`mmap(MAP_FIXED_NOREPLACE)`でランダム化。`getentropy()`/`/dev/urandom`からシード取得。ヒープアドレスの予測不可能性によりメモリ安全性向上。スタックASLRはOSが提供するがヒープは言語ランタイム側での対応が必要
 - **Pure CL**: CL `random` による論理ワードオフセットランダム化。`*rt-heap-randomize*` トグル。ネイティブバックエンドで `mmap(MAP_FIXED_NOREPLACE)` に置換
@@ -633,18 +631,18 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: Linux MTE support (5.10+) / Android MTE deployment (Pixel 8+)。ハードウェアASANとして本番環境でのメモリ安全性検出
 - **難易度**: Hard
 
-#### FR-375: ⚠️: Shadow Memory for AddressSanitizer Integration (ASan統合)
+#### FR-375: Shadow Memory for AddressSanitizer Integration (ASan統合) ⚠️
 
-- **実装**: `*rt-asan-enabled*`, `%rt-asan-check-address`, `*rt-heap-poison-map*`, `*rt-heap-init-map*`, `*rt-heap-tag-map*` (`packages/runtime/src/heap-core.lisp`) + CLI `--asan` フラグ
+- **証跡（未確認）**: `*rt-asan-enabled*`, `%rt-asan-check-address`, `*rt-heap-poison-map*`, `*rt-heap-init-map*`, `*rt-heap-tag-map*` (`packages/runtime/src/heap-core.lisp`) + CLI `--asan` フラグ
 - **対象**: `packages/runtime/src/heap.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: ASanシャドウメモリマッピングを割り当て/解放時に更新。`rt-gc-alloc`でアロケーション時に当該アドレスをASan "accessible"マーク。GC回収時に"freed"マーク（redzoneで隣接アクセスも検出）。`-fsanitize=address`でコンパイルされたCコードとのinteropで一貫したメモリ安全性
 - **Pure CL**: ヒープアクセス時のポイズンチェック、ポイズン/init/tagマップ管理。ネイティブバックエンドで実際のASanシャドウメモリマッピングに置換
 - **テスト**: `packages/runtime/tests/gc-fr-tests.lisp` (`fr-375-asan-shadow-memory-poisoning`)
 - **根拠**: LLVM ASan integration / Rust sanitizer support。use-after-free・out-of-bounds検出
 
-#### FR-376: ⚠️: Guard Pages for Stack Overflow Detection (スタックオーバーフロー検出)
+#### FR-376: Guard Pages for Stack Overflow Detection (スタックオーバーフロー検出) ⚠️
 
-- **実装**: `rt-install-stack-guard`, `*rt-stack-guard-enabled*`, `*rt-stack-guard-registry*` (`packages/runtime/src/heap-core.lisp:155-178`)
+- **証跡（未確認）**: `rt-install-stack-guard`, `*rt-stack-guard-enabled*`, `*rt-stack-guard-registry*` (`packages/runtime/src/heap-core.lisp:155-178`)
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/vm/src/vm.lisp`
 - **内容**: コールスタック末尾にguard page（`mprotect(PROT_NONE)`）を配置。スタックオーバーフロー時にSIGSEGVが確実に発生し検出可能（guard pageなし→ヒープ破壊になる）。シグナルハンドラで`alternate signal stack`（`sigaltstack`）を使用しスタック上でハンドラが動作できるようにする
 - **Pure CL**: ガード記述子メタデータ（インストール状態、ページサイズ、fault-signal）を記録。ネイティブバックエンドで `mprotect(PROT_NONE)` + `sigaltstack` に置換
@@ -655,9 +653,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 82 — 不死オブジェクト・オフヒープデータ
 
-#### FR-377: ⚠️: Immortal / Permanent Objects (不死オブジェクト・永続領域)
+#### FR-377: Immortal / Permanent Objects (不死オブジェクト・永続領域) ⚠️
 
-- **実装**: `rt-make-immortal`, `rt-immortal-p`, `rt-immortal-objects-count`, `*rt-immortal-registry*`, `*rt-immortal-space-base*` (`packages/runtime/src/heap-resize.lisp:142-173`)
+- **証跡（未確認）**: `rt-make-immortal`, `rt-immortal-p`, `rt-immortal-objects-count`, `*rt-immortal-registry*`, `*rt-immortal-space-base*` (`packages/runtime/src/heap-resize.lisp:142-173`)
 - **対象**: `packages/runtime/src/heap.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: 一度生成されたら決してGCされないオブジェクト（組み込みシンボル・組み込み関数・コードオブジェクト）を独立した永続領域に配置。GCルートスキャン対象外（`rt-gc-add-root`不要）。永続領域はmmap固定アドレスでプロセス再起動後もアドレス不変（AOTキャッシュの基盤）
 - **Pure CL**: gensymベースのハンドル + ハッシュテーブルレジストリ + 論理空間ベースカーソル。ネイティブバックエンドで固定アドレス mmap に置換
@@ -665,21 +663,21 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: CPython 3.12 Immortal Objects (PEP 683) / JVM Metaspace / Ruby YJIT code region。GCルートスキャン量の削減とARC biasの単純化
 - **難易度**: Medium
 
-#### FR-378: ✅: Off-Heap Native Memory Management (オフヒープネイティブメモリ)
+#### FR-378: Off-Heap Native Memory Management (オフヒープネイティブメモリ) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **内容**: GC管理ヒープ外のネイティブメモリ割り当てAPI。`rt-native-alloc`/`rt-native-free`でFFIバッファ・IO作業メモリを管理。オフヒープ割り当て量をGCに通知（`rt-gc-register-external-memory`）し、外部メモリ圧力が高い場合にGCをより積極的に実行。Java `ByteBuffer.allocateDirect` / Go `cgo`相当
 - **根拠**: JVM DirectByteBuffer / .NET `System.Runtime.InteropServices.NativeMemory`。GCプレッシャーなしの大規模バッファ
 - **難易度**: Easy
 
-#### FR-379: ✅: Code Cache Management (コードキャッシュ管理)
+#### FR-379: Code Cache Management (コードキャッシュ管理) ⚠️
 
 - **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/runtime/src/heap.lisp`
 - **内容**: JIT生成コードを専用コードキャッシュ領域（rx: 実行可能/読み取り専用領域）に配置。コードキャッシュが満杯になった場合のEviction（LRU or reference-counting）。コンパイル済み関数のunload（deoptimization後）。コードキャッシュサイズの動的調整
 - **根拠**: JVM CodeCache / V8 CodeSpace / SpiderMonkey JitCode region。コードメモリのOOM防止
 - **難易度**: Medium
 
-#### FR-380: ✅: Heap Compaction Trigger Heuristics (コンパクションtriggerヒューリスティクス)
+#### FR-380: Heap Compaction Trigger Heuristics (コンパクションtriggerヒューリスティクス) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: フラグメンテーション率（`free-bytes / heap-size`）が閾値（デフォルト: 50%）を超えた場合にのみCompaction（FR-089/FR-213）を発動。通常GCとCompactingGCを分離することでCompactionコストを必要時のみ支払う。`gc-fragmentation-ratio`統計を`rt-gc-stats`に追加
@@ -690,7 +688,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 83 — 参照強度階層 (Reference Strength Hierarchy)
 
-#### FR-381: ✅: Soft References (ソフト参照)
+#### FR-381: Soft References (ソフト参照) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: FR-246でエフェメロン（key弱参照）を定義。しかしメモリ逼迫時のみGCされる「キャッシュ向け参照」は未定義
@@ -698,21 +696,21 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: Java `SoftReference` / Guava `SoftValues` cache。GC主導のキャッシュ退出でOOM防止
 - **難易度**: Medium
 
-#### FR-382: ✅: Weak References (弱参照)
+#### FR-382: Weak References (弱参照) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: `rt-weak-ref`型。参照先が到達不能になった次のGCサイクルで`nil`にクリアされる。クリア時にオプションの通知コールバック（referenceキュー相当）を呼び出し。シンボルインターン表・メモ化テーブルの正確なキー管理に使用。CLの`make-weak-pointer`相当
 - **根拠**: Java `WeakReference` / SBCL `sb-ext:make-weak-pointer` / Python `weakref`。インターンテーブルのメモリリーク防止
 - **難易度**: Easy
 
-#### FR-383: ✅: Phantom References (ファントム参照)
+#### FR-383: Phantom References (ファントム参照) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: `rt-phantom-ref`型。ファントム参照経由でオブジェクトへはアクセス不能（常に`nil`を返す）。ファイナライズ後・回収前にReferenceキューに入る。外部リソース（FFIバッファ・ファイルハンドル）の解放タイミング制御に使用。ファントム参照を持つオブジェクトはファントム参照がenqueueされるまで回収されない
 - **根拠**: Java `PhantomReference` / JEP 421 Finalization deprecation → Cleaner API。ファイナライザより安全なリソース管理
 - **難易度**: Medium
 
-#### FR-384: ✅: Reference Queue Processing Thread (参照キュー処理スレッド)
+#### FR-384: Reference Queue Processing Thread (参照キュー処理スレッド) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **依存**: FR-337, FR-381〜383
@@ -779,9 +777,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 86 — ヒープ動的リサイズ
 
-#### FR-391: ⚠️: Heap Growth Policy (ヒープ成長ポリシー)
+#### FR-391: Heap Growth Policy (ヒープ成長ポリシー) ⚠️
 
-- **実装**: `rt-heap-maybe-grow` (`packages/runtime/src/heap-resize.lisp:86-103`), Pure CL simple-vector resize（2x成長、>90%占有率、`*gc-max-heap-words*`上限）。本番の mmap/MADV ベース成長はネイティブバックエンド待ち
+- **証跡（未確認）**: `rt-heap-maybe-grow` (`packages/runtime/src/heap-resize.lisp:86-103`), Pure CL simple-vector resize（2x成長、>90%占有率、`*gc-max-heap-words*`上限）。本番の mmap/MADV ベース成長はネイティブバックエンド待ち
 - **テスト**: `packages/runtime/tests/gc-fr-tests.lisp` (`fr-391-heap-growth-policy-expands-old-space`)
 
 - **対象**: `packages/runtime/src/heap.lisp`
@@ -790,9 +788,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM `-Xmx`/`-Xms` / Go `runtime.ReadMemStats` growth。OOMの前にヒープを自動拡張
 - **難易度**: Medium
 
-#### FR-392: ⚠️: Heap Shrink Policy (ヒープ縮小ポリシー)
+#### FR-392: Heap Shrink Policy (ヒープ縮小ポリシー) ⚠️
 
-- **実装**: `rt-heap-maybe-shrink` (`packages/runtime/src/heap-resize.lisp:105-132`), Pure CL simple-vector resize（3連続低占有率サイクル後に半減、初期サイズ下限）。OSへのメモリ返却はネイティブバックエンド待ち
+- **証跡（未確認）**: `rt-heap-maybe-shrink` (`packages/runtime/src/heap-resize.lisp:105-132`), Pure CL simple-vector resize（3連続低占有率サイクル後に半減、初期サイズ下限）。OSへのメモリ返却はネイティブバックエンド待ち
 - **テスト**: `packages/runtime/tests/gc-fr-tests.lisp` (`fr-392-heap-shrink-policy-reduces-grown-heap`)
 
 - **対象**: `packages/runtime/src/heap.lisp`
@@ -842,14 +840,14 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 #### FR-397: ⏸️: Conservative Stack Scanning Fallback (保守的スタックスキャンフォールバック)
 
 - **対象**: `packages/runtime/src/gc.lisp`
-- **現状**: スタックマップ（FR-370）は基盤実装済み（x86-64-codegen.lisp, mir.lisp）。スタック上のポインタの完全なスキャンにはネイティブバックエンド統合が必要
+- **現状**: スタックマップ（FR-370）は基盤実装主張（未確認）（x86-64-codegen.lisp, mir.lisp）。スタック上のポインタの完全なスキャンにはネイティブバックエンド統合が必要
 - **内容**: スタックマップ（FR-370）の安全な補完手段。スタックフレームを全ワードスキャンし、ヒープアドレス範囲内の値をポインタ候補として保守的に処理。BDWGC（Boehm GC）方式。不正確なため移動GCと組み合わせ不可だが、インタープリタモードでは十分安全
 - **根拠**: Boehm-Demers-Weiser conservative GC / SBCL conservative roots on x86。正確スタックマップ実装前の安全な橋渡し
 - **難易度**: Medium
 
-#### FR-398: ✅: Free List Coalescing (フリーリスト結合)
+#### FR-398: Free List Coalescing (フリーリスト結合) ⚠️
 
-- **実装**: `gc-major-sweep.lisp:34` の `%rt-gc-coalesce-adjacent-free-blocks`、スイープ時に隣接フリーブロックを1つの大きなブロックにマージ。boundary tag方式（Knuth）でブロック間のfooter/headerに「free flag」を持つ
+- **証跡（未確認）**: `gc-major-sweep.lisp:34` の `%rt-gc-coalesce-adjacent-free-blocks`、スイープ時に隣接フリーブロックを1つの大きなブロックにマージ。boundary tag方式（Knuth）でブロック間のfooter/headerに「free flag」を持つ
 - **対象**: `packages/runtime/src/heap.lisp`
 - **現状**: `%gc-sweep-old-space`（`gc.lisp:301-329`）でフリーリストを構築するが、隣接フリーブロックの結合処理なし
 - **内容**: スイープ時に隣接するフリーブロックを1つの大きなブロックにマージ。ブロック間のfooter/headerに「free flag」を持つboundary tag方式（Knuth）。結合によりサイズクラス越えの大割り当てをフラグメンテーション後も可能にする
@@ -966,9 +964,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 93 — GC文字列最適化
 
-#### FR-411: ✅: String Deduplication (文字列重複排除)
+#### FR-411: String Deduplication (文字列重複排除) ⚠️
 
-- **実装**: `packages/runtime/src/runtime-strings.lisp` (`*rt-string-dedup-table*`, `%rt-ensure-string-dedup-table`, `rt-string-dedup`, `rt-string-intern`), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/runtime-strings.lisp` (`*rt-string-dedup-table*`, `%rt-ensure-string-dedup-table`, `rt-string-dedup`, `rt-string-intern`), package.lisp でエクスポート
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/vm/src/strings.lisp`
 - **内容**: GCマーキング時に文字列オブジェクトの内容ハッシュを計算し、同一内容の文字列が複数存在する場合にうち1つのバッキング配列のみ保持。他の文字列オブジェクトのバッキング配列ポインタを正規文字列へ付け替え（文字列オブジェクト自体は残る）。コンパイル済みコード中のリテラル文字列に特に有効
 - **根拠**: G1 String Deduplication (JEP 192) / V8 string deduplication。文字列ヘビーなワークロードで5-20%ヒープ削減
@@ -986,25 +984,25 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 94 — GCデバッグ・検証インフラ
 
-#### FR-413: ✅: GC Verification Pass (GC検証パス)
+#### FR-413: GC Verification Pass (GC検証パス) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: デバッグビルド専用のGC後ヒープ整合性チェック。全オブジェクトのヘッダフォーマット検証。全ポインタスロットが有効ヒープアドレスを指しているか確認。mark word状態の一貫性チェック。旧空間→若空間ポインタが全てRS/カードテーブルで追跡されているか検証。`*gc-verify-after-collect*`フラグで有効化
-- **実装**: 基盤実装完了: `*gc-verify-after-collect*`, `rt-gc-verify-heap` (`packages/runtime/src/gc.lisp`)、GC後検証呼び出し (`packages/runtime/src/gc-minor.lisp`, `packages/runtime/src/gc-major.lisp`)
+- **証跡（未確認）**: 基盤実装主張（未確認）: `*gc-verify-after-collect*`, `rt-gc-verify-heap` (`packages/runtime/src/gc.lisp`)、GC後検証呼び出し (`packages/runtime/src/gc-minor.lisp`, `packages/runtime/src/gc-major.lisp`)
 - **根拠**: HotSpot `VerifyAfterGC` / V8 `--verify-heap` / Go `GODEBUG=gccheckmark=1`。GC実装バグの早期検出
 - **難易度**: Easy
 
-#### FR-414: ✅: GC Stress Testing Mode (GCストレステストモード)
+#### FR-414: GC Stress Testing Mode (GCストレステストモード) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: `*gc-stress-mode*`フラグで全割り当て毎にGCを強制発動。テスト実行時に全てのGCフェーズを毎命令触れるため、GCセーフでないコードを即座に検出。「間違ったアドレスで動くが稀にしか壊れない」バグを確実に再現。`nix run .#test` 経由の canonical テストスイートとの統合
-- **実装**: 基盤実装完了: `*gc-stress-mode*` による割り当て境界GC強制 (`packages/runtime/src/gc.lisp`)、`*gc-verify-after-collect*` / `rt-gc-verify-heap` と併用可能
+- **証跡（未確認）**: 基盤実装主張（未確認）: `*gc-stress-mode*` による割り当て境界GC強制 (`packages/runtime/src/gc.lisp`)、`*gc-verify-after-collect*` / `rt-gc-verify-heap` と併用可能
 - **根拠**: JVM `-XX:+StressGC` / Go `GOGC=off` + `runtime.GC()` loops / Rust miri。GC協調バグの確実な検出
 - **難易度**: Easy
 
-#### FR-415: ✅: Heap Object Graph Visualizer (ヒープオブジェクトグラフ可視化)
+#### FR-415: Heap Object Graph Visualizer (ヒープオブジェクトグラフ可視化) ⚠️
 
-- **実装**: `packages/runtime/src/gc-profile.lisp:391` (`rt-gc-heap-dump-dot`), package.lisp でエクスポート。DOT/Graphviz形式出力対応
+- **証跡（未確認）**: `packages/runtime/src/gc-profile.lisp:391` (`rt-gc-heap-dump-dot`), package.lisp でエクスポート。DOT/Graphviz形式出力対応
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/cli/src/main.lisp`
 - **内容**: ヒープスナップショット（FR-368）をDOT形式または`.hprof`形式でダンプするデバッグコマンド。オブジェクト参照グラフを可視化しメモリリークのルートパスを特定。`./cl-cc heap-dump --format=dot > heap.dot && dot -Tsvg heap.dot > heap.svg`
 - **根拠**: JVM `jmap -histo` / V8 heap snapshot / heaptrack。開発者向けメモリ問題診断ツール
@@ -1066,29 +1064,29 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 97 — GC人間工学・自動設定
 
-#### FR-422: ✅: GC Ergonomics / Auto-Configuration (GC自動設定)
+#### FR-422: GC Ergonomics / Auto-Configuration (GC自動設定) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`, `packages/cli/src/main.lisp`
 - **現状**: `*gc-young-size-words*` / `*gc-old-size-words*`をユーザーが手動設定する必要がある
 - **内容**: 起動時にシステムRAM量（`sysctl hw.memsize` / `/proc/meminfo`）を照会し自動設定。デフォルトヒープ上限 = システムRAMの25%。JVM `-XX:+UseAdaptiveSizePolicy`相当の自動チューニングを有効化。コンテナ環境ではcgroupのメモリ制限（`/sys/fs/cgroup/memory.limit_in_bytes`）を優先。`--heap-max=4g` CLI引数でオーバーライド可能
-- **実装**: `rt-gc-auto-configure-heap` が若/旧世代サイズを自動構成し、`make-rt-heap` 初期化時にも適用 (`packages/runtime/src/heap.lisp`)
+- **証跡（未確認）**: `rt-gc-auto-configure-heap` が若/旧世代サイズを自動構成し、`make-rt-heap` 初期化時にも適用 (`packages/runtime/src/heap.lisp`)
 - **根拠**: JVM ergonomics heuristics / Go `GOMEMLIMIT` (1.19+) / .NET GC auto-configuration。デフォルト設定でほとんどのワークロードが最適動作するように
 - **難易度**: Easy
 
-#### FR-423: ✅: Container-Aware Heap Sizing (コンテナ対応ヒープサイズ設定)
+#### FR-423: Container-Aware Heap Sizing (コンテナ対応ヒープサイズ設定) ⚠️
 
 - **対象**: `packages/runtime/src/heap.lisp`
 - **依存**: FR-422
 - **内容**: Docker / Kubernetes環境では`/sys/fs/cgroup/memory.limit_in_bytes`（v1）または`/sys/fs/cgroup/memory.max`（v2）からコンテナメモリ制限を読み取り。cgroupメモリ制限の70%をヒープ上限に設定（残り30%はメタスペース・JIT・スタック等）。`/proc/1/cgroup`の有無でコンテナ検出
-- **実装**: `rt-heap-detect-container-memory-limit` が cgroup v2 `memory.max` と v1 `memory.limit_in_bytes` を検出し、`rt-gc-auto-configure-heap` がコンテナ上限を反映 (`packages/runtime/src/heap.lisp`)
+- **証跡（未確認）**: `rt-heap-detect-container-memory-limit` が cgroup v2 `memory.max` と v1 `memory.limit_in_bytes` を検出し、`rt-gc-auto-configure-heap` がコンテナ上限を反映 (`packages/runtime/src/heap.lisp`)
 - **根拠**: JVM JEP 415 Container-Aware GC / Go container awareness。OOMkillによるコンテナ強制終了の防止
 - **難易度**: Easy
 
-#### FR-424: ✅: GC Policy Selection (GCポリシー選択)
+#### FR-424: GC Policy Selection (GCポリシー選択) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/cli/src/main.lisp`
 - **内容**: `--gc=throughput|latency|memory` CLI引数でGCポリシー選択。`throughput`: 大きなヒープ・少ないGC頻度（バッチ処理向け）。`latency`: 小さなナーサリ・増分GC・Concurrent GC（対話的・サービス向け）。`memory`: 積極的GC・小ヒープ（組み込み・メモリ制限環境向け）。各ポリシーはパラメータセット（`*gc-young-size-words*`等）の構成済みプリセット
-- **実装**: `rt-gc-select-policy` が `:throughput` / `:pause-time` / `:balanced` のGCポリシープリセットを構成 (`packages/runtime/src/gc.lisp`)
+- **証跡（未確認）**: `rt-gc-select-policy` が `:throughput` / `:pause-time` / `:balanced` のGCポリシープリセットを構成 (`packages/runtime/src/gc.lisp`)
 - **根拠**: JVM GC selector (`-XX:+UseG1GC` etc.) / .NET GC modes (workstation/server/background)。用途に合わせた一発設定
 - **難易度**: Easy
 
@@ -1096,7 +1094,7 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 98 — GCペーサー・スループット制御
 
-> **FR-425/427**: 実装済み → Phase 81 以降のセクションを参照。`rt-gc-pacer-maybe-throttle` + エクスポート済み。
+> **FR-425/427**: 実装主張（未確認） → Phase 81 以降のセクションを参照。`rt-gc-pacer-maybe-throttle` + エクスポート済み。
 
 #### FR-426: ⏸️: GC Throughput Target (GCスループット目標)
 
@@ -1105,28 +1103,28 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: JVM Adaptive Size Policy GCTimeRatio / G1 pause fraction。メモリとスループットのトレードオフ自動最適化
 - **難易度**: Medium
 
-> **FR-427**: 実装済み → Phase 81 以降のセクションを参照。`*gc-back-pressure-threshold*` + `rt-gc-pacer-maybe-throttle` に統合、`rt-gc-alloc` に統合済み。
+> **FR-427**: 実装主張（未確認） → Phase 81 以降のセクションを参照。`*gc-back-pressure-threshold*` + `rt-gc-pacer-maybe-throttle` に統合、`rt-gc-alloc` に統合済み。
 
-#### FR-428: ✅: without-gcing Critical Sections (GC禁止クリティカルセクション)
+#### FR-428: without-gcing Critical Sections (GC禁止クリティカルセクション) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/vm/src/vm.lisp`
 - **内容**: `(without-gcing &body body)` マクロ。body実行中は`*gc-inhibit*`フラグをセットしGCトリガーを抑制。body中に割り当て枯渇が発生した場合は実際のGCを保留し、bodyを抜けた直後に実行。リアルタイム処理・シグナルハンドラ・内部GCコード自体が使用する保護機構
-- **実装**: `without-gcing` マクロ、`rt-gc-inhibit-p`、`rt-heap` の `gc-inhibit` / `gc-pending` スロットでGC抑制と保留GCを管理 (`packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`)
+- **証跡（未確認）**: `without-gcing` マクロ、`rt-gc-inhibit-p`、`rt-heap` の `gc-inhibit` / `gc-pending` スロットでGC抑制と保留GCを管理 (`packages/runtime/src/gc.lisp`, `packages/runtime/src/heap.lisp`)
 - **根拠**: SBCL `without-gcing` / CCL `without-interrupts`。GC再入防止とシグナルハンドラの安全性
 - **難易度**: Easy
 
-#### FR-429: ✅: GC Safe Regions in Native Code (ネイティブコードのGCセーフ領域)
+#### FR-429: GC Safe Regions in Native Code (ネイティブコードのGCセーフ領域) ⚠️
 
-- **実装**: `packages/runtime/src/gc-safepoints.lisp` (`rt-gc-enter-safe-region`, `rt-gc-leave-safe-region`, `with-gc-safe-region`, `rt-gc-thread-safe-region-depth`, `*rt-gc-safe-region-depths*`), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/gc-safepoints.lisp` (`rt-gc-enter-safe-region`, `rt-gc-leave-safe-region`, `with-gc-safe-region`, `rt-gc-thread-safe-region-depth`, `*rt-gc-safe-region-depths*`), package.lisp でエクスポート
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **内容**: FFI呼び出し中（CコードがLisp VM外で動作中）はスレッドが「GCセーフ」状態であることをランタイムに通知。GCセーフスレッドはSTWで停止させずGCを続行可能（スタックスキャン不要のため）。FFI呼び出しの前後に`enter-gc-safe` / `leave-gc-safe`フェンスを生成。`leave-gc-safe`でGC開始確認とsafepoint処理
 - **Pure CL**: 協調的safe-regionネスト深度追跡API。ネイティブバックエンドでFFI境界のフェンス生成に変換
 - **根拠**: JVM JNI critical sections / Go `runtime.entersyscall` / Python GIL release。長時間FFI中のGCを他スレッドが待たない
 - **難易度**: Medium
 
-#### FR-430: ✅: GC Inhibit During Signal Handlers (シグナルハンドラ中のGC抑制)
+#### FR-430: GC Inhibit During Signal Handlers (シグナルハンドラ中のGC抑制) ⚠️
 
-- **実装**: `packages/runtime/src/gc-safepoints.lisp` (`rt-gc-signal-handler-enter`, `rt-gc-signal-handler-leave`, `with-gc-signal-inhibit`), `*gc-inhibit-during-signals*` (`packages/runtime/src/gc-data.lisp:43`), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/gc-safepoints.lisp` (`rt-gc-signal-handler-enter`, `rt-gc-signal-handler-leave`, `with-gc-signal-inhibit`), `*gc-inhibit-during-signals*` (`packages/runtime/src/gc-data.lisp:43`), package.lisp でエクスポート
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: POSIX シグナルハンドラ（SIGSEGV, SIGUSR1等）実行中は自動的に`*gc-inhibit*`を設定。シグナルハンドラがヒープを操作した場合でも一貫したGC状態を維持。ハンドラ復帰時にペンディングGCを確認して実行
 - **根拠**: SBCL signal handler GC inhibit / Go signal handling during GC。シグナルハンドラでのGC再入を防ぐ
@@ -1208,26 +1206,26 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 103 — アイドル時GC・バックグラウンドGC
 
-#### FR-439: ✅: Idle-Time Background GC (アイドル時バックグラウンドGC)
+#### FR-439: Idle-Time Background GC (アイドル時バックグラウンドGC) ⚠️
 
-- **実装**: `packages/runtime/src/gc-major-sweep.lisp:417-445` (`*gc-idle-work-fraction*`, `%rt-gc-background-work`), プログラムがI/O待機・sleep・イベントループのidleハンドラにいる間にバックグラウンドGCを実行
+- **証跡（未確認）**: `packages/runtime/src/gc-major-sweep.lisp:417-445` (`*gc-idle-work-fraction*`, `%rt-gc-background-work`), プログラムがI/O待機・sleep・イベントループのidleハンドラにいる間にバックグラウンドGCを実行
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: プログラムがI/O待機・sleep・イベントループのidleハンドラにいる間にバックグラウンドGCを実行。`epoll_wait` / `kqueue`の待機時間をGC作業に充てる。Go `runtime.GC()` 的な「ミューテータが暇なときにGCを進める」方式。アイドルGCの進捗を`*gc-idle-work-fraction*`で制御（例: idle時間の50%をGCに）
 - **Pure CL**: 協調的バックグラウンドGC作業API（idle呼び出し側が作業量を制御）。ネイティブバックエンドでepoll/kqueue idle統合に変換
 - **根拠**: V8 Idle-time GC / Chromium idle tasks / Go background GC。GCがワークロードと重ならないアイドル期間を有効活用
 - **難易度**: Medium
 
-#### FR-441: ✅: Periodic GC for Long-Running Processes (長時間プロセス定期GC)
+#### FR-441: Periodic GC for Long-Running Processes (長時間プロセス定期GC) ⚠️
 
-- **実装**: `packages/runtime/src/gc-major-sweep.lisp:420-443` (`*gc-periodic-interval-ms*`, `*gc-last-periodic-gc-time*`, `%rt-gc-periodic-check`), 定期的なminor GCを発動
+- **証跡（未確認）**: `packages/runtime/src/gc-major-sweep.lisp:420-443` (`*gc-periodic-interval-ms*`, `*gc-last-periodic-gc-time*`, `%rt-gc-periodic-check`), 定期的なminor GCを発動
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: `*gc-periodic-interval-ms*`（デフォルト: 0=無効）で定期的なminor GCを発動。REPLセッション・長期間割り当てが少ない処理中でも定期的にナーサリをクリーンアップ。老化してnurseryに残り続けるオブジェクトの昇格機会を提供。タイマーはバックグラウンドスレッドまたはシグナル（SIGALRM）ベース
 - **根拠**: Go runtime periodic GC trigger / JVM `-XX:GCTimeLimit` / .NET `GC.Collect(0, GCCollectionMode.Optimized)`。長時間idle後の最初のGCが巨大にならないように
 - **難易度**: Easy
 
-#### FR-443: ✅: Generational Hypothesis Validation (世代別仮説の検証・適応)
+#### FR-443: Generational Hypothesis Validation (世代別仮説の検証・適応) ⚠️
 
-- **実装**: `packages/runtime/src/gc-minor.lisp:271-275` (`promotion-ratio`), `packages/runtime/src/gc-policy.lisp:234-258` (`rt-gc-dynamic-tenure(promotion-ratio)`, `%rt-gc-tune-nursery(promotion-ratio)`)
+- **証跡（未確認）**: `packages/runtime/src/gc-minor.lisp:271-275` (`promotion-ratio`), `packages/runtime/src/gc-policy.lisp:234-258` (`rt-gc-dynamic-tenure(promotion-ratio)`, `%rt-gc-tune-nursery(promotion-ratio)`)
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: 「若いオブジェクトは若くして死ぬ」仮説が成立しているかを実行時統計で継続検証。`promotion-ratio` = 若GC後に旧世代に昇格した割合を追跡。昇格率が異常に高い（例: >40%）場合は若世代サイズを縮小し旧世代GCをより頻繁に実行する適応的切り替え。世代別仮説が崩れるワークロード（全オブジェクトが長命）では単一世代GCに自動フォールバック
 - **根拠**: JVM adaptive generation sizing / Go GC tuning heuristics。コンパイラ自身のような「多くのオブジェクトが長命」なワークロードへの適応
@@ -1276,33 +1274,33 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 105 — ヒープ内省・Walking API
 
-#### FR-445: ✅: Heap Walking API (ヒープWalking API)
+#### FR-445: Heap Walking API (ヒープWalking API) ⚠️
 
-- **実装**: `packages/runtime/src/gc-profile.lisp` (`rt-gc-map-heap-objects`), package.lisp でエクスポート。ヤング・オールド空間の全オブジェクトを走査
+- **証跡（未確認）**: `packages/runtime/src/gc-profile.lisp` (`rt-gc-map-heap-objects`), package.lisp でエクスポート。ヤング・オールド空間の全オブジェクトを走査
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: 全ヒープオブジェクトの反復・フィルタ・コレクションのためのウォーキングAPI。`do-heap-objects`マクロでGC-safeに全オブジェクトを訪問。コールバック`(lambda (object-address) ...)`。FR-446（room）の内部実装として使用。ANSI CL `room`関数・独自のメモリ診断ツール構築の基盤
 - **根拠**: SBCL `map-allocated-objects` / JVM JVMTI IterateOverHeap / .NET `GC.GetGeneration`。カスタムメモリ分析の標準インターフェース
 - **難易度**: Easy
 
-#### FR-425: ✅: GC Pacer / Allocation Pacing (GCペーサー)
+#### FR-425: GC Pacer / Allocation Pacing (GCペーサー) ⚠️
 
-- **実装**: `packages/runtime/src/gc-policy.lisp` (`rt-gc-pacer-maybe-throttle`, `*gc-pacer-enabled*`, `*gc-allocation-rate-limit-words-per-sec*`), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/gc-policy.lisp` (`rt-gc-pacer-maybe-throttle`, `*gc-pacer-enabled*`, `*gc-allocation-rate-limit-words-per-sec*`), package.lisp でエクスポート
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: GCより割り当てが速すぎる場合に割り当てスループットを制限するペース制御。割り当てレートを`*gc-allocation-rate-limit-words-per-sec*`で上限設定。ペース制御は`sleep`による協調的スロットリング（Pure CL）/ タイトループ`pause`命令（ネイティブ）。割り当てレートが上限を超えるとsleep挿入
 - **根拠**: Go GC pacer / V8 allocation pacing / Android ART GC pacing。GCの割り当て負けを防ぎGCポーズの爆発を抑止
 - **難易度**: Medium
 
-#### FR-427: ✅: Allocation Back-Pressure (割り当てバックプレッシャー)
+#### FR-427: Allocation Back-Pressure (割り当てバックプレッシャー) ⚠️
 
-- **実装**: `packages/runtime/src/gc-policy.lisp` (`*gc-back-pressure-threshold*`, `rt-gc-pacer-maybe-throttle` に統合), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/gc-policy.lisp` (`*gc-back-pressure-threshold*`, `rt-gc-pacer-maybe-throttle` に統合), package.lisp でエクスポート
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: ヒープ占有率が閾値（`*gc-back-pressure-threshold*`、デフォルト85%）を超えたら割り当て要求側で即座にGCを実行するバックプレッシャー機構。高占有率での新規割り当てを同期的GC完了までブロック。`rt-gc-alloc`各呼び出しで占有率チェック。占有率が低くなれば自動的にバックプレッシャー解除
 - **根拠**: Go GC assist / JVM GC overhead limit / Linux memory reclaim。OOMの最終防衛線
 - **難易度**: Easy
 
-#### FR-448: ✅: GC-Cooperative Weak Hash Tables (GC協調弱ハッシュテーブル)
+#### FR-448: GC-Cooperative Weak Hash Tables (GC協調弱ハッシュテーブル) ⚠️
 
-- **実装**: `packages/runtime/src/runtime-math-io.lisp:153-202` (`rt-make-hash-table :weakness`, `rt-hash-table-weakness`, `rt-weak-hash-table`, `+rt-hash-table-weakness-modes+`, `%rt-make-backing-hash-table`), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/runtime-math-io.lisp:153-202` (`rt-make-hash-table :weakness`, `rt-hash-table-weakness`, `rt-weak-hash-table`, `+rt-hash-table-weakness-modes+`, `%rt-make-backing-hash-table`), package.lisp でエクスポート
 - **対象**: `packages/vm/src/hash.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: `(make-hash-table :weakness :key)` / `:value` / `:key-and-value` / `:key-or-value` の4モードをサポート。内部実装はエフェメロン（FR-246）の配列として表現。GCマーキングフェーズでキー到達可能性を判定し、到達不能エントリをスイープフェーズで自動削除。`hash-table-weakness`アクセサ追加
 - **テスト**: `packages/runtime/tests/gc-fr-tests.lisp`
@@ -1348,12 +1346,12 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 108 — ライトバリア最適化追加
 
-#### FR-453: ✅: Write Barrier Batching / Coalescing (ライトバリア一括処理)
+#### FR-453: Write Barrier Batching / Coalescing (ライトバリア一括処理) ⚠️
 
 - **対象**: `packages/runtime/src/gc.lisp`
 - **現状**: `rt-gc-write-barrier`は毎ストアでカードテーブルを即時更新
 - **内容**: per-thread「バリアバッファ」（固定サイズキューorログ）にポインタ書き込みアドレスを蓄積。バッファ満杯時に一括でカードテーブル更新（ソート+重複除去）。GCサイクル開始時にもフラッシュ。キャッシュラインへの重複アクセスを排除しカードテーブル更新コストを削減。SATBキューとバリアバッファを統合
-- **実装**: `barrier-buffer` スロットと `rt-gc-flush-barrier-buffer`、`*rt-use-barrier-batching*` による batched card mark が実装済み (`packages/runtime/src/heap.lisp`, `packages/runtime/src/gc-write-barrier.lisp`, `packages/runtime/src/gc-minor.lisp`)
+- **証跡（未確認）**: `barrier-buffer` スロットと `rt-gc-flush-barrier-buffer`、`*rt-use-barrier-batching*` による batched card mark が実装主張（未確認） (`packages/runtime/src/heap.lisp`, `packages/runtime/src/gc-write-barrier.lisp`, `packages/runtime/src/gc-minor.lisp`)
 - **根拠**: G1 Dirty Card Queue / Shenandoah SATB buffer / ZGC store buffer。バリア1回あたりのコストをキャッシュフレンドリーに削減
 - **難易度**: Medium
 
@@ -1407,26 +1405,26 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 111 — 二段階ファイナライゼーション・復活防止
 
-#### FR-459: ✅: Two-Phase Finalization Algorithm (二段階ファイナライゼーション)
+#### FR-459: Two-Phase Finalization Algorithm (二段階ファイナライゼーション) ⚠️
 
-- **実装**: `packages/runtime/src/gc.lisp` (`rt-register-finalizer`, `rt-unregister-finalizer`), package.lisp でエクスポート (FR-459/460/471)
+- **証跡（未確認）**: `packages/runtime/src/gc.lisp` (`rt-register-finalizer`, `rt-unregister-finalizer`), package.lisp でエクスポート (FR-459/460/471)
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: フェーズ1（マーキング）: 到達不能だがファイナライザ登録済みオブジェクトを「finalizable」としてマーク。これらを「一時的に到達可能」に戻し（復活）ファイナライゼーションキューに入れる。フェーズ2（次のGCサイクル）: ファイナライザ実行済みで再度到達不能のオブジェクトを実際に回収。2サイクル必要なことを`rt-gc-stats`に記録
 - **根拠**: Java GC finalization two-pass / .NET suppressed finalization / Python `tp_finalize`。ファイナライザ実行中の安全性とオブジェクト復活セマンティクスの正確な実装
 - **難易度**: Medium
 
-#### FR-461: ⚠️: madvise Sequential Hints for GC Scan (GCスキャン用madviseシーケンシャルヒント)
+#### FR-461: madvise Sequential Hints for GC Scan (GCスキャン用madviseシーケンシャルヒント) ⚠️
 
-- **実装**: `packages/runtime/src/gc-safepoints.lisp:159-197` (`rt-heap-madvise-sequential`, `rt-heap-madvise-willneed`, `rt-heap-madvise-hugepage`)
+- **証跡（未確認）**: `packages/runtime/src/gc-safepoints.lisp:159-197` (`rt-heap-madvise-sequential`, `rt-heap-madvise-willneed`, `rt-heap-madvise-hugepage`)
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: GCのマーキング・スキャンフェーズでヒープ領域を線形走査する直前に`madvise(MADV_SEQUENTIAL)`を発行。カーネルの先読みを最大化（デフォルトはMADV_NORMAL）。スキャン後に`madvise(MADV_NORMAL)`で復元。AArch64では`madvise(MADV_WILLNEED)`で対象ページを明示的にプリフェッチ。GCスキャンのページフォルトによる遅延を排除
 - **Pure CL**: 範囲検証のみのno-op。ネイティブバックエンドで実際の madvise(2) 呼び出しに置換
 - **根拠**: JVM CMSの`madvise`利用 / Go `sysHugePage`ヒント / V8 heap scanner hints。メモリスキャン帯域幅の最大活用
 - **難易度**: Easy
 
-#### FR-462: ⚠️: Huge Page Auto-Promotion for Hot Regions (ホットリージョンのHuge Page自動昇格)
+#### FR-462: Huge Page Auto-Promotion for Hot Regions (ホットリージョンのHuge Page自動昇格) ⚠️
 
-- **実装**: `packages/runtime/src/gc-safepoints.lisp:186-197` (`rt-heap-madvise-hugepage`), `*rt-heap-hugepage-enabled*` (`packages/runtime/src/gc-data.lisp:83`)
+- **証跡（未確認）**: `packages/runtime/src/gc-safepoints.lisp:186-197` (`rt-heap-madvise-hugepage`), `*rt-heap-hugepage-enabled*` (`packages/runtime/src/gc-data.lisp:83`)
 - **対象**: `packages/runtime/src/heap.lisp`
 - **依存**: FR-288 (Large Page Support)
 - **内容**: 頻繁にアクセスされるヒープリージョン（コードキャッシュ・若世代hot zone）を`madvise(MADV_HUGEPAGE)`でTHP（Transparent Huge Pages）対象に指定。アクセス頻度の低いコールドリージョンは`MADV_NOHUGEPAGE`で標準4KBに維持。khugepaged（Linuxカーネル）との協調でTHP使用量を最適化。`/proc/[pid]/smaps`でHuge Page使用状況を監視
@@ -1438,9 +1436,9 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ### Phase 112 — madvise・OS ヒントの活用
 
-> **FR-461**: ⚠️ 実装済み → Phase 81 のセクションを参照。`rt-heap-madvise-sequential`/`rt-heap-madvise-willneed` (gc-safepoints.lisp)。
+> **FR-461**: ⚠️ 実装主張（未確認） → Phase 81 のセクションを参照。`rt-heap-madvise-sequential`/`rt-heap-madvise-willneed` (gc-safepoints.lisp)。
 
-> **FR-462**: ⚠️ 実装済み → Phase 81 のセクションを参照。`rt-heap-madvise-hugepage` + `*rt-heap-hugepage-enabled*` (gc-safepoints.lisp, gc-data.lisp)。
+> **FR-462**: ⚠️ 実装主張（未確認） → Phase 81 のセクションを参照。`rt-heap-madvise-hugepage` + `*rt-heap-hugepage-enabled*` (gc-safepoints.lisp, gc-data.lisp)。
 
 #### FR-463: ⏸️: Memory Defragmentation via mremap (mremapによるメモリデフラグ)
 
@@ -1495,33 +1493,33 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 - **根拠**: Deutsch-Schorr-Waite DFS copying / HotSpot CMS foreground GC ordering / JikesRVM GC copy ordering。GC直後のキャッシュウォームアップコスト削減
 - **難易度**: Hard
 
-#### FR-469: ✅: Generation-Based Object Aging Statistics (世代別オブジェクト老化統計)
+#### FR-469: Generation-Based Object Aging Statistics (世代別オブジェクト老化統計) ⚠️
 
-- **実装**: `packages/runtime/src/gc-profile.lisp:42` (`rt-heap-age-hist`), `packages/runtime/src/heap-core.lisp:39` (age-hist スロット), package.lisp でエクスポート
+- **証跡（未確認）**: `packages/runtime/src/gc-profile.lisp:42` (`rt-heap-age-hist`), `packages/runtime/src/heap-core.lisp:39` (age-hist スロット), package.lisp でエクスポート
 - **対象**: `packages/runtime/src/gc.lisp`
 - **内容**: 各オブジェクトが何回minor GCを生き残ったかを`age`フィールド（既存FR-394 mark word）で追跡。age分布ヒストグラムを`rt-gc-stats`に追加。age > threshold で旧世代昇格する現行ロジックに加え、「同一割り当てサイトから生成されたオブジェクトの平均age」を統計化。割り当てサイト別長命オブジェクト特定
 - **根拠**: JVM GC age histogram / G1 `-XX:+PrintGCDetails`。世代別仮説（FR-443）の実測検証ツール
 - **難易度**: Easy
 
-#### FR-470: ✅: Adjustable Array GC Handling (可変長配列のGC処理)
+#### FR-470: Adjustable Array GC Handling (可変長配列のGC処理) ⚠️
 
-- **実装**: `packages/runtime/src/gc-safepoints.lisp:199-227` (`rt-gc-register-adjustable-array`, `*rt-adjustable-array-storage-registry*`, `%rt-gc-clean-adjustable-array-registry`)
+- **証跡（未確認）**: `packages/runtime/src/gc-safepoints.lisp:199-227` (`rt-gc-register-adjustable-array`, `*rt-adjustable-array-storage-registry*`, `%rt-gc-clean-adjustable-array-registry`)
 - **対象**: `packages/vm/src/vm.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: `adjust-array`で配列サイズ変更時の旧バッキングストア回収。新旧両方の配列オブジェクトが同一GCサイクルに存在する過渡状態を正しく処理。displaced array（`make-array :displaced-to`）の参照先が回収されないようにGCルート追加。fill pointer配列のfill pointer以降の要素はスキャン不要（明示的nil化 or スキャン範囲制限）
 - **根拠**: SBCL adjustable vector / ANSI CL spec §15.1.2。CLの標準配列機能とGCの整合性
 - **難易度**: Medium
 
-#### FR-471: ✅: Open Stream / Port as GC Finalizable Resource (オープンストリームのGC管理)
+#### FR-471: Open Stream / Port as GC Finalizable Resource (オープンストリームのGC管理) ⚠️
 
-- **実装**: package.lisp で `rt-register-finalizer`, `rt-unregister-finalizer`, `rt-register-stream-finalizer` をエクスポート (FR-459/460/471)
+- **証跡（未確認）**: package.lisp で `rt-register-finalizer`, `rt-unregister-finalizer`, `rt-register-stream-finalizer` をエクスポート (FR-459/460/471)
 - **対象**: `packages/vm/src/io.lisp`, `packages/runtime/src/gc.lisp`
 - **内容**: `(open ...)` で作成したストリームオブジェクトが到達不能になったときに自動`close`を実行するファイナライザを登録。ファイルディスクリプタリーク防止。ただし`close`のタイミングは非決定的なため、`with-open-file`の使用を推奨する警告機構も追加。ファイナライザ経由でcloseされたストリームをリソース統計に記録
 - **根拠**: SBCL stream finalization / CPython `ResourceWarning` / Java `FileInputStream.finalize()`。GCによるリソースリーク防止の最後の砦
 - **難易度**: Easy
 
-#### FR-472: ✅: Hash Consing / Structure Sharing via GC (GCによる構造共有・ハッシュコンシング)
+#### FR-472: Hash Consing / Structure Sharing via GC (GCによる構造共有・ハッシュコンシング) ⚠️
 
-- **実装**: `packages/runtime/src/gc-references.lisp:31-101` (`rt-hash-cons-entry`, `*rt-hash-cons-registry*`, `rt-register-hash-cons`, `rt-hash-cons-inc-ref`, `rt-hash-cons-dec-ref`, `%rt-gc-sweep-hash-consing`), gc-major-sweep.lisp から sweep 時に呼び出し
+- **証跡（未確認）**: `packages/runtime/src/gc-references.lisp:31-101` (`rt-hash-cons-entry`, `*rt-hash-cons-registry*`, `rt-register-hash-cons`, `rt-hash-cons-inc-ref`, `rt-hash-cons-dec-ref`, `%rt-gc-sweep-hash-consing`), gc-major-sweep.lisp から sweep 時に呼び出し
 - **対象**: `packages/runtime/src/gc.lisp`, `packages/vm/src/vm.lisp`
 - **内容**: 同一内容のimmutableオブジェクト（リスト・ベクタ・文字列）を1つのヒープ表現に統合するハッシュコンシング。`(cons a b)` 生成時に内容ハッシュテーブルを検索し既存等値オブジェクトがあれば新規割り当てなしでその参照を返す。GCがweak hash tableでハッシュコンシングテーブルを管理（到達不能になれば自動削除）。コンパイラ中間表現の重複ASTノード共有に特に有効
 - **根拠**: SBCL cons hashing / Lean4 hash consing / Coq kernel hash consing。コンパイラ内部での同一サブ式の重複排除。cl-ccのAST・CPS変換結果に直接適用可能
@@ -1550,12 +1548,6 @@ Garbage collection, memory management, heap optimization, and cache efficiency.
 
 ---
 
-## ステータスサマリ
+## ステータス
 
-| 分類          | 件数    | 説明                                                                           |
-| ------------- | ------- | ------------------------------------------------------------------------------ |
-| ✅ 実装完了   | 71      | Pure CL 実装としてテスト済み（OS/ネイティブ資源の意味論は範囲外）              |
-| ⚠️ スタブ実装 | 17      | インターフェース定義済み、OS/ハードウェア統合待ち                              |
-| ⏸️ 意図的延期 | 78      | OS統合・ハードウェア拡張・ネイティブバックエンド・大規模ランタイム再設計が必要 |
-| ❌ 未着手     | 0       |                                                                                |
-| **合計**      | **166** |                                                                                |
+個別FRの状態を記録します。固定件数や固定テスト結果は記録しません。

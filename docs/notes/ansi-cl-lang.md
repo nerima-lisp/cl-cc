@@ -1,5 +1,7 @@
 # ✅ ANSI CL: Language Core — ✅ 720 / — 0
 
+> 状態判定は `docs/notes/fr-status.md` の語彙に従う。対象欄のパスが現行ツリーに存在しないFRは、設計記述として扱い完了とは判定しない。
+
 Evaluation/compilation, lambda lists, types/classes, data/control flow, iteration, CLOS (object system), structures, conditions/restarts, symbols, packages, numbers, characters.
 
 このチェックマークは**文書の整備完了**を示します。各節の `✅` / `—` は cl-cc 実装状況または repo で確認できた根拠の有無を表します。

@@ -1,11 +1,13 @@
 # ANSI CL: Standard Library & Extensions
 
+> 状態判定は `docs/notes/fr-status.md` の語彙に従う。対象欄のパスが現行ツリーに存在しないFRは、設計記述として扱い完了とは判定しない。
+
 Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, printer, reader, system configuration, global variables, declarations, environment/tools, modern extensions.
 
 ## 完了ステータス
 
 - ✅ **完了**: この文書で追跡している ANSI CL 標準ライブラリ 352 FR はすべて完了しています。
-- `docs/README.md` でも `✅ COMPLETE` として集計しています（352 complete / 0 partial / 0 failed）。
+- `docs/notes/fr-status.md` では、個別証跡が確認できる範囲だけを状態語彙に従って集計します。
 - 対象範囲は、この文書内の標準ライブラリ・I/O・reader/printer・環境系・実用拡張の追跡 FR です。
 
 ---
