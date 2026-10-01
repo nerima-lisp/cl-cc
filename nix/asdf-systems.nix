@@ -449,14 +449,14 @@ let
       installPhase =
         lib.replaceStrings
           [
+            ''--prefix ASDF_OUTPUT_TRANSLATIONS : "$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g):"''
             ''"$CL_SOURCE_REGISTRY''${CL_SOURCE_REGISTRY:+:}"''
             ''"$CL_SOURCE_REGISTRY:"''
-            ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g):"''
           ]
           [
+            ''--set ASDF_OUTPUT_TRANSLATIONS "$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g):"''
             ''"$CL_SOURCE_REGISTRY"''
             ''"$CL_SOURCE_REGISTRY"''
-            ''"$(echo $CL_SOURCE_REGISTRY | sed s,//:,::,g)"''
           ]
           old.installPhase;
     });
