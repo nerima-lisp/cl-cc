@@ -1,7 +1,8 @@
 # CLI
 
 `cl-cc` is the public command-line entry point. The command and option names
-below are sourced from `packages/cli/src/main.lisp` and `args.lisp`.
+below are sourced from `packages/cli/src/main.lisp`, `args.lisp`, and
+`cli-spec.lisp`; the generated schema is available with `cl-cc docs markdown`.
 
 ## Commands
 
@@ -19,24 +20,24 @@ below are sourced from `packages/cli/src/main.lisp` and `args.lisp`.
 | `compile-commands [path]` | Generate `compile_commands.json`; `-o` changes its output path. |
 | `install <system.asd>` | Register or compile a local ASDF system. |
 | `uninstall <system>` | Remove a registered local system. |
-| `fuzz [--seed N]` | Run compiler fuzzing. |
-| `reduce <file>` | Reduce a compiler test case. |
-| `audit` | Run the dependency audit handler. |
+| `fuzz [--seed N]` | Placeholder handler; reports a fuzzing completion message. |
+| `reduce <file>` | Placeholder handler; reports a reduction completion message. |
+| `audit` | Placeholder handler; reports a dependency-audit completion message. |
 | `doc <path>` | Generate API documentation; `-o` selects the output. |
-| `doctest <path>` | Run docstring examples. |
-| `show-types <file>` | Show inferred type signatures. |
-| `assert-density <path>` | Analyze assertion density. |
-| `abi-dump <file>` | Dump an ABI manifest. |
-| `abi-check <old> <new>` | Check two ABI manifests for compatibility. |
-| `demangle <name>` | Demangle a C++ ABI symbol. |
+| `doctest <path>` | Placeholder handler; reports zero failures. |
+| `show-types <file>` | Placeholder handler; reports no file specified. |
+| `assert-density <path>` | Placeholder handler; reports a fixed result. |
+| `abi-dump <file>` | Placeholder handler; reports completion. |
+| `abi-check <old> <new>` | Placeholder handler; reports compatibility. |
+| `demangle <name>` | Placeholder handler; echoes the supplied name. |
 | `disasm <wasm>` | Disassemble Wasm; `--wat` emits WAT and `--decompile` uses wasm-decompile. |
 | `inspect <wasm>` | Inspect Wasm sections and disassembly. |
-| `objdump <file>` | Inspect binary internals. |
-| `macrostep <file>` | Step through macro expansion. |
-| `bisect [range]` | Find a regression commit. |
-| `features` | List feature flags. |
-| `dep-graph [--format F]` | Render the ASDF dependency graph. Formats are `dot`, `json`, `mermaid`, and `topo`. |
-| `generate <schema>` | Run schema-based code generation. |
+| `objdump <file>` | Placeholder handler; prints a fixed section summary. |
+| `macrostep <file>` | Placeholder handler; reports expansion completion. |
+| `bisect [range]` | Placeholder handler; reports a fixed result. |
+| `features` | Print the handler's static feature list. |
+| `dep-graph` | Render the ASDF dependency graph. |
+| `generate <schema>` | Placeholder handler; reports code-generation completion. |
 | `update [pkg]` | Update dependencies. |
 | `completion <shell>` | Emit completion for `bash`, `zsh`, `fish`, `powershell`, `nushell`, or `elvish`. |
 | `docs [format]` | Emit CLI reference as `markdown`, `man`, or `json` (default `markdown`). |

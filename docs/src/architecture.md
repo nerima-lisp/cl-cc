@@ -1,11 +1,11 @@
 # Architecture
 
 cl-cc is a Common Lisp compiler implemented in Common Lisp. The checked-in
-repository contains the parser, compilation pipeline, bytecode VM, runtime,
-native emitters, CLI, and tooling. The AST, type, macro-expansion, CPS, MIR,
+repository contains the pipeline integration, bytecode VM, runtime, emitter
+integration/tests, CLI, and tooling. The parser, AST, type, macro-expansion, CPS, MIR,
 register-allocation, and code-generation systems are consumed as ASDF/Nix
-dependencies from sibling repositories; they are not directories in this
-checkout.
+dependencies from sibling repositories; their implementations are not
+directories in this checkout.
 
 ## The pipeline
 
@@ -13,7 +13,7 @@ checkout.
 Source (.lisp, .php, .js, .mjs)
     |
     v
-Parser and language integration                         packages/parse
+Parser and language integration                         external cl-cc-parse
     |
     v
 Pipeline and lowering                                   packages/pipeline
@@ -23,8 +23,8 @@ Compilation and optimization                            packages/compile
     |       external MIR/regalloc/codegen systems
     +--> VM interpreter                                  packages/vm
     |       bytecode execution and runtime integration
-    +--> Native/Wasm emission                            packages/emit
-    |       x86-64, AArch64, and Wasm emitters
+    +--> Native/Wasm emission                            external cl-cc-emit
+    |       in-tree integration/tests in packages/emit
     +--> Bytecode encoding                               packages/binary
             portable format
 ```
@@ -47,7 +47,7 @@ The package directories currently present in this repository are:
 | `emit` | native and Wasm emission |
 | `formatter` | source formatting |
 | `optimize` | optimization passes |
-| `parse` | parser and language input |
+| `parse` | parser integration and tests; implementation is external |
 | `pipeline` | high-level compile/evaluate pipeline |
 | `prolog-tools` | call-graph tooling |
 | `repl` | interactive REPL |
@@ -56,10 +56,12 @@ The package directories currently present in this repository are:
 | `stdlib` | standard library |
 | `testing-framework` | test support |
 | `tools` | development tools |
+| `umbrella-tests` | umbrella test definitions |
 | `vm` | bytecode VM |
 
-The external systems include `cl-cc-ast`, `cl-cc-type`, `cl-cc-expand`,
-`cl-cc-cps`, `cl-cc-mir`, `cl-cc-regalloc`, and `cl-cc-codegen`. They are
+The external systems include `cl-cc-parse`, `cl-cc-ast`, `cl-cc-type`,
+`cl-cc-expand`, `cl-cc-cps`, `cl-cc-mir`, `cl-cc-regalloc`, and
+`cl-cc-codegen`, and `cl-cc-emit`. They are
 declared in `flake.nix` and `nix/asdf-systems.nix` and loaded as dependencies.
 The Prolog integration is split between external `cl-prolog-kit` and the
 in-tree `cl-cc-prolog-tools` system. `cl-cc-prolog` is not the name of a
@@ -86,11 +88,10 @@ analysis using `cl-prolog-kit`; it is tooling, not a compiler package named
 
 ## Runtime
 
-The runtime package supplies heap management, garbage collection, object
-representation, I/O and FFI integration, image support, and stack-safety
-facilities used by the VM. These are the supported runtime boundaries exposed
-by the current tree; experimental algorithms are not advertised as public
-features here.
+The runtime package is the in-tree boundary for heap management, garbage
+collection, object representation, I/O and FFI integration, image support, and
+stack-safety facilities used by the VM. The architecture page does not infer
+additional runtime interfaces from test names or comments.
 
 ## Self-hosting
 
@@ -99,8 +100,8 @@ The supported entry point is `cl-cc selfhost [file]`; `--profile` records VM
 instruction frequencies for the workload. The REPL and `eval` commands use
 the same pipeline and preserve definitions within their process/session.
 
-The example below exercises the public language surface rather than describing
-an internal package:
+The example below exercises the evaluator without describing an internal
+package:
 
 ```lisp
 (defun eval-ast (node)
@@ -111,8 +112,3 @@ an internal package:
 (eval-ast '(1 (2 (3 4))))
 ;; => 10
 ```
-
-Distributed consensus, CRDTs, OpenTelemetry, io_uring, RCU/QSBR, and similar
-items are not documented as supported cl-cc architecture features because the
-current source and package boundaries do not establish them as production
-interfaces.
