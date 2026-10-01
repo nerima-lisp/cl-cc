@@ -273,7 +273,7 @@
                                 (symbol-name entry)
                                 (cl-weave::test-case-name test))
                            (setf found t))))
-                      found))))))
+                      found))))
     (dolist (module (or modules
                         (cl-cc/optimize:opt-roadmap-evidence-modules evidence)))
       (expect (module-exists-p module) :to-be-truthy))
