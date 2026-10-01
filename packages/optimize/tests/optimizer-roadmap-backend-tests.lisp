@@ -232,7 +232,12 @@
   "Assert that the external public evidence record is complete."
   (flet ((module-exists-p (module)
            (or (probe-file module)
-           (let* ((pathname (pathname module))
+               (let ((root (ignore-errors
+                             (asdf:system-source-directory
+                              (asdf:find-system "cl-cc")))))
+                 (and root
+                      (probe-file (merge-pathnames module root))))
+               (let* ((pathname (pathname module))
                   (parts (pathname-directory pathname))
                   (package (and (equal (first parts) :relative)
                                 (second parts)
