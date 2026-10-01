@@ -243,7 +243,6 @@
                (let* ((pathname (pathname module))
                   (parts (pathname-directory pathname))
                   (package (and (equal (first parts) :relative)
-                                (second parts)
                                 (third parts)))
                       (system (and package
                                     (ignore-errors
