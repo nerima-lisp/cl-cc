@@ -6,8 +6,8 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 
 ## 完了ステータス
 
-- ✅ **完了**: この文書で追跡している ANSI CL 標準ライブラリ 352 FR はすべて完了しています。
-- `docs/notes/fr-status.md` では、個別証跡が確認できる範囲だけを状態語彙に従って集計します。
+- ❓ **未検証**: 一部の完了主張は現行チェックアウトの証跡で再確認できていません。
+- `docs/notes/fr-status.md` の状態語彙に従い、現行ツリーで確認できない対象パスは完了根拠にしません。
 - 対象範囲は、この文書内の標準ライブラリ・I/O・reader/printer・環境系・実用拡張の追跡 FR です。
 
 ---
@@ -222,9 +222,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `*default-pathname-defaults*`                                                                                       | ✅   | stdlib-source.lisp defvar                                  |
 | `compile-file-pathname`                                                                                             | ✅   | added to `*vm-host-bridge-functions*` whitelist in vm.lisp |
 
-#### FR-566: パス名 API 完全化 — ✅ COMPLETE
+#### FR-566: パス名 API 完全化 — ❓ 未検証
 
-- **対象**: `packages/runtime/src/runtime.lisp`, `packages/vm/src/io.lisp`
+- **対象**: `packages/runtime/src/runtime.lisp`, `旧対象パス（現行実装位置未特定）`
 - **実装**: `make-pathname` / `pathname` / `namestring` / `truename` / `probe-file` / `directory` などの pathname API は VM host bridge に登録済み。
 - **内容**: ANSI CL 19.2 の pathname 関数群。`truename` (実際のファイルシステムパス解決)。`*default-pathname-defaults*` VM global 初期化
 - **根拠**: ANSI CL 19.2 — Pathname Functions
@@ -245,13 +245,13 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `file-write-date` / `file-author`                                                | ✅   | registered as host bridges in vm.lisp                                                                                                                          |
 | `directory`                                                                      | ✅   | registered as host bridge in vm.lisp                                                                                                                           |
 | `ensure-directories-exist`                                                       | ✅   | registered as host bridge in vm.lisp                                                                                                                           |
-| `load` `:verbose`/`:print`/`:if-does-not-exist`/`:external-format`               | ✅   | `packages/pipeline/pipeline.lisp: our-load` / `packages/vm/src/io.lisp: load ブリッジ`; keyword-bearing 形は pipeline 側にのみあり、builtin path は unary-only |
+| `load` `:verbose`/`:print`/`:if-does-not-exist`/`:external-format`               | ❓   | 旧対象パス `旧対象パス（現行実装位置未特定）` と `旧対象パス（現行実装位置未特定）` は現行ツリーにも外部 clone にも存在しないため、完了根拠から除外 |
 | `compile-file` 3値返却 (output-truename, warnings-p, failure-p)                  | ✅   | macros-stdlib.lisp: `(values (probe-file pathname) nil nil)`                                                                                                   |
 
-#### FR-589: open/load/compile-file 完全キーワード引数 — ✅ COMPLETE
+#### FR-589: open/load/compile-file 完全キーワード引数 — ❓ 未検証
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/pipeline/pipeline.lisp`
-- **実装**: `open` は phase2 handler で `:direction` / `:if-exists` / `:if-does-not-exist` を処理し、`load` は `our-load`/VM bridge、`compile-file` は stdlib shim で `our-load` 後に3値を返す。
+- **対象**: 現行の `packages/compile/src/codegen-phase2.lisp`, `packages/stdlib/src/stdlib-source.lisp`
+- **実装**: `open` と `compile-file` の現行コードは確認できるが、`load` のキーワード対応を完了と判断できる現行証跡は確認できない。
 - **内容**: ANSI CL 21.2 の `open` 全キーワード実装。`load` / `compile-file` の制御変数対応。`compile-file` の3値返却
 - **根拠**: ANSI CL 21.2.1 / 24.1
 - **難易度**: Medium
@@ -280,9 +280,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | 複合ストリームアクセサ (`broadcast-stream-streams` 等)               | ✅                           | vm.lisp host bridges — broadcast-stream-streams, two-way-stream-input/output-stream, echo-stream-input/output-stream, concatenated-stream-streams |
 | `with-standard-io-syntax`                                            | ✅                           | FR-632: binds all ANSI-standard I/O vars (`*print-escape*`, `*print-base*`, `*read-base*`, `*package*` etc.)                                      |
 
-#### FR-567: 複合ストリームアクセサ — ✅ COMPLETE
+#### FR-567: 複合ストリームアクセサ — ❓ 未検証
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`
 - **実装**: broadcast/two-way/echo/concatenated stream の構成ストリーム accessor は VM host bridge 経由で元ストリーム handle を返す。
 - **内容**: 各複合ストリームの構成ストリームを取得するアクセサ群
 - **根拠**: ANSI CL 21.1
@@ -315,9 +315,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 - **根拠**: ANSI CL 21.2 — read-sequence, write-sequence
 - **難易度**: Medium
 
-#### FR-568: read-char-no-hang — ✅ COMPLETE
+#### FR-568: read-char-no-hang — ❓ 未検証
 
-- **対象**: `packages/expand/src/macros-filesystem.lisp`, `packages/vm/src/io.lisp`, `packages/compile/src/builtin-registry.lisp`
+- **対象**: `packages/expand/src/macros-filesystem.lisp`, `旧対象パス（現行実装位置未特定）`, `packages/compile/src/builtin-registry.lisp`
 - **実装**: `macros-filesystem.lisp` で `read-char` 委譲スタブとして提供済み。
 - **内容**: `read-char-no-hang` — 文字が利用可能なら返却、なければ `nil` を返す。`listen` との連携
 - **根拠**: ANSI CL 21.2 — read-char-no-hang
@@ -332,9 +332,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `stream-element-type`                            | ✅   |
 | `file-string-length`                             | ✅   | macros-stdlib.lisp — UTF-8 バイト数を `string-to-octets` で計算; 文字は `(string char)` に変換してから計算 |
 
-#### FR-591: file-string-length — ✅ COMPLETE
+#### FR-591: file-string-length — ❓ 未検証
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`
 - **実装**: 文字・文字列を UTF-8 バイト数として計算し、VM file handle 経由の stream designator でも動作する。
 - **内容**: `(file-string-length stream object)` — `object` (文字または文字列) を `stream` に書いた場合のファイルポジション移動量を返す
 - **根拠**: ANSI CL 21.2 — file-string-length
@@ -364,9 +364,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `write-to-string` キーワード引数 (`:base`, `:radix`, `:escape` 等) | ✅   | FR-646: VM グローバルから `*print-base*`/`*print-radix*`/`*print-escape*`/`*print-level*`/`*print-length*`/`*print-circle*`/`*print-case*` を読み取り CL 動的バインドに変換してから `write-to-string` 呼出 |
 | `prin1-to-string` / `princ-to-string`                              | ✅   | FR-481: `prin1-to-string` → `vm-write-to-string-inst` (with escaping); `princ-to-string` → `vm-princ-to-string-inst` (no escaping)                                                                         |
 
-#### FR-569: write 関数 (全キーワード形式) — ✅ COMPLETE
+#### FR-569: write 関数 (全キーワード形式) — ❓ 未検証
 
-- **対象**: `packages/expand/src/macros-filesystem.lisp`, `packages/vm/src/io.lisp`, `packages/compile/src/builtin-registry.lisp`
+- **対象**: `packages/expand/src/macros-filesystem.lisp`, `旧対象パス（現行実装位置未特定）`, `packages/compile/src/builtin-registry.lisp`
 - **実装**: `macros-filesystem.lisp` で `write` マクロを実装済み。`write-to-string` と印字制御変数束縛に委譲し、`object` を返す。
 - **内容**: `(write object :stream s :escape t :radix nil :base 10 :circle nil :pretty nil :level nil :length nil :case :upcase :gensym t :array t :readably nil :right-margin nil :miser-width nil :lines nil :pprint-dispatch ...)` の実装
 - **根拠**: ANSI CL 22.3.1
@@ -389,9 +389,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `*print-pprint-dispatch*`                      | ✅   | stdlib-source.lisp defvar                                                             |
 | `*print-case*`                                 | ✅   | stdlib-source.lisp defvar                                                             |
 
-#### FR-570: _print-circle_ / _print-gensym_ / _print-case_ — ✅ COMPLETE
+#### FR-570: _print-circle_ / _print-gensym_ / _print-case_ — ❓ 未検証
 
-- **対象**: `packages/vm/src/vm.lisp`, `packages/vm/src/io.lisp`
+- **対象**: `packages/vm/src/vm.lisp`, `旧対象パス（現行実装位置未特定）`
 - **実装**: これら3変数は VM global として定義済み。
 - **内容**: `*print-circle*` — 循環構造検出・`*print-gensym*` — `#:` プレフィックス制御。`*print-case*` — `:upcase`/`:downcase`/`:capitalize`/`:preserve` シンボル大文字小文字制御
 - **根拠**: ANSI CL 22.1 — print control variables
@@ -464,9 +464,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `with-compilation-unit`    | ✅               | ANSI 互換の最小実装あり。`locally` で本体を包み、オプションは保持せず無視                       |
 | ASDF 統合                  | ✅ (`cl-cc.asd`) |
 
-#### FR-574: ロード・コンパイル制御変数 — ✅ COMPLETE
+#### FR-574: ロード・コンパイル制御変数 — ❓ 未検証
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/vm/src/vm.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/vm/src/vm.lisp`
 - **実装**: `*load-pathname*` / `*load-truename*` / `*compile-file-pathname*` / `*compile-file-truename*` と load/compile print/verbose 変数は stdlib で定義済み。
 - **根拠**: ANSI CL 23.1.1 / 24.1
 - **難易度**: Easy
@@ -535,9 +535,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | `disassemble`                         | ✅   | macros-stdlib.lisp — delegates to host SBCL `disassemble`              |
 | `dribble`                             | ✅   | macros-stdlib.lisp — delegates to host SBCL `dribble`                  |
 
-#### FR-576: disassemble — ✅ COMPLETE
+#### FR-576: disassemble — ❓ 未検証
 
-- **対象**: `packages/cli/src/main.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: `packages/cli/src/main.lisp`, `旧対象パス（現行実装位置未特定）`
 - **実装**: VM bridge の `%vm-safe-disassemble` が関数 designator を host `cl:disassemble` に委譲し、非関数入力はブロックせず `nil` を返す。
 - **内容**: `(disassemble fn)` — VM 命令列を人間可読形式で出力。デバッグ・最適化確認に不可欠
 - **根拠**: ANSI CL 25.1.4 — disassemble
@@ -565,9 +565,9 @@ Cons/lists, arrays, strings, sequences, hash tables, filesystem, streams/I/O, pr
 | -------------------------- | ---- | ---------------------------------------------------------------- |
 | `y-or-n-p` / `yes-or-no-p` | ✅   | FR-578: `macros-stdlib.lisp` でマクロ定義 (read-line + 文字比較) |
 
-#### FR-578: y-or-n-p / yes-or-no-p — ✅ COMPLETE
+#### FR-578: y-or-n-p / yes-or-no-p — ❓ 未検証
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/compile/src/builtin-registry.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/compile/src/builtin-registry.lisp`
 - **実装**: `*query-io*` から `read-line` し、`y`/`yes` または `yes`/`no` を判定する非ブロッキング bridge を登録済み。
 - **内容**: `y-or-n-p` — "y" または "n" を受け付ける。`yes-or-no-p` — "yes" / "no" フルスペル要求。`*query-io*` ストリームを使用
 - **根拠**: ANSI CL 25.1.2
@@ -763,9 +763,9 @@ ANSI CL 外だが 2026 年のモダンな CL 実装が提供する機能。
 - **根拠**: ANSI CL 17.2 — sort :key argument
 - **難易度**: Easy
 
-#### FR-612: read / read-char eof-error-p / eof-value 引数 — ✅ COMPLETE
+#### FR-612: read / read-char eof-error-p / eof-value 引数 — ❓ 未検証
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/compile/src/builtin-registry-data.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/compile/src/builtin-registry-data.lisp`
 - **実装**: `codegen-io.lisp` の `%compile-stream-read` が `read` / `read-char` / `read-line` の 3引数以上を処理し、`:eof` sentinel を `eof-value` に置換する。
 - **内容**: `(read stream eof-error-p eof-value recursive-p)` / `(read-char stream eof-error-p eof-value recursive-p)` — 4引数形式を完全サポート。eof-error-p = nil のとき EOF で eof-value を返す
 - **根拠**: ANSI CL 23.2 / 21.2 — read, read-char eof handling
@@ -921,9 +921,9 @@ ANSI CL 外だが 2026 年のモダンな CL 実装が提供する機能。
 - **根拠**: ANSI CL 22.1.1 — with-standard-io-syntax
 - **難易度**: Medium (プリンタ変数の実装に依存)
 
-#### FR-633: clear-output — ✅ COMPLETE
+#### FR-633: clear-output — ❓ 未検証
 
-- **対象**: `packages/compile/src/builtin-registry-data.lisp`, `packages/vm/src/io.lisp`
+- **対象**: `packages/compile/src/builtin-registry-data.lisp`, `旧対象パス（現行実装位置未特定）`
 - **実装**: `vm-clear-output` 命令と `clear-output` ビルトイン登録が実装済み
 - **内容**: 出力バッファを破棄する
 - **根拠**: ANSI CL 21.2 — clear-output

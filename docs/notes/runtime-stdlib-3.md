@@ -1,7 +1,7 @@
 # Runtime: Standard Library — ANSI Compliance and Optimization (Phase 176-235, 73 FRs)
 
-**Status: ⚠️ Partial / planned.** The entries below are not a local completion
-claim unless their cited implementation and test evidence exists here.
+**Status: ❓ Unverified.** This ANSI/optimization backlog remains unverified until
+each entry's cited implementation and test evidence is confirmed in this checkout.
 
 MOP extensions, compiler macros, GC tuning, parallel compilation, error messages, weak references, fixnum/bignum/rational/complex arithmetic, external formats, pretty printer, FORMAT/READ complete, eval-when, LOOP extensions, CLOS method combinations, dynamic binding optimization, tail calls, runtime type checking, compilation environment, character/string compliance, defstruct, type declarations, image save/load, OS interface, POSIX signals, finalizers, symbol macros, setf expanders, escape analysis, TRMC, package-local nicknames, bytecode layer, CLOS class changes, ASDF integration, serialization, class-allocated slots, inlining, printer/reader variables, numeric I/O, dynamic wind, interprocedural optimization, SBCL compatibility, block/tagbody, numeric comparison, sequence operations, hash table SIMD, source tracking, trace/step/break, numeric output, CLOS compile-time optimization, weak pointers, native threads, terminal control, circular printing, local declarations, code walker, numeric clamp, precise stack maps, typep dispatch, Gray streams, LOOP arithmetic.
 

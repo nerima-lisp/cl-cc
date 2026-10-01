@@ -1,6 +1,6 @@
 # Runtime: Subsystems & Infrastructure
 
-**Status: ⚠️ Partial / planned.** Most entries are design notes; referenced
+**Status: ❓ Unverified design backlog.** Most entries are design notes; referenced
 implementation paths must be checked in the current checkout before a FR is
 marked implemented.
 

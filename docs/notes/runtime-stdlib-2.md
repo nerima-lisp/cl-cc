@@ -1,7 +1,7 @@
 # Runtime: Standard Library — Extended Features (Phase 138-175, 71 FRs)
 
-**Status: ⚠️ Partial / planned.** The entries below are not a local completion
-claim unless their cited implementation and test evidence exists here.
+**Status: ❓ Unverified.** This extended-runtime backlog remains unverified until
+each entry's cited implementation and test evidence is confirmed in this checkout.
 
 Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuations, hygienic macros, script mode, C embedding API, memory pools, circular structure printing, transient collections, security hardening, runtime configuration, sequence protocol, numeric stability, thread synchronization, networking, lazy evaluation, numeric dispatch optimization, multiple values ABI, random access I/O, copy-on-write, green threads, custom hash tables, floor/truncate complete, CLOS fast path, load-time-value, symbol table, FASL paging, PGO persistence, tail call/exception interaction, backquote optimization, RISC-V backend, delimited continuations, reproducible builds, forward references, I/O buffering, pathname system.
 
