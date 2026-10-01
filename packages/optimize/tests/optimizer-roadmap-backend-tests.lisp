@@ -245,12 +245,14 @@
                                  (ignore-errors
                                    (asdf:system-source-directory system)))))
                  (and root
-                      (probe-file
-                       (merge-pathnames
-                        (format nil "~{~A~^/~}/~A"
-                                (cdddr parts)
-                                (file-namestring pathname))
-                        root))))))
+                      (some (lambda (directory)
+                              (probe-file
+                               (merge-pathnames
+                                (format nil "~{~A~^/~}/~A"
+                                        directory
+                                        (file-namestring pathname))
+                                root)))
+                            (list (cdddr parts) (cddddr parts)))))))
          (api-entry-exists-p (entry)
            (if (consp entry)
                (multiple-value-bind (symbol found)
@@ -258,10 +260,11 @@
                  (and found symbol (or (fboundp symbol) (boundp symbol))))
                (and (symbolp entry) (or (fboundp entry) (boundp entry)))))
          (test-anchor-exists-p (entry)
-           (or (gethash entry cl-cc/test::*known-test-names*)
-               (and (symbolp entry)
-                    (gethash (intern (symbol-name entry) :cl-cc/test)
-                             cl-cc/test::*known-test-names*)))))
+           (and (symbolp entry)
+                (loop for registered being the hash-keys
+                        of cl-cc/test::*known-test-names*
+                      thereis (string= (symbol-name registered)
+                                       (symbol-name entry))))))
     (dolist (module (or modules
                         (cl-cc/optimize:opt-roadmap-evidence-modules evidence)))
       (expect (module-exists-p module) :to-be-truthy))
