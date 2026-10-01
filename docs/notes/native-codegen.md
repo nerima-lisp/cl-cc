@@ -1,6 +1,6 @@
 # Native Backend: Code Generation — Implementation Status
 
-> **Status**: 83 FRs are listed: 75 marked ✅ and 8 marked 🔶. No FR is currently marked ⬜, but the ✅ marks require refreshed, reproducible evidence.
+> **Status**: 83 FRs are listed: 74 marked ✅ and 9 marked 🔶. No FR is currently marked ⬜, but the ✅ marks require refreshed, reproducible evidence.
 > **Last updated**: 2026-05-20 (historical note; the test count is not retained as current evidence)
 > **Evidence note**: The current checkout has `packages/emit/` but not the documented `packages/codegen/`, `packages/regalloc/`, or `packages/mir/` directories. Those stale paths are not evidence until remapped to files that exist in the current checkout.
 > **Verification level**: ✅ = verified by code inspection + tests; 🔶 = structural evidence exists but functional verification is incomplete; ⬜ = not implemented or not evidenced.

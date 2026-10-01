@@ -1,6 +1,6 @@
 # Tooling: Advanced Compilation I
 
-> **Status**: 136 FRs are indexed. The historical ✅ markers are not a current completion claim; implementation, reachable integration, and reproducible test evidence must be refreshed per FR. See `docs/README.md` for overall progress.
+> **Status**: 136 FRs are indexed. The historical ✅ markers are not a current completion claim; implementation, reachable integration, and reproducible test evidence must be refreshed per FR. See `docs/notes/fr-status.md` for the roadmap index.
 
 ML-driven optimization, parallel/distributed compilation, WebAssembly targets, structured concurrency, formal verification, CHERI security, advanced optimization passes, ABI.
 

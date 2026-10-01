@@ -1724,11 +1724,11 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: Apple Core ML / ANE仕様。2025 年以降の Mac でのローカル LLM 推論に必要
 - **難易度**: Very Hard
 
-#### FR-440: eBPF コード生成 ⬜
+#### FR-440: eBPF コード生成 🔶
 
-- **対象**: 新規 `packages/emit/src/ebpf.lisp`
+- **対象**: 外部 `cl-cc-codegen-native` の `emit/src/ebpf.lisp`（現行 checkout では `packages/emit/tests/ebpf-tests.lisp` のみ）
 - **内容**: Linux カーネル内で実行される eBPF プログラムへのコンパイル。制約: (1) ループは検証器が終了証明可能なもののみ、(2) ヒープ割り当て不可（スタックと BPF マップのみ）、(3) 関数呼び出しは BPF helper 関数のみ。ネットワークパケット処理・性能トレース・セキュリティフィルタの CL 実装
-- **根拠**: Linux eBPF verifier / BPF CO-RE。2025 年の Linux システムプログラミングの標準ツール
+- **根拠**: pinned な `cl-cc-codegen-native` に verifier 制約検査、bytecode/ELF emission、`compile-ebpf-program` が存在する。in-tree テストは heap 操作拒否と基本命令 encoding を検証するが、外部実装の実行と実カーネル verifier は未確認。
 - **難易度**: Very Hard
 
 #### FR-441: OpenMP 自動並列化 ✅

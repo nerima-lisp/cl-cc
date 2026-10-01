@@ -230,17 +230,62 @@
 
 (defun %optimize-backend-assert-evidence-contains (evidence modules api-symbols test-anchors)
   "Assert that the external public evidence record is complete."
-  (declare (ignore modules api-symbols test-anchors))
-  (expect (cl-cc/optimize:opt-roadmap-evidence-modules evidence) :to-be-truthy)
-  (expect (cl-cc/optimize:opt-roadmap-evidence-api-symbols evidence) :to-be-truthy)
-  (expect (cl-cc/optimize:opt-roadmap-evidence-test-anchors evidence) :to-be-truthy))
+  (flet ((module-exists-p (module)
+           (or (probe-file module)
+           (let* ((pathname (pathname module))
+                  (parts (pathname-directory pathname))
+                  (package (and (equal (first parts) :relative)
+                                (second parts)
+                                (third parts)))
+                      (system (and package
+                                    (ignore-errors
+                                      (asdf:find-system
+                                       (format nil "cl-cc-~(~A~)" package)))))
+                      (root (and system
+                                 (ignore-errors
+                                   (asdf:system-source-directory system)))))
+                 (and root
+                      (probe-file
+                       (merge-pathnames
+                        (format nil "~{~A~^/~}/~A"
+                                (cdddr parts)
+                                (file-namestring pathname))
+                        root))))))
+         (api-entry-exists-p (entry)
+           (if (consp entry)
+               (multiple-value-bind (symbol found)
+                   (find-symbol (cdr entry) (car entry))
+                 (and found symbol (or (fboundp symbol) (boundp symbol))))
+               (and (symbolp entry) (or (fboundp entry) (boundp entry)))))
+         (test-anchor-exists-p (entry)
+           (or (gethash entry cl-cc/test::*known-test-names*)
+               (and (symbolp entry)
+                    (gethash (intern (symbol-name entry) :cl-cc/test)
+                             cl-cc/test::*known-test-names*)))))
+    (dolist (module (or modules
+                        (cl-cc/optimize:opt-roadmap-evidence-modules evidence)))
+      (expect (module-exists-p module) :to-be-truthy))
+    (dolist (api-entry (or api-symbols
+                           (cl-cc/optimize:opt-roadmap-evidence-api-symbols evidence)))
+      (expect (api-entry-exists-p api-entry) :to-be-truthy))
+    (dolist (test-anchor (or test-anchors
+                             (cl-cc/optimize:opt-roadmap-evidence-test-anchors evidence)))
+      (expect (test-anchor-exists-p test-anchor) :to-be-truthy))))
 
 (defun %optimize-backend-assert-evidence-case
     (feature-id status modules api-symbols test-anchors)
   "Assert the roadmap evidence contract for FEATURE-ID."
-  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
+  (let* ((feature (find feature-id
+                        (cl-cc/optimize:optimize-backend-roadmap-doc-features)
+                        :key #'cl-cc/optimize::opt-roadmap-feature-id
+                        :test #'string=))
+         (expected-status (%optimize-backend-evidence-status-for-feature feature))
+         (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
+    (expect feature :to-be-truthy)
     (expect evidence :to-be-truthy)
-    (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be status)
+    (expect status :to-be expected-status)
+    (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
+            :to-be expected-status)
     (%optimize-backend-assert-evidence-contains
      evidence
      modules
@@ -308,14 +353,15 @@
 
 (it-sequential "optimize-backend-roadmap-reconciled-fr-statuses-match-doc"
   (dolist (feature (cl-cc/optimize:optimize-backend-roadmap-doc-features))
-    (unless (eq (cl-cc/optimize::opt-roadmap-feature-status feature)
+    (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature))
+           (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence
+                      feature-id)))
+      (expect evidence :to-be-truthy)
+      (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
+              :to-be (%optimize-backend-evidence-status-for-feature feature))
+      (when (eq (cl-cc/optimize::opt-roadmap-feature-status feature)
                 :implemented)
-      (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature))
-             (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence
-                        feature-id)))
-        (expect evidence :to-be-truthy)
-        (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
-                :to-be (%optimize-backend-evidence-status-for-feature feature))))))
+        (%optimize-backend-assert-evidence-contains evidence nil nil nil)))))
 
 (it-sequential "optimize-backend-roadmap-fr-ids-by-status-partitions-document"
   (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))

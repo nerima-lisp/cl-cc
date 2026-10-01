@@ -1,6 +1,6 @@
 # Native Backend: Advanced Optimization & Platform
 
-> **Status**: 147 FRs are listed: 64 marked ✅, 5 marked 🔶, and 78 have no status marker and are therefore treated as ⬜ pending. Verified status is not established until cited paths and tests are refreshed. See `docs/README.md` for overall progress.
+> **Status**: 147 FRs are listed: 64 marked ✅, 5 marked 🔶, and 78 have no status marker and are therefore treated as ⬜ pending. Verified status is not established until cited paths and tests are refreshed. See `docs/notes/fr-status.md` for the roadmap index.
 
 LTO, advanced optimization passes, staged compilation, security hardening, GC integration, debug info, zero-cost exceptions, modern ISA, ML-driven optimization, WASM edge runtime, value range analysis, threading, developer experience, binary hardening, post-link optimization, functional language optimization, standard optimization passes, target/platform completion, profiling, modern IR, code quality, GC lifecycle, advanced concurrency, formal verification, tooling/IDE, security completion.
 
