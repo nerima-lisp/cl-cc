@@ -2,7 +2,7 @@
 ;;;; Phases 104-105: Runtime JIT infrastructure
 (asdf:defsystem "cl-cc-jit"
   :description "JIT compilation subsystem: stack maps, safepoints, write barriers, call stubs, code cache, trace JIT"
-  :version "0.1.0"
+  :version "0.2.0"
   :author "takeokunn"
   :license "MIT"
   :homepage "https://github.com/nerima-lisp/cl-cc"

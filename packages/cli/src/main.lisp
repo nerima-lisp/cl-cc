@@ -10,7 +10,7 @@
 
 (in-package :cl-cc/cli)
 
-(defparameter *version* "0.1.0"
+(defparameter *version* "0.2.0"
   "CL-CC version string.")
 
 ;;; ─────────────────────────────────────────────────────────────────────────

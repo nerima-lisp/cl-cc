@@ -8,7 +8,7 @@ the heap are all preserved between forms.
 
 ```console
 $ cl-cc repl
-CL-CC 0.1.0  —  ANSI Common Lisp
+CL-CC 0.2.0  —  ANSI Common Lisp
 Type a CL form and press Return. (exit) or Ctrl+D to quit.
 
 * (defun factorial (n)

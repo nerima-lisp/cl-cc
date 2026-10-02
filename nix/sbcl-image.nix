@@ -39,7 +39,7 @@ let
 in
 pkgs.stdenvNoCC.mkDerivation {
   pname = "cl-cc-test-image";
-  version = "0.1.0";
+  version = "0.2.0";
   src = testSrc;
 
   nativeBuildInputs = [
