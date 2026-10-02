@@ -13,7 +13,7 @@ or dates. Those values drift independently and must not be duplicated here.
 ## ANSI CL Compliance
 
 - [ansi-cl-lang.md](ansi-cl-lang.md) - Language core - ✅ local evidence recorded per FR
-- [ansi-cl-stdlib.md](ansi-cl-stdlib.md) - Standard library - ❓ one completion claim lacks local evidence
+- [ansi-cl-stdlib.md](ansi-cl-stdlib.md) - Standard library - ❓ several entries rely on external or unverified evidence
 
 ## Type System
 
