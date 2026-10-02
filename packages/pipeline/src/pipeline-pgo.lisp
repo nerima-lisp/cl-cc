@@ -3,6 +3,9 @@
 ;;; %make-direct-compilation-result and compile-string*.
 (in-package :cl-cc/pipeline)
 
+(defparameter +pgo-dominance-threshold+ 0.9
+  "Minimum observed type share required for PGO specialization.")
+
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; PGO counter-plan construction and type-feedback annotation
 ;;; ─────────────────────────────────────────────────────────────────────────
@@ -125,7 +128,7 @@ The runtime keys map logical plan IDs onto VM profile keys:
            (when (and (plusp total)
                       best
                       (> (/ (float (cdr best)) total)
-                         cl-cc/vm::+ic-pgo-dominance-threshold+))
+                         +pgo-dominance-threshold+))
              (push (cons pc (car best)) dominant))))
        by-pc)
       dominant)))

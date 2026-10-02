@@ -27,6 +27,7 @@
     (:file "pipeline-incremental")
    (:file "pipeline-runtime-bridges")
    (:file "pipeline")
+   (:file "pipeline-pgo")
    (:file "pipeline-runtime")
    (:file "pipeline-native")
     (:file "perf-map")
