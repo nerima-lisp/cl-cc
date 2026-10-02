@@ -1,5 +1,8 @@
 # Runtime: Standard Library — Extended Features (Phase 138-175, 71 FRs)
 
+**Status: ❓ Unverified.** This extended-runtime backlog remains unverified until
+each entry's cited implementation and test evidence is confirmed in this checkout.
+
 Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuations, hygienic macros, script mode, C embedding API, memory pools, circular structure printing, transient collections, security hardening, runtime configuration, sequence protocol, numeric stability, thread synchronization, networking, lazy evaluation, numeric dispatch optimization, multiple values ABI, random access I/O, copy-on-write, green threads, custom hash tables, floor/truncate complete, CLOS fast path, load-time-value, symbol table, FASL paging, PGO persistence, tail call/exception interaction, backquote optimization, RISC-V backend, delimited continuations, reproducible builds, forward references, I/O buffering, pathname system.
 
 ---
@@ -137,7 +140,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-804: Syntax-Rules / Define-Syntax (衛生的マクロ)
 
-- **対象**: `packages/expand/src/macro.lisp` (新ファイル `packages/expand/src/syntax-rules.lisp`)
+- **対象**: `外部: cl-cc-expand/src/macro.lisp` (新ファイル `外部: cl-cc-expand/src/syntax-rules.lisp`)
 - **内容**:
   - `(define-syntax name (syntax-rules (keywords...) (pattern template) ...))` — Scheme R7RS互換
   - パターン変数の衛生性: マクロ展開で導入される変数が呼び出し側の変数と衝突しない
@@ -149,7 +152,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-805: Gensym-based Hygiene (gensymベースの衛生性)
 
-- **対象**: `packages/expand/src/macro.lisp`
+- **対象**: `外部: cl-cc-expand/src/macro.lisp`
 - **現状**: `defmacro` のマクロでは手動 `gensym` が必要。自動化なし
 - **内容**:
   - `(with-gensyms (x y z) body)` — 複数 gensym の一括生成マクロ
@@ -251,7 +254,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-820: Print-Circle Implementation (*print-circle*実装)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **現状**: `*print-circle*` = `t` が未実装。循環リスト印刷で無限ループ
 - **内容**:
   - フェーズ1（ラベリング）: DFS で全サブ構造を訪問し、2回以上訪問された構造に `#n=` 番号を付与
@@ -264,7 +267,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-821: Copy-Structure (構造体コピー)
 
-- **対象**: `packages/expand/src/expander-defstruct.lisp`, `packages/vm/src/vm-clos.lisp`
+- **対象**: `外部: cl-cc-expand/src/expander-defstruct.lisp`, `packages/vm/src/vm-clos.lisp`
 - **内容**:
   - `copy-structure struct` — ANSI CL標準の構造体浅コピー（FR-446の完成版）
   - `deep-copy obj` — cl-cc独自の深コピー（循環参照はFR-820の共有構造検出を活用）
@@ -363,7 +366,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-834: JIT Threshold Configuration (JIT閾値設定)
 
-- **対象**: `packages/vm/src/vm-run.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: `packages/vm/src/vm-run.lisp`, `旧対象パス（現行実装位置未特定）`
 - **内容**:
   - `*jit-tier1-threshold*` — Tier-0 → Tier-1 エスカレートの呼び出し回数（デフォルト100）
   - `*jit-trace-threshold*` — トレース記録開始の閾値（デフォルト100ループ反復）
@@ -390,7 +393,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-838: Extensible Sequence Protocol (拡張可能シーケンスプロトコル)
 
-- **対象**: `packages/vm/src/vm-clos.lisp`, `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `packages/vm/src/vm-clos.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **内容**:
   - ユーザーが独自のシーケンス型を定義し、`length`/`elt`/`(setf elt)`/`subseq`/`make-sequence-like` を実装することで全シーケンス関数が動作する
   - `sequence` 抽象クラスを `standard-class` の上位に定義
@@ -401,7 +404,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-839: Iteration Protocol (反復プロトコル)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **内容**:
   - `(make-iterator sequence)` → iterator オブジェクト
   - `(iterator-next it)` → `(values value has-more-p)`
@@ -488,7 +491,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-851: TCP/UDP Socket API (ソケットAPI)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/runtime/src/runtime.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/runtime/src/runtime.lisp`
 - **内容**:
   - `(make-tcp-socket)` / `(make-udp-socket)` → socket オブジェクト
   - `(socket-connect sock host port)` — TCP接続
@@ -505,7 +508,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-852: DNS Resolution (DNS解決)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - `(dns-resolve host)` → list of IP strings (A/AAAA レコード)
   - `(dns-reverse-resolve ip)` → hostname string (PTR レコード)
@@ -518,7 +521,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-853: TLS/SSL サポート
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - OpenSSL/LibreSSL をFFI経由でラップ: `SSL_new`, `SSL_connect`, `SSL_read`, `SSL_write`
   - `(make-tls-context &key verify-peer ca-bundle)` → TLS context
@@ -537,7 +540,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-856: Promises — delay/force (遅延評価)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, `packages/vm/src/vm.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/vm/src/vm.lisp`
 - **内容**:
   - `(delay expr)` → promise オブジェクト（`force` 呼び出しまで評価を延期）
   - `(force promise)` — 評価を強制し結果をキャッシュ（idempotent）
@@ -552,7 +555,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-857: Memoization (メモ化)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **内容**:
   - `(memoize fn &key (test #'equal) (size 1024))` → memoized-fn
   - `(defun/memo name args body)` — メモ化defun ショートハンド
@@ -631,7 +634,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-868: file-position / Random Access (ファイルランダムアクセス)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - `(file-position stream)` → integer (現在位置) または `nil`
   - `(file-position stream position)` → boolean (成功/失敗)
@@ -646,7 +649,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-869: Memory-Mapped Files (メモリマップトファイル)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/runtime/src/runtime.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/runtime/src/runtime.lisp`
 - **内容**:
   - `(mmap-file path &key (protection :read) (flags :private))` → mmap オブジェクト
   - `(mmap-array mmap element-type)` → 直接アクセス可能な displaced array
@@ -848,7 +851,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-896: Package Lock / Sealed Package (パッケージロック)
 
-- **対象**: `packages/vm/src/vm.lisp`, `packages/expand/src/expander.lisp`
+- **対象**: `packages/vm/src/vm.lisp`, `外部: cl-cc-expand/src/expander.lisp`
 - **内容**:
   - `(lock-package package)` — パッケージ内シンボルの追加・削除・再定義を禁止
   - `(package-locked-p package)` → boolean
@@ -917,7 +920,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-908: Quasiquote Compiler Optimization (準引用コンパイル最適化)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`, `packages/compile/src/codegen.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`, `packages/compile/src/codegen.lisp`
 - **内容**:
   - 静的部分の定数折りたたみ: `` `(a b ,@nil c) `` → `(list 'a 'b 'c)` に最適化
   - 単一スプライスの特殊化: `` `(,@list) `` → `(copy-list list)` または直接返却
@@ -935,7 +938,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-911: RISC-V 64-bit Backend (RISC-V 64ビットバックエンド)
 
-- **対象**: `packages/emit/src/riscv64.lisp` (新規), `packages/mir/src/target.lisp`
+- **対象**: `packages/emit/src/riscv64.lisp` (新規), `外部: cl-cc-mir/src/target.lisp`
 - **内容**:
   - RV64GC (G=IMAFD, C=圧縮命令) の命令エンコーディング
   - レジスタ規約: `ra`(x1), `sp`(x2), `a0`-`a7`(x10-x17 引数), `t0`-`t6`(一時), `s0`-`s11`(保存)
@@ -954,7 +957,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-914: Named Continuation Prompts (名前付き継続プロンプト)
 
-- **対象**: `packages/vm/src/vm-execute.lisp`, `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `packages/vm/src/vm-execute.lisp`, `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **内容**:
   - `(make-prompt-tag &optional name)` → prompt-tag オブジェクト
   - `(call-with-prompt tag thunk handler)` — Racket の `call-with-continuation-prompt` に相当
@@ -1008,7 +1011,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-923: Buffered I/O Control (I/Oバッファ制御)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - `(make-buffered-stream stream &key (buffer-size 4096) (strategy :full))` — バッファリング戦略
   - `:full` (全バッファリング) / `:line` (行バッファリング) / `:none` (非バッファリング)
@@ -1023,7 +1026,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-924: String / Broadcast / Echo Streams (特殊ストリーム)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - `(make-string-input-stream string &optional start end)` → string-stream
   - `(make-string-output-stream)` → string-output-stream; `(get-output-stream-string)` で取得
@@ -1042,7 +1045,7 @@ Algebraic effects, string builder/rope, structured logging, LSP/DAP, continuatio
 
 #### FR-927: Pathname Operations (パス名操作)
 
-- **対象**: `packages/vm/src/io.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`
 - **内容**:
   - `(make-pathname &key host device directory name type version)` — ANSI CL パス名コンストラクタ
   - `(pathname-host p)` / `(pathname-directory p)` / `(pathname-name p)` / `(pathname-type p)` アクセサ

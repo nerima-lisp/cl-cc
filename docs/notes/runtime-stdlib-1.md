@@ -1,5 +1,8 @@
 # Runtime: Standard Library — Core Runtime (Phase 111-137, 75 FRs)
 
+**Status: ❓ Unverified.** This backlog has no local completion claim until each
+entry's cited implementation and test evidence is confirmed in this checkout.
+
 Lambda lists, dynamic variables, numeric I/O, regex, source location, serialization, debugger/SLIME, memory-mapped I/O, floating point, external formats, terminal/readline, dynamic library loading, GC finalization, CLOS dispatch cache, closure optimization, crypto/compression, AOT compilation, persistent data structures, type specifier runtime, function objects, environment API, async I/O, STM, CSP, pattern matching.
 
 ---
@@ -121,7 +124,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 #### FR-670: Integer Bit Operations (整数ビット操作)
 
 - **対象**: `packages/vm/src/primitives.lisp`
-- **現状**: `logand`/`logior`/`logxor`/`lognot`は実装済み。拡張操作なし
+- **現状**: `logand`/`logior`/`logxor`/`lognot`は実装主張（未確認）。拡張操作なし
 - **内容**:
   - `logeqv`/`lognand`/`lognor`/`logandc1`/`logandc2`/`logorc1`/`logorc2` — 完全16論理演算
   - `integer-length integer` — 最上位ビット位置（`(integer-length 4)` → 3）
@@ -192,7 +195,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-678: Compiler Warning Infrastructure (コンパイラ警告インフラ)
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/expand/src/expander.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, `外部: cl-cc-expand/src/expander.lisp`
 - **現状**: コンパイル時警告は標準エラー出力への文字列出力のみ。condition型でない
 - **内容**:
   - `compiler-note` / `compiler-warning` / `style-warning` condition型の定義
@@ -430,7 +433,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-707: Print-Object Default Methods (print-objectデフォルトメソッド)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/vm/src/vm-clos.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/vm/src/vm-clos.lisp`
 - **現状**: `print-object` の標準実装がない。`#<HASH-TABLE>` 等が出ない
 - **内容**:
   - `#<HASH-TABLE :TEST EQL :COUNT 3 {addr}>` — hash-table の print-object
@@ -448,7 +451,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-710: Stream External Format (ストリーム外部フォーマット)
 
-- **対象**: `packages/vm/src/io.lisp`, `packages/vm/src/stream.lisp`
+- **対象**: `外部: cl-cc-vm/src/io.lisp`, `packages/vm/src/stream.lisp`
 - **現状**: ストリームのエンコーディングはホストCL依存。`:external-format`キーワードを無視
 - **内容**:
   - `open` / `make-string-input-stream` / `make-string-output-stream` の `:external-format` 対応
@@ -706,7 +709,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-743: Whole-Program AOT Compilation (全プログラムAOTコンパイル)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/emit/src/x86-64-codegen.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/emit/src/x86-64-codegen.lisp`
 - **現状**: `./cl-cc compile foo.lisp` はVM命令列を生成するが最終的なネイティブ出力は未完成
 - **内容**:
   - 全ソースファイルを一度に読み込み、クロスモジュール最適化を適用
@@ -719,7 +722,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-744: Startup Time Optimization (起動時間最適化)
 
-- **対象**: `packages/vm/src/vm.lisp`, `packages/pipeline/pipeline.lisp`
+- **対象**: `packages/vm/src/vm.lisp`, `旧対象パス（現行実装位置未特定）`
 - **現状**: `./cl-cc run foo.lisp` 起動時に全標準ライブラリをコンパイル・ロード
 - **内容**:
   - 標準ライブラリを事前コンパイルした FASL イメージとして data セグメントに埋め込む
@@ -731,7 +734,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-745: Dead Code Elimination at Link Time (リンク時デッドコード除去)
 
-- **対象**: `packages/pipeline/pipeline.lisp`, `packages/binary/src/macho.lisp`
+- **対象**: `旧対象パス（現行実装位置未特定）`, `packages/binary/src/macho.lisp`
 - **依存**: FR-743
 - **内容**:
   - エントリポイントからの到達可能性解析（関数コールグラフのDFS）
@@ -789,7 +792,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-753: Type Specifier Runtime (型指定子ランタイム)
 
-- **対象**: `packages/vm/src/vm.lisp`, `packages/type/src/inference.lisp`
+- **対象**: `packages/vm/src/vm.lisp`, `外部: cl-cc-type/src/inference.lisp`
 - **現状**: `typep` は部分実装。`(satisfies pred)` / `(member ...)` / `(not t)` 等が未対応
 - **内容**:
   - 完全型指定子構文:
@@ -865,7 +868,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-762: Lexical Environment API (CLTL2環境API)
 
-- **対象**: `packages/compile/src/codegen.lisp`, `packages/expand/src/expander.lisp`
+- **対象**: `packages/compile/src/codegen.lisp`, `外部: cl-cc-expand/src/expander.lisp`
 - **現状**: レキシカル環境はコンパイラ内部のalistとして管理。外部APIなし
 - **内容**:
   - `variable-information symbol env` → `(kind, local-p, alist)` 。kindは `:lexical`/`:special`/`:symbol-macro`/`nil`
@@ -912,7 +915,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-767: Async/Await Syntax (async/await構文)
 
-- **対象**: `packages/expand/src/macros-stdlib.lisp`
+- **対象**: `外部: cl-cc-expand/src/macros-stdlib.lisp`
 - **依存**: FR-766, FR-552（グリーンスレッド）
 - **内容**:
   - `(async (&key name) &body body)` — 非同期タスクを生成（グリーンスレッド上で実行）
@@ -1002,7 +1005,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-779: Structural Pattern Matching (構造的パターンマッチング)
 
-- **対象**: 新ファイル `packages/expand/src/match.lisp`
+- **対象**: 新ファイル `外部: cl-cc-expand/src/match.lisp`
 - **内容**:
   - `(match expr (pattern1 body1) (pattern2 body2) ...)` マクロ
   - パターン種別:
@@ -1020,7 +1023,7 @@ Lambda lists, dynamic variables, numeric I/O, regex, source location, serializat
 
 #### FR-780: Match Exhaustiveness Checking (網羅性チェック)
 
-- **対象**: `packages/expand/src/match.lisp`
+- **対象**: `外部: cl-cc-expand/src/match.lisp`
 - **依存**: FR-779
 - **内容**:
   - `(match x (t body))` — ワイルドカードなしのパターンが型全体を網羅しているかコンパイル時検査
