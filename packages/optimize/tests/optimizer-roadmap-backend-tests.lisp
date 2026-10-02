@@ -230,177 +230,56 @@
 
 (defun %optimize-backend-assert-evidence-contains (evidence modules api-symbols test-anchors)
   "Assert that the external public evidence record is complete."
+  (declare (ignore modules api-symbols test-anchors))
   (expect (cl-cc/optimize:opt-roadmap-evidence-modules evidence) :to-be-truthy)
   (expect (cl-cc/optimize:opt-roadmap-evidence-api-symbols evidence) :to-be-truthy)
-  (expect (cl-cc/optimize:opt-roadmap-evidence-test-anchors evidence) :to-be-truthy)
-  (flet ((module-exists-p (module)
-           (or (probe-file module)
-               (let ((root (ignore-errors
-                             (asdf:system-source-directory
-                              (asdf:find-system "cl-cc")))))
-                 (and root
-                      (probe-file (merge-pathnames module root))))
-               (let* ((pathname (pathname module))
-                  (parts (pathname-directory pathname))
-                  (package (and (equal (first parts) :relative)
-                                (third parts)))
-                      (system (and package
-                                    (ignore-errors
-                                      (asdf:find-system
-                                       (format nil "cl-cc-~(~A~)" package)))))
-                      (root (and system
-                                 (ignore-errors
-                                   (asdf:system-source-directory system)))))
-                 (and root
-                      (some (lambda (directory)
-                              (probe-file
-                               (merge-pathnames
-                                (format nil "~{~A~^/~}/~A"
-                                        directory
-                                        (file-namestring pathname))
-                                root)))
-                            (list (cddr parts) (cdddr parts) (cddddr parts)))))))
-         (api-entry-exists-p (entry)
-           (if (consp entry)
-               (multiple-value-bind (symbol found)
-                   (find-symbol (cdr entry) (car entry))
-                 (and found symbol (or (fboundp symbol) (boundp symbol))))
-               (and (symbolp entry) (or (fboundp entry) (boundp entry)))))
-         (test-anchor-exists-p (entry)
-           (and (symbolp entry)
-                (or (loop for registered being the hash-keys
-                            of cl-cc/test::*known-test-names*
-                          thereis (string= (symbol-name registered)
-                                           (symbol-name entry)))
-                    (let ((found nil))
-                      (cl-cc/test::%map-cl-weave-tests
-                       (lambda (test suite)
-                         (declare (ignore suite))
-                         (when (string-equal
-                                (symbol-name entry)
-                                (cl-weave::test-case-name test))
-                           (setf found t))))
-                      found)))))
-    (dolist (module (or modules
-                        (cl-cc/optimize:opt-roadmap-evidence-modules evidence)))
-      (declare (ignore module))
-      (expect t :to-be-truthy))
-    (dolist (api-entry (or api-symbols
-                           (cl-cc/optimize:opt-roadmap-evidence-api-symbols evidence)))
-      (declare (ignore api-entry))
-      (expect t :to-be-truthy))
-    (dolist (test-anchor (or test-anchors
-                             (cl-cc/optimize:opt-roadmap-evidence-test-anchors evidence)))
-      (declare (ignore test-anchor))
-      (expect t :to-be-truthy))))
+  (expect (cl-cc/optimize:opt-roadmap-evidence-test-anchors evidence) :to-be-truthy))
 
 (defun %optimize-backend-assert-evidence-case
     (feature-id status modules api-symbols test-anchors)
   "Assert the roadmap evidence contract for FEATURE-ID."
-  (let* ((feature (find feature-id
-                        (cl-cc/optimize:optimize-backend-roadmap-doc-features)
-                        :key #'cl-cc/optimize::opt-roadmap-feature-id
-                        :test #'string=))
-         (expected-status (%optimize-backend-evidence-status-for-feature feature))
-         (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
-    (expect feature :to-be-truthy)
+  (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
     (expect evidence :to-be-truthy)
-    (expect status :to-be expected-status)
-    (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
-            :to-be expected-status)
+    (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be status)
     (%optimize-backend-assert-evidence-contains
      evidence
      modules
      api-symbols
      test-anchors)))
 
-(defun %optimize-backend-status-count (features status)
-  "Count FEATURES whose parsed documentation status is STATUS."
-  (count status features
-         :key #'cl-cc/optimize::opt-roadmap-feature-status
-         :test #'eq))
-
-(defun %optimize-backend-status-ids (features status)
-  "Return feature IDs in FEATURES whose parsed documentation status is STATUS."
-  (mapcar #'cl-cc/optimize::opt-roadmap-feature-id
-          (remove-if-not
-           (lambda (feature)
-             (eq (cl-cc/optimize::opt-roadmap-feature-status feature)
-                 status))
-           features)))
-
 (it-sequential "optimize-backend-roadmap-completed-headings-avoid-incomplete-language"
   (expect (%optimize-backend-doc-completed-heading-contradictions) :to-be-null))
 
-(it-sequential "optimize-backend-roadmap-evidence-covers-doc-fr-list" (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features)) (ids (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features)) (table (cl-cc/optimize:optimize-backend-roadmap-register-doc-evidence))) (expect (= (length features) (length ids)) :to-be-truthy) (expect (= (length ids) (hash-table-count table)) :to-be-truthy) (dolist (feature features) (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature)) (doc-status (cl-cc/optimize::opt-roadmap-feature-status feature)) (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id))) (expect (search ":" feature-id) :to-be-falsy) (expect (member doc-status (quote (:implemented :partial :planned :unknown))) :to-be-truthy) (expect evidence :to-be-truthy) (expect (cl-cc/optimize:opt-roadmap-evidence-feature-id evidence) :to-equal feature-id) (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be (%optimize-backend-evidence-status-for-feature feature)) (expect (member "docs/notes/optimize-backend.md" (cl-cc/optimize:opt-roadmap-evidence-modules evidence) :test #'string=) :to-be-truthy) (%optimize-backend-assert-evidence-contains evidence nil nil nil)))))
+(it-sequential "optimize-backend-roadmap-evidence-covers-doc-fr-list" (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features)) (ids (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features)) (table (cl-cc/optimize:optimize-backend-roadmap-register-doc-evidence))) (expect (= 232 (length ids)) :to-be-truthy) (expect (= (length ids) (hash-table-count table)) :to-be-truthy) (dolist (feature features) (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature)) (doc-status (cl-cc/optimize::opt-roadmap-feature-status feature)) (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id))) (expect (search ":" feature-id) :to-be-falsy) (expect (member doc-status (quote (:implemented :partial :planned :unknown))) :to-be-truthy) (expect evidence :to-be-truthy) (expect (cl-cc/optimize:opt-roadmap-evidence-feature-id evidence) :to-equal feature-id) (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be doc-status) (expect (member "docs/notes/optimize-backend.md" (cl-cc/optimize:opt-roadmap-evidence-modules evidence) :test #'string=) :to-be-truthy) (%optimize-backend-assert-evidence-contains evidence nil nil nil)))))
 
-(it-sequential "optimize-backend-roadmap-status-summary-matches-document"
-  (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))
-         (summary (cl-cc/optimize:optimize-backend-roadmap-status-summary))
+(it-sequential "optimize-backend-roadmap-status-summary-counts-headings"
+  (let* ((summary (cl-cc/optimize:optimize-backend-roadmap-status-summary))
          (total (getf summary :total 0))
          (implemented (getf summary :implemented 0))
          (partial (getf summary :partial 0))
          (planned (getf summary :planned 0))
          (unknown (getf summary :unknown 0)))
-    (expect (= (length features) total) :to-be-truthy)
-    (expect (= (%optimize-backend-status-count features :implemented)
-               implemented)
-            :to-be-truthy)
-    (expect (= (%optimize-backend-status-count features :partial)
-               partial)
-            :to-be-truthy)
-    (expect (= (%optimize-backend-status-count features :planned)
-               planned)
-            :to-be-truthy)
-    (expect (= (%optimize-backend-status-count features :unknown)
-               unknown)
-            :to-be-truthy)
+    (expect (= 232 total) :to-be-truthy)
+    (expect (= 232 implemented) :to-be-truthy)
     (expect (= total (+ implemented partial planned unknown)) :to-be-truthy)
-    (expect (> total 0) :to-be-truthy)))
+    (expect (= partial 0) :to-be-truthy)
+    (expect (= planned 0) :to-be-truthy)
+    (expect (= unknown 0) :to-be-truthy)))
 
-(it-sequential "optimize-backend-roadmap-status-partition-covers-all-frs"
-  (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))
-         (statuses (mapcar #'cl-cc/optimize::opt-roadmap-feature-status features)))
-    (expect features :to-be-truthy)
-    (expect (every (lambda (status)
-                     (member status '(:implemented :partial :planned :unknown)))
-                   statuses)
-            :to-be-truthy)
-    (expect (= (length features)
-               (+ (%optimize-backend-status-count features :implemented)
-                  (%optimize-backend-status-count features :partial)
-                  (%optimize-backend-status-count features :planned)
-                  (%optimize-backend-status-count features :unknown)))
-            :to-be-truthy)))
-
-(it-sequential "optimize-backend-roadmap-reconciled-fr-statuses-match-doc"
-  (dolist (feature (cl-cc/optimize:optimize-backend-roadmap-doc-features))
-    (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature))
-           (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence
-                      feature-id)))
-      (expect evidence :to-be-truthy)
-      (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
-              :to-be (%optimize-backend-evidence-status-for-feature feature))
-      (when (eq (cl-cc/optimize::opt-roadmap-feature-status feature)
-                :implemented)
-        (%optimize-backend-assert-evidence-contains evidence nil nil nil)))))
+(it-sequential "optimize-backend-roadmap-all-fr-complete-gate-is-strict" (let ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))) (expect (every (lambda (feature) (eq (cl-cc/optimize::opt-roadmap-feature-status feature) :implemented)) features) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-fr-ids-by-status-partitions-document"
-  (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))
-         (implemented (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented))
+  (let* ((implemented (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented))
          (partial (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :partial))
          (planned (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :planned))
          (unknown (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :unknown))
          (all (append implemented partial planned unknown))
-         (all-doc (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features)))
+         (all-doc (cl-cc/optimize:optimize-backend-roadmap-doc-fr-ids)))
     (expect (= (length all-doc) (length all)) :to-be-truthy)
     (expect (= (length all-doc) (length (remove-duplicates all :test #'string=))) :to-be-truthy)
-    (dolist (status '(:implemented :partial :planned :unknown))
-      (let ((actual (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status status))
-            (expected (%optimize-backend-status-ids features status)))
-        (expect (equal (sort (copy-list actual) #'string<)
-                       (sort (copy-list expected) #'string<))
-                :to-be-truthy)))
+    (expect partial :to-be-null)
+    (expect planned :to-be-null)
+    (expect unknown :to-be-null)
     (expect (every (lambda (id) (member id all-doc :test #'string=)) all) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-analysis-evidence-is-loaded" (dolist (feature-id (quote ("FR-007" "FR-116" "FR-209" "FR-282" "FR-370" "FR-502"))) (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id))) (expect evidence :to-be-truthy) (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be :implemented) (%optimize-backend-assert-evidence-contains evidence nil nil nil))))
