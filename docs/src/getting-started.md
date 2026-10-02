@@ -24,6 +24,10 @@ If you do not have Nix, follow the
 only supported way to build cl-cc: the compiler depends on several sibling
 nerima-lisp libraries that are resolved through the flake.
 
+The flake currently declares only `x86_64-linux`. On macOS and other
+undeclared systems, `nix run .#test` and `nix build` fail because those
+attributes are not generated; use a supported Linux system for these commands.
+
 ## Quick start
 
 Enter the development shell and run a program. `nix develop` puts SBCL, the
