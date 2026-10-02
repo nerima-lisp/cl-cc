@@ -173,13 +173,11 @@ cl-cc check file.js --strict
 
 ## Inspecting the build
 
-`dep-graph` renders the ASDF dependency graph, modelled with
-[cl-dataflow-kit](https://github.com/nerima-lisp/cl-dataflow-kit):
-
-```sh
-cl-cc dep-graph --format mermaid
-cl-cc dep-graph --format topo
-```
+`dep-graph` renders the ASDF dependency graph as DOT by default, modelled with
+[cl-dataflow-kit](https://github.com/nerima-lisp/cl-dataflow-kit). The helper
+contains a parser for `--format dot|json|mermaid|topo`, but that option is not
+registered in the CLI's authoritative flag table, so it is not currently a
+supported command-line option.
 
 `completion` emits a shell completion script, and `docs` emits the CLI
 reference in Markdown, man, or JSON form. Both are generated from the same
