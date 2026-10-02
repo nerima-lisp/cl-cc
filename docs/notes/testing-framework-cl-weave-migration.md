@@ -6,7 +6,7 @@
 
 ## 1. 現状（実測）
 
-- **7176 の `deftest` / `deftest-each`**、**523 テストファイル**（packages/\*/tests, tests/）。
+- 過去の集計値は現行checkoutで再現できないため完了判定の根拠にしない。件数は固定コマンドと実行結果を添えて再集計する。
 - `deftest`/`defsuite`/`assert-*` は **既に cl-weave-backed**（framework が cl-weave
   のスイートに登録する薄いアダプタ）。`cl-weave:run-all` で全テストが走る。
 - framework 独自機能の利用は少数: `assert-run`(27) `assert-run-string`(5)
@@ -87,7 +87,7 @@ reporter/filter がこれを使う。flat な `it-sequential` は階層を失う
 
 ## 6. リスクと検証
 
-- **規模**: 7176 テスト。**変換ツールの正確性が全て**。パッケージ単位で
+- **規模**: 現行件数は未確定。**変換ツールの正確性が全て**。パッケージ単位で
   「変換前後の cl-weave:run-all の passed 数一致」を不変条件に（抽出repo で確立した
   検証法。ただし静的一致でなく実行時 pass 数一致）。
 - **fixtures / before-each**: `defbefore` 等はスイート scoped。flat 化で

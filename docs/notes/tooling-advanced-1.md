@@ -1,6 +1,6 @@
 # Tooling: Advanced Compilation I
 
-> **Status**: ✅ 136 / ✅ 0 / ✅ 0 — 136 FRs total. FULLY COMPLETE. All FRs implemented, evidenced, and verified. Full codebase audit completed 2026-05-27. See `docs/README.md` for overall progress.
+> **Status**: 136 FRs are indexed. The historical ✅ markers are not a current completion claim; implementation, reachable integration, and reproducible test evidence must be refreshed per FR. See `docs/notes/fr-status.md` for the roadmap index.
 
 ML-driven optimization, parallel/distributed compilation, WebAssembly targets, structured concurrency, formal verification, CHERI security, advanced optimization passes, ABI.
 
@@ -237,7 +237,7 @@ ML-driven optimization, parallel/distributed compilation, WebAssembly targets, s
 - **対象**: `packages/optimize/src/optimizer.lisp`
 - **現状**: 多重ループのイテレーション順序変換なし
 - **内容**: 2重以上のネストループを**タイル（ブロック）**単位で実行順序を変換。内ループのアクセスパターンがキャッシュラインに収まるようタイルサイズを自動決定（L1/L2サイズから計算）。行列乗算・画像フィルタ等への適用。PLUTO / Polly (LLVM) 相当の多面体変換の簡略版
-- **根拠**: キャッシュミス削減で行列演算が5〜10x高速化。数値演算系の最重要変換の一つ
+- **根拠**: キャッシュミス削減を狙う設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### ✅ FR-404: Global Value Numbering / GVN (大域値番号付け)
@@ -425,7 +425,7 @@ ML-driven optimization, parallel/distributed compilation, WebAssembly targets, s
 - **対象**: `packages/compile/src/codegen.lisp`, `packages/runtime/src/heap.lisp`
 - **現状**: fixnum・float含むすべての値がタグ付き表現（boxed）またはヒープオブジェクト
 - **内容**: `(declare (type fixnum x))` 宣言のある局所変数を**untagged 64-bit integer**として扱い、タグ付け/外し命令を除去。`(simple-array fixnum (*))` を unboxed fixnum配列として格納（8バイト/要素、GCスキャン不要）。float配列も同様（double-float = 8バイト生値）。GCルートとしてのマーキングから除外
-- **根拠**: SBCL `(declare (type (simple-array fixnum) arr))` は既にunboxed最適化を行う。数値集約コードで2〜4x高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### ✅ FR-431: Staged Compilation / Multi-Stage Programming (段階的コンパイル)
@@ -773,7 +773,7 @@ ML-driven optimization, parallel/distributed compilation, WebAssembly targets, s
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **現状**: sum/max/min等のリダクションループはスカラ逐次実行
 - **内容**: **自動リダクション認識**: `(loop for x in arr sum x)` → SIMD並列部分和生成 + 最終集約。**水平加算** (`_mm256_hadd_ps`) / **水平最大** (`_mm256_max_ps`) のSIMD命令生成。コンパイラによるloop accumulatorの依存性解析でリオーダー可能と証明。`(declare (cl-cc:reduction sum))` ヒント
-- **根拠**: GCC/Clangのリダクション自動ベクトル化。数値集約の典型パターンで4〜8x高速化
+- **根拠**: 外部実装を参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 ---
@@ -945,7 +945,7 @@ ML-driven optimization, parallel/distributed compilation, WebAssembly targets, s
 - **対象**: `packages/emit/src/x86-64-codegen.lisp`, `packages/emit/src/aarch64-codegen.lisp`
 - **現状**: 命令スケジューリング（FR-408）は基本ブロック内のみ。ループ反復間のオーバーラップなし
 - **内容**: **Modulo Scheduling**: ループ本体をInitiation Interval（II）で割り当て、前の反復の命令と次の反復の命令を**オーバーラップ**実行。`prologue + kernel + epilogue`に展開。FP演算（レイテンシ4〜8クロック）のスループットを最大化。メモリアクセスのパイプライン化（ロードの投機的先行実行）。GCC `-fmodulo-sched` / Itanium EPIC
-- **根拠**: 高レイテンシ命令が多い数値計算ループでスループット2〜4x向上。FMA（Fused Multiply-Add）をフルに活用できる
+- **根拠**: FMA活用を狙う設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Very Hard
 
 #### ✅ FR-514: Software Prefetch Insertion (ソフトウェアプリフェッチ挿入)

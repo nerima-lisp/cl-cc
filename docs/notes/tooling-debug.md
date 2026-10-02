@@ -2,6 +2,8 @@
 
 Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, code coverage, memory profiling, package management, hot reload, security.
 
+> **Status**: FR見出し上は ✅ 26件、🔶 7件、未完了または計画扱い20件です。現行ツリーで対象パス、接続経路、対応テストを再確認するまで、✅をリリース完了の主張として扱いません。
+
 ---
 
 ### Phase 67 — デバッグ・診断
@@ -14,7 +16,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **根拠**: GDB / LLDB / SBCL `(break)`。デバッグなしでの開発は非現実的
 - **難易度**: Hard
 
-#### ⚠️ FR-311: Native Code Disassembler (ネイティブコード逆アセンブラ)
+#### 🔶 FR-311: Native Code Disassembler (ネイティブコード逆アセンブラ)
 
 - **対象**: 新規`packages/emit/src/disasm/x86-64-disasm.lisp`, `packages/emit/src/disasm/aarch64-disasm.lisp`
 - **現状**: バイトコードISA逆アセンブラ（`packages/bytecode/src/decode.lisp:202`、`disassemble-instruction`）は存在。x86-64/ARM64のネイティブ命令デコーダなし
@@ -38,7 +40,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **根拠**: SBCL `(sb-debug:print-backtrace)` / GDB `bt`。エラー診断の基本
 - **難易度**: Medium
 
-#### ⚠️ FR-314: VM Watchpoints/Tracepoints (VMウォッチポイント/トレースポイント)
+#### 🔶 FR-314: VM Watchpoints/Tracepoints (VMウォッチポイント/トレースポイント)
 
 - **対象**: `packages/vm/src/vm.lisp`, `packages/vm/src/vm-run.lisp`
 - **現状**: `vm-reg-set`（`vm-run.lisp:306-310`）と`vm-reg-get`（`vm-run.lisp:301-304`）にフックなし。トレース/ウォッチインフラなし
@@ -142,7 +144,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 
 ### Phase 87 — コンパイルパイプライン改善
 
-#### ⚠️ FR-502: our-load AST pipeline
+#### 🔶 FR-502: our-load AST pipeline
 
 - **対象**: `packages/pipeline/pipeline.lisp`
 - **現状**: `our-load`がソースを文字列→S式→`eval`のパスを取り、AST変換・最適化をバイパスする場合がある
@@ -158,7 +160,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **根拠**: ANSI CL 3.3.4 — declaim, deftype
 - **難易度**: Medium
 
-#### ⚠️ FR-504: prescan 多重パッケージ
+#### 🔶 FR-504: prescan 多重パッケージ
 
 - **対象**: `packages/pipeline/pipeline.lisp`
 - **現状**: `%prescan-in-package`が単一パッケージの切り替えのみ対応。同一ファイルに複数`in-package`が出現する場合に誤動作
@@ -166,7 +168,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **根拠**: 複数パッケージを跨ぐソースファイルのセルフホスティング対応
 - **難易度**: Medium
 
-#### ⚠️ FR-505: compile-file セルフホスト読み込み
+#### 🔶 FR-505: compile-file セルフホスト読み込み
 
 - **対象**: `packages/pipeline/pipeline.lisp`
 - **現状**: `compile-file`相当の機能でセルフホスト読み込みが`#.`/`#+`/`#-`の一部リーダーマクロで誤動作する可能性
@@ -191,7 +193,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **対象**: `packages/vm/src/vm-run.lisp`, 新規`src/jit/baseline.lisp`
 - **現状**: VMはフラットベクタのインタープリタ（`run-vm`、`vm-run.lisp:265`）。ネイティブコード生成は`packages/emit/src/x86-64-codegen.lisp`に存在するがVM実行とは分離されている
 - **内容**: VM命令列を**ウォームアップなし**で直接x86-64機械語に変換するベースラインJIT。register allocationは簡略（1命令1スタックスロット）で可。最適化は行わず変換速度優先。VMインタープリタとのスイッチング機構（`--jit=off/baseline/opt`フラグ）
-- **根拠**: V8 Liftoff / SpiderMonkey Baseline / LuaJIT。インタープリタの10〜30x高速化が初回コンパイルコストなしに得られる
+- **根拠**: V8 Liftoff / SpiderMonkey Baseline / LuaJITを参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Hard
 
 #### ✅ FR-331: Tiered Compilation (階層型コンパイル)
@@ -254,7 +256,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **根拠**: GCC `-fdevirtualize-speculatively` / LLVM devirt pass。CLOSのメソッド呼び出しが最大のオーバーヘッド源の一つ
 - **難易度**: Hard
 
-#### ⚠️ FR-338: Whole-Program Dead Code Elimination (全プログラムDCE)
+#### 🔶 FR-338: Whole-Program Dead Code Elimination (全プログラムDCE)
 
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/binary/src/macho.lisp`
 - **現状**: DCEは関数内レベルのみ（`opt-pass-dead-code`）。未呼び出し関数はバイナリに残留
@@ -307,7 +309,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **対象**: `packages/optimize/src/optimizer.lisp`, `packages/emit/src/x86-64-codegen.lisp`
 - **現状**: SIMD命令（SSE/AVX/AVX-512）生成なし。スカラループのみ
 - **内容**: ループベクトル化パス: (1) ループ依存性解析（配列アクセスのstride/aliasチェック）、(2) `(loop for i below n ...)` 形式のベクトル幅決定（AVX2=8 floats）、(3) `vm-simd-*` 疑似命令生成、(4) x86-64でのVEX-prefixed SSE/AVX命令列エミット。`(declare (optimize (speed 3)))` でのみ発動
-- **根拠**: GCC `-O2` / Clang `-O2`の自動ベクトル化。数値演算・文字列操作で5〜10x高速化
+- **根拠**: GCC/Clangを参考にした設計案。cl-ccでの性能効果は未測定。
 - **難易度**: Very Hard
 
 #### FR-346: SLP Vectorization / スーパーワードレベル並列化
@@ -354,7 +356,7 @@ Debugging, diagnostics, developer ecosystem, JIT, LTO, static analysis, SIMD, co
 - **根拠**: テストの質の定量指標。高カバレッジでも低mutation scoreならテストが弱い
 - **難易度**: Hard
 
-#### ⚠️ FR-353: Property-Based Testing Integration (PBT深化)
+#### 🔶 FR-353: Property-Based Testing Integration (PBT深化)
 
 - **対象**: 外部 cl-weave (`gen-*` combinators)
 - **現状**: cl-weave の native `it-property` / `it-fuzz` が生成・shrinking・失敗最小化を担当（`framework-fuzz.lisp` の自前実装は重複のため削除済み）

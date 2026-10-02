@@ -1,8 +1,9 @@
 # Native Backend: Code Generation — Implementation Status
 
-> **Last updated**: 2026-05-20 (Sisyphus — Complete: all ⬜ items implemented; 7553/7667 tests pass)
-> **Note**: This document reflects the restructured codebase (`packages/emit/` → `packages/codegen/` + `packages/regalloc/`).
-> **Verification level**: ✅ = verified by code inspection + tests; 🔶 = structural evidence exists but not exhaustively tested; ⬜ = genuinely unimplemented.
+> **Status**: 83 FRs are listed: 74 marked ✅ and 9 marked 🔶. No FR is currently marked ⬜, but the ✅ marks require refreshed, reproducible evidence.
+> **Last updated**: 2026-05-20 (historical note; the test count is not retained as current evidence)
+> **Evidence note**: The current checkout has `packages/emit/` but not the documented `packages/codegen/`, `packages/regalloc/`, or `packages/mir/` directories. The old package paths below are historical labels, not current evidence. Read-only comparison finds the corresponding external sources under `nerima-lisp/cl-cc-codegen-native` (`codegen/` and `regalloc/`) and `nerima-lisp/cl-cc-mir` (`src/`); each FR still requires a path and test anchor from that repository before its marker can be treated as verified.
+> **Verification level**: ✅ = verified by code inspection + tests; 🔶 = structural evidence exists but functional verification is incomplete; ⬜ = not implemented or not evidenced.
 
 ## Status Legend
 
@@ -23,14 +24,14 @@
 - Fixed: double codesign eliminated (suppressed in `write-mach-o-file`, timeout-guarded in pipeline)
 - Cache keys now include target-os
 
-### Task 2: AArch64 Text Emission Spill Support ✅
+### Task 2: AArch64 Text Emission Spill Support 🔶
 
 - `packages/codegen/src/aarch64.lisp`: Extended register pool from 8 to 18 caller-saved registers
 - `target-register` no longer errors for virtual registers up to :R17
 - Callee-saved registers (x19-x28) excluded from pool to avoid ABI violations
 - Spill infrastructure (`%aarch64-spill-home-offset`, store/load helpers) defined
 
-### Task 3: WASM Direct Emitter Completion ✅
+### Task 3: WASM Direct Emitter Completion 🔶
 
 - `packages/codegen/src/wasm-emit-instrs.lisp`: Fixed `vm-print` to pass value as argument to `$host_print_val`
 - `vm-const` now handles string, symbol, character, and float literals
@@ -40,12 +41,12 @@
 
 ## Phase 4 — Native Backend Layer
 
-### FR-008: Float Unboxing ⚠️
+### FR-008: Float Unboxing 🔶
 
 - **Files**: `packages/codegen/src/x86-64-codegen-core.lisp`
 - XMM register constants defined; float vreg detection exists. End-to-end float unboxing through codegen not exhaustively verified.
 
-### FR-009: Inline Caching for Generic Functions ⚠️
+### FR-009: Inline Caching for Generic Functions 🔶
 
 - **Files**: `packages/vm/src/vm-ic.lisp`
 - IC file exists. Functional verification of cache hit/miss/invalidation incomplete.
@@ -128,7 +129,7 @@
 | FR     | Description                    | Status | Files                                                 |
 | ------ | ------------------------------ | ------ | ----------------------------------------------------- |
 | FR-186 | Function Reordering            | ✅     | `packages/pipeline/src/pipeline-native.lisp`          |
-| FR-187 | Prefetch Insertion             | ✅     | `packages/optimize/src/optimizer-flow-loop.lisp`      |
+| FR-187 | Prefetch Insertion             | 🔶     | The historical `packages/optimize/src/optimizer-flow-loop.lisp` path is absent from this checkout; evidence must be remapped to an existing external source before verification. |
 | FR-188 | NOP Padding / Alignment        | ✅     | `packages/codegen/src/x86-64-codegen-core.lisp`       |
 | FR-189 | Cache-Line Aware Object Layout | 🔶     | Card table exists; hot/cold field separation not done |
 
@@ -149,7 +150,7 @@
 | FR     | Description              | Status | Notes                                                                                                                                                                                                           |
 | ------ | ------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | FR-226 | Auto-Vectorization       | ✅     | `opt-pass-auto-vectorization` in optimizer.lisp; SIMD backend lowering via `vm-simd-vector-op` wired to x86-64 SSE/AVX + AArch64 NEON                                                                           |
-| FR-227 | SLP Vectorizer           | ⚠️     | `opt-pass-slp-vectorize` in optimizer.lisp (lines 815-1057): pack discovery, isomorphism, lane matching, SIMD op generation. 3 tests pass. Needs: float ops, broader coverage, end-to-end backend verification. |
+| FR-227 | SLP Vectorizer           | 🔶     | `opt-pass-slp-vectorize` has structural evidence and focused tests, but float operations, broader coverage, and end-to-end backend verification remain incomplete. |
 | FR-228 | x86-64 SSE/AVX Emission  | ✅     | SSE/AVX packed integer encoders, `vm-simd-vector-op` lowering, MOVDQU/VPSUBD/VPAND/VPOR/VPXOR                                                                                                                   |
 | FR-229 | AArch64 NEON Emission    | ✅     | NEON packed integer encoders (ADD/SUB/MUL/AND/ORR/EOR), LD1/ST1, `a64-vm-simd-vector-op`                                                                                                                        |
 | FR-230 | SIMD Register Allocation | 🔶     | FP register class separated; SIMD-specific partial                                                                                                                                                              |

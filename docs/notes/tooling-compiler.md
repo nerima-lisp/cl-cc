@@ -2,6 +2,8 @@
 
 Compiler frontend optimization, isolated infrastructure, binary/link/FFI, compiler quality, security hardening, diagnostics, compiler pass infrastructure.
 
+> **Status**: FR見出し上は ✅ 23件、🔶 1件、未完了または計画扱い14件です。現行ツリーで対象パス、接続経路、対応テストを再確認するまで、✅をリリース完了の主張として扱いません。
+
 ---
 
 ### Phase 21 — コンパイラ・言語フロントエンド最適化
@@ -11,7 +13,7 @@ Compiler frontend optimization, isolated infrastructure, binary/link/FFI, compil
 - **実装**: `packages/compile/src/context.lisp:219-239` (`%declaration-type-bindings`), `context.lisp:166-178` (`%declaration-inline-policy`), `codegen-core-let.lisp:21-26` (`%ast-let-binding-ignored-p`), `codegen-core-let-emit-pass.lisp:187-194` (unused-variable suppression), `comp-env.lisp:55` (`special`/`ignorable`/`dynamic-extent` 認識)
 - **内容**: `(declare (type fixnum x))` → type-bindings登録、`(declare (inline f))` → inline-policy設定、`(declare (ignore x))` → 未使用警告抑制
 - **根拠**: 全 declare 節 (`type`, `inline`, `notinline`, `ignore`, `ignorable`, `special`, `dynamic-extent`, `optimize`, `forward-reference`) が compile 層で処理済み。FR-318 テストが ignore 警告抑制を検証。
-- **難易度**: Medium → ✅ COMPLETE
+- **難易度**: Medium → 🔶 実装とテストソースは確認済み、今回のテスト実行は未実施
 
 #### ✅ FR-126: define-compiler-macro
 
@@ -20,12 +22,12 @@ Compiler frontend optimization, isolated infrastructure, binary/link/FFI, compil
 - **根拠**: 完全な compiler macro システム。expander が `lookup-compiler-macro` + `invoke-registered-expander` 経由で compiler macro を解決。
 - **難易度**: Medium → ✅ COMPLETE
 
-#### ✅ FR-127: Type Proclamations (declaim/proclaim ftype)
+#### 🔶 FR-127: Type Proclamations (declaim/proclaim ftype)
 
-- **実装**: `packages/expand/src/runtime-stdlib-3-expander.lisp:22-27` (`%record-declaim-ftype-clause`), `runtime-stdlib-3-expander.lisp:43-48` (`declaim` マクロ), `expander-typed-params.lisp:19-21` (`*function-type-registry*`), `macros-runtime-support.lisp:60-87` (inline/optimize 処理)
+- **実装**: 外部 repo `nerima-lisp/cl-cc-expand` の `src/runtime-stdlib-3-expander.lisp:22-27` (`%record-declaim-ftype-clause`), `src/runtime-stdlib-3-expander.lisp:43-48` (`declaim` マクロ), `src/expander-typed-params.lisp:19-21` (`*function-type-registry*`), `src/macros-runtime-support.lisp:40-87` (inline/optimize 処理)。現行 checkout の `packages/expand/` は存在しない。
 - **内容**: `(declaim (ftype (function (fixnum) fixnum) foo))` を解析し `*global-proclamations*` に登録。`type`, `inline`, `notinline`, `optimize`, `ftype`, `special` 全節対応。
-- **根拠**: declaim の全節が runtime-stdlib-3-expander で処理済み。ftype は `*global-proclamations*` にルーティング（`*function-type-registry*` は typed-param syntax 用）。
-- **難易度**: Medium → ✅ COMPLETE
+- **根拠**: 外部 repo `nerima-lisp/cl-cc-expand` の `t/runtime-stdlib-3-expander-test.lisp:15-24` が type/ftype/special の記録を検証し、`t/macros-runtime-support-test.lisp:24-68` が inline/optimize の registry 更新を検証する。これらのテストは今回実行していない。
+- **難易度**: Medium → 🔶 実装とテストソースは確認済み、今回のテスト実行は未実施
 
 #### ✅ FR-128: Typecase Jump Table Dispatch
 
