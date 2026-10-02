@@ -263,8 +263,8 @@
     (expect (= 229 implemented) :to-be-truthy)
     (expect (= total (+ implemented partial planned unknown)) :to-be-truthy)
     (expect (= partial 1) :to-be-truthy)
-    (expect (= planned 2) :to-be-truthy)
-    (expect (= unknown 0) :to-be-truthy)))
+    (expect (= planned 0) :to-be-truthy)
+    (expect (= unknown 2) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-all-fr-complete-gate-is-strict" (let ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))) (expect (not (every (lambda (feature) (eq (cl-cc/optimize::opt-roadmap-feature-status feature) :implemented)) features)) :to-be-truthy)))
 
@@ -278,8 +278,8 @@
     (expect (= (length all-doc) (length all)) :to-be-truthy)
     (expect (= (length all-doc) (length (remove-duplicates all :test #'string=))) :to-be-truthy)
     (expect (= 1 (length partial)) :to-be-truthy)
-    (expect (= 2 (length planned)) :to-be-truthy)
-    (expect unknown :to-be-null)
+    (expect planned :to-be-null)
+    (expect (= 2 (length unknown)) :to-be-truthy)
     (expect (every (lambda (id) (member id all-doc :test #'string=)) all) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-analysis-evidence-is-loaded" (dolist (feature-id (quote ("FR-007" "FR-116" "FR-209" "FR-282" "FR-370" "FR-502"))) (let ((evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id))) (expect evidence :to-be-truthy) (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be :implemented) (%optimize-backend-assert-evidence-contains evidence nil nil nil))))
