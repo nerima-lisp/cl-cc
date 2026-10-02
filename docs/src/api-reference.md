@@ -1,8 +1,9 @@
 # CLI
 
 `cl-cc` is the public command-line entry point. The command and option names
-below are sourced from `packages/cli/src/main.lisp`, `args.lisp`, and
-`cli-spec.lisp`; the generated schema is available with `cl-cc docs markdown`.
+below are sourced from `packages/cli/src/main.lisp`,
+`packages/cli/src/args.lisp`, and `packages/cli/src/cli-spec.lisp`; the
+generated schema is available with `cl-cc docs markdown`.
 
 ## Commands
 
@@ -36,7 +37,7 @@ below are sourced from `packages/cli/src/main.lisp`, `args.lisp`, and
 | `macrostep <file>` | Placeholder handler; reports expansion completion. |
 | `bisect [range]` | Placeholder handler; reports a fixed result. |
 | `features` | Print the handler's static feature list. |
-| `dep-graph` | Render the ASDF dependency graph. |
+| `dep-graph` | Render the ASDF dependency graph as DOT by default. |
 | `generate <schema>` | Placeholder handler; reports code-generation completion. |
 | `update [pkg]` | Update dependencies. |
 | `completion <shell>` | Emit completion for `bash`, `zsh`, `fish`, `powershell`, `nushell`, or `elvish`. |
@@ -61,9 +62,9 @@ otherwise Lisp) and can be overridden with `--lang lisp|elisp|php|js|javascript`
 | `--seed <N>` | Fuzzing seed. |
 | `--lang <value>` | Select the source language. |
 
-The normal architecture default is `x86-64`; `--aot` defaults the Wasm path to
-`wasm32`. Native output follows the host/backend format, while Wasm options
-produce `.wasm` output.
+The normal architecture default is `x86-64`; `--aot` selects the Wasm path and
+defaults it to `wasm32`. Native compilation uses the selected native backend,
+while Wasm options produce `.wasm` output.
 
 ## Execution and core options
 
@@ -127,4 +128,7 @@ The accepted options are:
 `--reproducible` is an alias for `--deterministic`; `--emit-debug-info` is an
 alias for `--debug-info`. `--help` and `-h` display the global or command help.
 
-For the generated authoritative schema, run `cl-cc docs markdown`.
+For the generated schema from the parser's registered command and flag set, run
+`cl-cc docs markdown`. The `dep-graph` helper contains a separate `--format`
+parser, but `--format` is not registered in `packages/cli/src/args.lisp`; it is
+therefore not listed as a generally accepted CLI option here.

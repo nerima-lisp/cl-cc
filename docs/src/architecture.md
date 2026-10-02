@@ -47,20 +47,20 @@ The package directories currently present in this repository are:
 | `compile` | compiler and code-generation integration |
 | `debug` | debugger and inspection support |
 | `docgen` | documentation generation |
-| `emit` | integration/tests for the external emission system |
+| `emit` | FPGA support plus integration/tests for the external emission system |
 | `formatter` | source formatting |
-| `optimize` | integration/tests for the external optimizer |
-| `parse` | parser integration and tests; implementation is external |
+| `optimize` | tests for the external optimizer |
+| `parse` | parser tests; implementation is external |
 | `pipeline` | high-level compile/evaluate pipeline |
 | `prolog-tools` | call-graph tooling |
 | `repl` | interactive REPL |
-| `runtime` | integration/tests for the external runtime |
+| `runtime` | runtime integration/tests and the C header |
 | `selfhost` | self-hosting workloads |
 | `stdlib` | standard library |
 | `testing-framework` | test support |
 | `tools` | development tools |
 | `umbrella-tests` | umbrella test definitions |
-| `vm` | integration/tests for the external VM |
+| `vm` | tests for the external VM |
 
 The external systems include `cl-cc-bootstrap`, `cl-cc-parse`, `cl-cc-ast`,
 `cl-cc-type`, `cl-cc-expand`, `cl-cc-cps`, `cl-cc-mir`, `cl-cc-target`,
