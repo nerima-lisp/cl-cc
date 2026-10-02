@@ -39,7 +39,7 @@ Runner-observed environment variables:
   Source: runner implementation path must be refreshed before this artifact is treated as evidence.
 - `CLCC_TEST_TRACE=1` — When set, every test prints
   `# [trace] running <name>` to `*error-output*` before dispatch (hang diagnosis).
-  Source: `packages/testing-framework/src/framework-runner.lisp:116-118`.
+  Source: the current test runner implementation; refresh its exact path before treating this as file-level evidence.
 - `CLCC_TEST_TIMEOUT` — Overrides the default per-test wall-clock timeout in seconds.
   The framework default timeout path must be refreshed before this artifact is treated as evidence,
   and the canonical Nix entrypoints (`nix run .#test`, `checks.tests`) export `CLCC_TEST_TIMEOUT=10`
@@ -93,4 +93,4 @@ diagnostic block that includes `duration_ms: N.NNN` (double-float
 milliseconds derived from `:duration-ns`). For failures, the pre-existing
 failure YAML (`message:`, etc.) is preserved and `duration_ms:` is spliced
 in just before the closing `  ...` sentinel.
-Source: `packages/testing-framework/src/framework.lisp:455-496`.
+Source: the current TAP writer implementation; refresh its exact line range before treating this as file-level evidence.

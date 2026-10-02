@@ -118,7 +118,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 - **根拠**: GCC switch lowering / LLVM SwitchInst→LookupTable。分岐数Nに対してO(N)→O(log N)またはO(1)
 - **難易度**: Medium
 
-- **関連実装**: `packages/expand/src/macros-control-flow-case.lisp` では整数 `case` に対して疎集合の二分探索木展開（`%case-expand-integer-tree`）と密集合の table dispatch（`%case-expand-integer-table`）を実装済み。`typecase` 側は `%prune-typecase-clauses` による到達不能節削減に加え、`%typecase-build-decision-tree` による順序意味保存の balanced tree dispatch（`%typecase-should-use-decision-tree-p`）を実装済み。さらに split 境界選択を `%typecase-choose-split-index` へ分離し、`subtypep` 関係（`%typecase-related-types-p`）に基づいて left/right 半分の cross-overlap が小さい境界を優先することで、クラス階層（型包含）を考慮した木再編成を行う。重なり型を含む場合も left-half guard を先に評価して先頭一致優先の `typecase` 意味論を維持する。`packages/expand/tests/macros-control-flow-loop-tests.lisp` が sparse integer tree、dense integer table、typecase pruning、disjoint/overlapping arms の decision-tree 展開、type 関係判定 helper、split 選択 helper を検証する。
+- **関連実装**: 現行 checkout の control-flow 実装と `packages/compile/tests/control-flow-tests.lisp` を参照。旧 `packages/expand/...` の実装・テストパスはこの checkout の証跡として扱わない。
 
 ---
 
