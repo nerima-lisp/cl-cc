@@ -4,7 +4,7 @@ Partial evaluation, memory analysis, numeric optimization, string/control flow, 
 
 **実装状況**: FR見出しは232件あります。各 `✅` は実装本体・接続経路・対応テストを確認できた場合に限り有効とし、設計または planning helper のみの項目は 🔶、対象パスが存在しない項目は ⬜ として再監査します。本文の全FR完了宣言は更新しません。
 
-現行checkoutにない `packages/*` パスは証跡として扱いません。外部リポジトリの証跡を使う場合は、リポジトリ名・現行パス・対応テストを明記します。
+現行checkoutにない `packages/*` パスは証跡として扱いません。旧 `packages/codegen/`・`packages/regalloc/`・`packages/mir/` の記述は歴史的な対象ラベルです。外部リポジトリの証跡を使う場合は、`nerima-lisp/cl-cc-codegen-native` の `codegen/` / `regalloc/`、または `nerima-lisp/cl-cc-mir` の `src/` と、対応テストを明記します。
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Status**: 83 FRs are listed: 74 marked ✅ and 9 marked 🔶. No FR is currently marked ⬜, but the ✅ marks require refreshed, reproducible evidence.
 > **Last updated**: 2026-05-20 (historical note; the test count is not retained as current evidence)
-> **Evidence note**: The current checkout has `packages/emit/` but not the documented `packages/codegen/`, `packages/regalloc/`, or `packages/mir/` directories. Those stale paths are not evidence until remapped to files that exist in the current checkout.
+> **Evidence note**: The current checkout has `packages/emit/` but not the documented `packages/codegen/`, `packages/regalloc/`, or `packages/mir/` directories. The old package paths below are historical labels, not current evidence. Read-only comparison finds the corresponding external sources under `nerima-lisp/cl-cc-codegen-native` (`codegen/` and `regalloc/`) and `nerima-lisp/cl-cc-mir` (`src/`); each FR still requires a path and test anchor from that repository before its marker can be treated as verified.
 > **Verification level**: ✅ = verified by code inspection + tests; 🔶 = structural evidence exists but functional verification is incomplete; ⬜ = not implemented or not evidenced.
 
 ## Status Legend
