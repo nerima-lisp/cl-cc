@@ -40,7 +40,10 @@
     (expect encoded :to-equal "-__u-g==")
     (expect (equalp bytes (cl-cc/runtime:rt-base64-decode encoded :url-safe t)) :to-be-truthy)))
 
-(it-sequential "fr-740-zlib-roundtrip-and-checksum"
+;;; The pinned runtime does not export compression primitives. These tests
+;;; intentionally cover its stored-block codec contract until a public
+;;; compression API is available.
+(it-sequential "fr-740-zlib-stored-block-roundtrip"
   (let* ((plain "zlib payload")
          (bytes (%string-octets plain))
          (compressed (cl-cc/runtime::zlib-compress bytes))
@@ -48,7 +51,7 @@
     (expect (%octet-string decompressed)
             :to-equal (concatenate 'string (%octet-string #(1 12 0 243 255)) plain))))
 
-(it-sequential "fr-740-gzip-roundtrip-and-trailer"
+(it-sequential "fr-740-gzip-stored-block-roundtrip"
   (let* ((plain "gzip payload")
          (bytes (%string-octets plain))
          (compressed (cl-cc/runtime::gzip-compress bytes))
