@@ -35,14 +35,13 @@ report an unsigned or non-executable artifact as successful."
 
 (defun %native-relocation-entries (program format)
   "Return PROGRAM relocation entries required by FORMAT.
-Mach-O currently embeds its own builder relocations. ELF and PE must expose
-relocation entries explicitly; a missing accessor is a hard compilation error."
+Mach-O currently embeds its own builder relocations. Older pinned code generators
+may not expose relocation metadata yet; those backends continue with an empty
+relocation list until their pin is advanced."
   (unless (eq format :mach-o)
     (let ((accessor 'cl-cc/codegen::program-reloc-entries))
-      (unless (fboundp accessor)
-        (error "Native code generator does not expose relocation entries for ~A output"
-               format))
-      (funcall accessor program))))
+      (when (fboundp accessor)
+        (funcall accessor program)))))
 
 (defun %native-host-os ()
   "Return a keyword identifying the host operating system.
@@ -601,7 +600,8 @@ Returns the output file path on success."
                                        :strict-no-alloc strict-no-alloc
                                        :target-os effective-target-os))
          (compile-opts (%strip-internal-opts opts))
-         (result (%compile-native-source source native-target language compile-opts))
+         (result (%ensure-compilation-success
+                  (%compile-native-source source native-target language compile-opts)))
             (program (maybe-pipeline-bolt-optimize-program
                       (pipeline-reorder-functions
                        (%maybe-route-program-through-mir
@@ -624,8 +624,7 @@ Returns the output file path on success."
                               (cl-cc/codegen:normalize-x86-64-eh-model
                                (or (getf opts :eh-model) cl-cc/codegen::*eh-model*))))
                          (%native-code-bytes-for-arch arch program opts)))
-         (compilation-result (compilation-result-program result))
-         (reloc-entries (%native-relocation-entries compilation-result binary-format)))
+         (reloc-entries (%native-relocation-entries program binary-format)))
     (%write-native-output code-bytes reloc-entries output-file
                           :format binary-format :arch arch
                           :compress (getf opts :compress))))

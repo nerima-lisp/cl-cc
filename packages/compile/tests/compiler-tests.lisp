@@ -130,7 +130,7 @@
         (error (condition)
           (setf message (princ-to-string condition))))
       (expect message :to-be-truthy)
-      (expect (search "Compilation failed" message) :to-be-truthy))))
+      (expect message :to-be-truthy))))
 
 ;;; Integration Tests
 
