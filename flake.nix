@@ -83,28 +83,25 @@
     # names by nix/asdf-systems.nix, so every `deps = [ "cl-cc-ast" ... ]`
     # resolves to the external derivation. cl-cc-type depends on cl-cc-ast.
     #
-    # Pinned by commit, not tag: neither repository has cut a release yet.
-    # A commit is a stronger pin than a tag (a tag can be moved), so this
-    # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
-    # once those releases are tagged.
+    # Pinned to the first released tag for each standalone subsystem.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast/5bb81120a1acf3a0c125dac655549582f3eb137e";
+      url = "github:nerima-lisp/cl-cc-ast/v0.2.1";
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type/324b1c06b86a382f6561019d087d845667cf4606";
+      url = "github:nerima-lisp/cl-cc-type/v0.2.1";
       flake = false;
     };
     cl-cc-binary = {
-      url = "github:nerima-lisp/cl-cc-binary/3c81059218b0d99838d04dff7dbbb3dd8821a8ad";
+      url = "github:nerima-lisp/cl-cc-binary/v0.2.1";
       flake = false;
     };
     cl-cc-bootstrap = {
-      url = "github:nerima-lisp/cl-cc-bootstrap/b1ff1defbba014ba7b312c882ee8a5e7cabb5cc3";
+      url = "github:nerima-lisp/cl-cc-bootstrap/v0.1.1";
       flake = false;
     };
     cl-cc-vm = {
-      url = "github:nerima-lisp/cl-cc-vm/670376ada1b5b1aa40e4f798764ac34c5cc1959b";
+      url = "github:nerima-lisp/cl-cc-vm/v0.1.1";
       flake = false;
     };
     cl-cc-mir = {
@@ -112,35 +109,35 @@
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/b09fdc12f8a181946319ac7a4cd2794466617db4";
+      url = "github:nerima-lisp/cl-cc-cps/v0.1.1";
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/2628bd758f76df1513456641a358c63812e70aac";
+      url = "github:nerima-lisp/cl-cc-expand/v0.1.1";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/51c0db63ff125413568ec08c79e33dcf34f00fbf";
+      url = "github:nerima-lisp/cl-cc-optimize/v0.5.2";
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/e58718ee08dd916054ca62c782d0c9435e22583e";
+      url = "github:nerima-lisp/cl-cc-codegen-native/v0.2.1";
       flake = false;
     };
     cl-cc-parse = {
-      url = "github:nerima-lisp/cl-cc-parse/7316dd82137290082fa1fe03300d3aa388d84117";
+      url = "github:nerima-lisp/cl-cc-parse/v0.1.1";
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/c36a40dcf8ddff72c7eaeb3baee5154c9b27d190";
+      url = "github:nerima-lisp/cl-cc-php/v0.1.2";
       flake = false;
     };
     cl-cc-javascript = {
-      url = "github:nerima-lisp/cl-cc-javascript/777d5450681601860af20d5858c297e7d1af842b";
+      url = "github:nerima-lisp/cl-cc-javascript/v0.2.1";
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/d8d636b";
+      url = "github:nerima-lisp/cl-cc-runtime/v0.1.1";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
