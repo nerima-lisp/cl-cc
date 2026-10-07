@@ -34,7 +34,7 @@
   (uiop:with-temporary-file (:pathname cache :keep t)
     (with-open-file (stream cache :direction :output :if-exists :supersede)
       (write-line "cache" stream))
-    (with-replaced-function (cl-cc::%stdlib-source-file-paths
+    (with-replaced-function (cl-cc/pipeline::%stdlib-source-file-paths
                              (lambda () nil))
       (expect (cl-cc/pipeline::%stdlib-cache-fresh-p cache) :to-be-falsy))
     (ignore-errors (delete-file cache))))
