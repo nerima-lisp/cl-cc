@@ -197,10 +197,19 @@ Unreadable or absent fields return NIL rather than signaling."
                             (position #\: location :from-end t :end last-colon))))
       (cond
         ((and prev-colon last-colon)
-         (values (ignore-errors (parse-integer (subseq location (1+ prev-colon) last-colon)))
-                 (ignore-errors (parse-integer (subseq location (1+ last-colon))))))
+         (values (handler-case
+                     (parse-integer (subseq location (1+ prev-colon) last-colon)
+                                    :junk-allowed nil)
+                   (parse-error () nil))
+                 (handler-case
+                     (parse-integer (subseq location (1+ last-colon))
+                                    :junk-allowed nil)
+                   (parse-error () nil))))
         (last-colon
-         (values (ignore-errors (parse-integer (subseq location (1+ last-colon))))
+         (values (handler-case
+                     (parse-integer (subseq location (1+ last-colon))
+                                    :junk-allowed nil)
+                   (parse-error () nil))
                  nil))
         (t
          (values nil nil))))))
@@ -236,8 +245,8 @@ around the execution. Returns the value produced by RUN-COMPILED."
     (t
      (handler-case
          (apply #'compile-string source :target :vm kwargs)
-        (error ()
-          (apply #'cl-cc:compile-string-with-stdlib source :target :vm kwargs))))))
+       (error ()
+         (apply #'cl-cc:compile-string-with-stdlib source :target :vm kwargs))))))
 
 ;;; ─── Watch mode + hot-reload (FR-808 / FR-916/917) ──────────────────────────
 ;;;
@@ -263,12 +272,19 @@ Returns SOURCE."
 
 (defun %watch-recompile-and-run (file source vm-state)
   "Recompile SOURCE (language detected from FILE) and run it in VM-STATE.
-Lisp sources use the auto-stdlib fallback; other languages compile directly."
+Lisp sources use the standard-library-free compiler; other languages compile
+directly."
   (let* ((language (%detect-language file ""))
          (result (if (member language '(:lisp :elisp))
                      (%compile-lisp-with-auto-stdlib source nil nil nil)
                      (compile-string source :target :vm :language language))))
     (run-compiled (compilation-result-program result) :state vm-state)))
+
+(defun %watch-file-write-date (file)
+  ;; Atomic-save rename can briefly make FILE unavailable; keep the watcher alive.
+  (handler-case
+      (file-write-date file)
+    (file-error () nil)))
 
 (defun %watch-file-poll (file vm-state &key (interval 0.3))
   "Block, polling FILE's write-date; on each change recompile and re-run FILE in
@@ -276,14 +292,14 @@ VM-STATE. Loops until interrupted with Ctrl-C, then returns NIL.
 
 Powers `cl-cc run FILE --watch`: edit-save-rerun without restarting the
 process, reusing one VM state so prior global definitions remain visible."
-  (let ((last-write (ignore-errors (file-write-date file))))
+  (let ((last-write (%watch-file-write-date file)))
     (format *error-output*
             "~&; watching ~A — save to re-run, Ctrl-C to stop~%" (namestring file))
     (force-output *error-output*)
     (handler-case
         (loop
           (sleep interval)
-          (let ((now (ignore-errors (file-write-date file))))
+          (let ((now (%watch-file-write-date file)))
             (when (and now (not (eql now last-write)))
               (setf last-write now)
               (let ((source (%read-command-source file)))
@@ -317,7 +333,7 @@ Accepts either a path to a .asd file or a system name for Quicklisp installation
         ((uiop:file-exists-p spec)
          (let* ((entry (%register-asd spec))
                 (order (%toposort-systems (list (getf entry :name)))))
-           (dolist (system order) (ignore-errors (asdf:load-system system)))
+           (dolist (system order) (asdf:load-system system))
            (format t "Installed ~A from ~A~%" (getf entry :name) (getf entry :path))
            (when (getf entry :depends-on)
              (format t "Dependencies: ~{~A~^, ~}~%" (getf entry :depends-on)))))

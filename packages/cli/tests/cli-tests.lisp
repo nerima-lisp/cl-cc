@@ -266,6 +266,82 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
                  (cl-cc/cli::dep-graph :output-format :dot))))
       (expect (search "digraph" dot) :to-be-truthy))))
 
+(it-sequential "cli-advanced-command-registry-has-no-fake-success-routes"
+  (dolist (command '("fuzz" "reduce" "audit" "doctest" "assert-density"
+                     "objdump" "macrostep" "bisect" "features" "generate"))
+    (expect (assoc command cl-cc/cli::*cli-command-dispatch* :test #'string=)
+            :to-be-null))
+  (dolist (command '("fuzz" "reduce" "audit" "doctest" "assert-density"
+                     "objdump" "macrostep" "bisect" "features" "generate"))
+    (signals cl-cc/cli:arg-parse-error
+      (cl-cc/cli:parse-args (list command))))
+  (dolist (command '("doc" "show-types" "abi-dump" "abi-check" "demangle"
+                     "disasm" "inspect" "dep-graph" "update"))
+    (expect (assoc command cl-cc/cli::*cli-command-dispatch* :test #'string=)
+            :to-be-truthy)))
+
+(it-sequential "cli-dep-graph-format-rejects-unknown-values"
+  (expect (cl-cc/cli::%parse-dep-graph-format "json") :to-be :json)
+  (expect (cl-cc/cli::%parse-dep-graph-format "topo") :to-be :topo)
+  (signals error (cl-cc/cli::%parse-dep-graph-format "yaml")))
+
+(it-sequential "cli-dispatch-commands-reject-empty-input-or-have-explicit-valid-empty-form"
+  (let ((valid-without-arguments
+          '("repl" "selfhost" "symbols" "compile-commands" "dep-graph"
+            "update" "completion" "docs" "version")))
+    (dolist (entry cl-cc/cli::*cli-command-dispatch*)
+      (let ((command (car entry)))
+        (if (member command valid-without-arguments :test #'string=)
+            ;; These commands intentionally have a documented no-argument form;
+            ;; invoking them here would start REPL I/O or write generated files.
+            (expect command :to-be-truthy)
+            (let* ((system (cl-boundary-kit:make-test-system-boundary))
+                   (outcome :returned)
+                   (codes nil)
+                   (cl-cc/cli::*cli-boundaries*
+                     (cl-boundary-kit:make-boundary-context :system system)))
+              (handler-case
+                  (funcall (cdr entry)
+                           (cl-cc/cli:make-parsed-args :command command))
+                (error () (setf outcome :error)))
+              (setf codes (cl-boundary-kit:test-system-exit-codes system))
+              (expect (or (eq outcome :error)
+                          (some #'plusp codes))
+                      :to-be-truthy)))))))
+
+(it-sequential "cli-file-commands-reject-missing-input"
+  (let ((missing "/tmp/cl-cc-cli-missing-input-for-test.lisp")
+        (commands '("run" "compile" "check" "doc" "show-types" "disasm"
+                    "inspect")))
+    (dolist (command commands)
+      (let* ((entry (assoc command cl-cc/cli::*cli-command-dispatch* :test #'string=))
+             (system (cl-boundary-kit:make-test-system-boundary))
+             (outcome :returned)
+             (cl-cc/cli::*cli-boundaries*
+               (cl-boundary-kit:make-boundary-context :system system)))
+        (handler-case
+            (funcall (cdr entry)
+                     (cl-cc/cli:make-parsed-args
+                      :command command :positional (list missing)))
+          (error () (setf outcome :error)))
+        (expect (or (eq outcome :error)
+                    (some #'plusp (cl-boundary-kit:test-system-exit-codes system)))
+                :to-be-truthy)))
+    (let* ((entry (assoc "abi-check" cl-cc/cli::*cli-command-dispatch*
+                         :test #'string=))
+           (system (cl-boundary-kit:make-test-system-boundary))
+           (outcome :returned)
+           (cl-cc/cli::*cli-boundaries*
+             (cl-boundary-kit:make-boundary-context :system system)))
+      (handler-case
+          (funcall (cdr entry)
+                   (cl-cc/cli:make-parsed-args
+                    :command "abi-check" :positional (list missing missing)))
+        (error () (setf outcome :error)))
+      (expect (or (eq outcome :error)
+                  (some #'plusp (cl-boundary-kit:test-system-exit-codes system)))
+              :to-be-truthy))))
+
 (it-sequential "cli-symbol-index-fuzzy-finds-definitions"
   (uiop:with-temporary-file (:pathname source :type "lisp" :keep t)
     (with-open-file (out source :direction :output :if-exists :supersede)

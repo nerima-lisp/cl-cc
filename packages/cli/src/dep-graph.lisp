@@ -30,11 +30,9 @@
     (dolist (sys-name (asdf:registered-systems))
       (unless (gethash sys-name seen)
         (setf (gethash sys-name seen) t)
-        (handler-case
-            (let ((sys (asdf:find-system sys-name nil)))
-              (when sys
-                (setf edges (nconc edges (%asdf-system-dependencies sys)))))
-          (error () nil))))
+        (let ((sys (asdf:find-system sys-name nil)))
+          (when sys
+            (setf edges (nconc edges (%asdf-system-dependencies sys)))))))
     edges))
 
 (defun %dep-node-name (name)
@@ -58,7 +56,7 @@ dependency becomes a node, and each dependency becomes a directed edge."
               (to   (%dep-node-name (cdr edge))))
           (ensure-node from)
           (ensure-node to)
-          (ignore-errors (cl-dataflow-kit:add-edge graph from to)))))
+          (cl-dataflow-kit:add-edge graph from to))))
     graph))
 
 (defun %dep-graph-json (graph)
@@ -105,18 +103,26 @@ OUTPUT-FORMAT is :dot, :json, :mermaid, or :topo."
 ;;; CLI entry point
 ;;; ─────────────────────────────────────────────────────────────────────────
 
+(defun %parse-dep-graph-format (value)
+  "Parse and validate the --format value for dep-graph."
+  (let ((name (or value "dot")))
+    (cond
+      ((string-equal name "dot") :dot)
+      ((string-equal name "json") :json)
+      ((string-equal name "mermaid") :mermaid)
+      ((string-equal name "topo") :topo)
+      (t (error "Invalid dep-graph format ~S (expected dot, json, mermaid, or topo)"
+                name)))))
+
 (defun %parse-dep-graph-args (args)
-  "Parse --format dot|json|mermaid|topo from ARGS.  Returns a keyword."
-  (let ((format :dot))
-    (loop for arg in args
-          for next-arg = (nth (1+ (position arg args :test #'string=)) args)
-          when (string= arg "--format")
-            do (cond
-                 ((string-equal next-arg "json")    (setf format :json))
-                 ((string-equal next-arg "mermaid") (setf format :mermaid))
-                 ((string-equal next-arg "topo")    (setf format :topo))
-                 ((string-equal next-arg "dot")     (setf format :dot))))
-    format))
+  "Parse --format from PARSED-ARGS or a legacy raw argument list."
+  (%parse-dep-graph-format
+   (if (typep args 'parsed-args)
+       (flag args "--format")
+       (let ((position (position "--format" args :test #'string=)))
+         (when position
+           (or (nth (1+ position) args)
+               (error "--format requires a value")))))))
 
 (defun %handle-dep-graph (args)
   "CLI handler for `cl-cc dep-graph [--format dot|json|mermaid|topo]`."
@@ -125,10 +131,4 @@ OUTPUT-FORMAT is :dot, :json, :mermaid, or :topo."
         (progn
           (format *error-output* "; FR-361: generating dependency graph (~A)...~%" format)
           (dep-graph :output-format format))
-        (progn
-          (format *error-output* "ERROR: ASDF not available.~%")
-          (cond
-            ((eq format :json)
-             (format t "{~%  \"error\": \"ASDF not loaded\"~%}~%"))
-            (t
-             (format t "digraph { node [shape=box]; ERROR [label=\"ASDF not loaded\"]; }~%")))))))
+        (error "ASDF not available."))))

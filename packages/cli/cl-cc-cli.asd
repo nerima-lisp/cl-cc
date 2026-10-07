@@ -31,6 +31,6 @@
     (:file "handlers-compile")  ; compile handler
     (:file "handlers-eval")     ; eval handler
     (:file "handlers-repl")     ; REPL handler
-    (:file "handlers-advanced") ; check and advanced/stub handlers
+    (:file "handlers-advanced") ; check and implemented advanced handlers
     (:file "dep-graph")         ; FR-361: Dependency graph visualization
     (:file "cli-spec")))        ; cl-cli app spec: completion/docs/version
