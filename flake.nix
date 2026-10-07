@@ -306,7 +306,11 @@
             version = siblingVersion "cl-log-kit";
             src = inputs.cl-log-kit;
             systems = [ "cl-log-kit" ];
-            lispLibs = [ clDateKit clConcurrentKit clHostKit ];
+            lispLibs = [
+              clDateKit
+              clConcurrentKit
+              clHostKit
+            ];
           };
           clBoundaryKit = sbcl.buildASDFSystem {
             pname = "cl-boundary-kit";
@@ -320,21 +324,31 @@
             version = siblingVersion "cl-cli";
             src = inputs.cl-cli;
             systems = [ "cl-cli" ];
-            lispLibs = [ clHostKit clPrologKit ];
+            lispLibs = [
+              clHostKit
+              clPrologKit
+            ];
           };
           clTtyKit = sbcl.buildASDFSystem {
             pname = "cl-tty-kit";
             version = siblingVersion "cl-tty-kit";
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
-            lispLibs = [ clCodecKit clConcurrentKit clPrologKit ];
+            lispLibs = [
+              clCodecKit
+              clConcurrentKit
+              clPrologKit
+            ];
           };
           clRegexKit = sbcl.buildASDFSystem {
             pname = "cl-regex-kit";
             version = siblingVersion "cl-regex-kit";
             src = inputs.cl-regex-kit;
             systems = [ "cl-regex-kit" ];
-            lispLibs = [ clConcurrentKit clParserKit ];
+            lispLibs = [
+              clConcurrentKit
+              clParserKit
+            ];
           };
           clHostKit = sbcl.buildASDFSystem {
             pname = "cl-host-kit";
@@ -397,7 +411,10 @@
             version = siblingVersion "cl-concurrent-kit";
             src = inputs.cl-concurrent-kit;
             systems = [ "cl-concurrent-kit" ];
-            lispLibs = [ clBoundaryKit clDateKit ];
+            lispLibs = [
+              clBoundaryKit
+              clDateKit
+            ];
           };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
