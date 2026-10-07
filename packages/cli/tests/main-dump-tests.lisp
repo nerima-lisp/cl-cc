@@ -154,6 +154,14 @@
                     :print-opt-remarks t
                     :opt-remarks-mode :missed))))
 
+(it-sequential "cli-compile-opts-strict-no-alloc-reaches-kwargs"
+  (let* ((parsed (cl-cc/cli:parse-args
+                  '("compile" "f.lisp" "--strict-no-alloc")))
+         (opts (cl-cc/cli::%parse-compile-opts parsed))
+         (kwargs (cl-cc/cli::%compile-opts-kwargs opts nil)))
+    (expect (cl-cc/cli::compile-opts-strict-no-alloc opts) :to-be-truthy)
+    (expect (getf kwargs :strict-no-alloc) :to-be-truthy)))
+
 (it-sequential "cli-dump-ir-phase-invalid-signals-error"
   (handler-case
       (progn

@@ -58,6 +58,8 @@ reserved cl-cli key (:help / :version).")
     ("--no-stdlib" . "Disable lazy stdlib auto-require")
     ("--verbose"   . "Show compilation details on stderr")
     ("--strict"    . "Treat type warnings as errors (check only)")
+    ("--strict-no-alloc" . "Treat no-allocation violations as compilation errors")
+    ("--format"    . "dep-graph output: dot | json | mermaid | topo")
     ("--tier"      . "Compilation tier: 0 fast, 1 optimized")
     ("--timeout"   . "Maximum execution time in seconds")
     ("--no-timeout" . "Disable the CLI timeout")
@@ -120,8 +122,8 @@ key->legacy-hash)."
 here fall back to a generated one-liner.")
 
 (defparameter *cli-file-commands*
-  '("run" "compile" "check" "doc" "doctest" "show-types" "objdump"
-    "macrostep" "reduce" "disasm" "inspect" "abi-dump")
+  '("run" "compile" "check" "doc" "show-types"
+    "disasm" "inspect" "abi-dump" "abi-check")
   "Commands whose positional argument is a file path — flagged with a :file
 completion hint so shells offer path completion.")
 
@@ -197,7 +199,7 @@ keyed by the canonical flag strings (only options actually supplied are set, so
     (when command
       (setf (parsed-args-command result) (cl-cli:command-name command))
       (setf (parsed-args-positional result)
-            (copy-list (ignore-errors (cl-cli:positional-value inv :args)))))
+            (copy-list (or (cl-cli:positional-value inv :args) nil))))
     (maphash (lambda (key legacy-keys)
                (let ((source (cl-cli:option-value-source inv key)))
                  (when (and source (not (eq source :default)))
