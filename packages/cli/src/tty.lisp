@@ -18,7 +18,7 @@ or NIL (never).")
     ((t) t)
     ((nil) nil)
     (t (and (null (uiop:getenv "NO_COLOR"))
-            (ignore-errors (interactive-stream-p stream))))))
+            (interactive-stream-p stream)))))
 
 (defun %sgr (text &rest codes)
   "Wrap TEXT in a cl-tty-kit SGR sequence built from CODES, resetting after,

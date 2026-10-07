@@ -268,11 +268,8 @@ Returns true when Quicklisp successfully loaded the system."
     (when (and quickload
                (fboundp quickload)
                (not (eq (symbol-function quickload) #'ql-quickload)))
-      (handler-case
-          (progn
-            (funcall quickload name :silent t)
-            t)
-        (error () nil)))))
+      (funcall quickload name :silent t)
+      t)))
 
 (defun %find-system-or-quickload (name)
   "Find ASDF system NAME, trying registered paths first and Quicklisp second."
@@ -292,10 +289,10 @@ Returns true when Quicklisp successfully loaded the system."
         (out nil))
     (labels ((deps (name)
                (or (getf (%registry-system-entry name) :depends-on)
-                   (ignore-errors
-                     (mapcar #'%normalize-system-name
-                             (asdf:system-depends-on (asdf:find-system name nil))))
-                   nil))
+                   (let ((system (asdf:find-system name nil)))
+                     (when system
+                       (mapcar #'%normalize-system-name
+                               (asdf:system-depends-on system))))))
              (visit (name)
                (let ((n (%normalize-system-name name)))
                  (unless (gethash n seen)
@@ -310,10 +307,10 @@ Returns true when Quicklisp successfully loaded the system."
       (nreverse out))))
 
 (defun %asdf-component-source-files (component)
-  (let ((children (ignore-errors (asdf:component-children component))))
+  (let ((children (asdf:component-children component)))
     (if children
         (mapcan #'%asdf-component-source-files children)
-        (let ((path (ignore-errors (asdf:component-pathname component))))
+        (let ((path (asdf:component-pathname component)))
           (if (and path (string= (or (pathname-type path) "") "lisp"))
               (list (namestring path))
               nil)))))
@@ -327,7 +324,7 @@ Returns true when Quicklisp successfully loaded the system."
   (%ensure-registered-systems-visible)
   (with-output-to-string (out)
     (dolist (name (%toposort-systems (list system-name)))
-      (ignore-errors (asdf:load-system name))
+      (asdf:load-system name)
       (dolist (file (%system-source-files name))
         (format out "~%;;; system ~A file ~A~%" name file)
         (write-string (%read-file file) out)
@@ -346,4 +343,5 @@ Returns true when Quicklisp successfully loaded the system."
                    :arch arch :output-file output :language :lisp :compress compress
                    (append (if bolt (list :bolt t :bolt-profile bolt-profile) nil)
                            kwargs)))
-      (ignore-errors (delete-file tmp)))))
+      (when (probe-file tmp)
+        (delete-file tmp)))))

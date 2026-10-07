@@ -103,6 +103,10 @@
     (let ((p (cl-cc/cli:parse-args argv)))
     (expect (%flags p flag-key) :to-be-truthy))))
 
+(it-sequential "cli-args-bool-flags strict-no-alloc"
+  (let ((p (cl-cc/cli:parse-args '("compile" "f.lisp" "--strict-no-alloc"))))
+    (expect (%flags p "--strict-no-alloc") :to-be-truthy)))
+
 (it-sequential "cli-args-bool-flags help"
   (destructuring-bind (argv flag-key) (list '("--help") "--help")
     (let ((p (cl-cc/cli:parse-args argv)))
@@ -175,6 +179,10 @@
 (it-sequential "cli-args-timeout-string-flag"
   (let ((p (cl-cc/cli:parse-args '("eval" "(+ 1 2)" "--timeout" "7"))))
     (expect (%flags p "--timeout") :to-equal "7")))
+
+(it-sequential "cli-args-format-string-flag"
+  (let ((p (cl-cc/cli:parse-args '("dep-graph" "--format" "json"))))
+    (expect (%flags p "--format") :to-equal "json")))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; String flags — --key=value inline form

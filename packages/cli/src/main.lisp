@@ -33,24 +33,14 @@ Commands:
   compile-commands [path] Generate compile_commands.json
   install  <system.asd>   Register/compile a local ASDF system
   uninstall <system>      Remove a registered local system
-  fuzz     [--seed N]     Compiler fuzzing (FR-794)
-  reduce   <file>         Test case reduction (FR-796)
-  audit                   Dependency vulnerability scan (FR-814)
   doc      <path>         API documentation generation (FR-902)
-  doctest  <path>         Run docstring code examples (FR-903)
   show-types <file>       Show inferred type signatures (FR-904)
-  assert-density <path>   Assertion density analysis (FR-905)
   abi-dump  <file>        Dump ABI manifest (FR-777)
   abi-check <old> <new>   Check ABI compatibility (FR-777)
   demangle  <name>        Demangle C++ ABI symbol (FR-776)
   disasm    [--wat] <wasm> Disassemble Wasm via wabt tools (FR-322)
   inspect   <wasm>         Inspect Wasm sections/disassembly (FR-322)
-  objdump   <file>        Inspect binary internals (FR-808)
-  macrostep <file>        Step through macro expansion (FR-836)
-  bisect    [range]       Find regression commit (FR-809)
-  features                List feature flags (FR-812)
   dep-graph [--format F]  ASDF dependency graph via cl-dataflow-kit: dot|json|mermaid|topo (FR-361)
-  generate  <schema>      Build-time code generation (FR-815)
   update    [pkg]         Update dependencies (FR-813)
   completion <shell>      Print a shell completion script (bash/zsh/fish/…)
   docs      [format]      Render reference docs (markdown|man|json)
@@ -98,6 +88,8 @@ Options:
   --stats                 Print per-pass optimizer stats
   --trace-emit            Print VM/OPT/ASM compilation stages
   --strict                Treat type warnings as errors (check only)
+  --strict-no-alloc       Treat no-allocation violations as compilation errors
+  --format <value>        Output format for dep-graph: dot, json, mermaid, topo
   --Werror                Treat compiler warnings as errors
   --Werror-category <cat> Treat matching warning category/code as error
   --timeout <seconds>     Maximum execution time (default: 30 seconds)
@@ -366,25 +358,14 @@ Examples:
      ("symbols" . %do-symbols)
      ("profile" . %do-profile)
      ("compile-commands" . %do-compile-commands)
-     ;; ── Phase 129-160: Advanced Compilation III commands ──
-    ("fuzz"         . %do-fuzz)
-    ("reduce"       . %do-reduce)
-    ("audit"        . %do-audit)
     ("doc"          . %do-doc)
-    ("doctest"      . %do-doctest)
     ("show-types"   . %do-show-types)
-    ("assert-density" . %do-assert-density)
     ("abi-dump"     . %do-abi-dump)
      ("abi-check"    . %do-abi-check)
      ("demangle"     . %do-demangle)
      ("disasm"       . %do-disasm)
      ("inspect"      . %do-inspect)
-     ("objdump"      . %do-objdump)
-    ("macrostep"    . %do-macrostep)
-    ("bisect"       . %do-bisect)
-     ("features"     . %do-features)
      ("dep-graph"    . %do-dep-graph)
-     ("generate"     . %do-generate)
     ("update"       . %do-update)
     ;; cl-cli-backed commands (handlers defined in cli-spec.lisp).
     ("completion"   . %do-completion)

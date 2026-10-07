@@ -24,12 +24,6 @@ used to produce it."
       (no-stdlib
        (compile-and-run #'compile-string))
       (t
-       ;; Default: try the fast stdlib-free compile; only on a real compile
-       ;; error fall back to the (much slower) stdlib-aware compiler. The
-       ;; native `system-name` branch that used to sit here was a bad paste
-       ;; from the compile handler — system-name/output/arch/compress are
-       ;; unbound in this scope, so evaluating that cond test derailed every
-       ;; plain `cl-cc eval EXPR` invocation. eval never compiles systems.
        (handler-case
            (compile-and-run #'compile-string)
          (error ()

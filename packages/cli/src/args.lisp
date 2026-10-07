@@ -63,6 +63,7 @@
      ("--verbose" . :bool)
     ("--strict"  . :bool)
      ("--strict-no-alloc" . :bool)
+    ("--format" . :string)
      ("--pass-pipeline" . :string)
       ("--opt-bisect-limit" . :string)
        ("--debug-info" . :bool)
@@ -114,8 +115,6 @@
       ("--executable" . :bool)
       ("--toplevel" . :string)
       ("--compression" . :string)
-      ;; fuzz: deterministic seed
-      ("--seed" . :string)
        ;; FR-276: optimization level
       ("-O" . :string)
       ("--opt-level" . :string)

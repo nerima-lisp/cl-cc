@@ -31,7 +31,7 @@ When --stdlib is also supplied, warm the stdlib cache first so the saved image
 starts with parsed/expanded stdlib forms and the VM snapshot already resident."
   (let ((path (flag parsed "--dump-image")))
     (when (flag parsed "--stdlib")
-      (ignore-errors (cl-cc:warm-stdlib-cache)))
+      (cl-cc:warm-stdlib-cache))
     (format *error-output* "; cl-cc: dumping initialized image to ~A~%" path)
     (finish-output *error-output*)
     (sb-ext:save-lisp-and-die path
@@ -248,7 +248,8 @@ Returns T for plain coverage, :MCDC for MC/DC, NIL when unset."
    (memoize-macros     nil)
    ;; FR-356: runtime GC heap tuning flags (stored as heap words)
    (gc-min-heap        nil)
-   (gc-max-heap        nil))
+   (gc-max-heap        nil)
+   (strict-no-alloc    nil))
 
 (defun %parse-compile-opts (parsed)
   "Extract all pipeline/tracing flags from PARSED into a compile-opts struct."
@@ -301,12 +302,15 @@ Returns T for plain coverage, :MCDC for MC/DC, NIL when unset."
     :trace-macros       (flag parsed "--trace-macros")
     :memoize-macros     (flag parsed "--memoize-macros")
     :gc-min-heap        (%parse-gc-heap-words (flag parsed "--gc-min-heap") "--gc-min-heap")
-    :gc-max-heap        (%parse-gc-heap-words (flag parsed "--gc-max-heap") "--gc-max-heap")))
+    :gc-max-heap        (%parse-gc-heap-words (flag parsed "--gc-max-heap") "--gc-max-heap")
+    :strict-no-alloc    (flag parsed "--strict-no-alloc")))
 
 (defun %parse-gc-heap-words (spec flag-name)
   "Parse a GC heap byte count SPEC for FLAG-NAME into runtime heap words."
   (when spec
-    (let ((bytes (ignore-errors (parse-integer spec :junk-allowed nil))))
+    (let ((bytes (handler-case
+                     (parse-integer spec :junk-allowed nil)
+                   (parse-error () nil))))
       (unless (and (integerp bytes) (plusp bytes))
         (format *error-output* "Invalid ~A: ~A (expected positive byte count)~%" flag-name spec)
         (%cli-exit 2))
@@ -316,14 +320,20 @@ Returns T for plain coverage, :MCDC for MC/DC, NIL when unset."
   "Parse an optimization level spec string (-O0/-O1/-O2/-O3 or 0/1/2/3).
 Returns an integer 0-3 or NIL."
   (when spec
-    (let ((level (ignore-errors (parse-integer spec))))
-      (and level (<= 0 level 3) level))))
+    (let ((level (handler-case
+                     (parse-integer spec :junk-allowed nil)
+                   (parse-error () nil))))
+      (unless (and level (<= 0 level 3))
+        (error "Invalid optimization level: ~A (expected 0, 1, 2, or 3)" spec))
+      level)))
 
 (defun %parse-opt-bisect-limit (spec)
   "Parse --opt-bisect-limit / CL_CC_OPT_BISECT as a non-negative integer or NIL."
   (let ((text (and spec (string-trim '(#\Space #\Tab #\Newline #\Return) spec))))
     (when (and text (plusp (length text)))
-      (let ((limit (ignore-errors (parse-integer text :junk-allowed nil))))
+      (let ((limit (handler-case
+                       (parse-integer text :junk-allowed nil)
+                     (parse-error () nil))))
         (unless (and (integerp limit) (<= 0 limit))
           (format *error-output* "Invalid opt bisect limit: ~A (expected non-negative integer)~%" spec)
           (%cli-exit 2))
@@ -333,11 +343,9 @@ Returns an integer 0-3 or NIL."
   "Return a flat keyword plist for compile-string.
 STREAM is the resolved trace-json output stream (may be nil)."
   (labels ((safe-read-profile (path)
-             (when path
-               (handler-case
-                   (with-open-file (in path :direction :input)
-                     (read in nil nil))
-                  (error () nil))))
+             (when (and path (probe-file path))
+               (with-open-file (in path :direction :input)
+                 (read in nil nil))))
            (instruction-profile-alist-p (profile)
              (and (listp profile)
                   (every (lambda (entry)
@@ -397,6 +405,9 @@ STREAM is the resolved trace-json output stream (may be nil)."
                     nil)
                 (if (compile-opts-coverage opts)
                     (list :coverage (compile-opts-coverage opts))
+                    nil)
+                (if (compile-opts-strict-no-alloc opts)
+                    (list :strict-no-alloc t)
                     nil)
                  (if (compile-opts-block-compile opts)
                      (list :block-compile t)

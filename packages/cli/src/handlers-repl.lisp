@@ -146,9 +146,8 @@ inside strings for REPL input balancing."
     (%initialize-repl-completeness-globals)
     (%load-repl-history-file)
     (when stdlib
-      (handler-case (cl-cc:run-string-repl cl-cc:*standard-library-source*
-                                           :language language)
-        (error () nil)))
+      (cl-cc:run-string-repl cl-cc:*standard-library-source*
+                             :language language))
     (when (and watch watch-file)
       (let ((source (%read-command-source watch-file)))
         (%record-hot-reload-source watch-file source nil)
@@ -160,21 +159,22 @@ inside strings for REPL input balancing."
             (%style-note "Type a form and press Return. (exit) or Ctrl+D to quit."))
     (force-output)
     (let ((stdlib-loaded-p stdlib))
-       (flet ((eval-and-print (form)
-              (let* ((*terminal-io* *terminal-io*)
-                     (*query-io* *query-io*)
-                     (*debug-io* *debug-io*)
-                     (result (handler-case (cl-cc:run-string-repl form :language language)
-                               (error (e)
-                                 (if (or no-stdlib stdlib-loaded-p)
-                                     (error e)
-                                     (progn
-                                       (cl-cc:run-string-repl cl-cc:*standard-library-source*
-                                                              :language language)
-                                       (setf stdlib-loaded-p t)
-                                       (cl-cc:run-string-repl form :language language))))))
-                     (values-list (or (cl-cc/vm:vm-values-list cl-cc/repl::*repl-vm-state*)
-                                      (list result))))
+      (flet ((eval-and-print (form)
+               (let* ((*terminal-io* *terminal-io*)
+                      (*query-io* *query-io*)
+                      (*debug-io* *debug-io*)
+                      (result (handler-case
+                                  (cl-cc:run-string-repl form :language language)
+                                (error (e)
+                                  (if (or no-stdlib stdlib-loaded-p)
+                                      (error e)
+                                      (progn
+                                        (cl-cc:run-string-repl cl-cc:*standard-library-source*
+                                                               :language language)
+                                        (setf stdlib-loaded-p t)
+                                        (cl-cc:run-string-repl form :language language))))))
+                      (values-list (or (cl-cc/vm:vm-values-list cl-cc/repl::*repl-vm-state*)
+                                       (list result))))
                  (%update-repl-completeness-globals form values-list)
                  (when (not (null result))
                    (format t "=> ~A~%" (%style-result (prin1-to-string result))))
@@ -184,8 +184,7 @@ inside strings for REPL input balancing."
         (force-output)
         (let ((buffer ""))
           (loop
-            (let ((line (handler-case (read-line *standard-input* nil nil)
-                          (error () nil))))
+            (let ((line (read-line *standard-input* nil nil)))
               (when (null line)
                 (%save-repl-history-file)
                 (format t "~%Goodbye.~%")
