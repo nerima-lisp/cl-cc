@@ -389,6 +389,7 @@
               clLogKit
               clProcessKit
               clJsonKit
+              clHostKit
             ];
           };
           clCcBootstrap = sbcl.buildASDFSystem {
@@ -439,6 +440,7 @@
               clCcBootstrap
               clCcType
               clCcVm
+              clHostKit
             ];
           };
           clCcOptimize = sbcl.buildASDFSystem {
@@ -452,6 +454,7 @@
               clCcAst
               clPrologKit
               clParserKit
+              clHostKit
             ];
           };
           # One source tree, three systems -- the repository holds them
@@ -482,6 +485,8 @@
               clCcBinary
               clCcOptimize
               clCcRegalloc
+              clProcessKit
+              clHostKit
             ];
           };
           clCcEmit = sbcl.buildASDFSystem {
@@ -517,6 +522,8 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clHostKit
+              clJsonKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
