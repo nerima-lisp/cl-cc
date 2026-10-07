@@ -378,6 +378,14 @@ takes the top-level path) caught correctly."
                  (cl-cc/compile:compilation-result-vm-instructions result)))
           result))))
 
+(defun %ensure-compilation-success (result)
+  "Signal recorded top-level compilation errors before exposing RESULT."
+  (let ((errors (cl-cc/compile:compilation-result-errors result)))
+    (when errors
+      (error "Compilation failed:~%~{~A~^~%~}"
+             (mapcar #'princ-to-string errors))))
+  result)
+
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; Language-level parsing
 ;;; ─────────────────────────────────────────────────────────────────────────
@@ -600,6 +608,7 @@ top-level, and optimization stages."
                               (apply #'compile-toplevel-forms
                                      forms
                                      (%opts->compile-kwargs opts)))))))))
+      (%ensure-compilation-success result)
       (%pgo-apply-type-feedback-to-result result opts)
       (setf (cl-cc/vm:vm-program-compilation-tier
              (cl-cc/compile:compilation-result-program result))
@@ -679,6 +688,7 @@ arguments are forwarded to the expression, top-level, and optimization stages."
                            (apply #'compile-toplevel-forms
                                   all-forms
                                   (%opts->compile-kwargs opts))))))))
+      (%ensure-compilation-success result)
       (setf (cl-cc/compile:compilation-result-pgo-counter-plan result)
             (%build-pgo-counter-plan-from-instructions
              (cl-cc/compile:compilation-result-vm-instructions result)))
