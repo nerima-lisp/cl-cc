@@ -292,30 +292,38 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
             ("symbols" . "workspace defaults")
             ("compile-commands" . "current-directory defaults")
             ("dep-graph" . "current-system defaults")
-            ("update" . "all packages")
-            ("completion" . "default shell")
-            ("docs" . "markdown output")
-            ("version" . "version output"))))
+            ("update" . "all packages")))
+        (safe-without-arguments '("completion" "docs" "version")))
     (dolist (entry cl-cc/cli::*cli-command-dispatch*)
       (let ((command (car entry)))
-        (if (assoc command valid-without-arguments :test #'string=)
+        (cond
+          ((member command safe-without-arguments :test #'string=)
+           (let ((output
+                   (with-output-to-string (stream)
+                     (let ((*standard-output* stream)
+                           (*error-output* stream))
+                       (funcall (cdr entry)
+                                (cl-cc/cli:make-parsed-args :command command)))))
+             (expect (plusp (length output)) :to-be-truthy)))
+          ((assoc command valid-without-arguments :test #'string=)
             ;; These commands intentionally have a documented no-argument form;
             ;; invoking them here would start REPL I/O or write generated files.
             (expect (cdr (assoc command valid-without-arguments :test #'string=))
                     :to-be-truthy)
-            (let* ((system (cl-boundary-kit:make-test-system-boundary))
-                   (outcome :returned)
-                   (codes nil)
-                   (cl-cc/cli::*cli-boundaries*
-                     (cl-boundary-kit:make-boundary-context :system system)))
-              (handler-case
-                  (funcall (cdr entry)
-                           (cl-cc/cli:make-parsed-args :command command))
-                (error () (setf outcome :error)))
-              (setf codes (cl-boundary-kit:test-system-exit-codes system))
-              (expect (or (eq outcome :error)
-                          (some #'plusp codes))
-                      :to-be-truthy)))))))
+          (t
+           (let* ((system (cl-boundary-kit:make-test-system-boundary))
+                  (outcome :returned)
+                  (codes nil)
+                  (cl-cc/cli::*cli-boundaries*
+                    (cl-boundary-kit:make-boundary-context :system system)))
+             (handler-case
+                 (funcall (cdr entry)
+                          (cl-cc/cli:make-parsed-args :command command))
+               (error () (setf outcome :error)))
+             (setf codes (cl-boundary-kit:test-system-exit-codes system))
+             (expect (or (eq outcome :error)
+                         (some #'plusp codes))
+                     :to-be-truthy))))))))
 
 (it-sequential "cli-file-commands-reject-missing-input"
   (let ((missing "/tmp/cl-cc-cli-missing-input-for-test.lisp")
