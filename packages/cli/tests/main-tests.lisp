@@ -376,6 +376,43 @@
       (expect plain-attempts :to-equal 1)
       (expect stdlib-attempts :to-equal 1))))
 
+(it-sequential "cli-default-repl-falls-back-to-stdlib"
+  (let ((form-attempts 0)
+        (stdlib-attempts 0))
+    (%with-cli-function-overrides
+        ((uiop:command-line-arguments (lambda () '("repl")))
+         (cl-cc:reset-repl-state (lambda () nil))
+         (cl-cc:%ensure-repl-state (lambda () nil))
+         (cl-cc/cli::%initialize-repl-completeness-globals (lambda () nil))
+         (cl-cc/cli::%load-repl-history-file (lambda () nil))
+         (cl-cc/cli::%save-repl-history-file (lambda () nil))
+         (cl-cc/cli::%update-repl-completeness-globals
+           (lambda (&rest args) (declare (ignore args)) nil))
+         (cl-cc:%repl-record-history
+           (lambda (&rest args) (declare (ignore args)) nil))
+         (cl-cc:repl-edit-input-line (lambda (line) (values line nil nil)))
+         (cl-cc/vm:vm-values-list (lambda (&rest args) (declare (ignore args)) nil))
+         (cl-cc:run-string-repl
+           (lambda (source &key language)
+             (declare (ignore language))
+             (cond
+               ((eq source cl-cc:*standard-library-source*)
+                (incf stdlib-attempts)
+                nil)
+               ((zerop form-attempts)
+                (incf form-attempts)
+                (error "stdlib symbol is unresolved"))
+               (t
+                (incf form-attempts)
+                42)))))
+      (let ((*standard-input* (make-string-input-stream
+                               (format nil "(stdlib-symbol)~%")))
+            (*standard-output* (make-string-output-stream))
+            (*error-output* (make-string-output-stream)))
+        (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0))
+      (expect form-attempts :to-equal 2)
+      (expect stdlib-attempts :to-equal 1))))
+
 (it-sequential "cli-do-compile-dump-ir-forwards-elisp-language"
   (let ((captured-language :unset)
         (captured-source :unset))
