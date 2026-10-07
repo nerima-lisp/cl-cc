@@ -303,7 +303,7 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
                      (let ((*standard-output* stream)
                            (*error-output* stream))
                        (funcall (cdr entry)
-                                (cl-cc/cli:make-parsed-args :command command)))))
+                                (cl-cc/cli:make-parsed-args :command command))))))
              (expect (plusp (length output)) :to-be-truthy)))
           ((assoc command valid-without-arguments :test #'string=)
            ;; These commands intentionally have a documented no-argument form;
@@ -322,7 +322,7 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
              (expect (or (eq outcome :error)
                          (some #'plusp
                                (cl-boundary-kit:test-system-exit-codes system)))
-                     :to-be-truthy)))))))))
+                     :to-be-truthy))))))))
 
 (it-sequential "cli-file-commands-reject-missing-input"
   (let ((missing "/tmp/cl-cc-cli-missing-input-for-test.lisp")
