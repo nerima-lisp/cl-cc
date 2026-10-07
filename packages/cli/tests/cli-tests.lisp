@@ -287,14 +287,22 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
 
 (it-sequential "cli-dispatch-commands-reject-empty-input-or-have-explicit-valid-empty-form"
   (let ((valid-without-arguments
-          '("repl" "selfhost" "symbols" "compile-commands" "dep-graph"
-            "update" "completion" "docs" "version")))
+          '(("repl" . "interactive input")
+            ("selfhost" . "profile workload defaults")
+            ("symbols" . "workspace defaults")
+            ("compile-commands" . "current-directory defaults")
+            ("dep-graph" . "current-system defaults")
+            ("update" . "all packages")
+            ("completion" . "default shell")
+            ("docs" . "markdown output")
+            ("version" . "version output"))))
     (dolist (entry cl-cc/cli::*cli-command-dispatch*)
       (let ((command (car entry)))
-        (if (member command valid-without-arguments :test #'string=)
+        (if (assoc command valid-without-arguments :test #'string=)
             ;; These commands intentionally have a documented no-argument form;
             ;; invoking them here would start REPL I/O or write generated files.
-            (expect command :to-be-truthy)
+            (expect (cdr (assoc command valid-without-arguments :test #'string=))
+                    :to-be-truthy)
             (let* ((system (cl-boundary-kit:make-test-system-boundary))
                    (outcome :returned)
                    (codes nil)
@@ -323,6 +331,21 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
             (funcall (cdr entry)
                      (cl-cc/cli:make-parsed-args
                       :command command :positional (list missing)))
+          (error () (setf outcome :error)))
+        (expect (or (eq outcome :error)
+                    (some #'plusp (cl-boundary-kit:test-system-exit-codes system)))
+                :to-be-truthy)))
+    (dolist (command '("abi-dump"))
+      (let* ((entry (assoc command cl-cc/cli::*cli-command-dispatch*
+                           :test #'string=))
+             (system (cl-boundary-kit:make-test-system-boundary))
+             (outcome :returned)
+             (cl-cc/cli::*cli-boundaries*
+               (cl-boundary-kit:make-boundary-context :system system)))
+        (handler-case
+            (funcall (cdr entry)
+                     (cl-cc/cli:make-parsed-args
+                      :command command :positional nil))
           (error () (setf outcome :error)))
         (expect (or (eq outcome :error)
                     (some #'plusp (cl-boundary-kit:test-system-exit-codes system)))

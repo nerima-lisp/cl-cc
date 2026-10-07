@@ -331,6 +331,51 @@
         (expect captured-language :to-equal :elisp)
         (expect run-called :to-equal :dummy)))))
 
+(it-sequential "cli-default-eval-falls-back-to-stdlib"
+  (let ((plain-attempts 0)
+        (stdlib-attempts 0))
+    (%with-cli-function-overrides
+        ((cl-cc:compile-string (lambda (&rest args)
+                                 (declare (ignore args))
+                                 (incf plain-attempts)
+                                 (error "stdlib symbol is unresolved")))
+         (cl-cc:compile-string-with-stdlib (lambda (&rest args)
+                                             (declare (ignore args))
+                                             (incf stdlib-attempts)
+                                             (cl-cc/compile:make-compilation-result
+                                              :program :stdlib-program)))
+         (cl-cc/cli::%call-with-runtime-sanitizer-flags
+           (lambda (opts thunk &rest args)
+             (declare (ignore opts args))
+             (funcall thunk)))
+         (cl-cc:run-compiled (lambda (program &rest args)
+                               (declare (ignore args))
+                               (expect program :to-equal :stdlib-program)
+                               42)))
+      (expect (cl-cc/cli::%compile-and-run-eval-form
+               "(stdlib-symbol)" nil nil :lisp nil nil nil)
+              :to-equal 42)
+      (expect plain-attempts :to-equal 1)
+      (expect stdlib-attempts :to-equal 1))))
+
+(it-sequential "cli-default-run-falls-back-to-stdlib"
+  (let ((plain-attempts 0)
+        (stdlib-attempts 0))
+    (%with-cli-function-overrides
+        ((cl-cc:compile-string (lambda (&rest args)
+                                 (declare (ignore args))
+                                 (incf plain-attempts)
+                                 (error "stdlib symbol is unresolved")))
+         (cl-cc:compile-string-with-stdlib (lambda (&rest args)
+                                             (declare (ignore args))
+                                             (incf stdlib-attempts)
+                                             :stdlib-result)))
+      (expect (cl-cc/cli::%compile-lisp-with-auto-stdlib
+               "(stdlib-symbol)" nil nil nil)
+              :to-equal :stdlib-result)
+      (expect plain-attempts :to-equal 1)
+      (expect stdlib-attempts :to-equal 1))))
+
 (it-sequential "cli-do-compile-dump-ir-forwards-elisp-language"
   (let ((captured-language :unset)
         (captured-source :unset))
