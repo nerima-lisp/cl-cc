@@ -122,10 +122,15 @@
 
 ;;; Error Handling Tests
 
-(it-sequential "compile-error-conditions"
-  (handler-case (run-string "x") (error () nil))
-  (handler-case (compile-string "(if 1 2)") (error () nil))
-  (handler-case (compile-string "(+ 1)") (error () nil)))
+(it-sequential "compile-error-conditions-propagate-with-details"
+  (dolist (source '("x" "(if 1 2 3 4)"))
+    (let ((message nil))
+      (handler-case
+          (compile-string source)
+        (error (condition)
+          (setf message (princ-to-string condition))))
+      (expect message :to-be-truthy)
+      (expect (search "Compilation failed" message) :to-be-truthy))))
 
 ;;; Integration Tests
 

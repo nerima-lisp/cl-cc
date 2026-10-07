@@ -23,13 +23,26 @@ The direct VM-to-codegen path remains the fallback and the default.")
 
 (defun %run-short-native-command (argv)
   "Run a short external helper command with an explicit timeout.
-Returns NIL on timeout or command failure so native compilation can continue
-without hanging forever on platform utility calls like chmod."
+Signals an error on timeout or command failure so native compilation cannot
+report an unsigned or non-executable artifact as successful."
   (handler-case
       (sb-ext:with-timeout *native-command-timeout-seconds*
-        (uiop:run-program argv :ignore-error-status t))
-    (sb-ext:timeout () nil)
-    (error () nil)))
+        (uiop:run-program argv :ignore-error-status nil))
+    (sb-ext:timeout ()
+      (error "Native helper timed out: ~{~A~^ ~}" argv))
+    (error (condition)
+      (error "Native helper failed (~{~A~^ ~}): ~A" argv condition))))
+
+(defun %native-relocation-entries (program format)
+  "Return PROGRAM relocation entries required by FORMAT.
+Mach-O currently embeds its own builder relocations. ELF and PE must expose
+relocation entries explicitly; a missing accessor is a hard compilation error."
+  (unless (eq format :mach-o)
+    (let ((accessor 'cl-cc/codegen::program-reloc-entries))
+      (unless (fboundp accessor)
+        (error "Native code generator does not expose relocation entries for ~A output"
+               format))
+      (funcall accessor program))))
 
 (defun %native-host-os ()
   "Return a keyword identifying the host operating system.
@@ -612,9 +625,7 @@ Returns the output file path on success."
                                (or (getf opts :eh-model) cl-cc/codegen::*eh-model*))))
                          (%native-code-bytes-for-arch arch program opts)))
          (compilation-result (compilation-result-program result))
-         (reloc-entries (and compilation-result
-                             (ignore-errors
-                              (cl-cc/codegen::program-reloc-entries compilation-result)))))
+         (reloc-entries (%native-relocation-entries compilation-result binary-format)))
     (%write-native-output code-bytes reloc-entries output-file
                           :format binary-format :arch arch
                           :compress (getf opts :compress))))
@@ -757,8 +768,9 @@ TARGET-OS is :DARWIN (default on macOS), :LINUX, or :WINDOWS. When NIL, auto-det
           output)
         (let* ((native-target (%native-target-for-arch arch))
                (compile-opts (%strip-internal-opts opts))
-               (result (%compile-native-file-source source native-target effective-language compile-opts))
-                  (program (maybe-pipeline-bolt-optimize-program
+               (raw-result (%compile-native-file-source source native-target effective-language compile-opts))
+               (result (%ensure-compilation-success raw-result))
+               (program (maybe-pipeline-bolt-optimize-program
                             (pipeline-reorder-functions
                              (%maybe-route-program-through-mir
                               (compilation-result-program result) arch opts))
@@ -780,7 +792,9 @@ TARGET-OS is :DARWIN (default on macOS), :LINUX, or :WINDOWS. When NIL, auto-det
                                     (cl-cc/codegen:normalize-x86-64-eh-model
                                      (or (getf opts :eh-model) cl-cc/codegen::*eh-model*))))
                                (%native-code-bytes-for-arch arch program opts))))
-          (%write-native-output code-bytes nil output
+          (%write-native-output code-bytes
+                               (%native-relocation-entries program binary-format)
+                               output
                                :format binary-format :arch arch
                                :compress (getf opts :compress))
           (%copy-file-bytes output cache-path)
