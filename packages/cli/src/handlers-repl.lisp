@@ -145,10 +145,7 @@ inside strings for REPL input balancing."
     (cl-cc:%ensure-repl-state)
     (%initialize-repl-completeness-globals)
     (%load-repl-history-file)
-    (when (or stdlib (not no-stdlib))
-      ;; The default policy used to retry after an arbitrary REPL error. Load
-      ;; the library before the first form so a library failure is visible and
-      ;; user form failures are not mistaken for a missing dependency.
+    (when stdlib
       (cl-cc:run-string-repl cl-cc:*standard-library-source*
                              :language language))
     (when (and watch watch-file)
@@ -161,13 +158,23 @@ inside strings for REPL input balancing."
     (format t "~A~%~%"
             (%style-note "Type a form and press Return. (exit) or Ctrl+D to quit."))
     (force-output)
-    (flet ((eval-and-print (form)
-              (let* ((*terminal-io* *terminal-io*)
-                     (*query-io* *query-io*)
-                     (*debug-io* *debug-io*)
-                     (result (cl-cc:run-string-repl form :language language))
-                     (values-list (or (cl-cc/vm:vm-values-list cl-cc/repl::*repl-vm-state*)
-                                      (list result))))
+    (let ((stdlib-loaded-p stdlib))
+      (flet ((eval-and-print (form)
+               (let* ((*terminal-io* *terminal-io*)
+                      (*query-io* *query-io*)
+                      (*debug-io* *debug-io*)
+                      (result (handler-case
+                                  (cl-cc:run-string-repl form :language language)
+                                (error (e)
+                                  (if (or no-stdlib stdlib-loaded-p)
+                                      (error e)
+                                      (progn
+                                        (cl-cc:run-string-repl cl-cc:*standard-library-source*
+                                                               :language language)
+                                        (setf stdlib-loaded-p t)
+                                        (cl-cc:run-string-repl form :language language))))))
+                      (values-list (or (cl-cc/vm:vm-values-list cl-cc/repl::*repl-vm-state*)
+                                       (list result))))
                  (%update-repl-completeness-globals form values-list)
                  (when (not (null result))
                    (format t "=> ~A~%" (%style-result (prin1-to-string result))))
@@ -228,4 +235,4 @@ inside strings for REPL input balancing."
                         (eval-and-print trimmed))
                   (error (e)
                     (format t "~A~%" (%style-error (format nil "; Error: ~A" e)))
-                     (force-output)))))))))))
+                     (force-output))))))))))))

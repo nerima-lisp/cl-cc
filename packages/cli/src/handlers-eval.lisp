@@ -24,7 +24,10 @@ used to produce it."
       (no-stdlib
        (compile-and-run #'compile-string))
       (t
-       (compile-and-run #'compile-string)))))
+       (handler-case
+           (compile-and-run #'compile-string)
+         (error ()
+           (compile-and-run #'cl-cc:compile-string-with-stdlib)))))))
 
 (defun %do-eval (parsed)
   "Handle the `cl-cc eval' subcommand using PARSED arguments.
