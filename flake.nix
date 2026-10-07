@@ -540,7 +540,10 @@
             version = siblingVersion "cl-cc-binary";
             src = inputs.cl-cc-binary;
             systems = [ "cl-cc-binary" ];
-            lispLibs = [ clLogKit ];
+            lispLibs = [
+              clLogKit
+              clProcessKit
+            ];
           };
 
           asdf = import ./nix/asdf-systems.nix {
