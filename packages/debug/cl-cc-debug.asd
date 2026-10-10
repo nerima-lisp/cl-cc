@@ -5,7 +5,7 @@
   :author "takeokunn"
   :license "MIT"
   :homepage "https://github.com/nerima-lisp/cl-cc"
-  :version "0.2.0"
+  :version "0.3.0"
   :depends-on (:cl-cc-bootstrap :cl-cc-vm)
   :pathname "src"
   :serial t
@@ -19,7 +19,7 @@
   :author "takeokunn"
   :license "MIT"
   :homepage "https://github.com/nerima-lisp/cl-cc"
-  :version "0.2.0"
+  :version "0.3.0"
   :depends-on (:cl-cc-debug :cl-cc-testing-framework)
   :pathname "tests"
   :serial t

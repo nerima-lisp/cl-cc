@@ -5,8 +5,8 @@ project treats as a security issue.
 
 ## Test suite status
 
-The fast test plan passes **9184 tests with 0 failures** in the local
-2026-06-14 run (`nix run .#test -- --no-warm-stdlib`).
+The fast test plan is the `cl-cc-tests` flake check. It covers the canonical
+unit suites and is the minimum gate for a release.
 
 The fast plan excludes the integration, E2E, conformance, and
 documentation/evidence suites by taxonomy, so a green `nix run .#test` is not
@@ -98,6 +98,8 @@ so the native backend limitations above apply to it equally.
 
 | Version | Supported |
 | ------- | --------- |
+| 0.3.x   | ✓         |
+| 0.2.x   | ✓         |
 | 0.1.x   | ✓         |
 
 ## Security scope

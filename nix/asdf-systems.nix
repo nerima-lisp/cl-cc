@@ -63,7 +63,7 @@ let
     }:
     sbcl.buildASDFSystem {
       pname = name;
-      version = "0.2.0";
+      version = "0.3.0";
       src = pkgSrc src;
       systems = [ name ];
       lispLibs = (map (n: allSystems.${n}) deps) ++ extraLispLibs;
@@ -310,7 +310,7 @@ let
   # against `productionAsdfSystems`, not external flake inputs).
   cl-cc-prolog-tools = sbcl.buildASDFSystem {
     pname = "cl-cc-prolog-tools";
-    version = "0.2.0";
+    version = "0.3.0";
     src = pkgSrc "packages/prolog-tools";
     systems = [ "cl-cc-prolog-tools" ];
     lispLibs = [
@@ -324,7 +324,7 @@ let
   # cl-cc-prolog-tools closure above.
   cl-cc-prolog-tools-test = sbcl.buildASDFSystem {
     pname = "cl-cc-prolog-tools-test";
-    version = "0.2.0";
+    version = "0.3.0";
     src = pkgSrc "packages/prolog-tools";
     systems = [ "cl-cc-prolog-tools/tests" ];
     lispLibs = [
@@ -352,7 +352,7 @@ let
   testAsdfSystems = {
     "cl-cc-jit/tests" = sbcl.buildASDFSystem {
       pname = "cl-cc-jit-tests";
-      version = "0.2.0";
+      version = "0.3.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc-jit/tests" ];
 
@@ -375,7 +375,7 @@ let
       # pname stays hyphenated: it becomes a store path component, which cannot
       # contain a slash. Only `systems` names the ASDF system.
       pname = "cl-cc-test";
-      version = "0.2.0";
+      version = "0.3.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc/test" ];
 
@@ -412,7 +412,7 @@ let
     };
     "cl-cc-javascript-test" = sbcl.buildASDFSystem {
       pname = "cl-cc-javascript-test";
-      version = "0.2.0";
+      version = "0.3.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc-javascript-test" ];
       # cl-cc-javascript is the pinned external production system used by local JS tests.
@@ -427,7 +427,7 @@ let
     };
     "cl-cc/test/e2e" = sbcl.buildASDFSystem {
       pname = "cl-cc-test-e2e";
-      version = "0.2.0";
+      version = "0.3.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc/test/e2e" ];
       lispLibs = with productionAsdfSystems; [

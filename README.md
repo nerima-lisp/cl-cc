@@ -36,7 +36,7 @@ cl-cc compile file.lisp -o out --arch x86-64
 ```nix
 # flake.nix
 inputs.cl-cc = {
-  url = "github:nerima-lisp/cl-cc/v0.2.0";
+  url = "github:nerima-lisp/cl-cc/v0.3.0";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
