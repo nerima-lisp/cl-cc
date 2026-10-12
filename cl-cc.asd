@@ -116,6 +116,9 @@
    ;; internals directly; there is no equivalent to port them to now that
    ;; cl-weave is the engine (cl-weave has its own 615-test self-suite covering
    ;; the same ground for cl-weave's own internals).
+    (:module "testing-framework-tests"
+     :pathname "packages/testing-framework/tests"
+     :components ((:file "framework-snapshot-tests")))
     (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests") (:file "script-mode-tests")))
     (:module "parse-tests"
     :pathname "packages/parse/tests"
