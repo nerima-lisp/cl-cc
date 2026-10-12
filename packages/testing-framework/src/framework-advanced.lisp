@@ -13,6 +13,9 @@
 (defvar *update-snapshots* nil
   "When t, overwrite snapshot files on assert-snapshot mismatch.")
 
+(defvar *snapshot-dir* "tests/snapshots/"
+  "Project-relative directory string for snapshots, including a trailing separator.")
+
 ;;; ------------------------------------------------------------
 ;;; FR-015 — testing: Nested Sub-Cases
 ;;; ------------------------------------------------------------
@@ -36,12 +39,12 @@ Uses *testing-context* to accumulate nesting depth for diagnostics."
   (concatenate 'string *snapshot-dir* name ".snap"))
 
 (defun %read-snapshot (path)
-  "Read and return the saved snapshot value from PATH, or return the
- symbol :snapshot-not-found if the file does not exist."
-  (handler-case
-      (with-open-file (stream path :direction :input)
-        (read stream))
-    (file-error () :snapshot-not-found)))
+  "Return the saved snapshot value and T, or :snapshot-not-found and NIL
+if the file does not exist."
+  (with-open-file (stream path :direction :input :if-does-not-exist nil)
+    (if stream
+        (values (read stream) t)
+        (values :snapshot-not-found nil))))
 
 (defun %write-snapshot (path value)
   "Write VALUE to the snapshot file at PATH, creating directories as needed."
@@ -58,24 +61,22 @@ On first run (no snapshot file), saves the result.
 When *update-snapshots* is t, overwrites the saved file with the current value."
   (let ((actual-var  (gensym "ACTUAL"))
         (path-var    (gensym "PATH"))
-        (saved-var   (gensym "SAVED")))
+        (saved-var   (gensym "SAVED"))
+        (present-var (gensym "PRESENT")))
     `(let* ((,actual-var ,form)
-            (,path-var   (%snapshot-path ,name))
-            (,saved-var  (%read-snapshot ,path-var)))
-       (cond
-         ;; First run: no snapshot yet — save and pass
-         ((eq ,saved-var :snapshot-not-found)
-          (%write-snapshot ,path-var ,actual-var)
-          t)
-         ;; Update mode: overwrite snapshot unconditionally
-         (*update-snapshots*
-          (%write-snapshot ,path-var ,actual-var)
-          t)
-          ;; Normal run: compare
-          ((not (equal ,saved-var ,actual-var))
-           (cl-weave:fail "assert-snapshot ~S mismatch (expected ~S, got ~S)"
-                          ,name ,saved-var ,actual-var))
-          (t t)))))
+            (,path-var   (%snapshot-path ,name)))
+       (multiple-value-bind (,saved-var ,present-var) (%read-snapshot ,path-var)
+         (cond
+           ((not ,present-var)
+            (%write-snapshot ,path-var ,actual-var)
+            t)
+           (*update-snapshots*
+            (%write-snapshot ,path-var ,actual-var)
+            t)
+           ((not (equal ,saved-var ,actual-var))
+            (cl-weave:fail "assert-snapshot ~S mismatch (expected ~S, got ~S)"
+                           ,name ,saved-var ,actual-var))
+           (t t))))))
 
 ;;; ------------------------------------------------------------
 ;;; FR-014 — deftest-each: Parameterized Tests
