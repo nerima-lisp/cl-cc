@@ -179,7 +179,7 @@ let
                                   (cl-weave::test-event-status event)
                                   (cl-weave::test-event-condition event))
                           (finish-output *error-output*))
-                        event)))))
+                        event))))
           (format *error-output* "~&# cl-cc test-case diagnostics installed~%")
           (finish-output *error-output*))''
       ];
