@@ -273,7 +273,7 @@
             src = inputs.cl-weave;
             systems = [ "cl-weave" ];
           };
-          # cl-parser-kit is self-contained. cl-boundary-kit pulls cl-log-kit.
+          # cl-parser-kit is self-contained. cl-boundary-kit uses cl-host-kit.
           # cl-dataflow-kit and cl-cli depend on the external cl-prolog-kit
           # engine in production. cl-tty-kit instead depends on codec and
           # concurrency libraries in its current main system.
@@ -298,13 +298,18 @@
             version = siblingVersion "cl-log-kit";
             src = inputs.cl-log-kit;
             systems = [ "cl-log-kit" ];
+            lispLibs = [
+              clDateKit
+              clConcurrentKit
+              clHostKit
+            ];
           };
           clBoundaryKit = sbcl.buildASDFSystem {
             pname = "cl-boundary-kit";
             version = siblingVersion "cl-boundary-kit";
             src = inputs.cl-boundary-kit;
             systems = [ "cl-boundary-kit" ];
-            lispLibs = [ clLogKit ];
+            lispLibs = [ clHostKit ];
           };
           clCli = sbcl.buildASDFSystem {
             pname = "cl-cli";
