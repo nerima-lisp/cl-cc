@@ -102,13 +102,13 @@
                      :parameters
                      (list (cl-cc/binary::make-dwarf-variable-location
                             :name "x" :kind :register :register 0))))))
-         (alist (cl-cc/binary::build-dwarf-section-alist cu))
-         (info (%fr-byte-list (cdr (assoc ".debug_info" alist :test #'string=))))
-         (line (%fr-byte-list (cdr (assoc ".debug_line" alist :test #'string=))))
-         (abbrev (%fr-byte-list (cdr (assoc ".debug_abbrev" alist :test #'string=)))))
-    (expect (cdr (assoc ".debug_info" alist :test #'string=)) :to-be-truthy)
-    (expect (cdr (assoc ".debug_line" alist :test #'string=)) :to-be-truthy)
-    (expect (cdr (assoc ".debug_abbrev" alist :test #'string=)) :to-be-truthy)
+         (sections (cl-cc/binary:build-dwarf-debug-sections cu))
+         (info (%fr-byte-list (cl-cc/binary::dwarf-debug-sections-info sections)))
+         (line (%fr-byte-list (cl-cc/binary::dwarf-debug-sections-line sections)))
+         (abbrev (%fr-byte-list (cl-cc/binary::dwarf-debug-sections-abbrev sections))))
+    (expect (cl-cc/binary::dwarf-debug-sections-info sections) :to-be-truthy)
+    (expect (cl-cc/binary::dwarf-debug-sections-line sections) :to-be-truthy)
+    (expect (cl-cc/binary::dwarf-debug-sections-abbrev sections) :to-be-truthy)
     ;; .debug_info: unit_length:u32, version:u16=5, unit_type=compile, addr_size=8.
     (expect (subseq info 4 8) :to-equal '(5 0 1 8))
     ;; .debug_line: unit_length:u32, version:u16=5, addr_size=8, segment_selector=0.

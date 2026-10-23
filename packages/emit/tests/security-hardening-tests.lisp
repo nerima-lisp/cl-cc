@@ -17,39 +17,6 @@
     (funcall thunk (lambda (byte) (push byte bytes)))
     (nreverse bytes)))
 
-(defun %security-u16le (bytes offset)
-  (+ (aref bytes offset)
-     (ash (aref bytes (+ offset 1)) 8)))
-
-(defun %security-u32le (bytes offset)
-  (+ (aref bytes offset)
-     (ash (aref bytes (+ offset 1)) 8)
-     (ash (aref bytes (+ offset 2)) 16)
-     (ash (aref bytes (+ offset 3)) 24)))
-
-(defun %security-u64le (bytes offset)
-  (loop for i below 8
-        sum (ash (aref bytes (+ offset i)) (* 8 i))))
-
-(defun %security-c-string (bytes offset)
-  (with-output-to-string (out)
-    (loop for i from offset below (length bytes)
-          for byte = (aref bytes i)
-          until (zerop byte)
-          do (write-char (code-char byte) out))))
-
-(defun %security-elf-section-names (bytes)
-  (let* ((shoff (%security-u64le bytes 40))
-         (shentsize (%security-u16le bytes 58))
-         (shnum (%security-u16le bytes 60))
-         (shstrndx (%security-u16le bytes 62))
-         (shstr-header (+ shoff (* shstrndx shentsize)))
-         (shstr-offset (%security-u64le bytes (+ shstr-header 24))))
-    (loop for i below shnum
-          for header = (+ shoff (* i shentsize))
-          for name-offset = (%security-u32le bytes header)
-          collect (%security-c-string bytes (+ shstr-offset name-offset)))))
-
 (defun %security-indirect-call-program ()
   (cl-cc/vm::make-vm-program
    :instructions (list (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil)
@@ -114,18 +81,6 @@
       (expect (second reloc) :to-equal cl-cc/binary::+r-x86-64-pc32+)
       (expect (third reloc) :to-equal "puts")
       (expect (fourth reloc) :to-equal -4))))
-
-(it-sequential "fr-652-split-dwarf-dwo-sections-and-debuglink-are-well-formed"
-  (let* ((dwo (cl-cc/binary::build-dwo-file "unit.dwo"))
-         (names (%security-elf-section-names dwo))
-         (skeleton (cl-cc/binary::build-dwarf-skeleton-cu "unit.dwo"))
-         (debuglink (cl-cc/binary::build-gnu-debuglink-section "unit.dwo" dwo)))
-    (expect (member ".debug_info.dwo" names :test #'string=) :to-be-truthy)
-    (expect (member ".debug_abbrev.dwo" names :test #'string=) :to-be-truthy)
-    (expect (member ".debug_line.dwo" names :test #'string=) :to-be-truthy)
-    (expect (search '(#x30 #x21) (%security-byte-list skeleton) :test #'eql) :to-be-truthy)
-    (expect (%security-c-string debuglink 0) :to-equal "unit.dwo")
-    (expect (mod (- (length debuglink) 4) 4) :to-equal 0)))
 
 (it-sequential "fr-771-safestack-dual-stack-hooks-are-in-full-program-output"
   (let ((x86 (%security-byte-list

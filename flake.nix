@@ -35,7 +35,7 @@
       flake = false;
     };
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v1.0.0";
+      url = "github:nerima-lisp/cl-weave/32671560d3d15d4ecf33b9d8af862ea60737841b";
       flake = false;
     };
     # cl-parser-kit backs packages/parse's tokenizer/combinator/Pratt layer,
@@ -45,7 +45,7 @@
     # behind packages/cli, and cl-tty-kit provides the ANSI/screen/input
     # primitives for the interactive REPL.
     cl-parser-kit = {
-      url = "github:nerima-lisp/cl-parser-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-parser-kit/6379014e6d85bdaecc57157611baa4ddf4b2b206";
       flake = false;
     };
     cl-dataflow-kit = {
@@ -53,13 +53,13 @@
       flake = false;
     };
     cl-boundary-kit = {
-      url = "github:nerima-lisp/cl-boundary-kit/v0.6.0";
+      url = "github:nerima-lisp/cl-boundary-kit/62e4a7df3e52061c38b7ff4f596436bdda985f71";
       flake = false;
     };
     # cl-log-kit backs cl-boundary-kit's logging boundary (split out of
     # cl-boundary-kit itself); pulled in the same way as the toolkits above.
     cl-log-kit = {
-      url = "github:nerima-lisp/cl-log-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-log-kit/580ebe23e4106edb8dcc89c0d4732f585c17e3f9";
       flake = false;
     };
     cl-cli = {
@@ -67,15 +67,19 @@
       flake = false;
     };
     cl-tty-kit = {
-      url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-tty-kit/add24964a286720baa9e08722f4b611fcefdf22f";
+      flake = false;
+    };
+    cl-codec-kit = {
+      url = "github:nerima-lisp/cl-codec-kit/5885db990560b1aa3992a88daceea010b9adc1d2";
       flake = false;
     };
     cl-regex-kit = {
-      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
+      url = "github:nerima-lisp/cl-regex-kit/da83905cad2bcb28518ebb28cac6628c654bb328";
       flake = false;
     };
     cl-host-kit = {
-      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
+      url = "github:nerima-lisp/cl-host-kit/ec565470b634605e23b0d6eef0645eb15e8e3356";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
@@ -88,78 +92,78 @@
     # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
     # once those releases are tagged.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast/5bb81120a1acf3a0c125dac655549582f3eb137e";
+      url = "github:nerima-lisp/cl-cc-ast/a45c5acecfccb91a43f6a04251e8a5d6ec3d3213";
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type/324b1c06b86a382f6561019d087d845667cf4606";
+      url = "github:nerima-lisp/cl-cc-type/ff2e742911b4b193457a75208b7b9ad6b06ab23a";
       flake = false;
     };
     cl-cc-binary = {
-      url = "github:nerima-lisp/cl-cc-binary/3c81059218b0d99838d04dff7dbbb3dd8821a8ad";
+      url = "github:nerima-lisp/cl-cc-binary/4c0661c1b2e22be5f28277b0d563eea6651c51e3";
       flake = false;
     };
     cl-cc-bootstrap = {
-      url = "github:nerima-lisp/cl-cc-bootstrap/b1ff1defbba014ba7b312c882ee8a5e7cabb5cc3";
+      url = "github:nerima-lisp/cl-cc-bootstrap/027f6c9826010c15789454e69abd2930738b50af";
       flake = false;
     };
     cl-cc-vm = {
-      url = "github:nerima-lisp/cl-cc-vm/670376ada1b5b1aa40e4f798764ac34c5cc1959b";
+      url = "github:nerima-lisp/cl-cc-vm/462213fcf5e0e6cecc09992e8cb0b7ed48dbce2f";
       flake = false;
     };
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/9679e3a471df1bea446df9b22cb26a32e85c42c8";
+      url = "github:nerima-lisp/cl-cc-mir/663c4c01c800ca7e64d444c53204645173e84854";
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/b09fdc12f8a181946319ac7a4cd2794466617db4";
+      url = "github:nerima-lisp/cl-cc-cps/681e60997c212c47feafc3956ae1b6b923ad2d36";
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/2628bd758f76df1513456641a358c63812e70aac";
+      url = "github:nerima-lisp/cl-cc-expand/b260853bb668e488af0ea3d1ebfad6db35d1b7c3";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/51c0db63ff125413568ec08c79e33dcf34f00fbf";
+      url = "github:nerima-lisp/cl-cc-optimize/f6cd93f54b4e04083aad0f3fee30def14a427f89";
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/e58718ee08dd916054ca62c782d0c9435e22583e";
+      url = "github:nerima-lisp/cl-cc-codegen-native/8f749c1d4d83b9f68595ee88af0d1207d7dd68db";
       flake = false;
     };
     cl-cc-parse = {
-      url = "github:nerima-lisp/cl-cc-parse/7316dd82137290082fa1fe03300d3aa388d84117";
+      url = "github:nerima-lisp/cl-cc-parse/75d8699835731ec6ca44e15c82ef02601f5100fe";
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/c36a40dcf8ddff72c7eaeb3baee5154c9b27d190";
+      url = "github:nerima-lisp/cl-cc-php/ee65c1d2ba3c9cec825f737251628b4c3c02390d";
       flake = false;
     };
     cl-cc-javascript = {
-      url = "github:nerima-lisp/cl-cc-javascript/777d5450681601860af20d5858c297e7d1af842b";
+      url = "github:nerima-lisp/cl-cc-javascript/da713f534812427099b9049a8b64ac431c8ea63f";
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/d8d636b";
+      url = "github:nerima-lisp/cl-cc-runtime/d23ea44512b162def39ec981426c4c8e1af4df84";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
     # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
     # cl-log-kit, both already above; cl-json-kit is self-contained.
     cl-process-kit = {
-      url = "github:nerima-lisp/cl-process-kit/v1.0.1";
+      url = "github:nerima-lisp/cl-process-kit/1276a8b8db6120ac15a0911c255a586b3a030ca1";
       flake = false;
     };
     cl-json-kit = {
-      url = "github:nerima-lisp/cl-json-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-json-kit/dace990f643d1dd07639ce57a2559c5143850cce";
       flake = false;
     };
     cl-date-kit = {
-      url = "github:nerima-lisp/cl-date-kit/040f6bf936c0dd946a0049eaa715e4c1c6a40eb5";
+      url = "github:nerima-lisp/cl-date-kit/021c00df3f4dd18cad7206221125d1596db2fae5";
       flake = false;
     };
     cl-concurrent-kit = {
-      url = "github:nerima-lisp/cl-concurrent-kit/c129a0b4be03ef2b1671ab208f9b390573eb0412";
+      url = "github:nerima-lisp/cl-concurrent-kit/0ef20d36a0a12800f231172227bd94034611c639";
       flake = false;
     };
   };
@@ -270,9 +274,9 @@
             systems = [ "cl-weave" ];
           };
           # cl-parser-kit is self-contained. cl-boundary-kit pulls cl-log-kit.
-          # cl-dataflow-kit, cl-cli and cl-tty-kit all depend on the external
-          # cl-prolog-kit engine in production, so clPrologKit is threaded into their
-          # lispLibs and thereby reaches any cl-cc package consuming them.
+          # cl-dataflow-kit and cl-cli depend on the external cl-prolog-kit
+          # engine in production. cl-tty-kit instead depends on codec and
+          # concurrency libraries in its current main system.
           clParserKit = sbcl.buildASDFSystem {
             pname = "cl-parser-kit";
             version = siblingVersion "cl-parser-kit";
@@ -314,7 +318,10 @@
             version = siblingVersion "cl-tty-kit";
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
-            lispLibs = [ clPrologKit ];
+            lispLibs = [
+              clCodecKit
+              clConcurrentKit
+            ];
           };
           clRegexKit = sbcl.buildASDFSystem {
             pname = "cl-regex-kit";
@@ -383,6 +390,12 @@
             src = inputs.cl-concurrent-kit;
             systems = [ "cl-concurrent-kit" ];
           };
+          clCodecKit = sbcl.buildASDFSystem {
+            pname = "cl-codec-kit";
+            version = siblingVersion "cl-codec-kit";
+            src = inputs.cl-codec-kit;
+            systems = [ "cl-codec-kit" ];
+          };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
             version = siblingVersion "cl-cc-runtime";
@@ -442,6 +455,7 @@
               clCcBootstrap
               clCcType
               clCcVm
+              clHostKit
             ];
           };
           clCcOptimize = sbcl.buildASDFSystem {
@@ -455,6 +469,7 @@
               clCcAst
               clPrologKit
               clParserKit
+              clHostKit
             ];
           };
           # One source tree, three systems -- the repository holds them
@@ -485,6 +500,8 @@
               clCcBinary
               clCcOptimize
               clCcRegalloc
+              clProcessKit
+              clHostKit
             ];
           };
           clCcEmit = sbcl.buildASDFSystem {
@@ -520,6 +537,8 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clHostKit
+              clJsonKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
@@ -543,7 +562,7 @@
             version = siblingVersion "cl-cc-binary";
             src = inputs.cl-cc-binary;
             systems = [ "cl-cc-binary" ];
-            lispLibs = [ clLogKit ];
+            lispLibs = [ clProcessKit ];
           };
 
           asdf = import ./nix/asdf-systems.nix {
