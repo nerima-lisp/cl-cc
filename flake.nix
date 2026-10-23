@@ -389,6 +389,10 @@
             version = siblingVersion "cl-concurrent-kit";
             src = inputs.cl-concurrent-kit;
             systems = [ "cl-concurrent-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clDateKit
+            ];
           };
           clCodecKit = sbcl.buildASDFSystem {
             pname = "cl-codec-kit";
