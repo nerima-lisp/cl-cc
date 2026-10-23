@@ -87,10 +87,12 @@
 ;;; Skippable with --no-warm-stdlib or CLCC_WARM_STDLIB=0, which is how the
 ;;; warm path itself gets exercised as a code path rather than assumed.
 (let* ((args (uiop:command-line-arguments))
-       (filter (loop for rest on args
-                     when (and (string= (first rest) "--filter")
-                               (second rest))
-                       return (second rest)))
+       (filter
+         (or (uiop:getenv "CL_CC_TEST_FILTER")
+             (loop for rest on args
+                   when (and (string= (first rest) "--filter")
+                             (second rest))
+                     return (second rest))))
        (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
        (worker-env (uiop:getenv "CL_CC_TEST_WORKERS"))
        (max-workers
