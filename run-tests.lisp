@@ -120,11 +120,7 @@
         ;; concurrency all delegate to it (see
         ;; packages/testing-framework/src/framework-definitions.lisp).
         (uiop:quit
-         (if (cl-weave:run-all :reporter :spec
-                               :name-filter filter
-                               :max-workers max-workers)
-             0
-             1)))
+         (let ((passed-p (progn (format t "# entering cl-weave:run-all~%") (finish-output) (cl-weave:run-all :reporter :spec :name-filter filter :max-workers max-workers)))) (format t "# cl-weave:run-all returned ~S~%" passed-p) (finish-output) (if passed-p 0 1))))
     (error (e)
       (format t "~&not ok - run-all fatal error: ~A~%" e)
       (format *error-output* "~&FATAL: ~A~%" e)
