@@ -258,8 +258,12 @@ cache contract."
         (success-p nil)
         (*package* (or (find-package :cl-cc) *package*)))
     (unwind-protect
+         ;; The bundled stdlib is trusted source and uses reader-evaluated forms
+         ;; for host-derived numeric constants. User/source-file parsing keeps
+         ;; the safe default.
          (let ((result (mapcar #'compiler-macroexpand-all
-                                (parse-all-forms *standard-library-source*))))
+                               (parse-all-forms *standard-library-source*
+                                                :allow-read-eval t))))
             ;; Tripwire: stdlib source is plain text; every entry MUST be a sexp.
             (dolist (form result)
               (when (typep form 'ast-node)
