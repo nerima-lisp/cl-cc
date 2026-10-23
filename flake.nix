@@ -35,7 +35,7 @@
       flake = false;
     };
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v1.0.0";
+      url = "github:nerima-lisp/cl-weave/32671560d3d15d4ecf33b9d8af862ea60737841b";
       flake = false;
     };
     # cl-parser-kit backs packages/parse's tokenizer/combinator/Pratt layer,
@@ -45,7 +45,7 @@
     # behind packages/cli, and cl-tty-kit provides the ANSI/screen/input
     # primitives for the interactive REPL.
     cl-parser-kit = {
-      url = "github:nerima-lisp/cl-parser-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-parser-kit/6379014e6d85bdaecc57157611baa4ddf4b2b206";
       flake = false;
     };
     cl-dataflow-kit = {
@@ -53,13 +53,13 @@
       flake = false;
     };
     cl-boundary-kit = {
-      url = "github:nerima-lisp/cl-boundary-kit/v0.6.0";
+      url = "github:nerima-lisp/cl-boundary-kit/62e4a7df3e52061c38b7ff4f596436bdda985f71";
       flake = false;
     };
     # cl-log-kit backs cl-boundary-kit's logging boundary (split out of
     # cl-boundary-kit itself); pulled in the same way as the toolkits above.
     cl-log-kit = {
-      url = "github:nerima-lisp/cl-log-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-log-kit/580ebe23e4106edb8dcc89c0d4732f585c17e3f9";
       flake = false;
     };
     cl-cli = {
@@ -67,15 +67,15 @@
       flake = false;
     };
     cl-tty-kit = {
-      url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-tty-kit/add24964a286720baa9e08722f4b611fcefdf22f";
       flake = false;
     };
     cl-regex-kit = {
-      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
+      url = "github:nerima-lisp/cl-regex-kit/da83905cad2bcb28518ebb28cac6628c654bb328";
       flake = false;
     };
     cl-host-kit = {
-      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
+      url = "github:nerima-lisp/cl-host-kit/ec565470b634605e23b0d6eef0645eb15e8e3356";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
@@ -147,19 +147,19 @@
     # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
     # cl-log-kit, both already above; cl-json-kit is self-contained.
     cl-process-kit = {
-      url = "github:nerima-lisp/cl-process-kit/v1.0.1";
+      url = "github:nerima-lisp/cl-process-kit/1276a8b8db6120ac15a0911c255a586b3a030ca1";
       flake = false;
     };
     cl-json-kit = {
-      url = "github:nerima-lisp/cl-json-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-json-kit/dace990f643d1dd07639ce57a2559c5143850cce";
       flake = false;
     };
     cl-date-kit = {
-      url = "github:nerima-lisp/cl-date-kit/040f6bf936c0dd946a0049eaa715e4c1c6a40eb5";
+      url = "github:nerima-lisp/cl-date-kit/021c00df3f4dd18cad7206221125d1596db2fae5";
       flake = false;
     };
     cl-concurrent-kit = {
-      url = "github:nerima-lisp/cl-concurrent-kit/c129a0b4be03ef2b1671ab208f9b390573eb0412";
+      url = "github:nerima-lisp/cl-concurrent-kit/0ef20d36a0a12800f231172227bd94034611c639";
       flake = false;
     };
   };
