@@ -109,7 +109,7 @@
     (expect (search expected-str out) :to-be-truthy))))
 
 (it-sequential "cli-print-global-help version"
-  (destructuring-bind (expected-str) (list "Version: 0.2.0")
+  (destructuring-bind (expected-str) (list "Version: 0.3.0")
     (let ((out (with-output-to-string (s)
                (let ((*standard-output* s)
                      (*error-output* s))
