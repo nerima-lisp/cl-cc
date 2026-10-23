@@ -43,6 +43,11 @@ Returns the register holding the GF dispatch table."
     (emit ctx (make-vm-label :name skip-label))
     (emit ctx (make-vm-get-global :dst dst :name name))
     (emit ctx (make-vm-label :name end-label))
+    ;; cl-cc-vm's vm-generic-function-p needs :__generic__ alongside the
+    ;; :__methods__ table created by vm-class-def.
+    (emit ctx (make-vm-const :dst check-reg :value :__generic__))
+    (emit ctx (make-vm-const :dst sym-reg :value t))
+    (emit ctx (make-vm-sethash :key check-reg :table dst :value sym-reg))
     (setf (gethash name (ctx-global-generics ctx)) dst)
     dst))
 
