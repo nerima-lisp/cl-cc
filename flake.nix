@@ -70,6 +70,10 @@
       url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
       flake = false;
     };
+    cl-codec-kit = {
+      url = "github:nerima-lisp/cl-codec-kit/5885db990560b1aa3992a88daceea010b9adc1d2";
+      flake = false;
+    };
     cl-regex-kit = {
       url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
       flake = false;
@@ -269,10 +273,6 @@
             src = inputs.cl-weave;
             systems = [ "cl-weave" ];
           };
-          # cl-parser-kit is self-contained. cl-boundary-kit pulls cl-log-kit.
-          # cl-dataflow-kit, cl-cli and cl-tty-kit all depend on the external
-          # cl-prolog-kit engine in production, so clPrologKit is threaded into their
-          # lispLibs and thereby reaches any cl-cc package consuming them.
           clParserKit = sbcl.buildASDFSystem {
             pname = "cl-parser-kit";
             version = siblingVersion "cl-parser-kit";
@@ -285,8 +285,11 @@
             src = inputs.cl-dataflow-kit;
             systems = [ "cl-dataflow-kit" ];
             lispLibs = [
-              clPrologKit
+              clBoundaryKit
               clConcurrentKit
+              clDateKit
+              clHostKit
+              clPrologKit
             ];
           };
           clLogKit = sbcl.buildASDFSystem {
@@ -294,13 +297,19 @@
             version = siblingVersion "cl-log-kit";
             src = inputs.cl-log-kit;
             systems = [ "cl-log-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+              clDateKit
+              clHostKit
+            ];
           };
           clBoundaryKit = sbcl.buildASDFSystem {
             pname = "cl-boundary-kit";
             version = siblingVersion "cl-boundary-kit";
             src = inputs.cl-boundary-kit;
             systems = [ "cl-boundary-kit" ];
-            lispLibs = [ clLogKit ];
+            lispLibs = [ clHostKit ];
           };
           clCli = sbcl.buildASDFSystem {
             pname = "cl-cli";
@@ -314,14 +323,26 @@
             version = siblingVersion "cl-tty-kit";
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
-            lispLibs = [ clPrologKit ];
+            lispLibs = [
+              clBoundaryKit
+              clCodecKit
+              clConcurrentKit
+              clDateKit
+              clHostKit
+            ];
           };
           clRegexKit = sbcl.buildASDFSystem {
             pname = "cl-regex-kit";
             version = siblingVersion "cl-regex-kit";
             src = inputs.cl-regex-kit;
             systems = [ "cl-regex-kit" ];
-            lispLibs = [ clParserKit ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+              clDateKit
+              clHostKit
+              clParserKit
+            ];
           };
           clHostKit = sbcl.buildASDFSystem {
             pname = "cl-host-kit";
@@ -352,9 +373,6 @@
             systems = [ "cl-cc-type" ];
             lispLibs = [ clCcAst ];
           };
-          # The standalone cl-cc-binary took a dependency on cl-log-kit that the
-          # in-tree copy did not have; clLogKit is already an input for
-          # cl-boundary-kit, so it is threaded in here rather than added.
           clProcessKit = sbcl.buildASDFSystem {
             pname = "cl-process-kit";
             version = siblingVersion "cl-process-kit";
@@ -362,6 +380,10 @@
             systems = [ "cl-process-kit" ];
             lispLibs = [
               clBoundaryKit
+              clCodecKit
+              clConcurrentKit
+              clDateKit
+              clHostKit
               clLogKit
             ];
           };
@@ -382,6 +404,17 @@
             version = siblingVersion "cl-concurrent-kit";
             src = inputs.cl-concurrent-kit;
             systems = [ "cl-concurrent-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clDateKit
+              clHostKit
+            ];
+          };
+          clCodecKit = sbcl.buildASDFSystem {
+            pname = "cl-codec-kit";
+            version = siblingVersion "cl-codec-kit";
+            src = inputs.cl-codec-kit;
+            systems = [ "cl-codec-kit" ];
           };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
@@ -442,6 +475,7 @@
               clCcBootstrap
               clCcType
               clCcVm
+              clHostKit
             ];
           };
           clCcOptimize = sbcl.buildASDFSystem {
@@ -455,6 +489,7 @@
               clCcAst
               clPrologKit
               clParserKit
+              clHostKit
             ];
           };
           # One source tree, three systems -- the repository holds them
@@ -485,6 +520,8 @@
               clCcBinary
               clCcOptimize
               clCcRegalloc
+              clProcessKit
+              clHostKit
             ];
           };
           clCcEmit = sbcl.buildASDFSystem {
@@ -520,6 +557,8 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clHostKit
+              clJsonKit
             ];
           };
           clCcJavascript = sbcl.buildASDFSystem {
@@ -532,6 +571,7 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clBoundaryKit
               clDateKit
               clJsonKit
               clConcurrentKit
@@ -543,7 +583,7 @@
             version = siblingVersion "cl-cc-binary";
             src = inputs.cl-cc-binary;
             systems = [ "cl-cc-binary" ];
-            lispLibs = [ clLogKit ];
+            lispLibs = [ clProcessKit ];
           };
 
           asdf = import ./nix/asdf-systems.nix {
