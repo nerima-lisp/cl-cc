@@ -35,7 +35,11 @@
       flake = false;
     };
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/v1.0.0";
+      url = "github:nerima-lisp/cl-weave/v1.4.0";
+      flake = false;
+    };
+    cl-codec-kit = {
+      url = "github:nerima-lisp/cl-codec-kit/v0.6.0";
       flake = false;
     };
     # cl-parser-kit backs packages/parse's tokenizer/combinator/Pratt layer,
@@ -45,7 +49,7 @@
     # behind packages/cli, and cl-tty-kit provides the ANSI/screen/input
     # primitives for the interactive REPL.
     cl-parser-kit = {
-      url = "github:nerima-lisp/cl-parser-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-parser-kit/v1.1.1";
       flake = false;
     };
     cl-dataflow-kit = {
@@ -53,29 +57,29 @@
       flake = false;
     };
     cl-boundary-kit = {
-      url = "github:nerima-lisp/cl-boundary-kit/v0.6.0";
+      url = "github:nerima-lisp/cl-boundary-kit/v2.3.0";
       flake = false;
     };
     # cl-log-kit backs cl-boundary-kit's logging boundary (split out of
     # cl-boundary-kit itself); pulled in the same way as the toolkits above.
     cl-log-kit = {
-      url = "github:nerima-lisp/cl-log-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-log-kit/v2.2.0";
       flake = false;
     };
     cl-cli = {
-      url = "github:nerima-lisp/cl-cli/v1.0.1";
+      url = "github:nerima-lisp/cl-cli/v1.4.0";
       flake = false;
     };
     cl-tty-kit = {
-      url = "github:nerima-lisp/cl-tty-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-tty-kit/v1.6.1";
       flake = false;
     };
     cl-regex-kit = {
-      url = "github:nerima-lisp/cl-regex-kit/v0.2.0";
+      url = "github:nerima-lisp/cl-regex-kit/v2.2.0";
       flake = false;
     };
     cl-host-kit = {
-      url = "github:nerima-lisp/cl-host-kit/v0.2.1";
+      url = "github:nerima-lisp/cl-host-kit/v0.3.1";
       flake = false;
     };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
@@ -147,19 +151,19 @@
     # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
     # cl-log-kit, both already above; cl-json-kit is self-contained.
     cl-process-kit = {
-      url = "github:nerima-lisp/cl-process-kit/v1.0.1";
+      url = "github:nerima-lisp/cl-process-kit/v3.4.0";
       flake = false;
     };
     cl-json-kit = {
-      url = "github:nerima-lisp/cl-json-kit/v1.0.0";
+      url = "github:nerima-lisp/cl-json-kit/v1.2.0";
       flake = false;
     };
     cl-date-kit = {
-      url = "github:nerima-lisp/cl-date-kit/040f6bf936c0dd946a0049eaa715e4c1c6a40eb5";
+      url = "github:nerima-lisp/cl-date-kit/v1.1.1";
       flake = false;
     };
     cl-concurrent-kit = {
-      url = "github:nerima-lisp/cl-concurrent-kit/c129a0b4be03ef2b1671ab208f9b390573eb0412";
+      url = "github:nerima-lisp/cl-concurrent-kit/v0.6.1";
       flake = false;
     };
   };
@@ -269,7 +273,15 @@
             src = inputs.cl-weave;
             systems = [ "cl-weave" ];
           };
-          # cl-parser-kit is self-contained. cl-boundary-kit pulls cl-log-kit.
+          clCodecKit = sbcl.buildASDFSystem {
+            pname = "cl-codec-kit";
+            version = siblingVersion "cl-codec-kit";
+            src = inputs.cl-codec-kit;
+            systems = [ "cl-codec-kit" ];
+          };
+          # cl-parser-kit is self-contained. The runtime dependencies of each
+          # toolkit are threaded explicitly because these are plain source
+          # inputs rather than flakes with dependency closures.
           # cl-dataflow-kit, cl-cli and cl-tty-kit all depend on the external
           # cl-prolog-kit engine in production, so clPrologKit is threaded into their
           # lispLibs and thereby reaches any cl-cc package consuming them.
@@ -294,34 +306,49 @@
             version = siblingVersion "cl-log-kit";
             src = inputs.cl-log-kit;
             systems = [ "cl-log-kit" ];
+            lispLibs = [
+              clDateKit
+              clConcurrentKit
+              clHostKit
+            ];
           };
           clBoundaryKit = sbcl.buildASDFSystem {
             pname = "cl-boundary-kit";
             version = siblingVersion "cl-boundary-kit";
             src = inputs.cl-boundary-kit;
             systems = [ "cl-boundary-kit" ];
-            lispLibs = [ clLogKit ];
+            lispLibs = [ clHostKit ];
           };
           clCli = sbcl.buildASDFSystem {
             pname = "cl-cli";
             version = siblingVersion "cl-cli";
             src = inputs.cl-cli;
             systems = [ "cl-cli" ];
-            lispLibs = [ clPrologKit ];
+            lispLibs = [
+              clHostKit
+              clPrologKit
+            ];
           };
           clTtyKit = sbcl.buildASDFSystem {
             pname = "cl-tty-kit";
             version = siblingVersion "cl-tty-kit";
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
-            lispLibs = [ clPrologKit ];
+            lispLibs = [
+              clCodecKit
+              clConcurrentKit
+              clPrologKit
+            ];
           };
           clRegexKit = sbcl.buildASDFSystem {
             pname = "cl-regex-kit";
             version = siblingVersion "cl-regex-kit";
             src = inputs.cl-regex-kit;
             systems = [ "cl-regex-kit" ];
-            lispLibs = [ clParserKit ];
+            lispLibs = [
+              clConcurrentKit
+              clParserKit
+            ];
           };
           clHostKit = sbcl.buildASDFSystem {
             pname = "cl-host-kit";
@@ -363,6 +390,8 @@
             lispLibs = [
               clBoundaryKit
               clLogKit
+              clCodecKit
+              clConcurrentKit
             ];
           };
           clJsonKit = sbcl.buildASDFSystem {
@@ -382,6 +411,10 @@
             version = siblingVersion "cl-concurrent-kit";
             src = inputs.cl-concurrent-kit;
             systems = [ "cl-concurrent-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clDateKit
+            ];
           };
           clCcRuntime = sbcl.buildASDFSystem {
             pname = "cl-cc-runtime";
