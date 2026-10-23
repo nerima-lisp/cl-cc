@@ -35,10 +35,45 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Checkout ANSI-test
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: pfdietz/ansi-test
+          ref: 6e3f70002559d56d3e4a6f0b8ddcc083d202f066
+          path: .ci/ansi-test
+          persist-credentials: false
+
       - uses: ./.github/actions/nix-setup
         with:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Probe ANSI-test eval and compile drivers
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ANSI_SOURCE: ${{ github.workspace }}/.ci/ansi-test
+        run: |
+          set -euo pipefail
+          nix run "$GITHUB_WORKSPACE#load"
+          nix build "$GITHUB_WORKSPACE#default" --out-link "$RUNNER_TEMP/cl-cc"
+
+          eval_dir="$RUNNER_TEMP/ansi-test-eval"
+          compile_dir="$RUNNER_TEMP/ansi-test-compile"
+          mkdir -p "$eval_dir" "$compile_dir"
+          cp -R "$ANSI_SOURCE/." "$eval_dir/"
+          cp -R "$ANSI_SOURCE/." "$compile_dir/"
+
+          eval_status=0
+          (cd "$eval_dir" && "$RUNNER_TEMP/cl-cc/bin/cl-cc" run --lang lisp --no-timeout ./doit.lsp) || eval_status=$?
+          compile_status=0
+          (cd "$compile_dir" && "$RUNNER_TEMP/cl-cc/bin/cl-cc" run --lang lisp --no-timeout ./compileit.lsp) || compile_status=$?
+
+          printf 'doit.lsp exit: %s\n' "$eval_status"
+          printf 'compileit.lsp exit: %s\n' "$compile_status"
+          test "$eval_status" -eq 0
+          test "$compile_status" -eq 0
 
       # Runs the SBCL test suite (checks.default), the treefmt formatting gate
       # (checks.formatting), and the mkdocs --strict build (checks.docs).
