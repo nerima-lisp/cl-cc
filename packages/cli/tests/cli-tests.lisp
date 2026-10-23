@@ -535,11 +535,7 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
                            (cl-cc/vm:vm-global-vars state)) :to-equal '("alpha" "beta"))))
 
 (defun %run-do-compile-dump-ir-annotate-source-output (path)
-  "Run do-compile dump-ir logic directly: compile-string + %dump-ir-phase.
-We bypass %do-compile because uiop:quit interception (via with-replaced-function
-or sb-int:encapsulate) does not work reliably against SBCL pre-compiled
-core-image code.  Instead we call compile-string and %dump-ir-phase directly —
-the same path that %do-compile takes internally."
+  "Run the compile and IR-dump path without invoking the CLI exit boundary."
   (let* ((source (cl-cc/cli::%read-command-source path))
          (result (cl-cc:compile-string source
                                        :target :vm
@@ -604,8 +600,7 @@ the same path that %do-compile takes internally."
 (it-sequential "cli-do-check-error-prints-diagnostic-snippet"
   (%with-temp-file (path "(+ 1\n")
     (let ((stderr (make-string-output-stream)))
-      (let ((code (with-fake-quit
-                    (let ((*error-output* stderr))
+      (let ((code (with-cli-exit (let ((*error-output* stderr))
                       (cl-cc/cli::%do-check
                        (make-cli-parsed :command "check"
                                         :positional (list path)))))))

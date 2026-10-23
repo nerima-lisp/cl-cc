@@ -2,24 +2,17 @@
 
 (in-package :cl-cc/test)
 
-(defmacro with-fake-quit (&body body)
-  "Run BODY with uiop:quit intercepted via sb-int:encapsulate + catch/throw.
-Encapsulation works even for SBCL-compiled core-image code where
-symbol-function replacement may be bypassed by fdefinition optimisation."
-  (let ((gcode (gensym "CODE")))
-    `(let ((,gcode nil))
-       (unwind-protect
-            (progn
-              (sb-int:encapsulate
-               'uiop:quit 'cl-cc-test-fake-quit
-               (lambda (original &rest args)
-                 (declare (ignore original))
-                 (setf ,gcode (car args))
-                 (throw 'cl-cc-cli-quit ,gcode)))
-              (catch 'cl-cc-cli-quit
-                ,@body))
-         (ignore-errors
-          (sb-int:unencapsulate 'uiop:quit 'cl-cc-test-fake-quit))))))
+(defmacro with-cli-exit (&body body)
+  "Run BODY with the CLI system boundary throwing its requested exit code."
+  (let ((exit-tag (gensym "CLI-EXIT"))
+        (system (gensym "SYSTEM")))
+    `(let* ((,system
+              (cl-boundary-kit:make-system-boundary
+               :exit-fn (lambda (code) (throw ',exit-tag code))))
+            (cl-cc/cli::*cli-boundaries*
+              (cl-boundary-kit:make-boundary-context :system ,system)))
+       (catch ',exit-tag
+         ,@body))))
 
 (defun make-cli-parsed (&key command positional flags)
   (let ((parsed (cl-cc/cli::make-parsed-args :command command

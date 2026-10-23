@@ -20,14 +20,6 @@
          (dolist (entry ,saved)
            (setf (symbol-function (car entry)) (cdr entry)))))))
 
-(defmacro %with-captured-quit (&body body)
-  "Run BODY with uiop:quit modeled as a non-local exit carrying the exit code."
-  `(%with-cli-function-overrides
-       ((uiop:quit (lambda (&optional code)
-                     (throw 'cl-cc-cli-quit code))))
-     (catch 'cl-cc-cli-quit
-       ,@body)))
-
 (it-sequential "cli-print-global-help usage"
   (destructuring-bind (expected-str) (list "Usage: cl-cc <command>")
     (let ((out (with-output-to-string (s)
@@ -235,7 +227,7 @@
     (let ((out (with-output-to-string (s)
                  (let ((*standard-output* s)
                        (*error-output* s))
-                   (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)))))
+                   (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 0)))))
       (expect (search "Usage: cl-cc <command>" out) :to-be-truthy))))
 
 (it-sequential "cli-main-top-level-help-uses-command-help"
@@ -243,7 +235,7 @@
     (%with-cli-function-overrides
         ((uiop:command-line-arguments (lambda () '("run" "--help")))
          (cl-cc/cli::%print-help (lambda (&optional command) (setf printed-command command))))
-      (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)
+      (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 0)
       (expect printed-command :to-equal "run"))))
 
 (it-sequential "cli-main-help-subcommand-prints-positional-help"
@@ -251,7 +243,7 @@
     (%with-cli-function-overrides
         ((uiop:command-line-arguments (lambda () '("help" "compile")))
          (cl-cc/cli::%print-help (lambda (&optional command) (setf printed-command command))))
-      (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)
+      (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 0)
       (expect printed-command :to-equal "compile"))))
 
 (it-sequential "cli-main-unknown-command-prints-error-and-exits-2"
@@ -262,7 +254,7 @@
       (let ((err (with-output-to-string (s)
                    (let ((*standard-output* s)
                          (*error-output* s))
-                     (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 2)))))
+                     (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 2)))))
         (expect printed-help :to-be-truthy)
         (expect (search "Unknown command: bogus" err) :to-be-truthy)))))
 
@@ -277,7 +269,7 @@
       (let ((err (with-output-to-string (s)
                    (let ((*standard-output* s)
                          (*error-output* s))
-                     (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 2)))))
+                     (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 2)))))
         (expect printed-help :to-be-truthy)
         (expect (search "boom" err) :to-be-truthy)))))
 
@@ -303,7 +295,7 @@
                     (let ((*standard-input* (make-string-input-stream (format nil "(+ 1 2)~%")))
                          (*standard-output* s)
                          (*error-output* s))
-                     (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0)))))
+                     (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 0)))))
         (expect captured-language :to-equal :elisp)
         (expect captured-source :to-equal "(+ 1 2)")
         (expect (search "Emacs Lisp" out) :to-be-truthy)
@@ -409,7 +401,7 @@
                                (format nil "(stdlib-symbol)~%")))
             (*standard-output* (make-string-output-stream))
             (*error-output* (make-string-output-stream)))
-        (expect (%with-captured-quit (cl-cc/cli:main)) :to-equal 0))
+        (expect (with-cli-exit (cl-cc/cli:main)) :to-equal 0))
       (expect form-attempts :to-equal 2)
       (expect stdlib-attempts :to-equal 1))))
 

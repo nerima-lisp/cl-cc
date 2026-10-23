@@ -1,13 +1,10 @@
 ;;;; cli/src/boundaries.lisp — CLI process I/O boundaries (cl-boundary-kit)
 ;;;;
 ;;;; The CLI's external effects flow through an explicit cl-boundary-kit
-;;;; boundary context instead of calling host primitives ad hoc.  The default
-;;;; context uses the native boundaries (real process exit, console, argv); the
-;;;; native system boundary terminates via `uiop:quit`, so the existing tests
-;;;; that model quit as a non-local exit keep working.  Tests can bind
-;;;; *CLI-BOUNDARIES* to a context assembled from cl-boundary-kit's make-test-*
-;;;; boundaries to capture exit codes and console output deterministically,
-;;;; without the process actually dying.
+;;;; boundary context instead of calling host primitives ad hoc. The default
+;;;; context uses native boundaries, whose system boundary terminates the
+;;;; process. Tests that exercise exit paths bind a non-terminating system
+;;;; boundary so the requested code can be observed without exiting the image.
 
 (in-package :cl-cc/cli)
 
@@ -28,9 +25,8 @@ reflects the current *standard-output* / argv at call time."
   (or *cli-boundaries* (%make-native-boundaries)))
 
 (defun %cli-exit (&optional (code 0))
-  "Terminate the CLI through the system boundary.  With the native boundary
-this calls `uiop:quit`; with a test system boundary it records the code and
-returns, so unit tests can assert on exit codes without exiting the image."
+  "Terminate through the system boundary. The native boundary exits the
+process; a test boundary can capture the code and return."
   (cl-boundary-kit:system-exit
    (cl-boundary-kit:boundary-context-get (%cli-context) :system)
    code))

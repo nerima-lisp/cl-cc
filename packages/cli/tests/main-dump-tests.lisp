@@ -37,8 +37,7 @@
 
 (it-sequential "cli-arch-keyword-invalid-exits-2"
   (let ((stderr (make-string-output-stream)))
-    (let ((code (with-fake-quit
-                  (let ((*error-output* stderr))
+    (let ((code (with-cli-exit (let ((*error-output* stderr))
                     (cl-cc/cli::%arch-keyword "mips")
                     (expect t :to-be-falsy)))))
       (expect (= 2 code) :to-be-truthy))
@@ -91,8 +90,7 @@
 
 (it-sequential "cli-parse-opt-remarks-mode-invalid-exits-2"
   (let ((stderr (make-string-output-stream)))
-    (let ((code (with-fake-quit
-                  (let ((*error-output* stderr))
+    (let ((code (with-cli-exit (let ((*error-output* stderr))
                     (cl-cc/cli::%parse-opt-remarks-mode "bogus")
                     (expect t :to-be-falsy)))))
       (expect (= 2 code) :to-be-truthy))
@@ -100,8 +98,7 @@
 
 (it-sequential "cli-parse-opt-remarks-mode-invalid-shows-did-you-mean"
   (let ((stderr (make-string-output-stream)))
-    (let ((code (with-fake-quit
-                  (let ((*error-output* stderr))
+    (let ((code (with-cli-exit (let ((*error-output* stderr))
                     (cl-cc/cli::%parse-opt-remarks-mode "chagned")
                     (expect t :to-be-falsy)))))
       (expect (= 2 code) :to-be-truthy))
