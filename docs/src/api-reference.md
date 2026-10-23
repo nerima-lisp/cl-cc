@@ -21,24 +21,14 @@ generated schema is available with `cl-cc docs markdown`.
 | `compile-commands [path]` | Generate `compile_commands.json`; `-o` changes its output path. |
 | `install <system.asd>` | Register or compile a local ASDF system. |
 | `uninstall <system>` | Remove a registered local system. |
-| `fuzz [--seed N]` | Placeholder handler; reports a fuzzing completion message. |
-| `reduce <file>` | Placeholder handler; reports a reduction completion message. |
-| `audit` | Placeholder handler; reports a dependency-audit completion message. |
 | `doc <path>` | Generate API documentation; `-o` selects the output. |
-| `doctest <path>` | Placeholder handler; reports zero failures. |
-| `show-types <file>` | Placeholder handler; reports no file specified. |
-| `assert-density <path>` | Placeholder handler; reports a fixed result. |
-| `abi-dump <file>` | Placeholder handler; reports completion. |
-| `abi-check <old> <new>` | Placeholder handler; reports compatibility. |
-| `demangle <name>` | Placeholder handler; echoes the supplied name. |
+| `show-types <file>` | Infer and print the type of a source file. |
+| `abi-dump <file>` | Write the current ABI manifest to a file. |
+| `abi-check <old> <new>` | Compare two ABI manifest files; incompatible manifests fail. |
+| `demangle <name>` | Demangle a CL-CC ABI symbol. |
 | `disasm <wasm>` | Disassemble Wasm; `--wat` emits WAT and `--decompile` uses wasm-decompile. |
 | `inspect <wasm>` | Inspect Wasm sections and disassembly. |
-| `objdump <file>` | Placeholder handler; prints a fixed section summary. |
-| `macrostep <file>` | Placeholder handler; reports expansion completion. |
-| `bisect [range]` | Placeholder handler; reports a fixed result. |
-| `features` | Print the handler's static feature list. |
-| `dep-graph` | Render the ASDF dependency graph as DOT by default. |
-| `generate <schema>` | Placeholder handler; reports code-generation completion. |
+| `dep-graph [--format F]` | Render the ASDF dependency graph as `dot`, `json`, `mermaid`, or `topo`. |
 | `update [pkg]` | Update dependencies. |
 | `completion <shell>` | Emit completion for `bash`, `zsh`, `fish`, `powershell`, `nushell`, or `elvish`. |
 | `docs [format]` | Emit CLI reference as `markdown`, `man`, or `json` (default `markdown`). |
@@ -59,8 +49,8 @@ otherwise Lisp) and can be overridden with `--lang lisp|elisp|php|js|javascript`
 | `--core <file>` | Load a core image before running. |
 | `--dump-image <file>` | Dump an initialized image. |
 | `--script` | Use script mode. |
-| `--seed <N>` | Fuzzing seed. |
 | `--lang <value>` | Select the source language. |
+| `--format <value>` | `dep-graph` output format: `dot`, `json`, `mermaid`, or `topo`. |
 
 The normal architecture default is `x86-64`; `--aot` selects the Wasm path and
 defaults it to `wasm32`. Native compilation uses the selected native backend,
@@ -129,6 +119,5 @@ The accepted options are:
 alias for `--debug-info`. `--help` and `-h` display the global or command help.
 
 For the generated schema from the parser's registered command and flag set, run
-`cl-cc docs markdown`. The `dep-graph` helper contains a separate `--format`
-parser, but `--format` is not registered in `packages/cli/src/args.lisp`; it is
-therefore not listed as a generally accepted CLI option here.
+`cl-cc docs markdown`. The `--format` flag is registered globally and is used by
+`dep-graph`.

@@ -117,6 +117,16 @@ Returns :lisp, :elisp, :php, or :javascript."
       (%quit-command-usage-error command
                                  (format nil "'~A' requires a file argument." command))))
 
+(defun %required-existing-file-arg (parsed command)
+  "Return a required positional path after checking it is a readable file."
+  (let* ((file (%required-file-arg parsed command))
+         (pathname (probe-file file)))
+    (unless (and pathname
+                 (uiop:file-exists-p pathname)
+                 (pathname-name pathname))
+      (error "~A: file does not exist: ~A" command file))
+    file))
+
 (defun %read-command-source (file)
   "Read FILE or print a consistent CLI read error and exit with status 1."
   (handler-case (%strip-shebang-line (%read-file file))
@@ -348,8 +358,8 @@ Returns a parsed-args structure."
 ;;; FR-917: Reproducible build support stub
 (defun cl-cc-deterministic-build-p ()
   "FR-917: Return T when building in reproducible/deterministic mode."
-  (let ((env (or (ignore-errors (uiop:getenv "CLCC_DETERMINISTIC"))
-                 (ignore-errors (uiop:getenv "SOURCE_DATE_EPOCH")))))
+  (let ((env (or (uiop:getenv "CLCC_DETERMINISTIC")
+                 (uiop:getenv "SOURCE_DATE_EPOCH"))))
     (and env (not (member (string-downcase env) '("" "0" "false" "no") :test #'string=)))))
 
 (defun configure-reproducible-build (&key (epoch "0") (seed 0))

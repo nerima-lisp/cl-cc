@@ -85,11 +85,17 @@
   (incf (gethash stack samples 0) count)
   samples)
 
+(defun %parse-flamegraph-integer (text &key (radix 10))
+  "Parse a perf field, returning NIL only for a malformed field."
+  (handler-case
+      (parse-integer text :radix radix :junk-allowed nil)
+    (parse-error () nil)))
+
 (defun %perf-map-line->sample (line samples)
   "Add one sample from a perf-map line to SAMPLES when LINE is valid."
   (let ((parts (uiop:split-string line :separator '(#\Space #\Tab))))
     (when (>= (length parts) 3)
-      (let ((size (ignore-errors (parse-integer (second parts) :radix 16)))
+      (let ((size (%parse-flamegraph-integer (second parts) :radix 16))
             (name (third parts)))
         (when (and size name)
           (%flamegraph-inc-sample samples (format nil "jit;~A" name) (max 1 size))))))
@@ -101,7 +107,7 @@
          (parts (uiop:split-string trimmed :separator '(#\Space #\Tab)))
          (last-part (car (last parts)))
          (count (and (> (length parts) 1)
-                     (ignore-errors (parse-integer last-part :junk-allowed nil))))
+                     (%parse-flamegraph-integer last-part)))
          (stack (if count
                     (subseq trimmed 0 (position-if (lambda (ch) (member ch '(#\Space #\Tab)))
                                                    trimmed :from-end t))
@@ -121,7 +127,7 @@
         (loop for line = (read-line in nil nil)
               while line
               for parts = (uiop:split-string line :separator '(#\Space #\Tab))
-              do (if (and parts (ignore-errors (parse-integer (first parts) :radix 16)))
+              do (if (and parts (%parse-flamegraph-integer (first parts) :radix 16))
                      (%perf-map-line->sample line samples)
                      (%perf-script-line->sample line samples)))))
     samples))
@@ -129,7 +135,7 @@
 (defun %default-perf-map-path ()
   (parse-namestring
    (format nil "/tmp/perf-~D.map"
-           (or (ignore-errors
+           (or (progn
                  (require :sb-posix)
                  (let* ((pkg (find-package "SB-POSIX"))
                         (sym (and pkg (find-symbol "GETPID" pkg))))
