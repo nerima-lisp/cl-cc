@@ -84,13 +84,46 @@
 ;;; both caches under *macro-eval-fn* = #'eval so workers see cache HITs and
 ;;; bypass both rebuild paths entirely.
 ;;;
-;;; Skippable with --no-warm-stdlib or CLCC_WARM_STDLIB=0, which is how the
-;;; warm path itself gets exercised as a code path rather than assumed.
+;;; Pass --no-warm-stdlib or set CLCC_WARM_STDLIB=0 to skip cache warming.
 (let* ((args (uiop:command-line-arguments))
        (filter (loop for rest on args
                      when (and (string= (first rest) "--filter")
                                (second rest))
                        return (second rest)))
+       (diagnostic-optimize-core
+         (member "--diagnostic-optimize-core" args :test #'string=))
+       ;; Test names also occur in other files; this option restricts the
+       ;; filter to optimizer-pipeline-core-tests.lisp.
+       (diagnostic-location
+         (when diagnostic-optimize-core
+           (unless filter
+             (error "--diagnostic-optimize-core requires --filter."))
+           (let* ((component
+                    (asdf:find-component
+                     "cl-cc/test"
+                     (list "optimize-tests" "optimizer-pipeline-core-tests")))
+                  (pathname (asdf:component-pathname component))
+                  (expected-location
+                    (cl-weave::location-pathname-designator pathname))
+                  (normalized-filter (cl-weave::normalized-test-filter filter))
+                  (count 0))
+             (cl-cc/test::%map-cl-weave-tests
+              (lambda (test suite)
+                (when (and
+                       (cl-weave::test-path-matches-filter-p
+                        (cl-weave::test-path suite test)
+                        normalized-filter)
+                       (equal expected-location
+                              (cl-weave::test-location-pathname test)))
+                  (incf count)
+                  (format t "# diagnostic selected: ~A (~A)~%"
+                          (cl-weave::test-case-name test)
+                          expected-location))))
+             (force-output)
+             (unless (= count 1)
+               (error "Expected one optimize-core test for ~S, found ~D."
+                      filter count))
+             pathname)))
        (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
        (worker-env (uiop:getenv "CL_CC_TEST_WORKERS"))
        (max-workers
@@ -116,12 +149,14 @@
               (format t "# stdlib cache warm skipped~%")
               (format t "# forcing serial test execution (max-workers=1) because stdlib cache warming is disabled~%")
               (setf max-workers 1)))
-        ;; cl-weave is the test engine: registration, execution, reporting and
-        ;; concurrency all delegate to it (see
-        ;; packages/testing-framework/src/framework-definitions.lisp).
         (uiop:quit
          (if (cl-weave:run-all :reporter :spec
                                :name-filter filter
+                               :location-filter
+                               (when diagnostic-optimize-core
+                                 (list diagnostic-location))
+                               :pass-with-no-tests
+                               (not diagnostic-optimize-core)
                                :max-workers max-workers)
              0
              1)))

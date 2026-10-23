@@ -28,9 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # persist-credentials: false — this job runs untrusted PR code via
-      # `nix flake check`, and never needs the token, so don't leave it in
-      # .git/config for that code to read.
+      # Keep checkout credentials out of .git/config because nix flake check
+      # executes PR code. Cachix credentials are configured separately below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -40,12 +39,38 @@ jobs:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # Runs the SBCL test suite (checks.default), the treefmt formatting gate
-      # (checks.formatting), and the mkdocs --strict build (checks.docs).
-      # Add `--all-systems` only when the flake declares more than one system.
+      - name: Isolate adaptive optimizer tests
+        id: optimizer-diagnostics
+        env:
+          CL_CC_TEST_WORKERS: "1"
+        run: |
+          # The previous fatal stack ended in MAKE-LIST. Run each non-empty
+          # adaptive-budget case separately; the adjacent min-floor case uses NIL.
+          failed=0
+          for case_name in \
+            "adaptive-max-iterations-regions tiny" \
+            "adaptive-max-iterations-regions small" \
+            "adaptive-max-iterations-regions medium" \
+            "adaptive-max-iterations-regions large" \
+            "adaptive-max-iterations-regions huge" \
+            "adaptive-max-iterations-respects-max-cap"
+          do
+            printf '# diagnostic case: %s\n' "$case_name"
+            if nix run .#test --print-build-logs -- --filter "$case_name" --diagnostic-optimize-core; then
+              printf '# diagnostic case passed: %s\n' "$case_name"
+            else
+              status=$?
+              printf '# diagnostic case failed (exit %s): %s\n' "$status" "$case_name" >&2
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      # Evaluates the flake's declared checks for this runner's system.
       - name: Check flake
+        if: ${{ success() || steps.optimizer-diagnostics.outcome == 'failure' }}
         run: nix flake check --print-build-logs
 
-      # Catches stray conflict markers and whitespace errors that compile fine.
+      # Detects whitespace errors in the diff.
       - name: Check diff hygiene
         run: git diff --check
