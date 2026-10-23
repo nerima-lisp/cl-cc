@@ -35,7 +35,7 @@
       flake = false;
     };
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/32671560d3d15d4ecf33b9d8af862ea60737841b";
+      url = "github:nerima-lisp/cl-weave/v1.0.0";
       flake = false;
     };
     # cl-parser-kit backs packages/parse's tokenizer/combinator/Pratt layer,
@@ -92,59 +92,59 @@
     # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
     # once those releases are tagged.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast/a45c5acecfccb91a43f6a04251e8a5d6ec3d3213";
+      url = "github:nerima-lisp/cl-cc-ast/5bb81120a1acf3a0c125dac655549582f3eb137e";
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type/ff2e742911b4b193457a75208b7b9ad6b06ab23a";
+      url = "github:nerima-lisp/cl-cc-type/324b1c06b86a382f6561019d087d845667cf4606";
       flake = false;
     };
     cl-cc-binary = {
-      url = "github:nerima-lisp/cl-cc-binary/4c0661c1b2e22be5f28277b0d563eea6651c51e3";
+      url = "github:nerima-lisp/cl-cc-binary/3c81059218b0d99838d04dff7dbbb3dd8821a8ad";
       flake = false;
     };
     cl-cc-bootstrap = {
-      url = "github:nerima-lisp/cl-cc-bootstrap/027f6c9826010c15789454e69abd2930738b50af";
+      url = "github:nerima-lisp/cl-cc-bootstrap/b1ff1defbba014ba7b312c882ee8a5e7cabb5cc3";
       flake = false;
     };
     cl-cc-vm = {
-      url = "github:nerima-lisp/cl-cc-vm/462213fcf5e0e6cecc09992e8cb0b7ed48dbce2f";
+      url = "github:nerima-lisp/cl-cc-vm/670376ada1b5b1aa40e4f798764ac34c5cc1959b";
       flake = false;
     };
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/663c4c01c800ca7e64d444c53204645173e84854";
+      url = "github:nerima-lisp/cl-cc-mir/9679e3a471df1bea446df9b22cb26a32e85c42c8";
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/681e60997c212c47feafc3956ae1b6b923ad2d36";
+      url = "github:nerima-lisp/cl-cc-cps/b09fdc12f8a181946319ac7a4cd2794466617db4";
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/b260853bb668e488af0ea3d1ebfad6db35d1b7c3";
+      url = "github:nerima-lisp/cl-cc-expand/2628bd758f76df1513456641a358c63812e70aac";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/f6cd93f54b4e04083aad0f3fee30def14a427f89";
+      url = "github:nerima-lisp/cl-cc-optimize/51c0db63ff125413568ec08c79e33dcf34f00fbf";
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/8f749c1d4d83b9f68595ee88af0d1207d7dd68db";
+      url = "github:nerima-lisp/cl-cc-codegen-native/e58718ee08dd916054ca62c782d0c9435e22583e";
       flake = false;
     };
     cl-cc-parse = {
-      url = "github:nerima-lisp/cl-cc-parse/75d8699835731ec6ca44e15c82ef02601f5100fe";
+      url = "github:nerima-lisp/cl-cc-parse/7316dd82137290082fa1fe03300d3aa388d84117";
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/ee65c1d2ba3c9cec825f737251628b4c3c02390d";
+      url = "github:nerima-lisp/cl-cc-php/c36a40dcf8ddff72c7eaeb3baee5154c9b27d190";
       flake = false;
     };
     cl-cc-javascript = {
-      url = "github:nerima-lisp/cl-cc-javascript/da713f534812427099b9049a8b64ac431c8ea63f";
+      url = "github:nerima-lisp/cl-cc-javascript/777d5450681601860af20d5858c297e7d1af842b";
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/d23ea44512b162def39ec981426c4c8e1af4df84";
+      url = "github:nerima-lisp/cl-cc-runtime/d8d636b";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the

@@ -513,6 +513,24 @@
 ;;; Section 10: Print support
 ;;; ──────────────────────────────────────────────────────────────────────────
 
+(it-sequential "wasm-binary-write-f64 pos-1.0"
+  (destructuring-bind (value expected) (list 1.0d0 '(0 0 0 0 0 0 #xf0 #x3f))
+    (let ((buf (cl-cc/binary::make-wasm-buffer)))
+    (cl-cc/binary::wasm-buf-write-f64 buf value)
+    (expect (coerce buf 'list) :to-equal expected))))
+
+(it-sequential "wasm-binary-write-f64 neg-2.5"
+  (destructuring-bind (value expected) (list -2.5d0 '(0 0 0 0 0 0 #x04 #xc0))
+    (let ((buf (cl-cc/binary::make-wasm-buffer)))
+    (cl-cc/binary::wasm-buf-write-f64 buf value)
+    (expect (coerce buf 'list) :to-equal expected))))
+
+(it-sequential "wasm-binary-write-f64 neg-zero"
+  (destructuring-bind (value expected) (list -0.0d0 '(0 0 0 0 0 0 0 #x80))
+    (let ((buf (cl-cc/binary::make-wasm-buffer)))
+    (cl-cc/binary::wasm-buf-write-f64 buf value)
+    (expect (coerce buf 'list) :to-equal expected))))
+
 (it-sequential "wasm-binary-leb128-encodings uleb-624485"
   (destructuring-bind (kind value expected) (list :u 624485 '(#xe5 #x8e #x26))
     (let ((actual (ecase kind
