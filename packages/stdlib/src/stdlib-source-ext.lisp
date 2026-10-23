@@ -323,8 +323,8 @@
     "(defun integer-decode-float (f)
        (multiple-value-bind (m e s) (decode-float f)
          (values (round (* m (expt 2 52))) (- e 52) (if (minusp s) -1 1))))"
-    "(defconstant most-positive-fixnum #.(1- (expt 2 62)))"
-    "(defconstant most-negative-fixnum #.(- (expt 2 62)))"
+    "(defconstant most-positive-fixnum 4611686018427387903)" ; original expression: (1- (expt 2 62))
+    "(defconstant most-negative-fixnum -4611686018427387904)" ; original expression: (- (expt 2 62))
     "(defconstant most-positive-short-float 1.0e38)"
     "(defconstant most-negative-short-float -1.0e38)"
     "(defconstant least-positive-short-float 1.0e-38)"
