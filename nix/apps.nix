@@ -159,6 +159,30 @@ let
         "${testImage}/cl-cc-test.core"
       ];
       extraEnv = ''export CL_CC_TEST_WORKERS="''${CL_CC_TEST_WORKERS:-4}"'';
+      lispPostLoadEvalForms = [
+        ''
+          (sb-ext:without-package-locks
+            (let ((original-test-runner
+                    (symbol-function 'cl-weave::run-test-case/internal)))
+              (setf (symbol-function 'cl-weave::run-test-case/internal)
+                    (lambda (suite test)
+                      (format *error-output*
+                              "~&# cl-cc test-start: ~{~A~^ > ~}~%"
+                              (cl-weave::test-path suite test))
+                      (finish-output *error-output*)
+                      (let ((event (funcall original-test-runner suite test)))
+                        (unless (member (cl-weave::test-event-status event)
+                                        '(:pass :skip :todo))
+                          (format *error-output*
+                                  "~&# cl-cc test-result: ~{~A~^ > ~} [~A] ~A~%"
+                                  (cl-weave::test-path suite test)
+                                  (cl-weave::test-event-status event)
+                                  (cl-weave::test-event-condition event))
+                          (finish-output *error-output*))
+                        event)))))
+          (format *error-output* "~&# cl-cc test-case diagnostics installed~%")
+          (finish-output *error-output*))''
+      ];
       loadFiles = [ "run-tests.lisp" ];
     };
 
@@ -198,25 +222,6 @@ let
                            (filter (loop for rest on args
                                          when (and (string= (first rest) "--filter") (second rest))
                                            return (second rest))))
-                      (sb-ext:without-package-locks
-                            (let ((original-test-runner
-                                    (symbol-function 'cl-weave::run-test-case/internal)))
-                              (setf (symbol-function 'cl-weave::run-test-case/internal)
-                                    (lambda (suite test)
-                                      (format *error-output*
-                                              "~&# cl-cc test-start: ~{~A~^ > ~}~%"
-                                              (cl-weave::test-path suite test))
-                                      (finish-output *error-output*)
-                                      (let ((event (funcall original-test-runner suite test)))
-                                        (unless (member (cl-weave::test-event-status event)
-                                                        '(:pass :skip :todo))
-                                          (format *error-output*
-                                                  "~&# cl-cc test-result: ~{~A~^ > ~} [~A] ~A~%"
-                                                  (cl-weave::test-path suite test)
-                                                  (cl-weave::test-event-status event)
-                                                  (cl-weave::test-event-condition event))
-                                          (finish-output *error-output*))
-                                        event)))))
                       (handler-case
                           (uiop:quit (if (cl-weave:run-all :reporter :spec
                                                             :name-filter filter
