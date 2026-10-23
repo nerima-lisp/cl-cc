@@ -289,8 +289,11 @@
             src = inputs.cl-dataflow-kit;
             systems = [ "cl-dataflow-kit" ];
             lispLibs = [
-              clPrologKit
+              clBoundaryKit
               clConcurrentKit
+              clDateKit
+              clHostKit
+              clPrologKit
             ];
           };
           clLogKit = sbcl.buildASDFSystem {
@@ -299,8 +302,9 @@
             src = inputs.cl-log-kit;
             systems = [ "cl-log-kit" ];
             lispLibs = [
-              clDateKit
+              clBoundaryKit
               clConcurrentKit
+              clDateKit
               clHostKit
             ];
           };
@@ -324,8 +328,11 @@
             src = inputs.cl-tty-kit;
             systems = [ "cl-tty-kit" ];
             lispLibs = [
+              clBoundaryKit
               clCodecKit
               clConcurrentKit
+              clDateKit
+              clHostKit
             ];
           };
           clRegexKit = sbcl.buildASDFSystem {
@@ -333,7 +340,13 @@
             version = siblingVersion "cl-regex-kit";
             src = inputs.cl-regex-kit;
             systems = [ "cl-regex-kit" ];
-            lispLibs = [ clParserKit ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+              clDateKit
+              clHostKit
+              clParserKit
+            ];
           };
           clHostKit = sbcl.buildASDFSystem {
             pname = "cl-host-kit";
@@ -364,9 +377,6 @@
             systems = [ "cl-cc-type" ];
             lispLibs = [ clCcAst ];
           };
-          # The standalone cl-cc-binary took a dependency on cl-log-kit that the
-          # in-tree copy did not have; clLogKit is already an input for
-          # cl-boundary-kit, so it is threaded in here rather than added.
           clProcessKit = sbcl.buildASDFSystem {
             pname = "cl-process-kit";
             version = siblingVersion "cl-process-kit";
@@ -374,6 +384,10 @@
             systems = [ "cl-process-kit" ];
             lispLibs = [
               clBoundaryKit
+              clCodecKit
+              clConcurrentKit
+              clDateKit
+              clHostKit
               clLogKit
             ];
           };
@@ -397,6 +411,7 @@
             lispLibs = [
               clBoundaryKit
               clDateKit
+              clHostKit
             ];
           };
           clCodecKit = sbcl.buildASDFSystem {
@@ -560,6 +575,7 @@
               clCcBootstrap
               clCcParse
               clCcVm
+              clBoundaryKit
               clDateKit
               clJsonKit
               clConcurrentKit
