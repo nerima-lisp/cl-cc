@@ -6,6 +6,39 @@
 
 (in-package :cl-cc/test)
 
+(it-sequential "pipeline-native-helper-failure-is-not-swallowed"
+  (let ((message nil))
+    (with-replaced-function (uiop:run-program
+                             (lambda (&rest args)
+                               (declare (ignore args))
+                               (error "injected native helper failure")))
+      (handler-case
+          (cl-cc::%run-short-native-command '("codesign" "-s" "-" "output"))
+        (error (condition)
+          (setf message (princ-to-string condition)))))
+    (expect (search "injected native helper failure" message) :to-be-truthy)))
+
+(it-sequential "pipeline-native-relocation-failure-is-not-swallowed"
+  (let ((message nil))
+    (with-replaced-function (cl-cc/codegen::program-reloc-entries
+                             (lambda (&rest args)
+                               (declare (ignore args))
+                               (error "injected relocation failure")))
+      (handler-case
+          (cl-cc::%native-relocation-entries :program :elf)
+        (error (condition)
+          (setf message (princ-to-string condition)))))
+    (expect (search "injected relocation failure" message) :to-be-truthy)))
+
+(it-sequential "pipeline-native-stdlib-cache-is-not-fresh-without-source-dates"
+  (uiop:with-temporary-file (:pathname cache :keep t)
+    (with-open-file (stream cache :direction :output :if-exists :supersede)
+      (write-line "cache" stream))
+    (with-replaced-function (cl-cc/pipeline::%stdlib-source-file-paths
+                             (lambda () nil))
+      (expect (cl-cc/pipeline::%stdlib-cache-fresh-p cache) :to-be-falsy))
+    (ignore-errors (delete-file cache))))
+
 (defmacro with-native-cache-stubs ((&key cache-path) &body body)
   "Stub cache-related native helper calls for routing/cache tests."
   `(with-replaced-function (cl-cc::%compile-cache-key

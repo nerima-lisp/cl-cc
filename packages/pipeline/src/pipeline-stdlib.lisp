@@ -107,29 +107,36 @@ SETF places while isolating per-source typed defstruct accessors.")
 
 (defun %stdlib-source-file-paths ()
   "Return known source files that contribute to *STANDARD-LIBRARY-SOURCE*."
+  ;; The disk cache is optional, but an unknown source location must invalidate
+  ;; it rather than making an old cache appear fresh.
   (let ((base (ignore-errors
                 (asdf:system-relative-pathname :cl-cc-stdlib #P"src/"))))
-    (remove-if-not #'probe-file
-                   (when base
-                     (mapcar (lambda (name) (merge-pathnames name base))
-                             '("stdlib-source-core.lisp"
-                               "stdlib-source.lisp"
-                               "stdlib-source-ext.lisp"
-                               "stdlib-source-clos.lisp"))))))
+    (when base
+      (let ((paths (mapcar (lambda (name) (merge-pathnames name base))
+                           '("stdlib-source-core.lisp"
+                             "stdlib-source.lisp"
+                             "stdlib-source-ext.lisp"
+                             "stdlib-source-clos.lisp"))))
+        (and (every #'probe-file paths) paths)))))
 
 (defun %stdlib-source-newest-write-date ()
-  "Return the newest write date among stdlib source files, or 0 if unknown."
-  (loop for path in (%stdlib-source-file-paths)
-        for date = (ignore-errors (file-write-date path))
-        when date maximize date into newest
-        finally (return (or newest 0))))
+  "Return the newest write date, or NIL when any source date is unknown."
+  (let ((paths (%stdlib-source-file-paths)))
+    (when paths
+      (loop for path in paths
+            for date = (ignore-errors (file-write-date path))
+            when (null date) do (return-from %stdlib-source-newest-write-date nil)
+            maximize date into newest
+            finally (return newest)))))
 
 (defun %stdlib-cache-fresh-p (cache-path)
   "Return T when CACHE-PATH exists and is newer than all stdlib source files."
   (let ((cache-date (and (probe-file cache-path)
                          (ignore-errors (file-write-date cache-path)))))
-    (and cache-date
-         (>= cache-date (%stdlib-source-newest-write-date)))))
+    (let ((source-date (%stdlib-source-newest-write-date)))
+      (and cache-date
+           source-date
+           (>= cache-date source-date)))))
 
 (defun %stdlib-cache-payload-valid-p (payload)
   "Return T when PAYLOAD is a readable stdlib cache payload."

@@ -146,6 +146,7 @@
    #:%build-stdlib-expanded-cache
    #:%copy-snapshot-ht
    #:%write-native-binary
+   #:%native-relocation-entries
    #:%compile-cache-key
    #:%compile-cache-path
    #:%compile-native-expression
