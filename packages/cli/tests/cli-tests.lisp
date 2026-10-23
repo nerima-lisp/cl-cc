@@ -604,13 +604,19 @@ the same path that %do-compile takes internally."
 (it-sequential "cli-do-check-error-prints-diagnostic-snippet"
   (%with-temp-file (path "(+ 1\n")
     (let ((stderr (make-string-output-stream)))
+      (format *error-output* "~&; cl-cc cli-diagnostic: before-check~%")
+      (finish-output *error-output*)
       (let ((code (with-fake-quit
                     (let ((*error-output* stderr))
                       (cl-cc/cli::%do-check
                        (make-cli-parsed :command "check"
                                         :positional (list path)))))))
+        (format *error-output* "~&; cl-cc cli-diagnostic: after-check code=~S~%" code)
+        (finish-output *error-output*)
         (expect (= 1 code) :to-be-truthy))
       (let ((out (get-output-stream-string stderr)))
         (expect (search "type-check: failed" out) :to-be-truthy)
         (expect (search "^" out) :to-be-truthy)
-        (expect (search "Type trace:" out) :to-be-truthy)))))
+        (expect (search "Type trace:" out) :to-be-truthy))
+      (format *error-output* "~&; cl-cc cli-diagnostic: after-output-checks~%")
+      (finish-output *error-output*))))
