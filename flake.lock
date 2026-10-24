@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "ansi-test": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1680319748,
+        "narHash": "sha256-MLMB1zDRxnZochLel3eGb9E1oZpyt4WR0ejOEiTbJW0=",
+        "owner": "pfdietz",
+        "repo": "ansi-test",
+        "rev": "6e3f70002559d56d3e4a6f0b8ddcc083d202f066",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pfdietz",
+        "repo": "ansi-test",
+        "rev": "6e3f70002559d56d3e4a6f0b8ddcc083d202f066",
+        "type": "github"
+      }
+    },
     "cl-boundary-kit": {
       "flake": false,
       "locked": {
@@ -511,6 +528,7 @@
     },
     "root": {
       "inputs": {
+        "ansi-test": "ansi-test",
         "cl-boundary-kit": "cl-boundary-kit",
         "cl-cc-ast": "cl-cc-ast",
         "cl-cc-binary": "cl-cc-binary",
