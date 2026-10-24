@@ -112,3 +112,70 @@
 
 (it-sequential "stdlib-source-omits-sbcl-compatibility-stubs"
   (expect (search "without-package-locks" cl-cc::*standard-library-source*) :to-be-falsy))
+(it-sequential "stdlib-compile-file-creates-loadable-output"
+  (let* ((root (uiop:ensure-directory-pathname
+                (merge-pathnames (format nil "cl-cc-compile-file-~A/" (gensym))
+                                 (uiop:temporary-directory))))
+         (source-path (merge-pathnames #P"input.lisp" root))
+         (output-path (compile-file-pathname source-path))
+         (explicit-output-path (merge-pathnames #P"explicit.fasl" root))
+         (value-symbol (intern (format nil "*COMPILE-FILE-OUTPUT-~A*" (gensym))
+                               :cl-cc/test)))
+    (unwind-protect
+         (progn
+           (ensure-directories-exist source-path)
+           (with-open-file (output source-path
+                                   :direction :output
+                                   :if-exists :supersede
+                                   :if-does-not-exist :create)
+             (format output "(in-package :cl-cc/test)~%(defparameter ~A 42)~%"
+                     (symbol-name value-symbol)))
+           (with-reset-repl-state
+             (let ((compiled-path
+                     (run-string
+                      (format nil "(compile-file ~S)" (namestring source-path))
+                      :stdlib t)))
+               (expect (namestring compiled-path)
+                       :to-equal (namestring (truename output-path)))
+               (expect (probe-file output-path) :to-be-truthy))
+             (let ((compiled-path
+                     (run-string
+                      (format nil "(compile-file ~S :output-file ~S)"
+                              (namestring source-path)
+                              (namestring explicit-output-path))
+                      :stdlib t)))
+               (expect (namestring compiled-path)
+                       :to-equal (namestring (truename explicit-output-path)))
+               (expect (probe-file explicit-output-path) :to-be-truthy))
+             (cl-cc/repl::our-load output-path)
+             (expect (gethash value-symbol
+                              (cl-cc/vm:vm-global-vars cl-cc::*repl-vm-state*))
+                     :to-be 42)))
+      (when (probe-file root)
+        (uiop:delete-directory-tree root :validate t)))))
+(it-sequential "stdlib-compile-file-preserves-source-when-output-is-input"
+  (let* ((root (uiop:ensure-directory-pathname
+                (merge-pathnames (format nil "cl-cc-compile-file-~A/" (gensym))
+                                 (uiop:temporary-directory))))
+         (source-path (merge-pathnames #P"input.lisp" root)))
+    (unwind-protect
+         (progn
+           (ensure-directories-exist source-path)
+           (with-open-file (stream source-path
+                                   :direction :output
+                                   :if-exists :supersede
+                                   :if-does-not-exist :create)
+             (write-string "(defun compiled-copy () 42)" stream))
+           (let ((source (uiop:read-file-string source-path)))
+             (with-reset-repl-state
+               (let ((compiled-path
+                       (run-string
+                        (format nil "(compile-file ~S :output-file ~S)"
+                                (namestring source-path)
+                                (namestring source-path))
+                        :stdlib t)))
+                 (expect (namestring compiled-path)
+                         :to-equal (namestring (truename source-path)))
+                 (expect (uiop:read-file-string source-path) :to-equal source)))))
+      (when (probe-file root)
+        (uiop:delete-directory-tree root :validate t)))))
