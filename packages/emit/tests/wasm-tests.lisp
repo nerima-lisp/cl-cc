@@ -15,7 +15,8 @@
 
 ;;; ──────────────────────────────────────────────────────────────────────────
 ;;; Helper: compile a source string to WAT, returning the assembly string.
-;;; Returns NIL on any error so individual tests can assert-true on the result.
+;;; Compilation errors propagate to the test runner. Tests that expect them use
+;;; %capture-wasm-error-message to assert the condition text.
 ;;; ──────────────────────────────────────────────────────────────────────────
 
 (defun %wat-for (source-string)
