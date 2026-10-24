@@ -41,6 +41,11 @@
     (dolist (inst instructions)
       (cl-cc/codegen::emit-instruction target inst s))
     (get-output-stream-string s)))
+(defun %capture-wasm-error-message (thunk)
+  (handler-case
+      (funcall thunk)
+    (error (condition)
+      (princ-to-string condition))))
 
 ;;; ──────────────────────────────────────────────────────────────────────────
 ;;; Section 1-2: Module structure — always present in any WAT output
@@ -357,24 +362,11 @@
       (assert-output-contains set "BCE: explicit bounds check eliminated")
       (assert-output-contains set "array.set $eqref_array_t"))))
 
-(it-sequential "wasm-gc-slot-read-write-emitters"
-  (let ((out (%direct-wasm-emit*
-              (list (cl-cc:make-vm-class-def :dst :r9
-                                             :class-name (quote my-class)
-                                             :superclasses nil
-                                             :slot-names (quote (foo))
-                                             :slot-initargs nil
-                                             :slot-initform-regs nil
-                                             :slot-types nil
-                                             :default-initarg-regs nil
-                                             :class-slots nil
-                                             :metaclass-reg nil)
-                    (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name (quote foo))
-                    (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name (quote foo) :value-reg :r2)))))
-    (assert-output-contains out "struct.get $instance_t 1")
-    (assert-output-contains out "array.get $eqref_array_t")
-    (assert-output-contains out "array.set $eqref_array_t")
-    (assert-output-contains out "struct.set $instance_t 1")))
+(it-sequential "wasm-gc-slot-read-without-class-layout"
+  (let* ((inst (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name :foo))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal
+            "Unsupported WASM instruction: VM-SLOT-READ has no slot index for :FOO")))
 
 (it-sequential "wasm-gc-slot-read-write-use-class-slot-index-mapping"
   (let ((out (%direct-wasm-emit*
