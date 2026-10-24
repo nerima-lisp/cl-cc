@@ -374,34 +374,19 @@
     (expect message :to-equal
             "Unsupported WASM instruction: VM-SLOT-WRITE has no slot index for :FOO")))
 
-(it-sequential "wasm-gc-slot-index-resolution-prefers-object-class-layout"
-  (let ((out (%direct-wasm-emit*
-              (list
-               (cl-cc:make-vm-class-def :dst :r7
-                                        :class-name 'class-a
+(it-sequential "wasm-gc-object-class-layout-rejects-unsupported-class-def"
+  (let* ((inst (cl-cc:make-vm-class-def :dst :r8
+                                        :class-name :class-b
                                         :superclasses nil
-                                        :slot-names '(foo bar)
+                                        :slot-names (quote (bar foo))
                                         :slot-initargs nil
                                         :slot-initform-regs nil
                                         :slot-types nil
                                         :default-initarg-regs nil
                                         :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-class-def :dst :r8
-                                        :class-name 'class-b
-                                        :superclasses nil
-                                        :slot-names '(bar foo)
-                                        :slot-initargs nil
-                                        :slot-initform-regs nil
-                                        :slot-types nil
-                                        :default-initarg-regs nil
-                                        :class-slots nil
-                                        :metaclass-reg nil)
-               ;; Build object of class-b; foo should resolve to index 1 in class-b.
-               (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil)
-               (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'foo)))))
-    (assert-output-contains out "array.get $eqref_array_t")
-    (assert-output-contains out "(i32.const 1)")))
+                                        :metaclass-reg nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
 (it-sequential "wasm-gc-slot-index-resolution-includes-superclass-slots"
   (let ((out (%direct-wasm-emit*
