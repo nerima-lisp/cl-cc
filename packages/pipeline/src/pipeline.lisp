@@ -565,8 +565,9 @@ top-level, and optimization stages."
       (parse-source-for-language source language :source-file source-file)
     (%register-backend-runtime-bridges)
     (%install-backend-vm-integrations)
-    (when (eq language :php)
-      (php-check-supported-forms forms))
+    (let ((validator (find-backend-input-validator language)))
+      (when validator
+        (funcall validator forms)))
     (let* ((opts  (%make-pipeline-opts
                     :target target :type-check type-check :safety safety
                      :speed speed
@@ -644,8 +645,9 @@ arguments are forwarded to the expression, top-level, and optimization stages."
        (parse-source-for-language source language :source-file source-file)
      (%register-backend-runtime-bridges)
      (%install-backend-vm-integrations)
-     (when (eq language :php)
-       (php-check-supported-forms forms))
+     (let ((validator (find-backend-input-validator language)))
+       (when validator
+         (funcall validator forms)))
      (let* ((opts  (%make-pipeline-opts
                      :target target :type-check type-check :safety safety
                       :speed speed
