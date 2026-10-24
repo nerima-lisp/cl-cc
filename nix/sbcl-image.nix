@@ -50,6 +50,7 @@ pkgs.stdenvNoCC.mkDerivation {
   buildPhase = ''
     runHook preBuild
     export HOME="$TMPDIR"
+    export CLCC_WARM_STDLIB_TRACE=1
     ${dispatchEnv}
     # Load production systems + testing framework (NOT "cl-cc/test").
     # Excluding "cl-cc/test" keeps test-file top-level forms out of the core;
