@@ -35,12 +35,51 @@ against: the set has to be identical to what the old package scan produced."
           (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))
           (push sym registered))))))
 
+(defun %register-logical-pathname-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   'cl:logical-pathname-translations
+   #'cl:logical-pathname-translations)
+  (cl-cc/vm:vm-register-host-bridge
+   (intern "%SET-LOGICAL-PATHNAME-TRANSLATIONS" :cl-cc)
+   (lambda (host translations)
+     (setf (cl:logical-pathname-translations host) translations)
+     translations)))
+(defun %register-package-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:make-package)
+   (lambda (name &key nicknames (use (quote (:cl))))
+     (cl-cc/runtime:rt-make-package name :nicknames nicknames :use use)))
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:symbol-name)
+   (lambda (symbol)
+     (let ((guest-symbol (if (cl-cc/vm::vm-immediate-symbol-p symbol)
+                             (cl-cc/vm::vm-decode-symbol symbol)
+                             symbol)))
+       (cl-cc/runtime:rt-symbol-name guest-symbol))))
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:intern)
+   (lambda (name &optional package)
+     (let* ((state cl-cc/vm:*vm-state*)
+            (globals (and state (cl-cc/vm:vm-global-vars state)))
+            (guest-name (if (cl-cc/vm::vm-immediate-symbol-p name)
+                            (cl-cc/vm::vm-decode-symbol name)
+                            name))
+            (guest-package (or package
+                               (and globals
+                                    (gethash (quote cl:*package*) globals))))
+            (guest-package (if (cl-cc/vm::vm-immediate-symbol-p guest-package)
+                               (cl-cc/vm::vm-decode-symbol guest-package)
+                               guest-package)))
+       (cl-cc/runtime:rt-intern
+        (cl-cc/vm::%vm-host-string guest-name)
+        (cl-cc/vm::%vm-host-string guest-package))))))
 (defun %register-backend-runtime-bridges ()
-  "Register every loaded backend runtime bridge at pipeline start-up.
+  "Register built-in package/pathname and loaded backend runtime bridges.
 
-This compatibility boundary is called unconditionally by both source compilation
-entry points. Bridge discovery belongs to the backend registries, so the pipeline
-must not name or scan an external backend package here."
+Called by both source compilation entry points. Backend bridge discovery belongs
+to backend registries; the built-in Common Lisp bridges are registered directly."
+  (%register-logical-pathname-runtime-bridges)
+  (%register-package-runtime-bridges)
   (%register-backend-protocol-bridges))
 
 (defun %register-php-runtime-bridges ()

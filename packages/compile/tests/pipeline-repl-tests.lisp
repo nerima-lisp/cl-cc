@@ -286,3 +286,118 @@
         (expect line :to-equal "FR312-TAB-ONLY-CANDIDATE")
         (expect candidates :to-equal '("FR312-TAB-ONLY-CANDIDATE"))
         (expect edited-p :to-be-truthy)))))
+(it-sequential "pipeline-repl-our-load-binds-nested-pathnames"
+  (with-reset-repl-state
+    (uiop:with-temporary-file (:pathname parent-path :type "lisp")
+      (uiop:with-temporary-file (:pathname child-path :type "lisp")
+        (cl-cc::%ensure-repl-state)
+        (let* ((globals (cl-cc/vm:vm-global-vars cl-cc::*repl-vm-state*))
+               (load-pathname-symbol (find-symbol "*LOAD-PATHNAME*" :cl-cc/vm))
+               (load-truename-symbol (find-symbol "*LOAD-TRUENAME*" :cl-cc/vm))
+               (previous-load-pathname #P"prior-parent.lisp"))
+          (with-open-file (out child-path
+                               :direction :output
+                               :if-exists :supersede)
+            (format out
+                    "(defvar *pipeline-repl-child-load-pathname*)~%(defvar *pipeline-repl-child-load-truename*)~%(setf *pipeline-repl-child-load-pathname* *load-pathname*)~%(setf *pipeline-repl-child-load-truename* *load-truename*)~%"))
+          (with-open-file (out parent-path
+                               :direction :output
+                               :if-exists :supersede)
+            (format out
+                    "(defvar *pipeline-repl-parent-load-pathname*)~%(defvar *pipeline-repl-parent-load-truename*)~%(defvar *pipeline-repl-parent-after-load-pathname*)~%(defvar *pipeline-repl-parent-after-load-truename*)~%(setf *pipeline-repl-parent-load-pathname* *load-pathname*)~%(setf *pipeline-repl-parent-load-truename* *load-truename*)~%(load ~S)~%(setf *pipeline-repl-parent-after-load-pathname* *load-pathname*)~%(setf *pipeline-repl-parent-after-load-truename* *load-truename*)~%"
+                    (namestring child-path)))
+          (setf (gethash load-pathname-symbol globals) previous-load-pathname)
+          (remhash load-truename-symbol globals)
+          (cl-cc/repl::our-load parent-path)
+          (let ((child-load-pathname
+                  (gethash (find-symbol "*PIPELINE-REPL-CHILD-LOAD-PATHNAME*" :cl-cc/test) globals))
+                (child-load-truename
+                  (gethash (find-symbol "*PIPELINE-REPL-CHILD-LOAD-TRUENAME*" :cl-cc/test) globals))
+                (parent-load-pathname
+                  (gethash (find-symbol "*PIPELINE-REPL-PARENT-LOAD-PATHNAME*" :cl-cc/test) globals))
+                (parent-load-truename
+                  (gethash (find-symbol "*PIPELINE-REPL-PARENT-LOAD-TRUENAME*" :cl-cc/test) globals))
+                (parent-after-load-pathname
+                  (gethash (find-symbol "*PIPELINE-REPL-PARENT-AFTER-LOAD-PATHNAME*" :cl-cc/test) globals))
+                (parent-after-load-truename
+                  (gethash (find-symbol "*PIPELINE-REPL-PARENT-AFTER-LOAD-TRUENAME*" :cl-cc/test) globals)))
+            (expect (pathnamep child-load-pathname) :to-be-truthy)
+            (expect (namestring child-load-pathname) :to-equal (namestring child-path))
+            (expect (namestring child-load-truename) :to-equal (namestring (truename child-path)))
+            (expect (namestring parent-load-pathname) :to-equal (namestring parent-path))
+            (expect (namestring parent-load-truename) :to-equal (namestring (truename parent-path)))
+            (expect (namestring parent-after-load-pathname) :to-equal (namestring parent-path))
+            (expect (namestring parent-after-load-truename) :to-equal (namestring (truename parent-path))))
+          (expect (eq (gethash load-pathname-symbol globals) previous-load-pathname) :to-be-truthy)
+          (expect (nth-value 1 (gethash load-truename-symbol globals)) :to-be-falsy))))))
+(it-sequential "pipeline-repl-our-load-binds-common-lisp-pathnames"
+  (with-reset-repl-state
+    (uiop:with-temporary-file (:pathname load-path :type "lisp")
+      (uiop:with-temporary-file (:pathname error-path :type "lisp")
+        (cl-cc::%ensure-repl-state)
+        (let* ((globals (cl-cc/vm:vm-global-vars cl-cc::*repl-vm-state*))
+               (common-load-pathname-symbol (find-symbol "*LOAD-PATHNAME*" :cl))
+               (common-load-truename-symbol (find-symbol "*LOAD-TRUENAME*" :cl))
+               (previous-common-load-pathname #P"prior-common-load-pathname.lisp")
+               (previous-common-load-truename #P"prior-common-load-truename.lisp"))
+          (setf (gethash common-load-pathname-symbol globals) previous-common-load-pathname
+                (gethash common-load-truename-symbol globals) previous-common-load-truename)
+          (with-open-file (out load-path
+                               :direction :output
+                               :if-exists :supersede)
+            (format out
+                    "(setf *pipeline-repl-cl-user-load-pathname* *load-pathname*)~%(setf *pipeline-repl-cl-user-load-truename* *load-truename*)~%"))
+          (with-open-file (out error-path
+                               :direction :output
+                               :if-exists :supersede)
+            (write-line "(setf *pipeline-repl-cl-user-error-entered* t)" out)
+            (write-line "(error \"expected load error\")" out))
+          (let ((*package* (find-package :cl-user)))
+            (cl-cc/repl::our-load load-path))
+          (let ((loaded-pathname
+                  (gethash (find-symbol "*PIPELINE-REPL-CL-USER-LOAD-PATHNAME*" :cl-user)
+                           globals))
+                (loaded-truename
+                  (gethash (find-symbol "*PIPELINE-REPL-CL-USER-LOAD-TRUENAME*" :cl-user)
+                           globals)))
+            (expect (namestring loaded-pathname) :to-equal (namestring load-path))
+            (expect (namestring loaded-truename) :to-equal (namestring (truename load-path))))
+          (expect (eq (gethash common-load-pathname-symbol globals)
+                      previous-common-load-pathname)
+                  :to-be-truthy)
+          (expect (eq (gethash common-load-truename-symbol globals)
+                      previous-common-load-truename)
+                  :to-be-truthy)
+          (let ((load-failed-p nil))
+            (handler-case
+                (let ((*package* (find-package :cl-user)))
+                  (cl-cc/repl::our-load error-path))
+              (error () (setf load-failed-p t)))
+            (expect load-failed-p :to-be-truthy)
+            (expect (gethash (find-symbol "*PIPELINE-REPL-CL-USER-ERROR-ENTERED*" :cl-user)
+                             globals)
+                    :to-be-truthy))
+          (expect (eq (gethash common-load-pathname-symbol globals)
+                      previous-common-load-pathname)
+                  :to-be-truthy)
+          (expect (eq (gethash common-load-truename-symbol globals)
+                      previous-common-load-truename)
+                  :to-be-truthy)
+          (remhash common-load-pathname-symbol globals)
+          (remhash common-load-truename-symbol globals)
+          (let ((*package* (find-package :cl-user)))
+            (cl-cc/repl::our-load load-path))
+          (expect (nth-value 1 (gethash common-load-pathname-symbol globals))
+                  :to-be-falsy)
+          (expect (nth-value 1 (gethash common-load-truename-symbol globals))
+                  :to-be-falsy)
+          (let ((load-failed-p nil))
+            (handler-case
+                (let ((*package* (find-package :cl-user)))
+                  (cl-cc/repl::our-load error-path))
+              (error () (setf load-failed-p t)))
+            (expect load-failed-p :to-be-truthy))
+          (expect (nth-value 1 (gethash common-load-pathname-symbol globals))
+                  :to-be-falsy)
+          (expect (nth-value 1 (gethash common-load-truename-symbol globals))
+                  :to-be-falsy))))))

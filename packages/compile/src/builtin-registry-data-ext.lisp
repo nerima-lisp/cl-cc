@@ -175,7 +175,7 @@ read-char and read-line have optional stream args, so they use :stream-input-opt
      (unuse-package make-vm-unuse-package-inst :packages-to-unuse :pkg)
      (shadow make-vm-shadow-inst :symbol-names :pkg)
      (unintern make-vm-unintern-inst :symbol :pkg))
-  "Binary builtins with :dst + 2 custom slots. 2nd arg optional, nil slot when absent.
+  "Binary builtins with :dst + 2 custom slots. 2nd arg defaults to *PACKAGE* when absent.
    (cl-sym vm-ctor slot1 slot2).")
 
 (defparameter *builtin-ternary-opt-nil-custom-entries*

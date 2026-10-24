@@ -225,14 +225,14 @@ and forcing it to T would lose it."
     result-reg))
 
 (defun emit-builtin-binary-opt-nil-slot (entry args result-reg ctx)
-  "Binary emitter with :dst + 2 custom slots. 2nd arg optional, nil slot when absent.
-   Used for INTERN."
+  "Binary emitter with an optional package argument defaulting to the current package."
   (let* ((slots (be-slots entry))
          (a-reg (compile-ast (first args) ctx))
-         (b-reg (when (second args)
-                  (%compile-operand-protecting (second args) ctx (list a-reg)))))
+         (pkg-reg (if (second args)
+                      (%compile-operand-protecting (second args) ctx (list a-reg))
+                      (compile-ast (make-ast-var :name (quote *package*)) ctx))))
     (emit ctx (funcall (be-ctor entry) :dst result-reg
-                       (first slots) a-reg (second slots) b-reg))
+                       (first slots) a-reg (second slots) pkg-reg))
     result-reg))
 
 (defun emit-builtin-ternary-opt-nil-custom (entry args result-reg ctx)

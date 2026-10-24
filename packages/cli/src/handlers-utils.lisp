@@ -223,16 +223,16 @@ around the execution. Returns the value produced by RUN-COMPILED."
     (%trace-emit-stages result *standard-output*))
   (%call-with-runtime-sanitizer-flags
    opts
-         (lambda ()
-      (prog1 (run-compiled (compilation-result-program result) :state vm-state)
-        (%maybe-print-jit-cache-stats opts)
-        (when (compile-opts-profile opts)
-          (print-profile vm-state))
-        (when (compile-opts-flamegraph-path opts)
-          (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
-            (if (plusp (hash-table-count samples))
-                (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
-                (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))))))
+   (lambda ()
+     (prog1 (run-compiled (compilation-result-program result) :state vm-state)
+       (%maybe-print-jit-cache-stats opts)
+       (when (compile-opts-profile opts)
+         (print-profile vm-state))
+       (when (compile-opts-flamegraph-path opts)
+         (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
+           (if (plusp (hash-table-count samples))
+               (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
+               (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))))))
 
 (defun %compile-lisp-with-auto-stdlib (source kwargs stdlib no-stdlib)
   "Compile Lisp SOURCE, lazily falling back to stdlib on first unresolved use.

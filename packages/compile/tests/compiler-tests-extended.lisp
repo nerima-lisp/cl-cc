@@ -48,6 +48,30 @@
 
 (it-sequential "compile-find-symbol-builtin"
   (expect (run-string "(multiple-value-bind (sym status) (find-symbol \"CAR\" :cl) (list (symbol-name sym) status))" :stdlib t) :to-equal '("CAR" :external)))
+(it-sequential "compile-package-operations-default-to-current-package"
+  (expect
+   (run-string
+    "(let* ((pkg (make-package :cl-cc-current-package-ops-test :use nil))
+            (*package* pkg)
+            (sym (intern (string :exported))))
+       (export sym)
+       (nth-value 1 (find-symbol (string :exported) pkg)))"
+    :stdlib t)
+   :to-equal :external))
+(it-sequential "compile-package-function-designators-use-current-package"
+  (expect
+   (run-string
+    "(let* ((pkg (make-package :cl-cc-package-function-designators :use nil))
+            (*package* pkg)
+            (symbols (mapcar (function intern)
+                             (mapcar (function symbol-name)
+                                     (list :alpha :beta)))))
+       (and (equal (mapcar (function symbol-name) symbols)
+                   (mapcar (function symbol-name) (list :alpha :beta)))
+            (eq (symbol-package (first symbols)) pkg)
+            (eq (symbol-package (second symbols)) pkg)))"
+    :stdlib t)
+   :to-be-truthy))
 
 (it-sequential "compile-float-inspection-builtins float-precision"
   (destructuring-bind (form expected) (list "(float-precision 1.0)" (float-precision 1.0))
@@ -332,5 +356,46 @@
               "(let ((s (make-string-output-stream)))
                  (close s :abort t))")))
     (expect r :to-be-truthy)))
+(it-sequential "compile-logical-pathname-translations-setf-bridge"
+  (let* ((host (format nil "CL-CC-LOGICAL-SETF-~A" (get-universal-time)))
+         (previous
+           (handler-case
+               (cl:logical-pathname-translations host)
+             (type-error () :unregistered)))
+         (translations
+           (list
+             (list "AUX;*.*.*"
+                   (format nil "~A*.*"
+                           (namestring (uiop:temporary-directory))))))
+         (source
+           (format nil
+                   "(let ((host-evaluations 0)
+                         (translation-evaluations 0)
+                         (order 0))
+                      (let ((assigned
+                              (setf (cl:logical-pathname-translations
+                                      (progn
+                                        (setq host-evaluations (1+ host-evaluations))
+                                        (setq order (+ (* order 10) 1))
+                                        ~S))
+                                    (progn
+                                      (setq translation-evaluations (1+ translation-evaluations))
+                                      (setq order (+ (* order 10) 2))
+                                      ~S))))
+                        (list assigned host-evaluations translation-evaluations order
+                              (cl:logical-pathname-translations ~S))))"
+                   host translations host)))
+    (unwind-protect
+         (let ((result (run-string source :stdlib t)))
+           (expect (first result) :to-equal translations)
+           (expect (second result) :to-equal 1)
+           (expect (third result) :to-equal 1)
+           (expect (fourth result) :to-equal 12)
+           (expect (fifth result)
+                   :to-equal (cl:logical-pathname-translations host)))
+      (setf (cl:logical-pathname-translations host)
+            (if (eq previous :unregistered)
+                nil
+                previous)))))
 
 ;;; Extended stdlib/keyword integration tests are in compiler-tests-extended-stdlib.lisp.

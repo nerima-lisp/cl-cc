@@ -407,5 +407,6 @@
        (cl:pathname-match-p pathname wildcard))"
     "(defun translate-pathname (source from-wildcard to-wildcard)
        (cl:translate-pathname source from-wildcard to-wildcard))"
+    "(defsetf cl:logical-pathname-translations %set-logical-pathname-translations)"
 
        ))

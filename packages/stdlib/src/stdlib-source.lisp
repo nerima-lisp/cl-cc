@@ -44,9 +44,22 @@
 
     ;; FR-589: minimal compile-file shim for the VM interpreter.
     "(defun compile-file (input-file &key output-file verbose print external-format)
-   (declare (ignore output-file external-format))
-   (our-load input-file :verbose verbose :print print)
-   (values (probe-file input-file) nil nil))"
+   (declare (ignore external-format))
+   (let* ((input-pathname (pathname input-file))
+          (output-pathname (or output-file (compile-file-pathname input-pathname)))
+          (source
+            (with-open-file (input input-pathname :direction :input)
+              (with-output-to-string (contents)
+                (loop for character = (read-char input nil nil)
+                      while character
+                      do (write-char character contents))))))
+     (our-load input-pathname :verbose verbose :print print)
+     (with-open-file (output output-pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :if-does-not-exist :create)
+       (write-string source output))
+     (values (truename output-pathname) nil nil)))"
 
     ;; FR-580: CFFI-compatible host-backed FFI shim.
     "(defun foreign-funcall (name &rest arguments)
