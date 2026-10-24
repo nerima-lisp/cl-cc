@@ -158,7 +158,7 @@ let
         "--core"
         "${testImage}/cl-cc-test.core"
       ];
-      extraEnv = ''export CL_CC_TEST_WORKERS="''${CL_CC_TEST_WORKERS:-4}"'';
+      extraEnv = ''export CL_CC_TEST_WORKERS="1"'';
       loadFiles = [ "run-tests.lisp" ];
     };
 
