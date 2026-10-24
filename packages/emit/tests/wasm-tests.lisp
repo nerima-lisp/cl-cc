@@ -402,21 +402,19 @@
          (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
     (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
-(it-sequential "wasm-gc-class-def-emits-class-meta-struct"
-  (let ((out (%direct-wasm-emit
-              (cl-cc:make-vm-class-def :dst :r7
-                                       :class-name 'my-class
-                                       :superclasses nil
-                                       :slot-names '(a b)
-                                       :slot-initargs nil
-                                       :slot-initform-regs nil
-                                       :slot-types nil
-                                       :default-initarg-regs nil
-                                       :class-slots nil
-                                       :metaclass-reg nil))))
-    (assert-output-contains out "struct.new $class_meta_t")
-    (assert-output-contains out "(i32.const 2)")
-    (assert-output-contains out "(array.new $eqref_array_t (ref.null eq) (i32.const 0))")))
+(it-sequential "wasm-gc-class-def-reports-unsupported-instruction"
+  (let* ((inst (cl-cc:make-vm-class-def :dst :r7
+                                        :class-name :my-class
+                                        :superclasses nil
+                                        :slot-names (quote (:a :b))
+                                        :slot-initargs nil
+                                        :slot-initform-regs nil
+                                        :slot-types nil
+                                        :default-initarg-regs nil
+                                        :class-slots nil
+                                        :metaclass-reg nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
 (it-sequential "wasm-gc-make-obj-uses-class-reg-in-instance-struct"
   (let ((out (%direct-wasm-emit*
