@@ -72,4 +72,15 @@
                        :to-equal (quote (:not-run)))
       (cl-weave:signals error
         (%ensure-no-expected-failure-violations violations)))))
+(cl-weave:it-sequential "expected-failure event normalization preserves pass paths"
+  (let* ((event (cl-weave::make-test-event
+                  :status :pass
+                  :path (list "suite" "passing test")))
+         (result (%expected-failure-result-from-event event)))
+    (cl-weave:expect (getf result :path) :to-equal "suite > passing test")
+    (cl-weave:expect (getf result :status) :to-be :pass)
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results nil (list result) :require-complete t)
+      (cl-weave:expect matched :to-equal nil)
+      (cl-weave:expect violations :to-equal nil))))
 (in-suite cl-cc-suite)

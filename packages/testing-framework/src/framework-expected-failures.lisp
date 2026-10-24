@@ -46,24 +46,25 @@
                        :condition-class (when condition
                                          (%expected-failure-print-value
                                           (type-of condition))))))
-    (if (eq status :error)
-        (append result
-                (list :condition-message (princ-to-string condition)))
-        (if assertion
-            (append result
-                    (list :assertion-form
-                          (%expected-failure-collapse-whitespace
-                           (%expected-failure-print-value
-                            (cl-weave::assertion-detail-form assertion)))
-                          :matcher (%expected-failure-print-value
-                                    (cl-weave::assertion-detail-matcher assertion))
-                          :actual (%expected-failure-print-value
-                                   (cl-weave::assertion-detail-actual assertion))
-                          :expected (%expected-failure-print-value
-                                     (cl-weave::assertion-detail-expected assertion))
-                          :negated (%expected-failure-print-value
-                                    (cl-weave::assertion-detail-negated assertion)))
-            result)))))
+    (cond
+      ((eq status :error)
+       (append result
+               (list :condition-message (princ-to-string condition))))
+      (assertion
+       (append result
+               (list :assertion-form
+                     (%expected-failure-collapse-whitespace
+                      (%expected-failure-print-value
+                       (cl-weave::assertion-detail-form assertion)))
+                     :matcher (%expected-failure-print-value
+                               (cl-weave::assertion-detail-matcher assertion))
+                     :actual (%expected-failure-print-value
+                              (cl-weave::assertion-detail-actual assertion))
+                     :expected (%expected-failure-print-value
+                                (cl-weave::assertion-detail-expected assertion))
+                     :negated (%expected-failure-print-value
+                               (cl-weave::assertion-detail-negated assertion)))))
+      (t result))))
 
 (defun %expected-failure-valid-entry-p (entry)
   (and (listp entry)
