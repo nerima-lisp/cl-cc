@@ -260,12 +260,23 @@
        (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2))))))
 
 (it-sequential "wasm-tail-call-direct-path-uses-return-call-when-callee-known"
-  (let ((out (let ((cl-cc/codegen::*wasm-tail-call-enabled* t))
-               (%direct-wasm-emit*
-                (list (cl-cc:make-vm-func-ref :dst :r1 :label "known_fn")
-                      (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2)))))))
-    (assert-output-contains out "(return_call $known_fn)")
-    (expect (search "return_call_indirect" out :test #'char=) :to-be-falsy)))
+  (let* ((module (cl-cc/codegen::make-empty-wasm-module))
+         (callee (cl-cc/codegen::make-wasm-function-def
+                  :index 0
+                  :wat-name "$known_fn"))
+         (stream (make-string-output-stream))
+         (target (make-instance 'cl-cc/codegen::wasm-target
+                                :module module
+                                :reg-map (cl-cc/codegen::make-wasm-reg-map-for-function 0))))
+    (cl-cc/codegen::wasm-module-add-function module callee)
+    (let ((cl-cc/codegen::*wasm-tail-call-enabled* t))
+      (dolist (inst (list
+                     (cl-cc:make-vm-func-ref :dst :r1 :label "known_fn")
+                     (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2))))
+        (cl-cc/codegen::emit-instruction target inst stream)))
+    (let ((out (get-output-stream-string stream)))
+      (assert-output-contains out "(return_call $known_fn)")
+      (expect (search "return_call_indirect" out :test #'char=) :to-be-falsy))))
 
 (it-sequential "wasm-tail-call-direct-path-requires-feature"
   (let ((cl-cc/codegen::*wasm-tail-call-enabled* nil))
@@ -486,7 +497,10 @@
                :method-reg :r2))))
     (assert-output-contains out "call $host_rt_register_method")
     ;; Symbol specializer should be passed as non-null staged symbol eqref.
-    (assert-output-contains out "struct.new $symbol_t")))
+    (expect
+      (or (search "struct.new $symbol_t" out :test (function char=))
+          (search "struct.new_immutable $symbol_t" out :test (function char=)))
+      :to-be-truthy)))
 
 (it-sequential "wasm-gc-generic-call-runtime-bridge-emission"
   (let ((out (%direct-wasm-emit

@@ -12,9 +12,9 @@
   (destructuring-bind (inst) (list (cl-cc:make-vm-label :name "test"))
     (expect (cl-cc/codegen::instruction-size inst) :to-equal 0)))
 
-(it-sequential "x86-instruction-size-zero-cases unknown"
-  (destructuring-bind (inst) (list (list :not-a-real-inst))
-    (expect (cl-cc/codegen::instruction-size inst) :to-equal 0)))
+(it-sequential "x86-instruction-size rejects unknown instruction"
+  (signals error
+    (cl-cc/codegen::instruction-size '(:not-a-real-inst))))
 
 ;;; ─── build-label-offsets ────────────────────────────────────────────────
 

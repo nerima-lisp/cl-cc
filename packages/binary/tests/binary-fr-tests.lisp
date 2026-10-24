@@ -182,7 +182,8 @@
                                        (cl-cc:make-vm-ret :reg :r0))
                    :result-register :r0))
          (bytes (%fr-byte-list
-                 (let ((cl-cc/codegen:*zero-cost-eh-enabled* t))
+                 (let ((cl-cc/codegen:*zero-cost-eh-enabled* t)
+                      (cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                    (cl-cc/codegen:compile-to-x86-64-bytes program)))))
     (expect (search '(#x49 #xBB) bytes :test #'eql) :to-be-truthy)
     (expect (search '(#x41 #xFF #xE3) bytes :test #'eql) :to-be-truthy)
