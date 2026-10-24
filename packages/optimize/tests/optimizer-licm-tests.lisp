@@ -387,7 +387,9 @@
     (setf (cl-cc/optimize:bb-instructions b) (list c42))
     (let ((env (cl-cc/optimize::%opt-pre-block-out-env b constant-ids)))
       (expect (hash-table-p env) :to-be-truthy)
-      (expect (gethash (list :const (gethash 42 constant-ids)) env) :to-equal :r0))))
+      (progn
+        (expect (nth-value 1 (gethash 42 constant-ids)) :to-be-truthy)
+        (expect (gethash (list :const (gethash 42 constant-ids)) env) :to-equal :r0)))))
 
 (it-sequential "pre-block-out-env-removes-stale-entries-on-overwrite"
   (let* ((b (make-instance (quote cl-cc/optimize:basic-block)))

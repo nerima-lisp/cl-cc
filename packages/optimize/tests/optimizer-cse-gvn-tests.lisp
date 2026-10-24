@@ -283,7 +283,9 @@
          (key (cl-cc/optimize::%gvn-key
                (make-vm-const :dst :r0 :value 5)
                gen val-env constant-ids)))
-    (expect key :to-equal (list :const (gethash 5 constant-ids)))
+    (progn
+      (expect (nth-value 1 (gethash 5 constant-ids)) :to-be-truthy)
+      (expect key :to-equal (list :const (gethash 5 constant-ids))))
     (expect key :to-equal
             (cl-cc/optimize::%gvn-key
              (make-vm-const :dst :r1 :value 5)
