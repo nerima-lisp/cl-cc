@@ -9,6 +9,7 @@
 ;;; - compile-string :target :wasm integration
 
 (in-package :cl-cc/test)
+(in-suite cl-cc-integration-suite)
 
 
 

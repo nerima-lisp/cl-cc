@@ -7,6 +7,7 @@
 ;;;; - FR-560/561/562: Zero-cost EH table selection and landing pads
 
 (in-package :cl-cc/test)
+(in-suite cl-cc-integration-suite)
 
 
 

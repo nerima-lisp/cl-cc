@@ -8,6 +8,7 @@
 ;;;;   - Regression guard: arm64 and x86-64 backends produce different bytes
 
 (in-package :cl-cc/test)
+(in-suite cl-cc-integration-suite)
 
 
 ;;; ─────────────────────────────────────────────────────────────────────────
