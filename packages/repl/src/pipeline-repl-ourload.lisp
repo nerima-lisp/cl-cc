@@ -32,12 +32,12 @@
              (when end (subseq trimmed 1 end))))
           (t nil))))))
 
-(defun our-load (pathname &key (verbose nil) (print nil) (if-does-not-exist :error)
+(defun %our-load-source (pathname &key (verbose nil) (print nil) (if-does-not-exist :error)
                                   (external-format :default))
   "Load a Lisp source file by reading, compiling, and executing each form."
   (declare (ignore external-format))
   (when (and (eq if-does-not-exist nil) (not (probe-file pathname)))
-    (return-from our-load nil))
+    (return-from %our-load-source nil))
   (let ((path (namestring (truename pathname))))
     (when verbose
       (format *standard-output* "; Loading ~A~%" path))
@@ -105,6 +105,41 @@
                    (setf last-result (run-form-repl form))
                    (when print
                     (format *standard-output* "~S~%" last-result)))))))))))
+(defun our-load (pathname &key (verbose nil) (print nil) (if-does-not-exist :error)
+                                  (external-format :default))
+  (when (and (eq if-does-not-exist nil) (not (probe-file pathname)))
+    (return-from our-load nil))
+  (%ensure-repl-state)
+  (let* ((load-pathname (cl:pathname pathname))
+         (load-truename (cl:truename pathname))
+         (globals (vm-global-vars *repl-vm-state*))
+         (load-bindings
+           (remove-duplicates
+            (list (cons (find-symbol "*LOAD-PATHNAME*" :cl-cc/vm) load-pathname)
+                  (cons (find-symbol "*LOAD-TRUENAME*" :cl-cc/vm) load-truename)
+                  (cons (find-symbol "*LOAD-PATHNAME*" :cl) load-pathname)
+                  (cons (find-symbol "*LOAD-TRUENAME*" :cl) load-truename))
+            :key #'car :test #'eq))
+         (previous-bindings
+           (mapcar (lambda (binding)
+                     (multiple-value-bind (value present-p)
+                         (gethash (car binding) globals)
+                       (list (car binding) value present-p)))
+                   load-bindings)))
+    (unwind-protect
+         (progn
+           (dolist (binding load-bindings)
+             (setf (gethash (car binding) globals) (cdr binding)))
+           (%our-load-source pathname
+                             :verbose verbose
+                             :print print
+                             :if-does-not-exist if-does-not-exist
+                             :external-format external-format))
+      (dolist (binding previous-bindings)
+        (destructuring-bind (symbol value present-p) binding
+          (if present-p
+              (setf (gethash symbol globals) value)
+              (remhash symbol globals)))))))
 
 (defun %sync-repl-globals-into-vm-state (target-state)
   "Copy globals defined in the persistent REPL state into TARGET-STATE, but only
