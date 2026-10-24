@@ -46,9 +46,33 @@ against: the set has to be identical to what the old package scan produced."
      translations)))
 (defun %register-package-runtime-bridges ()
   (cl-cc/vm:vm-register-host-bridge
-   'cl:make-package
-   (lambda (name &key nicknames (use '(:cl)))
-     (cl-cc/runtime:rt-make-package name :nicknames nicknames :use use))))
+   (quote cl:make-package)
+   (lambda (name &key nicknames (use (quote (:cl))))
+     (cl-cc/runtime:rt-make-package name :nicknames nicknames :use use)))
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:symbol-name)
+   (lambda (symbol)
+     (let ((guest-symbol (if (cl-cc/vm::vm-immediate-symbol-p symbol)
+                             (cl-cc/vm::vm-decode-symbol symbol)
+                             symbol)))
+       (cl-cc/runtime:rt-symbol-name guest-symbol))))
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:intern)
+   (lambda (name &optional package)
+     (let* ((state cl-cc/vm:*vm-state*)
+            (globals (and state (cl-cc/vm:vm-global-vars state)))
+            (guest-name (if (cl-cc/vm::vm-immediate-symbol-p name)
+                            (cl-cc/vm::vm-decode-symbol name)
+                            name))
+            (guest-package (or package
+                               (and globals
+                                    (gethash (quote cl:*package*) globals))))
+            (guest-package (if (cl-cc/vm::vm-immediate-symbol-p guest-package)
+                               (cl-cc/vm::vm-decode-symbol guest-package)
+                               guest-package)))
+       (cl-cc/runtime:rt-intern
+        (cl-cc/vm::%vm-host-string guest-name)
+        (cl-cc/vm::%vm-host-string guest-package))))))
 (defun %register-backend-runtime-bridges ()
   "Register built-in package/pathname and loaded backend runtime bridges.
 

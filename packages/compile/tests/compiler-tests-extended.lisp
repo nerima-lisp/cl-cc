@@ -58,6 +58,20 @@
        (nth-value 1 (find-symbol (string :exported) pkg)))"
     :stdlib t)
    :to-equal :external))
+(it-sequential "compile-package-function-designators-use-current-package"
+  (expect
+   (run-string
+    "(let* ((pkg (make-package :cl-cc-package-function-designators :use nil))
+            (*package* pkg)
+            (symbols (mapcar (function intern)
+                             (mapcar (function symbol-name)
+                                     (list :alpha :beta)))))
+       (and (equal (mapcar (function symbol-name) symbols)
+                   (mapcar (function symbol-name) (list :alpha :beta)))
+            (eq (symbol-package (first symbols)) pkg)
+            (eq (symbol-package (second symbols)) pkg)))"
+    :stdlib t)
+   :to-be-truthy))
 
 (it-sequential "compile-float-inspection-builtins float-precision"
   (destructuring-bind (form expected) (list "(float-precision 1.0)" (float-precision 1.0))
