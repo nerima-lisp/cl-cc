@@ -485,3 +485,26 @@
                                 (uiop:find-symbol* '#:selfhost-suite :cl-cc/test)
                                 :parallel nil
                                 :random nil)))
+(asdf:defsystem "cl-cc/test/pipeline-php"
+  :description "PHP pipeline end-to-end tests."
+  :depends-on (:cl-cc :cl-cc-testing-framework)
+  :serial t
+  :components
+  ((:module "pipeline-php-tests"
+     :pathname "packages/pipeline/tests"
+     :serial t
+     :components
+     ((:file "pipeline-php-e2e-tests")))))
+(asdf:defsystem "cl-cc/test/pipeline-javascript"
+  :description "JavaScript pipeline end-to-end tests."
+  :depends-on (:cl-cc :cl-cc-testing-framework)
+  :serial t
+  :components
+  ((:module "pipeline-javascript-tests"
+     :pathname "packages/pipeline/tests"
+     :serial t
+     :components
+     ((:file "pipeline-javascript-e2e-core-tests")
+      (:file "pipeline-javascript-e2e-advanced-tests")
+      (:file "pipeline-javascript-e2e-advanced-builtins-tests")
+      (:file "pipeline-javascript-e2e-modern-tests")))))
