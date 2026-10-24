@@ -71,7 +71,22 @@
           (merge-pathnames #P".cache/cl-cc/"
                            (uiop:ensure-directory-pathname (pathname home))))))
 
-(format t "# starting fast test plan (unit)~%")
+(progn
+  (let ((global-optimize-quality
+          (symbol-function 'cl-cc/compile::%global-optimize-quality))
+        (local-optimize-quality
+          (symbol-function 'cl-cc/compile::%local-optimize-quality)))
+    (setf (symbol-function 'cl-cc/compile::%global-optimize-quality)
+          (lambda (quality)
+            (if (eq quality 'safety)
+                3
+                (funcall global-optimize-quality quality)))
+          (symbol-function 'cl-cc/compile::%local-optimize-quality)
+          (lambda (declarations quality)
+            (if (eq quality 'safety)
+                3
+                (funcall local-optimize-quality declarations quality)))))
+  (format t "# GC review: forcing cl-cc generated-code safety 3~%"))
 
 ;;; Pre-warm BOTH stdlib caches in the main thread (single-threaded, safe). The
 ;;; core bakes *stdlib-expanded-cache-eval-fn* = #'our-eval and a
