@@ -398,7 +398,7 @@ $c = new C(); echo $c->hello();")
             :to-equal "A"))
 
 ;; t/parser-class-e2e-test.lisp:372 "conflicting trait methods with no insteadof clause report a clear error
-instead of silently picking one trait's version"
+;; instead of silently picking one trait's version"
 (it-sequential
     "conflicting trait methods with no insteadof clause report a clear error
 instead of silently picking one trait's version"
@@ -464,7 +464,7 @@ $s = new Square(4); echo $s->describe();")
             :to-equal "area=16"))
 
 ;; t/parser-class-e2e-test.lisp:432 "instantiating an abstract class directly is currently NOT rejected —
-unlike real PHP's fatal \"Cannot instantiate abstract class\" error"
+;; unlike real PHP's fatal \"Cannot instantiate abstract class\" error"
 (it-sequential
     "instantiating an abstract class directly is currently NOT rejected —
 unlike real PHP's fatal \"Cannot instantiate abstract class\" error"
@@ -493,7 +493,7 @@ unlike real PHP's fatal \"Cannot instantiate abstract class\" error"
             :to-equal "hi"))
 
 ;; t/parser-class-e2e-test.lisp:458 "an abstract class using a trait, and a concrete subclass of it, both get
-the trait's methods"
+;; the trait's methods"
 (it-sequential
     "an abstract class using a trait, and a concrete subclass of it, both get
 the trait's methods"
@@ -518,7 +518,7 @@ $p = new Point(5); echo $p->x;")
             :to-equal "5"))
 
 ;; t/parser-class-e2e-test.lisp:480 "reassigning a readonly property after construction is currently NOT
-rejected — unlike real PHP's fatal \"Cannot modify readonly property\" error"
+;; rejected — unlike real PHP's fatal \"Cannot modify readonly property\" error"
 (it-sequential
     "reassigning a readonly property after construction is currently NOT
 rejected — unlike real PHP's fatal \"Cannot modify readonly property\" error"
@@ -544,7 +544,7 @@ $p = new Point(5); $p->x = 99; echo $p->x;")
             :to-equal "hi"))
 
 ;; t/parser-class-e2e-test.lisp:503 "extending a final class is currently NOT rejected — unlike real PHP's
-fatal \"Cannot extend final class\" error"
+;; fatal \"Cannot extend final class\" error"
 (it-sequential
     "extending a final class is currently NOT rejected — unlike real PHP's
 fatal \"Cannot extend final class\" error"
@@ -1090,7 +1090,7 @@ fatal \"Cannot extend final class\" error"
       (expect (cl-cc/ast:ast-let-p (first forms)) :to-be-truthy)))
 
 ;; t/parser-e2e-test.lisp:459 "goto's target label statement is not yet supported, but now reports a
-clear diagnostic instead of a confusing generic parse error"
+;; clear diagnostic instead of a confusing generic parse error"
 (it-sequential
     "goto's target label statement is not yet supported, but now reports a
 clear diagnostic instead of a confusing generic parse error"
@@ -1121,7 +1121,7 @@ clear diagnostic instead of a confusing generic parse error"
       (expect (search "labeled statement" (princ-to-string condition)) :to-be-truthy)))
 
 ;; t/parser-e2e-test.lisp:487 "prefix ++ on a non-assignable operand reports a clear diagnostic, not an
-internal arity error"
+;; internal arity error"
 (it-sequential
     "prefix ++ on a non-assignable operand reports a clear diagnostic, not an
 internal arity error"
@@ -1675,9 +1675,9 @@ internal arity error"
             :to-equal "a1b2"))
 
 ;; t/runtime-builtins-array-e2e-test.lisp:343 "array_walk/array_walk_recursive's by-ref callback parameter does not
-mutate the array — the callback is invoked with the plain value, not a PHP
-reference box, so any assignment inside a `function(&$value)` callback is
-lost"
+;; mutate the array — the callback is invoked with the plain value, not a PHP
+;; reference box, so any assignment inside a `function(&$value)` callback is
+;; lost"
 (it-sequential
     "array_walk/array_walk_recursive's by-ref callback parameter does not
 mutate the array — the callback is invoked with the plain value, not a PHP
@@ -2034,7 +2034,7 @@ echo $r->getMangledName();
       "name"))
 
 ;; t/runtime-builtins-io-objects-php85-test.lisp:263 "%php-reflection-property-new always sets :public, so getMangledName never
-actually mangles a private/protected property's name"
+;; actually mangles a private/protected property's name"
 (it-sequential
     "%php-reflection-property-new always sets :public, so getMangledName never
 actually mangles a private/protected property's name"
