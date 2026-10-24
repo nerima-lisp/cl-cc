@@ -94,12 +94,12 @@
 ;;; ─── enode-memo-key ──────────────────────────────────────────────────────
 
 (it-sequential "enode-memo-key nullary"
-  (destructuring-bind (op children expected) (list 'const nil '(const))
+  (destructuring-bind (op children expected) (list 'const nil '(const nil nil nil))
     (let ((node (cl-cc/optimize:make-e-node :op op :children children)))
     (expect (cl-cc/optimize::enode-memo-key node) :to-equal expected))))
 
 (it-sequential "enode-memo-key binary"
-  (destructuring-bind (op children expected) (list 'add '(0 1) '(add 0 1))
+  (destructuring-bind (op children expected) (list 'add '(0 1) '(add (0 1) nil nil))
     (let ((node (cl-cc/optimize:make-e-node :op op :children children)))
     (expect (cl-cc/optimize::enode-memo-key node) :to-equal expected))))
 
@@ -270,39 +270,38 @@
 ;;; ─── %egraph-rewrite-inst ────────────────────────────────────────────────
 
 (it-sequential "egraph-rewrite-inst-no-dst-returns-unchanged"
-  (let* ((eg         (make-test-egraph))
-         (reg-map    (make-hash-table :test #'eq))
-         (class->regs (make-hash-table :test #'equal))
-         (ret        (make-vm-ret :reg :r0)))
-    (let ((result (cl-cc/optimize::%egraph-rewrite-inst ret eg reg-map class->regs)))
+  (let* ((eg (make-test-egraph))
+         (class->representative (make-hash-table :test #'equal))
+         (ret (make-vm-ret :reg :r0)))
+    (let ((result (cl-cc/optimize::%egraph-rewrite-inst
+                   ret nil eg class->representative 0 nil)))
       (expect result :to-be ret))))
 
 (it-sequential "egraph-rewrite-inst-dst-in-const-class-becomes-vm-const"
-  (let* ((eg         (make-test-egraph))
-         (class-id   (cl-cc/optimize:egraph-add eg 'const))
-         (class-ht   (gethash (cl-cc/optimize:egraph-find eg class-id) (cl-cc:eg-classes eg)))
-         (reg-map    (make-hash-table :test #'eq))
-         (class->regs (make-hash-table :test #'equal))
-         (move       (make-vm-move :dst :r1 :src :r0)))
+  (let* ((eg (make-test-egraph))
+         (class-id (cl-cc/optimize:egraph-add eg 'const))
+         (class-ht (gethash (cl-cc/optimize:egraph-find eg class-id)
+                            (cl-cc:eg-classes eg)))
+         (class->representative (make-hash-table :test #'equal))
+         (move (make-vm-move :dst :r1 :src :r0)))
     (setf (cl-cc:ec-data class-ht) 42)
-    (setf (gethash :r1 reg-map) class-id)
-    (let ((result (cl-cc/optimize::%egraph-rewrite-inst move eg reg-map class->regs)))
+    (let ((result (cl-cc/optimize::%egraph-rewrite-inst
+                   move class-id eg class->representative 0 nil)))
       (expect (cl-cc:vm-const-p result) :to-be-truthy)
       (expect (cl-cc:vm-dst result) :to-be :r1)
       (expect (cl-cc/vm::vm-value result) :to-equal 42))))
 
 (it-sequential "egraph-rewrite-inst-dst-with-alias-becomes-vm-move"
-  (let* ((eg         (make-test-egraph))
-         (class-id   (cl-cc/optimize:egraph-add eg 'add
-                       (cl-cc/optimize:egraph-add eg 'const)
-                       (cl-cc/optimize:egraph-add eg 'const)))
-         (reg-map    (make-hash-table :test #'eq))
+  (let* ((eg (make-test-egraph))
+         (class-id (cl-cc/optimize:egraph-add eg 'add
+                      (cl-cc/optimize:egraph-add eg 'const)
+                      (cl-cc/optimize:egraph-add eg 'const)))
          (class->representative (make-hash-table :test #'equal))
-         (canon      (cl-cc/optimize:egraph-find eg class-id))
-         (add-inst   (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
-    (setf (gethash :r2 reg-map) class-id)
-    (setf (gethash canon class->representative) :r3)
-    (let ((result (cl-cc/optimize::%egraph-rewrite-inst add-inst eg reg-map class->representative)))
+         (canon (cl-cc/optimize:egraph-find eg class-id))
+         (add-inst (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
+    (setf (gethash canon class->representative) (cons 0 :r3))
+    (let ((result (cl-cc/optimize::%egraph-rewrite-inst
+                   add-inst class-id eg class->representative 1 #(0 0))))
       (expect (cl-cc:vm-move-p result) :to-be-truthy)
       (expect (cl-cc:vm-dst result) :to-be :r2)
       (expect (cl-cc/vm::vm-src result) :to-be :r3))))

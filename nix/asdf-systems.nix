@@ -1,6 +1,7 @@
 {
   lib,
   sbcl,
+  buildAsdfSystem,
   clPrologKit,
   clWeave,
   clParserKit,
@@ -61,7 +62,7 @@ let
       allSystems,
       extraLispLibs ? [ ],
     }:
-    sbcl.buildASDFSystem {
+    buildAsdfSystem {
       pname = name;
       version = "0.2.0";
       src = pkgSrc src;
@@ -308,7 +309,7 @@ let
   # dependency closure, so it is exposed here rather than through
   # `mkAsdfSystem`'s internal-only `deps` lookup (which only resolves names
   # against `productionAsdfSystems`, not external flake inputs).
-  cl-cc-prolog-tools = sbcl.buildASDFSystem {
+  cl-cc-prolog-tools = buildAsdfSystem {
     pname = "cl-cc-prolog-tools";
     version = "0.2.0";
     src = pkgSrc "packages/prolog-tools";
@@ -322,12 +323,13 @@ let
   # Its cl-weave test suite is a separate system/derivation so the
   # cl-weave dependency stays test-only, never reaching the production
   # cl-cc-prolog-tools closure above.
-  cl-cc-prolog-tools-test = sbcl.buildASDFSystem {
+  cl-cc-prolog-tools-test = buildAsdfSystem {
     pname = "cl-cc-prolog-tools-test";
     version = "0.2.0";
     src = pkgSrc "packages/prolog-tools";
     systems = [ "cl-cc-prolog-tools/tests" ];
     lispLibs = [
+      cl-cc-prolog-tools
       productionAsdfSystems.cl-cc-ast
       clPrologKit
       clWeave
@@ -350,7 +352,7 @@ let
   # Keep self-hosting E2E tests available as an explicit system; the canonical
   # fast test app does not auto-load it.
   testAsdfSystems = {
-    "cl-cc-jit/tests" = sbcl.buildASDFSystem {
+    "cl-cc-jit/tests" = buildAsdfSystem {
       pname = "cl-cc-jit-tests";
       version = "0.2.0";
       src = pkgSrc testSrc;
@@ -371,7 +373,7 @@ let
         cl-cc-testing-framework
       ];
     };
-    "cl-cc/test" = sbcl.buildASDFSystem {
+    "cl-cc/test" = buildAsdfSystem {
       # pname stays hyphenated: it becomes a store path component, which cannot
       # contain a slash. Only `systems` names the ASDF system.
       pname = "cl-cc-test";
@@ -410,7 +412,7 @@ let
         cl-cc-formatter
       ];
     };
-    "cl-cc-javascript-test" = sbcl.buildASDFSystem {
+    "cl-cc-javascript-test" = buildAsdfSystem {
       pname = "cl-cc-javascript-test";
       version = "0.2.0";
       src = pkgSrc testSrc;
@@ -425,7 +427,7 @@ let
         cl-cc-javascript
       ];
     };
-    "cl-cc/test/e2e" = sbcl.buildASDFSystem {
+    "cl-cc/test/e2e" = buildAsdfSystem {
       pname = "cl-cc-test-e2e";
       version = "0.2.0";
       src = pkgSrc testSrc;
@@ -435,6 +437,7 @@ let
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
+        cl-cc-formatter
       ];
     };
   };

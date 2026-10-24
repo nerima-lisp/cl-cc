@@ -92,59 +92,59 @@
     # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
     # once those releases are tagged.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast/a45c5acecfccb91a43f6a04251e8a5d6ec3d3213";
+      url = "github:nerima-lisp/cl-cc-ast/9342f855b64d88f89e99be6a0ba1619e2b02280b";
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type/ff2e742911b4b193457a75208b7b9ad6b06ab23a";
+      url = "github:nerima-lisp/cl-cc-type/1fd5b0afb0245edb965d33cc492988e6bb9f2caf";
       flake = false;
     };
     cl-cc-binary = {
-      url = "github:nerima-lisp/cl-cc-binary/4c0661c1b2e22be5f28277b0d563eea6651c51e3";
+      url = "github:nerima-lisp/cl-cc-binary/3fa4d4b00f4a6298f4b1e78c11930a74f14a8da2";
       flake = false;
     };
     cl-cc-bootstrap = {
-      url = "github:nerima-lisp/cl-cc-bootstrap/027f6c9826010c15789454e69abd2930738b50af";
+      url = "github:nerima-lisp/cl-cc-bootstrap/1a4c69756d6cf268c93e613641bf9f137b32559e";
       flake = false;
     };
     cl-cc-vm = {
-      url = "github:nerima-lisp/cl-cc-vm/462213fcf5e0e6cecc09992e8cb0b7ed48dbce2f";
+      url = "github:nerima-lisp/cl-cc-vm/9d084d4357cf30abf4875f63335a94eddaf6a9eb";
       flake = false;
     };
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/663c4c01c800ca7e64d444c53204645173e84854";
+      url = "github:nerima-lisp/cl-cc-mir/eee6b5a4bcf76eeb25c461296b3c33092c8563b6";
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/681e60997c212c47feafc3956ae1b6b923ad2d36";
+      url = "github:nerima-lisp/cl-cc-cps/aa6b7cbc98fa6e5f597104acb7c6b09ba9c2d796";
       flake = false;
     };
     cl-cc-expand = {
-      url = "github:nerima-lisp/cl-cc-expand/b260853bb668e488af0ea3d1ebfad6db35d1b7c3";
+      url = "github:nerima-lisp/cl-cc-expand/105aa913ba2680bd0e3ce68725a31dc6ddfcbf56";
       flake = false;
     };
     cl-cc-optimize = {
-      url = "github:nerima-lisp/cl-cc-optimize/f6cd93f54b4e04083aad0f3fee30def14a427f89";
+      url = "github:nerima-lisp/cl-cc-optimize/369fc4c42a5893915ec29d4ca05fb0eb24c3af6a";
       flake = false;
     };
     cl-cc-codegen-native = {
-      url = "github:nerima-lisp/cl-cc-codegen-native/8f749c1d4d83b9f68595ee88af0d1207d7dd68db";
+      url = "github:nerima-lisp/cl-cc-codegen-native/3bc0966c82cbd11d83899d1661ea428dc7bb5ee1";
       flake = false;
     };
     cl-cc-parse = {
-      url = "github:nerima-lisp/cl-cc-parse/75d8699835731ec6ca44e15c82ef02601f5100fe";
+      url = "github:nerima-lisp/cl-cc-parse/5c11a5149e4f86c0fedbd4d1f47c4d815c38f681";
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/ee65c1d2ba3c9cec825f737251628b4c3c02390d";
+      url = "github:nerima-lisp/cl-cc-php/d59cdbf72bffacf77a276dfb3492f2be35e8a363";
       flake = false;
     };
     cl-cc-javascript = {
-      url = "github:nerima-lisp/cl-cc-javascript/da713f534812427099b9049a8b64ac431c8ea63f";
+      url = "github:nerima-lisp/cl-cc-javascript/ea2e920ed36ba203943fc62bcac1d70d79dcfa29";
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/d23ea44512b162def39ec981426c4c8e1af4df84";
+      url = "github:nerima-lisp/cl-cc-runtime/79a6102ff1c7c155d592961317c980a6e05c1a0c";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
@@ -254,7 +254,20 @@
           dispatchModule = import ./nix/dispatch-sem-fix.nix { inherit pkgs lib; };
           dispatchSemFix = dispatchModule.dispatchSemFix or null;
           sbclModule = import ./nix/sbcl.nix { inherit pkgs; };
-          inherit (sbclModule) sbcl sbclBootstrap;
+          sbclBase = sbclModule.sbcl;
+          buildAsdfSystem =
+            args:
+            (sbclBase.buildASDFSystem args)
+            // {
+              asdfMetadata = {
+                inherit (args) pname src systems;
+                lispLibs = args.lispLibs or [ ];
+              };
+            };
+          sbcl = sbclBase // {
+            buildASDFSystem = buildAsdfSystem;
+          };
+          inherit (sbclModule) sbclBootstrap;
 
           # Sibling toolkits, built from the pinned source trees. The `version`
           # of each mirrors the tag or commit its input is pinned to.
@@ -621,6 +634,7 @@
               clCcPhp
               clCcJavascript
               ;
+            buildAsdfSystem = sbcl.buildASDFSystem;
           };
           inherit (asdf)
             productionAsdfSystems
@@ -632,6 +646,107 @@
             cl-cc-prolog-tools
             cl-cc-prolog-tools-test
             ;
+
+          childFlakeSources = [
+            {
+              name = "bootstrap";
+              source = inputs.cl-cc-bootstrap;
+            }
+            {
+              name = "ast";
+              source = inputs.cl-cc-ast;
+            }
+            {
+              name = "parse";
+              source = inputs.cl-cc-parse;
+            }
+            {
+              name = "expand";
+              source = inputs.cl-cc-expand;
+            }
+            {
+              name = "cps";
+              source = inputs.cl-cc-cps;
+            }
+            {
+              name = "type";
+              source = inputs.cl-cc-type;
+            }
+            {
+              name = "optimize";
+              source = inputs.cl-cc-optimize;
+            }
+            {
+              name = "mir";
+              source = inputs.cl-cc-mir;
+            }
+            {
+              name = "codegen-native";
+              source = inputs.cl-cc-codegen-native;
+            }
+            {
+              name = "binary";
+              source = inputs.cl-cc-binary;
+            }
+            {
+              name = "vm";
+              source = inputs.cl-cc-vm;
+            }
+            {
+              name = "runtime";
+              source = inputs.cl-cc-runtime;
+            }
+            {
+              name = "php";
+              source = inputs.cl-cc-php;
+            }
+            {
+              name = "javascript";
+              source = inputs.cl-cc-javascript;
+            }
+          ];
+
+          asdfSystemDerivations = lib.unique (
+            builtins.attrValues productionAsdfSystems
+            ++ builtins.attrValues testAsdfSystems
+            ++ [
+              clPrologKit
+              clWeave
+              clParserKit
+              clDataflowKit
+              clLogKit
+              clBoundaryKit
+              clCli
+              clTtyKit
+              clRegexKit
+              clHostKit
+              clCcAst
+              clCcType
+              clProcessKit
+              clJsonKit
+              clDateKit
+              clConcurrentKit
+              clCodecKit
+              clCcRuntime
+              clCcBootstrap
+              clCcVm
+              clCcMir
+              clCcCps
+              clCcExpand
+              clCcOptimize
+              clCcRegalloc
+              clCcCodegen
+              clCcEmit
+              clCcParse
+              clCcPhp
+              clCcJavascript
+              clCcBinary
+              cl-cc-prolog-tools
+              cl-cc-prolog-tools-test
+            ]
+          );
+
+          rootLock = builtins.fromJSON (builtins.readFile ./flake.lock);
 
           binaryModule = import ./nix/binary.nix {
             inherit
@@ -700,6 +815,9 @@
               clPrologKit
               clWeave
               clCcAst
+              rootLock
+              childFlakeSources
+              asdfSystemDerivations
               ;
             inherit (appsModule) apps;
           };
@@ -715,7 +833,13 @@
               test-image = testImage;
             };
           inherit (appsModule) apps;
-          inherit (checksModule) testSuite jitTests prologToolsTests;
+          inherit (checksModule)
+            testSuite
+            jitTests
+            prologToolsTests
+            toolkitPinConsistency
+            lisplibsConsistency
+            ;
           inherit (devshellModule) devShells;
         }
       );
@@ -754,6 +878,9 @@
         # The JIT write-barrier suite is a secondary ASDF system and must be
         # exercised explicitly; building its FASLs alone does not run tests.
         cl-cc-jit-tests = perSystem.${system}.jitTests;
+
+        toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
+        lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
       });
 
       apps = forAllSystems (system: perSystem.${system}.apps);
