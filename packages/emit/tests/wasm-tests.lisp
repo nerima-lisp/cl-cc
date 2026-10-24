@@ -368,25 +368,11 @@
     (expect message :to-equal
             "Unsupported WASM instruction: VM-SLOT-READ has no slot index for :FOO")))
 
-(it-sequential "wasm-gc-slot-read-write-use-class-slot-index-mapping"
-  (let ((out (%direct-wasm-emit*
-              (list (cl-cc:make-vm-class-def :dst :r9
-                                             :class-name 'my-class
-                                             :superclasses nil
-                                             :slot-names '(foo bar baz)
-                                             :slot-initargs nil
-                                             :slot-initform-regs nil
-                                             :slot-types nil
-                                             :default-initarg-regs nil
-                                             :class-slots nil
-                                             :metaclass-reg nil)
-                    (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'bar)
-                    (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name 'baz :value-reg :r2)))))
-    ;; bar => index 1, baz => index 2 from class-def slot order.
-    (assert-output-contains out "array.get $eqref_array_t")
-    (assert-output-contains out "(i32.const 1)")
-    (assert-output-contains out "array.set $eqref_array_t")
-    (assert-output-contains out "(i32.const 2)")))
+(it-sequential "wasm-gc-slot-write-without-class-layout"
+  (let* ((inst (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name :foo :value-reg :r2))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal
+            "Unsupported WASM instruction: VM-SLOT-WRITE has no slot index for :FOO")))
 
 (it-sequential "wasm-gc-slot-index-resolution-prefers-object-class-layout"
   (let ((out (%direct-wasm-emit*
