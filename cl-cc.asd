@@ -118,7 +118,7 @@
    ;; the same ground for cl-weave's own internals).
     (:module "testing-framework-tests"
      :pathname "packages/testing-framework/tests"
-     :components ((:file "framework-snapshot-tests")))
+     :components ((:file "framework-snapshot-tests") (:file "expected-failure-manifest-tests")))
     (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests") (:file "script-mode-tests")))
     (:module "parse-tests"
     :pathname "packages/parse/tests"
