@@ -277,29 +277,41 @@
     (expect (gethash '(:const 7) memo) :to-be :r0)))
 
 (it-sequential "gvn-key-result const-5"
-  (destructuring-bind (inst expected expect-non-nil) (list (make-vm-const :dst :r0 :value 5) '(:const 5) t)
-    (let* ((gen     (make-hash-table :test #'eq))
-         (val-env (make-hash-table :test #'eq))
-         (key     (cl-cc/optimize::%gvn-key inst gen val-env)))
-    (if expect-non-nil
-        (expect key :to-equal expected)
-        (expect key :to-be-null)))))
+  (let* ((gen (make-hash-table :test (function eq)))
+         (val-env (make-hash-table :test (function eq)))
+         (constant-ids (make-hash-table :test (function eql)))
+         (key (cl-cc/optimize::%gvn-key
+               (make-vm-const :dst :r0 :value 5)
+               gen val-env constant-ids)))
+    (expect key :to-equal (list :const (gethash 5 constant-ids)))
+    (expect key :to-equal
+            (cl-cc/optimize::%gvn-key
+             (make-vm-const :dst :r1 :value 5)
+             gen val-env constant-ids))
+    (expect (not (equal key
+                        (cl-cc/optimize::%gvn-key
+                         (make-vm-const :dst :r2 :value 6)
+                         gen val-env constant-ids)))
+            :to-be-truthy)))
 
 (it-sequential "gvn-key-result halt-impure"
-  (destructuring-bind (inst expected expect-non-nil) (list (make-vm-halt :reg :r0) nil nil)
-    (let* ((gen     (make-hash-table :test #'eq))
-         (val-env (make-hash-table :test #'eq))
-         (key     (cl-cc/optimize::%gvn-key inst gen val-env)))
-    (if expect-non-nil
-        (expect key :to-equal expected)
-        (expect key :to-be-null)))))
+  (let* ((gen (make-hash-table :test (function eq)))
+         (val-env (make-hash-table :test (function eq)))
+         (constant-ids (make-hash-table :test (function eql)))
+         (key (cl-cc/optimize::%gvn-key
+               (make-vm-halt :reg :r0)
+               gen val-env constant-ids)))
+    (expect key :to-be-null)))
 
 (it-sequential "gvn-key-pure-binop-returns-list-headed-by-type"
-  (let ((gen     (make-hash-table :test #'eq))
-        (val-env (make-hash-table :test #'eq)))
-    (let ((key (cl-cc/optimize::%gvn-key (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) gen val-env)))
-      (expect (consp key) :to-be-truthy)
-      (expect (car key) :to-be 'cl-cc/vm::vm-add))))
+  (let* ((gen (make-hash-table :test (function eq)))
+         (val-env (make-hash-table :test (function eq)))
+         (constant-ids (make-hash-table :test (function eql)))
+         (key (cl-cc/optimize::%gvn-key
+               (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
+               gen val-env constant-ids)))
+    (expect (consp key) :to-be-truthy)
+    (expect (car key) :to-be (quote cl-cc/vm::vm-add))))
 
 ;;; ─── %gvn-maybe-replace ──────────────────────────────────────────────────
 
