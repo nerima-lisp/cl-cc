@@ -146,7 +146,13 @@ let
       forwardArgs = true;
       lispPreLoadEvalForms = [
         "(require :asdf)"
-        ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
+        ''
+          (asdf:initialize-output-translations
+                      (quote
+                       (:output-translations
+                        ((:root "packages/pipeline/tests/")
+                         (:home ".cache" "common-lisp" :implementation))
+                        :inherit-configuration)))''
       ];
       extraSbclFlags = [
         "--core"
@@ -166,7 +172,13 @@ let
       forwardArgs = true;
       lispPreLoadEvalForms = [
         "(require :asdf)"
-        ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
+        ''
+          (asdf:initialize-output-translations
+                      (quote
+                       (:output-translations
+                        ((:root "packages/pipeline/tests/")
+                         (:home ".cache" "common-lisp" :implementation))
+                        :inherit-configuration)))''
       ];
       extraSbclFlags = [
         "--core"
