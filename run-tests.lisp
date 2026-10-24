@@ -16,7 +16,7 @@
 (require :asdf)
 (progn
   (require :uiop)
-  (setf (sb-alien:extern-alien "verify_gens" sb-alien:int) 0)
+  (setf (sb-alien:extern-alien "verify_gens" sb-alien:char) 0)
   (setf (sb-alien:extern-alien "pre_verify_gen_0" sb-alien:int) 1)
   (setf (sb-ext:bytes-consed-between-gcs) (* 16 1024 1024))
   (format t "# GC review: SBCL heap verification enabled~%"))
