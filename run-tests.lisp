@@ -14,7 +14,12 @@
 ;;;; ahead.
 
 (require :asdf)
-(require :uiop)
+(progn
+  (require :uiop)
+  (setf (sb-alien:extern-alien "verify_gens" sb-alien:int) 0)
+  (setf (sb-alien:extern-alien "pre_verify_gen_0" sb-alien:int) 1)
+  (setf (sb-ext:bytes-consed-between-gcs) (* 16 1024 1024))
+  (format t "# GC review: SBCL heap verification enabled~%"))
 
 ;;; Under `--core`, ASDF already knows every cl-cc system and its FASLs, and the
 ;;; source registry points into the Nix store; re-registering from the working
@@ -120,9 +125,12 @@
         ;; concurrency all delegate to it (see
         ;; packages/testing-framework/src/framework-definitions.lisp).
         (uiop:quit
-         (if (cl-weave:run-all :reporter :spec
-                               :name-filter filter
-                               :max-workers max-workers)
+         (if (progn
+               (format t "# GC review: full verifying GC after stdlib warmup~%")
+               (sb-ext:gc :full t)
+               (cl-weave:run-all :reporter :spec
+                                 :name-filter filter
+                                 :max-workers max-workers))
              0
              1)))
     (error (e)
