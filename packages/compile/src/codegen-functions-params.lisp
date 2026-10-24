@@ -113,15 +113,9 @@ Returns (values opt-closure-data rest-reg key-closure-data opt-bindings
             supplied-p-entries)))
 
 (defparameter *rest-stack-alloc-safe-consumers*
-  '("CAR" "CDR" "CAAR" "CADR" "CDAR" "CDDR" "CAAAR" "CAADR" "CADAR" "CADDR"
-    "CDAAR" "CDADR" "CDDAR" "CDDDR" "FIRST" "SECOND" "THIRD" "FOURTH" "FIFTH"
-    "SIXTH" "SEVENTH" "EIGHTH" "NINTH" "TENTH" "CONS" "LIST" "LIST*" "LENGTH"
-    "NULL" "CONSP" "LISTP" "ATOM" "ENDP" "NOT" "EQ" "EQL" "EQUAL" "EQUALP"
-    "MEMBER" "ASSOC" "FIND" "POSITION" "COUNT" "REMOVE" "REMOVE-IF"
-    "REMOVE-IF-NOT" "REMOVE-DUPLICATES" "REVERSE" "NREVERSE" "SORT"
-    "STABLE-SORT" "REDUCE" "EVERY" "SOME" "NOTANY" "NOTEVERY"
-    "MAPCAR" "MAPC" "MAPCAN" "MAPL" "MAPLIST" "MAPCON")
-  "Functions that consume a &rest list without causing it to escape.")
+  '(cl:length cl:null cl:consp cl:listp cl:atom cl:endp
+    cl:not cl:eq cl:eql cl:equal cl:equalp)
+  "Functions that inspect a &rest list without returning its elements or cells.")
 
 (defun rest-param-stack-alloc-p (body-forms rest-name)
   "Return T when REST-NAME is only used in stack-safe contexts within BODY-FORMS.

@@ -125,13 +125,29 @@
 
 ;;; ─── rest-param-stack-alloc-p ────────────────────────────────────────────
 
-(it-sequential "rest-param-stack-alloc-p-non-list-body"
-  (expect (cl-cc/compile::rest-param-stack-alloc-p nil 'rest) :to-be-falsy)
-  (expect (cl-cc/compile::rest-param-stack-alloc-p 'x  'rest) :to-be-falsy))
-
 (it-sequential "rest-param-stack-alloc-p-safe-consumers"
-  (let ((body-forms (list `(car rest))))
-    (expect (cl-cc/compile::rest-param-stack-alloc-p body-forms 'rest) :to-be-truthy)))
+  (expect (cl-cc/compile::rest-param-stack-alloc-p nil 'rest) :to-be-falsy)
+  (expect (cl-cc/compile::rest-param-stack-alloc-p 'x 'rest) :to-be-falsy)
+  (let ((rest-var (make-ast-var :name 'rest)))
+    (expect (cl-cc/compile::rest-param-stack-alloc-p
+             (list (make-ast-call :func 'cl:length :args (list rest-var))) 'rest)
+            :to-be-truthy)
+    (expect (cl-cc/compile::rest-param-stack-alloc-p
+             (list (make-ast-call :func 'cl:car :args (list rest-var))) 'rest)
+            :to-be-falsy)
+    (expect (cl-cc/compile::rest-param-stack-alloc-p
+             (list (make-ast-call :func 'cl:list :args (list rest-var))) 'rest)
+            :to-be-falsy)
+    (expect (cl-cc/compile::rest-param-stack-alloc-p
+             (list (make-ast-call :func 'cl:cdr :args (list rest-var))) 'rest)
+            :to-be-falsy)))
+
+(it-sequential "rest-param-stack-alloc-p-callback-consumers"
+  (let ((rest-var (make-ast-var :name 'rest)))
+    (dolist (consumer (list 'cl:position 'cl:count 'cl:every 'cl:notany 'cl:notevery))
+      (expect (cl-cc/compile::rest-param-stack-alloc-p
+               (list (make-ast-call :func consumer :args (list rest-var))) 'rest)
+              :to-be-falsy))))
 
 ;;; ─── build-all-param-bindings ────────────────────────────────────────────
 

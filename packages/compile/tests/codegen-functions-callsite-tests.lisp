@@ -488,21 +488,19 @@
 
 ;;; ─── rest params ──────────────────────────────────────────────────────────
 
-(it-sequential "codegen-rest-params-stack-alloc-classification local-consumer"
-  (destructuring-bind (expected declarations body) (list t nil (list (make-ast-call :func 'car :args (list (make-ast-var :name 'args)))))
-    (let* ((ctx (make-codegen-ctx))
+(it-sequential "codegen-rest-params-stack-alloc-classification scalar-consumer"
+  (let* ((ctx (make-codegen-ctx))
+         (rest-var (make-ast-var :name 'args))
          (ast (make-ast-lambda
-                :params '(x)
-                :rest-param 'args
-                :declarations declarations
-                :body body)))
+               :params '(x)
+               :rest-param 'args
+               :declarations nil
+               :body (list (make-ast-call :func 'length :args (list rest-var))))))
     (compile-ast ast ctx)
     (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
                     (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
       (expect inst :to-be-truthy)
-      (if expected
-          (expect (cl-cc/vm::vm-closure-rest-stack-alloc-p inst) :to-be-truthy)
-          (expect (cl-cc/vm::vm-closure-rest-stack-alloc-p inst) :to-be-null))))))
+      (expect (cl-cc/vm::vm-closure-rest-stack-alloc-p inst) :to-be-truthy))))
 
 (it-sequential "codegen-rest-params-stack-alloc-classification direct-return"
   (destructuring-bind (expected declarations body) (list nil nil (list (make-ast-var :name 'args)))
@@ -519,6 +517,20 @@
       (if expected
           (expect (cl-cc/vm::vm-closure-rest-stack-alloc-p inst) :to-be-truthy)
           (expect (cl-cc/vm::vm-closure-rest-stack-alloc-p inst) :to-be-null))))))
+
+(it-sequential "codegen-rest-params-stack-alloc-classification list-return"
+  (let* ((ctx (make-codegen-ctx))
+         (rest-var (make-ast-var :name 'args))
+         (ast (make-ast-lambda
+               :params '(x)
+               :rest-param 'args
+               :declarations nil
+               :body (list (make-ast-call :func 'list :args (list rest-var))))))
+    (compile-ast ast ctx)
+    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
+                    (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
+      (expect inst :to-be-truthy)
+      (expect (cl-cc/vm::vm-closure-rest-stack-alloc-p inst) :to-be-null))))
 
 (it-sequential "codegen-rest-params-stack-alloc-classification dynamic-extent"
   (destructuring-bind (expected declarations body) (list t '((dynamic-extent args)) (list (make-ast-var :name 'args)))
