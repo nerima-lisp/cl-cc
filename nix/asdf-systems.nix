@@ -329,7 +329,6 @@ let
     src = pkgSrc "packages/prolog-tools";
     systems = [ "cl-cc-prolog-tools/tests" ];
     lispLibs = [
-      cl-cc-prolog-tools
       productionAsdfSystems.cl-cc-ast
       clPrologKit
       clWeave
