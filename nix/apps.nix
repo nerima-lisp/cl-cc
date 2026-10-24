@@ -150,7 +150,7 @@ let
           (asdf:initialize-output-translations
                       (quote
                        (:output-translations
-                        ((:root "packages/pipeline/tests/")
+                        ((:root :**/ "packages/pipeline/tests/")
                          (:home ".cache" "common-lisp" :implementation))
                         :inherit-configuration)))''
       ];
@@ -176,7 +176,7 @@ let
           (asdf:initialize-output-translations
                       (quote
                        (:output-translations
-                        ((:root "packages/pipeline/tests/")
+                        ((:root :**/ "packages/pipeline/tests/")
                          (:home ".cache" "common-lisp" :implementation))
                         :inherit-configuration)))''
       ];
