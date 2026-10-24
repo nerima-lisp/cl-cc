@@ -153,9 +153,8 @@
   (destructuring-bind (val expected) (list -7 -7)
     (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
 
-(it-sequential "x86-64-regs-vm-const-to-integer-cases other"
-  (destructuring-bind (val expected) (list 3.14 0)
-    (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
+(it-sequential "x86-64-regs-vm-const-to-integer rejects float"
+  (signals error (cl-cc/codegen::vm-const-to-integer 3.14)))
 
 ;;; ─── x86-64-double-float-bits ────────────────────────────────────────────
 

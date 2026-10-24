@@ -155,18 +155,16 @@
     ;; Guard must not clobber target via `mov rax, [rax]`.
     (expect (search '(#x48 #x8B #x00) bytes :test #'eql) :to-be-falsy)))
 
-(it-sequential "x86-64-shadow-stack-control-inst-emits-nop-when-shadow-stack-disabled"
-  (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* nil))
-                 (%x86-collect-bytes
-                  (lambda (s)
-                    (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-push-handler :handler-type :error :handler-label "Lh" :result-reg :R0)
-                     s
-                     0
-                     (make-hash-table :test #'equal)))))))
-    (expect (= 2 (length bytes)) :to-be-truthy)
-    (expect (= #x66 (nth 0 bytes)) :to-be-truthy)
-    (expect (= #x90 (nth 1 bytes)) :to-be-truthy)))
+(it-sequential "x86-64-shadow-stack-control-inst-errors-when-disabled"
+  (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* nil))
+    (signals error
+      (%x86-collect-bytes
+       (lambda (s)
+         (cl-cc/codegen::emit-vm-instruction-with-labels
+          (cl-cc/vm::make-vm-push-handler :handler-type :error :handler-label "Lh" :result-reg :R0)
+          s
+          0
+          (make-hash-table :test #'equal)))))))
 
 (it-sequential "x86-64-shadow-stack-control-inst-emits-saveprevssp-when-enabled"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))

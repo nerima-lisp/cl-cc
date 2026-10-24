@@ -50,16 +50,18 @@
 ;;; ─── %opt-pre-expression-key ─────────────────────────────────────────────
 
 (it-sequential "pre-expression-key-cases const"
-  (destructuring-bind (inst shape expected) (list (make-vm-const :dst :r0 :value 7) :const '(:const 7))
-    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
-    (ecase shape
-      (:const  (expect key :to-equal expected))
-      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
-      (:null   (expect key :to-be-null))))))
+  (let* ((constant-ids (make-hash-table :test 'eql))
+         (inst (make-vm-const :dst :r0 :value 7))
+         (same-inst (make-vm-const :dst :r1 :value 7))
+         (key (cl-cc/optimize::%opt-pre-expression-key inst constant-ids))
+         (same-key (cl-cc/optimize::%opt-pre-expression-key same-inst constant-ids)))
+    (expect (consp key) :to-be-truthy)
+    (expect (first key) :to-be :const)
+    (expect same-key :to-equal key)))
 
 (it-sequential "pre-expression-key-cases binary"
   (destructuring-bind (inst shape expected) (list (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1) :binary nil)
-    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst (make-hash-table :test 'eql))))
     (ecase shape
       (:const  (expect key :to-equal expected))
       (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
@@ -67,15 +69,15 @@
 
 (it-sequential "pre-expression-key-cases impure"
   (destructuring-bind (inst shape expected) (list (make-vm-halt  :reg :r0) :null nil)
-    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst (make-hash-table :test 'eql))))
     (ecase shape
       (:const  (expect key :to-equal expected))
       (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
       (:null   (expect key :to-be-null))))))
 
 (it-sequential "pre-expression-key-commutative"
-  (let ((key-ab (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
-        (key-ba (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r1 :rhs :r0))))
+  (let ((key-ab (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) (make-hash-table :test 'eql)))
+        (key-ba (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r1 :rhs :r0) (make-hash-table :test 'eql))))
     (expect key-ba :to-equal key-ab)))
 
 ;;; ─── %opt-pre-splice-before-terminator ───────────────────────────────────
