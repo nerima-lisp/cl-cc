@@ -1,0 +1,190 @@
+name: GC invariant reproduction
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gc-repro-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  gc-repro:
+    if: startsWith(github.head_ref, 'ctl/GC-repro-')
+    name: Reproduce GC invariant on Linux x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Run conditions and validate results
+        shell: bash
+        timeout-minutes: 24
+        run: |
+          set -euo pipefail
+          mkdir -p gc-repro-logs
+          failures=0
+          fatal_match='GC invariant lost, file "alloc.c", line 346'
+          {
+            printf 'condition\tattempt\titerations\n'
+            for planned_condition in baseline threshold verifier; do
+              for planned_attempt in {1..8}; do
+                printf '%s\t%s\t8\n' "$planned_condition" "$planned_attempt"
+              done
+            done
+          } > gc-repro-logs/manifest.tsv
+
+          config_is_valid() {
+            local condition="$1" attempt="$2" expected_bytes="$3" log="$4"
+            local verifier_only="$5"
+            awk \
+              -v expected_condition="condition=$condition" \
+              -v expected_attempt="attempt=$attempt" \
+              -v expected_bytes="bytes_cons=$expected_bytes" \
+              -v verifier_only="$verifier_only" '
+                $1 == "GC_REPRO:" && $2 == "CONFIG" {
+                  condition = 0
+                  attempt = 0
+                  bytes = 0
+                  verify_gens = 0
+                  pre_verify_gen_0 = 0
+                  for (i = 3; i <= NF; i++) {
+                    if ($i == expected_condition) condition = 1
+                    if ($i == expected_attempt) attempt = 1
+                    if ($i == expected_bytes) bytes = 1
+                    if ($i == "verify_gens=0") verify_gens = 1
+                    if ($i == "pre_verify_gen_0=1") pre_verify_gen_0 = 1
+                  }
+                  if (condition && attempt) {
+                    records++
+                    valid = bytes && (verifier_only != "true" || (verify_gens && pre_verify_gen_0))
+                  }
+                }
+                END { exit !(records == 1 && valid) }
+              ' "$log"
+          }
+
+          iteration_starts_are_valid() {
+            local condition="$1" attempt="$2" mode="$3" log="$4"
+            awk \
+              -v expected_condition="condition=$condition" \
+              -v expected_attempt="attempt=$attempt" \
+              -v mode="$mode" '
+                $1 == "GC_REPRO:" && $2 == "ITERATION_START" {
+                  condition = 0
+                  attempt = 0
+                  iteration = ""
+                  selected = 0
+                  elapsed = 0
+                  for (i = 3; i <= NF; i++) {
+                    if ($i == expected_condition) condition = 1
+                    if ($i == expected_attempt) attempt = 1
+                    if ($i ~ /^iteration=[1-8]$/) iteration = substr($i, 11)
+                    if ($i == "selected=7") selected = 1
+                    if ($i ~ /^elapsed_ms=[0-9]+$/) elapsed = 1
+                  }
+                  if (condition && attempt) {
+                    records++
+                    if (iteration == "" || !selected || !elapsed || seen[iteration]) {
+                      invalid = 1
+                    } else {
+                      seen[iteration] = 1
+                    }
+                  }
+                }
+                END {
+                  if (records < 1 || invalid) exit 1
+                  if (mode == "complete") {
+                    if (records != 8) exit 1
+                    for (i = 1; i <= 8; i++) if (!seen[i]) exit 1
+                  }
+                  exit 0
+                }
+              ' "$log"
+          }
+
+          marker_count() {
+            local marker="$1" log="$2"
+            grep -Fxc -- "$marker" "$log" || true
+          }
+
+          for condition in baseline threshold verifier; do
+            case "$condition" in
+              baseline|verifier) expected_bytes=2147483648 ;;
+              threshold) expected_bytes=1048576 ;;
+            esac
+            verifier_only=false
+            if [[ "$condition" == verifier ]]; then
+              verifier_only=true
+            fi
+
+            for ((attempt = 1; attempt <= 8; attempt++)); do
+              log="gc-repro-logs/${condition}-${attempt}.log"
+              preflight="GC_REPRO: PREFLIGHT condition=${condition} attempt=${attempt} iterations=8 selected=7 configuration=verified"
+              result_pattern="^GC_REPRO: RESULT condition=${condition} attempt=${attempt} iterations=8 selected=7 elapsed_ms=[0-9]+ status=passed$"
+
+              echo "Starting condition=${condition} attempt=${attempt}; log=${log}"
+              : > "$log"
+              attempt_start=$SECONDS
+              printf 'GC_REPRO: ATTEMPT_START condition=%s attempt=%s iterations=8 shell_elapsed_seconds=%s\n' \
+                "$condition" "$attempt" "$attempt_start" | tee -a "$log"
+              set +e
+              nix run .#gc-repro -- --condition "$condition" --iterations 8 --attempt "$attempt" 2>&1 | tee -a "$log"
+              pipeline_status=("${PIPESTATUS[@]}")
+              set -e
+              attempt_elapsed=$((SECONDS - attempt_start))
+              command_status="${pipeline_status[0]}"
+              tee_status="${pipeline_status[1]}"
+              printf 'GC_REPRO: ATTEMPT condition=%s attempt=%s elapsed_seconds=%s exit_status=%s tee_status=%s\n' \
+                "$condition" "$attempt" "$attempt_elapsed" "$command_status" "$tee_status" | tee -a "$log"
+
+              valid_config=false
+              if config_is_valid "$condition" "$attempt" "$expected_bytes" "$log" "$verifier_only"; then
+                valid_config=true
+              fi
+              preflight_count=$(marker_count "$preflight" "$log")
+              fatal_count=$(grep -Fc -- "$fatal_match" "$log" || true)
+              result_count=$(grep -Ec "$result_pattern" "$log" || true)
+
+              if [[ "$tee_status" != 0 ]]; then
+                echo "::error::Could not save complete log for ${condition} attempt ${attempt}"
+                failures=1
+              elif [[ "$valid_config" != true || "$preflight_count" != 1 ]]; then
+                echo "::error::Missing or invalid readback/preflight markers for ${condition} attempt ${attempt} (exit ${command_status})"
+                failures=1
+              elif [[ "$command_status" == 0 && "$fatal_count" == 0 ]]; then
+                if [[ "$result_count" == 1 ]] && iteration_starts_are_valid "$condition" "$attempt" complete "$log"; then
+                  echo "Completed condition=${condition} attempt=${attempt}"
+                else
+                  echo "::error::Missing, duplicate, or inconsistent success markers for ${condition} attempt ${attempt}"
+                  failures=1
+                fi
+              elif [[ "$command_status" != 0 && "$fatal_count" == 1 && "$result_count" == 0 ]] && iteration_starts_are_valid "$condition" "$attempt" any "$log"; then
+                echo "Recorded target GC invariant fatal for ${condition} attempt=${attempt}"
+              else
+                echo "::error::Unexpected result for ${condition} attempt ${attempt} (exit ${command_status}, target fatals ${fatal_count})"
+                failures=1
+              fi
+            done
+          done
+
+          if [[ "$failures" != 0 ]]; then
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: gc-repro-logs
+          path: gc-repro-logs/
+          if-no-files-found: warn

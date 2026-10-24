@@ -124,6 +124,19 @@ let
   apps = rec {
     default = repl;
 
+    gc-repro = mkSbclScript {
+      name = "gc-repro";
+      description = "Run one bounded GC-invariant reproduction condition";
+      sbclVariant = "tests";
+      loadProjectAsd = false;
+      forwardArgs = true;
+      extraSbclFlags = [
+        "--core"
+        "${testImage}/cl-cc-test.core"
+      ];
+      loadFiles = [ "scripts/gc-repro.lisp" ];
+    };
+
     # `test` runs the canonical fast unit plan via `cl-weave:run-all`
     # (packages/testing-framework's DEFTEST/etc. macros register into
     # cl-weave's suite tree; see framework-definitions.lisp).
