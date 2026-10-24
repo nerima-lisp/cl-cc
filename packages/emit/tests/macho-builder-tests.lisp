@@ -35,8 +35,8 @@
     (let ((seg (find "__DATA" (cl-cc/binary::mach-o-builder-segments b)
                      :key #'cl-cc/binary:segment-command-segname :test #'string=)))
       (expect (null seg) :to-be-falsy)
-      (expect (cl-cc/binary:segment-command-maxprot seg) :to-equal 6)
-      (expect (cl-cc/binary:segment-command-initprot seg) :to-equal 6))))
+      (expect (cl-cc/binary:segment-command-maxprot seg) :to-equal 3)
+      (expect (cl-cc/binary:segment-command-initprot seg) :to-equal 3))))
 
 (it-sequential "macho-build-binary-is-nonempty-ub8-vector-at-least-4096-bytes"
   (let ((b (cl-cc/binary:make-mach-o-builder :x86-64))

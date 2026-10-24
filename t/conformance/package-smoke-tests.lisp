@@ -18,7 +18,7 @@
 (it-sequential "pkg-smoke-find-package-cl"
   (let ((pkg (cl-cc/runtime::rt-find-package "CL")))
     (expect pkg :to-be-truthy)
-    (expect (cl-cc/runtime::rt-package-name pkg) :to-equal "CL")))
+    (expect (cl-cc/runtime::rt-package-name pkg) :to-equal "COMMON-LISP")))
 
 (it-sequential "pkg-smoke-intern"
   (let* ((pkg (cl-cc/runtime::rt-find-package "CL-USER"))
@@ -65,7 +65,7 @@
     (expect (find "CL-USER" pkgs
                        :test #'equal
                        :key #'cl-cc/runtime::rt-package-name) :to-be-truthy)
-    (expect (find "CL" pkgs
+    (expect (find "COMMON-LISP" pkgs
                        :test #'equal
                        :key #'cl-cc/runtime::rt-package-name) :to-be-truthy)))
 

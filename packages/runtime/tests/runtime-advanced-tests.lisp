@@ -152,7 +152,7 @@
 (it-sequential "rt-package-registry-is-seeded-conservatively"
   (expect (find :cl-cc/runtime cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
   (expect (find :cl-cc/bootstrap cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
-  (expect (find :cl cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
+  (expect (find :common-lisp cl-cc/runtime::*rt-bootstrap-package-names*) :to-be-truthy)
   (expect (gethash "CL-CC/RUNTIME" cl-cc/runtime:*rt-package-registry*) :to-be-truthy))
 
 (it-sequential "rt-intern-preserves-seeded-host-package-symbols"
