@@ -123,12 +123,13 @@
         (cond
           ((not (stringp path))
            (push (list :kind :invalid-result-path :status status) violations))
-          ((gethash path result-paths)
-           (push (list :kind :duplicate-result :path path :status status)
-                 violations))
           (t
-           (setf (gethash path result-paths) result)
-           (let ((expected (gethash path manifest-by-path)))
+           (let* ((expected (gethash path manifest-by-path))
+                  (duplicate (gethash path result-paths)))
+             (when duplicate
+               (push (list :kind :duplicate-result :path path :status status)
+                     violations))
+             (setf (gethash path result-paths) result)
              (cond
                ((and (null expected) (member status '(:fail :error)))
                 (push (list :kind :unregistered-failure
@@ -141,7 +142,8 @@
                      (member status '(:fail :error))
                      (equal (%expected-failure-signature expected t)
                             (%expected-failure-signature result nil)))
-                (push expected matched))
+                (unless (member expected matched :test #'eq)
+                  (push expected matched)))
                (expected
                 (push (list :kind :condition-changed
                             :path path :status status

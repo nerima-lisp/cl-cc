@@ -3,7 +3,11 @@
 ;;;;
 ;;;; Covers: opt-pass-loop-rotation, opt-pass-loop-peel, opt-pass-loop-unrolling.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-loop-transforms-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-loop-transforms-tests-suite))
 
 ;;; ─── Helper: build instruction sequences ─────────────────────────────────
 

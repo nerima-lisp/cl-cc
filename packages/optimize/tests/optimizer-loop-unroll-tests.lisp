@@ -1,6 +1,8 @@
 ;;;; Unit tests for FR-601 loop unrolling.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-integration-suite))
 
 (defun %fr601-counted-loop (&key (limit-constant-p t) (limit-value 3))
   "Build a small counted loop in the optimizer's canonical loop shape."

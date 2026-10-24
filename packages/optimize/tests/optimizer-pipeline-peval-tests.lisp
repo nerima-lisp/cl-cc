@@ -5,7 +5,11 @@
 ;;;;   analysis, FR-211 specialization plan caching, program-level partial
 ;;;;   evaluation, and opt-pass-specialize-known-args.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-pipeline-peval-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-pipeline-peval-tests-suite))
 
 ;;; ─── FR-209 opt-specialize-constant-args ────────────────────────────────────
 

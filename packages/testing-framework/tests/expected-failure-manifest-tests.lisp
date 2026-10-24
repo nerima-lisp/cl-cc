@@ -83,4 +83,34 @@
         (audit-expected-failure-results nil (list result) :require-complete t)
       (cl-weave:expect matched :to-equal nil)
       (cl-weave:expect violations :to-equal nil))))
+(cl-weave:it-sequential "expected-failure manifest rejects duplicate unrelated passes"
+  (let* ((path "suite > passing test")
+        (results (list (list :path path :status :pass)
+                       (list :path path :status :pass))))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results nil results :require-complete t)
+      (cl-weave:expect matched :to-equal nil)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal (quote (:duplicate-result)))
+      (cl-weave:signals error
+        (%ensure-no-expected-failure-violations violations)))))
+(cl-weave:it-sequential "expected-failure manifest rejects duplicate expected failures"
+  (let* ((path "suite > expected failure")
+         (manifest (list (%manifest-test-entry path :fail)))
+         (result (copy-list (first manifest)))
+         (mismatched-result (copy-list result)))
+    (setf (getf result :status) :fail
+          (getf mismatched-result :status) :fail
+          (getf mismatched-result :actual) "unexpected")
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list mismatched-result result (copy-list result))
+                                        :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal '(:condition-changed :duplicate-result :duplicate-result))
+      (cl-weave:signals error
+        (%ensure-no-expected-failure-violations violations)))))
 (in-suite cl-cc-suite)

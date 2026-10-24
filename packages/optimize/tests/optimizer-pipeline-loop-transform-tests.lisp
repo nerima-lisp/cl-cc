@@ -5,7 +5,11 @@
 ;;;;   FR-525 polyhedral scheduling, FR-526 loop fusion/fission,
 ;;;;   FR-527 ML inline scoring, FR-528 learned codegen costs.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-pipeline-loop-transform-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-pipeline-loop-transform-tests-suite))
 
 ;;; ─── FR-523 Affine loop analysis ────────────────────────────────────────────
 

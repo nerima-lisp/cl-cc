@@ -35,7 +35,7 @@
          (result    (cl-cc/compile::%case-of-case-collapse-node inner-if cond nil)))
     (expect result :to-be else-node)))
 
-(deftest-compile codegen-toplevel-cps-semantic-preservation
+(deftest-compile codegen-toplevel-cps-semantic-preservation-core-helper-cases
   "Top-level CPS routing preserves common supported forms."
   :cases (("two-safe-forms" 7 "(+ 1 2) (+ 3 4)")
           ("defvar-then-use" 3 "(defvar *ulw-cps* 1) (+ *ulw-cps* 2)")

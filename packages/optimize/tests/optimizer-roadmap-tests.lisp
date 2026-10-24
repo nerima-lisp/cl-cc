@@ -5,7 +5,9 @@
 ;;;;   status-aware summaries, completed-heading checks, related-path checks,
 ;;;;   sidecar contradictions, and per-cluster implementation evidence.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-integration-suite))
 
 ;;; ─── Optimize roadmap evidence and helper contracts ───────────────────────
 

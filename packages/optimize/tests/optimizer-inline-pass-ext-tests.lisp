@@ -9,7 +9,11 @@
 ;;;; Depends on helpers defined in optimizer-inline-pass-tests.lisp
 ;;;; (loaded before this file via :serial t ASDF).
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-inline-pass-ext-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-inline-pass-ext-tests-suite))
 
 ;;; ─── opt-inline-inst-cost ───────────────────────────────────────────────────
 
