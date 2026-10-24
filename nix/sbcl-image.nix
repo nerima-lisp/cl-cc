@@ -70,6 +70,7 @@ pkgs.stdenvNoCC.mkDerivation {
       --eval '(handler-case (asdf:load-system :cl-cc-testing-framework) (error (e) (format *error-output* "~&FATAL: ~A~%" e) (uiop:quit 1)))' \
       --eval '(format t "# cl-cc-test-image: warming stdlib cache~%")' \
       --eval '(ignore-errors (cl-cc:warm-stdlib-cache))' \
+      --eval '(setf cl-cc/selfhost::*warm-stdlib-trace* nil)' \
       --eval '(sb-ext:gc :full t)' \
       --eval '(setf *default-pathname-defaults* #P"/")' \
       --eval '(setf uiop:*temporary-directory* nil)' \
