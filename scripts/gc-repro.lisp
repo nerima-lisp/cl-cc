@@ -127,30 +127,39 @@
                       "attempt" attempt
                       "bytes_cons" expected-bytes))))
 
-(defun gc-repro-target-file ()
-  (merge-pathnames
-   #P"packages/optimize/tests/optimizer-pipeline-tests.lisp"
-   (uiop:ensure-directory-pathname (uiop:getcwd))))
+(defun gc-repro-target-location-p (entry)
+  (let* ((file (getf (cl-weave:test-plan-entry-location entry) :file))
+         (path (and file (namestring (pathname file))))
+         (suffix "packages/optimize/tests/optimizer-pipeline-tests.lisp")
+         (start (and path (- (length path) (length suffix)))))
+    (and start
+         (not (minusp start))
+         (string= suffix path :start2 start))))
 
-(defun gc-repro-plan (target-file)
-  (let ((plan (cl-weave:collect-test-plan
-               (cl-weave:root-suite)
-               :name-filter "adaptive-max-iterations"
-               :location-filter (list target-file))))
-    (unless (and (= (length plan) +gc-repro-target-count+)
-                 (every (lambda (entry)
-                          (let ((file (getf
-                                       (cl-weave:test-plan-entry-location entry)
-                                       :file)))
-                            (and file
-                                 (equalp
-                                  (uiop:ensure-absolute-pathname
-                                   file (uiop:getcwd))
-                                  target-file)))
-                        plan)))
-      (error "Expected exactly ~D target tests at ~A, found ~D."
-             +gc-repro-target-count+ target-file (length plan)))
-    plan))
+(defun gc-repro-plan ()
+  (let* ((name-plan (cl-weave:collect-test-plan
+                     (cl-weave:root-suite)
+                     :name-filter "adaptive-max-iterations"))
+         (target-plan (remove-if-not
+                       (function gc-repro-target-location-p)
+                       name-plan)))
+    (unless (= (length target-plan) +gc-repro-target-count+)
+      (error "Expected exactly ~D target tests, found ~D among ~D name matches."
+             +gc-repro-target-count+ (length target-plan) (length name-plan)))
+    (unless (every (function gc-repro-target-location-p) target-plan)
+      (error "A selected test is outside the optimizer pipeline test file."))
+    (let ((target-file
+            (getf (cl-weave:test-plan-entry-location (first target-plan))
+                  :file)))
+      (unless (every (lambda (entry)
+                       (equal (namestring (pathname target-file))
+                              (namestring
+                               (pathname
+                                (getf (cl-weave:test-plan-entry-location entry)
+                                      :file)))))
+                     target-plan)
+        (error "Selected tests have multiple source file pathnames."))
+      (values target-plan target-file))))
 
 (defun gc-repro-run (condition attempt iterations selected target-file start)
   (dotimes (index iterations)
@@ -213,18 +222,17 @@
          (options (gc-repro-parse-options (uiop:command-line-arguments)))
          (condition (getf options :condition))
          (iterations (getf options :iterations))
-         (attempt (getf options :attempt))
-         (target-file (gc-repro-target-file)))
+         (attempt (getf options :attempt)))
     (gc-repro-configure condition attempt)
-    (let* ((plan (gc-repro-plan target-file))
-           (selected (length plan)))
-      (gc-repro-log "PREFLIGHT"
-                    "condition" condition
-                    "attempt" attempt
-                    "iterations" iterations
-                    "selected" selected
-                    "configuration" "verified")
-      (gc-repro-run condition attempt iterations selected target-file start))))
+    (multiple-value-bind (plan target-file) (gc-repro-plan)
+      (let ((selected (length plan)))
+        (gc-repro-log "PREFLIGHT"
+                      "condition" condition
+                      "attempt" attempt
+                      "iterations" iterations
+                      "selected" selected
+                      "configuration" "verified")
+        (gc-repro-run condition attempt iterations selected target-file start)))))
 
 (handler-case
     (progn

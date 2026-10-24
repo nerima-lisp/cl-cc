@@ -33,7 +33,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p gc-repro-logs
-          failures=0
           fatal_match='GC invariant lost, file "alloc.c", line 346'
           {
             printf 'condition\tattempt\titerations\n'
@@ -156,31 +155,37 @@ jobs:
               fatal_count=$(grep -Fc -- "$fatal_match" "$log" || true)
               result_count=$(grep -Ec "$result_pattern" "$log" || true)
 
+              stop_reason=""
               if [[ "$tee_status" != 0 ]]; then
                 echo "::error::Could not save complete log for ${condition} attempt ${attempt}"
-                failures=1
+                stop_reason="log-save-failure"
               elif [[ "$valid_config" != true || "$preflight_count" != 1 ]]; then
                 echo "::error::Missing or invalid readback/preflight markers for ${condition} attempt ${attempt} (exit ${command_status})"
-                failures=1
+                stop_reason="invalid-readback-or-preflight"
               elif [[ "$command_status" == 0 && "$fatal_count" == 0 ]]; then
                 if [[ "$result_count" == 1 ]] && iteration_starts_are_valid "$condition" "$attempt" complete "$log"; then
                   echo "Completed condition=${condition} attempt=${attempt}"
                 else
                   echo "::error::Missing, duplicate, or inconsistent success markers for ${condition} attempt ${attempt}"
-                  failures=1
+                  stop_reason="invalid-success-markers"
                 fi
               elif [[ "$command_status" != 0 && "$fatal_count" == 1 && "$result_count" == 0 ]] && iteration_starts_are_valid "$condition" "$attempt" any "$log"; then
                 echo "Recorded target GC invariant fatal for ${condition} attempt=${attempt}"
               else
                 echo "::error::Unexpected result for ${condition} attempt ${attempt} (exit ${command_status}, target fatals ${fatal_count})"
-                failures=1
+                stop_reason="unexpected-result"
+              fi
+
+              if [[ -n "$stop_reason" ]]; then
+                if ! printf 'GC_REPRO: STOP reason=%s condition=%s attempt=%s\n' \
+                  "$stop_reason" "$condition" "$attempt" | tee -a "$log"; then
+                  echo "::error::Could not append stop record to ${log}"
+                fi
+                echo "Stopping after condition=${condition} attempt=${attempt}; planned later attempts remain in the manifest"
+                exit 1
               fi
             done
           done
-
-          if [[ "$failures" != 0 ]]; then
-            exit 1
-          fi
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
