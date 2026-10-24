@@ -330,3 +330,18 @@ asserting the new path reproduces it has to still hold the old one."
               (if present-p
                   (setf (gethash symbol table) previous)
                   (remhash symbol table))))))))
+  (it-sequential "pipeline-make-package-runtime-bridge"
+    (let* ((name (format nil "CL-CC-PIPELINE-~A" (gensym)))
+           (source (format nil "(make-package ~S)" name)))
+      (unwind-protect
+           (let ((package (run-string source)))
+             (expect (hash-table-p package) :to-be-truthy)
+             (expect (cl-cc/runtime:rt-find-package name) :to-be package)
+             (progn
+               (expect (length (gethash :use-list package)) :to-equal 1)
+               (expect (member (cl-cc/runtime:rt-find-package :cl)
+                               (gethash :use-list package))
+                       :to-be-truthy)))
+        (let ((package (cl-cc/runtime:rt-find-package name)))
+          (when package
+            (cl-cc/runtime::rt-delete-package package))))))
