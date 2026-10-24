@@ -99,6 +99,12 @@
   (destructuring-bind (expr) (list "(+ 1 2)")
     (expect (typep (compile-string expr :target :vm) 'cl-cc/compile:compilation-result) :to-be-truthy)))
 
+(it-sequential "pipeline-compile-string PHP route"
+  (let ((result
+          (compile-string "<?php $x = 42;" :target :vm :language :php)))
+    (expect (typep result (quote cl-cc/compile:compilation-result))
+            :to-be-truthy)))
+
 (it-sequential "pipeline-compile-string-returns-result multiple-forms"
   (destructuring-bind (expr) (list "(defun f (x) x)")
     (expect (typep (compile-string expr :target :vm) 'cl-cc/compile:compilation-result) :to-be-truthy)))
