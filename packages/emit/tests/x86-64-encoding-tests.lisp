@@ -480,7 +480,7 @@
           (%capture-x86-error-message
            (lambda () (cl-cc/codegen::vm-const-to-integer (quote foo))))))
     (expect message :to-equal
-            "Unsupported VM-CONST literal for native codegen: FOO")))
+            "Unsupported VM-CONST literal for native codegen: CL-CC/TEST::FOO")))
 
 (it-sequential "x86-vm-const-to-integer rejects list"
   (let ((message
