@@ -61,6 +61,7 @@ jobs:
             else
               status=$?
               printf '# diagnostic case failed (exit %s): %s\n' "$status" "$case_name" >&2
+              printf '::error title=Adaptive optimizer diagnostic failed::%s (exit %s)\n' "$case_name" "$status"
               failed=1
             fi
           done
