@@ -211,8 +211,9 @@
 
 (it-sequential "compile-cps-transform if"
   (destructuring-bind (form) (list "(if 1 2 3)")
-    (let* ((result (compile-string form)) (cps (compilation-result-cps result)))
-    (expect (or (null cps) (listp cps)) :to-be-truthy))))
+    (let* ((result (compile-string form :target :vm))
+           (cps (compilation-result-cps result)))
+      (expect (or (null cps) (listp cps)) :to-be-truthy))))
 
 ;;; ─── FR-008 Float Unboxing ─────────────────────────────────────────────────
 
