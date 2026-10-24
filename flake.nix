@@ -166,6 +166,10 @@
       url = "github:nerima-lisp/cl-concurrent-kit/0ef20d36a0a12800f231172227bd94034611c639";
       flake = false;
     };
+    ansi-test = {
+      url = "github:pfdietz/ansi-test/6e3f70002559d56d3e4a6f0b8ddcc083d202f066";
+      flake = false;
+    };
   };
 
   # Plain `outputs` with `forAllSystems`, not flake-parts. The whole flake is
@@ -729,32 +733,128 @@
       # docs reported separately? That is what these three names are for. Adding
       # a second job to ci.yml instead would re-implement the same scheduling
       # and lose cache sharing between the pieces.
-      checks = forAllSystems (system: {
-        # The SBCL test suite, run through ./run-tests.lisp.
-        default = perSystem.${system}.testSuite;
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          clCc = perSystem.${system}.packages.default;
+          ansiChapters = [
+            "symbols"
+            "eval-and-compile"
+            "data-and-control-flow"
+            "iteration"
+            "objects"
+            "conditions"
+            "cons"
+            "arrays"
+            "hash-tables"
+            "packages"
+            "numbers"
+            "sequences"
+            "structures"
+            "types-and-classes"
+            "strings"
+            "characters"
+            "pathnames"
+            "files"
+            "streams"
+            "printer"
+            "reader"
+            "system-construction"
+            "environment"
+            "misc"
+          ];
+          ansiModes = [
+            "eval"
+            "compile"
+          ];
+          ansiChecks = builtins.listToAttrs (
+            builtins.concatMap (
+              chapter:
+              map (
+                mode:
+                let
+                  name = "ansi-${chapter}-${mode}";
+                in
+                {
+                  inherit name;
+                  value = pkgs.runCommand name { nativeBuildInputs = [ pkgs.python3 ]; } ''
+                    set -eu
 
-        # Fails `nix flake check` when any tracked Nix file is unformatted,
-        # which is what makes the formatter a gate rather than a suggestion.
-        formatting = treefmtEval.${system}.config.build.check self;
+                    export HOME="$TMPDIR/home"
+                    export XDG_CACHE_HOME="$TMPDIR/cache"
+                    mkdir -p "$HOME" "$XDG_CACHE_HOME"
 
-        # `packages.docs` runs `mkdocs build --strict`, so a broken link or a
-        # page missing from the nav fails right here. Without this the docs are
-        # only ever built by docs.yml, which runs after the merge to main —
-        # a break would surface as a failed deploy rather than a failed pull
-        # request.
-        docs = perSystem.${system}.packages.docs;
+                    cp -R ${inputs.ansi-test} ansi-test
+                    chmod -R u+w ansi-test
+                    cp ${./t/conformance/ansi/run-chapter.lisp} ansi-test/.cl-cc-ansi-runner.lisp
+                    cat > ansi-test/.cl-cc-ansi-run-config.sexp <<'EOF'
+                    (:chapter "${chapter}" :mode "${mode}")
+                    EOF
 
-        # The standalone binary has to keep linking, not just the library.
-        build = perSystem.${system}.packages.default;
+                    cd ansi-test
+                    ${pkgs.lib.optionalString (name == "ansi-arrays-eval") "export CLCC_ANSI_VM_TRACE=1"}
+                    if ${clCc}/bin/cl-cc run --lang lisp --stdlib .cl-cc-ansi-runner.lisp > "$TMPDIR/runner.log" 2>&1; then
+                      runner_status=0
+                    else
+                      runner_status=$?
+                    fi
 
-        # packages/prolog-tools has its own cl-weave suite, driven by
-        # `asdf:test-system` rather than by cl-cc's runner.
-        cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
+                    if python3 ${./t/conformance/ansi/check-results.py} \
+                      --chapter ${chapter} \
+                      --mode ${mode} \
+                      --expected ${./t/conformance/ansi/expected-failures.sexp} \
+                      --counts ${./t/conformance/ansi/expected-counts.sexp} \
+                      --runner-log "$TMPDIR/runner.log" \
+                      --runner-status "$runner_status" \
+                      --summary "$TMPDIR/summary.txt" > "$TMPDIR/checker.log" 2>&1; then
+                      cat "$TMPDIR/checker.log"
+                      test -s sandbox/ansi-suite.log
+                      mkdir -p "$out"
+                      cp "$TMPDIR/summary.txt" "$out/summary.txt"
+                      cp "$TMPDIR/runner.log" "$out/runner.log"
+                      cp sandbox/ansi-suite.log "$out/suite.log"
+                    else
+                      checker_status=$?
+                      cat "$TMPDIR/checker.log"
+                      cat "$TMPDIR/runner.log"
+                      if test -f sandbox/ansi-suite.log; then cat sandbox/ansi-suite.log; fi
+                      exit "$checker_status"
+                    fi
+                  '';
+                }
+              ) ansiModes
+            ) ansiChapters
+          );
+        in
+        {
+          # The SBCL test suite, run through ./run-tests.lisp.
+          default = perSystem.${system}.testSuite;
 
-        # The JIT write-barrier suite is a secondary ASDF system and must be
-        # exercised explicitly; building its FASLs alone does not run tests.
-        cl-cc-jit-tests = perSystem.${system}.jitTests;
-      });
+          # Fails `nix flake check` when any tracked Nix file is unformatted,
+          # which is what makes the formatter a gate rather than a suggestion.
+          formatting = treefmtEval.${system}.config.build.check self;
+
+          # `packages.docs` runs `mkdocs build --strict`, so a broken link or a
+          # page missing from the nav fails right here. Without this the docs are
+          # only ever built by docs.yml, which runs after the merge to main —
+          # a break would surface as a failed deploy rather than a failed pull
+          # request.
+          docs = perSystem.${system}.packages.docs;
+
+          # The standalone binary has to keep linking, not just the library.
+          build = perSystem.${system}.packages.default;
+
+          # packages/prolog-tools has its own cl-weave suite, driven by
+          # `asdf:test-system` rather than by cl-cc's runner.
+          cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
+
+          # The JIT write-barrier suite is a secondary ASDF system and must be
+          # exercised explicitly; building its FASLs alone does not run tests.
+          cl-cc-jit-tests = perSystem.${system}.jitTests;
+        }
+        // ansiChecks
+      );
 
       apps = forAllSystems (system: perSystem.${system}.apps);
 

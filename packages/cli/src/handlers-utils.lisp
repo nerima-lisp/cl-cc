@@ -214,6 +214,185 @@ Unreadable or absent fields return NIL rather than signaling."
         (t
          (values nil nil))))))
 
+(progn
+  (defvar *ansi-vm-trace-installed* nil)
+
+  (defun %maybe-install-ansi-vm-diagnostic-trace ()
+    (when (and (equal (uiop:getenv "CLCC_ANSI_VM_TRACE") "1")
+               (not *ansi-vm-trace-installed*))
+      (let ((original (symbol-function 'cl-cc/vm::vm-execute-instruction-guarded))
+            (event-count 0)
+            (event-limit 1024)
+            (watched-functions (make-hash-table :test #'eq)))
+        (labels ((emit (control &rest args)
+                       (handler-case
+                           (cond
+                            ((< event-count event-limit)
+                             (incf event-count)
+                             (apply (function format) *error-output*
+                                    (concatenate (quote string) "; ansi-vm-trace " control "~%")
+                                    args)
+                             (finish-output *error-output*))
+                            ((= event-count event-limit)
+                             (incf event-count)
+                             (format *error-output*
+                                     "; ansi-vm-trace truncated noncritical events after ~D~%"
+                                     event-limit)
+                             (finish-output *error-output*)))
+                         (error () nil)))
+                 (emit-critical (control &rest args)
+                                (handler-case
+                                    (progn
+                                      (apply #'format *error-output*
+                                             (concatenate 'string "; ansi-vm-trace " control "~%")
+                                             args)
+                                      (finish-output *error-output*))
+                                  (error () nil)))
+                 (summary (value)
+                          (let* ((type (type-of value))
+                                 (type-name (if (symbolp type)
+                                                (symbol-name type)
+                                              "COMPOUND-TYPE")))
+                            (if (or (null value)
+                                    (symbolp value)
+                                    (numberp value)
+                                    (characterp value)
+                                    (stringp value))
+                                (format nil "~A ~S" type-name value)
+                              type-name)))
+                 (register-index-p (id)
+                                   (and (integerp id) (not (minusp id))))
+                 (register (state id &optional (include-value t))
+                           (if include-value
+                               (format nil "~A=~A"
+                                       (if (register-index-p id)
+                                           (format nil "r~D" id)
+                                         (summary id))
+                                       (handler-case
+                                           (summary (cl-cc/vm:vm-reg-get state id))
+                                         (error () "#<unavailable>")))
+                             (if (register-index-p id)
+                                 (format nil "r~D" id)
+                               (summary id))))
+                 (registers (state ids)
+                            (format nil "[~{~A~^, ~}]"
+                                    (mapcar (lambda (id) (register state id)) ids)))
+                 (watched-label (label)
+                                (when (stringp label)
+                                  (let* ((upcased (string-upcase label))
+                                         (colon (position (code-char 58) upcased :from-end t))
+                                         (name (if colon (subseq upcased (1+ colon)) upcased)))
+                                    (when (member name '("INTERN" "SYMBOL-NAME" "MAPCAR"
+                                                                  "MAKE-PACKAGE" "FUNCALL" "APPLY"
+                                                                  "EXPORT")
+                                                  :test #'string=)
+                                      name))))
+                 (function-label (function)
+                                 (or (and function (gethash function watched-functions))
+                                     (when (typep function 'cl-cc/vm::vm-closure-object)
+                                       (watched-label
+                                        (cl-cc/vm:vm-closure-entry-label function)))))
+                 (execute (instruction state pc labels)
+                          (cond
+                           ((typep instruction 'cl-cc/vm::vm-func-ref)
+                            (let ((label
+                                   (handler-case
+                                       (watched-label (cl-cc/vm::vm-label-name instruction))
+                                     (error () nil))))
+                              (if label
+                                  (let ((results
+                                         (multiple-value-list
+                                          (funcall original instruction state pc labels))))
+                                    (handler-case
+                                        (let* ((id (cl-cc/vm::vm-dst instruction))
+                                               (valid-id (register-index-p id))
+                                               (function (and valid-id
+                                                              (cl-cc/vm:vm-reg-get state id))))
+                                          (when (and valid-id function)
+                                            (setf (gethash function watched-functions) label))
+                                          (emit "FUNC-REF pc=~D label=~A dst=~A value=~A results=~A"
+                                                pc label (register nil id nil) (register state id)
+                                                (summary results)))
+                                      (error () nil))
+                                    (apply #'values results))
+                                (funcall original instruction state pc labels))))
+                           ((typep instruction 'cl-cc/vm::vm-call)
+                            (let ((call-info
+                                   (handler-case
+                                       (let* ((function-id (cl-cc/vm::vm-func-reg instruction))
+                                              (argument-ids (cl-cc/vm::vm-args instruction))
+                                              (function (and (register-index-p function-id)
+                                                             (cl-cc/vm:vm-reg-get state function-id)))
+                                              (target-label (function-label function))
+                                              (callback-label
+                                               (when (member target-label '("FUNCALL" "APPLY")
+                                                             :test #'string=)
+                                                 (loop for id in argument-ids
+                                                       for argument = (and (register-index-p id)
+                                                                           (cl-cc/vm:vm-reg-get state id))
+                                                       for label = (function-label argument)
+                                                       when label return label)))
+                                              (call-label
+                                               (cond
+                                                ((and target-label
+                                                      (not (member target-label '("FUNCALL" "APPLY")
+                                                                   :test #'string=)))
+                                                 target-label)
+                                                (callback-label
+                                                 (format nil "~A callback=~A"
+                                                         target-label callback-label))))
+                                              (destination (cl-cc/vm::vm-dst instruction)))
+                                         (when call-label
+                                           (list call-label function-id function argument-ids
+                                                 destination)))
+                                     (error () nil))))
+                              (if call-info
+                                  (progn
+                                    (handler-case
+                                        (emit "CALL before pc=~D label=~A func-id=~A target=~A args=~A dst=~A"
+                                              pc (first call-info) (register nil (second call-info) nil)
+                                              (summary (third call-info))
+                                              (registers state (fourth call-info))
+                                              (register nil (fifth call-info) nil))
+                                      (error () nil))
+                                    (let ((results
+                                           (multiple-value-list
+                                            (funcall original instruction state pc labels))))
+                                      (handler-case
+                                          (emit "CALL after pc=~D label=~A next=~A halted=~A returned=~A dst=~A"
+                                              pc (first call-info)
+                                              (summary (first results))
+                                              (summary (second results))
+                                              (summary (third results))
+                                              (register state (fifth call-info)))
+                                        (error () nil))
+                                      (apply #'values results)))
+                                (funcall original instruction state pc labels))))
+                           ((typep instruction 'cl-cc/vm::vm-export-inst)
+                            (handler-case
+                                (emit-critical "EXPORT before pc=~D symbols=~A pkg-id=~A pkg=~A dst=~A"
+                                               pc
+                                               (register state (cl-cc/vm::vm-export-symbols instruction))
+                                               (register nil (cl-cc/vm::vm-export-pkg instruction) nil)
+                                               (register state (cl-cc/vm::vm-export-pkg instruction))
+                                               (register nil (cl-cc/vm::vm-dst instruction) nil))
+                              (error () nil))
+                            (let ((results
+                                   (multiple-value-list
+                                    (funcall original instruction state pc labels))))
+                              (handler-case
+                                  (emit "EXPORT after pc=~D returned=~A dst=~A"
+                                        pc (summary results)
+                                        (register state (cl-cc/vm::vm-dst instruction)))
+                                (error () nil))
+                              (apply #'values results)))
+                           (t
+                            (funcall original instruction state pc labels)))))
+          (setf (symbol-function 'cl-cc/vm::vm-execute-instruction-guarded)
+                #'execute)
+          (setf *ansi-vm-trace-installed* t)
+          (emit "installed with limit=~D" event-limit))))))
+
 (defun %run-compiled-result (result vm-state opts)
   "Execute RESULT's program in VM-STATE under runtime options from OPTS.
 
@@ -223,16 +402,17 @@ around the execution. Returns the value produced by RUN-COMPILED."
     (%trace-emit-stages result *standard-output*))
   (%call-with-runtime-sanitizer-flags
    opts
-         (lambda ()
-      (prog1 (run-compiled (compilation-result-program result) :state vm-state)
-        (%maybe-print-jit-cache-stats opts)
-        (when (compile-opts-profile opts)
-          (print-profile vm-state))
-        (when (compile-opts-flamegraph-path opts)
-          (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
-            (if (plusp (hash-table-count samples))
-                (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
-                (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))))))
+   (lambda ()
+     (%maybe-install-ansi-vm-diagnostic-trace)
+     (prog1 (run-compiled (compilation-result-program result) :state vm-state)
+       (%maybe-print-jit-cache-stats opts)
+       (when (compile-opts-profile opts)
+         (print-profile vm-state))
+       (when (compile-opts-flamegraph-path opts)
+         (let ((samples (cl-cc/vm:vm-get-profile-samples vm-state)))
+           (if (plusp (hash-table-count samples))
+               (%write-flamegraph-svg (compile-opts-flamegraph-path opts) samples)
+               (%write-flamegraph-from-perf-data (compile-opts-flamegraph-path opts)))))))))
 
 (defun %compile-lisp-with-auto-stdlib (source kwargs stdlib no-stdlib)
   "Compile Lisp SOURCE, lazily falling back to stdlib on first unresolved use.
