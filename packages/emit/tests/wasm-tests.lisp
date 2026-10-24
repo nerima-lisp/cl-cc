@@ -363,6 +363,7 @@
       (assert-output-contains set "BCE: explicit bounds check eliminated")
       (assert-output-contains set "array.set $eqref_array_t"))))
 
+;; Positive GC class-layout and object-allocation coverage is tracked in cl-cc-codegen-native Issue #19.
 (it-sequential "wasm-gc-slot-read-without-class-layout"
   (let* ((inst (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name :foo))
          (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
