@@ -144,6 +144,10 @@ let
       enableDispatchSemFix = true;
       enablePbtSanitize = true;
       forwardArgs = true;
+      lispPreLoadEvalForms = [
+        "(require :asdf)"
+        ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
+      ];
       extraSbclFlags = [
         "--core"
         "${testImage}/cl-cc-test.core"
@@ -160,6 +164,10 @@ let
       enableDispatchSemFix = true;
       enablePbtSanitize = true;
       forwardArgs = true;
+      lispPreLoadEvalForms = [
+        "(require :asdf)"
+        ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
+      ];
       extraSbclFlags = [
         "--core"
         "${testImage}/cl-cc-test.core"
