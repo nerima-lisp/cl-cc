@@ -126,18 +126,51 @@ let
 
     # `test` runs the canonical fast unit plan via `cl-weave:run-all`
     # (packages/testing-framework's DEFTEST/etc. macros register into
-    # cl-weave's suite tree; see framework-definitions.lisp).
-    # `nix flake check` invokes this same program through `checks.default`.
-    # Warm-cache reuse: the FASL cleaner is disabled by default so repeat
-    # invocations stay fast. Manual cleanup: `rm -rf ~/.cache/common-lisp/`.
+    # cl-weave's suite tree; see framework-definitions.lisp). With no arguments,
+    # trailingScript also runs the JavaScript and PHP pipeline suites.
+    # `nix flake check` invokes this program with no arguments through `checks.default`.
+    # Warm-cache reuse: the FASL cache is retained by default. Manual cleanup:
+    # `rm -rf ~/.cache/common-lisp/`.
     #
     # The plan itself lives in the tracked ./run-tests.lisp rather than in Nix
     # strings here. That file is the org-standard Lisp-level entry point and
     # runs on its own with `sbcl --script run-tests.lisp`; keeping a single copy
     # means the fast (core-image) path and the plain path cannot drift apart.
+    pipelineJavascriptTests = mkSbclScript {
+      name = "pipeline-javascript-tests";
+      description = "Run the JavaScript pipeline integration tests";
+      sbclVariant = "tests";
+      loadProjectAsd = false;
+      enableDispatchSemFix = true;
+      enablePbtSanitize = true;
+      forwardArgs = true;
+      extraSbclFlags = [
+        "--core"
+        "${testImage}/cl-cc-test.core"
+      ];
+      extraEnv = ''export CL_CC_TEST_WORKERS="''${CL_CC_TEST_WORKERS:-4}"'';
+      loadFiles = [ "t/run-pipeline-tests.lisp" ];
+    };
+
+    pipelinePhpTests = mkSbclScript {
+      name = "pipeline-php-tests";
+      description = "Run the PHP pipeline integration tests";
+      sbclVariant = "tests";
+      loadProjectAsd = false;
+      enableDispatchSemFix = true;
+      enablePbtSanitize = true;
+      forwardArgs = true;
+      extraSbclFlags = [
+        "--core"
+        "${testImage}/cl-cc-test.core"
+      ];
+      extraEnv = ''export CL_CC_TEST_WORKERS="''${CL_CC_TEST_WORKERS:-4}"'';
+      loadFiles = [ "t/run-pipeline-tests.lisp" ];
+    };
+
     test = mkSbclScript {
       name = "test";
-      description = "Run the canonical fast unit test plan";
+      description = "Run the canonical unit and PHP/JavaScript pipeline test suites";
       sbclVariant = "tests";
       loadProjectAsd = false;
       enableDispatchSemFix = true;
@@ -160,6 +193,12 @@ let
       ];
       extraEnv = ''export CL_CC_TEST_WORKERS="''${CL_CC_TEST_WORKERS:-4}"'';
       loadFiles = [ "run-tests.lisp" ];
+      trailingScript = ''
+        if [ "$#" -eq 0 ]; then
+          ${pipelineJavascriptTests.program} "cl-cc/test/pipeline-javascript"
+          ${pipelinePhpTests.program} "cl-cc/test/pipeline-php"
+        fi
+      '';
     };
 
     coverage = mkSbclScript {
