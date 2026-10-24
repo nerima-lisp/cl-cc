@@ -53,11 +53,14 @@
   (let* ((constant-ids (make-hash-table :test 'eql))
          (inst (make-vm-const :dst :r0 :value 7))
          (same-inst (make-vm-const :dst :r1 :value 7))
+         (different-inst (make-vm-const :dst :r2 :value 8))
          (key (cl-cc/optimize::%opt-pre-expression-key inst constant-ids))
-         (same-key (cl-cc/optimize::%opt-pre-expression-key same-inst constant-ids)))
+         (same-key (cl-cc/optimize::%opt-pre-expression-key same-inst constant-ids))
+         (different-key (cl-cc/optimize::%opt-pre-expression-key different-inst constant-ids)))
     (expect (consp key) :to-be-truthy)
     (expect (first key) :to-be :const)
-    (expect same-key :to-equal key)))
+    (expect same-key :to-equal key)
+    (expect (not (equal different-key key)) :to-be-truthy)))
 
 (it-sequential "pre-expression-key-cases binary"
   (destructuring-bind (inst shape expected) (list (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1) :binary nil)
