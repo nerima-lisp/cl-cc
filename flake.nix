@@ -35,7 +35,7 @@
       flake = false;
     };
     cl-weave = {
-      url = "github:nerima-lisp/cl-weave/32671560d3d15d4ecf33b9d8af862ea60737841b";
+      url = "github:nerima-lisp/cl-weave/e74bbbd9a1667242ea141a2c6c1b921e5cdcd91e";
       flake = false;
     };
     # cl-parser-kit backs packages/parse's tokenizer/combinator/Pratt layer,
