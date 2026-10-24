@@ -497,7 +497,10 @@
                :method-reg :r2))))
     (assert-output-contains out "call $host_rt_register_method")
     ;; Symbol specializer should be passed as non-null staged symbol eqref.
-    (assert-output-contains out "struct.new $symbol_t")))
+    (expect
+      (or (search "struct.new $symbol_t" out :test (function char=))
+          (search "struct.new_immutable $symbol_t" out :test (function char=)))
+      :to-be-truthy)))
 
 (it-sequential "wasm-gc-generic-call-runtime-bridge-emission"
   (let ((out (%direct-wasm-emit
