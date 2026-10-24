@@ -381,21 +381,23 @@
 ;;; ─── %opt-pre-block-out-env ──────────────────────────────────────────────
 
 (it-sequential "pre-block-out-env-maps-key-to-defining-register"
-  (let* ((b   (make-instance 'cl-cc/optimize:basic-block))
-         (c42 (make-vm-const :dst :r0 :value 42)))
+  (let* ((b (make-instance (quote cl-cc/optimize:basic-block)))
+         (c42 (make-vm-const :dst :r0 :value 42))
+         (constant-ids (make-hash-table :test (function eql))))
     (setf (cl-cc/optimize:bb-instructions b) (list c42))
-    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b)))
+    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b constant-ids)))
       (expect (hash-table-p env) :to-be-truthy)
-      (expect (gethash '(:const 42) env) :to-equal :r0))))
+      (expect (gethash (list :const (gethash 42 constant-ids)) env) :to-equal :r0))))
 
 (it-sequential "pre-block-out-env-removes-stale-entries-on-overwrite"
-  (let* ((b  (make-instance 'cl-cc/optimize:basic-block))
+  (let* ((b (make-instance (quote cl-cc/optimize:basic-block)))
          (c1 (make-vm-const :dst :r0 :value 1))
-         (c2 (make-vm-const :dst :r0 :value 2)))
+         (c2 (make-vm-const :dst :r0 :value 2))
+         (constant-ids (make-hash-table :test (function eql))))
     (setf (cl-cc/optimize:bb-instructions b) (list c1 c2))
-    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b)))
-      (expect (gethash '(:const 1) env) :to-be-null)
-      (expect (gethash '(:const 2) env) :to-equal :r0))))
+    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b constant-ids)))
+      (expect (gethash (list :const (gethash 1 constant-ids)) env) :to-be-null)
+      (expect (gethash (list :const (gethash 2 constant-ids)) env) :to-equal :r0))))
 
 ;;; ─── %opt-pre-join-elim ──────────────────────────────────────────────────
 
