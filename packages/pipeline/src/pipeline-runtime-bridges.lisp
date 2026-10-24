@@ -35,12 +35,21 @@ against: the set has to be identical to what the old package scan produced."
           (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))
           (push sym registered))))))
 
+(defun %register-logical-pathname-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   'cl:logical-pathname-translations
+   #'cl:logical-pathname-translations)
+  (cl-cc/vm:vm-register-host-bridge
+   (intern "%SET-LOGICAL-PATHNAME-TRANSLATIONS" :cl-cc)
+   (lambda (host translations)
+     (setf (cl:logical-pathname-translations host) translations)
+     translations)))
 (defun %register-backend-runtime-bridges ()
-  "Register every loaded backend runtime bridge at pipeline start-up.
+  "Register built-in pathname and loaded backend runtime bridges.
 
-This compatibility boundary is called unconditionally by both source compilation
-entry points. Bridge discovery belongs to the backend registries, so the pipeline
-must not name or scan an external backend package here."
+Called by both source compilation entry points. Backend bridge discovery belongs
+to backend registries; the built-in Common Lisp pathname bridge is registered directly."
+  (%register-logical-pathname-runtime-bridges)
   (%register-backend-protocol-bridges))
 
 (defun %register-php-runtime-bridges ()
