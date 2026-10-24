@@ -17,6 +17,11 @@
 (it-sequential "x86-64-regs-red-zone-spill-non-leaf-always-false"
   (expect (cl-cc/codegen::x86-64-red-zone-spill-p nil 1) :to-be-falsy)
   (expect (cl-cc/codegen::x86-64-red-zone-spill-p nil 16) :to-be-falsy))
+(defun %capture-x86-error-message (thunk)
+  (handler-case
+      (funcall thunk)
+    (error (condition)
+      (princ-to-string condition))))
 
 (it-sequential "x86-64-regs-red-zone-spill-leaf-exceeds-limit-returns-false"
   (expect (cl-cc/codegen::x86-64-red-zone-spill-p t 17) :to-be-falsy)
@@ -154,7 +159,11 @@
     (expect (= expected (cl-cc/codegen::vm-const-to-integer val)) :to-be-truthy)))
 
 (it-sequential "x86-64-regs-vm-const-to-integer rejects float"
-  (signals error (cl-cc/codegen::vm-const-to-integer 3.14)))
+  (let ((message
+          (%capture-x86-error-message
+           (lambda () (cl-cc/codegen::vm-const-to-integer 3.14)))))
+    (expect message :to-equal
+            "Unsupported VM-CONST literal for native codegen: 3.14")))
 
 ;;; ─── x86-64-double-float-bits ────────────────────────────────────────────
 

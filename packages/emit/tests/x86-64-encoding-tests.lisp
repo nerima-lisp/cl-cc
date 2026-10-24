@@ -469,13 +469,27 @@
     (expect (cl-cc/codegen::vm-const-to-integer input) :to-equal expected)))
 
 (it-sequential "x86-vm-const-to-integer rejects string"
-  (signals error (cl-cc/codegen::vm-const-to-integer "hello")))
+  (let ((message
+          (%capture-x86-error-message
+           (lambda () (cl-cc/codegen::vm-const-to-integer "hello")))))
+    (expect message :to-equal
+            "Unsupported VM-CONST literal for native codegen: \"hello\"")))
 
 (it-sequential "x86-vm-const-to-integer rejects symbol"
-  (signals error (cl-cc/codegen::vm-const-to-integer 'foo)))
+  (let ((message
+          (%capture-x86-error-message
+           (lambda () (cl-cc/codegen::vm-const-to-integer (quote foo))))))
+    (expect message :to-equal
+            "Unsupported VM-CONST literal for native codegen: FOO")))
 
 (it-sequential "x86-vm-const-to-integer rejects list"
-  (signals error (cl-cc/codegen::vm-const-to-integer '(1 2))))
+  (let ((message
+          (%capture-x86-error-message
+           (lambda ()
+             (cl-cc/codegen::vm-const-to-integer
+              (quote (1 2)))))))
+    (expect message :to-equal
+            "Unsupported VM-CONST literal for native codegen: (1 2)")))
 
 (it-sequential "x86-setcc-register-size low-reg-rax"
   (destructuring-bind (reg expected-len) (list cl-cc/codegen::+rax+ 3)

@@ -13,8 +13,13 @@
     (expect (cl-cc/codegen::instruction-size inst) :to-equal 0)))
 
 (it-sequential "x86-instruction-size rejects unknown instruction"
-  (signals error
-    (cl-cc/codegen::instruction-size '(:not-a-real-inst))))
+  (let ((message
+          (%capture-x86-error-message
+           (lambda ()
+             (cl-cc/codegen::instruction-size
+              (quote (:not-a-real-inst)))))))
+    (expect message :to-equal
+            "Unsupported x86-64 instruction: CONS")))
 
 ;;; ─── build-label-offsets ────────────────────────────────────────────────
 

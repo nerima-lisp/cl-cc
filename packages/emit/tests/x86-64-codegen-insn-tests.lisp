@@ -157,14 +157,19 @@
 
 (it-sequential "x86-64-shadow-stack-control-inst-errors-when-disabled"
   (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* nil))
-    (signals error
-      (%x86-collect-bytes
-       (lambda (s)
-         (cl-cc/codegen::emit-vm-instruction-with-labels
-          (cl-cc/vm::make-vm-push-handler :handler-type :error :handler-label "Lh" :result-reg :R0)
-          s
-          0
-          (make-hash-table :test #'equal)))))))
+    (let ((message
+            (%capture-x86-error-message
+             (lambda ()
+               (%x86-collect-bytes
+                (lambda (s)
+                  (cl-cc/codegen::emit-vm-instruction-with-labels
+                   (cl-cc/vm::make-vm-push-handler
+                    :handler-type :error :handler-label "Lh" :result-reg :R0)
+                   s
+                   0
+                   (make-hash-table :test (function equal)))))))))
+      (expect message :to-equal
+              "Unsupported x86-64 instruction: VM-PUSH-HANDLER requires shadow-stack support"))))
 
 (it-sequential "x86-64-shadow-stack-control-inst-emits-saveprevssp-when-enabled"
   (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
