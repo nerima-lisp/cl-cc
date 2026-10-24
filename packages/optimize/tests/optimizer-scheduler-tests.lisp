@@ -7,7 +7,9 @@
 ;;;;                               preserves barriers in original relative position
 ;;;;   schedule-pre-ra           — pressure-aware scheduling produces valid orderings
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-integration-suite))
 
 ;;; ─── Test helpers ─────────────────────────────────────────────────────────
 

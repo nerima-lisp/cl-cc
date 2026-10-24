@@ -6,7 +6,11 @@
 ;;;;                     opt-adaptive-inline-threshold, opt-inline-eligible-p
 ;;;;   Full passes     — opt-pass-global-dce, opt-pass-inline
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-inline-pass-tests-2-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-inline-pass-tests-2-suite))
 
 ;;; ─── opt-inline-inst-cost ───────────────────────────────────────────────────
 

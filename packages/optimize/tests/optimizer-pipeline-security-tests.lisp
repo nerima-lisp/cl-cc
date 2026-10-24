@@ -3,7 +3,11 @@
 ;;;;
 ;;;; Covers: CFI, retpoline, stack canary, shadow stack, HTM.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-pipeline-security-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-pipeline-security-tests-suite))
 
 ;;; ─── Control Flow Integrity (CFI) ───────────────────────────────────────────
 

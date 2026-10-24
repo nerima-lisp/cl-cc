@@ -6,7 +6,11 @@
 ;;;;   loop-rotation, loop-peeling, loop-unrolling, code-sinking,
 ;;;;   opt-pass-dominated-type-check-elim, opt-passes-preserve-straight-line.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-flow-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-flow-tests-suite))
 
 ;;; ─── Test helpers ────────────────────────────────────────────────────────
 

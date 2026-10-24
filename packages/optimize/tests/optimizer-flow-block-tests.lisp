@@ -5,7 +5,9 @@
 ;;;;   cfg-block-temperature, opt-pass-branch-correlation,
 ;;;;   opt-pass-tail-merge (tail-duplication).
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-integration-suite))
 
 ;;; ─── Straight-line preservation / empty-input ───────────────────────────
 
