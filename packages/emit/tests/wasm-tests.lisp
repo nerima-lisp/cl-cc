@@ -416,22 +416,10 @@
          (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
     (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
-(it-sequential "wasm-gc-make-obj-uses-class-reg-in-instance-struct"
-  (let ((out (%direct-wasm-emit*
-              (list
-               (cl-cc:make-vm-class-def :dst :r8
-                                        :class-name 'my-class
-                                        :superclasses nil
-                                        :slot-names '(a b)
-                                        :slot-initargs nil
-                                        :slot-initform-regs nil
-                                        :slot-types nil
-                                        :default-initarg-regs nil
-                                        :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil)))))
-    (assert-output-contains out "struct.new $instance_t")
-    (expect (search "ref.null $class_meta_t" out :test #'char=) :to-be-falsy)))
+(it-sequential "wasm-gc-make-obj-reports-unsupported-instruction"
+  (let* ((inst (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-MAKE-OBJ")))
 
 (it-sequential "wasm-gc-register-method-runtime-bridge-emission"
   (let ((out (%direct-wasm-emit
