@@ -388,35 +388,19 @@
          (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
     (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
-(it-sequential "wasm-gc-slot-index-resolution-includes-superclass-slots"
-  (let ((out (%direct-wasm-emit*
-              (list
-               (cl-cc:make-vm-class-def :dst :r7
-                                        :class-name 'super-c
-                                        :superclasses nil
-                                        :slot-names '(sa sb)
+(it-sequential "wasm-gc-inherited-layout-rejects-unsupported-class-def"
+  (let* ((inst (cl-cc:make-vm-class-def :dst :r8
+                                        :class-name :sub-c
+                                        :superclasses (quote (:super-c))
+                                        :slot-names (quote (:sc))
                                         :slot-initargs nil
                                         :slot-initform-regs nil
                                         :slot-types nil
                                         :default-initarg-regs nil
                                         :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-class-def :dst :r8
-                                        :class-name 'sub-c
-                                        :superclasses '(super-c)
-                                        :slot-names '(sc)
-                                        :slot-initargs nil
-                                        :slot-initform-regs nil
-                                        :slot-types nil
-                                        :default-initarg-regs nil
-                                        :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil)
-               ;; inherited sb should resolve to index 1; own sc should resolve to index 2
-               (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'sb)
-               (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name 'sc :value-reg :r2)))))
-    (assert-output-contains out "(i32.const 1)")
-    (assert-output-contains out "(i32.const 2)")))
+                                        :metaclass-reg nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
 (it-sequential "wasm-gc-class-def-emits-class-meta-struct"
   (let ((out (%direct-wasm-emit
