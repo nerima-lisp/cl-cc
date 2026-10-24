@@ -48,6 +48,16 @@
 
 (it-sequential "compile-find-symbol-builtin"
   (expect (run-string "(multiple-value-bind (sym status) (find-symbol \"CAR\" :cl) (list (symbol-name sym) status))" :stdlib t) :to-equal '("CAR" :external)))
+(it-sequential "compile-package-operations-default-to-current-package"
+  (expect
+   (run-string
+    "(let* ((pkg (make-package :cl-cc-current-package-ops-test :use nil))
+            (*package* pkg)
+            (sym (intern (string :exported))))
+       (export sym)
+       (nth-value 1 (find-symbol (string :exported) pkg)))"
+    :stdlib t)
+   :to-equal :external))
 
 (it-sequential "compile-float-inspection-builtins float-precision"
   (destructuring-bind (form expected) (list "(float-precision 1.0)" (float-precision 1.0))

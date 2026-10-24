@@ -33,7 +33,7 @@
 ;;;   :unary-opt-nil      (fn &opt arg)         → (:dst :src), nil default
 ;;;   :binary-opt-one     (fn a &opt b)         → (:dst :lhs :rhs), 1 default
 ;;;   :ternary-opt-nil-custom (fn a b &opt c)   → :dst + 3 custom slots, nil default
-;;;   :binary-opt-nil-slot (fn a &opt b)        → :dst + 2 custom slots, nil default
+;;;   :binary-opt-nil-slot (fn a &opt b)        → :dst + 2 custom slots, *package* default
 ;;;   :binary-synth-zero  (fn a b)              → :dst + 3 custom slots, zero synth
 (in-package :cl-cc/compile)
 
