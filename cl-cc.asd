@@ -385,7 +385,12 @@
        :components
        ((:file "perfmap-tests")
         (:file "pipeline-incremental-hot-parallel-tests")
-        (:file "pipeline-pgo-tests")))
+        (:file "pipeline-pgo-tests")
+        (:file "pipeline-javascript-e2e-core-tests")
+        (:file "pipeline-javascript-e2e-advanced-tests")
+        (:file "pipeline-javascript-e2e-advanced-builtins-tests")
+        (:file "pipeline-javascript-e2e-modern-tests")
+        (:file "pipeline-php-e2e-tests")))
      (:module "tools-tests"
       :pathname "packages/tools/tests"
       :serial t
