@@ -20,11 +20,10 @@
 
 (defun %wat-for (source-string)
   "Compile SOURCE-STRING via compile-string :target :wasm and return the WAT
-   assembly string, or NIL if compilation fails."
-  (ignore-errors
-    (let ((result (compile-string source-string :target :wasm)))
-      (when result
-        (compilation-result-assembly result)))))
+   assembly string. Compilation errors propagate to the test runner."
+  (let ((result (compile-string source-string :target :wasm)))
+    (when result
+      (compilation-result-assembly result))))
 
 (defun %direct-wasm-emit (inst)
   "Emit INST through the non-trampoline wasm target methods directly." 

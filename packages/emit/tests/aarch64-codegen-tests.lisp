@@ -17,11 +17,10 @@
 
 (defun %a64-compile (source)
   "Compile SOURCE string to AArch64 machine-code bytes.
-Returns the byte vector, or NIL on error."
-  (ignore-errors
-    (compile-to-aarch64-bytes
-     (compilation-result-program
-      (compile-string source :target :vm)))))
+Compilation errors propagate to the test runner."
+  (compile-to-aarch64-bytes
+   (compilation-result-program
+    (compile-string source :target :vm))))
 
 (defun %a64-collect-bytes (emit-fn)
   "Collect bytes emitted by a native AArch64 emitter."
