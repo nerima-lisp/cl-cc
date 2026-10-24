@@ -793,7 +793,6 @@
                     EOF
 
                     cd ansi-test
-                    ${pkgs.lib.optionalString (name == "ansi-arrays-eval") "export CLCC_ANSI_VM_TRACE=1"}
                     if ${clCc}/bin/cl-cc run --lang lisp --stdlib .cl-cc-ansi-runner.lisp > "$TMPDIR/runner.log" 2>&1; then
                       runner_status=0
                     else
@@ -819,6 +818,7 @@
                       cat "$TMPDIR/checker.log"
                       cat "$TMPDIR/runner.log"
                       if test -f sandbox/ansi-suite.log; then cat sandbox/ansi-suite.log; fi
+                      python3 -c 'import sys; lines=open(sys.argv[1],errors="replace").readlines(); print(next((line.rstrip() for line in reversed(lines) if line.startswith("ANSI-STAGE:")), "ANSI-STAGE: unavailable"))' "$TMPDIR/runner.log"
                       exit "$checker_status"
                     fi
                   '';

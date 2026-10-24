@@ -11,12 +11,18 @@
   (getf cl-user::*ansi-run-config* :mode))
 
 ;; Load the ANSI regression-test framework and its test registry.
-(load "gclload1.lsp")
+(progn
+  (format *error-output* "ANSI-STAGE: bootstrap-loading~%")
+  (load "gclload1.lsp")
+  (format *error-output* "ANSI-STAGE: bootstrap-loaded~%"))
 
 ;; Compile mode compiles each test form before running it; eval mode evaluates it.
 (setf regression-test:*compile-tests* (string= cl-user::*ansi-mode* "compile"))
 
-(load (concatenate 'string cl-user::*ansi-chapter* "/load.lsp"))
+(progn
+  (format *error-output* "ANSI-STAGE: chapter-loading~%")
+  (load (concatenate 'string cl-user::*ansi-chapter* "/load.lsp"))
+  (format *error-output* "ANSI-STAGE: chapter-loaded~%"))
 
 ;; The upstream driver tests require both load specials to be NIL. When this
 ;; runner inherits either non-NIL load special, remove them from the test registry.
@@ -41,7 +47,10 @@
 
 ;; do-tests writes its transcript to ansi-suite.log; Nix saves this script's
 ;; stdout, including the ANSI markers below, as runner.log.
-(regression-test:do-tests :out "ansi-suite.log")
+(progn
+  (format *error-output* "ANSI-STAGE: do-tests-starting~%")
+  (regression-test:do-tests :out "ansi-suite.log")
+  (format *error-output* "ANSI-STAGE: do-tests-finished~%"))
 
 ;; Tests can carry :notes annotations; do-tests skips entries with disabled notes.
 ;; Executed is pass plus fail; inactive is the loaded remainder after filtering
