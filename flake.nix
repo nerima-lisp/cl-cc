@@ -104,7 +104,7 @@
       flake = false;
     };
     cl-cc-bootstrap = {
-      url = "github:nerima-lisp/cl-cc-bootstrap/027f6c9826010c15789454e69abd2930738b50af";
+      url = "github:nerima-lisp/cl-cc-bootstrap/1a4c69756d6cf268c93e613641bf9f137b32559e";
       flake = false;
     };
     cl-cc-vm = {
@@ -136,7 +136,7 @@
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/ee65c1d2ba3c9cec825f737251628b4c3c02390d";
+      url = "github:nerima-lisp/cl-cc-php/d59cdbf72bffacf77a276dfb3492f2be35e8a363";
       flake = false;
     };
     cl-cc-javascript = {
