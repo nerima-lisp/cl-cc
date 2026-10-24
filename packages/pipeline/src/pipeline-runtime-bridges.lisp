@@ -44,12 +44,18 @@ against: the set has to be identical to what the old package scan produced."
    (lambda (host translations)
      (setf (cl:logical-pathname-translations host) translations)
      translations)))
+(defun %register-package-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   'cl:make-package
+   (lambda (name &key nicknames (use '(:cl)))
+     (cl-cc/runtime:rt-make-package name :nicknames nicknames :use use))))
 (defun %register-backend-runtime-bridges ()
-  "Register built-in pathname and loaded backend runtime bridges.
+  "Register built-in package/pathname and loaded backend runtime bridges.
 
 Called by both source compilation entry points. Backend bridge discovery belongs
-to backend registries; the built-in Common Lisp pathname bridge is registered directly."
+to backend registries; the built-in Common Lisp bridges are registered directly."
   (%register-logical-pathname-runtime-bridges)
+  (%register-package-runtime-bridges)
   (%register-backend-protocol-bridges))
 
 (defun %register-php-runtime-bridges ()
