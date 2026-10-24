@@ -436,6 +436,7 @@ let
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
+        cl-cc-formatter
       ];
     };
   };
