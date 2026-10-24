@@ -106,7 +106,7 @@
     (expect (or (null (cl-cc:compilation-result-optimized-instructions result))
                      (listp (cl-cc:compilation-result-optimized-instructions result))) :to-be-truthy)))
 
-(it-sequential "prolog-peephole-collapses-const-followed-by-move"
+(it-sequential "prolog-peephole-preserves-const-source-followed-by-move"
   (let ((out (cl-cc/optimize:apply-prolog-peephole
               '((:const :r1 42) (:move :r2 :r1)))))
-    (expect out :to-equal '((:const :r2 42)))))
+    (expect out :to-equal '((:const :r1 42) (:const :r2 42)))))
