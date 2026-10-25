@@ -19,6 +19,9 @@
 (defun run-native-compile (worker input output cache-root run-label)
   (let ((command
          (list (namestring sb-ext:*runtime-pathname*)
+               ;; Some test cores exceed SBCL’s default 1 GiB dynamic space.
+               "--dynamic-space-size"
+               "3072"
                "--core"
                (namestring sb-ext:*core-pathname*)
                "--noinform"
