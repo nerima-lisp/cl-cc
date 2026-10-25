@@ -29,15 +29,15 @@
 
 ;; ──── Topology implementation ────
 (it-sequential "fr-624-topology-core-detection"
-  (let* ((cl-cc/runtime::*rt-detected-cpu-cores*
-           (or cl-cc/runtime::*rt-detected-cpu-cores* 1))
+  (let* ((cl-cc/runtime/os::*rt-detected-cpu-cores*
+           (or cl-cc/runtime/os::*rt-detected-cpu-cores* 1))
          (cores (cl-cc/runtime:detect-cpu-cores)))
     (expect (integerp cores) :to-be-truthy)
     (expect (plusp cores) :to-be-truthy)))
 
 (it-sequential "fr-624-topology-numa-info-returns-plist"
-  (let* ((cl-cc/runtime::*rt-detected-cpu-cores*
-           (or cl-cc/runtime::*rt-detected-cpu-cores* 1))
+  (let* ((cl-cc/runtime/os::*rt-detected-cpu-cores*
+           (or cl-cc/runtime/os::*rt-detected-cpu-cores* 1))
          (topo (cl-cc/runtime:detect-numa-topology)))
     (expect (listp topo) :to-be-truthy)
     (dolist (node topo)
@@ -45,16 +45,16 @@
       (expect (getf node :node-id) :to-be-truthy))))
 
 (it-sequential "fr-624-topology-cpulist-parser-normalizes-ranges"
-  (expect (cl-cc/runtime::%rt-parse-cpulist "0-2,2,4,nope,6-5,7") :to-equal '(0 1 2 4 7)))
+  (expect (cl-cc/runtime/os::%rt-parse-cpulist "0-2,2,4,nope,6-5,7") :to-equal '(0 1 2 4 7)))
 
 (it-sequential "fr-624-topology-memory-bytes-sums-known-nodes"
-  (expect (cl-cc/runtime::%rt-topology-memory-bytes
+  (expect (cl-cc/runtime/os::%rt-topology-memory-bytes
                  '((:node-id 0 :memory-bytes 128)
                    (:node-id 1 :memory-bytes nil)
                    (:node-id 2 :memory-bytes 256))) :to-equal 384))
 
 (it-sequential "fr-624-topology-cache-returns-fresh-tree"
-  (let ((cl-cc/runtime::*rt-detected-numa-topology*
+  (let ((cl-cc/runtime/os::*rt-detected-numa-topology*
           '((:node-id 0 :cpus (0 1) :memory-bytes 128 :kind :dram))))
     (let ((topology (cl-cc/runtime:detect-numa-topology)))
       (setf (first (getf (first topology) :cpus)) 99))
