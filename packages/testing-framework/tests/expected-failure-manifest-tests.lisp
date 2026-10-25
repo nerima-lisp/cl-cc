@@ -113,4 +113,16 @@
                        :to-equal '(:condition-changed :duplicate-result :duplicate-result))
       (cl-weave:signals error
         (%ensure-no-expected-failure-violations violations)))))
-(in-suite cl-cc-suite)
+(cl-weave:it-sequential "suite taxonomy and defsuite option validation"
+  (cl-weave:signals program-error
+    (macroexpand-1 '(defsuite unsupported-suite :parallel nil)))
+  (cl-weave:expect
+   (%suite-for-test-source #P"/tmp/repo/t/conformance/example.lisp")
+   :to-be 'cl-cc-conformance-suite)
+  (cl-weave:expect
+   (%suite-for-test-source #P"/tmp/repo/t/e2e/example.lisp")
+   :to-be 'selfhost-suite)
+  (cl-weave:expect
+   (%suite-for-test-source #P"/tmp/repo/packages/core/tests/example.lisp")
+   :to-be nil))
+(in-suite cl-cc-unit-suite)

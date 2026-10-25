@@ -18,26 +18,25 @@
 
 (defsuite cl-cc-integration-serial-suite
   :description "Sequential-only integration tests"
-  :parent cl-cc-integration-suite
-  :parallel nil)
+  :parent cl-cc-integration-suite)
 
 (defsuite cl-cc-e2e-suite
   :description "End-to-end tests"
   :parent cl-cc-suite)
+(defsuite selfhost-suite
+  :description "Self-hosting end-to-end tests"
+  :parent cl-cc-e2e-suite)
 
 (defsuite cl-cc-serial-suite
   :description "Sequential-only unit tests"
-  :parent cl-cc-unit-suite
-  :parallel nil)
+  :parent cl-cc-unit-suite)
 
 (defsuite cl-cc-conformance-suite
   :description "ANSI CL conformance tests (expected-fail for known gaps)"
-  :parent cl-cc-suite
-  :parallel nil)
+  :parent cl-cc-suite)
 
 (defsuite cl-cc-documentation-suite
   :description "Documentation, roadmap, and implementation evidence checks"
-  :parent cl-cc-suite
-  :parallel nil)
+  :parent cl-cc-suite)
 
-(in-suite cl-cc-suite)
+(in-suite cl-cc-unit-suite)

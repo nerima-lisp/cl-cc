@@ -173,36 +173,91 @@
   t)
 
 (defun run-tests (&key (reporter :spec) name-filter max-workers
-                    (stream *standard-output*))
-  (let* ((manifest (read-expected-failure-manifest))
-         (results (mapcar #'%expected-failure-result-from-event
-                          (cl-weave::normalize-run-results
-                           (cl-weave:run (cl-weave::root-suite)
-                                         :reporter reporter
-                                         :stream stream
-                                         :name-filter name-filter
-                                         :max-workers max-workers)))))
-    (multiple-value-bind (matched violations)
-        (audit-expected-failure-results manifest results
-                                        :require-complete (null name-filter))
-      (dolist (entry matched)
-        (format stream "# [XFAIL] ~A owner=~A work-order=~A~%"
-                (getf entry :path)
-                (getf entry :owner-repository)
-                (getf entry :work-order)))
-      (dolist (violation violations)
-        (%report-expected-failure-violation violation stream))
-      (let* ((errored (count-if (lambda (violation)
-                                  (eq (getf violation :status) :error))
-                                violations))
-             (failed (- (length violations) errored)))
-        (format stream
-                "# cl-cc-tests summary: ~D passed, ~D expected-failed, ~D skipped, ~D todo, ~D failed, ~D errored, ~D total~%"
-                (%expected-failure-count-status results :pass)
-                (length matched)
-                (%expected-failure-count-status results :skip)
-                (%expected-failure-count-status results :todo)
-                failed
-                errored
-                (length results)))
-      (%ensure-no-expected-failure-violations violations))))
+                    (stream *standard-output*) (suite 'cl-cc-suite)
+                    (parallel t) random)
+  (let ((suite-object (if (symbolp suite)
+                          (%ensure-suite-object suite)
+                          suite)))
+    (when (member "CL-CC-E2E-SUITE"
+                  (mapcar #'cl-weave::suite-name
+                          (cl-weave::suite-lineage suite-object))
+                  :test #'string=)
+      (asdf:load-system "cl-cc/test/e2e"))
+    (let* ((order (and random :random))
+           (plan (cl-weave:collect-test-plan suite-object
+                                             :name-filter name-filter
+                                             :order order))
+           (runnable-count
+             (count :run plan :key #'cl-weave:test-plan-entry-status))
+           (selected-paths
+             (mapcar (lambda (entry)
+                       (cl-weave::path-string
+                        (cl-weave:test-plan-entry-path entry)))
+                     plan)))
+      (unless (plusp runnable-count)
+        (error "Test suite ~A has no runnable tests."
+               (cl-weave::suite-name suite-object)))
+      (let* ((suite-prefix
+               (format nil "~{~A~^ > ~}"
+                       (mapcar #'cl-weave::suite-name
+                               (rest (cl-weave::suite-lineage suite-object)))))
+             (manifest-prefix (concatenate 'string suite-prefix " > "))
+             (suite-manifest
+               (remove-if-not
+                (lambda (entry)
+                  (let ((path (getf entry :path)))
+                    (and (stringp path)
+                         (<= (length manifest-prefix) (length path))
+                         (string= manifest-prefix path
+                                  :end2 (length manifest-prefix)))))
+                (read-expected-failure-manifest)))
+             (manifest
+               (remove-if-not
+                (lambda (entry)
+                  (member (getf entry :path) selected-paths :test #'equal))
+                suite-manifest))
+             (results
+               (mapcar #'%expected-failure-result-from-event
+                       (cl-weave::normalize-run-results
+                        (cl-weave:run suite-object
+                                      :reporter reporter
+                                      :stream stream
+                                      :name-filter name-filter
+                                      :order order
+                                      :max-workers (if parallel
+                                                       max-workers
+                                                       1))))))
+        (multiple-value-bind (matched violations)
+            (audit-expected-failure-results manifest results
+                                            :require-complete t)
+          (dolist (entry matched)
+            (format stream "# [XFAIL] ~A owner=~A work-order=~A~%"
+                    (getf entry :path)
+                    (getf entry :owner-repository)
+                    (getf entry :work-order)))
+          (dolist (violation violations)
+            (%report-expected-failure-violation violation stream))
+          (let* ((errored (count-if (lambda (violation)
+                                      (eq (getf violation :status) :error))
+                                    violations))
+                 (failed (- (length violations) errored)))
+            (format stream
+                    "# cl-cc-tests summary: ~D passed, ~D expected-failed, ~D skipped, ~D todo, ~D failed, ~D errored, ~D total~%"
+                    (%expected-failure-count-status results :pass)
+                    (length matched)
+                    (%expected-failure-count-status results :skip)
+                    (%expected-failure-count-status results :todo)
+                    failed
+                    errored
+                    (length results)))
+          (%ensure-no-expected-failure-violations violations))))))
+(defun run-suite (suite &key (reporter :spec) name-filter max-workers
+                    (stream *standard-output*) (parallel t) random)
+  "Run SUITE through the expected-failure-audited runner."
+  (run-tests :suite suite
+             :reporter reporter
+             :name-filter name-filter
+             :max-workers max-workers
+             :stream stream
+             :parallel parallel
+             :random random))

@@ -1,9 +1,9 @@
 (defpackage :cl-cc/test
   (:use :cl)
-  ;; Native cl-weave test API, imported so files can be migrated off the
-  ;; home-grown deftest/assert-* to it-sequential/expect incrementally
-  ;; (testing-framework -> cl-weave migration; see docs/).
-  (:import-from :cl-weave #:it-sequential #:it-sequential-each #:expect #:signals
+  (:shadow #:it-sequential)
+  ;; cl-weave API used by files migrating off the home-grown test framework.
+  ;; The local IT-SEQUENTIAL wrapper assigns conformance and e2e sources.
+  (:import-from :cl-weave #:it-sequential-each #:expect #:signals
                 #:describe-sequential #:before-each #:after-each #:it-todo)
   (:shadowing-import-from :cl-cc/type
    :type-node

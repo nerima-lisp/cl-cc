@@ -56,7 +56,6 @@
            skip
            pending
            expected-fail
-           defexpected
            shrink
            shrink-integer
            shrink-list
