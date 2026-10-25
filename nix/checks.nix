@@ -445,7 +445,19 @@ in
                    (enough-namestring (pathname path) root))
                  (prefix-p (prefix string)
                    (and (>= (length string) (length prefix))
-                        (string= prefix string :end2 (length prefix)))))
+                        (string= prefix string :end2 (length prefix))))
+                 (ends-with-p (suffix string)
+                   (and (>= (length string) (length suffix))
+                        (string= suffix string
+                                 :start2 (- (length string) (length suffix)))))
+                 (test-system-p (name)
+                   (let ((name (string-downcase name)))
+                     (or (search "/test/" name)
+                         (search "/tests/" name)
+                         (ends-with-p "/test" name)
+                         (ends-with-p "/tests" name)
+                         (ends-with-p "-test" name)
+                         (ends-with-p "-tests" name)))))
           (let* ((root (uiop:ensure-directory-pathname
                         (truename (uiop:getenv "CL_CC_SOURCE_ROOT"))))
                  (root-name (namestring root))
@@ -482,7 +494,8 @@ in
                            (record-component child)))))
               (dolist (name (asdf:registered-systems))
                 (let ((system (asdf:find-system name nil)))
-                  (when system (record-component system)))))
+                  (when (and system (test-system-p name))
+                    (record-component system)))))
             (unless candidate-files
               (error "No test files were found; refusing a vacuous orphan check."))
             (let* ((vm-files (remove-if-not
@@ -521,8 +534,10 @@ in
             ../cl-cc.asd
           ];
         };
+        # Use a clean ASDF registry so component paths resolve inside `src`.
+        # sbclWithTests pre-registers systems from separate Nix derivations.
         nativeBuildInputs = [
-          sbclWithTests
+          pkgs.sbcl
           pkgs.findutils
         ];
       }
@@ -531,11 +546,7 @@ in
         export XDG_CACHE_HOME="$TMPDIR/cache"
         mkdir -p "$HOME" "$XDG_CACHE_HOME"
         export CL_CC_SOURCE_ROOT="$src"
-        if [ -n "''${CL_SOURCE_REGISTRY-}" ]; then
-          export CL_SOURCE_REGISTRY="$src//:$CL_SOURCE_REGISTRY"
-        else
-          export CL_SOURCE_REGISTRY="$src//"
-        fi
+        export CL_SOURCE_REGISTRY="$src//"
         sbcl --noinform --script ${orphanCheckScript}
         touch "$out"
       '';
