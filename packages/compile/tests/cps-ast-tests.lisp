@@ -136,7 +136,7 @@
     (expect (>= lambda-count 2) :to-be-truthy)))
 
 (it-sequential "cps-ast-unsupported-node-signals-dedicated-condition"
-  (let ((node (cl-cc/ast::make-ast-hole)))
+  (let ((node (cl-cc/ast:make-ast-hole)))
     (handler-case
         (progn
           (cl-cc/cps:cps-transform-ast node (quote k))

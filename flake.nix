@@ -823,6 +823,7 @@
               rootLock
               childFlakeSources
               asdfSystemDerivations
+              productionAsdfSystems
               ;
             inherit (appsModule) apps;
           };
@@ -843,6 +844,8 @@
             testSuites
             jitTests
             prologToolsTests
+            crossRepoInternalRefs
+            contextMap
             toolkitPinConsistency
             lisplibsConsistency
             ;
@@ -884,6 +887,10 @@
         # packages/prolog-tools has its own cl-weave suite, driven by
         # `asdf:test-system` rather than by cl-cc's runner.
         cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
+
+        cross-repo-internal-refs = perSystem.${system}.crossRepoInternalRefs;
+
+        context-map = perSystem.${system}.contextMap;
 
         # The JIT write-barrier suite is a secondary ASDF system and must be
         # exercised explicitly; building its FASLs alone does not run tests.

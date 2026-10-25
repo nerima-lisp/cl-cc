@@ -200,115 +200,155 @@
                                (cl-cc/ast:make-ast-var :name 'b))))))
     (assert-list-contains result '(a b) :length 2)))
 
-;;; ─── %escape-add-kind / %escape-merge-kinds (extracted pure helpers) ─────
+;;; ─── Public escape-kind deduplication and merging ────────────────────────
 
 (it-sequential "escape-add-kind-deduplicates fresh-add"
-  (destructuring-bind (kind acc expected) (list :return nil '(:return))
-    (expect (cl-cc/ast::%escape-add-kind kind acc) :to-equal expected)))
+  (expect (cl-cc/ast:binding-escape-kinds-in-body
+           (list (cl-cc/ast:make-ast-var :name 'x)) 'x)
+          :to-equal '(:return)))
 
 (it-sequential "escape-add-kind-deduplicates already-there"
-  (destructuring-bind (kind acc expected) (list :return '(:return) '(:return))
-    (expect (cl-cc/ast::%escape-add-kind kind acc) :to-equal expected)))
+  (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body
+                (list (cl-cc/ast:make-ast-var :name 'x)
+                      (cl-cc/ast:make-ast-var :name 'x))
+                'x)))
+    (expect (member :return kinds) :to-be-truthy)
+    (expect (length kinds) :to-equal 1)))
 
 (it-sequential "escape-add-kind-deduplicates second-kind"
-  (destructuring-bind (kind acc expected) (list :capture '(:return) '(:capture :return))
-    (expect (cl-cc/ast::%escape-add-kind kind acc) :to-equal expected)))
+  (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body
+                (list (cl-cc/ast:make-ast-var :name 'x)
+                      (cl-cc/ast:make-ast-lambda
+                       :params '(z)
+                       :body (list (cl-cc/ast:make-ast-var :name 'x))))
+                'x)))
+    (expect (member :return kinds) :to-be-truthy)
+    (expect (member :capture kinds) :to-be-truthy)
+    (expect (length kinds) :to-equal 2)))
 
 (it-sequential "escape-merge-kinds-merges-multiple-lists"
-  (expect (cl-cc/ast::%escape-merge-kinds nil nil) :to-equal nil)
-  (let ((result (cl-cc/ast::%escape-merge-kinds '(:return) '(:return :capture))))
-    (assert-list-contains result '(:return :capture) :length 2)))
+  (expect (cl-cc/ast:binding-escape-kinds-in-body nil 'x) :to-be-null)
+  (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body
+                (list (cl-cc/ast:make-ast-var :name 'x)
+                      (cl-cc/ast:make-ast-lambda
+                       :params '(z)
+                       :body (list (cl-cc/ast:make-ast-var :name 'x))))
+                'x)))
+    (expect (member :return kinds) :to-be-truthy)
+    (expect (member :capture kinds) :to-be-truthy)
+    (expect (length kinds) :to-equal 2)))
 
-;;; ─── %count-ast-calls (extracted recursive helper) ───────────────────────
+;;; ─── Public direct-call counting ─────────────────────────────────────────
 
 (it-sequential "count-ast-calls-direct-match-returns-one"
   (let ((node (cl-cc/ast:make-ast-call
                :func 'my-fn
                :args (list (cl-cc/ast:make-ast-int :value 1)))))
-    (expect (= 1 (cl-cc/ast::%count-ast-calls node 'my-fn)) :to-be-truthy)))
+    (expect (= 1 (cl-cc/ast:binding-direct-call-count-in-body (list node) 'my-fn))
+            :to-be-truthy)))
 
 (it-sequential "count-ast-calls-no-match-returns-zero"
   (let ((node (cl-cc/ast:make-ast-call
                :func 'other-fn
                :args (list (cl-cc/ast:make-ast-int :value 1)))))
-    (expect (= 0 (cl-cc/ast::%count-ast-calls node 'my-fn)) :to-be-truthy)))
+    (expect (= 0 (cl-cc/ast:binding-direct-call-count-in-body (list node) 'my-fn))
+            :to-be-truthy)))
 
 (it-sequential "count-ast-calls-counts-across-nested-children"
   (let* ((inner (cl-cc/ast:make-ast-call :func 'my-fn :args nil))
          (outer (cl-cc/ast:make-ast-progn :forms (list inner inner))))
-    (expect (= 2 (cl-cc/ast::%count-ast-calls outer 'my-fn)) :to-be-truthy)))
+    (expect (= 2 (cl-cc/ast:binding-direct-call-count-in-body (list outer) 'my-fn))
+            :to-be-truthy)))
 
-;;; ─── %escape-mentions-node-p / %escape-mentions-forms-p ─────────────────
+;;; ─── Public binding-reference classification ─────────────────────────────
 
 (it-sequential "escape-mentions-node-p-cases match"
-  (destructuring-bind (node binding expected) (list (cl-cc/ast:make-ast-var :name 'x) 'x t)
-    (if expected
-      (expect (cl-cc/ast::%escape-mentions-node-p node binding) :to-be-truthy)
-      (expect (cl-cc/ast::%escape-mentions-node-p node binding) :to-be-falsy))))
+  (destructuring-bind (node binding expected)
+      (list (cl-cc/ast:make-ast-var :name 'x) 'x t)
+    (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body (list node) binding)))
+      (if expected
+          (expect (member :return kinds) :to-be-truthy)
+          (expect (member :return kinds) :to-be-falsy)))))
 
 (it-sequential "escape-mentions-node-p-cases no-match"
-  (destructuring-bind (node binding expected) (list (cl-cc/ast:make-ast-var :name 'y) 'x nil)
-    (if expected
-      (expect (cl-cc/ast::%escape-mentions-node-p node binding) :to-be-truthy)
-      (expect (cl-cc/ast::%escape-mentions-node-p node binding) :to-be-falsy))))
+  (destructuring-bind (node binding expected)
+      (list (cl-cc/ast:make-ast-var :name 'y) 'x nil)
+    (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body (list node) binding)))
+      (if expected
+          (expect (member :return kinds) :to-be-truthy)
+          (expect (member :return kinds) :to-be-falsy)))))
 
 (it-sequential "escape-mentions-node-p-cases literal"
-  (destructuring-bind (node binding expected) (list (cl-cc/ast:make-ast-int :value 1) 'x nil)
-    (if expected
-      (expect (cl-cc/ast::%escape-mentions-node-p node binding) :to-be-truthy)
-      (expect (cl-cc/ast::%escape-mentions-node-p node binding) :to-be-falsy))))
+  (destructuring-bind (node binding expected)
+      (list (cl-cc/ast:make-ast-int :value 1) 'x nil)
+    (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body (list node) binding)))
+      (if expected
+          (expect (member :return kinds) :to-be-truthy)
+          (expect (member :return kinds) :to-be-falsy)))))
 
 (it-sequential "escape-mentions-forms-p-returns-true-when-a-form-matches"
-  (expect (cl-cc/ast::%escape-mentions-forms-p
-                (list (cl-cc/ast:make-ast-var :name 'x)) 'x) :to-be-truthy))
+  (expect (member :return
+                  (cl-cc/ast:binding-escape-kinds-in-body
+                   (list (cl-cc/ast:make-ast-var :name 'x)) 'x))
+          :to-be-truthy))
 
 (it-sequential "escape-mentions-forms-p-returns-false-when-no-form-matches"
-  (expect (cl-cc/ast::%escape-mentions-forms-p
-                 (list (cl-cc/ast:make-ast-int :value 1)) 'x) :to-be-falsy))
+  (expect (cl-cc/ast:binding-escape-kinds-in-body
+           (list (cl-cc/ast:make-ast-int :value 1)) 'x)
+          :to-be-falsy))
 
 (it-sequential "escape-mentions-forms-p-returns-false-for-nil-list"
-  (expect (cl-cc/ast::%escape-mentions-forms-p nil 'x) :to-be-falsy))
+  (expect (cl-cc/ast:binding-escape-kinds-in-body nil 'x) :to-be-falsy))
 
-;;; ─── %escape-classify-children ──────────────────────────────────────────
+;;; ─── Public nested-node classification ───────────────────────────────────
 
 (it-sequential "escape-classify-children-returns-nil-when-no-child-matches"
-  (let* ((child  (cl-cc/ast:make-ast-int :value 42))
+  (let* ((child (cl-cc/ast:make-ast-int :value 42))
          (parent (cl-cc/ast:make-ast-progn :forms (list child))))
-    (expect (cl-cc/ast::%escape-classify-children parent 'x nil) :to-be-null)))
+    (expect (cl-cc/ast:binding-escape-kinds-in-body (list parent) 'x)
+            :to-be-null)))
 
 (it-sequential "escape-classify-children-reports-return-when-child-is-matching-var"
-  (let* ((child  (cl-cc/ast:make-ast-var :name 'x))
+  (let* ((child (cl-cc/ast:make-ast-var :name 'x))
          (parent (cl-cc/ast:make-ast-progn :forms (list child))))
-    (let ((kinds (cl-cc/ast::%escape-classify-children parent 'x nil)))
-      (expect (member :return kinds) :to-be-truthy))))
+    (expect (member :return
+                    (cl-cc/ast:binding-escape-kinds-in-body (list parent) 'x))
+            :to-be-truthy)))
 
-;;; ─── %escape-capture-kinds ───────────────────────────────────────────────
+;;; ─── Public closure-capture classification ────────────────────────────────
 
 (it-sequential "escape-capture-kinds-returns-nil-when-body-does-not-reference-binding"
-  (let ((body (list (cl-cc/ast:make-ast-int :value 0))))
-    (expect (cl-cc/ast::%escape-capture-kinds body 'x nil) :to-be-null)))
+  (let ((body (list (cl-cc/ast:make-ast-lambda
+                     :params '(z)
+                     :body (list (cl-cc/ast:make-ast-int :value 0))))))
+    (expect (cl-cc/ast:binding-escape-kinds-in-body body 'x) :to-be-null)))
 
 (it-sequential "escape-capture-kinds-returns-capture-when-body-references-binding"
-  (let ((body (list (cl-cc/ast:make-ast-var :name 'x))))
-    (let ((kinds (cl-cc/ast::%escape-capture-kinds body 'x nil)))
-      (expect (member :capture kinds) :to-be-truthy))))
+  (let ((body (list (cl-cc/ast:make-ast-lambda
+                     :params '(z)
+                     :body (list (cl-cc/ast:make-ast-var :name 'x))))))
+    (expect (member :capture
+                    (cl-cc/ast:binding-escape-kinds-in-body body 'x))
+            :to-be-truthy)))
 
-;;; ─── %escape-classify / binding-escape-kinds-in-body ────────────────────
+;;; ─── Public binding escape-kind API ──────────────────────────────────────
 
 (it-sequential "escape-classify-matching-var-yields-return"
   (let ((node (cl-cc/ast:make-ast-var :name 'x)))
-    (expect (cl-cc/ast::%escape-classify node 'x nil) :to-equal '(:return))))
+    (expect (cl-cc/ast:binding-escape-kinds-in-body (list node) 'x)
+            :to-equal '(:return))))
 
 (it-sequential "escape-classify-non-matching-var-yields-nil"
   (let ((node (cl-cc/ast:make-ast-var :name 'y)))
-    (expect (cl-cc/ast::%escape-classify node 'x nil) :to-be-null)))
+    (expect (cl-cc/ast:binding-escape-kinds-in-body (list node) 'x)
+            :to-be-null)))
 
 (it-sequential "binding-escape-kinds-detects-capture-via-lambda"
   (let* ((body (list (cl-cc/ast:make-ast-lambda
                       :params '(z)
-                      :body   (list (cl-cc/ast:make-ast-var :name 'x))))))
-    (let ((kinds (cl-cc/compile::binding-escape-kinds-in-body body 'x)))
+                      :body (list (cl-cc/ast:make-ast-var :name 'x))))))
+    (let ((kinds (cl-cc/ast:binding-escape-kinds-in-body body 'x)))
       (expect (member :capture kinds) :to-be-truthy))))
 
 (it-sequential "binding-escape-kinds-returns-nil-for-empty-body"
-  (expect (cl-cc/compile::binding-escape-kinds-in-body nil 'x) :to-be-null))
+  (expect (cl-cc/ast:binding-escape-kinds-in-body nil 'x) :to-be-null))

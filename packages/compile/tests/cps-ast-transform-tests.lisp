@@ -71,7 +71,7 @@
 (it-sequential "cps-control-unbound-return-from-signals-before-value-transform"
   (let ((node (cl-cc:make-ast-return-from
                :name nil
-               :value (cl-cc/ast::make-ast-hole))))
+               :value (cl-cc/ast:make-ast-hole))))
     (handler-case
         (progn
           (cl-cc:cps-transform-ast* node)
