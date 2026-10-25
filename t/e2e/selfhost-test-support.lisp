@@ -116,7 +116,7 @@ long-lived CL-CC/TEST package during canonical full-suite runs."
             "packages/type/src/inference.lisp"
             "packages/type/src/checker.lisp"
             "packages/type/src/printer.lisp"
-            "packages/mir/src/mir.lisp"
+            "packages/mir/ir/mir.lisp"
             "packages/vm/src/vm.lisp"
-            "packages/runtime/src/gc-data.lisp"))
+            "packages/runtime/memory/gc-data.lisp"))
   "Representative subset of source files covering all major modules.")
