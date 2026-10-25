@@ -113,6 +113,51 @@
                        :to-equal '(:condition-changed :duplicate-result :duplicate-result))
       (cl-weave:signals error
         (%ensure-no-expected-failure-violations violations)))))
+
+(cl-weave:it-sequential "full-suite XFAIL audit retains stale manifest entries"
+  (let* ((selected-entry (%manifest-test-entry "suite > selected" :fail))
+         (stale-entry (%manifest-test-entry "suite > stale" :fail))
+         (manifest (list selected-entry stale-entry))
+         (selected-paths (list (getf selected-entry :path)))
+         (selected-result (append (copy-list selected-entry)
+                                  (list :status :fail))))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results
+         (%select-expected-failure-manifest manifest selected-paths nil)
+         (list selected-result)
+         :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal '(:not-run))
+      (cl-weave:expect (getf (first violations) :path)
+                       :to-equal (getf stale-entry :path)))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results
+         (%select-expected-failure-manifest manifest selected-paths t)
+         (list selected-result)
+         :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))))
+
+(cl-weave:it-sequential "it-sequential routes by source suite rather than leaked current suite"
+  (let* ((source #P"/tmp/packages/optimize/tests/runner-taxonomy-tests.lisp")
+         (source-key (namestring source)))
+    (unwind-protect
+         (let ((*compile-file-truename* source)
+               (cl-weave::*current-suite* (%ensure-suite-object 'cl-cc-pbt-suite)))
+           (remhash source-key *source-suite-assignments*)
+           (let ((expansion (macroexpand-1 '(it-sequential "ordinary" nil))))
+             (cl-weave:expect (search "CL-CC-UNIT-SUITE"
+                                      (prin1-to-string expansion))
+                              :to-be-truthy))
+           (macroexpand-1 '(in-suite cl-cc-private-tests))
+           (let ((expansion (macroexpand-1 '(it-sequential "private" nil))))
+             (cl-weave:expect (search "CL-CC-PRIVATE-TESTS"
+                                      (prin1-to-string expansion))
+                              :to-be-truthy)))
+      (remhash source-key *source-suite-assignments*))))
+
 (cl-weave:it-sequential "suite taxonomy and defsuite option validation"
   (cl-weave:signals program-error
     (macroexpand-1 '(defsuite unsupported-suite :parallel nil)))
@@ -124,5 +169,5 @@
    :to-be 'selfhost-suite)
   (cl-weave:expect
    (%suite-for-test-source #P"/tmp/repo/packages/core/tests/example.lisp")
-   :to-be nil))
+   :to-be 'cl-cc-unit-suite))
 (in-suite cl-cc-unit-suite)

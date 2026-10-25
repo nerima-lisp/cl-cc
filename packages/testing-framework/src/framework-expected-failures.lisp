@@ -166,11 +166,21 @@
   (format stream "# ~A ~A~%"
           (string-upcase (symbol-name (getf violation :kind)))
           (or (getf violation :path) "manifest")))
-(defun %ensure-no-expected-failure-violations (violations)
-  (when violations
-    (error "cl-cc expected-failure manifest rejected ~D test result(s)."
-           (length violations)))
-  t)
+(progn
+  (defun %ensure-no-expected-failure-violations (violations)
+    (when violations
+      (error "cl-cc expected-failure manifest rejected ~D test result(s)."
+             (length violations)))
+    t)
+
+  (defun %select-expected-failure-manifest
+      (suite-manifest selected-paths name-filter)
+    (if name-filter
+        (remove-if-not
+         (lambda (entry)
+           (member (getf entry :path) selected-paths :test (function equal)))
+         suite-manifest)
+      suite-manifest)))
 
 (defun run-tests (&key (reporter :spec) name-filter max-workers
                     (stream *standard-output*) (suite 'cl-cc-suite)
@@ -211,11 +221,7 @@
                          (string= manifest-prefix path
                                   :end2 (length manifest-prefix)))))
                 (read-expected-failure-manifest)))
-             (manifest
-               (remove-if-not
-                (lambda (entry)
-                  (member (getf entry :path) selected-paths :test #'equal))
-                suite-manifest))
+             (manifest (%select-expected-failure-manifest suite-manifest selected-paths name-filter))
              (results
                (mapcar #'%expected-failure-result-from-event
                        (cl-weave::normalize-run-results

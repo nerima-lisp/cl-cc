@@ -65,24 +65,43 @@ earlier IN-SUITE (see %ENSURE-SUITE-OBJECT)."
   (declare (ignore description))
   `(%ensure-suite-object ',name ',parent))
 
+(progn
+  (defvar *source-suite-assignments* (make-hash-table :test (function equal)))
+
+  (defun %current-test-source ()
+    (or *compile-file-truename* *compile-file-pathname*
+        *load-truename* *load-pathname*))
+
+  (defun %note-source-suite (source suite)
+    (when source
+      (setf (gethash (namestring (pathname source)) *source-suite-assignments*)
+            suite))
+    suite)
+
+  (defun %suite-for-test-source (source)
+    (let* ((source-name (when source (namestring (pathname source))))
+           (explicit-suite (when source-name
+                             (gethash source-name *source-suite-assignments*))))
+      (or explicit-suite
+          (when source-name
+            (or (cond
+                  ((search "t/conformance/" source-name :test (function char-equal))
+                   (quote cl-cc-conformance-suite))
+                  ((search "t/e2e/" source-name :test (function char-equal))
+                   (quote selfhost-suite)))
+                (quote cl-cc-unit-suite)))))))
 (defmacro in-suite (name)
-  "Make NAME's suite the target of subsequent flat DEFTEST/DEFBEFORE/DEFAFTER
-calls, persistently (not lexically scoped) — mirrors the original IN-SUITE."
-  `(setf cl-weave::*current-suite* (%ensure-suite-object ',name)))
-(defun %suite-for-test-source (source)
-  (let ((source-name (when source (namestring (pathname source)))))
-    (cond
-      ((and source-name (search "t/conformance/" source-name :test #'char-equal))
-       'cl-cc-conformance-suite)
-      ((and source-name (search "t/e2e/" source-name :test #'char-equal))
-       'selfhost-suite))))
+  "Make NAME the persistent suite for direct cl-weave registrations and record it for ordinary tests in this source file."
+  (%note-source-suite (%current-test-source) name)
+  (list (quote setf)
+        (quote cl-weave::*current-suite*)
+        (list (quote %ensure-suite-object) (list (quote quote) name))))
 (defmacro it-sequential (name &body body)
-  (let* ((source (or *compile-file-truename* *compile-file-pathname*
-                     *load-truename* *load-pathname*))
+  (let* ((source (%current-test-source))
          (suite (%suite-for-test-source source)))
     `(let ((cl-weave::*current-suite*
-             ,(if suite `(%ensure-suite-object ',suite)
-                  'cl-weave::*current-suite*)))
+             ,(if suite `(%ensure-suite-object (quote ,suite))
+                  (quote cl-weave::*current-suite*))))
        (cl-weave:it-sequential ,name ,@body))))
 
 ;;; ------------------------------------------------------------
