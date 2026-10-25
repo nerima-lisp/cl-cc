@@ -471,6 +471,12 @@ let
       "cl-process-kit"
       "cl-json-kit"
       "cl-host-kit"
+      "cl-observability-kit"
+      "cl-observability-kit/prometheus"
+      "cl-observability-kit/otlp"
+      "cl-deflate-kit"
+      "cl-crypto-kit"
+      "cl-resilience-kit"
     ])
     (contextMapEdgesFrom "cl-cc-pipeline" [
       "cl-cc-bootstrap"
