@@ -872,8 +872,6 @@ umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/codegen::encode
 umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/codegen::encode-paciasp 1
 umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/codegen::with-output-to-vector 1
 umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/codegen::x86-64-cfi-plan 1
-umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/runtime::+rt-prot-exec+ 3
-umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/runtime::+rt-prot-read+ 2
 umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/runtime/os::rt-xom-effective-prot 3
 umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/runtime/os::rt-xom-supported-p 1
 umbrella/packages/emit/tests/security-hardening-tests.lisp cl-cc/vm::make-vm-program 4
