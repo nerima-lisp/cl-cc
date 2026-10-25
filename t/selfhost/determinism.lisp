@@ -60,43 +60,43 @@
          (second-output nil)
          (actual nil))
     (labels ((write-octets (pathname octets)
-               (ensure-directories-exist pathname)
-               (with-open-file (stream pathname
-                                       :direction :output
-                                       :element-type '(unsigned-byte 8)
-                                       :if-exists :error
-                                       :if-does-not-exist :create)
-                 (write-sequence octets stream)))
-             (path-offset (octets pathname)
-               (let ((path-string (namestring pathname)))
-                 (when (every (lambda (character) (< (char-code character) 128))
-                              path-string)
-                   (let ((needle
-                           (map '(vector (unsigned-byte 8))
-                                #'char-code
-                                path-string)))
-                     (loop for start from 0 to (- (length octets) (length needle))
-                           when (loop for index below (length needle)
-                                      always (= (aref octets (+ start index))
-                                                (aref needle index)))
-                             return start))))
-             (path-pair-at-offset-p (left-output left-path right-output right-path offset)
-               (let ((left-offset (path-offset left-output left-path))
-                     (right-offset (path-offset right-output right-path))
-                     (path-length (length (namestring left-path))))
-                 (and left-offset
-                      right-offset
-                      (= left-offset right-offset)
-                      (= path-length (length (namestring right-path)))
-                      (<= left-offset offset)
-                      (< offset (+ left-offset path-length)))))
-             (absolute-path-difference-p (offset)
-               (or (path-pair-at-offset-p first-output input-one
-                                          second-output input-two offset)
-                   (path-pair-at-offset-p first-output output-one
-                                          second-output output-two offset)
-                   (path-pair-at-offset-p first-output cache-one
-                                          second-output cache-two offset))))
+    (ensure-directories-exist pathname)
+    (with-open-file (stream pathname
+                            :direction :output
+                            :element-type (quote (unsigned-byte 8))
+                            :if-exists :error
+                            :if-does-not-exist :create)
+      (write-sequence octets stream)))
+  (path-offset (octets pathname)
+    (let ((path-string (namestring pathname)))
+      (when (every (lambda (character) (< (char-code character) 128))
+                   path-string)
+        (let ((needle
+                (map (quote (vector (unsigned-byte 8)))
+                     (function char-code)
+                     path-string)))
+          (loop for start from 0 to (- (length octets) (length needle))
+                when (loop for index below (length needle)
+                           always (= (aref octets (+ start index))
+                                     (aref needle index)))
+                  return start)))))
+  (path-pair-at-offset-p (left-output left-path right-output right-path offset)
+    (let ((left-offset (path-offset left-output left-path))
+          (right-offset (path-offset right-output right-path))
+          (path-length (length (namestring left-path))))
+      (and left-offset
+           right-offset
+           (= left-offset right-offset)
+           (= path-length (length (namestring right-path)))
+           (<= left-offset offset)
+           (< offset (+ left-offset path-length)))))
+  (absolute-path-difference-p (offset)
+    (or (path-pair-at-offset-p first-output input-one
+                               second-output input-two offset)
+        (path-pair-at-offset-p first-output output-one
+                               second-output output-two offset)
+        (path-pair-at-offset-p first-output cache-one
+                               second-output cache-two offset))))
       (unwind-protect
           (progn
             (unless (and (probe-file source) (probe-file worker))
@@ -116,36 +116,36 @@
             (setf second-output (read-octets output-two))
             (if (equalp first-output second-output)
                 (format t "raw output bytes match: ~D octets~%" (length first-output))
-                (let* ((offset (first-differing-offset first-output second-output))
-                       (absolute-path-p (absolute-path-difference-p offset)))
+              (let* ((offset (first-differing-offset first-output second-output))
+                     (absolute-path-p (absolute-path-difference-p offset)))
+                (format t
+                        "raw output bytes differ: first offset ~D, sizes ~D and ~D~%"
+                        offset
+                        (length first-output)
+                        (length second-output))
+                (if absolute-path-p
+                    (format t
+                            "first differing byte is inside corresponding run-specific absolute paths~%")
                   (format t
-                          "raw output bytes differ: first offset ~D, sizes ~D and ~D~%"
-                          offset
-                          (length first-output)
-                          (length second-output))
-                  (if absolute-path-p
-                      (format t
-                              "first differing byte is inside corresponding run-specific absolute paths~%")
-                      (format t
-                              "difference cause is unclassified (time, gensym, and hash order are not inferred); no normalization was applied~%"))
-                  (push
-                   (list :check
-                         :determinism
-                         :id
-                         (if absolute-path-p
-                             :absolute-path-in-native-output
-                             :native-output-bytes-differ)
-                         :classification
-                         :bug
-                         :reason
-                         (if absolute-path-p
-                             "The first differing bytes are in corresponding run-specific absolute paths."
-                             "The same Lisp input produced different native output bytes; cause is unclassified."))
-                   actual)))
+                          "difference cause is unclassified (time, gensym, and hash order are not inferred); no normalization was applied~%"))
+                (push
+                 (list :check
+                       :determinism
+                       :id
+                       (if absolute-path-p
+                           :absolute-path-in-native-output
+                         :native-output-bytes-differ)
+                       :classification
+                       :bug
+                       :reason
+                       (if absolute-path-p
+                           "The first differing bytes are in corresponding run-specific absolute paths."
+                         "The same Lisp input produced different native output bytes; cause is unclassified."))
+                 actual)))
             (unless (check-mismatch-set :determinism actual (read-expected-mismatches))
               (uiop:quit 1)))
         (when (probe-file temporary-root)
-          (uiop:delete-directory-tree temporary-root :validate t :if-does-not-exist :ignore)))))))
+          (uiop:delete-directory-tree temporary-root :validate t :if-does-not-exist :ignore))))))
 
 (handler-case (run-determinism-check)
   (error (condition)
