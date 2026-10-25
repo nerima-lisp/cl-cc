@@ -468,7 +468,6 @@ let
     (contextMapEdgesFrom "cl-cc-vm" [ "cl-cc-runtime" ])
     (contextMapEdgesFrom "cl-cc-runtime" [
       "cl-log-kit"
-      "cl-process-kit"
       "cl-json-kit"
       "cl-host-kit"
       "cl-observability-kit"
