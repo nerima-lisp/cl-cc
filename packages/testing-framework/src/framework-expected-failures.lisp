@@ -192,7 +192,13 @@
                   (mapcar #'cl-weave::suite-name
                           (cl-weave::suite-lineage suite-object))
                   :test #'string=)
-      (asdf:load-system "cl-cc/test/e2e"))
+      (progn
+        ;; Compile the late-loaded E2E sources into the writable cache, not the Nix store.
+        (asdf:initialize-output-translations
+         (quote (:output-translations
+                 (t (:home ".cache" "common-lisp" :implementation))
+                 :ignore-inherited-configuration)))
+        (asdf:load-system "cl-cc/test/e2e")))
     (let* ((order (and random :random))
            (plan (cl-weave:collect-test-plan suite-object
                                              :name-filter name-filter
