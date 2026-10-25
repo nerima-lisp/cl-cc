@@ -170,4 +170,13 @@
   (cl-weave:expect
    (%suite-for-test-source #P"/tmp/repo/packages/core/tests/example.lisp")
    :to-be 'cl-cc-unit-suite))
-(in-suite cl-cc-unit-suite)
+(progn
+  (in-suite cl-cc-unit-suite)
+  (let ((cl-weave::*current-suite* (%ensure-suite-object (find-symbol "CL-CC-UNIT-SUITE" :cl-cc))))
+    (cl-weave:it-sequential "W2-01 control failure" (cl-weave:expect nil :to-be-truthy)))
+  (let ((cl-weave::*current-suite* (%ensure-suite-object (find-symbol "CL-CC-INTEGRATION-SUITE" :cl-cc))))
+    (cl-weave:it-sequential "W2-01 control failure" (cl-weave:expect nil :to-be-truthy)))
+  (let ((cl-weave::*current-suite* (%ensure-suite-object (find-symbol "SELFHOST-SUITE" :cl-cc))))
+    (cl-weave:it-sequential "W2-01 control failure" (cl-weave:expect nil :to-be-truthy)))
+  (let ((cl-weave::*current-suite* (%ensure-suite-object (find-symbol "CL-CC-CONFORMANCE-SUITE" :cl-cc))))
+    (cl-weave:it-sequential "W2-01 control failure" (cl-weave:expect nil :to-be-truthy))))
