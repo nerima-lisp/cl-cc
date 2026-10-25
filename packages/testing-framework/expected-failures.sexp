@@ -32,9 +32,5 @@
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > block-forms early-return" :expected-status :error :condition-class "SIMPLE-ERROR" :condition-message "Unsupported x86-64 instruction: VM-GET-GLOBAL" :owner-repository "nerima-lisp/cl-cc-codegen-native" :work-order "https://github.com/nerima-lisp/cl-cc-codegen-native/issues/16")
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > block-forms nested" :expected-status :error :condition-class "SIMPLE-ERROR" :condition-message "Unsupported x86-64 instruction: VM-GET-GLOBAL" :owner-repository "nerima-lisp/cl-cc-codegen-native" :work-order "https://github.com/nerima-lisp/cl-cc-codegen-native/issues/16")
 (:path "CL-CC-SUITE > CL-CC-E2E-SUITE > SELFHOST-SUITE > selfhost-reader-macros" :expected-status :error :condition-class "SIMPLE-ERROR" :condition-message "Reader error: #. is not allowed when *read-eval* is NIL" :owner-repository "nerima-lisp/cl-cc-parse" :work-order "W2-01 FR-005")
-(:path "CL-CC-SUITE > CL-CC-E2E-SUITE > SELFHOST-SUITE > selfhost-load-own-source" :expected-status :error :condition-class "SB-INT:SIMPLE-FILE-ERROR" :condition-message "Failed to find the TRUENAME of packages/parse/src/cst.lisp:
-
-  No such file or directory" :owner-repository "nerima-lisp/cl-cc" :work-order "W2-01 FR-005")
-(:path "CL-CC-SUITE > CL-CC-E2E-SUITE > SELFHOST-SUITE > selfhost-all-source-files-smoke" :expected-status :error :condition-class "SB-INT:SIMPLE-FILE-ERROR" :condition-message "Failed to find the TRUENAME of packages/bootstrap/src/package.lisp:
-
-  No such file or directory" :owner-repository "nerima-lisp/cl-cc" :work-order "W2-01 FR-005")
+(:path "CL-CC-SUITE > CL-CC-E2E-SUITE > SELFHOST-SUITE > selfhost-load-own-source" :expected-status :error :condition-class "SIMPLE-ERROR" :condition-message "Unbound variable: CL-CC/OPTIMIZE::PRODUCER-TYPE" :owner-repository "nerima-lisp/cl-cc" :work-order "https://github.com/nerima-lisp/cl-cc/issues/67")
+(:path "CL-CC-SUITE > CL-CC-E2E-SUITE > SELFHOST-SUITE > selfhost-all-source-files-smoke" :expected-status :error :condition-class "SIMPLE-ERROR" :condition-message-prefix "Unbound variable: #:OR" :owner-repository "nerima-lisp/cl-cc" :work-order "https://github.com/nerima-lisp/cl-cc/issues/66")

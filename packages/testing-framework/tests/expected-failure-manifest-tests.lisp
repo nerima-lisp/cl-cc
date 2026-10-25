@@ -62,6 +62,33 @@
       (cl-weave:signals error
         (%ensure-no-expected-failure-violations violations)))))
 
+(cl-weave:it-sequential "expected-failure manifest matches dynamic condition message prefixes"
+  (let* ((path "suite > dynamic error")
+         (manifest (list (list :path path
+                               :expected-status :error
+                               :condition-class "SIMPLE-ERROR"
+                               :condition-message-prefix "Unbound variable: #:OR"
+                               :owner-repository "nerima-lisp/cl-cc"
+                               :work-order "https://github.com/nerima-lisp/cl-cc/issues/1")))
+         (matching-result (list :path path
+                                :status :error
+                                :condition-class "SIMPLE-ERROR"
+                                :condition-message "Unbound variable: #:OR49592"))
+         (mismatching-result (list :path path
+                                  :status :error
+                                  :condition-class "SIMPLE-ERROR"
+                                  :condition-message "Unbound variable: #:AND49592")))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest (list matching-result) :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest (list mismatching-result) :require-complete t)
+      (cl-weave:expect matched :to-equal nil)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal '(:condition-changed)))))
+
 (cl-weave:it-sequential "expected-failure manifest rejects tests that did not run"
   (let ((manifest (list (%manifest-test-entry "suite > not run" :fail))))
     (multiple-value-bind (matched violations)
