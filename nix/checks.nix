@@ -141,13 +141,17 @@ let
   contextMapRepositories = [
     {
       name = "umbrella";
-      source = toString ../.;
+      source = ../.;
     }
   ]
   ++ map (child: {
     inherit (child) name;
-    source = toString child.source;
+    source = child.source;
   }) childFlakeSources;
+
+  contextMapRepositorySourceReferences = lib.concatMapStringsSep " " (
+    repository: ''"${repository.source}"''
+  ) contextMapRepositories;
 
   contextMapProductionSystems = lib.unique (
     lib.concatMap (package: package.asdfMetadata.systems) (builtins.attrValues productionAsdfSystems)
@@ -384,12 +388,12 @@ let
     [
       {
         name = "umbrella";
-        source = toString ../.;
+        source = ../.;
       }
     ]
     ++ map (child: {
       inherit (child) name;
-      source = toString child.source;
+      source = child.source;
     }) childFlakeSources
     ++ lib.concatMap (
       package:
@@ -414,6 +418,10 @@ let
       }
     ]
   );
+
+  contextMapSourceRootReferences = lib.concatMapStringsSep " " (
+    root: ''"${root.source}"''
+  ) contextMapSourceRoots;
 
   contextMapEdgesFrom = source: targets: map (target: { inherit source target; }) targets;
   contextMapAllowedEdges = lib.concatLists [
@@ -495,6 +503,7 @@ let
         nativeBuildInputs = [ pkgs.python3 ];
       }
       ''
+        printf '%s\n' ${contextMapRepositorySourceReferences} >/dev/null
         cat > repositories.json <<'JSON'
         ${builtins.toJSON contextMapRepositories}
         JSON
@@ -821,6 +830,7 @@ let
       ''
         export HOME="$TMPDIR/home"
         mkdir -p "$HOME"
+        printf '%s\n' ${contextMapSourceRootReferences} >/dev/null
         cat > context-map.json <<'JSON'
         ${builtins.toJSON {
           repositories = contextMapSourceRoots;
