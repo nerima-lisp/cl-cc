@@ -25,9 +25,13 @@
                     (getf entry :expected-status)
                     (getf entry :status))))
     (if (eq status :error)
-        (list :status status
-              :condition-class (getf entry :condition-class)
-              :condition-message (getf entry :condition-message))
+        (append (list :status status
+                      :condition-class (getf entry :condition-class))
+                (if (getf entry :condition-message-prefix)
+                    (list :condition-message-prefix
+                          (getf entry :condition-message-prefix))
+                    (list :condition-message
+                          (getf entry :condition-message))))
         (list :status status
               :condition-class (getf entry :condition-class)
               :assertion-form (getf entry :assertion-form)
@@ -36,24 +40,27 @@
               :expected (getf entry :expected)
               :negated (getf entry :negated)))))
 
+(defun %expected-failure-signatures-match-p (expected actual)
+  (let ((expected-signature (%expected-failure-signature expected t))
+        (actual-signature (%expected-failure-signature actual nil)))
+    (and (equal (getf expected-signature :status)
+                (getf actual-signature :status))
+         (equal (getf expected-signature :condition-class)
+                (getf actual-signature :condition-class))
+         (if (eq (getf expected-signature :status) :error)
+             (let ((prefix (getf expected-signature :condition-message-prefix))
+                   (message (getf actual-signature :condition-message)))
+               (if prefix
+                   (and (stringp prefix)
+                        (stringp message)
+                        (<= (length prefix) (length message))
+                        (string= prefix message :end2 (length prefix)))
+                   (equal (getf expected-signature :condition-message)
+                          message)))
+             (equal expected-signature actual-signature)))))
+
 (defun %expected-failure-condition-message (condition)
-  (let* ((message (princ-to-string condition))
-         (pathname (and (typep condition (quote file-error))
-                        (file-error-pathname condition)))
-         (pathname-string (and pathname (namestring pathname)))
-         (relative-path (and pathname
-                             (enough-namestring
-                              pathname
-                              (asdf:system-source-directory "cl-cc/test"))))
-         (message-offset (and pathname-string
-                              (search pathname-string message))))
-    (if (and relative-path message-offset)
-        (concatenate (quote string)
-                     (subseq message 0 message-offset)
-                     relative-path
-                     (subseq message (+ message-offset
-                                        (length pathname-string))))
-        message)))
+  (princ-to-string condition))
 
 (defun %expected-failure-result-from-event (event)
   (let* ((status (cl-weave::test-event-status event))
@@ -97,7 +104,13 @@
        (stringp (getf entry :owner-repository))
        (stringp (getf entry :work-order))
        (if (eq (getf entry :expected-status) :error)
-           (stringp (getf entry :condition-message))
+           (let ((message (getf entry :condition-message))
+                 (prefix (getf entry :condition-message-prefix)))
+             (and (or (null message) (stringp message))
+                  (or (null prefix) (stringp prefix))
+                  (not (and message prefix))
+                  (or (stringp message)
+                      (and (stringp prefix) (plusp (length prefix))))))
            (every (lambda (key) (stringp (getf entry key)))
                   '(:assertion-form :matcher :actual :expected :negated)))))
 
@@ -162,8 +175,7 @@
                       violations))
                ((and expected
                      (member status '(:fail :error))
-                     (equal (%expected-failure-signature expected t)
-                            (%expected-failure-signature result nil)))
+                     (%expected-failure-signatures-match-p expected result))
                 (unless (member expected matched :test #'eq)
                   (push expected matched)))
                (expected

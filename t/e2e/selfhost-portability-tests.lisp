@@ -26,26 +26,29 @@
 
 (it-sequential "selfhost-no-sbcl-references-in-core"
   (let ((violations nil) (total-files 0))
-    (dolist (file-path (selfhost-all-source-files))
-      (incf total-files)
-      (unless (%file-on-allowlist-p file-path)
-        (handler-case
-            (with-open-file (stream file-path :direction :input
-                                          :if-does-not-exist nil)
-              (when stream
-                (loop for line = (read-line stream nil nil)
-                      for line-number from 1
-                      while line
-                      do (dolist (pkg *disallowed-sbcl-packages*)
-                           (let ((pos (search pkg line :test #'char-equal)))
-                             (when pos
-                               (unless (search ";" (subseq line 0 (min pos 2))
-                                               :test #'char=)
-                                 (push (list file-path line-number
-                                             (string-trim " " line))
-                                       violations))))))))
-          (file-error (c)
-            (push (list file-path 0 (princ-to-string c)) violations)))))
+    (dolist (source-file (selfhost-all-source-files))
+      (let ((file-path (car source-file))
+            (source-path (cdr source-file)))
+        (incf total-files)
+        (unless (%file-on-allowlist-p file-path)
+          (handler-case
+              (with-open-file (stream source-path :direction :input
+                                                :if-does-not-exist nil)
+                (when stream
+                  (loop for line = (read-line stream nil nil)
+                        for line-number from 1
+                        while line
+                        do (dolist (pkg *disallowed-sbcl-packages*)
+                             (let ((pos (search pkg line :test #'char-equal)))
+                               (when pos
+                                 (unless (search ";" (subseq line 0 (min pos 2))
+                                                 :test #'char=)
+                                   (push (list file-path line-number
+                                               (string-trim " " line))
+                                         violations))))))))
+            (file-error (condition)
+              (push (list file-path 0 (princ-to-string condition))
+                    violations))))))
     (unless (null violations)
       (fail "~D selfhost core file(s) contain disallowed SBCL references:~%~{~%  ~A:~D  ~A~}"
             (length violations) (nreverse violations)))
