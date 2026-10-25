@@ -137,7 +137,7 @@
       flake = false;
     };
     cl-cc-parse = {
-      url = "github:nerima-lisp/cl-cc-parse/5c11a5149e4f86c0fedbd4d1f47c4d815c38f681";
+      url = "github:nerima-lisp/cl-cc-parse/c78ce5307019193523ed1f54ed652e6e8a97eda6";
       flake = false;
     };
     cl-cc-php = {
