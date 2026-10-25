@@ -71,3 +71,4 @@ riscv64	ffi-abs	compile-failure	:unimplemented	Unknown native architecture: :RIS
 riscv64	ffi-strlen	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
 riscv64	heap-cons	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
 riscv64	heap-vector	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+x86-64	integer-add	compile-failure	:unimplemented	Intentional negative control: expected compile failure	Temporary control row: integer-add is known to compile and match on x86-64, so this row must trigger unexpected-pass detection.
