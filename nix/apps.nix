@@ -230,7 +230,7 @@ let
         ''(asdf:initialize-output-translations (quote (:output-translations (t (:home ".cache" "common-lisp" :implementation)) :ignore-inherited-configuration)))''
       ];
       lispPostLoadEvalForms = [
-        ''(format t "# enabling coverage before reloading :cl-cc and :cl-cc-javascript-test~%")''
+        ''(format t "# enabling coverage before reloading :cl-cc and :cl-cc-javascript/test~%")''
         ''
           (handler-case
                         (asdf:load-system :cl-cc-type :force t)
@@ -252,11 +252,11 @@ let
                         (uiop:quit 1)))''
         ''
           (handler-case
-                        (asdf:load-system :cl-cc-javascript-test :force t)
+                        (asdf:load-system :cl-cc-javascript/test :force t)
                       (error (e)
                         (format *error-output* "~&FATAL: ~A~%" e)
                         (uiop:quit 1)))''
-        # :cl-cc-javascript-test depends only on :cl-cc/:cl-cc-testing-framework/
+        # :cl-cc-javascript/test depends only on :cl-cc/:cl-cc-testing-framework/
         # :cl-cc-javascript (NOT the "cl-cc/test" aggregate), so cl-weave's global
         # suite tree in this process already contains nothing but the JS tests —
         # no extra suite/location scoping is needed.
