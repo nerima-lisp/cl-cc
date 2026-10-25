@@ -406,37 +406,7 @@
       :serial t
       :components
       ((:file "docgen-suite-tests")))
-     (:module "runtime-tests"
-      :pathname "packages/runtime/tests"
-      :serial t
-    :components
-    ((:file "runtime-tests")
-     (:file "runtime-tests-2")
-     (:file "runtime-strings-chars-tests")
-     (:file "runtime-clos-tests")
-     (:file "runtime-advanced-tests")
-      (:file "runtime-io-tests")
-      (:file "runtime-serialize-tests")
-      (:file "gc-tests")
-      (:file "gc-fr-tests")
-      (:file "gc-stats-tests")
-     (:file "gc-sweep-major-tests")
-     (:file "heap-tests")
-      (:file "heap-sanitizer-tests")
-     (:file "heap-gc-tests")
-     (:file "heap-trace-tests")
-      (:file "gc-write-barrier-tests")
-         (:file "runtime-subsystem-fr-tests")
-         (:file "runtime-stdlib-2-runtime-tests")
-         (:file "runtime-stdlib-3-os-tests")
-         (:file "runtime-stdlib-3-image-tests")
-         (:file "runtime-crypto-compress-tests")
-        (:file "continuous-profile-tests")
-        (:file "deadlock-tests")
-       (:file "value-tests")
-       (:file "dynlib-tests")
-       (:file "frame-tests")))
-   (:module "migration-safety"
+     (:module "migration-safety"
      :pathname "packages/umbrella-tests"
      :components
      ((:file "migration-safety-tests")))

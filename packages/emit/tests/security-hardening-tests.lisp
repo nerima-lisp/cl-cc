@@ -114,9 +114,9 @@
                          a64 :test #'eql) :to-be-truthy)))
 
 (it-sequential "fr-772-runtime-xom-effective-protection-removes-read-when-supported"
-  (let ((cl-cc/runtime::*xom-enabled* nil))
-    (expect (cl-cc/runtime::rt-xom-effective-prot) :to-equal (logior cl-cc/runtime::+rt-prot-read+ cl-cc/runtime::+rt-prot-exec+)))
-  (let ((cl-cc/runtime::*xom-enabled* t))
-    (if (cl-cc/runtime::rt-xom-supported-p)
-        (expect (cl-cc/runtime::rt-xom-effective-prot) :to-equal cl-cc/runtime::+rt-prot-exec+)
-        (expect (cl-cc/runtime::rt-xom-effective-prot) :to-equal (logior cl-cc/runtime::+rt-prot-read+ cl-cc/runtime::+rt-prot-exec+)))))
+  (let ((cl-cc/runtime/os:*xom-enabled* nil))
+    (expect (cl-cc/runtime/os::rt-xom-effective-prot) :to-equal (logior cl-cc/runtime/memory:+rt-prot-read+ cl-cc/runtime/memory:+rt-prot-exec+)))
+  (let ((cl-cc/runtime/os:*xom-enabled* t))
+    (if (cl-cc/runtime/os::rt-xom-supported-p)
+        (expect (cl-cc/runtime/os::rt-xom-effective-prot) :to-equal cl-cc/runtime/memory:+rt-prot-exec+)
+        (expect (cl-cc/runtime/os::rt-xom-effective-prot) :to-equal (logior cl-cc/runtime/memory:+rt-prot-read+ cl-cc/runtime/memory:+rt-prot-exec+)))))

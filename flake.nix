@@ -87,6 +87,24 @@
       url = "github:nerima-lisp/cl-host-kit/ec565470b634605e23b0d6eef0645eb15e8e3356";
       flake = false;
     };
+    # Additional runtime dependencies, pinned to the revisions in the
+    # standalone runtime's lockfile.
+    cl-observability-kit = {
+      url = "github:nerima-lisp/cl-observability-kit/c7036f43ac8b69457a2979c2cb2c6806452bd728";
+      flake = false;
+    };
+    cl-deflate-kit = {
+      url = "github:nerima-lisp/cl-deflate-kit/711eb7540ac43869ae08060b6153e5dc768a8382";
+      flake = false;
+    };
+    cl-crypto-kit = {
+      url = "github:nerima-lisp/cl-crypto-kit/41ed7e90f736591aa1961bc6deb0741c73392a60";
+      flake = false;
+    };
+    cl-resilience-kit = {
+      url = "github:nerima-lisp/cl-resilience-kit/741d42399ad781244bd36750c6626bd9f4e8b16b";
+      flake = false;
+    };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
     # repository. Injected into the internal system graph under their original
     # names by nix/asdf-systems.nix, so every `deps = [ "cl-cc-ast" ... ]`
@@ -97,7 +115,7 @@
     # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
     # once those releases are tagged.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast/9342f855b64d88f89e99be6a0ba1619e2b02280b";
+      url = "github:nerima-lisp/cl-cc-ast/8289d9cec15df0ac73011e3ea872dc3c669f9540";
       flake = false;
     };
     cl-cc-type = {
@@ -117,7 +135,7 @@
       flake = false;
     };
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/eee6b5a4bcf76eeb25c461296b3c33092c8563b6";
+      url = "github:nerima-lisp/cl-cc-mir/3c3cba4b57ac10d7ad52a7bf6aaf421e598dd198";
       flake = false;
     };
     cl-cc-cps = {
@@ -149,12 +167,13 @@
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/79a6102ff1c7c155d592961317c980a6e05c1a0c";
+      url = "github:nerima-lisp/cl-cc-runtime/ea817be8dc506b45e8e9b4f14073422108a1e7ec";
       flake = false;
     };
-    # Pulled in by the standalone cl-cc-runtime, which took dependencies the
-    # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
-    # cl-log-kit, both already above; cl-json-kit is self-contained.
+    # Dependencies of the standalone cl-cc-runtime that the in-tree copy did
+    # not have. Existing toolkit pins above provide logging, process, and JSON;
+    # the additional source pins above provide observability, compression,
+    # cryptography, and resilience.
     cl-process-kit = {
       url = "github:nerima-lisp/cl-process-kit/1276a8b8db6120ac15a0911c255a586b3a030ca1";
       flake = false;
@@ -210,17 +229,20 @@
       # to say which was right. A release now edits one line.
       #
       # Nix regexes are whole-string anchored and `.` never spans newlines, so
-      # the version is extracted line-by-line rather than with a single
-      # multi-line match.
+      # the version is extracted from non-comment lines rather than with a
+      # single multi-line match. ASDF metadata may share a line.
       asdVersion =
         asd:
         let
           lines = nixpkgs.lib.splitString "\n" (builtins.readFile asd);
+          versionPattern = "[^;]*[[:space:]]*:version \"([^\"]*)\".*";
           versionLine = builtins.head (
-            builtins.filter (line: builtins.match "[[:space:]]*:version \"[^\"]*\"" line != null) lines
+            builtins.filter (
+              line: builtins.match "[[:space:]]*;.*" line == null && builtins.match versionPattern line != null
+            ) lines
           );
         in
-        builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
+        builtins.head (builtins.match versionPattern versionLine);
 
       version = asdVersion ./cl-cc.asd;
 
@@ -433,6 +455,43 @@
             src = inputs.cl-json-kit;
             systems = [ "cl-json-kit" ];
           };
+          clObservabilityKit = sbcl.buildASDFSystem {
+            pname = "cl-observability-kit";
+            version = siblingVersion "cl-observability-kit";
+            src = inputs.cl-observability-kit;
+            systems = [
+              "cl-observability-kit"
+              "cl-observability-kit/prometheus"
+              "cl-observability-kit/otlp"
+            ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+            ];
+          };
+          clDeflateKit = sbcl.buildASDFSystem {
+            pname = "cl-deflate-kit";
+            version = siblingVersion "cl-deflate-kit";
+            src = inputs.cl-deflate-kit;
+            systems = [ "cl-deflate-kit" ];
+          };
+          clCryptoKit = sbcl.buildASDFSystem {
+            pname = "cl-crypto-kit";
+            version = siblingVersion "cl-crypto-kit";
+            src = inputs.cl-crypto-kit;
+            systems = [ "cl-crypto-kit" ];
+          };
+          clResilienceKit = sbcl.buildASDFSystem {
+            pname = "cl-resilience-kit";
+            version = siblingVersion "cl-resilience-kit";
+            src = inputs.cl-resilience-kit;
+            systems = [ "cl-resilience-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+              clDateKit
+            ];
+          };
           clDateKit = sbcl.buildASDFSystem {
             pname = "cl-date-kit";
             version = siblingVersion "cl-date-kit";
@@ -465,6 +524,10 @@
               clLogKit
               clProcessKit
               clJsonKit
+              clObservabilityKit
+              clDeflateKit
+              clCryptoKit
+              clResilienceKit
             ];
           };
           clCcBootstrap = sbcl.buildASDFSystem {
@@ -747,6 +810,10 @@
               clCcType
               clProcessKit
               clJsonKit
+              clObservabilityKit
+              clDeflateKit
+              clCryptoKit
+              clResilienceKit
               clDateKit
               clConcurrentKit
               clCodecKit
@@ -930,7 +997,6 @@
             "packages/parse/tests"
             "packages/pipeline/tests"
             "packages/prolog-tools/tests"
-            "packages/runtime/tests"
             "packages/testing-framework/tests"
             "packages/tools/tests"
             "packages/vm/tests"
