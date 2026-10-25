@@ -50,7 +50,10 @@
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
        (ensure-system-asd :cl-cc-selfhost "packages/selfhost/cl-cc-selfhost.asd" here)
         (ensure-system-asd :cl-cc-repl "packages/repl/cl-cc-repl.asd" here)
-        (ensure-system-asd :cl-cc-debug "packages/debug/cl-cc-debug.asd" here))))
+        ;; The production cl-cc derivation omits this test-only ASDF file.
+        (when (probe-file
+              (merge-pathnames "packages/debug/cl-cc-debug.asd" here))
+          (ensure-system-asd :cl-cc-debug "packages/debug/cl-cc-debug.asd" here)))))
 
 (asdf:defsystem "cl-cc"
   :description "Self-hosting Common Lisp compiler: reader and macroexpander through CPS, typed IR, and optimiser to bytecode, native x86-64/ARM64/WebAssembly, PHP, and JavaScript."
