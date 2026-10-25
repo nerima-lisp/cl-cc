@@ -195,9 +195,11 @@
       (progn
         ;; Compile the late-loaded E2E sources into the writable cache, not the Nix store.
         (asdf:initialize-output-translations
-         (quote (:output-translations
-                 (t (:home ".cache" "common-lisp" :implementation))
-                 :ignore-inherited-configuration)))
+         `(:output-translations
+           (,(asdf:component-pathname
+               (asdf:find-component "cl-cc/test/e2e" "e2e"))
+             (:home ".cache" "common-lisp" :implementation))
+           :inherit-configuration))
         (asdf:load-system "cl-cc/test/e2e")))
     (let* ((order (and random :random))
            (plan (cl-weave:collect-test-plan suite-object
