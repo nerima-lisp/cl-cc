@@ -981,6 +981,66 @@
         # exercised explicitly; building its FASLs alone does not run tests.
         cl-cc-jit-tests = perSystem.${system}.jitTests;
 
+        parity-x86-64 =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-x86-64"
+            {
+              nativeBuildInputs = [ python3 ] ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh x86-64
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
+        parity-wasm =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-wasm"
+            {
+              nativeBuildInputs = [
+                python3
+                wasmtime
+              ]
+              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh wasm
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
+        parity-aarch64 =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-aarch64"
+            {
+              nativeBuildInputs = [
+                python3
+                qemu-user
+              ]
+              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh aarch64
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
+        parity-riscv64 =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-riscv64"
+            {
+              nativeBuildInputs = [
+                python3
+                qemu-user
+              ]
+              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh riscv64
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
         toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
         lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
         orphan-tests = inputs.cl-nix-forge.lib.${system}.mkOrphanTestCheck {
@@ -1023,6 +1083,31 @@
               "t/selfhost/determinism.lisp"
               "t/selfhost/harness-support.lisp"
               "t/selfhost/stage2-fixpoint.lisp"
+              # These files are inputs to standalone parity Nix checks, not ASDF-registered test files.
+              "t/parity/worker.lisp"
+              "t/parity/programs/bignum-add.lisp"
+              "t/parity/programs/bignum-multiply.lisp"
+              "t/parity/programs/ffi-abs.lisp"
+              "t/parity/programs/ffi-strlen.lisp"
+              "t/parity/programs/file-stream-position.lisp"
+              "t/parity/programs/file-stream-roundtrip.lisp"
+              "t/parity/programs/format-a.lisp"
+              "t/parity/programs/format-newline.lisp"
+              "t/parity/programs/heap-cons.lisp"
+              "t/parity/programs/heap-vector.lisp"
+              "t/parity/programs/integer-add.lisp"
+              "t/parity/programs/integer-subtract.lisp"
+              "t/parity/programs/load-continuation.lisp"
+              "t/parity/programs/load-value.lisp"
+              "t/parity/programs/ratio-add.lisp"
+              "t/parity/programs/ratio-divide.lisp"
+              "t/parity/programs/string-stream-input.lisp"
+              "t/parity/programs/string-stream-output.lisp"
+              "t/parity/programs/wasm-atomic-rmw-xchg.lisp"
+              "t/parity/programs/wasm-float-add.lisp"
+              "t/parity/programs/wasm-float-arithmetic.lisp"
+              "t/parity/support/loaded-continuation.lisp"
+              "t/parity/support/loaded-value.lisp"
             ];
           name = "orphan-tests";
         };

@@ -1,0 +1,22 @@
+# name	category	source	stdlib	source-kind	targets
+integer-add	integer	integer-add.lisp	no	source	all
+integer-subtract	integer	integer-subtract.lisp	no	source	all
+bignum-add	bignum	bignum-add.lisp	no	source	all
+bignum-multiply	bignum	bignum-multiply.lisp	no	source	all
+ratio-divide	ratio	ratio-divide.lisp	no	source	all
+ratio-add	ratio	ratio-add.lisp	no	source	all
+format-a	format	format-a.lisp	no	source	all
+format-newline	format	format-newline.lisp	no	source	all
+string-stream-output	string-stream	string-stream-output.lisp	no	source	all
+string-stream-input	string-stream	string-stream-input.lisp	no	source	all
+file-stream-roundtrip	file-stream	file-stream-roundtrip.lisp	no	source	all
+file-stream-position	file-stream	file-stream-position.lisp	no	source	all
+load-value	load	load-value.lisp	no	source	all
+load-continuation	load	load-continuation.lisp	no	source	all
+ffi-abs	typed-ffi	ffi-abs.lisp	yes	source	all
+ffi-strlen	typed-ffi	ffi-strlen.lisp	yes	source	all
+heap-cons	heap-allocation	heap-cons.lisp	no	source	all
+heap-vector	heap-allocation	heap-vector.lisp	no	source	all
+wasm-float-add	wasm-float	wasm-float-add.lisp	no	vm-program	wasm
+wasm-float-arithmetic	wasm-float	wasm-float-arithmetic.lisp	no	vm-program	wasm
+wasm-atomic-rmw-xchg	wasm-atomic	wasm-atomic-rmw-xchg.lisp	no	vm-program	wasm
