@@ -58,7 +58,7 @@ long-lived CL-CC/TEST package during canonical full-suite runs."
        (setf cl:*features* original-features))))
 
 (defun %asdf-source-files (sys-name project-prefix)
-  "Return project-relative CL source file paths for SYS-NAME, in ASDF load order."
+  "Return project-relative labels and absolute pathnames for SYS-NAME sources."
   (let ((sys (asdf:find-system sys-name nil)))
     (when sys
       (let ((sys-root (asdf:system-source-directory sys))
@@ -66,8 +66,11 @@ long-lived CL-CC/TEST package during canonical full-suite runs."
         (labels ((walk (comp)
                    (typecase comp
                      (asdf:cl-source-file
-                      (let ((rel (enough-namestring (asdf:component-pathname comp) sys-root)))
-                        (push (concatenate 'string project-prefix rel) result)))
+                      (let* ((source-path (asdf:component-pathname comp))
+                             (rel (enough-namestring source-path sys-root)))
+                        (push (cons (concatenate 'string project-prefix rel)
+                                    source-path)
+                              result)))
                      (asdf:module
                       (dolist (child (asdf:component-children comp))
                         (walk child))))))
@@ -76,8 +79,7 @@ long-lived CL-CC/TEST package during canonical full-suite runs."
         (nreverse result)))))
 
 (defun selfhost-all-source-files ()
-  "All source files in dependency order for Phase 4 self-hosting verification.
-Computed at call time so the result is path-independent across compile/load contexts."
+  "Source pairs in dependency order: project-relative labels and ASDF paths."
   (append
    (%asdf-source-files :cl-cc-bootstrap  "packages/bootstrap/")
    (%asdf-source-files :cl-cc-ast        "packages/ast/")
@@ -90,27 +92,31 @@ Computed at call time so the result is path-independent across compile/load cont
    (%asdf-source-files :cl-cc-optimize   "packages/optimize/")
    (%asdf-source-files :cl-cc-emit       "packages/emit/")
    (%asdf-source-files :cl-cc-compile    "packages/compile/")
-    (%asdf-source-files :cl-cc-stdlib    "packages/stdlib/")
-    (list "packages/umbrella-src/package.lisp")
-    (%asdf-source-files :cl-cc-pipeline   "packages/pipeline/")))
+   (%asdf-source-files :cl-cc-stdlib    "packages/stdlib/")
+   (list (cons "src/package.lisp" (truename "src/package.lisp")))
+   (%asdf-source-files :cl-cc-pipeline   "packages/pipeline/")))
 
 (defparameter *selfhost-representative-files*
-  '("packages/parse/src/cst.lisp"
-    "packages/parse/src/lexer.lisp"
-    "packages/optimize/src/optimizer.lisp"
-    "packages/type/src/package.lisp"
-    "packages/type/src/kind.lisp"
-    "packages/type/src/multiplicity.lisp"
-    "packages/type/src/types-core.lisp"
-    "packages/type/src/types-extended-nodes.lisp"
-    "packages/type/src/types-env.lisp"
-    "packages/type/src/parser.lisp"
-    "packages/type/src/typeclass.lisp"
-    "packages/type/src/solver.lisp"
-    "packages/type/src/inference.lisp"
-    "packages/type/src/checker.lisp"
-    "packages/type/src/printer.lisp"
-    "packages/mir/src/mir.lisp"
-    "packages/vm/src/vm.lisp"
-    "packages/runtime/src/gc.lisp")
+  (mapcar (lambda (file-path)
+            (or (cdr (assoc file-path (selfhost-all-source-files) :test #'string=))
+                (error "Selfhost representative source file ~A is not an ASDF source"
+                       file-path)))
+          '("packages/parse/src/cst.lisp"
+            "packages/parse/src/lexer.lisp"
+            "packages/optimize/src/optimizer.lisp"
+            "packages/type/src/package.lisp"
+            "packages/type/src/kind.lisp"
+            "packages/type/src/multiplicity.lisp"
+            "packages/type/src/types-core.lisp"
+            "packages/type/src/types-extended-nodes.lisp"
+            "packages/type/src/types-env.lisp"
+            "packages/type/src/parser.lisp"
+            "packages/type/src/typeclass.lisp"
+            "packages/type/src/solver.lisp"
+            "packages/type/src/inference.lisp"
+            "packages/type/src/checker.lisp"
+            "packages/type/src/printer.lisp"
+            "packages/mir/src/mir.lisp"
+            "packages/vm/src/vm.lisp"
+            "packages/runtime/src/gc-data.lisp"))
   "Representative subset of source files covering all major modules.")
