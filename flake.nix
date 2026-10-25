@@ -229,17 +229,20 @@
       # to say which was right. A release now edits one line.
       #
       # Nix regexes are whole-string anchored and `.` never spans newlines, so
-      # the version is extracted line-by-line rather than with a single
-      # multi-line match.
+      # the version is extracted from non-comment lines rather than with a
+      # single multi-line match. ASDF metadata may share a line.
       asdVersion =
         asd:
         let
           lines = nixpkgs.lib.splitString "\n" (builtins.readFile asd);
+          versionPattern = ".*[[:space:]]*:version \"([^\"]*)\".*";
           versionLine = builtins.head (
-            builtins.filter (line: builtins.match "[[:space:]]*:version \"[^\"]*\"" line != null) lines
+            builtins.filter (
+              line: builtins.match "[[:space:]]*;.*" line == null && builtins.match versionPattern line != null
+            ) lines
           );
         in
-        builtins.head (builtins.match "[[:space:]]*:version \"([^\"]*)\"" versionLine);
+        builtins.head (builtins.match versionPattern versionLine);
 
       version = asdVersion ./cl-cc.asd;
 
