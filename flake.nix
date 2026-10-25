@@ -10,6 +10,11 @@
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    cl-nix-forge = {
+      url = "github:nerima-lisp/cl-nix-forge/v0.7.4";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+    };
 
     # Every sibling is pinned to an immutable ref — a release tag where one
     # exists, a commit otherwise. A bare `github:nerima-lisp/cl-weave` follows
@@ -29,7 +34,7 @@
     # so the attribute is omitted here. The rule exists to stop each input from
     # locking its own nixpkgs and inflating flake.lock; taking source trees
     # achieves that outcome more completely, since no second nixpkgs enters the
-    # lock at all. treefmt-nix, the one real flake input, carries `follows`.
+    # lock at all. treefmt-nix and cl-nix-forge, the real flake inputs, carry `follows`.
     cl-prolog-kit = {
       url = "github:nerima-lisp/cl-prolog-kit/v1.5.0";
       flake = false;
@@ -881,6 +886,41 @@
 
         toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
         lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
+        orphan-tests = inputs.cl-nix-forge.lib.${system}.mkOrphanTestCheck {
+          src = ./.;
+          testRoots = [
+            "packages/binary/tests"
+            "packages/cli/tests"
+            "packages/compile/tests"
+            "packages/debug/tests"
+            "packages/docgen/tests"
+            "packages/emit/tests"
+            "packages/formatter/tests"
+            "packages/optimize/tests"
+            "packages/parse/tests"
+            "packages/pipeline/tests"
+            "packages/prolog-tools/tests"
+            "packages/runtime/tests"
+            "packages/testing-framework/tests"
+            "packages/tools/tests"
+            "packages/vm/tests"
+            "src/jit/tests"
+            "t"
+          ];
+          testSystems = [
+            "cl-cc/test"
+            "cl-cc/test/e2e"
+            "cl-cc-debug/tests"
+            "cl-cc-docgen/test"
+            "cl-cc-jit/tests"
+            "cl-cc-prolog-tools/tests"
+            "cl-cc-tools/tests"
+          ];
+          allowlist = nixpkgs.lib.filter (path: path != "") (
+            nixpkgs.lib.splitString "\n" (builtins.readFile ./t/orphan-allowlist.txt)
+          );
+          name = "orphan-tests";
+        };
       });
 
       apps = forAllSystems (system: perSystem.${system}.apps);

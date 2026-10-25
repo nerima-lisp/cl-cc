@@ -181,7 +181,6 @@ let
 
         (defstruct system-spec pname systems source libs)
         (defstruct library-spec pname systems source)
-        (defparameter *skipped-system-builds* 0)
 
         (defun split-on (delimiter string)
           (loop with start = 0
@@ -292,14 +291,8 @@ let
                  (missing-roots (remove-if (lambda (name) (asdf:find-system name nil)) roots)))
             (cond
               (missing-roots
-               (if (and (equal (system-spec-pname spec) "cl-cc-javascript-test")
-                        (equal missing-roots '("cl-cc-javascript-test")))
-                   (progn
-                     (incf *skipped-system-builds*)
-                     (format t "skipped cl-cc-javascript-test: its selected ASDF system is absent; W2-02 owns its cleanup~%")
-                     nil)
-                   (error "ASDF cannot resolve selected systems for ~A: ~{~A~^, ~}"
-                          (system-spec-pname spec) missing-roots)))
+               (error "ASDF cannot resolve selected systems for ~A: ~{~A~^, ~}"
+                      (system-spec-pname spec) missing-roots))
               (t
                (let* ((closure (collect-dependencies roots))
                       (required (make-hash-table :test 'equal))
@@ -351,9 +344,8 @@ let
                   (dolist (message (nreverse errors))
                     (format *error-output* "~A~%" message))
                   (sb-ext:exit :code 1))
-                (format t "checked ~D ASDF system builds; skipped ~D without source systems~%"
-                        (- (hash-table-count specs) *skipped-system-builds*)
-                        *skipped-system-builds*))))
+                (format t "checked ~D ASDF system builds~%"
+                        (hash-table-count specs)))))
         LISP
         sbcl --noinform --script lisplibs-check.lisp asdf-systems.tsv
         touch "$out"
@@ -438,4 +430,5 @@ in
           --eval '(asdf:test-system :cl-cc-prolog-tools)'
         touch $out
       '';
+
 }
