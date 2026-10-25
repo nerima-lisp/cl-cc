@@ -810,6 +810,10 @@
               clCcType
               clProcessKit
               clJsonKit
+              clObservabilityKit
+              clDeflateKit
+              clCryptoKit
+              clResilienceKit
               clDateKit
               clConcurrentKit
               clCodecKit
