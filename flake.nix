@@ -97,7 +97,7 @@
     # satisfies the invariant the tag rule exists to protect. Swap in `/v0.1.0`
     # once those releases are tagged.
     cl-cc-ast = {
-      url = "github:nerima-lisp/cl-cc-ast/9342f855b64d88f89e99be6a0ba1619e2b02280b";
+      url = "github:nerima-lisp/cl-cc-ast/8289d9cec15df0ac73011e3ea872dc3c669f9540";
       flake = false;
     };
     cl-cc-type = {
@@ -117,7 +117,7 @@
       flake = false;
     };
     cl-cc-mir = {
-      url = "github:nerima-lisp/cl-cc-mir/eee6b5a4bcf76eeb25c461296b3c33092c8563b6";
+      url = "github:nerima-lisp/cl-cc-mir/3c3cba4b57ac10d7ad52a7bf6aaf421e598dd198";
       flake = false;
     };
     cl-cc-cps = {
@@ -149,7 +149,7 @@
       flake = false;
     };
     cl-cc-runtime = {
-      url = "github:nerima-lisp/cl-cc-runtime/79a6102ff1c7c155d592961317c980a6e05c1a0c";
+      url = "github:nerima-lisp/cl-cc-runtime/ea817be8dc506b45e8e9b4f14073422108a1e7ec";
       flake = false;
     };
     # Pulled in by the standalone cl-cc-runtime, which took dependencies the
@@ -930,7 +930,6 @@
             "packages/parse/tests"
             "packages/pipeline/tests"
             "packages/prolog-tools/tests"
-            "packages/runtime/tests"
             "packages/testing-framework/tests"
             "packages/tools/tests"
             "packages/vm/tests"
