@@ -345,7 +345,7 @@ let
                     (format *error-output* "~A~%" message))
                   (sb-ext:exit :code 1))
                 (format t "checked ~D ASDF system builds~%"
-                        (hash-table-count specs))))
+                        (hash-table-count specs)))))
         LISP
         sbcl --noinform --script lisplibs-check.lisp asdf-systems.tsv
         touch "$out"
