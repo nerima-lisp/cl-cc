@@ -839,6 +839,7 @@
             prologToolsTests
             toolkitPinConsistency
             lisplibsConsistency
+            orphanTests
             ;
           inherit (devshellModule) devShells;
         }
@@ -881,6 +882,7 @@
 
         toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
         lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
+        orphan-tests = perSystem.${system}.orphanTests;
       });
 
       apps = forAllSystems (system: perSystem.${system}.apps);

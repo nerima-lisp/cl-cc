@@ -181,7 +181,6 @@ let
 
         (defstruct system-spec pname systems source libs)
         (defstruct library-spec pname systems source)
-        (defparameter *skipped-system-builds* 0)
 
         (defun split-on (delimiter string)
           (loop with start = 0
@@ -292,14 +291,8 @@ let
                  (missing-roots (remove-if (lambda (name) (asdf:find-system name nil)) roots)))
             (cond
               (missing-roots
-               (if (and (equal (system-spec-pname spec) "cl-cc-javascript-test")
-                        (equal missing-roots '("cl-cc-javascript-test")))
-                   (progn
-                     (incf *skipped-system-builds*)
-                     (format t "skipped cl-cc-javascript-test: its selected ASDF system is absent; W2-02 owns its cleanup~%")
-                     nil)
-                   (error "ASDF cannot resolve selected systems for ~A: ~{~A~^, ~}"
-                          (system-spec-pname spec) missing-roots)))
+               (error "ASDF cannot resolve selected systems for ~A: ~{~A~^, ~}"
+                      (system-spec-pname spec) missing-roots))
               (t
                (let* ((closure (collect-dependencies roots))
                       (required (make-hash-table :test 'equal))
@@ -351,9 +344,8 @@ let
                   (dolist (message (nreverse errors))
                     (format *error-output* "~A~%" message))
                   (sb-ext:exit :code 1))
-                (format t "checked ~D ASDF system builds; skipped ~D without source systems~%"
-                        (- (hash-table-count specs) *skipped-system-builds*)
-                        *skipped-system-builds*))))
+                (format t "checked ~D ASDF system builds~%"
+                        (hash-table-count specs))))
         LISP
         sbcl --noinform --script lisplibs-check.lisp asdf-systems.tsv
         touch "$out"
@@ -437,5 +429,113 @@ in
           --eval '(asdf:load-asd (truename "packages/prolog-tools/cl-cc-prolog-tools.asd"))' \
           --eval '(asdf:test-system :cl-cc-prolog-tools)'
         touch $out
+      '';
+
+  orphanTests =
+    let
+      orphanCheckScript = pkgs.writeText "cl-cc-orphan-tests-check.lisp" ''
+        (require :asdf)
+
+        (labels ((read-lines (path)
+                   (with-open-file (stream path)
+                     (loop for line = (read-line stream nil nil)
+                           while line
+                           collect line)))
+                 (relative-path (path root)
+                   (enough-namestring (pathname path) root))
+                 (prefix-p (prefix string)
+                   (and (>= (length string) (length prefix))
+                        (string= prefix string :end2 (length prefix)))))
+          (let* ((root (uiop:ensure-directory-pathname
+                        (truename (uiop:getenv "CL_CC_SOURCE_ROOT"))))
+                 (root-name (namestring root))
+                 (root-asd (namestring (merge-pathnames "cl-cc.asd" root)))
+                 (allowlist-path (merge-pathnames "t/orphan-allowlist.txt" root))
+                 (asd-files (uiop:run-program
+                             (list "find" root-name "-type" "f" "-name" "*.asd")
+                             :output :lines))
+                 (candidate-files
+                   (mapcar
+                    (lambda (path) (relative-path path root))
+                    (uiop:run-program
+                     (list "find" root-name "-type" "f" "-name" "*.lisp"
+                           "(" "-path" (concatenate 'string root-name "t/*")
+                           "-o" "-path" (concatenate 'string root-name "*/tests/*")
+                           "-o" "-path" (concatenate 'string root-name "*/test/*") ")")
+                     :output :lines)))
+                 (allowlist (read-lines allowlist-path))
+                 (loaded-components (make-hash-table :test 'equal))
+                 (component-count 0))
+            (unless (and (probe-file root-asd) (probe-file allowlist-path)
+                         (member root-asd asd-files :test #'string=))
+              (error "The root ASDF file or orphan allowlist is missing from the check source."))
+            (dolist (asd (sort (remove root-asd asd-files :test #'string=) #'string<))
+              (asdf:load-asd (pathname asd)))
+            (asdf:load-asd (pathname root-asd))
+            (labels ((record-component (component)
+                       (incf component-count)
+                       (let ((path (asdf:component-pathname component)))
+                         (when path
+                           (setf (gethash (relative-path path root) loaded-components) t)))
+                       (dolist (child (asdf:component-children component))
+                         (record-component child))))
+              (dolist (name (asdf:registered-systems))
+                (let ((system (asdf:find-system name nil)))
+                  (when system (record-component system)))))
+            (unless candidate-files
+              (error "No test files were found; refusing a vacuous orphan check."))
+            (let* ((vm-files (remove-if-not
+                              (lambda (path) (prefix-p "packages/vm/tests/" path))
+                              candidate-files))
+                   (allowed (make-hash-table :test 'equal)))
+              (unless (and (= (length vm-files) 53)
+                           (= (length allowlist) 53)
+                           (= (length allowlist)
+                              (length (remove-duplicates allowlist :test #'string=)))
+                           (equal (sort (copy-list vm-files) #'string<)
+                                  (sort (copy-list allowlist) #'string<)))
+                (error "t/orphan-allowlist.txt must exactly match the 53 files in packages/vm/tests."))
+              (dolist (path allowlist)
+                (setf (gethash path allowed) t))
+              (let ((orphans (remove-if
+                              (lambda (path)
+                                (or (gethash path allowed)
+                                    (gethash path loaded-components)))
+                              candidate-files)))
+                (when orphans
+                  (error "Found ~D orphan test files:~%  ~{~A~%  ~}"
+                         (length orphans) orphans))
+                (format t "orphan-tests: ~D candidates, ~D ASDF components, 53 allowlisted; no orphans.~%"
+                        (length candidate-files) component-count)))))
+      '';
+    in
+    pkgs.runCommand "cl-cc-orphan-tests"
+      {
+        src = lib.fileset.toSource {
+          root = ../.;
+          fileset = lib.fileset.unions [
+            ../packages
+            ../src/jit
+            ../t
+            ../cl-cc.asd
+          ];
+        };
+        nativeBuildInputs = [
+          sbclWithTests
+          pkgs.findutils
+        ];
+      }
+      ''
+        export HOME="$TMPDIR/home"
+        export XDG_CACHE_HOME="$TMPDIR/cache"
+        mkdir -p "$HOME" "$XDG_CACHE_HOME"
+        export CL_CC_SOURCE_ROOT="$src"
+        if [ -n "''${CL_SOURCE_REGISTRY-}" ]; then
+          export CL_SOURCE_REGISTRY="$src//:$CL_SOURCE_REGISTRY"
+        else
+          export CL_SOURCE_REGISTRY="$src//"
+        fi
+        sbcl --noinform --script ${orphanCheckScript}
+        touch "$out"
       '';
 }
