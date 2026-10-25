@@ -1,6 +1,6 @@
 ;;;; run-tests.lisp — the canonical Lisp-level entry point for cl-cc's tests.
 ;;;;
-;;;;   sbcl --script run-tests.lisp [--no-warm-stdlib]
+;;;;   sbcl --script run-tests.lisp [--suite unit|integration|e2e|conformance] [--no-warm-stdlib]
 ;;;;
 ;;;; This file holds the test plan itself. `nix run .#test` and `checks.default`
 ;;;; both reach it; the only thing Nix adds is a `--core` snapshot with :cl-cc,
@@ -71,8 +71,6 @@
           (merge-pathnames #P".cache/cl-cc/"
                            (uiop:ensure-directory-pathname (pathname home))))))
 
-(format t "# starting fast test plan (unit)~%")
-
 ;;; Pre-warm BOTH stdlib caches in the main thread (single-threaded, safe). The
 ;;; core bakes *stdlib-expanded-cache-eval-fn* = #'our-eval and a
 ;;; *stdlib-vm-snapshot* compiled under our-eval. After the *macro-eval-fn* reset
@@ -91,6 +89,21 @@
                      when (and (string= (first rest) "--filter")
                                (second rest))
                        return (second rest)))
+       (suite-name
+         (or (loop for rest on args
+                   when (string= (first rest) "--suite")
+                     do (unless (second rest)
+                          (error "--suite requires a value."))
+                        (return (second rest)))
+             "unit"))
+       (suite
+         (cond
+           ((string-equal suite-name "unit") 'cl-cc/test:cl-cc-unit-suite)
+           ((string-equal suite-name "integration") 'cl-cc/test:cl-cc-integration-suite)
+           ((string-equal suite-name "e2e") 'cl-cc/test:cl-cc-e2e-suite)
+           ((string-equal suite-name "conformance") 'cl-cc/test:cl-cc-conformance-suite)
+           (t (error "Unknown test suite ~S. Expected unit, integration, e2e, or conformance."
+                     suite-name))))
        (warm-env (uiop:getenv "CLCC_WARM_STDLIB"))
        (worker-env (uiop:getenv "CL_CC_TEST_WORKERS"))
        (max-workers
@@ -116,11 +129,12 @@
               (format t "# stdlib cache warm skipped~%")
               (format t "# forcing serial test execution (max-workers=1) because stdlib cache warming is disabled~%")
               (setf max-workers 1)))
-        ;; cl-weave is the test engine: registration, execution, reporting and
-        ;; concurrency all delegate to it (see
-        ;; packages/testing-framework/src/framework-definitions.lisp).
+        (format t "# starting fast test plan (~A)~%" suite-name)
         (uiop:quit
-         (if (cl-cc/test:run-tests :reporter :spec :name-filter filter :max-workers max-workers)
+         (if (cl-cc/test:run-tests :reporter :spec
+                                   :name-filter filter
+                                   :max-workers max-workers
+                                   :suite suite)
              0
              1)))
     (error (e)
