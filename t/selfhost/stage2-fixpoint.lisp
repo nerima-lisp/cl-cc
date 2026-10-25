@@ -159,8 +159,58 @@
             (funcall counter))
     (funcall reset)))
 
+(defun bootstrap-generated-or-error-p (condition)
+  (and (typep condition 'simple-error)
+       (let ((control (simple-condition-format-control condition))
+             (arguments (simple-condition-format-arguments condition)))
+         (and (stringp control)
+              (string= control "Unbound variable: ~S")
+              (consp arguments)
+              (null (cdr arguments))
+              (symbolp (car arguments))
+              (null (symbol-package (car arguments)))
+              (let ((name (symbol-name (car arguments))))
+                (and (> (length name) 2)
+                     (string= name "OR" :end1 2)
+                     (loop for index from 2 below (length name)
+                           always (digit-char-p (char name index)))))))))
+
+(defun assert-bootstrap-generated-or-error-controls ()
+  (let ((generated-variable (make-symbol "OR123")))
+    (unless (bootstrap-generated-or-error-p
+             (make-condition 'simple-error
+                             :format-control "Unbound variable: ~S"
+                             :format-arguments (list generated-variable)))
+      (error "Bootstrap error matcher rejected the observed condition shape"))
+    (dolist (condition
+              (list
+               (make-condition 'simple-condition
+                               :format-control "Unbound variable: ~S"
+                               :format-arguments (list generated-variable))
+               (make-condition 'simple-error
+                               :format-control "Other error: ~S"
+                               :format-arguments (list generated-variable))
+               (make-condition 'simple-error
+                               :format-control "Unbound variable: ~S"
+                               :format-arguments (list (make-symbol "OR")))
+               (make-condition 'simple-error
+                               :format-control "Unbound variable: ~S"
+                               :format-arguments (list (make-symbol "ORx")))
+               (make-condition 'simple-error
+                               :format-control "Unbound variable: ~S"
+                               :format-arguments (list (intern "OR123" *package*)))
+               (make-condition 'simple-error
+                               :format-control "Unbound variable: ~S"
+                               :format-arguments
+                               (list generated-variable (make-symbol "OR456")))))
+      (when (bootstrap-generated-or-error-p condition)
+        (error "Bootstrap error matcher accepted a near-miss condition: ~A"
+               condition)))
+    t))
+
 (defun run-stage2-check ()
   (assert-matcher-controls)
+  (assert-bootstrap-generated-or-error-controls)
   (let* ((selfhost-loader (fbound-package-symbol "CL-CC" "OUR-LOAD"))
          (compile-string (fbound-package-symbol "CL-CC/PIPELINE" "COMPILE-STRING"))
          (program-accessor
@@ -213,8 +263,7 @@
                                        "Stage2 VM host bridge dispatch calls: 0 (stage2 VM did not start; this is not an FR-020 zero-bridge pass).~%")
                                (if (and (zerop loaded-count)
                                         (string= last-source "packages/bootstrap/src/package.lisp")
-                                        (search "#:OR" (princ-to-string condition)
-                                                :test (function char-equal)))
+                                        (bootstrap-generated-or-error-p condition))
                                    (progn
                                      (push
                                       (list :check :stage2-fixpoint
