@@ -401,11 +401,7 @@
       :serial t
       :components
       ((:file "formatter-tests")))
-     (:module "docgen-tests"
-      :pathname "packages/docgen/tests"
-      :serial t
-      :components
-      ((:file "docgen-suite-tests")))
+     (:module "docgen-tests" :pathname "packages/docgen/tests" :serial t :components ((:file "docgen-suite-tests") (:static-file "fixture-source.lisp")))
      (:module "runtime-tests"
       :pathname "packages/runtime/tests"
       :serial t
