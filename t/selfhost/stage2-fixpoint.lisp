@@ -256,6 +256,12 @@
            :classification :unimplemented
            :reason "compile-file-to-native produces a host-native executable via %compile-native-file-source; it cannot provide the stage1 VM artifact or raw VM bytes for stage1-to-stage2 comparison, and no selfhost stage builder or serializer is available.")
      actual)
+    (push
+     (list :check :stage2-fixpoint
+           :id :control-unexpected-mismatch
+           :classification :bug
+           :reason "Injected CI control mismatch")
+     actual)
     (unless (check-mismatch-set :stage2-fixpoint actual (read-expected-mismatches))
       (uiop:quit 1))))
 
