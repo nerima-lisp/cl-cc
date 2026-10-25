@@ -947,24 +947,7 @@
       # docs reported separately? That is what these three names are for. Adding
       # a second job to ci.yml instead would re-implement the same scheduling
       # and lose cache sharing between the pieces.
-      checks = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-          parityCheck =
-            target: runners:
-            pkgs.runCommand "parity-${target}" {
-              nativeBuildInputs = [
-                perSystem.${system}.sbclWithCLCC
-                pkgs.python3
-              ] ++ runners;
-            } ''
-              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
-              bash ${self}/t/parity/run-parity.sh ${target}
-              cp "$PARITY_OUTPUT" "$out"
-            '';
-        in
-        {
+      checks = forAllSystems (system: {
         # The SBCL test suite, run through ./run-tests.lisp.
         default = perSystem.${system}.testSuite;
         tests-unit = perSystem.${system}.testSuites.unit;
@@ -998,10 +981,65 @@
         # exercised explicitly; building its FASLs alone does not run tests.
         cl-cc-jit-tests = perSystem.${system}.jitTests;
 
-        parity-x86-64 = parityCheck "x86-64" [ ];
-        parity-wasm = parityCheck "wasm" [ pkgs.wasmtime ];
-        parity-aarch64 = parityCheck "aarch64" [ pkgs.qemu-user ];
-        parity-riscv64 = parityCheck "riscv64" [ pkgs.qemu-user ];
+        parity-x86-64 =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-x86-64"
+            {
+              nativeBuildInputs = [ python3 ] ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh x86-64
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
+        parity-wasm =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-wasm"
+            {
+              nativeBuildInputs = [
+                python3
+                wasmtime
+              ]
+              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh wasm
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
+        parity-aarch64 =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-aarch64"
+            {
+              nativeBuildInputs = [
+                python3
+                qemu-user
+              ]
+              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh aarch64
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+
+        parity-riscv64 =
+          with nixpkgs.legacyPackages.${system};
+          runCommand "parity-riscv64"
+            {
+              nativeBuildInputs = [
+                python3
+                qemu-user
+              ]
+              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+            }
+            ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh riscv64
+              cp "$PARITY_OUTPUT" "$out"
+            '';
 
         toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
         lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
@@ -1045,6 +1083,31 @@
               "t/selfhost/determinism.lisp"
               "t/selfhost/harness-support.lisp"
               "t/selfhost/stage2-fixpoint.lisp"
+              # These files are inputs to standalone parity Nix checks, not ASDF-registered test files.
+              "t/parity/worker.lisp"
+              "t/parity/programs/bignum-add.lisp"
+              "t/parity/programs/bignum-multiply.lisp"
+              "t/parity/programs/ffi-abs.lisp"
+              "t/parity/programs/ffi-strlen.lisp"
+              "t/parity/programs/file-stream-position.lisp"
+              "t/parity/programs/file-stream-roundtrip.lisp"
+              "t/parity/programs/format-a.lisp"
+              "t/parity/programs/format-newline.lisp"
+              "t/parity/programs/heap-cons.lisp"
+              "t/parity/programs/heap-vector.lisp"
+              "t/parity/programs/integer-add.lisp"
+              "t/parity/programs/integer-subtract.lisp"
+              "t/parity/programs/load-continuation.lisp"
+              "t/parity/programs/load-value.lisp"
+              "t/parity/programs/ratio-add.lisp"
+              "t/parity/programs/ratio-divide.lisp"
+              "t/parity/programs/string-stream-input.lisp"
+              "t/parity/programs/string-stream-output.lisp"
+              "t/parity/programs/wasm-atomic-rmw-xchg.lisp"
+              "t/parity/programs/wasm-float-add.lisp"
+              "t/parity/programs/wasm-float-arithmetic.lisp"
+              "t/parity/support/loaded-continuation.lisp"
+              "t/parity/support/loaded-value.lisp"
             ];
           name = "orphan-tests";
         };
@@ -1130,8 +1193,7 @@
             '';
             installPhase = "mkdir -p $out && touch $out/passed";
           };
-        }
-      );
+      });
 
       apps = forAllSystems (system: perSystem.${system}.apps);
 
