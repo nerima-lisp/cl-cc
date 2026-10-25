@@ -20,24 +20,27 @@
            (and symbol (fboundp symbol) symbol)))))
 
 (defun %artifact-api-name-p (name)
-  (or
-   (and
-    (some (lambda (needle)
-            (search needle name :test (function char-equal)))
-          (list "STAGE1" "STAGE2" "STAGE-1" "STAGE-2" "SELFHOST" "SELF-HOST"))
-    (some (lambda (needle)
-            (search needle name :test (function char-equal)))
-          (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE" "EMIT"
-                "DUMP" "SAVE" "OCTET")))
-   (and
-    (some (lambda (needle)
-            (search needle name :test (function char-equal)))
-          (list "VM-ARTIFACT" "VM-PROGRAM" "VM-STAGE" "VM-BYTECODE"
-                "VM-IMAGE" "BYTECODE-ARTIFACT" "BYTECODE-PROGRAM"))
-    (some (lambda (needle)
-            (search needle name :test (function char-equal)))
-          (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE" "TO-OCTET"
-                "TO-BYTE" "TO-BYTES" "TO-OCTETS")))))
+  (and
+   ;; Instruction profile output is diagnostic data, not a compiler stage artifact.
+   (not (search "PROFILE" name :test (function char-equal)))
+   (or
+    (and
+     (some (lambda (needle)
+             (search needle name :test (function char-equal)))
+           (list "STAGE1" "STAGE2" "STAGE-1" "STAGE-2" "SELFHOST" "SELF-HOST"))
+     (some (lambda (needle)
+             (search needle name :test (function char-equal)))
+           (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE" "EMIT"
+                 "DUMP" "SAVE" "OCTET")))
+    (and
+     (some (lambda (needle)
+             (search needle name :test (function char-equal)))
+           (list "VM-ARTIFACT" "VM-PROGRAM" "VM-STAGE" "VM-BYTECODE"
+                 "VM-IMAGE" "BYTECODE-ARTIFACT" "BYTECODE-PROGRAM"))
+     (some (lambda (needle)
+             (search needle name :test (function char-equal)))
+           (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE" "TO-OCTET"
+                 "TO-BYTE" "TO-BYTES" "TO-OCTETS"))))))
 (defun vm-artifact-api-candidates ()
   (let ((seen (make-hash-table :test (function eq))))
     (loop for package in (list-all-packages)
