@@ -477,8 +477,9 @@ in
                        (let ((path (asdf:component-pathname component)))
                          (when path
                            (setf (gethash (relative-path path root) loaded-components) t)))
-                       (dolist (child (asdf:component-children component))
-                         (record-component child))))
+                       (when (typep component 'asdf:module)
+                         (dolist (child (asdf:component-children component))
+                           (record-component child)))))
               (dolist (name (asdf:registered-systems))
                 (let ((system (asdf:find-system name nil)))
                   (when system (record-component system)))))
