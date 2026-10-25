@@ -3389,7 +3389,6 @@ umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-find-package 1
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-find-symbol 4
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-import 1
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-intern 6
-umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-list-all-packages 1
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-make-package 3
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-package-name 4
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-symbol-name 2

@@ -60,7 +60,7 @@
       (expect found :to-be-null))))
 
 (it-sequential "pkg-smoke-list-all-packages"
-  (let ((pkgs (cl-cc/runtime::rt-list-all-packages)))
+  (let ((pkgs (cl-cc/runtime/values:rt-list-all-packages)))
     (expect (>= (length pkgs) 2) :to-be-truthy)
     (expect (find "CL-USER" pkgs
                        :test #'equal
