@@ -19,40 +19,43 @@
            (declare (ignore status))
            (and symbol (fboundp symbol) symbol)))))
 
-(defun %artifact-api-name-p (package-name name)
-    (or (search "STAGE1" name :test (function char-equal))
-        (search "STAGE2" name :test (function char-equal))
-        (search "STAGE-1" name :test (function char-equal))
-        (search "STAGE-2" name :test (function char-equal))
-        (and (some (lambda (needle)
-                     (search needle name :test (function char-equal)))
-                   (list "BYTECODE" "VM-PROGRAM" "VM-ARTIFACT" "VM-IMAGE"
-                         "SELFHOST" "SELF-HOST"))
-             (some (lambda (needle)
-                     (search needle name :test (function char-equal)))
-                   (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE"
-                         "EMIT" "DUMP" "SAVE" "OCTET")))
-        (and (some (lambda (needle)
-                     (search needle package-name :test (function char-equal)))
-                   (list "BINARY" "COMPILE" "PIPELINE" "SELFHOST" "VM"))
-             (some (lambda (needle)
-                     (search needle name :test (function char-equal)))
-                   (list "SERIAL" "ENCODE" "TO-OCTET" "TO-BYTE"
-                         "WRITE-BYTECODE" "WRITE-VM" "BUILD-STAGE"))
-             (some (lambda (needle)
-                     (search needle name :test (function char-equal)))
-                   (list "BYTE" "OCTET" "PROGRAM" "ARTIFACT" "VM")))))
-  (defun vm-artifact-api-candidates ()
+(defun %artifact-api-name-p (name)
+  (or
+   (and
+    (some (lambda (needle)
+            (search needle name :test (function char-equal)))
+          (list "STAGE1" "STAGE2" "STAGE-1" "STAGE-2" "SELFHOST" "SELF-HOST"))
+    (some (lambda (needle)
+            (search needle name :test (function char-equal)))
+          (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE" "EMIT"
+                "DUMP" "SAVE" "OCTET")))
+   (and
+    (some (lambda (needle)
+            (search needle name :test (function char-equal)))
+          (list "VM-ARTIFACT" "VM-PROGRAM" "VM-STAGE" "VM-BYTECODE"
+                "VM-IMAGE" "BYTECODE-ARTIFACT" "BYTECODE-PROGRAM"))
+    (some (lambda (needle)
+            (search needle name :test (function char-equal)))
+          (list "BUILD" "COMPILE" "SERIAL" "WRITE" "ENCODE" "TO-OCTET"
+                "TO-BYTE" "TO-BYTES" "TO-OCTETS")))))
+(defun vm-artifact-api-candidates ()
+  (let ((seen (make-hash-table :test (function eq))))
     (loop for package in (list-all-packages)
           for package-name = (package-name package)
           when (and (search "CL-CC" package-name :test (function char-equal))
                     (not (string= package-name "CL-CC/SELFHOST-HARNESS")))
-            append
-            (loop for symbol being the symbols of package
-                  for name = (symbol-name symbol)
-                  when (and (fboundp symbol)
-                            (%artifact-api-name-p package-name name))
-                    collect (format nil "~A::~A" package-name name))))
+          append
+          (loop for symbol being the symbols of package
+                for name = (symbol-name symbol)
+                when (and (fboundp symbol)
+                          (not (gethash symbol seen))
+                          (%artifact-api-name-p name))
+                collect
+                (progn
+                  (setf (gethash symbol seen) t)
+                  (format nil "~A::~A"
+                          (package-name (symbol-package symbol))
+                          name))))))
   (defun find-fbound-api-symbol (package-names symbol-name)
     (loop for package-name in package-names
           for symbol = (fbound-package-symbol package-name symbol-name)
@@ -158,9 +161,9 @@
   (let* ((selfhost-loader (fbound-package-symbol "CL-CC" "OUR-LOAD"))
          (compile-string (fbound-package-symbol "CL-CC/PIPELINE" "COMPILE-STRING"))
          (program-accessor
-           (fbound-package-symbol "CL-CC/COMPILE" "COMPILATION-RESULT-PROGRAM"))
+          (fbound-package-symbol "CL-CC/COMPILE" "COMPILATION-RESULT-PROGRAM"))
          (assembly-accessor
-           (fbound-package-symbol "CL-CC/COMPILE" "COMPILATION-RESULT-ASSEMBLY"))
+          (fbound-package-symbol "CL-CC/COMPILE" "COMPILATION-RESULT-ASSEMBLY"))
          (artifact-candidates (vm-artifact-api-candidates))
          (source-files (selfhost-all-source-files))
          (loaded-count 0)
@@ -181,31 +184,45 @@
             (length source-files)
             (caar source-files)
             (car (car (last source-files))))
-    (format t "Existing CL-CC/PIPELINE::COMPILE-FILE-TO-NATIVE writes a host-native executable via %COMPILE-NATIVE-FILE-SOURCE; it is not a selfhost VM stage builder or raw VM-byte serializer. No selfhost VM stage builder or raw-byte serializer API candidates were found in loaded CL-CC packages.~%")
+    (format t "Existing CL-CC/PIPELINE::COMPILE-FILE-TO-NATIVE writes a host-native executable via %COMPILE-NATIVE-FILE-SOURCE; it is not a selfhost stage builder or raw VM-byte serializer. No stage-specific VM builder or whole VM artifact byte serializer API names were found in loaded CL-CC packages.~%")
     (call-with-counted-vm-host-bridges
      (lambda (bridge-counter reset-counter)
        (verify-vm-host-bridge-counter bridge-counter reset-counter)
        (let ((original-features (copy-list cl:*features*)))
          (unwind-protect
-              (progn
-                (pushnew :cl-cc-self-hosting cl:*features*)
-                (handler-bind ((warning (function muffle-warning)))
-                  (cl-cc:with-fresh-repl-state
-                    (let ((cl-cc:*skip-optimizer-passes* t))
-                      (dolist (source-file source-files)
-                        (setf last-source (car source-file))
-                        (handler-case
-                            (progn
-                              (funcall selfhost-loader (cdr source-file))
-                              (incf loaded-count))
-                          (error (condition)
-                            (format *error-output*
-                                    "E2E-equivalent self-load stopped at ~A after ~D / ~D files; host bridge dispatch calls=~D: ~A~%"
-                                    last-source loaded-count (length source-files)
-                                    (funcall bridge-counter) condition)
-                            (format *error-output*
-                                    "Stage2 VM host bridge dispatch calls: 0 (stage2 VM did not start; this is not an FR-020 zero-bridge pass).~%")
-                            (error condition))))))))
+             (progn
+               (pushnew :cl-cc-self-hosting cl:*features*)
+               (handler-bind ((warning (function muffle-warning)))
+                 (cl-cc:with-fresh-repl-state
+                  (let ((cl-cc:*skip-optimizer-passes* t))
+                    (dolist (source-file source-files)
+                      (setf last-source (car source-file))
+                      (handler-case
+                          (progn
+                            (funcall selfhost-loader (cdr source-file))
+                            (incf loaded-count))
+                        (error (condition)
+                               (format *error-output*
+                                       "E2E-equivalent self-load stopped at ~A after ~D / ~D files; host bridge dispatch calls=~D: ~A~%"
+                                       last-source loaded-count (length source-files)
+                                       (funcall bridge-counter) condition)
+                               (format *error-output*
+                                       "Stage2 VM host bridge dispatch calls: 0 (stage2 VM did not start; this is not an FR-020 zero-bridge pass).~%")
+                               (if (and (zerop loaded-count)
+                                        (string= last-source "packages/bootstrap/src/package.lisp")
+                                        (search "#:OR" (princ-to-string condition)
+                                                :test (function char-equal)))
+                                   (progn
+                                     (push
+                                      (list :check :stage2-fixpoint
+                                            :id :self-load-stopped-at-bootstrap-package
+                                            :classification :bug
+                                            :reason "OUR-LOAD stopped at packages/bootstrap/src/package.lisp with an unbound generated OR variable.")
+                                      actual)
+                                     (format *error-output*
+                                             "Recorded baseline mismatch: :self-load-stopped-at-bootstrap-package (:bug).~%")
+                                     (return))
+                                 (error condition)))))))))
            (setf cl:*features* original-features)))
        (setf our-load-bridge-count (funcall bridge-counter))))
     (format t "E2E-equivalent our-load progress: loaded ~D / ~D source files; stop=~A.~%"
@@ -224,13 +241,18 @@
               (type-of result)
               (type-of program)
               (type-of assembly)))
-    (format t "Stage2 stop boundary: E2E-equivalent our-load completed; compile-file-to-native outputs a host-native executable, not a VM stage artifact. No selfhost stage builder or raw-byte serializer is available, so stage1/stage2 byte comparison did not start.~%")
-    (setf actual
-          (list
-           (list :check :stage2-fixpoint
-                 :id :stage2-output-unavailable
-                 :classification :unimplemented
-                 :reason "compile-file-to-native produces a host-native executable via %compile-native-file-source; it cannot provide the stage1 VM artifact or raw VM bytes for stage1-to-stage2 comparison, and no selfhost stage builder or serializer is available.")))
+    (format t
+            "Stage2 stop boundary: E2E-equivalent our-load ~A after ~D / ~D source files at ~A; compile-file-to-native emits a host-native executable, not a VM stage artifact. No selfhost stage builder or raw-byte serializer is available, so stage1/stage2 byte comparison did not start.~%"
+            (if (= loaded-count (length source-files)) "completed" "stopped")
+            loaded-count
+            (length source-files)
+            (or last-source :complete))
+    (push
+     (list :check :stage2-fixpoint
+           :id :stage2-output-unavailable
+           :classification :unimplemented
+           :reason "compile-file-to-native produces a host-native executable via %compile-native-file-source; it cannot provide the stage1 VM artifact or raw VM bytes for stage1-to-stage2 comparison, and no selfhost stage builder or serializer is available.")
+     actual)
     (unless (check-mismatch-set :stage2-fixpoint actual (read-expected-mismatches))
       (uiop:quit 1))))
 
