@@ -87,6 +87,24 @@
       url = "github:nerima-lisp/cl-host-kit/ec565470b634605e23b0d6eef0645eb15e8e3356";
       flake = false;
     };
+    # Additional runtime dependencies, pinned to the revisions in the
+    # standalone runtime's lockfile.
+    cl-observability-kit = {
+      url = "github:nerima-lisp/cl-observability-kit/c7036f43ac8b69457a2979c2cb2c6806452bd728";
+      flake = false;
+    };
+    cl-deflate-kit = {
+      url = "github:nerima-lisp/cl-deflate-kit/711eb7540ac43869ae08060b6153e5dc768a8382";
+      flake = false;
+    };
+    cl-crypto-kit = {
+      url = "github:nerima-lisp/cl-crypto-kit/41ed7e90f736591aa1961bc6deb0741c73392a60";
+      flake = false;
+    };
+    cl-resilience-kit = {
+      url = "github:nerima-lisp/cl-resilience-kit/741d42399ad781244bd36750c6626bd9f4e8b16b";
+      flake = false;
+    };
     # cl-cc-ast and cl-cc-type are the first subsystems split out of this
     # repository. Injected into the internal system graph under their original
     # names by nix/asdf-systems.nix, so every `deps = [ "cl-cc-ast" ... ]`
@@ -152,9 +170,10 @@
       url = "github:nerima-lisp/cl-cc-runtime/ea817be8dc506b45e8e9b4f14073422108a1e7ec";
       flake = false;
     };
-    # Pulled in by the standalone cl-cc-runtime, which took dependencies the
-    # in-tree copy did not have. cl-process-kit needs cl-boundary-kit and
-    # cl-log-kit, both already above; cl-json-kit is self-contained.
+    # Dependencies of the standalone cl-cc-runtime that the in-tree copy did
+    # not have. Existing toolkit pins above provide logging, process, and JSON;
+    # the additional source pins above provide observability, compression,
+    # cryptography, and resilience.
     cl-process-kit = {
       url = "github:nerima-lisp/cl-process-kit/1276a8b8db6120ac15a0911c255a586b3a030ca1";
       flake = false;
@@ -433,6 +452,43 @@
             src = inputs.cl-json-kit;
             systems = [ "cl-json-kit" ];
           };
+          clObservabilityKit = sbcl.buildASDFSystem {
+            pname = "cl-observability-kit";
+            version = siblingVersion "cl-observability-kit";
+            src = inputs.cl-observability-kit;
+            systems = [
+              "cl-observability-kit"
+              "cl-observability-kit/prometheus"
+              "cl-observability-kit/otlp"
+            ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+            ];
+          };
+          clDeflateKit = sbcl.buildASDFSystem {
+            pname = "cl-deflate-kit";
+            version = siblingVersion "cl-deflate-kit";
+            src = inputs.cl-deflate-kit;
+            systems = [ "cl-deflate-kit" ];
+          };
+          clCryptoKit = sbcl.buildASDFSystem {
+            pname = "cl-crypto-kit";
+            version = siblingVersion "cl-crypto-kit";
+            src = inputs.cl-crypto-kit;
+            systems = [ "cl-crypto-kit" ];
+          };
+          clResilienceKit = sbcl.buildASDFSystem {
+            pname = "cl-resilience-kit";
+            version = siblingVersion "cl-resilience-kit";
+            src = inputs.cl-resilience-kit;
+            systems = [ "cl-resilience-kit" ];
+            lispLibs = [
+              clBoundaryKit
+              clConcurrentKit
+              clDateKit
+            ];
+          };
           clDateKit = sbcl.buildASDFSystem {
             pname = "cl-date-kit";
             version = siblingVersion "cl-date-kit";
@@ -465,6 +521,10 @@
               clLogKit
               clProcessKit
               clJsonKit
+              clObservabilityKit
+              clDeflateKit
+              clCryptoKit
+              clResilienceKit
             ];
           };
           clCcBootstrap = sbcl.buildASDFSystem {
