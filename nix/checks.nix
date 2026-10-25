@@ -127,13 +127,13 @@ let
       metadata = package.asdfMetadata;
       providerMetadata = provider: {
         pname = provider.asdfMetadata.pname;
-        source = toString provider.asdfMetadata.src;
+        source = provider.asdfMetadata.src;
         systems = provider.asdfMetadata.systems;
       };
     in
     {
       inherit (metadata) pname systems;
-      source = toString metadata.src;
+      source = metadata.src;
       lispLibs = map providerMetadata metadata.lispLibs;
     }
   ) asdfSystemDerivations;
