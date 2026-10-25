@@ -1,0 +1,73 @@
+# target	fixture	stage	taxonomy	diagnostic	reason
+x86-64	bignum-add	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-GET-GLOBAL	The generated program requires VM-GET-GLOBAL, which this backend does not lower.
+x86-64	bignum-multiply	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-GET-GLOBAL	The generated program requires VM-GET-GLOBAL, which this backend does not lower.
+x86-64	ratio-divide	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-GET-GLOBAL	The generated program requires VM-GET-GLOBAL, which this backend does not lower.
+x86-64	ratio-add	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-GET-GLOBAL	The generated program requires VM-GET-GLOBAL, which this backend does not lower.
+x86-64	format-a	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-MAKE-STRING-OUTPUT-STREAM-INST	This backend does not lower VM-MAKE-STRING-OUTPUT-STREAM-INST used by the stream or FORMAT program.
+x86-64	format-newline	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-PRINC-TO-STRING-INST	This backend does not lower VM-PRINC-TO-STRING-INST used by the FORMAT program.
+x86-64	string-stream-output	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-MAKE-STRING-OUTPUT-STREAM-INST	This backend does not lower VM-MAKE-STRING-OUTPUT-STREAM-INST used by the stream or FORMAT program.
+x86-64	string-stream-input	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-MAKE-STRING-STREAM	This backend does not lower VM-MAKE-STRING-STREAM for the input-stream program.
+x86-64	file-stream-roundtrip	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-OPEN-FILE	This backend does not lower VM-OPEN-FILE, so the file-stream program cannot produce an artifact.
+x86-64	file-stream-position	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-OPEN-FILE	This backend does not lower VM-OPEN-FILE, so the file-stream program cannot produce an artifact.
+x86-64	load-value	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-LOAD-FILE	This backend does not lower VM-LOAD-FILE, so the load program cannot produce an artifact.
+x86-64	load-continuation	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-LOAD-FILE	This backend does not lower VM-LOAD-FILE, so the load program cannot produce an artifact.
+x86-64	ffi-abs	compile-failure	:unimplemented	Unsupported VM-CONST literal for native codegen: "abs"	The native FFI trampoline cannot lower the quoted foreign-function symbol constant.
+x86-64	ffi-strlen	compile-failure	:unimplemented	Unsupported VM-CONST literal for native codegen: "strlen"	The native FFI trampoline cannot lower the quoted foreign-function symbol constant.
+x86-64	heap-vector	compile-failure	:unimplemented	Unsupported x86-64 instruction: VM-MAKE-ARRAY	The x86-64 emitter does not lower VM-MAKE-ARRAY for this vector allocation.
+wasm	integer-add	compile-failure	:unimplemented	Unsupported WASM instruction: VM-TAIL-CALL	The AOT backend does not lower VM-TAIL-CALL in this source-generated program.
+wasm	integer-subtract	compile-failure	:unimplemented	Unsupported WASM instruction: VM-TAIL-CALL	The AOT backend does not lower VM-TAIL-CALL in this source-generated program.
+wasm	bignum-add	compile-failure	:bug	WASM VM-JUMP references unknown label "lambda_end_3"	The compiler emits VM-JUMP to lambda_end_3 without defining that label, so the generated program is invalid.
+wasm	bignum-multiply	compile-failure	:bug	WASM VM-JUMP references unknown label "lambda_end_3"	The compiler emits VM-JUMP to lambda_end_3 without defining that label, so the generated program is invalid.
+wasm	ratio-divide	compile-failure	:bug	WASM VM-JUMP references unknown label "lambda_end_3"	The compiler emits VM-JUMP to lambda_end_3 without defining that label, so the generated program is invalid.
+wasm	ratio-add	compile-failure	:bug	WASM VM-JUMP references unknown label "lambda_end_3"	The compiler emits VM-JUMP to lambda_end_3 without defining that label, so the generated program is invalid.
+wasm	format-a	compile-failure	:unimplemented	Unsupported WASM instruction: VM-MAKE-STRING-OUTPUT-STREAM-INST	This backend does not lower VM-MAKE-STRING-OUTPUT-STREAM-INST used by the stream or FORMAT program.
+wasm	format-newline	compile-failure	:unimplemented	Unsupported WASM instruction: VM-PRINC-TO-STRING-INST	This backend does not lower VM-PRINC-TO-STRING-INST used by the FORMAT program.
+wasm	string-stream-output	compile-failure	:unimplemented	Unsupported WASM instruction: VM-MAKE-STRING-OUTPUT-STREAM-INST	This backend does not lower VM-MAKE-STRING-OUTPUT-STREAM-INST used by the stream or FORMAT program.
+wasm	string-stream-input	compile-failure	:unimplemented	Unsupported WASM instruction: VM-MAKE-STRING-STREAM	This backend does not lower VM-MAKE-STRING-STREAM for the input-stream program.
+wasm	file-stream-roundtrip	compile-failure	:unimplemented	Unsupported WASM instruction: VM-OPEN-FILE	This backend does not lower VM-OPEN-FILE, so the file-stream program cannot produce an artifact.
+wasm	file-stream-position	compile-failure	:unimplemented	Unsupported WASM instruction: VM-OPEN-FILE	This backend does not lower VM-OPEN-FILE, so the file-stream program cannot produce an artifact.
+wasm	load-value	compile-failure	:unimplemented	Unsupported WASM instruction: VM-LOAD-FILE	This backend does not lower VM-LOAD-FILE, so the load program cannot produce an artifact.
+wasm	load-continuation	compile-failure	:unimplemented	Unsupported WASM instruction: VM-LOAD-FILE	This backend does not lower VM-LOAD-FILE, so the load program cannot produce an artifact.
+wasm	ffi-abs	compile-failure	:unimplemented	Unsupported WASM trampoline VM-CONST symbol literal: CL-CC/VM::%FOREIGN-FUNCALL	The AOT trampoline cannot represent the foreign-call function symbol as a VM constant.
+wasm	ffi-strlen	compile-failure	:unimplemented	Unsupported WASM trampoline VM-CONST symbol literal: CL-CC/VM::%FOREIGN-FUNCALL	The AOT trampoline cannot represent the foreign-call function symbol as a VM constant.
+wasm	heap-cons	compile-failure	:unimplemented	Unsupported WASM AOT host import: $cl_condition_to_exnref	The AOT module emitter rejects this condition-conversion host import before producing a module.
+wasm	heap-vector	compile-failure	:unimplemented	Unsupported WASM AOT host import: $cl_condition_to_exnref	The AOT module emitter rejects this condition-conversion host import before producing a module.
+wasm	wasm-float-add	compile-failure	:unimplemented	Unsupported WASM trampoline VM-CONST literal: 1.5d0	The AOT trampoline does not support the double-float VM-CONST literal, so float lowering is not reached.
+wasm	wasm-float-arithmetic	compile-failure	:unimplemented	Unsupported WASM trampoline VM-CONST literal: 1.5d0	The AOT trampoline does not support the double-float VM-CONST literal, so float lowering is not reached.
+wasm	wasm-atomic-rmw-xchg	compile-failure	:unimplemented	Wasm atomic swap VM-ATOMIC-SWAP requires atomic.rmw.xchg lowering.	Compile-only canary: this VM program swaps the value in addr-reg r0, initialized to 0, rather than allocated memory; it proves no atomic-memory parity. Keep the expected compile failure until this fixture is replaced with a valid aligned-memory oracle. If compilation starts succeeding before replacement, the unexpected pass must fail this check.
+aarch64	integer-add	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	integer-subtract	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	bignum-add	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	bignum-multiply	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	ratio-divide	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	ratio-add	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	format-a	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	format-newline	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	string-stream-output	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	string-stream-input	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	file-stream-roundtrip	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	file-stream-position	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	load-value	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	load-continuation	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	ffi-abs	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	ffi-strlen	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	heap-cons	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+aarch64	heap-vector	compile-failure	:unimplemented	Unsupported target: :ARM64	The high-level native pipeline rejects :ARM64 before target code generation.
+riscv64	integer-add	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	integer-subtract	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	bignum-add	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	bignum-multiply	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	ratio-divide	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	ratio-add	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	format-a	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	format-newline	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	string-stream-output	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	string-stream-input	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	file-stream-roundtrip	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	file-stream-position	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	load-value	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	load-continuation	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	ffi-abs	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	ffi-strlen	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	heap-cons	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.
+riscv64	heap-vector	compile-failure	:unimplemented	Unknown native architecture: :RISCV64	The native architecture mapper does not provide a :RISCV64 target.

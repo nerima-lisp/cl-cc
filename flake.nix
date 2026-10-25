@@ -947,7 +947,24 @@
       # docs reported separately? That is what these three names are for. Adding
       # a second job to ci.yml instead would re-implement the same scheduling
       # and lose cache sharing between the pieces.
-      checks = forAllSystems (system: {
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          parityCheck =
+            target: runners:
+            pkgs.runCommand "parity-${target}" {
+              nativeBuildInputs = [
+                perSystem.${system}.sbclWithCLCC
+                pkgs.python3
+              ] ++ runners;
+            } ''
+              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+              bash ${self}/t/parity/run-parity.sh ${target}
+              cp "$PARITY_OUTPUT" "$out"
+            '';
+        in
+        {
         # The SBCL test suite, run through ./run-tests.lisp.
         default = perSystem.${system}.testSuite;
         tests-unit = perSystem.${system}.testSuites.unit;
@@ -980,6 +997,11 @@
         # The JIT write-barrier suite is a secondary ASDF system and must be
         # exercised explicitly; building its FASLs alone does not run tests.
         cl-cc-jit-tests = perSystem.${system}.jitTests;
+
+        parity-x86-64 = parityCheck "x86-64" [ ];
+        parity-wasm = parityCheck "wasm" [ pkgs.wasmtime ];
+        parity-aarch64 = parityCheck "aarch64" [ pkgs.qemu-user ];
+        parity-riscv64 = parityCheck "riscv64" [ pkgs.qemu-user ];
 
         toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
         lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
@@ -1108,7 +1130,8 @@
             '';
             installPhase = "mkdir -p $out && touch $out/passed";
           };
-      });
+        }
+      );
 
       apps = forAllSystems (system: perSystem.${system}.apps);
 

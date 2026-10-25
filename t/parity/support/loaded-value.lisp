@@ -1,0 +1,1 @@
+(write-string "loaded-value")
