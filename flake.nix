@@ -921,11 +921,102 @@
             "cl-cc-prolog-tools/tests"
             "cl-cc-tools/tests"
           ];
-          allowlist = nixpkgs.lib.filter (path: path != "") (
-            nixpkgs.lib.splitString "\n" (builtins.readFile ./t/orphan-allowlist.txt)
-          );
+          allowlist =
+            nixpkgs.lib.filter (path: path != "") (
+              nixpkgs.lib.splitString "\n" (builtins.readFile ./t/orphan-allowlist.txt)
+            )
+            ++ [
+              # These files are inputs to standalone Nix checks, not ASDF-registered test files.
+              "t/selfhost/determinism-input.lisp"
+              "t/selfhost/determinism-worker.lisp"
+              "t/selfhost/determinism.lisp"
+              "t/selfhost/harness-support.lisp"
+              "t/selfhost/stage2-fixpoint.lisp"
+            ];
           name = "orphan-tests";
         };
+        determinism =
+          let
+            pkgs = nixpkgs.legacyPackages.${system};
+            lib = nixpkgs.lib;
+            selfhostSource = builtins.path {
+              name = "cl-cc-selfhost-source";
+              path = ./.;
+              filter =
+                path: type:
+                let
+                  absolutePath = toString path;
+                  repositoryRoot = toString ./.;
+                  relativePath = lib.removePrefix "${repositoryRoot}/" absolutePath;
+                  under = directory: relativePath == directory || lib.hasPrefix "${directory}/" relativePath;
+                in
+                absolutePath == repositoryRoot
+                || relativePath == "cl-cc.asd"
+                || under "packages"
+                || (relativePath == "src" && type == "directory")
+                || relativePath == "src/package.lisp"
+                || (relativePath == "src/ffi" && type == "directory")
+                || relativePath == "src/ffi/dynlib.lisp"
+                || (relativePath == "t" && type == "directory")
+                || under "t/selfhost";
+            };
+          in
+          pkgs.stdenvNoCC.mkDerivation {
+            pname = "cl-cc-selfhost-determinism";
+            version = "1";
+            src = selfhostSource;
+            buildPhase = ''
+              runHook preBuild
+              export HOME="$TMPDIR"
+              cat > run-tests.lisp <<'EOF'
+              (load "t/selfhost/determinism.lisp")
+              EOF
+              ${perSystem.${system}.apps.test.program}
+              runHook postBuild
+            '';
+            installPhase = "mkdir -p $out && touch $out/passed";
+          };
+        stage2-fixpoint =
+          let
+            pkgs = nixpkgs.legacyPackages.${system};
+            lib = nixpkgs.lib;
+            selfhostSource = builtins.path {
+              name = "cl-cc-selfhost-source";
+              path = ./.;
+              filter =
+                path: type:
+                let
+                  absolutePath = toString path;
+                  repositoryRoot = toString ./.;
+                  relativePath = lib.removePrefix "${repositoryRoot}/" absolutePath;
+                  under = directory: relativePath == directory || lib.hasPrefix "${directory}/" relativePath;
+                in
+                absolutePath == repositoryRoot
+                || relativePath == "cl-cc.asd"
+                || under "packages"
+                || (relativePath == "src" && type == "directory")
+                || relativePath == "src/package.lisp"
+                || (relativePath == "src/ffi" && type == "directory")
+                || relativePath == "src/ffi/dynlib.lisp"
+                || (relativePath == "t" && type == "directory")
+                || under "t/selfhost";
+            };
+          in
+          pkgs.stdenvNoCC.mkDerivation {
+            pname = "cl-cc-selfhost-stage2-fixpoint";
+            version = "1";
+            src = selfhostSource;
+            buildPhase = ''
+              runHook preBuild
+              export HOME="$TMPDIR"
+              cat > run-tests.lisp <<'EOF'
+              (load "t/selfhost/stage2-fixpoint.lisp")
+              EOF
+              ${perSystem.${system}.apps.test.program}
+              runHook postBuild
+            '';
+            installPhase = "mkdir -p $out && touch $out/passed";
+          };
       });
 
       apps = forAllSystems (system: perSystem.${system}.apps);
