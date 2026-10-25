@@ -49,7 +49,11 @@
        (ensure-system-asd :cl-cc-stdlib "packages/stdlib/cl-cc-stdlib.asd" here)
        (ensure-system-asd :cl-cc-pipeline "packages/pipeline/cl-cc-pipeline.asd" here)
        (ensure-system-asd :cl-cc-selfhost "packages/selfhost/cl-cc-selfhost.asd" here)
-        (ensure-system-asd :cl-cc-repl "packages/repl/cl-cc-repl.asd" here))))
+        (ensure-system-asd :cl-cc-repl "packages/repl/cl-cc-repl.asd" here)
+        ;; The production cl-cc derivation omits this test-only ASDF file.
+        (when (probe-file
+              (merge-pathnames "packages/debug/cl-cc-debug.asd" here))
+          (ensure-system-asd :cl-cc-debug "packages/debug/cl-cc-debug.asd" here)))))
 
 (asdf:defsystem "cl-cc"
   :description "Self-hosting Common Lisp compiler: reader and macroexpander through CPS, typed IR, and optimiser to bytecode, native x86-64/ARM64/WebAssembly, PHP, and JavaScript."
@@ -105,7 +109,7 @@
   :homepage "https://github.com/nerima-lisp/cl-cc"
   :bug-tracker "https://github.com/nerima-lisp/cl-cc/issues"
   :source-control (:git "https://github.com/nerima-lisp/cl-cc.git")
-  :depends-on (:cl-cc :cl-cc-jit :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools :cl-cc-formatter :cl-regex-kit)
+  :depends-on (:cl-cc :cl-cc-jit :cl-cc-cli :cl-cc-testing-framework :cl-cc-php :cl-cc-javascript :cl-cc-tools :cl-cc-formatter :cl-regex-kit :cl-cc-debug/tests)
   :serial t
   :components
   (;; Unit tests — each module now lives in its workspace's tests/ dir
@@ -452,7 +456,8 @@
      :pathname "t/conformance"
      :serial t
      :components
-     (      (:file "package-smoke-tests")
+     ((:file "package-smoke-tests")
+      (:file "package-language-tests")
       (:file "format-conformance-tests")
       (:file "number-conformance-tests")
       (:file "native-io-conformance-tests"))))
@@ -477,6 +482,7 @@
      :serial t
      :components
      ((:file "selfhost-test-support")
+      (:file "selfhost-portability-tests")
       (:file "selfhost-tests")
       (:file "selfhost-meta-tests"))))
   :perform (asdf:test-op (op c)

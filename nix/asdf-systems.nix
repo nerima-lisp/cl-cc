@@ -77,19 +77,6 @@ let
       src = "packages/docgen";
       deps = [ ];
     };
-    cl-cc-optimize = {
-      src = "packages/optimize";
-      deps = [
-        "cl-cc-vm"
-        "cl-cc-type"
-      ];
-      # clPrologKit backs the peephole/e-graph rewrite rules; clParserKit tokenizes
-      # and parses the `--pass-pipeline` spec string.
-      extraLispLibs = [
-        clPrologKit
-        clParserKit
-      ];
-    };
     cl-cc-compile = {
       src = "packages/compile";
       deps = [
@@ -415,9 +402,16 @@ let
     "cl-cc-javascript-test" = buildAsdfSystem {
       pname = "cl-cc-javascript-test";
       version = "0.2.0";
-      src = pkgSrc testSrc;
-      systems = [ "cl-cc-javascript-test" ];
-      # cl-cc-javascript is the pinned external production system used by local JS tests.
+      src = clCcJavascript.asdfMetadata.src;
+      systems = [ "cl-cc-javascript/test" ];
+      # This is a secondary system in cl-cc-javascript.asd, so resolve its source
+      # before the production derivation and preserve the .asd during installation.
+      preBuild = ''
+        export CL_SOURCE_REGISTRY="$src//''${CL_SOURCE_REGISTRY:+:$CL_SOURCE_REGISTRY}"
+      '';
+      postInstall = ''
+        find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
+      '';
       lispLibs = with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
@@ -480,6 +474,6 @@ in
     _: [ testAsdfSystems."cl-cc-jit/tests" ] ++ (lib.attrValues productionAsdfSystems)
   );
   sbclWithJavascriptTests = withPackages (
-    _: (lib.attrValues productionAsdfSystems) ++ [ testAsdfSystems."cl-cc-javascript-test" ]
+    _: [ testAsdfSystems."cl-cc-javascript-test" ] ++ (lib.attrValues productionAsdfSystems)
   );
 }
