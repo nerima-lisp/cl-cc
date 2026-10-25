@@ -5,7 +5,11 @@
 ;;;; Covers: opt-pass-hot-cold-layout, opt-pass-slp-vectorize,
 ;;;;   opt-pass-function-outlining, opt-pass-if-conversion, opt-pass-code-sinking.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-sinking-layout-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-sinking-layout-tests-suite))
 
 ;;; ─── Helpers ──────────────────────────────────────────────────────────────
 

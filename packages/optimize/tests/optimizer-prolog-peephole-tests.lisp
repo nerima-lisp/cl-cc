@@ -13,8 +13,8 @@
 (in-package :cl-cc/test)
 
 
-(it-sequential "prolog-peephole-equality-cases const-move-fusion"
-  (destructuring-bind (input expected) (list '((:const :r0 42) (:move :r1 :r0)) '((:const :r1 42)))
+(it-sequential "prolog-peephole-equality-cases const-move-preserves-source"
+  (destructuring-bind (input expected) (list '((:const :r0 42) (:move :r1 :r0)) '((:const :r0 42) (:const :r1 42)))
     (expect (cl-cc/optimize:apply-prolog-peephole input) :to-equal expected)))
 
 (it-sequential "prolog-peephole-equality-cases passthrough"
@@ -114,7 +114,7 @@
 
 (it-sequential "prolog-peephole-multiple-pairs"
   (expect (cl-cc/optimize:apply-prolog-peephole
-                 '((:const :r0 1) (:move :r1 :r0) (:add :r2 :r1 :r1))) :to-equal '((:const :r1 1) (:add :r2 :r1 :r1))))
+                 '((:const :r0 1) (:move :r1 :r0) (:add :r2 :r1 :r1))) :to-equal '((:const :r0 1) (:const :r1 1) (:add :r2 :r1 :r1))))
 
 (it-sequential "prolog-peephole-single-pair-reduction jump-to-label"
   (destructuring-bind (input expected-first) (list '((:jump "L0") (:label "L0")) '(:label "L0"))
@@ -186,10 +186,10 @@
   (destructuring-bind (input expected) (list '((:add :r1 :r0 :r0) (:sub :r2 :r1 :r1)) '((:add :r1 :r0 :r0) (:sub :r2 :r1 :r1)))
     (expect (cl-cc/optimize::%peephole-walk input nil) :to-equal expected)))
 
-(it-sequential "peephole-walk-matching-pair-fused"
+(it-sequential "peephole-walk-const-move-preserves-source"
   (expect (cl-cc/optimize::%peephole-walk
                  '((:const :r0 99) (:move :r1 :r0))
-                 nil) :to-equal '((:const :r1 99))))
+                 nil) :to-equal '((:const :r0 99) (:const :r1 99))))
 
 (it-sequential "peephole-walk-out-accumulator-is-prepended"
   (expect (cl-cc/optimize::%peephole-walk

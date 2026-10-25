@@ -14,7 +14,9 @@
 ;;;; opt-unary-src-p, opt-foldable-unary-arith-p, opt-foldable-type-pred-p
 ;;;; are already covered in optimizer-tests.lisp.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-integration-suite))
 
 ;;; ─── *opt-binary-fold-table* ─────────────────────────────────────────────
 

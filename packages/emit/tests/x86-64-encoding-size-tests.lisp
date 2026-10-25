@@ -12,9 +12,14 @@
   (destructuring-bind (inst) (list (cl-cc:make-vm-label :name "test"))
     (expect (cl-cc/codegen::instruction-size inst) :to-equal 0)))
 
-(it-sequential "x86-instruction-size-zero-cases unknown"
-  (destructuring-bind (inst) (list (list :not-a-real-inst))
-    (expect (cl-cc/codegen::instruction-size inst) :to-equal 0)))
+(it-sequential "x86-instruction-size rejects unknown instruction"
+  (let ((message
+          (%capture-x86-error-message
+           (lambda ()
+             (cl-cc/codegen::instruction-size
+              (quote (:not-a-real-inst)))))))
+    (expect message :to-equal
+            "Unsupported x86-64 instruction: CONS")))
 
 ;;; ─── build-label-offsets ────────────────────────────────────────────────
 

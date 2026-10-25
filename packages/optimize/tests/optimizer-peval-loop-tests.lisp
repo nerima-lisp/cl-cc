@@ -8,7 +8,11 @@
 ;;;;   scheduling, FR-526 loop fusion/fission, FR-527 MLGO scoring,
 ;;;;   FR-528 learned codegen cost.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-peval-loop-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-peval-loop-tests-suite))
 
 ;;; ─── FR-209/210/211 Partial Evaluation Helper Layer ────────────────────────
 

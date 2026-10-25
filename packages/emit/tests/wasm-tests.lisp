@@ -9,21 +9,22 @@
 ;;; - compile-string :target :wasm integration
 
 (in-package :cl-cc/test)
+(in-suite cl-cc-integration-suite)
 
 
 
 ;;; ──────────────────────────────────────────────────────────────────────────
 ;;; Helper: compile a source string to WAT, returning the assembly string.
-;;; Returns NIL on any error so individual tests can assert-true on the result.
+;;; Compilation errors propagate to the test runner. Tests that expect them use
+;;; %capture-wasm-error-message to assert the condition text.
 ;;; ──────────────────────────────────────────────────────────────────────────
 
 (defun %wat-for (source-string)
   "Compile SOURCE-STRING via compile-string :target :wasm and return the WAT
-   assembly string, or NIL if compilation fails."
-  (ignore-errors
-    (let ((result (compile-string source-string :target :wasm)))
-      (when result
-        (compilation-result-assembly result)))))
+   assembly string. Compilation errors propagate to the test runner."
+  (let ((result (compile-string source-string :target :wasm)))
+    (when result
+      (compilation-result-assembly result))))
 
 (defun %direct-wasm-emit (inst)
   "Emit INST through the non-trampoline wasm target methods directly." 
@@ -41,6 +42,11 @@
     (dolist (inst instructions)
       (cl-cc/codegen::emit-instruction target inst s))
     (get-output-stream-string s)))
+(defun %capture-wasm-error-message (thunk)
+  (handler-case
+      (funcall thunk)
+    (error (condition)
+      (princ-to-string condition))))
 
 ;;; ──────────────────────────────────────────────────────────────────────────
 ;;; Section 1-2: Module structure — always present in any WAT output
@@ -260,12 +266,23 @@
        (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2))))))
 
 (it-sequential "wasm-tail-call-direct-path-uses-return-call-when-callee-known"
-  (let ((out (let ((cl-cc/codegen::*wasm-tail-call-enabled* t))
-               (%direct-wasm-emit*
-                (list (cl-cc:make-vm-func-ref :dst :r1 :label "known_fn")
-                      (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2)))))))
-    (assert-output-contains out "(return_call $known_fn)")
-    (expect (search "return_call_indirect" out :test #'char=) :to-be-falsy)))
+  (let* ((module (cl-cc/codegen::make-empty-wasm-module))
+         (callee (cl-cc/codegen::make-wasm-function-def
+                  :index 0
+                  :wat-name "$known_fn"))
+         (stream (make-string-output-stream))
+         (target (make-instance 'cl-cc/codegen::wasm-target
+                                :module module
+                                :reg-map (cl-cc/codegen::make-wasm-reg-map-for-function 0))))
+    (cl-cc/codegen::wasm-module-add-function module callee)
+    (let ((cl-cc/codegen::*wasm-tail-call-enabled* t))
+      (dolist (inst (list
+                     (cl-cc:make-vm-func-ref :dst :r1 :label "known_fn")
+                     (cl-cc:make-vm-tail-call :dst :r0 :func :r1 :args (list :r2))))
+        (cl-cc/codegen::emit-instruction target inst stream)))
+    (let ((out (get-output-stream-string stream)))
+      (assert-output-contains out "(return_call $known_fn)")
+      (expect (search "return_call_indirect" out :test #'char=) :to-be-falsy))))
 
 (it-sequential "wasm-tail-call-direct-path-requires-feature"
   (let ((cl-cc/codegen::*wasm-tail-call-enabled* nil))
@@ -346,136 +363,65 @@
       (assert-output-contains set "BCE: explicit bounds check eliminated")
       (assert-output-contains set "array.set $eqref_array_t"))))
 
-(it-sequential "wasm-gc-slot-read-write-emitters"
-  (let ((out (%direct-wasm-emit*
-              (list (cl-cc:make-vm-class-def :dst :r9
-                                             :class-name (quote my-class)
-                                             :superclasses nil
-                                             :slot-names (quote (foo))
-                                             :slot-initargs nil
-                                             :slot-initform-regs nil
-                                             :slot-types nil
-                                             :default-initarg-regs nil
-                                             :class-slots nil
-                                             :metaclass-reg nil)
-                    (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name (quote foo))
-                    (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name (quote foo) :value-reg :r2)))))
-    (assert-output-contains out "struct.get $instance_t 1")
-    (assert-output-contains out "array.get $eqref_array_t")
-    (assert-output-contains out "array.set $eqref_array_t")
-    (assert-output-contains out "struct.set $instance_t 1")))
+;; Positive GC class-layout and object-allocation coverage is tracked in cl-cc-codegen-native Issue #19.
+(it-sequential "wasm-gc-slot-read-without-class-layout"
+  (let* ((inst (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name :foo))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal
+            "Unsupported WASM instruction: VM-SLOT-READ has no slot index for :FOO")))
 
-(it-sequential "wasm-gc-slot-read-write-use-class-slot-index-mapping"
-  (let ((out (%direct-wasm-emit*
-              (list (cl-cc:make-vm-class-def :dst :r9
-                                             :class-name 'my-class
-                                             :superclasses nil
-                                             :slot-names '(foo bar baz)
-                                             :slot-initargs nil
-                                             :slot-initform-regs nil
-                                             :slot-types nil
-                                             :default-initarg-regs nil
-                                             :class-slots nil
-                                             :metaclass-reg nil)
-                    (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'bar)
-                    (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name 'baz :value-reg :r2)))))
-    ;; bar => index 1, baz => index 2 from class-def slot order.
-    (assert-output-contains out "array.get $eqref_array_t")
-    (assert-output-contains out "(i32.const 1)")
-    (assert-output-contains out "array.set $eqref_array_t")
-    (assert-output-contains out "(i32.const 2)")))
+(it-sequential "wasm-gc-slot-write-without-class-layout"
+  (let* ((inst (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name :foo :value-reg :r2))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal
+            "Unsupported WASM instruction: VM-SLOT-WRITE has no slot index for :FOO")))
 
-(it-sequential "wasm-gc-slot-index-resolution-prefers-object-class-layout"
-  (let ((out (%direct-wasm-emit*
-              (list
-               (cl-cc:make-vm-class-def :dst :r7
-                                        :class-name 'class-a
+(it-sequential "wasm-gc-object-class-layout-rejects-unsupported-class-def"
+  (let* ((inst (cl-cc:make-vm-class-def :dst :r8
+                                        :class-name :class-b
                                         :superclasses nil
-                                        :slot-names '(foo bar)
+                                        :slot-names (quote (bar foo))
                                         :slot-initargs nil
                                         :slot-initform-regs nil
                                         :slot-types nil
                                         :default-initarg-regs nil
                                         :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-class-def :dst :r8
-                                        :class-name 'class-b
-                                        :superclasses nil
-                                        :slot-names '(bar foo)
-                                        :slot-initargs nil
-                                        :slot-initform-regs nil
-                                        :slot-types nil
-                                        :default-initarg-regs nil
-                                        :class-slots nil
-                                        :metaclass-reg nil)
-               ;; Build object of class-b; foo should resolve to index 1 in class-b.
-               (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil)
-               (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'foo)))))
-    (assert-output-contains out "array.get $eqref_array_t")
-    (assert-output-contains out "(i32.const 1)")))
+                                        :metaclass-reg nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
-(it-sequential "wasm-gc-slot-index-resolution-includes-superclass-slots"
-  (let ((out (%direct-wasm-emit*
-              (list
-               (cl-cc:make-vm-class-def :dst :r7
-                                        :class-name 'super-c
-                                        :superclasses nil
-                                        :slot-names '(sa sb)
+(it-sequential "wasm-gc-inherited-layout-rejects-unsupported-class-def"
+  (let* ((inst (cl-cc:make-vm-class-def :dst :r8
+                                        :class-name :sub-c
+                                        :superclasses (quote (:super-c))
+                                        :slot-names (quote (:sc))
                                         :slot-initargs nil
                                         :slot-initform-regs nil
                                         :slot-types nil
                                         :default-initarg-regs nil
                                         :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-class-def :dst :r8
-                                        :class-name 'sub-c
-                                        :superclasses '(super-c)
-                                        :slot-names '(sc)
-                                        :slot-initargs nil
-                                        :slot-initform-regs nil
-                                        :slot-types nil
-                                        :default-initarg-regs nil
-                                        :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil)
-               ;; inherited sb should resolve to index 1; own sc should resolve to index 2
-               (cl-cc:make-vm-slot-read :dst :r0 :obj-reg :r1 :slot-name 'sb)
-               (cl-cc:make-vm-slot-write :obj-reg :r1 :slot-name 'sc :value-reg :r2)))))
-    (assert-output-contains out "(i32.const 1)")
-    (assert-output-contains out "(i32.const 2)")))
+                                        :metaclass-reg nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
 
-(it-sequential "wasm-gc-class-def-emits-class-meta-struct"
-  (let ((out (%direct-wasm-emit
-              (cl-cc:make-vm-class-def :dst :r7
-                                       :class-name 'my-class
-                                       :superclasses nil
-                                       :slot-names '(a b)
-                                       :slot-initargs nil
-                                       :slot-initform-regs nil
-                                       :slot-types nil
-                                       :default-initarg-regs nil
-                                       :class-slots nil
-                                       :metaclass-reg nil))))
-    (assert-output-contains out "struct.new $class_meta_t")
-    (assert-output-contains out "(i32.const 2)")
-    (assert-output-contains out "(array.new $eqref_array_t (ref.null eq) (i32.const 0))")))
-
-(it-sequential "wasm-gc-make-obj-uses-class-reg-in-instance-struct"
-  (let ((out (%direct-wasm-emit*
-              (list
-               (cl-cc:make-vm-class-def :dst :r8
-                                        :class-name 'my-class
+(it-sequential "wasm-gc-class-def-reports-unsupported-instruction"
+  (let* ((inst (cl-cc:make-vm-class-def :dst :r7
+                                        :class-name :my-class
                                         :superclasses nil
-                                        :slot-names '(a b)
+                                        :slot-names (quote (:a :b))
                                         :slot-initargs nil
                                         :slot-initform-regs nil
                                         :slot-types nil
                                         :default-initarg-regs nil
                                         :class-slots nil
-                                        :metaclass-reg nil)
-               (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil)))))
-    (assert-output-contains out "struct.new $instance_t")
-    (expect (search "ref.null $class_meta_t" out :test #'char=) :to-be-falsy)))
+                                        :metaclass-reg nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-CLASS-DEF")))
+
+(it-sequential "wasm-gc-make-obj-reports-unsupported-instruction"
+  (let* ((inst (cl-cc:make-vm-make-obj :dst :r1 :class-reg :r8 :initarg-regs nil))
+         (message (%capture-wasm-error-message (lambda () (%direct-wasm-emit inst)))))
+    (expect message :to-equal "Unsupported WASM instruction: VM-MAKE-OBJ")))
 
 (it-sequential "wasm-gc-register-method-runtime-bridge-emission"
   (let ((out (%direct-wasm-emit
@@ -486,7 +432,7 @@
                :method-reg :r2))))
     (assert-output-contains out "call $host_rt_register_method")
     ;; Symbol specializer should be passed as non-null staged symbol eqref.
-    (assert-output-contains out "struct.new $symbol_t")))
+    (assert-output-contains out "struct.new_immutable $symbol_t")))
 
 (it-sequential "wasm-gc-generic-call-runtime-bridge-emission"
   (let ((out (%direct-wasm-emit

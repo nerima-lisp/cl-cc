@@ -3,10 +3,9 @@
 
 
 (defun is-compile-string (source &key (target :x86_64))
-  "Helper: verify that SOURCE compiles without error."
-  (handler-case
-      (progn (compile-string source :target target) t)
-    (error () nil)))
+  "Compile SOURCE for TARGET and return true on success.
+Compilation errors propagate to the test runner."
+  (progn (compile-string source :target target) t))
 
 ;; ----------------------------------------------------------------------------
 ;; setq tests

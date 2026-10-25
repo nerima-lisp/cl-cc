@@ -5,7 +5,11 @@
 ;;;;   opt-adaptive-max-iterations, opt-verify-instructions,
 ;;;;   opt-resolve-pass-pipeline, *opt-pass-registry* data, prolog-rewrite-stage.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-pipeline-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-pipeline-tests-suite))
 
 ;;; ─── opt-parse-pass-pipeline-string ─────────────────────────────────────────
 

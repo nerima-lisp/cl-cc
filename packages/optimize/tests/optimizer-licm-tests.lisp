@@ -50,16 +50,21 @@
 ;;; ─── %opt-pre-expression-key ─────────────────────────────────────────────
 
 (it-sequential "pre-expression-key-cases const"
-  (destructuring-bind (inst shape expected) (list (make-vm-const :dst :r0 :value 7) :const '(:const 7))
-    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
-    (ecase shape
-      (:const  (expect key :to-equal expected))
-      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
-      (:null   (expect key :to-be-null))))))
+  (let* ((constant-ids (make-hash-table :test 'eql))
+         (inst (make-vm-const :dst :r0 :value 7))
+         (same-inst (make-vm-const :dst :r1 :value 7))
+         (different-inst (make-vm-const :dst :r2 :value 8))
+         (key (cl-cc/optimize::%opt-pre-expression-key inst constant-ids))
+         (same-key (cl-cc/optimize::%opt-pre-expression-key same-inst constant-ids))
+         (different-key (cl-cc/optimize::%opt-pre-expression-key different-inst constant-ids)))
+    (expect (consp key) :to-be-truthy)
+    (expect (first key) :to-be :const)
+    (expect same-key :to-equal key)
+    (expect (not (equal different-key key)) :to-be-truthy)))
 
 (it-sequential "pre-expression-key-cases binary"
   (destructuring-bind (inst shape expected) (list (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1) :binary nil)
-    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst (make-hash-table :test 'eql))))
     (ecase shape
       (:const  (expect key :to-equal expected))
       (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
@@ -67,15 +72,15 @@
 
 (it-sequential "pre-expression-key-cases impure"
   (destructuring-bind (inst shape expected) (list (make-vm-halt  :reg :r0) :null nil)
-    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst)))
+    (let ((key (cl-cc/optimize::%opt-pre-expression-key inst (make-hash-table :test 'eql))))
     (ecase shape
       (:const  (expect key :to-equal expected))
       (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
       (:null   (expect key :to-be-null))))))
 
 (it-sequential "pre-expression-key-commutative"
-  (let ((key-ab (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
-        (key-ba (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r1 :rhs :r0))))
+  (let ((key-ab (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) (make-hash-table :test 'eql)))
+        (key-ba (cl-cc/optimize::%opt-pre-expression-key (make-vm-add :dst :r2 :lhs :r1 :rhs :r0) (make-hash-table :test 'eql))))
     (expect key-ba :to-equal key-ab)))
 
 ;;; ─── %opt-pre-splice-before-terminator ───────────────────────────────────
@@ -379,21 +384,25 @@
 ;;; ─── %opt-pre-block-out-env ──────────────────────────────────────────────
 
 (it-sequential "pre-block-out-env-maps-key-to-defining-register"
-  (let* ((b   (make-instance 'cl-cc/optimize:basic-block))
-         (c42 (make-vm-const :dst :r0 :value 42)))
+  (let* ((b (make-instance (quote cl-cc/optimize:basic-block)))
+         (c42 (make-vm-const :dst :r0 :value 42))
+         (constant-ids (make-hash-table :test (function eql))))
     (setf (cl-cc/optimize:bb-instructions b) (list c42))
-    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b)))
+    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b constant-ids)))
       (expect (hash-table-p env) :to-be-truthy)
-      (expect (gethash '(:const 42) env) :to-equal :r0))))
+      (progn
+        (expect (nth-value 1 (gethash 42 constant-ids)) :to-be-truthy)
+        (expect (gethash (list :const (gethash 42 constant-ids)) env) :to-equal :r0)))))
 
 (it-sequential "pre-block-out-env-removes-stale-entries-on-overwrite"
-  (let* ((b  (make-instance 'cl-cc/optimize:basic-block))
+  (let* ((b (make-instance (quote cl-cc/optimize:basic-block)))
          (c1 (make-vm-const :dst :r0 :value 1))
-         (c2 (make-vm-const :dst :r0 :value 2)))
+         (c2 (make-vm-const :dst :r0 :value 2))
+         (constant-ids (make-hash-table :test (function eql))))
     (setf (cl-cc/optimize:bb-instructions b) (list c1 c2))
-    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b)))
-      (expect (gethash '(:const 1) env) :to-be-null)
-      (expect (gethash '(:const 2) env) :to-equal :r0))))
+    (let ((env (cl-cc/optimize::%opt-pre-block-out-env b constant-ids)))
+      (expect (gethash (list :const (gethash 1 constant-ids)) env) :to-be-null)
+      (expect (gethash (list :const (gethash 2 constant-ids)) env) :to-equal :r0))))
 
 ;;; ─── %opt-pre-join-elim ──────────────────────────────────────────────────
 

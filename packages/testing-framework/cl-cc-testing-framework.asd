@@ -30,4 +30,5 @@ every test file)."
    (:file "framework-advanced")
    (:file "framework-compiler-run-string")
    (:file "framework-compiler")
-   (:file "framework-meta")))
+   (:file "framework-meta")
+   (:file "framework-expected-failures")))

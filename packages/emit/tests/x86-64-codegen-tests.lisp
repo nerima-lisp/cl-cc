@@ -184,9 +184,12 @@
   (destructuring-bind (input expected) (list -7 -7)
     (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
 
-(it-sequential "x86-64-vm-const-to-integer other→0"
-  (destructuring-bind (input expected) (list :foo 0)
-    (expect (= expected (cl-cc/codegen::vm-const-to-integer input)) :to-be-truthy)))
+(it-sequential "x86-64-vm-const-to-integer rejects unsupported value"
+  (let ((message
+          (%capture-x86-error-message
+           (lambda () (cl-cc/codegen::vm-const-to-integer :foo)))))
+    (expect message :to-equal
+            "Unsupported VM-CONST literal for native codegen: :FOO")))
 
 ;;; ─── *x86-64-instruction-sizes* ─────────────────────────────────────────────
 ;;; Note: hash keys are symbols in the cl-cc package; use cl-cc: prefix.

@@ -1,4 +1,6 @@
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-integration-suite))
 
 (defun idiom-zero-fill-loop ()
   (list (make-vm-const :dst :rzero :value 0)

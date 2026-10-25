@@ -6,7 +6,11 @@
 ;;;;   opt-resolve-pass-pipeline, *opt-pass-registry* data, prolog-rewrite-stage,
 ;;;;   COW helpers, bump/slab allocators, inline cache layer.
 
-(in-package :cl-cc/test)
+(progn
+  (cl:in-package :cl-cc/test)
+  (cl-cc/test::defsuite cl-cc/test::cl-cc-optimizer-pipeline-core-tests-suite
+    :parent cl-cc/test::cl-cc-integration-suite)
+  (cl-cc/test::in-suite cl-cc/test::cl-cc-optimizer-pipeline-core-tests-suite))
 
 ;;; The former %opt-trim-whitespace cases were removed with that private helper
 ;;; from the pinned cl-cc-optimize system; the parser tests below cover the

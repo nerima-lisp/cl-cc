@@ -120,12 +120,10 @@
         ;; concurrency all delegate to it (see
         ;; packages/testing-framework/src/framework-definitions.lisp).
         (uiop:quit
-         (if (cl-weave:run-all :reporter :spec
-                               :name-filter filter
-                               :max-workers max-workers)
+         (if (cl-cc/test:run-tests :reporter :spec :name-filter filter :max-workers max-workers)
              0
              1)))
     (error (e)
-      (format t "~&not ok - run-all fatal error: ~A~%" e)
+      (format t "~&not ok - test runner failed: ~A~%" e)
       (format *error-output* "~&FATAL: ~A~%" e)
       (uiop:quit 1))))
