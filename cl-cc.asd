@@ -457,7 +457,7 @@
      :serial t
      :components
      ((:file "package-smoke-tests")
-      (:file "package-conformance-tests")
+      (:file "package-language-tests")
       (:file "format-conformance-tests")
       (:file "number-conformance-tests")
       (:file "native-io-conformance-tests"))))
