@@ -601,6 +601,23 @@
         "type": "github"
       }
     },
+    "php-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792946056,
+        "narHash": "sha256-rspbfnrvnHFsuw0hPYlIUGIUEL4oy0iLfbpa7UrphQg=",
+        "owner": "php",
+        "repo": "php-src",
+        "rev": "93e09753772a2a36c7b83c890c023f31656ad457",
+        "type": "github"
+      },
+      "original": {
+        "owner": "php",
+        "repo": "php-src",
+        "rev": "93e09753772a2a36c7b83c890c023f31656ad457",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "cl-boundary-kit": "cl-boundary-kit",
@@ -638,6 +655,7 @@
         "cl-tty-kit": "cl-tty-kit",
         "cl-weave": "cl-weave",
         "nixpkgs": "nixpkgs",
+        "php-src": "php-src",
         "treefmt-nix": "treefmt-nix"
       }
     },
