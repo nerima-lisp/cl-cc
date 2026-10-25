@@ -129,7 +129,7 @@
               (format t "# stdlib cache warm skipped~%")
               (format t "# forcing serial test execution (max-workers=1) because stdlib cache warming is disabled~%")
               (setf max-workers 1)))
-        (format t "# starting fast test plan (~A)~%" suite-name)
+        (format t "# starting test plan (~A)~%" suite-name)
         (uiop:quit
          (if (cl-cc/test:run-tests :reporter :spec
                                    :name-filter filter
