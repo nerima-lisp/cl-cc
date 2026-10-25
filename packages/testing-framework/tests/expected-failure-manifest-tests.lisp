@@ -173,4 +173,13 @@
 (progn
   (in-suite cl-cc-unit-suite)
   (cl-weave:it-sequential "W2-01 control failure"
+    (cl-weave:expect nil :to-be-truthy))
+  (in-suite cl-cc-integration-suite)
+  (cl-weave:it-sequential "W2-01 control integration failure"
+    (cl-weave:expect nil :to-be-truthy))
+  (in-suite selfhost-suite)
+  (cl-weave:it-sequential "W2-01 control e2e failure"
+    (cl-weave:expect nil :to-be-truthy))
+  (in-suite cl-cc-conformance-suite)
+  (cl-weave:it-sequential "W2-01 control conformance failure"
     (cl-weave:expect nil :to-be-truthy)))
