@@ -49,7 +49,5 @@
             (file-error (condition)
               (push (list file-path 0 (princ-to-string condition))
                     violations))))))
-    (unless (null violations)
-      (fail "~D selfhost core file(s) contain disallowed SBCL references:~%~{~%  ~A:~D  ~A~}"
-            (length violations) (nreverse violations)))
+    (expect (nreverse violations) :to-equal nil)
     (expect (> total-files 10) :to-be-truthy)))

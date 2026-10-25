@@ -197,4 +197,57 @@
   (cl-weave:expect
    (%suite-for-test-source #P"/tmp/repo/packages/core/tests/example.lisp")
    :to-be 'cl-cc-unit-suite))
+(cl-weave:it-sequential "expected-failure manifest matches assertion failures by condition message"
+  (let* ((path "suite > assertion message")
+         (message-prefix "Test assertion failed: (CL-WEAVE:EXPECT (NREVERSE CL-CC/TEST::VIOLATIONS)")
+         (manifest (list (list :path path
+                               :expected-status :fail
+                               :condition-class "CL-WEAVE:ASSERTION-FAILURE"
+                               :condition-message-prefix message-prefix
+                               :owner-repository "nerima-lisp/cl-cc"
+                               :work-order "https://github.com/nerima-lisp/cl-cc/issues/69")))
+         (form '(cl-weave:expect (nreverse cl-cc/test::violations) :to-equal nil))
+         (detail (cl-weave::make-assertion-detail
+                  :form form
+                  :matcher :to-equal
+                  :actual "first violations"
+                  :expected nil
+                  :negated nil
+                  :pass nil))
+         (condition (make-condition 'cl-weave:assertion-failure :detail detail))
+         (event (cl-weave::make-test-event :status :fail
+                                           :path (list "suite" "assertion message")
+                                           :condition condition
+                                           :assertion detail))
+         (first-result (%expected-failure-result-from-event event))
+         (changed-actual-result (copy-list first-result))
+         (changed-message-result (copy-list first-result)))
+    (cl-weave:expect
+     (string= message-prefix
+              (getf first-result :condition-message)
+              :end2 (length message-prefix))
+     :to-be-truthy)
+    (setf (getf changed-actual-result :actual) "changed violations"
+          (getf changed-message-result :condition-message)
+          "Different assertion failure")
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list first-result)
+                                        :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list changed-actual-result)
+                                        :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list changed-message-result)
+                                        :require-complete t)
+      (cl-weave:expect matched :to-equal nil)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal (list :condition-changed)))))
 (in-suite cl-cc-unit-suite)
