@@ -350,32 +350,34 @@ let
         sbcl --noinform --script lisplibs-check.lisp asdf-systems.tsv
         touch "$out"
       '';
-  testSuiteFor = taxonomy: pkgs.stdenvNoCC.mkDerivation {
-    pname = "cl-cc-tests-${taxonomy}";
-    inherit version;
-    src = lib.fileset.toSource {
-      root = ../.;
-      fileset = lib.fileset.unions [
-        ../packages
-        ../t
-        ../nix
-        # docs/ is a test INPUT here, not documentation dressing:
-        # CL-CC-DOCUMENTATION-SUITE parses the FR specification documents and
-        # asserts that every backtick-quoted repository path inside them still
-        # resolves.
-        ../docs
-        ../run-tests.lisp
-        ../cl-cc.asd
-      ];
+  testSuiteFor =
+    taxonomy:
+    pkgs.stdenvNoCC.mkDerivation {
+      pname = "cl-cc-tests-${taxonomy}";
+      inherit version;
+      src = lib.fileset.toSource {
+        root = ../.;
+        fileset = lib.fileset.unions [
+          ../packages
+          ../t
+          ../nix
+          # docs/ is a test INPUT here, not documentation dressing:
+          # CL-CC-DOCUMENTATION-SUITE parses the FR specification documents and
+          # asserts that every backtick-quoted repository path inside them still
+          # resolves.
+          ../docs
+          ../run-tests.lisp
+          ../cl-cc.asd
+        ];
+      };
+      nativeBuildInputs = [ sbclWithTests ];
+      buildPhase = ''
+        export HOME="$TMPDIR"
+        ${apps.test.program} --suite ${taxonomy}
+      '';
+      installPhase = "mkdir -p $out && touch $out/passed";
+      meta.description = "cl-cc ${taxonomy} test suite";
     };
-    nativeBuildInputs = [ sbclWithTests ];
-    buildPhase = ''
-      export HOME="$TMPDIR"
-      ${apps.test.program} --suite ${taxonomy}
-    '';
-    installPhase = "mkdir -p $out && touch $out/passed";
-    meta.description = "cl-cc ${taxonomy} test suite";
-  };
 
   testSuites = {
     unit = testSuiteFor "unit";
