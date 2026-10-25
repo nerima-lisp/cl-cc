@@ -93,7 +93,7 @@ long-lived CL-CC/TEST package during canonical full-suite runs."
    (%asdf-source-files :cl-cc-emit       "packages/emit/")
    (%asdf-source-files :cl-cc-compile    "packages/compile/")
    (%asdf-source-files :cl-cc-stdlib    "packages/stdlib/")
-   (list (cons "src/package.lisp" (truename "src/package.lisp")))
+   (list (or (assoc "src/package.lisp" (%asdf-source-files :cl-cc "") :test (function string=)) (error "The cl-cc ASDF system has no src/package.lisp source")))
    (%asdf-source-files :cl-cc-pipeline   "packages/pipeline/")))
 
 (defparameter *selfhost-representative-files*
