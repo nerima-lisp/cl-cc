@@ -253,7 +253,25 @@
       perSystem = forAllSystems (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = nixpkgs.legacyPackages.${system}.extend (
+            final: prev: {
+              sbcl = final.wrapLisp {
+                pkg = prev.sbcl.overrideAttrs (_: {
+                  version = "2.6.9";
+                  src = final.fetchurl {
+                    name = "sbcl-2.6.9-source.tar.bz2";
+                    url = "https://sourceforge.net/projects/sbcl/files/sbcl/2.6.9/sbcl-2.6.9-source.tar.bz2/download";
+                    hash = "sha256-xv0dc1Vw60/zTK+WCZiMp37QvRK1XQmk/tB1vokNpRM=";
+                  };
+                });
+                faslExt = "fasl";
+                flags = [
+                  "--dynamic-space-size"
+                  "3000"
+                ];
+              };
+            }
+          );
           inherit (pkgs) lib;
 
           dispatchModule = import ./nix/dispatch-sem-fix.nix { inherit pkgs lib; };
