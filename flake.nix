@@ -235,7 +235,7 @@
         asd:
         let
           lines = nixpkgs.lib.splitString "\n" (builtins.readFile asd);
-          versionPattern = ".*[[:space:]]*:version \"([^\"]*)\".*";
+          versionPattern = "[^;]*[[:space:]]*:version \"([^\"]*)\".*";
           versionLine = builtins.head (
             builtins.filter (
               line: builtins.match "[[:space:]]*;.*" line == null && builtins.match versionPattern line != null
