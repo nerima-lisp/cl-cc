@@ -24,10 +24,17 @@
   (let ((status (if expectedp
                     (getf entry :expected-status)
                     (getf entry :status))))
-    (if (eq status :error)
-        (list :status status
-              :condition-class (getf entry :condition-class)
-              :condition-message (getf entry :condition-message))
+    (if (or (eq status :error)
+            (and expectedp
+                 (or (getf entry :condition-message)
+                     (getf entry :condition-message-prefix))))
+        (append (list :status status
+                      :condition-class (getf entry :condition-class))
+                (if (getf entry :condition-message-prefix)
+                    (list :condition-message-prefix
+                          (getf entry :condition-message-prefix))
+                    (list :condition-message
+                          (getf entry :condition-message))))
         (list :status status
               :condition-class (getf entry :condition-class)
               :assertion-form (getf entry :assertion-form)
@@ -36,20 +43,45 @@
               :expected (getf entry :expected)
               :negated (getf entry :negated)))))
 
+(defun %expected-failure-signatures-match-p (expected actual)
+  (let* ((expected-signature (%expected-failure-signature expected t))
+         (actual-signature (%expected-failure-signature actual nil))
+         (status (getf expected-signature :status))
+         (prefix (getf expected :condition-message-prefix))
+         (message-match-p (or (eq status :error)
+                              (getf expected :condition-message)
+                              prefix)))
+    (and (equal status (getf actual-signature :status))
+         (equal (getf expected-signature :condition-class)
+                (getf actual-signature :condition-class))
+         (if message-match-p
+             (let ((message (getf actual :condition-message)))
+               (if prefix
+                   (and (stringp prefix)
+                        (stringp message)
+                        (<= (length prefix) (length message))
+                        (string= prefix message :end2 (length prefix)))
+                   (equal (getf expected :condition-message) message)))
+             (equal expected-signature actual-signature)))))
+
+(defun %expected-failure-condition-message (condition)
+  (princ-to-string condition))
+
 (defun %expected-failure-result-from-event (event)
   (let* ((status (cl-weave::test-event-status event))
          (condition (cl-weave::test-event-condition event))
          (assertion (cl-weave::test-event-assertion event))
-         (result (list :path (cl-weave::path-string
-                              (cl-weave::test-event-path event))
-                       :status status
-                       :condition-class (when condition
-                                         (%expected-failure-print-value
-                                          (type-of condition))))))
+         (result (append (list :path (cl-weave::path-string
+                                      (cl-weave::test-event-path event))
+                               :status status
+                               :condition-class (when condition
+                                                  (%expected-failure-print-value
+                                                   (type-of condition))))
+                         (when (or condition (eq status :error))
+                           (list :condition-message
+                                 (%expected-failure-condition-message condition))))))
     (cond
-      ((eq status :error)
-       (append result
-               (list :condition-message (princ-to-string condition))))
+      ((eq status :error) result)
       (assertion
        (append result
                (list :assertion-form
@@ -76,10 +108,27 @@
        (stringp (getf entry :condition-class))
        (stringp (getf entry :owner-repository))
        (stringp (getf entry :work-order))
-       (if (eq (getf entry :expected-status) :error)
-           (stringp (getf entry :condition-message))
-           (every (lambda (key) (stringp (getf entry key)))
-                  '(:assertion-form :matcher :actual :expected :negated)))))
+       (cond
+         ((eq (getf entry :expected-status) :error)
+          (let ((message (getf entry :condition-message))
+                (prefix (getf entry :condition-message-prefix)))
+            (and (or (null message) (stringp message))
+                 (or (null prefix) (stringp prefix))
+                 (not (and message prefix))
+                 (or (stringp message)
+                     (and (stringp prefix) (plusp (length prefix)))))))
+         ((or (getf entry :condition-message)
+              (getf entry :condition-message-prefix))
+          (let ((message (getf entry :condition-message))
+                (prefix (getf entry :condition-message-prefix)))
+            (and (not (and message prefix))
+                 (or (and (null prefix) (stringp message))
+                     (and (null message)
+                          (stringp prefix)
+                          (plusp (length prefix)))))))
+         (t
+          (every (lambda (key) (stringp (getf entry key)))
+                 (list :assertion-form :matcher :actual :expected :negated))))))
 
 (defun %validate-expected-failure-manifest (manifest)
   (let ((paths (make-hash-table :test #'equal)))
@@ -133,15 +182,16 @@
              (cond
                ((and (null expected) (member status '(:fail :error)))
                 (push (list :kind :unregistered-failure
-                            :path path :status status)
+                            :path path
+                            :status status
+                            :actual (%expected-failure-signature result nil))
                       violations))
                ((and expected (eq status :pass))
                 (push (list :kind :unexpected-pass :path path :status status)
                       violations))
                ((and expected
                      (member status '(:fail :error))
-                     (equal (%expected-failure-signature expected t)
-                            (%expected-failure-signature result nil)))
+                     (%expected-failure-signatures-match-p expected result))
                 (unless (member expected matched :test #'eq)
                   (push expected matched)))
                (expected
@@ -165,44 +215,115 @@
 (defun %report-expected-failure-violation (violation stream)
   (format stream "# ~A ~A~%"
           (string-upcase (symbol-name (getf violation :kind)))
-          (or (getf violation :path) "manifest")))
-(defun %ensure-no-expected-failure-violations (violations)
-  (when violations
-    (error "cl-cc expected-failure manifest rejected ~D test result(s)."
-           (length violations)))
-  t)
+          (or (getf violation :path) "manifest"))
+  (when (getf violation :actual)
+    (format stream "  actual: ~S~%" (getf violation :actual))))
+(progn
+  (defun %ensure-no-expected-failure-violations (violations)
+    (when violations
+      (error "cl-cc expected-failure manifest rejected ~D test result(s)."
+             (length violations)))
+    t)
+
+  (defun %select-expected-failure-manifest
+      (suite-manifest selected-paths name-filter)
+    (if name-filter
+        (remove-if-not
+         (lambda (entry)
+           (member (getf entry :path) selected-paths :test (function equal)))
+         suite-manifest)
+      suite-manifest)))
 
 (defun run-tests (&key (reporter :spec) name-filter max-workers
-                    (stream *standard-output*))
-  (let* ((manifest (read-expected-failure-manifest))
-         (results (mapcar #'%expected-failure-result-from-event
-                          (cl-weave::normalize-run-results
-                           (cl-weave:run (cl-weave::root-suite)
-                                         :reporter reporter
-                                         :stream stream
-                                         :name-filter name-filter
-                                         :max-workers max-workers)))))
-    (multiple-value-bind (matched violations)
-        (audit-expected-failure-results manifest results
-                                        :require-complete (null name-filter))
-      (dolist (entry matched)
-        (format stream "# [XFAIL] ~A owner=~A work-order=~A~%"
-                (getf entry :path)
-                (getf entry :owner-repository)
-                (getf entry :work-order)))
-      (dolist (violation violations)
-        (%report-expected-failure-violation violation stream))
-      (let* ((errored (count-if (lambda (violation)
-                                  (eq (getf violation :status) :error))
-                                violations))
-             (failed (- (length violations) errored)))
-        (format stream
-                "# cl-cc-tests summary: ~D passed, ~D expected-failed, ~D skipped, ~D todo, ~D failed, ~D errored, ~D total~%"
-                (%expected-failure-count-status results :pass)
-                (length matched)
-                (%expected-failure-count-status results :skip)
-                (%expected-failure-count-status results :todo)
-                failed
-                errored
-                (length results)))
-      (%ensure-no-expected-failure-violations violations))))
+                    (stream *standard-output*) (suite 'cl-cc-suite)
+                    (parallel t) random)
+  (let ((suite-object (if (symbolp suite)
+                          (%ensure-suite-object suite)
+                          suite)))
+    (when (member "CL-CC-E2E-SUITE"
+                  (mapcar #'cl-weave::suite-name
+                          (cl-weave::suite-lineage suite-object))
+                  :test #'string=)
+      (progn
+        ;; Compile the late-loaded E2E sources into the writable cache, not the Nix store.
+        (asdf:initialize-output-translations
+         `(:output-translations
+           (,(asdf:component-pathname
+               (asdf:find-component "cl-cc/test/e2e" "e2e"))
+             (:home ".cache" "common-lisp" :implementation))
+           :inherit-configuration))
+        (asdf:load-system "cl-cc/test/e2e")))
+    (let* ((order (and random :random))
+           (plan (cl-weave:collect-test-plan suite-object
+                                             :name-filter name-filter
+                                             :order order))
+           (runnable-count
+             (count :run plan :key #'cl-weave:test-plan-entry-status))
+           (selected-paths
+             (mapcar (lambda (entry)
+                       (cl-weave::path-string
+                        (cl-weave:test-plan-entry-path entry)))
+                     plan)))
+      (unless (plusp runnable-count)
+        (error "Test suite ~A has no runnable tests."
+               (cl-weave::suite-name suite-object)))
+      (let* ((suite-prefix
+               (format nil "~{~A~^ > ~}"
+                       (mapcar #'cl-weave::suite-name
+                               (rest (cl-weave::suite-lineage suite-object)))))
+             (manifest-prefix (concatenate 'string suite-prefix " > "))
+             (suite-manifest
+               (remove-if-not
+                (lambda (entry)
+                  (let ((path (getf entry :path)))
+                    (and (stringp path)
+                         (<= (length manifest-prefix) (length path))
+                         (string= manifest-prefix path
+                                  :end2 (length manifest-prefix)))))
+                (read-expected-failure-manifest)))
+             (manifest (%select-expected-failure-manifest suite-manifest selected-paths name-filter))
+             (results
+               (mapcar #'%expected-failure-result-from-event
+                       (cl-weave::normalize-run-results
+                        (cl-weave:run suite-object
+                                      :reporter reporter
+                                      :stream stream
+                                      :name-filter name-filter
+                                      :order order
+                                      :max-workers (if parallel
+                                                       max-workers
+                                                       1))))))
+        (multiple-value-bind (matched violations)
+            (audit-expected-failure-results manifest results
+                                            :require-complete t)
+          (dolist (entry matched)
+            (format stream "# [XFAIL] ~A owner=~A work-order=~A~%"
+                    (getf entry :path)
+                    (getf entry :owner-repository)
+                    (getf entry :work-order)))
+          (dolist (violation violations)
+            (%report-expected-failure-violation violation stream))
+          (let* ((errored (count-if (lambda (violation)
+                                      (eq (getf violation :status) :error))
+                                    violations))
+                 (failed (- (length violations) errored)))
+            (format stream
+                    "# cl-cc-tests summary: ~D passed, ~D expected-failed, ~D skipped, ~D todo, ~D failed, ~D errored, ~D total~%"
+                    (%expected-failure-count-status results :pass)
+                    (length matched)
+                    (%expected-failure-count-status results :skip)
+                    (%expected-failure-count-status results :todo)
+                    failed
+                    errored
+                    (length results)))
+          (%ensure-no-expected-failure-violations violations))))))
+(defun run-suite (suite &key (reporter :spec) name-filter max-workers
+                    (stream *standard-output*) (parallel t) random)
+  "Run SUITE through the expected-failure-audited runner."
+  (run-tests :suite suite
+             :reporter reporter
+             :name-filter name-filter
+             :max-workers max-workers
+             :stream stream
+             :parallel parallel
+             :random random))

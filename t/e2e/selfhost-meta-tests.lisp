@@ -74,8 +74,8 @@
 
 (it-sequential "selfhost-load-own-source"
   (cl-cc:with-fresh-repl-state
-    (dolist (f *selfhost-representative-files*)
-      (cl-cc::our-load f))))
+    (dolist (source-path *selfhost-representative-files*)
+      (cl-cc::our-load source-path))))
 
 
 ;;; ─── Phase 1: Macro Eval Through Own VM ───────────────────────────────────
@@ -94,8 +94,8 @@
       (%with-selfhost-features
         (cl-cc:with-fresh-repl-state
           (let ((cl-cc:*skip-optimizer-passes* t))
-            (dolist (f files)
-              (cl-cc::our-load f)
+            (dolist (source-file files)
+              (cl-cc::our-load (cdr source-file))
               (incf ok)))))
       (expect ok :to-be (length files)))))
 

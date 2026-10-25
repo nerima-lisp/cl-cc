@@ -350,37 +350,47 @@ let
         sbcl --noinform --script lisplibs-check.lisp asdf-systems.tsv
         touch "$out"
       '';
+  testSuiteFor =
+    taxonomy:
+    pkgs.stdenvNoCC.mkDerivation {
+      pname = "cl-cc-tests-${taxonomy}";
+      inherit version;
+      src = lib.fileset.toSource {
+        root = ../.;
+        fileset = lib.fileset.unions [
+          ../packages
+          ../t
+          ../nix
+          # docs/ is a test INPUT here, not documentation dressing:
+          # CL-CC-DOCUMENTATION-SUITE parses the FR specification documents and
+          # asserts that every backtick-quoted repository path inside them still
+          # resolves.
+          ../docs
+          ../run-tests.lisp
+          ../cl-cc.asd
+        ];
+      };
+      nativeBuildInputs = [ sbclWithTests ];
+      buildPhase = ''
+        export HOME="$TMPDIR"
+        ${apps.test.program} --suite ${taxonomy}
+      '';
+      installPhase = "mkdir -p $out && touch $out/passed";
+      meta.description = "cl-cc ${taxonomy} test suite";
+    };
+
+  testSuites = {
+    unit = testSuiteFor "unit";
+    integration = testSuiteFor "integration";
+    e2e = testSuiteFor "e2e";
+    conformance = testSuiteFor "conformance";
+  };
 in
 {
-  inherit toolkitPinConsistency lisplibsConsistency;
+  inherit toolkitPinConsistency lisplibsConsistency testSuites;
 
-  # The canonical fast unit test suite, published as `checks.default`.
-  testSuite = pkgs.stdenvNoCC.mkDerivation {
-    pname = "cl-cc-tests";
-    inherit version;
-    src = lib.fileset.toSource {
-      root = ../.;
-      fileset = lib.fileset.unions [
-        ../packages
-        ../t
-        ../nix
-        # docs/ is a test INPUT here, not documentation dressing:
-        # CL-CC-DOCUMENTATION-SUITE parses the FR specification documents and
-        # asserts that every backtick-quoted repository path inside them still
-        # resolves. Drop this and 60-odd tests error out on a missing file.
-        ../docs
-        ../run-tests.lisp
-        ../cl-cc.asd
-      ];
-    };
-    nativeBuildInputs = [ sbclWithTests ];
-    buildPhase = ''
-      export HOME="$TMPDIR"
-      ${apps.test.program}
-    '';
-    installPhase = "mkdir -p $out && touch $out/passed";
-    meta.description = "cl-cc canonical fast unit test suite";
-  };
+  # The canonical fast unit suite remains available as checks.default.
+  testSuite = testSuites.unit;
 
   jitTests = pkgs.runCommand "cl-cc-jit-tests" { nativeBuildInputs = [ sbclWithJitTests ]; } ''
     export HOME="$TMPDIR/home"

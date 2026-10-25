@@ -840,6 +840,7 @@
           inherit (appsModule) apps;
           inherit (checksModule)
             testSuite
+            testSuites
             jitTests
             prologToolsTests
             toolkitPinConsistency
@@ -861,6 +862,10 @@
       checks = forAllSystems (system: {
         # The SBCL test suite, run through ./run-tests.lisp.
         default = perSystem.${system}.testSuite;
+        tests-unit = perSystem.${system}.testSuites.unit;
+        tests-integration = perSystem.${system}.testSuites.integration;
+        tests-e2e = perSystem.${system}.testSuites.e2e;
+        tests-conformance = perSystem.${system}.testSuites.conformance;
 
         # Fails `nix flake check` when any tracked Nix file is unformatted,
         # which is what makes the formatter a gate rather than a suggestion.

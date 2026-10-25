@@ -57,42 +57,56 @@ cl-weave suites can't be re-parented after creation."
                         (cl-weave::root-suite))))
               (cl-weave::register-suite (string name) (lambda ()))))))
 
-(defmacro defsuite (name &key description parent (parallel t))
+(defmacro defsuite (name &key description parent)
   "Define a test suite as a cl-weave suite object, parented under PARENT's
 suite (or the cl-weave root suite when PARENT is NIL). A no-op beyond
 returning the existing object when NAME was already auto-vivified by an
 earlier IN-SUITE (see %ENSURE-SUITE-OBJECT)."
-  (declare (ignore description parallel))
+  (declare (ignore description))
   `(%ensure-suite-object ',name ',parent))
 
+(progn
+  (defvar *source-suite-assignments* (make-hash-table :test (function equal)))
+
+  (defun %current-test-source ()
+    (or *compile-file-truename* *compile-file-pathname*
+        *load-truename* *load-pathname*))
+
+  (defun %note-source-suite (source suite)
+    (when source
+      (setf (gethash (namestring (pathname source)) *source-suite-assignments*)
+            suite))
+    suite)
+
+  (defun %suite-for-test-source (source)
+    (let* ((source-name (when source (namestring (pathname source))))
+           (explicit-suite (when source-name
+                             (gethash source-name *source-suite-assignments*))))
+      (or explicit-suite
+          (when source-name
+            (or (cond
+                  ((search "t/conformance/" source-name :test (function char-equal))
+                   (quote cl-cc-conformance-suite))
+                  ((search "t/e2e/" source-name :test (function char-equal))
+                   (quote selfhost-suite)))
+                (quote cl-cc-unit-suite)))))))
 (defmacro in-suite (name)
-  "Make NAME's suite the target of subsequent flat DEFTEST/DEFBEFORE/DEFAFTER
-calls, persistently (not lexically scoped) — mirrors the original IN-SUITE."
-  `(setf cl-weave::*current-suite* (%ensure-suite-object ',name)))
+  "Make NAME the persistent suite for direct cl-weave registrations and record it for ordinary tests in this source file."
+  (%note-source-suite (%current-test-source) name)
+  (list (quote setf)
+        (quote cl-weave::*current-suite*)
+        (list (quote %ensure-suite-object) (list (quote quote) name))))
+(defmacro it-sequential (name &body body)
+  (let* ((source (%current-test-source))
+         (suite (%suite-for-test-source source)))
+    `(let ((cl-weave::*current-suite*
+             ,(if suite `(%ensure-suite-object (quote ,suite))
+                  (quote cl-weave::*current-suite*))))
+       (cl-weave:it-sequential ,name ,@body))))
 
 ;;; ------------------------------------------------------------
 ;;; Test Definition
 ;;; ------------------------------------------------------------
-
-(defun %parse-deftest-body (forms)
-  "Parse body forms, extracting optional docstring and keyword args.
-Returns (values docstring timeout depends-on tags body-forms)."
-  (let ((docstring nil)
-        (timeout nil)
-        (depends-on nil)
-        (tags nil)
-        (rest forms))
-    (when (and rest (stringp (car rest)))
-      (setf docstring (car rest)
-            rest (cdr rest)))
-    (loop while (and rest (keywordp (car rest)))
-          do (let ((key (pop rest))
-                   (val (pop rest)))
-               (case key
-                 (:timeout   (setf timeout val))
-                 (:depends-on (setf depends-on val))
-                 (:tags      (setf tags val)))))
-    (values docstring timeout depends-on tags rest)))
 
 (progn
   (defvar *known-test-names* (make-hash-table :test (function eq))
@@ -188,22 +202,3 @@ description string DEFTEST registered them under.")
   "Skip the current test; forwards to cl-weave's own SKIP."
   `(cl-weave:skip ,reason))
 
-(defmacro defexpected (name &body body)
-  "Define a test that is EXPECTED TO FAIL (due to an unimplemented feature).
-Catches any error from BODY and treats it as a pass; an unexpected clean
-pass is also accepted (cl-weave has no XPASS-detection equivalent to the
-original framework's :expected-fail tag machinery).
-Syntax:
-   (defexpected name
-     \"docstring\"
-     :timeout 10
-     body-form...)"
-  (multiple-value-bind (docstring timeout depends-on tags body-forms)
-      (%parse-deftest-body body)
-    (declare (ignore tags))
-    `(deftest ,name
-       ,(or docstring (format nil "EXPECTED-FAIL: ~A" name))
-       :timeout ,(or timeout 60)
-       :depends-on ,depends-on
-       (ignore-errors (progn ,@body-forms))
-       t)))

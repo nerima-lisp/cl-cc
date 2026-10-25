@@ -62,6 +62,33 @@
       (cl-weave:signals error
         (%ensure-no-expected-failure-violations violations)))))
 
+(cl-weave:it-sequential "expected-failure manifest matches dynamic condition message prefixes"
+  (let* ((path "suite > dynamic error")
+         (manifest (list (list :path path
+                               :expected-status :error
+                               :condition-class "SIMPLE-ERROR"
+                               :condition-message-prefix "Unbound variable: #:OR"
+                               :owner-repository "nerima-lisp/cl-cc"
+                               :work-order "https://github.com/nerima-lisp/cl-cc/issues/1")))
+         (matching-result (list :path path
+                                :status :error
+                                :condition-class "SIMPLE-ERROR"
+                                :condition-message "Unbound variable: #:OR49592"))
+         (mismatching-result (list :path path
+                                  :status :error
+                                  :condition-class "SIMPLE-ERROR"
+                                  :condition-message "Unbound variable: #:AND49592")))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest (list matching-result) :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest (list mismatching-result) :require-complete t)
+      (cl-weave:expect matched :to-equal nil)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal '(:condition-changed)))))
+
 (cl-weave:it-sequential "expected-failure manifest rejects tests that did not run"
   (let ((manifest (list (%manifest-test-entry "suite > not run" :fail))))
     (multiple-value-bind (matched violations)
@@ -113,4 +140,114 @@
                        :to-equal '(:condition-changed :duplicate-result :duplicate-result))
       (cl-weave:signals error
         (%ensure-no-expected-failure-violations violations)))))
-(in-suite cl-cc-suite)
+
+(cl-weave:it-sequential "full-suite XFAIL audit retains stale manifest entries"
+  (let* ((selected-entry (%manifest-test-entry "suite > selected" :fail))
+         (stale-entry (%manifest-test-entry "suite > stale" :fail))
+         (manifest (list selected-entry stale-entry))
+         (selected-paths (list (getf selected-entry :path)))
+         (selected-result (append (copy-list selected-entry)
+                                  (list :status :fail))))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results
+         (%select-expected-failure-manifest manifest selected-paths nil)
+         (list selected-result)
+         :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal '(:not-run))
+      (cl-weave:expect (getf (first violations) :path)
+                       :to-equal (getf stale-entry :path)))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results
+         (%select-expected-failure-manifest manifest selected-paths t)
+         (list selected-result)
+         :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))))
+
+(cl-weave:it-sequential "it-sequential routes by source suite rather than leaked current suite"
+  (let* ((source #P"/tmp/packages/optimize/tests/runner-taxonomy-tests.lisp")
+         (source-key (namestring source)))
+    (unwind-protect
+         (let ((*compile-file-truename* source)
+               (cl-weave::*current-suite* (%ensure-suite-object 'cl-cc-pbt-suite)))
+           (remhash source-key *source-suite-assignments*)
+           (let ((expansion (macroexpand-1 '(it-sequential "ordinary" nil))))
+             (cl-weave:expect (search "CL-CC-UNIT-SUITE"
+                                      (prin1-to-string expansion))
+                              :to-be-truthy))
+           (macroexpand-1 '(in-suite cl-cc-private-tests))
+           (let ((expansion (macroexpand-1 '(it-sequential "private" nil))))
+             (cl-weave:expect (search "CL-CC-PRIVATE-TESTS"
+                                      (prin1-to-string expansion))
+                              :to-be-truthy)))
+      (remhash source-key *source-suite-assignments*))))
+
+(cl-weave:it-sequential "suite taxonomy and defsuite option validation"
+  (cl-weave:signals program-error
+    (macroexpand-1 '(defsuite unsupported-suite :parallel nil)))
+  (cl-weave:expect
+   (%suite-for-test-source #P"/tmp/repo/t/conformance/example.lisp")
+   :to-be 'cl-cc-conformance-suite)
+  (cl-weave:expect
+   (%suite-for-test-source #P"/tmp/repo/t/e2e/example.lisp")
+   :to-be 'selfhost-suite)
+  (cl-weave:expect
+   (%suite-for-test-source #P"/tmp/repo/packages/core/tests/example.lisp")
+   :to-be 'cl-cc-unit-suite))
+(cl-weave:it-sequential "expected-failure manifest matches assertion failures by condition message"
+  (let* ((path "suite > assertion message")
+         (message-prefix "Test assertion failed: (CL-WEAVE:EXPECT (NREVERSE CL-CC/TEST::VIOLATIONS)")
+         (manifest (list (list :path path
+                               :expected-status :fail
+                               :condition-class "CL-WEAVE:ASSERTION-FAILURE"
+                               :condition-message-prefix message-prefix
+                               :owner-repository "nerima-lisp/cl-cc"
+                               :work-order "https://github.com/nerima-lisp/cl-cc/issues/69")))
+         (form '(cl-weave:expect (nreverse cl-cc/test::violations) :to-equal nil))
+         (detail (cl-weave::make-assertion-detail
+                  :form form
+                  :matcher :to-equal
+                  :actual "first violations"
+                  :expected nil
+                  :negated nil
+                  :pass nil))
+         (condition (make-condition 'cl-weave:assertion-failure :detail detail))
+         (event (cl-weave::make-test-event :status :fail
+                                           :path (list "suite" "assertion message")
+                                           :condition condition
+                                           :assertion detail))
+         (first-result (%expected-failure-result-from-event event))
+         (changed-actual-result (copy-list first-result))
+         (changed-message-result (copy-list first-result)))
+    (cl-weave:expect
+     (string= message-prefix
+              (getf first-result :condition-message)
+              :end2 (length message-prefix))
+     :to-be-truthy)
+    (setf (getf changed-actual-result :actual) "changed violations"
+          (getf changed-message-result :condition-message)
+          "Different assertion failure")
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list first-result)
+                                        :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list changed-actual-result)
+                                        :require-complete t)
+      (cl-weave:expect (length matched) :to-equal 1)
+      (cl-weave:expect violations :to-equal nil))
+    (multiple-value-bind (matched violations)
+        (audit-expected-failure-results manifest
+                                        (list changed-message-result)
+                                        :require-complete t)
+      (cl-weave:expect matched :to-equal nil)
+      (cl-weave:expect (mapcar (lambda (violation) (getf violation :kind))
+                               violations)
+                       :to-equal (list :condition-changed)))))
+(in-suite cl-cc-unit-suite)
