@@ -36,6 +36,25 @@
               :expected (getf entry :expected)
               :negated (getf entry :negated)))))
 
+(defun %expected-failure-condition-message (condition)
+  (let* ((message (princ-to-string condition))
+         (pathname (and (typep condition (quote file-error))
+                        (file-error-pathname condition)))
+         (pathname-string (and pathname (namestring pathname)))
+         (relative-path (and pathname
+                             (enough-namestring
+                              pathname
+                              (asdf:system-source-directory "cl-cc/test"))))
+         (message-offset (and pathname-string
+                              (search pathname-string message))))
+    (if (and relative-path message-offset)
+        (concatenate (quote string)
+                     (subseq message 0 message-offset)
+                     relative-path
+                     (subseq message (+ message-offset
+                                        (length pathname-string))))
+        message)))
+
 (defun %expected-failure-result-from-event (event)
   (let* ((status (cl-weave::test-event-status event))
          (condition (cl-weave::test-event-condition event))
@@ -49,7 +68,8 @@
     (cond
       ((eq status :error)
        (append result
-               (list :condition-message (princ-to-string condition))))
+               (list :condition-message
+                     (%expected-failure-condition-message condition))))
       (assertion
        (append result
                (list :assertion-form
@@ -133,7 +153,9 @@
              (cond
                ((and (null expected) (member status '(:fail :error)))
                 (push (list :kind :unregistered-failure
-                            :path path :status status)
+                            :path path
+                            :status status
+                            :actual (%expected-failure-signature result nil))
                       violations))
                ((and expected (eq status :pass))
                 (push (list :kind :unexpected-pass :path path :status status)
@@ -165,7 +187,9 @@
 (defun %report-expected-failure-violation (violation stream)
   (format stream "# ~A ~A~%"
           (string-upcase (symbol-name (getf violation :kind)))
-          (or (getf violation :path) "manifest")))
+          (or (getf violation :path) "manifest"))
+  (when (getf violation :actual)
+    (format stream "  actual: ~S~%" (getf violation :actual))))
 (progn
   (defun %ensure-no-expected-failure-violations (violations)
     (when violations
