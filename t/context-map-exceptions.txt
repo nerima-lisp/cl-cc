@@ -40,7 +40,6 @@ cl-cc-compile cl-cc-optimize W3.4.cc.②
 cl-cc-compile cl-cc-codegen W3.4.cc.②
 cl-cc-compile cl-cc-target W3.4.cc.②
 cl-cc-compile cl-cc-regalloc W3.4.cc.②
-cl-cc-cps cl-cc-bootstrap W3.2.cps.④
 cl-cc-emit cl-cc-vm W3.4.codegen-native.④
 cl-cc-emit cl-cc-ast W3.4.codegen-native.④
 cl-cc-emit cl-cc-optimize W3.4.codegen-native.④
@@ -63,7 +62,6 @@ cl-cc-optimize cl-cc-type W3.3.optimize.④
 cl-cc-optimize cl-cc-ast W3.3.optimize.④
 cl-cc-optimize cl-parser-kit W3.3.optimize.④
 cl-cc-optimize cl-host-kit W3.3.optimize.④
-cl-cc-parse cl-cc-bootstrap W3.2.parse.④
 cl-cc-php cl-cc-parse W3.4.php.④
 cl-cc-php cl-cc-vm W3.4.php.④
 cl-cc-php cl-host-kit W3.4.php.④

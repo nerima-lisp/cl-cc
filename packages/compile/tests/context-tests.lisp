@@ -74,7 +74,7 @@
     (expect (cl-cc/compile:ctx-instructions ctx) :to-be-null)
     (expect (cl-cc/compile:ctx-env ctx) :to-be-null)
     (expect (typep (cl-cc/compile:ctx-type-env ctx) 'cl-cc/type:type-env) :to-be-truthy)
-    (expect (cl-cc/type::type-env-bindings (cl-cc/compile:ctx-type-env ctx)) :to-be-null)
+    (expect (cl-cc/type:type-env-bindings (cl-cc/compile:ctx-type-env ctx)) :to-be-null)
     (expect (gethash '*standard-output* (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy)
     (expect (gethash '*standard-input* (cl-cc/compile:ctx-global-variables ctx)) :to-be-truthy)
     ;; *features* is populated at warm-boot time, not at fresh context creation

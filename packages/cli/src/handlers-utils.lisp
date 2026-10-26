@@ -52,7 +52,7 @@
         (cl-cc/runtime:*gc-old-size-words*
          (or (compile-opts-gc-max-heap opts)
              cl-cc/runtime:*gc-old-size-words*))
-        (cl-cc/parse::*werror-p* (not (null (compile-opts-werror opts)))))
+        (cl-cc/parse:*werror-p* (not (null (compile-opts-werror opts)))))
     (funcall thunk)))
 
 (defun %pgo-profile-instructions (result)

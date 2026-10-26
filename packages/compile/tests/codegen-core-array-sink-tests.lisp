@@ -273,14 +273,14 @@
   (let ((ctx (make-codegen-ctx)))
     (handler-case
         (progn
-          (compile-ast (cl-cc/parse::lower-sexp-to-ast '_) ctx)
+          (compile-ast (cl-cc/parse:lower-sexp-to-ast '_) ctx)
           (expect nil :to-be-truthy))
       (cl-cc:ast-compilation-error (e)
         (expect (search "Typed hole" (format nil "~A" e)) :to-be-truthy)))))
 
 (it-sequential "codegen-if-narrows-branch-type-env"
   (let* ((ctx (make-codegen-ctx))
-         (ast (cl-cc/parse::lower-sexp-to-ast
+         (ast (cl-cc/parse:lower-sexp-to-ast
                 '(if (numberp x) (the fixnum x) 0))))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'x :R0)))
     (compile-ast ast ctx)
@@ -289,7 +289,7 @@
 
 (it-sequential "codegen-if-case-of-case-collapses-redundant-inner-branch"
   (let* ((ctx (make-codegen-ctx))
-         (ast (cl-cc/parse::lower-sexp-to-ast
+         (ast (cl-cc/parse:lower-sexp-to-ast
                '(if (numberp x)
                     (if (numberp x) 1 2)
                     3))))

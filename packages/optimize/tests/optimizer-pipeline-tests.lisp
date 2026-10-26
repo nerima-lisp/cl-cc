@@ -1188,3 +1188,15 @@
          (optimized (cl-cc/optimize::opt-pass-loop-fusion-fission program)))
     (%opt-assert-program-changed optimized program)
     (expect (some #'%opt-loop-split-marker-p optimized) :to-be-truthy)))
+
+(in-package :cl-cc/test)
+
+(it-sequential "optimizer-trmc-rewrites-list-star-termination-pattern"
+  (let* ((source '(defun trmc-list-star (n)
+                   (declare (optimize (tail-recursion-modulo-cons t)))
+                   (if (<= n 0)
+                       '(done . tail)
+                       (list* n (+ n 10) (trmc-list-star (- n 1))))))
+         (rewritten (cl-cc/optimize::opt-trmc-transform-defun-form source)))
+    ;; TRMC rewrite produces a valid form
+    (expect rewritten :to-be-truthy)))

@@ -46,13 +46,13 @@
 
 (it-sequential "ast-constant-folding-before-codegen arithmetic"
   (destructuring-bind (expected form) (list 6 '(+ 1 2 3))
-    (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse::lower-sexp-to-ast form))))
+    (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse:lower-sexp-to-ast form))))
     (expect (cl-cc/ast:ast-int-p result) :to-be-truthy)
     (expect (= expected (cl-cc/ast:ast-int-value result)) :to-be-truthy))))
 
 (it-sequential "ast-constant-folding-before-codegen string-length"
   (destructuring-bind (expected form) (list 5 '(string-length "hello"))
-    (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse::lower-sexp-to-ast form))))
+    (let ((result (cl-cc/compile:optimize-ast (cl-cc/parse:lower-sexp-to-ast form))))
     (expect (cl-cc/ast:ast-int-p result) :to-be-truthy)
     (expect (= expected (cl-cc/ast:ast-int-value result)) :to-be-truthy))))
 

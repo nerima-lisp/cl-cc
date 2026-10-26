@@ -279,7 +279,7 @@ Returns the inferred type, or NIL on failure (structured warning recorded unless
         (warnings nil)
         (errors nil))
     (dolist (diag diagnostics)
-      (let ((effective (cl-cc/parse::%maybe-promote-warning-diagnostic diag)))
+      (let ((effective (cl-cc/parse/diagnostics:maybe-promote-warning-diagnostic diag)))
         (if (eq (cl-cc/parse:diagnostic-severity effective) :error)
             (push effective errors)
             (push effective warnings))))

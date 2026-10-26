@@ -124,50 +124,14 @@
      :pathname "packages/testing-framework/tests"
      :components ((:file "framework-snapshot-tests") (:file "expected-failure-manifest-tests")))
     (:module "cli-tests" :pathname "packages/cli/tests" :serial t :components ((:file "test-support") (:file "args-tests") (:file "cli-tests") (:file "flamegraph-tests") (:file "main-tests") (:file "main-dump-tests") (:file "main-utils-tests") (:file "plugin-tests") (:file "script-mode-tests")))
-    (:module "parse-tests"
-    :pathname "packages/parse/tests"
-    :serial t
-    :components
-    ((:file "cl-parser-tests")
-     (:file "cl-parser-error-tests")
-     (:file "cl-parser-ast-tests")
-     (:file "cl-parser-new-tests")
-     (:file "cl-parser-new-extended-tests")
-     (:module "cl"
-      :serial t
-      :components
-      ((:file "lower-tests")
-       (:file "lower-arithmetic-tests")
-       (:file "parser-roundtrip-tests")
-       (:file "grammar-tokenstream-tests")
-       (:file "grammar-parser-tests")))
-     (:file "cst-tests")
-     (:file "lexer-tests")
-     (:file "lexer-dispatch-tests")
-     (:file "grammar-tests")
-     (:file "grammar-special-form-tests")
-     (:file "pratt-tests")
-     (:file "pratt-pipeline-tests")
-     (:file "combinator-tests")
-     (:file "combinator-tests-2")
-     (:file "parser-combinator-tests")
-     (:file "incremental-tests")
-     (:file "cst-to-ast-tests")
-     (:file "diagnostics-tests")))
-   ;; php85-tests-registration.lisp dropped: it meta-tested the removed
+    ;; php85-tests-registration.lisp dropped: it meta-tested the removed
       ;; homegrown *test-registry*/persist-* registration mechanism's own
       ;; internals directly, which has no cl-weave equivalent to preserve.
    (:module "compile-tests"
     :pathname "packages/compile/tests"
     :serial t
     :components
-    ((:file "cps-tests")
-     (:file "cps-ast-tests")
-     (:file "cps-ast-semantic-tests")
-     (:file "cps-ast-transform-tests")
-     (:file "cps-ast-extended-tests")
-      (:file "cps-ast-functional-tests")
-      (:file "builtin-registry-tests")
+    ((:file "builtin-registry-tests")
        (:file "builtin-registry-data-tests")
        (:file "fr-586-set-tests")
        (:file "fr-316-benchmark-tests")
