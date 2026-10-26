@@ -17888,7 +17888,7 @@
     "ext/uri/tests/whatwg/general/clone_success.phpt"
    ) :classification :bug
       :reason ":bug: Uri/Url objects are created with installed methods (runtime-builtins-io-uri.lisp:145-164), but clone fails on that supported hash-table-backed object representation."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 60\\ \\{700A2FAC33\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 60\\ \\{700A2FAC33\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 60\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 60\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/uri/tests/rfc3986/general/clone_success.phpt"
@@ -22126,7 +22126,7 @@
     "ext/date/tests/time/duration/methods/multiplyBy.phpt"
    ) :classification :unimplemented
       :reason ":unimplemented: the PHP date API/class/constant or syntax named in this diagnostic is absent from the pinned runtime."
-      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$"
+      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/date/tests/bug62500.phpt"
@@ -42231,7 +42231,7 @@
     "ext/standard/tests/array/find/array_find_types.phpt"
    ) :classification :unimplemented
       :reason "Pinned php-src PHPT standard/tests/array/find/array_find_types.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$`; this parser/compiler path is unimplemented."
-      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$"
+      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/standard/tests/array/range/range_inputs_float_small_step_exhaustion.phpt"
@@ -42333,7 +42333,7 @@
     "ext/standard/tests/file/bug81145.phpt"
    ) :classification :unimplemented
       :reason "Pinned php-src PHPT standard/tests/file/bug81145.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^SKIPIF\\ compile\\ failure:\\ compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-RPAREN\\ but\\ got\\ \\(:TYPE\\ :T\\-IDENT$`; this parser/compiler path is unimplemented."
-      :match "^SKIPIF\\ compile\\ failure:\\ compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-RPAREN\\ but\\ got\\ \\(:TYPE\\ :T\\-IDENT$"
+      :match "^SKIPIF\\ compile\\ failure:\\ compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-RPAREN\\ but\\ got\\ \\(:TYPE\\ :T\\-IDENT(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/standard/tests/file/disk_free_space_basic.phpt"
@@ -42483,7 +42483,7 @@
     "ext/standard/tests/general_functions/print_r_ints_64bit.phpt"
    ) :classification :unimplemented
       :reason "Pinned php-src PHPT standard/tests/general_functions/print_r_ints_64bit.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$`; this parser/compiler path is unimplemented."
-      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$"
+      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/standard/tests/general_functions/proc_nice_basic.phpt"
@@ -42501,7 +42501,7 @@
     "ext/standard/tests/general_functions/var_dump_ints_64bit.phpt"
    ) :classification :unimplemented
       :reason "Pinned php-src PHPT standard/tests/general_functions/var_dump_ints_64bit.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$`; this parser/compiler path is unimplemented."
-      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$"
+      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/standard/tests/general_functions/var_export_basic9.phpt"
@@ -42585,7 +42585,7 @@
     "ext/standard/tests/math/pow_basic_64bit.phpt"
    ) :classification :unimplemented
       :reason "Pinned php-src PHPT standard/tests/math/pow_basic_64bit.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$`; this parser/compiler path is unimplemented."
-      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$"
+      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/standard/tests/math/round.phpt"
