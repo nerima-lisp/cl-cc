@@ -42332,7 +42332,7 @@
   (:cases (
     "ext/standard/tests/file/bug81145.phpt"
    ) :classification :unimplemented
-      :reason "Pinned php-src PHPT standard/tests/file/bug81145.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^SKIPIF\\ compile\\ failure:\\ compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-RPAREN\\ but\\ got\\ \\(:TYPE\\ :T\\-IDENT$`; this parser/compiler path is unimplemented."
+      :reason "The fresh compile diagnostic reports an identifier where a closing parenthesis was expected; parsing this PHP syntax form is unimplemented."
       :match "^SKIPIF\\ compile\\ failure:\\ compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-RPAREN\\ but\\ got\\ \\(:TYPE\\ :T\\-IDENT(?s:.*)$"
       :stage :compile)
   (:cases (
@@ -42584,7 +42584,7 @@
   (:cases (
     "ext/standard/tests/math/pow_basic_64bit.phpt"
    ) :classification :unimplemented
-      :reason "Pinned php-src PHPT standard/tests/math/pow_basic_64bit.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE$`; this parser/compiler path is unimplemented."
+      :reason "The fresh compile diagnostic reports an identifier where an array-literal delimiter was expected; parsing this PHP syntax form is unimplemented."
       :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ comma\\ or\\ :T\\-RBRACKET\\ in\\ array\\ literal,\\ got\\ \\(:TYPE(?s:.*)$"
       :stage :compile)
   (:cases (
