@@ -44,7 +44,7 @@ jobs:
       # (checks.formatting), and the mkdocs --strict build (checks.docs).
       # Add `--all-systems` only when the flake declares more than one system.
       - name: Check flake
-        run: nix flake check --print-build-logs
+        run: nix flake check --print-build-logs --keep-going
 
       # Catches stray conflict markers and whitespace errors that compile fine.
       - name: Check diff hygiene
