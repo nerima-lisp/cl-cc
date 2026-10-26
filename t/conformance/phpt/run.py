@@ -1546,11 +1546,11 @@ def run_shard(
     jobs: int = DEFAULT_WORKERS,
     shard: Optional[str] = None,
 ) -> int:
+    started_at = time.monotonic()
     php_src = php_src.resolve()
     if not 1 <= jobs <= MAX_WORKERS:
         raise HarnessError(f"PHPT worker count must be between 1 and {MAX_WORKERS}")
-    if shard is not None:
-        parse_shard(shard)
+    shard_index, shard_count = parse_shard(shard) if shard is not None else (1, 1)
     project_root = Path(__file__).resolve().parents[3]
     sbcl = os.environ.get("SBCL") or shutil.which("sbcl")
     if not sbcl:
@@ -1777,6 +1777,10 @@ def run_shard(
     for case_id, reason in xfailed:
         suffix = f": {reason}" if reason else ""
         print(f"{case_id}: XFAILED{suffix}", file=sys.stderr)
+    print(
+        f"PHPT timing: split={split} shard={shard_index}/{shard_count} "
+        f"elapsed_seconds={time.monotonic() - started_at:.3f}"
+    )
     return int(bool(details) or counts["failed"] > 0 or counts["harness"] > 0)
 
 

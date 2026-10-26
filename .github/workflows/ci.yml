@@ -16,20 +16,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # One job on purpose. Granularity belongs in the flake's `checks.*`
-  # attributes, which `nix flake check` evaluates in parallel with build
-  # caching. Splitting these into separate GitHub jobs would duplicate that
-  # scheduling and lose cache sharing between them.
-  #
-  # Add a second job ONLY for work the Nix sandbox cannot do: network access,
-  # a real PTY/TTY, artifact upload, or a different runner OS.
-  check:
-    name: nix flake check
+  phpt:
+    name: PHPT group ${{ matrix.group }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        group: [0, 1, 2, 3, 4, 5]
     steps:
-      # persist-credentials: false — this job runs untrusted PR code via
-      # `nix flake check`, and never needs the token, so don't leave it in
+      # persist-credentials: false — this job runs untrusted PR code via Nix
+      # builds, and never needs the token, so don't leave it in
       # .git/config for that code to read.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,12 +38,83 @@ jobs:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # Runs the SBCL test suite (checks.default), the treefmt formatting gate
-      # (checks.formatting), and the mkdocs --strict build (checks.docs).
-      # Add `--all-systems` only when the flake declares more than one system.
-      - name: Check flake
-        run: nix flake check --print-build-logs --keep-going
+      - name: Build assigned PHPT shards
+        env:
+          PHPT_MATRIX_GROUP: ${{ matrix.group }}
+        shell: bash
+        run: |
+          mapfile -t checks < <(
+            nix eval --json .#checks.x86_64-linux --apply 'builtins.attrNames' |
+              python3 -c '
+          import json
+          import os
+          import sys
 
-      # Catches stray conflict markers and whitespace errors that compile fine.
+          group = int(os.environ["PHPT_MATRIX_GROUP"])
+          names = sorted(name for name in json.load(sys.stdin) if name.startswith("phpt-"))
+          selected = [name for index, name in enumerate(names) if index % 6 == group]
+          if len(names) != 61 or not selected:
+              raise SystemExit(f"expected 61 PHPT shards and a nonempty group; found {len(names)} shards and {len(selected)} in group {group}")
+          for name in selected:
+              print(f".#checks.x86_64-linux.{name}")
+          '
+          )
+          test "${#checks[@]}" -gt 0
+          printf 'Building %s PHPT checks in matrix group %s\n' "${#checks[@]}" "$PHPT_MATRIX_GROUP"
+          printf '  %s\n' "${checks[@]}"
+          nix build --no-link --print-build-logs --option keep-going true --option max-jobs 1 "${checks[@]}"
+
+  other-checks:
+    name: Other flake checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Evaluate all flake checks
+        run: nix flake check --no-build --print-build-logs --keep-going
+
+      - name: Build non-PHPT checks
+        shell: bash
+        run: |
+          mapfile -t checks < <(
+            nix eval --json .#checks.x86_64-linux --apply 'builtins.attrNames' |
+              python3 -c '
+          import json
+          import sys
+
+          names = sorted(name for name in json.load(sys.stdin) if not name.startswith("phpt-"))
+          if not names:
+              raise SystemExit("expected non-PHPT flake checks")
+          for name in names:
+              print(f".#checks.x86_64-linux.{name}")
+          '
+          )
+          test "${#checks[@]}" -gt 0
+          printf 'Building %s non-PHPT checks\n' "${#checks[@]}"
+          nix build --no-link --print-build-logs --option keep-going true --option max-jobs 1 "${checks[@]}"
+
       - name: Check diff hygiene
         run: git diff --check
+
+  check:
+    name: nix flake check
+    if: always()
+    needs: [phpt, other-checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both check groups to pass
+        env:
+          PHPT_RESULT: ${{ needs.phpt.result }}
+          OTHER_CHECKS_RESULT: ${{ needs.other-checks.result }}
+        run: |
+          test "$PHPT_RESULT" = success
+          test "$OTHER_CHECKS_RESULT" = success
