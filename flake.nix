@@ -1061,7 +1061,6 @@
             "packages/emit/tests"
             "packages/formatter/tests"
             "packages/optimize/tests"
-            "packages/parse/tests"
             "packages/pipeline/tests"
             "packages/prolog-tools/tests"
             "packages/testing-framework/tests"
