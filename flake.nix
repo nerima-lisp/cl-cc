@@ -162,6 +162,10 @@
       url = "github:nerima-lisp/cl-cc-php/d59cdbf72bffacf77a276dfb3492f2be35e8a363";
       flake = false;
     };
+    php-src = {
+      url = "github:php/php-src/93e09753772a2a36c7b83c890c023f31656ad457";
+      flake = false;
+    };
     cl-cc-javascript = {
       url = "github:nerima-lisp/cl-cc-javascript/ea2e920ed36ba203943fc62bcac1d70d79dcfa29";
       flake = false;
@@ -861,6 +865,92 @@
               dispatchSemFix
               ;
           };
+          phptCheckFor =
+            name: split: shardArgs:
+            pkgs.stdenvNoCC.mkDerivation {
+              pname = "cl-cc-phpt-${lib.toLower name}";
+              inherit version;
+              src = lib.fileset.toSource {
+                root = ./.;
+                fileset = lib.fileset.unions [
+                  ./packages
+                  ./t
+                  ./docs
+                  ./run-tests.lisp
+                  ./cl-cc.asd
+                ];
+              };
+              nativeBuildInputs = [
+                sbclWithTests
+                pkgs.python3
+                pkgs.pcre2.out
+              ];
+              buildPhase = ''
+                runHook preBuild
+                export HOME="$TMPDIR/home"
+                export XDG_CACHE_HOME="$TMPDIR/cache"
+                export PCRE2_LIBRARY="${pkgs.pcre2.out}/lib/libpcre2-8.so.0"
+                mkdir -p "$HOME" "$XDG_CACHE_HOME" "$TMPDIR/source"
+                cp -R "$src"/. "$TMPDIR/source/"
+                chmod -R u+w "$TMPDIR/source"
+                cd "$TMPDIR/source"
+                PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+                  -s t/conformance/phpt -p 'test_*.py'
+                python3 t/conformance/phpt/run.py \
+                  --php-src "${inputs.php-src}" \
+                  --split ${lib.escapeShellArg split} \
+                  --jobs 2 \
+                  ${lib.escapeShellArgs shardArgs}
+                runHook postBuild
+              '';
+              installPhase = "mkdir -p $out && touch $out/passed";
+              meta.description = "cl-cc php-src PHPT ${name} conformance check";
+            };
+          countPhpt =
+            path:
+            let
+              entries = builtins.readDir path;
+            in
+            lib.foldl' (
+              total: name:
+              let
+                kind = entries.${name};
+              in
+              total
+              + (
+                if kind == "directory" then
+                  countPhpt "${path}/${name}"
+                else if kind == "regular" && lib.hasSuffix ".phpt" name then
+                  1
+                else
+                  0
+              )
+            ) 0 (builtins.attrNames entries);
+          phptChecksFor =
+            name: split:
+            let
+              total = countPhpt "${inputs.php-src}/${split}";
+              shardCount = lib.max 1 (builtins.div (total + 399) 400);
+              checkName =
+                index:
+                "phpt-${name}-${
+                  lib.fixedWidthString 2 "0" (builtins.toString index)
+                }-of-${builtins.toString shardCount}";
+            in
+            lib.listToAttrs (
+              map (index: {
+                name = checkName index;
+                value = phptCheckFor name split [
+                  "--shard"
+                  "${builtins.toString (index + 1)}/${builtins.toString shardCount}"
+                ];
+              }) (lib.range 0 (shardCount - 1))
+            );
+          phptChecks =
+            phptChecksFor "Zend" "Zend"
+            // phptChecksFor "tests" "tests"
+            // phptChecksFor "ext" "ext"
+            // phptChecksFor "sapi" "sapi";
           appsModule = import ./nix/apps.nix {
             inherit
               pkgs
@@ -941,6 +1031,7 @@
             toolkitPinConsistency
             lisplibsConsistency
             ;
+          inherit phptChecks;
           inherit (devshellModule) devShells;
         }
       );
@@ -1199,7 +1290,7 @@
             '';
             installPhase = "mkdir -p $out && touch $out/passed";
           };
-      });
+      } // perSystem.${system}.phptChecks);
 
       apps = forAllSystems (system: perSystem.${system}.apps);
 
