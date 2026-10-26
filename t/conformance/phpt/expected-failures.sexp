@@ -17894,7 +17894,7 @@
     "ext/uri/tests/rfc3986/general/clone_success.phpt"
    ) :classification :bug
       :reason ":bug: Uri/Url objects are created with installed methods (runtime-builtins-io-uri.lisp:145-164), but clone fails on that supported hash-table-backed object representation."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 74\\ \\{700A3E2EB3\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 74\\ \\{700A3E2EB3\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 74\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 74\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/date/tests/003.phpt"
@@ -19817,7 +19817,7 @@
     "ext/standard/tests/array/array_key_exists.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/array/array_key_exists.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of CL-CC/PHP::ARR is #(#<HASH-TABLE :TEST EQ :COUNT 19 {700A2C30A3}> #S(CL-CC/VM::%VM-INSTANCE-STORAGE :VALUES #(\"Public var\"))), which is not of type HASH-TABLE.`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700A2C30A3\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/array_map_error.phpt"
@@ -19883,7 +19883,7 @@
     "ext/standard/tests/array/array_walk/array_walk_object1.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/array/array_walk/array_walk_object1.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of ARRAY is #(#<HASH-TABLE :TEST EQ :COUNT 19 {700C9C1803}> #S(CL-CC/VM::%VM-INSTANCE-STORAGE :VALUES #(10 10 10 #<CL-CC/VM:VM-CLOSURE-OBJECT {700C9B30A3}>))), which is not of type HASH-TABLE.`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C9C1803\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/array_walk/array_walk_recursive_error2.phpt"
@@ -19895,7 +19895,7 @@
     "ext/standard/tests/array/array_walk/bug79839.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/array/array_walk/bug79839.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of ARRAY is #(#<HASH-TABLE :TEST EQ :COUNT 19 {700C5B7A63}> #S(CL-CC/VM::%VM-INSTANCE-STORAGE :VALUES #(42))), which is not of type HASH-TABLE.`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C5B7A63\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/bug43541.phpt"
@@ -19942,14 +19942,14 @@
   (:cases (
     "ext/standard/tests/array/current_variation4.phpt"
    ) :classification :bug
-      :reason "Pinned php-src PHPT standard/tests/array/current_variation4.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of CL-CC/PHP::ARR is #S(CL-CC/AST:AST-CALL :SOURCE-FILE NIL :SOURCE-LINE NIL :SOURCE-COLUMN NIL :NAMESPACE NIL :IMPORTS NIL`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#S\\(CL\\-CC/AST:AST\\-CALL$"
+      :reason "The array implementation passed an AST call node through CL-CC/PHP::ARR where the operation requires a hash table, causing a runtime type failure."
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#S\\(CL\\-CC/AST(?:/NODES)?:AST\\-CALL(?s:.*)$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/key_variation4.phpt"
    ) :classification :bug
-      :reason "Pinned php-src PHPT standard/tests/array/key_variation4.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of CL-CC/PHP::ARR is #S(CL-CC/AST:AST-CALL :SOURCE-FILE NIL :SOURCE-LINE NIL :SOURCE-COLUMN NIL :NAMESPACE NIL :IMPORTS NIL`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#S\\(CL\\-CC/AST:AST\\-CALL$"
+      :reason "The array implementation passed an AST call node through CL-CC/PHP::ARR where the operation requires a hash table, causing a runtime type failure."
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#S\\(CL\\-CC/AST(?:/NODES)?:AST\\-CALL(?s:.*)$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/range/bug32021.phpt"
@@ -20033,13 +20033,13 @@
     "ext/standard/tests/array/sizeof_object1.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/array/sizeof_object1.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of CL-CC/PHP::ARR is #(#<HASH-TABLE :TEST EQ :COUNT 19 {700C9C3143}> #S(CL-CC/VM::%VM-INSTANCE-STORAGE :VALUES #(CL-CC/PHP::%PHP-NULL% CL-CC/PHP::%PHP-NULL% CL-CC/PHP::%PHP-NULL% #<CL-CC/VM:VM-CLOSURE-OBJECT {700C9B2483}>))), which is `; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C9C3143\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/sizeof_object2.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/array/sizeof_object2.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of CL-CC/PHP::ARR is #(#<HASH-TABLE :TEST EQ :COUNT 19 {701E453E33}> #S(CL-CC/VM::%VM-INSTANCE-STORAGE :VALUES #())), which is not of type HASH-TABLE.`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{701E453E33\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/array/sort/uasort_object1.phpt"
@@ -20129,7 +20129,7 @@
     "ext/standard/tests/general_functions/bug41970.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/general_functions/bug41970.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value of CL-CC/PHP::S is #<HASH-TABLE :TEST EQUAL :COUNT 5 {700CC0E503}>, which is not of type STRING.`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::S\\ is\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 5\\ \\{700CC0E503\\}>,\\ which\\ is\\ not\\ of\\ type\\ STRING\\.$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::S\\ is\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 5\\ \\{[0-9A-F]+\\}>,\\ which\\ is\\ not\\ of\\ type\\ STRING\\.$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/general_functions/bug79254.phpt"
@@ -21015,37 +21015,37 @@
     "ext/spl/tests/heap_001.phpt"
    ) :classification :bug
       :reason "The implemented SPL wrappers are hash-table objects, but PHP clone is lowered through CLOS COPY-INSTANCE and fails on those wrappers. Evidence: cl-cc-php source/src/runtime-builtins-io-spl.lisp:45-49; cl-cc-php source/src/runtime-helpers-generators.lisp:30-37. W4-04 taxonomy: W4-04 spec.md §2.3 (lines 67-74)."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 14\\ \\{700CA1A543\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 14\\ \\{700CA1A543\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 14\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 14\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/fixedarray_024.phpt"
    ) :classification :bug
       :reason "The implemented SPL wrappers are hash-table objects, but PHP clone is lowered through CLOS COPY-INSTANCE and fails on those wrappers. Evidence: cl-cc-php source/src/runtime-builtins-io-spl.lisp:45-49; cl-cc-php source/src/runtime-helpers-generators.lisp:30-37. W4-04 taxonomy: W4-04 spec.md §2.3 (lines 67-74)."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 17\\ \\{700A2B6573\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 17\\ \\{700A2B6573\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 17\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 17\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/dllist_004.phpt"
    ) :classification :bug
       :reason "The implemented SPL wrappers are hash-table objects, but PHP clone is lowered through CLOS COPY-INSTANCE and fails on those wrappers. Evidence: cl-cc-php source/src/runtime-builtins-io-spl.lisp:45-49; cl-cc-php source/src/runtime-helpers-generators.lisp:30-37. W4-04 taxonomy: W4-04 spec.md §2.3 (lines 67-74)."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{700CC05473\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{700CC05473\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/dllist_001.phpt"
    ) :classification :bug
       :reason "The implemented SPL wrappers are hash-table objects, but PHP clone is lowered through CLOS COPY-INSTANCE and fails on those wrappers. Evidence: cl-cc-php source/src/runtime-builtins-io-spl.lisp:45-49; cl-cc-php source/src/runtime-helpers-generators.lisp:30-37. W4-04 taxonomy: W4-04 spec.md §2.3 (lines 67-74)."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{700CF10CB3\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{700CF10CB3\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/dllist_002.phpt"
    ) :classification :bug
       :reason "The implemented SPL wrappers are hash-table objects, but PHP clone is lowered through CLOS COPY-INSTANCE and fails on those wrappers. Evidence: cl-cc-php source/src/runtime-builtins-io-spl.lisp:45-49; cl-cc-php source/src/runtime-helpers-generators.lisp:30-37. W4-04 taxonomy: W4-04 spec.md §2.3 (lines 67-74)."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{70153B3D53\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{70153B3D53\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/dllist_005.phpt"
    ) :classification :bug
       :reason "The implemented SPL wrappers are hash-table objects, but PHP clone is lowered through CLOS COPY-INSTANCE and fails on those wrappers. Evidence: cl-cc-php source/src/runtime-builtins-io-spl.lisp:45-49; cl-cc-php source/src/runtime-helpers-generators.lisp:30-37. W4-04 taxonomy: W4-04 spec.md §2.3 (lines 67-74)."
-      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 23\\ \\{700CC05C33\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 23\\ \\{700CC05C33\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
+      :match "^runtime\\ error:\\ Cannot\\ clone\\ non\\-object\\ value\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 23\\ \\{[0-9A-F]+\\}>:\\ copy\\-instance:\\ \\#<HASH\\-TABLE\\ :TEST\\ EQUAL\\ :COUNT\\ 23\\ \\{[0-9A-F]+\\}>\\ is\\ not\\ a\\ VM\\ CLOS\\ instance$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/fixedarray_004.phpt"
@@ -45318,8 +45318,8 @@
   (:cases (
     "ext/opcache/tests/opt/inference_003.phpt"
    ) :classification :unimplemented
-      :reason "Type inference 003: instanceof with unlinked class; the PHPT requires OPcache optimizer/JIT behavior, but the pinned runtime registers only opcache_is_script_cached_in_file_cache and no optimizer/JIT implementation (runtime-builtins-register-names-late.lisp:76)."
-      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-VAR\\ but\\ got\\ \\(:TYPE\\ :T\\-BACKSLASH$"
+      :reason "The pinned compiler rejected a namespace-separator token where a variable token was expected; the required PHP parse form is unimplemented."
+      :match "^compile\\ error:\\ PHP\\ parse\\ error:\\ expected\\ :T\\-VAR\\ but\\ got\\ \\(:TYPE\\ :T\\-BACKSLASH(?s:.*)$"
       :stage :compile)
   (:cases (
     "ext/opcache/tests/opt/inference_004.phpt"
@@ -46052,31 +46052,31 @@
     "tests/classes/array_access_007.phpt"
    ) :classification :unimplemented
       :reason "ArrayAccess is not implemented as an object-offset protocol; the pinned runtime only treats PHP arrays as hash tables."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C514673\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/classes/array_access_012.phpt"
    ) :classification :unimplemented
       :reason "ArrayAccess is not implemented as an object-offset protocol; the pinned runtime only treats PHP arrays as hash tables."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C44E283\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/classes/array_access_006.phpt"
    ) :classification :unimplemented
       :reason "ArrayAccess is not implemented as an object-offset protocol; the pinned runtime only treats PHP arrays as hash tables."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C59C943\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/classes/array_access_008.phpt"
    ) :classification :unimplemented
       :reason "ArrayAccess is not implemented as an object-offset protocol; the pinned runtime only treats PHP arrays as hash tables."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700CFE9F63\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/classes/array_access_005.phpt"
    ) :classification :unimplemented
       :reason "ArrayAccess is not implemented as an object-offset protocol; the pinned runtime only treats PHP arrays as hash tables."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700D08EF13\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/pcre/tests/bug27103.phpt"
@@ -46397,7 +46397,7 @@
     "ext/opcache/tests/jit/assign_dim_op_011.phpt"
    ) :classification :unimplemented
       :reason "JIT ASSIGN_DIM_OP: CONCAT of a temporary string into an ArrayAccess offset; the PHPT requires OPcache optimizer/JIT behavior, but the pinned runtime registers only opcache_is_script_cached_in_file_cache and no optimizer/JIT implementation (runtime-builtins-register-names-late.lisp:76)."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700DBF3143\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/opcache/tests/jit/assign_op_001.phpt"
@@ -51389,7 +51389,7 @@
     "ext/spl/tests/ArrayObject/array_027.phpt"
    ) :classification :unimplemented
       :reason "The case extends ArrayObject; the SPL constructor dispatch covers only six named SPL classes and has no ArrayObject implementation (parser-expr-new.lisp:46-58; runtime-builtins-io-spl.lisp:295-303)."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C0168B3\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/classes/type_hinting_004.phpt"
@@ -51423,13 +51423,13 @@
     "tests/lang/foreachLoopObjects.004.phpt"
    ) :classification :unimplemented
       :reason "The pinned foreach normalizer accepts arrays, generators, and host lists, but not PHP Iterator/IteratorAggregate or ordinary object properties."
-      :match "^runtime\\ error:\\ PHP\\ foreach:\\ value\\ is\\ not\\ iterable:\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{70150BA6F3\\}>$"
+      :match "^runtime\\ error:\\ PHP\\ foreach:\\ value\\ is\\ not\\ iterable:\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/lang/foreachLoopObjects.005.phpt"
    ) :classification :unimplemented
       :reason "The pinned foreach normalizer accepts arrays, generators, and host lists, but not PHP Iterator/IteratorAggregate or ordinary object properties."
-      :match "^runtime\\ error:\\ PHP\\ foreach:\\ value\\ is\\ not\\ iterable:\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{70152F41D3\\}>$"
+      :match "^runtime\\ error:\\ PHP\\ foreach:\\ value\\ is\\ not\\ iterable:\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "tests/output/ob_start_basic_003.phpt"
@@ -51679,7 +51679,7 @@
     "ext/spl/tests/spl_002.phpt"
    ) :classification :unimplemented
       :reason "The test expects Countable object dispatch; `%php-count` only accepts a hash-table PHP array and counts its array-order keys (runtime-helpers-array.lisp:86-89)."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C285983\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/bug70959.phpt"
@@ -51691,7 +51691,7 @@
     "ext/spl/tests/gh18018.phpt"
    ) :classification :unimplemented
       :reason "The test extends ArrayObject; ArrayObject is not in the SPL constructor/runtime implementation (parser-expr-new.lisp:46-58; runtime-builtins-io-spl.lisp:295-303)."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C3FBAA3\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/bug71838.phpt"
@@ -51802,13 +51802,13 @@
     "ext/spl/tests/bug53362.phpt"
    ) :classification :unimplemented
       :reason "The test subclasses SplFixedArray; built-in SPL construction is a direct-name special case that returns a wrapper, with no SPL parent-class inheritance path (parser-expr-new.lisp:46-58,164-166; runtime-builtins-io-spl.lisp:295-303)."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C29C943\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ ARRAY\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/bug64264.phpt"
    ) :classification :unimplemented
       :reason "The test subclasses SplFixedArray; built-in SPL construction is a direct-name special case that returns a wrapper, with no SPL parent-class inheritance path (parser-expr-new.lisp:46-58,164-166; runtime-builtins-io-spl.lisp:295-303)."
-      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{700C2E87C3\\}>$"
+      :match "^runtime\\ error:\\ The\\ value\\ of\\ CL\\-CC/PHP::ARR\\ is\\ \\#\\(\\#<HASH\\-TABLE\\ :TEST\\ EQ\\ :COUNT\\ 19\\ \\{[0-9A-F]+\\}>$"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/bug73029.phpt"
