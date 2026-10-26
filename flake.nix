@@ -119,7 +119,7 @@
       flake = false;
     };
     cl-cc-type = {
-      url = "github:nerima-lisp/cl-cc-type/1fd5b0afb0245edb965d33cc492988e6bb9f2caf";
+      url = "github:nerima-lisp/cl-cc-type/6ec18167058005d7e4c71c7b83dc5a473ade8620";
       flake = false;
     };
     cl-cc-binary = {
@@ -139,7 +139,7 @@
       flake = false;
     };
     cl-cc-cps = {
-      url = "github:nerima-lisp/cl-cc-cps/aa6b7cbc98fa6e5f597104acb7c6b09ba9c2d796";
+      url = "github:nerima-lisp/cl-cc-cps/ad021a15069d33b6e973c68c291993b5c303997b";
       flake = false;
     };
     cl-cc-expand = {
@@ -155,7 +155,7 @@
       flake = false;
     };
     cl-cc-parse = {
-      url = "github:nerima-lisp/cl-cc-parse/c78ce5307019193523ed1f54ed652e6e8a97eda6";
+      url = "github:nerima-lisp/cl-cc-parse/28faac22b87af0d902f839a95a72dd3d6dc0b26f";
       flake = false;
     };
     cl-cc-php = {
@@ -563,7 +563,13 @@
             pname = "cl-cc-cps";
             version = siblingVersion "cl-cc-cps";
             src = inputs.cl-cc-cps;
-            systems = [ "cl-cc-cps" ];
+            systems = [
+              "cl-cc-cps"
+              "cl-cc-cps/simplify"
+              "cl-cc-cps/trampoline"
+              "cl-cc-cps/trmc"
+              "cl-cc-cps/transform"
+            ];
             lispLibs = [
               clCcBootstrap
               clCcAst
@@ -648,6 +654,7 @@
             lispLibs = [
               clCcAst
               clCcBootstrap
+              clParserKit
             ];
           };
           clCcPhp = sbcl.buildASDFSystem {

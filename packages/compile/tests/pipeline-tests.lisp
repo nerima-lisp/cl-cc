@@ -138,11 +138,11 @@
     (expect (typep (cl-cc/compile:compilation-result-type-env result)
                         'cl-cc/type:type-env) :to-be-truthy)
     (multiple-value-bind (scheme found-p)
-        (cl-cc/type::type-env-lookup lookup-sym
+        (cl-cc/type:type-env-lookup lookup-sym
                                      (cl-cc/compile:compilation-result-type-env result))
       (expect found-p :to-be-truthy)
       (expect (cl-cc/type:type-primitive-name
-                          (cl-cc/type::type-scheme-type scheme)) :to-be 'fixnum)))))
+                          (cl-cc/type:type-scheme-type scheme)) :to-be 'fixnum)))))
 
 (it-sequential "pipeline-compile-toplevel-forms-defvar-type-env without-type-check"
   (destructuring-bind (forms lookup-sym type-check) (list '((defvar *typed-top-level-no-check* 42)) '*typed-top-level-no-check* nil)
@@ -150,11 +150,11 @@
     (expect (typep (cl-cc/compile:compilation-result-type-env result)
                         'cl-cc/type:type-env) :to-be-truthy)
     (multiple-value-bind (scheme found-p)
-        (cl-cc/type::type-env-lookup lookup-sym
+        (cl-cc/type:type-env-lookup lookup-sym
                                      (cl-cc/compile:compilation-result-type-env result))
       (expect found-p :to-be-truthy)
       (expect (cl-cc/type:type-primitive-name
-                          (cl-cc/type::type-scheme-type scheme)) :to-be 'fixnum)))))
+                          (cl-cc/type:type-scheme-type scheme)) :to-be 'fixnum)))))
 
 (it-sequential "pipeline-compile-toplevel-forms-captures-cps"
   (let ((result (cl-cc/compile:compile-toplevel-forms '((+ 1 2) (- 4 1)))))
@@ -174,21 +174,21 @@
   (destructuring-bind (forms lookup-sym type-check) (list '((defun typed-id (x) x)) 'typed-id t)
     (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
     (multiple-value-bind (scheme found-p)
-        (cl-cc/type::type-env-lookup lookup-sym
+        (cl-cc/type:type-env-lookup lookup-sym
                                      (cl-cc/compile:compilation-result-type-env result))
       (expect found-p :to-be-truthy)
       (expect (cl-cc/type:type-arrow-p
-                    (cl-cc/type::type-scheme-type scheme)) :to-be-truthy)))))
+                    (cl-cc/type:type-scheme-type scheme)) :to-be-truthy)))))
 
 (it-sequential "pipeline-compile-toplevel-forms-defun-type-env without-type-check"
   (destructuring-bind (forms lookup-sym type-check) (list '((defun typed-id-no-check (x) x)) 'typed-id-no-check nil)
     (let ((result (cl-cc/compile:compile-toplevel-forms forms :target :vm :type-check type-check)))
     (multiple-value-bind (scheme found-p)
-        (cl-cc/type::type-env-lookup lookup-sym
+        (cl-cc/type:type-env-lookup lookup-sym
                                      (cl-cc/compile:compilation-result-type-env result))
       (expect found-p :to-be-truthy)
       (expect (cl-cc/type:type-arrow-p
-                    (cl-cc/type::type-scheme-type scheme)) :to-be-truthy)))))
+                    (cl-cc/type:type-scheme-type scheme)) :to-be-truthy)))))
 
 ;;; Additional eval/prescan/stdlib integration tests live in pipeline-eval-tests.lisp.
 
@@ -330,3 +330,12 @@ asserting the new path reproduces it has to still hold the old one."
               (if present-p
                   (setf (gethash symbol table) previous)
                   (remhash symbol table))))))))
+
+(it-sequential "cps-trmc-run-string-pipeline-preserves-semantics"
+  (expect (run-string "(progn
+                               (defun trmc-pipeline-fixture (n)
+                                 (if (<= n 0)
+                                     nil
+                                     (cons n (trmc-pipeline-fixture (- n 1)))))
+                               (trmc-pipeline-fixture 4))"
+                             :pass-pipeline '(:trmc :fold :jump)) :to-equal '(4 3 2 1)))

@@ -198,6 +198,26 @@ let
       repository = "cps";
     }
     {
+      system = "cl-cc-cps/simplify";
+      context = "cps";
+      repository = "cps";
+    }
+    {
+      system = "cl-cc-cps/trampoline";
+      context = "cps";
+      repository = "cps";
+    }
+    {
+      system = "cl-cc-cps/trmc";
+      context = "cps";
+      repository = "cps";
+    }
+    {
+      system = "cl-cc-cps/transform";
+      context = "cps";
+      repository = "cps";
+    }
+    {
       system = "cl-cc-type";
       context = "type";
       repository = "type";
@@ -425,7 +445,11 @@ let
 
   contextMapEdgesFrom = source: targets: map (target: { inherit source target; }) targets;
   contextMapAllowedEdges = lib.concatLists [
-    (contextMapEdgesFrom "cl-cc-parse" [ "cl-cc-ast" ])
+    (contextMapEdgesFrom "cl-cc-parse" [
+      "cl-cc-ast"
+      "cl-cc-bootstrap"
+      "cl-parser-kit"
+    ])
     (contextMapEdgesFrom "cl-cc-php" [
       "cl-cc-ast"
       "cl-cc-bootstrap"
@@ -438,7 +462,17 @@ let
       "cl-cc-ast"
       "cl-cc-type"
     ])
-    (contextMapEdgesFrom "cl-cc-cps" [ "cl-cc-ast" ])
+    (contextMapEdgesFrom "cl-cc-cps" [
+      "cl-cc-ast"
+      "cl-cc-cps/transform"
+    ])
+    (contextMapEdgesFrom "cl-cc-cps/transform" [
+      "cl-cc-ast"
+      "cl-cc-bootstrap"
+      "cl-cc-cps/simplify"
+      "cl-cc-cps/trampoline"
+      "cl-cc-cps/trmc"
+    ])
     (contextMapEdgesFrom "cl-cc-type" [ "cl-cc-ast" ])
     (contextMapEdgesFrom "cl-cc-compile" [
       "cl-cc-ast"

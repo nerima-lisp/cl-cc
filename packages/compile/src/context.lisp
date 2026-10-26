@@ -491,7 +491,7 @@ clobbered. Returns ARG's result register."
         (cdr entry)
         (let* ((diag (cl-cc/parse:undefined-symbol-diagnostic
                       sym (%visible-symbol-candidates ctx) (cons 0 0)))
-               (notes (cl-cc/parse::diagnostic-notes diag)))
+               (notes (cl-cc/parse/diagnostics:diagnostic-notes diag)))
           (error "~A~@[ ~A~]"
                  (cl-cc/parse:diagnostic-message diag)
                  (first notes))))))
