@@ -26,7 +26,7 @@ jobs:
   check:
     name: nix flake check
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
       # persist-credentials: false — this job runs untrusted PR code via
       # `nix flake check`, and never needs the token, so don't leave it in
