@@ -19,9 +19,9 @@
          (loop-pos (%test-label-position out "loop")))
     (expect loop-pos :to-be-truthy)
     (expect (> loop-pos 3) :to-be-truthy)
-    (expect (typep (nth (- loop-pos 3) out) 'cl-cc/vm::vm-lt) :to-be-truthy)
+    (expect (typep (nth (- loop-pos 3) out) 'cl-cc/vm:vm-lt) :to-be-truthy)
     (expect (some (lambda (inst)
-                         (and (typep inst 'cl-cc/vm::vm-aref)
+                         (and (typep inst 'cl-cc/vm:vm-aref)
                               (cl-cc/optimize::opt-bounds-check-eliminable-marked-p inst)))
                        out) :to-be-truthy)))
 
@@ -39,7 +39,7 @@
                       (make-vm-label :name "exit")
                       (make-vm-ret :reg :tmp)))
          (out (cl-cc/optimize::opt-pass-loop-peel insts)))
-    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
+    (expect (mapcar #'cl-cc/vm:instruction->sexp out) :to-equal (mapcar #'cl-cc/vm:instruction->sexp insts))))
 
 ;;;; ─── FR-514 loop fusion / fission (optimizer-loop-fusion.lisp) ──────────────
 ;;;;
@@ -137,7 +137,7 @@
       (expect (gethash :a const-env) :to-be-null)
       (expect (= 7 (gethash :b const-env)) :to-be-truthy)
       ;; def-env still records the producing instruction for :a.
-      (expect (typep (gethash :a def-env) 'cl-cc/vm::vm-add) :to-be-truthy))))
+      (expect (typep (gethash :a def-env) 'cl-cc/vm:vm-add) :to-be-truthy))))
 
 (it-sequential "fr-514-register-dependencies-detects-cross-core-use"
   (let ((dependent-l (list (make-vm-add :dst :x :lhs :y :rhs :z)))
@@ -177,11 +177,11 @@
          (out (cl-cc/optimize:opt-pass-loop-fusion insts)))
     ;; Fusion collapses two loop headers into one: fewer instructions, one back-edge.
     (expect (< (length out) (length insts)) :to-be-truthy)
-    (expect (= 1 (count-if (lambda (x) (typep x 'cl-cc/vm::vm-jump)) out)) :to-be-truthy)
+    (expect (= 1 (count-if (lambda (x) (typep x 'cl-cc/vm:vm-jump)) out)) :to-be-truthy)
     ;; The surviving exit label is the second loop's exit.
     (expect (some (lambda (x)
-                         (and (typep x 'cl-cc/vm::vm-label)
-                              (equal (cl-cc/vm::vm-name x) "exitB")))
+                         (and (typep x 'cl-cc/vm:vm-label)
+                              (equal (cl-cc/vm:vm-name x) "exitB")))
                        out) :to-be-truthy)))
 
 (it-sequential "fr-514-fusion-skips-loops-with-different-iteration-spaces"
@@ -196,7 +196,7 @@
                  (%fr-514-counted-loop "headB" "exitB" :j :limit2 :one
                                        (list (make-vm-const :dst :xb :value 9)))))
          (out (cl-cc/optimize:opt-pass-loop-fusion insts)))
-    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
+    (expect (mapcar #'cl-cc/vm:instruction->sexp out) :to-equal (mapcar #'cl-cc/vm:instruction->sexp insts))))
 
 ;;; ─── loop fission pass ──────────────────────────────────────────────────────
 
@@ -214,12 +214,12 @@
          (out (cl-cc/optimize::opt-pass-loop-fission insts)))
     ;; Fission produces two suffixed loops (FISSION_A / FISSION_B).
     (expect (some (lambda (x)
-                         (and (typep x 'cl-cc/vm::vm-label)
-                              (search "FISSION_A" (string (cl-cc/vm::vm-name x)))))
+                         (and (typep x 'cl-cc/vm:vm-label)
+                              (search "FISSION_A" (string (cl-cc/vm:vm-name x)))))
                        out) :to-be-truthy)
     (expect (some (lambda (x)
-                         (and (typep x 'cl-cc/vm::vm-label)
-                              (search "FISSION_B" (string (cl-cc/vm::vm-name x)))))
+                         (and (typep x 'cl-cc/vm:vm-label)
+                              (search "FISSION_B" (string (cl-cc/vm:vm-name x)))))
                        out) :to-be-truthy)))
 
 (it-sequential "fr-514-fission-leaves-small-loops-unchanged"
@@ -231,4 +231,4 @@
                                        (list (make-vm-const :dst :x :value 1)))
                  (list (make-vm-ret :reg :x))))
          (out (cl-cc/optimize::opt-pass-loop-fission insts)))
-    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
+    (expect (mapcar #'cl-cc/vm:instruction->sexp out) :to-equal (mapcar #'cl-cc/vm:instruction->sexp insts))))

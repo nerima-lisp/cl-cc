@@ -42,7 +42,7 @@
     ;; All three forms are compiled; the register of form 3 is returned.
     (expect (keywordp reg) :to-be-truthy)
     ;; Three vm-const instructions should have been emitted
-    (expect (>= (count-if (lambda (i) (typep i 'cl-cc/vm::vm-const))
+    (expect (>= (count-if (lambda (i) (typep i 'cl-cc/vm:vm-const))
                                (codegen-instructions ctx))
                      3) :to-be-truthy)))
 
@@ -94,11 +94,11 @@
      (%mutual-tail-labels-fixture
       (make-ast-call :func 'evenp-local :args (list (make-ast-int :value 4))))
      ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-closure) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call) :to-be-null)
     (expect (some (lambda (inst)
-                 (and (typep inst 'cl-cc/vm::vm-jump)
-                      (search "labels_tail_fn" (cl-cc/vm::vm-label-name inst))))
+                 (and (typep inst 'cl-cc/vm:vm-jump)
+                      (search "labels_tail_fn" (cl-cc/vm:vm-label-name inst))))
            (codegen-instructions ctx)) :to-be-truthy)))
 
 (it-sequential "codegen-labels-the-wrapped-local-call-keeps-tail-scc"
@@ -112,11 +112,11 @@
               :value 'evenp-local)
        :args (list (make-ast-int :value 4))))
      ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-closure) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call) :to-be-null)
     (expect (some (lambda (inst)
-             (and (typep inst 'cl-cc/vm::vm-jump)
-                  (search "labels_tail_fn" (cl-cc/vm::vm-label-name inst))))
+             (and (typep inst 'cl-cc/vm:vm-jump)
+                  (search "labels_tail_fn" (cl-cc/vm:vm-label-name inst))))
            (codegen-instructions ctx)) :to-be-truthy)))
 
 (it-sequential "codegen-labels-non-tail-mutual-call-keeps-boxed-closures"
@@ -127,7 +127,7 @@
                       :lhs (make-ast-call :func 'evenp-local :args (list (make-ast-int :value 4)))
                       :rhs (make-ast-int :value 1)))
      ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-closure) :to-be-truthy)))
 
 (it-sequential "codegen-labels-restores-compiler-state-after-compilation"
   (let* ((ctx (make-codegen-ctx))

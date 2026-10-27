@@ -146,13 +146,13 @@
                      (append (list closure) body caller)))
          (has-specialized-label
            (some (lambda (inst)
-                   (and (typep inst 'cl-cc/vm::vm-label)
-                        (search "__spec__" (cl-cc/vm::vm-name inst))))
+                   (and (typep inst 'cl-cc/vm:vm-label)
+                        (search "__spec__" (cl-cc/vm:vm-name inst))))
                  optimized))
          (rewritten-call
            (find-if (lambda (inst)
-                      (and (typep inst 'cl-cc/vm::vm-call)
-                           (equal (cl-cc/vm::vm-args inst) '(:r4))))
+                      (and (typep inst 'cl-cc/vm:vm-call)
+                           (equal (cl-cc/vm:vm-args inst) '(:r4))))
                     optimized)))
     (expect has-specialized-label :to-be-truthy)
     (expect rewritten-call :to-be-truthy)))

@@ -182,16 +182,16 @@
 ;;; ─── instruction-size table ──────────────────────────────────────────────────
 
 (it-sequential "x86-instruction-size-table-coverage"
-  (dolist (tp '(cl-cc/vm::vm-const cl-cc/vm::vm-move cl-cc/vm::vm-add cl-cc/vm::vm-sub cl-cc/vm::vm-mul
-                cl-cc/vm::vm-integer-mul-high-u cl-cc/vm::vm-integer-mul-high-s
-                cl-cc/vm::vm-halt cl-cc/vm::vm-label cl-cc/vm::vm-jump cl-cc/vm::vm-jump-zero cl-cc/vm::vm-ret
-                cl-cc/vm::vm-lt cl-cc/vm::vm-gt cl-cc/vm::vm-le cl-cc/vm::vm-ge cl-cc/vm::vm-num-eq cl-cc/vm::vm-eq
-                cl-cc/vm::vm-neg cl-cc/vm::vm-not cl-cc/vm::vm-lognot cl-cc/vm::vm-inc cl-cc/vm::vm-dec
-                cl-cc/vm::vm-abs cl-cc/vm::vm-min cl-cc/vm::vm-max cl-cc/vm::vm-select cl-cc/vm::vm-ash
-                cl-cc/vm::vm-truncate cl-cc/vm::vm-rem cl-cc/vm::vm-div cl-cc/vm::vm-mod
-                cl-cc/vm::vm-and cl-cc/vm::vm-or cl-cc/vm::vm-logand cl-cc/vm::vm-logior cl-cc/vm::vm-logxor
-                cl-cc/vm::vm-logeqv cl-cc/vm::vm-logtest cl-cc/vm::vm-logbitp
-                cl-cc/vm::vm-null-p cl-cc/vm::vm-number-p cl-cc/vm::vm-integer-p
-                cl-cc/vm::vm-cons-p cl-cc/vm::vm-symbol-p cl-cc/vm::vm-function-p
+  (dolist (tp '(cl-cc/vm:vm-const cl-cc/vm:vm-move cl-cc/vm:vm-add cl-cc/vm:vm-sub cl-cc/vm:vm-mul
+                cl-cc/vm:vm-integer-mul-high-u cl-cc/vm:vm-integer-mul-high-s
+                cl-cc/vm:vm-halt cl-cc/vm:vm-label cl-cc/vm:vm-jump cl-cc/vm:vm-jump-zero cl-cc/vm:vm-ret
+                cl-cc/vm:vm-lt cl-cc/vm:vm-gt cl-cc/vm:vm-le cl-cc/vm:vm-ge cl-cc/vm:vm-num-eq cl-cc/vm:vm-eq
+                cl-cc/vm:vm-neg cl-cc/vm:vm-not cl-cc/vm:vm-lognot cl-cc/vm:vm-inc cl-cc/vm:vm-dec
+                cl-cc/vm:vm-abs cl-cc/vm:vm-min cl-cc/vm:vm-max cl-cc/vm:vm-select cl-cc/vm:vm-ash
+                cl-cc/vm:vm-truncate cl-cc/vm:vm-rem cl-cc/vm:vm-div cl-cc/vm:vm-mod
+                cl-cc/vm:vm-and cl-cc/vm:vm-or cl-cc/vm:vm-logand cl-cc/vm:vm-logior cl-cc/vm:vm-logxor
+                cl-cc/vm:vm-logeqv cl-cc/vm:vm-logtest cl-cc/vm:vm-logbitp
+                cl-cc/vm:vm-null-p cl-cc/vm:vm-number-p cl-cc/vm:vm-integer-p
+                cl-cc/vm:vm-cons-p cl-cc/vm:vm-symbol-p cl-cc/vm:vm-function-p
                 cl-cc/codegen::vm-spill-store cl-cc/codegen::vm-spill-load))
     (expect (gethash tp cl-cc/codegen::*x86-64-instruction-sizes*) :to-be-truthy)))

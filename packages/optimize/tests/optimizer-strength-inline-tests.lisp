@@ -14,7 +14,7 @@
 (it-sequential "strength-reduce-cases mul-rhs-pow2"
   (destructuring-bind (const-val op verify) (list 8 (make-vm-mul :dst :r2 :lhs :r0 :rhs :r1) (lambda (out op)
              (expect (member op out) :to-be-falsy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) out) :to-be-truthy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) out) :to-be-truthy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -23,7 +23,7 @@
 (it-sequential "strength-reduce-cases mul-lhs-pow2"
   (destructuring-bind (const-val op verify) (list 4 (make-vm-mul :dst :r2 :lhs :r1 :rhs :r0) (lambda (out op)
              (expect (member op out) :to-be-falsy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) out) :to-be-truthy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) out) :to-be-truthy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -32,7 +32,7 @@
 (it-sequential "strength-reduce-cases mul-non-power-of-2"
   (destructuring-bind (const-val op verify) (list 7 (make-vm-mul :dst :r2 :lhs :r0 :rhs :r1) (lambda (out op)
              (expect (member op out) :to-be-truthy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) out) :to-be-falsy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) out) :to-be-falsy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -41,7 +41,7 @@
 (it-sequential "strength-reduce-cases div-rhs-pow2"
   (destructuring-bind (const-val op verify) (list 8 (cl-cc:make-vm-div :dst :r2 :lhs :r0 :rhs :r1) (lambda (out op)
              (expect (member op out) :to-be-falsy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) out) :to-be-truthy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) out) :to-be-truthy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -50,7 +50,7 @@
 (it-sequential "strength-reduce-cases div-non-power-of-2"
   (destructuring-bind (const-val op verify) (list 7 (cl-cc:make-vm-div :dst :r2 :lhs :r0 :rhs :r1) (lambda (out op)
              (expect (member op out) :to-be-truthy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) out) :to-be-falsy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) out) :to-be-falsy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -59,7 +59,7 @@
 (it-sequential "strength-reduce-cases mod-pow2"
   (destructuring-bind (const-val op verify) (list 8 (cl-cc:make-vm-mod :dst :r2 :lhs :r0 :rhs :r1) (lambda (out op)
              (expect (member op out) :to-be-falsy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) out) :to-be-truthy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-logand)) out) :to-be-truthy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -68,7 +68,7 @@
 (it-sequential "strength-reduce-cases mod-non-power-of-2"
   (destructuring-bind (const-val op verify) (list 7 (cl-cc:make-vm-mod :dst :r2 :lhs :r0 :rhs :r1) (lambda (out op)
              (expect (member op out) :to-be-truthy)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) out) :to-be-falsy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-logand)) out) :to-be-falsy)))
     (let* ((c   (make-vm-const :dst :r1 :value const-val))
          (ret (make-vm-ret   :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c op ret))))
@@ -77,7 +77,7 @@
 ;;; ── opt-pass-reassociate: Arithmetic Reassociation ──────────────────────
 
 (it-sequential "reassociate-moves-constant-inward add"
-  (destructuring-bind (const-val op1 op2 op-type) (list 1 (make-vm-add    :dst :r4 :lhs :r2 :rhs :r1) (make-vm-add    :dst :r5 :lhs :r4 :rhs :r3) 'cl-cc/vm::vm-add)
+  (destructuring-bind (const-val op1 op2 op-type) (list 1 (make-vm-add    :dst :r4 :lhs :r2 :rhs :r1) (make-vm-add    :dst :r5 :lhs :r4 :rhs :r3) 'cl-cc/vm:vm-add)
     (let* ((c    (make-vm-const :dst :r1 :value const-val))
          (a    (make-vm-move  :dst :r2 :src :r8))
          (b    (make-vm-move  :dst :r3 :src :r9))
@@ -88,7 +88,7 @@
                      (= 2 (length ops))) :to-be-truthy))))
 
 (it-sequential "reassociate-moves-constant-inward logand"
-  (destructuring-bind (const-val op1 op2 op-type) (list 255 (make-vm-logand :dst :r4 :lhs :r2 :rhs :r1) (make-vm-logand :dst :r5 :lhs :r4 :rhs :r3) 'cl-cc/vm::vm-logand)
+  (destructuring-bind (const-val op1 op2 op-type) (list 255 (make-vm-logand :dst :r4 :lhs :r2 :rhs :r1) (make-vm-logand :dst :r5 :lhs :r4 :rhs :r3) 'cl-cc/vm:vm-logand)
     (let* ((c    (make-vm-const :dst :r1 :value const-val))
          (a    (make-vm-move  :dst :r2 :src :r8))
          (b    (make-vm-move  :dst :r3 :src :r9))
@@ -104,8 +104,8 @@
          (ret (make-vm-ret :reg :r2))
          (out (cl-cc/optimize::opt-pass-strength-reduce (list c mul ret))))
     (expect (member mul out) :to-be-falsy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) out) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add)) out) :to-be-truthy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) out) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-add)) out) :to-be-truthy)))
 
 ;;; ── %opt-mul-by-const-seq: Extracted Shift/Add Decomposition ────────────
 
@@ -115,49 +115,49 @@
     (lambda () (prog1 (intern (format nil "R~A" n) :keyword) (incf n)))))
 
 (it-sequential "mul-by-const-seq-cases zero"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list 0 'cl-cc/vm::vm-const nil)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list 0 'cl-cc/vm:vm-const nil)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
       (expect (some (lambda (i) (typep i expected-type-2)) seq) :to-be-truthy)))))
 
 (it-sequential "mul-by-const-seq-cases one"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list 1 'cl-cc/vm::vm-move nil)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list 1 'cl-cc/vm:vm-move nil)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
       (expect (some (lambda (i) (typep i expected-type-2)) seq) :to-be-truthy)))))
 
 (it-sequential "mul-by-const-seq-cases neg-one"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list -1 'cl-cc/vm::vm-move 'cl-cc/vm::vm-neg)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list -1 'cl-cc/vm:vm-move 'cl-cc/vm:vm-neg)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
       (expect (some (lambda (i) (typep i expected-type-2)) seq) :to-be-truthy)))))
 
 (it-sequential "mul-by-const-seq-cases two"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list 2 'cl-cc/vm::vm-ash nil)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list 2 'cl-cc/vm:vm-ash nil)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
       (expect (some (lambda (i) (typep i expected-type-2)) seq) :to-be-truthy)))))
 
 (it-sequential "mul-by-const-seq-cases three"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list 3 'cl-cc/vm::vm-add nil)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list 3 'cl-cc/vm:vm-add nil)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
       (expect (some (lambda (i) (typep i expected-type-2)) seq) :to-be-truthy)))))
 
 (it-sequential "mul-by-const-seq-cases four"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list 4 'cl-cc/vm::vm-ash nil)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list 4 'cl-cc/vm:vm-ash nil)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
       (expect (some (lambda (i) (typep i expected-type-2)) seq) :to-be-truthy)))))
 
 (it-sequential "mul-by-const-seq-cases six"
-  (destructuring-bind (n expected-type-1 expected-type-2) (list 6 'cl-cc/vm::vm-add nil)
+  (destructuring-bind (n expected-type-1 expected-type-2) (list 6 'cl-cc/vm:vm-add nil)
     (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 n (make-test-new-reg))))
     (expect (some (lambda (i) (typep i expected-type-1)) seq) :to-be-truthy)
     (when expected-type-2
@@ -165,9 +165,9 @@
 
 (it-sequential "mul-by-const-seq-correctness"
   (let* ((seq (cl-cc/optimize::%opt-mul-by-const-seq :r0 :r1 5 (make-test-new-reg)))
-         (add (find-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) seq)))
+         (add (find-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) seq)))
     (expect add :to-be-truthy)
-    (expect (cl-cc/vm::vm-dst add) :to-equal :r0)))
+    (expect (cl-cc/vm:vm-dst add) :to-equal :r0)))
 
 ;;; ── opt-inline-eligible-p: Extracted Eligibility Predicate ──────────────
 

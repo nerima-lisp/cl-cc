@@ -69,7 +69,7 @@
   (let ((fn (cl-cc/compile::binop-ctor '+)))
     (expect (functionp fn) :to-be-truthy)
     (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
-      (expect (typep inst 'cl-cc/vm::vm-add) :to-be-truthy))))
+      (expect (typep inst 'cl-cc/vm:vm-add) :to-be-truthy))))
 
 (it-sequential "binop-ctor-signals-error-for-unknown-op"
   (signals error (cl-cc/compile::binop-ctor 'no-such-op)))
@@ -104,7 +104,7 @@
          (fn  (cl-cc/compile::%numeric-binop-constructor '+ lhs rhs ctx)))
     (expect (functionp fn) :to-be-truthy)
     (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
-      (expect (typep inst 'cl-cc/vm::vm-integer-add) :to-be-truthy))))
+      (expect (typep inst 'cl-cc/vm:vm-integer-add) :to-be-truthy))))
 
 (it-sequential "numeric-binop-constructor-float-path"
   (let* ((ctx (make-codegen-ctx))
@@ -113,7 +113,7 @@
          (fn  (cl-cc/compile::%numeric-binop-constructor '+ lhs rhs ctx)))
     (expect (functionp fn) :to-be-truthy)
     (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
-      (expect (typep inst 'cl-cc/vm::vm-float-add) :to-be-truthy))))
+      (expect (typep inst 'cl-cc/vm:vm-float-add) :to-be-truthy))))
 
 (it-sequential "numeric-binop-constructor-float-path-through-ast-the"
   (let* ((ctx (make-codegen-ctx))
@@ -122,7 +122,7 @@
          (fn  (cl-cc/compile::%numeric-binop-constructor '+ lhs rhs ctx)))
     (expect (functionp fn) :to-be-truthy)
     (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
-      (expect (typep inst 'cl-cc/vm::vm-float-add) :to-be-truthy))))
+      (expect (typep inst 'cl-cc/vm:vm-float-add) :to-be-truthy))))
 
 (it-sequential "numeric-binop-constructor-generic-fallback"
   (let* ((ctx (make-codegen-ctx))
@@ -131,7 +131,7 @@
          (fn  (cl-cc/compile::%numeric-binop-constructor '+ lhs rhs ctx)))
     (expect (functionp fn) :to-be-truthy)
     (let ((inst (funcall fn :dst :r0 :lhs :r1 :rhs :r2)))
-      (expect (typep inst 'cl-cc/vm::vm-add) :to-be-truthy))))
+      (expect (typep inst 'cl-cc/vm:vm-add) :to-be-truthy))))
 
 ;;; ─── Branch typing / collapse helpers ──────────────────────────────────────
 
@@ -180,8 +180,8 @@
     (cl-cc/compile::%compile-if-branch
      (make-ast-int :value 99) ctx dst nil nil nil :then)
     (let ((insts (codegen-instructions ctx)))
-      (expect (some (lambda (i) (and (typep i 'cl-cc/vm::vm-move)
-                                          (eq dst (cl-cc/vm::vm-dst i))))
+      (expect (some (lambda (i) (and (typep i 'cl-cc/vm:vm-move)
+                                          (eq dst (cl-cc/vm:vm-dst i))))
                          insts) :to-be-truthy))))
 
 (it-sequential "compile-if-branch-emits-jump-when-label-supplied"
@@ -190,7 +190,7 @@
     (cl-cc/compile::%compile-if-branch
      (make-ast-int :value 7) ctx dst nil nil nil :then "end_label_0")
     (let ((insts (codegen-instructions ctx)))
-      (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) insts) :to-be-truthy))))
+      (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-jump)) insts) :to-be-truthy))))
 
 (it-sequential "compile-if-branch-no-jump-without-label"
   (let* ((ctx  (make-codegen-ctx))
@@ -198,7 +198,7 @@
     (cl-cc/compile::%compile-if-branch
      (make-ast-int :value 5) ctx dst nil nil nil :else)
     (let ((insts (codegen-instructions ctx)))
-      (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-jump)) insts) :to-be-falsy))))
+      (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-jump)) insts) :to-be-falsy))))
 
 (it-sequential "numeric-binop-precision-single-floats"
   (let ((ctx (make-codegen-ctx)))
@@ -247,6 +247,6 @@
                                                  :value (make-ast-int :value 5)))))
     (compile-ast ast ctx)
     (expect (find-if (lambda (inst)
-                       (typep inst 'cl-cc/vm::vm-integer-add))
+                       (typep inst 'cl-cc/vm:vm-integer-add))
                      (codegen-instructions ctx))
             :to-be-truthy)))

@@ -68,11 +68,11 @@
   (let* ((instrs (list (cl-cc:make-vm-const :dst :r1 :value 0)
                        (cl-cc:make-vm-lognot :dst :r0 :src :r1)))
          (out (cl-cc/optimize::opt-pass-fold instrs)))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-lognot)) out) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-lognot)) out) :to-be-falsy)
     (expect (some (lambda (i)
                          (and (cl-cc:vm-const-p i)
-                              (eq :r0 (cl-cc/vm::vm-dst i))
-                              (eql -1 (cl-cc/vm::vm-value i))))
+                              (eq :r0 (cl-cc/vm:vm-dst i))
+                              (eql -1 (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy)))
 
 (it-sequential "optimizer-not-zero-value"
@@ -97,7 +97,7 @@
 (it-sequential "optimizer-leaf-flag-through-compile-pipeline"
   (let* ((result (compile-string "(+ 1 2)" :target :x86_64))
           (program (compilation-result-program result)))
-     (expect (member (cl-cc/vm::vm-program-leaf-p program) '(t nil)) :to-be-truthy)))
+     (expect (member (cl-cc/vm:vm-program-leaf-p program) '(t nil)) :to-be-truthy)))
 
 (it-sequential "optimizer-pipeline-program-instructions-track-optimized-output"
   (let* ((result (compile-string "(+ 1 2)" :target :vm))

@@ -80,8 +80,8 @@
   (let* ((copies (make-hash-table :test #'eq)))
     (setf (gethash :r0 copies) :r5)
     (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) copies)))
-      (expect (cl-cc/vm::vm-dst inst) :to-be :r2)
-      (expect (cl-cc/vm::vm-lhs inst) :to-be :r5))))
+      (expect (cl-cc/vm:vm-dst inst) :to-be :r2)
+      (expect (cl-cc/vm:vm-lhs inst) :to-be :r5))))
 
 (it-sequential "rewrite-inst-regs-substitutes-ssa-keyword-registers"
   (let ((copies (make-hash-table :test #'eq)))
@@ -90,21 +90,21 @@
     (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
                  (make-vm-add :dst :i.3 :lhs :i :rhs :one)
                  copies)))
-      (expect (cl-cc/vm::vm-dst inst) :to-be :i.3)
-      (expect (cl-cc/vm::vm-lhs inst) :to-be :i.1)
-      (expect (cl-cc/vm::vm-rhs inst) :to-be :one.0))))
+      (expect (cl-cc/vm:vm-dst inst) :to-be :i.3)
+      (expect (cl-cc/vm:vm-lhs inst) :to-be :i.1)
+      (expect (cl-cc/vm:vm-rhs inst) :to-be :one.0))))
 
 (it-sequential "rewrite-inst-regs-never-rewrites-dst"
   (let* ((copies (make-hash-table :test #'eq)))
     (setf (gethash :r0 copies) :r99)
     (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs (make-vm-add :dst :r0 :lhs :r1 :rhs :r2) copies)))
-      (expect (cl-cc/vm::vm-dst inst) :to-be :r0))))
+      (expect (cl-cc/vm:vm-dst inst) :to-be :r0))))
 
 (it-sequential "rewrite-inst-regs-no-op-on-empty-copy-map"
   (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
                (make-vm-move :dst :r0 :src :r1)
                (make-hash-table :test #'eq))))
-    (expect (cl-cc/vm::vm-src inst) :to-be :r1)))
+    (expect (cl-cc/vm:vm-src inst) :to-be :r1)))
 
 ;;; ─── opt-pass-dead-store-elim ────────────────────────────────────────────
 
@@ -145,14 +145,14 @@
                         (make-vm-set-global :src :r0 :name 'x)
                         (make-vm-get-global :dst :r1 :name 'x)
                         (make-vm-ret :reg :r1)))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move))       result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-move))       result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-get-global)) result) :to-be-falsy)))
 
 (it-sequential "store-to-load-forward-no-prior-store-preserves-get-global"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
                   (list (make-vm-get-global :dst :r0 :name 'unknown)
                         (make-vm-ret :reg :r0)))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-truthy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-get-global)) result) :to-be-truthy)))
 
 (it-sequential "store-to-load-forward-prior-slot-write-replaces-slot-read"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
@@ -160,11 +160,11 @@
                         (cl-cc:make-vm-slot-read  :dst :out :obj-reg :obj :slot-name 'slot)
                         (make-vm-ret :reg :out)))))
     (expect (some (lambda (i)
-              (and (typep i 'cl-cc/vm::vm-move)
-                   (eq :out (cl-cc/vm::vm-dst i))
-                   (eq :value (cl-cc/vm::vm-src i))))
+              (and (typep i 'cl-cc/vm:vm-move)
+                   (eq :out (cl-cc/vm:vm-dst i))
+                   (eq :value (cl-cc/vm:vm-src i))))
            result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-slot-read)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-slot-read)) result) :to-be-falsy)))
 
 (it-sequential "store-to-load-forward-cross-block-dominating-store-replaces-get-global"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
@@ -179,11 +179,11 @@
                         (make-vm-get-global :dst :r1 :name 'x)
                         (make-vm-ret :reg :r1)))))
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
-                  (eq :r1 (cl-cc/vm::vm-dst i))
-                  (eq :r0 (cl-cc/vm::vm-src i))))
+             (and (typep i 'cl-cc/vm:vm-move)
+                  (eq :r1 (cl-cc/vm:vm-dst i))
+                  (eq :r0 (cl-cc/vm:vm-src i))))
            result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-get-global)) result) :to-be-falsy)))
 
 (it-sequential "store-to-load-forward-join-disagree-preserves-get-global"
   (let* ((load (make-vm-get-global :dst :r2 :name 'x))
@@ -200,8 +200,8 @@
                         (make-vm-ret :reg :r2)))))
     (expect (member load result :test #'eq) :to-be-truthy)
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
-                  (eq :r2 (cl-cc/vm::vm-dst i))))
+             (and (typep i 'cl-cc/vm:vm-move)
+                  (eq :r2 (cl-cc/vm:vm-dst i))))
             result) :to-be-falsy)))
 
 (it-sequential "store-to-load-forward-cross-block-dominating-slot-write-replaces-slot-read"
@@ -216,11 +216,11 @@
                         (cl-cc:make-vm-slot-read :dst :out :obj-reg :obj :slot-name 'slot)
                         (make-vm-ret :reg :out)))))
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
-                  (eq :out (cl-cc/vm::vm-dst i))
-                  (eq :val (cl-cc/vm::vm-src i))))
+             (and (typep i 'cl-cc/vm:vm-move)
+                  (eq :out (cl-cc/vm:vm-dst i))
+                  (eq :val (cl-cc/vm:vm-src i))))
            result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-slot-read)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-slot-read)) result) :to-be-falsy)))
 
 (it-sequential "store-to-load-forward-branch-constant-prunes-infeasible-edge"
   (let* ((result (cl-cc/optimize::opt-pass-store-to-load-forward
@@ -236,11 +236,11 @@
                         (make-vm-get-global :dst :r2 :name 'x)
                         (make-vm-ret :reg :r2)))))
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
-                  (eq :r2 (cl-cc/vm::vm-dst i))
-                  (eq :r0 (cl-cc/vm::vm-src i))))
+             (and (typep i 'cl-cc/vm:vm-move)
+                  (eq :r2 (cl-cc/vm:vm-dst i))
+                  (eq :r0 (cl-cc/vm:vm-src i))))
            result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-get-global)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-get-global)) result) :to-be-falsy)))
 
 ;;; ─── opt-pass-cons-slot-forward ──────────────────────────────────────────
 
@@ -249,9 +249,9 @@
                   (list (make-vm-cons :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-car  :dst :out  :src :cell))))
          (move (second result)))
-    (expect (typep move 'cl-cc/vm::vm-move) :to-be-truthy)
-    (expect (cl-cc/vm::vm-dst move) :to-be :out)
-    (expect (cl-cc/vm::vm-src move) :to-be :head)))
+    (expect (typep move 'cl-cc/vm:vm-move) :to-be-truthy)
+    (expect (cl-cc/vm:vm-dst move) :to-be :out)
+    (expect (cl-cc/vm:vm-src move) :to-be :head)))
 
 (it-sequential "cons-slot-forward-replaces-cdr-through-move-alias"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
@@ -259,19 +259,19 @@
                         (make-vm-move :dst :alias :src :cell)
                         (make-vm-cdr  :dst :out   :src :alias))))
          (move (third result)))
-    (expect (typep move 'cl-cc/vm::vm-move) :to-be-truthy)
-    (expect (cl-cc/vm::vm-dst move) :to-be :out)
-    (expect (cl-cc/vm::vm-src move) :to-be :tail)))
+    (expect (typep move 'cl-cc/vm:vm-move) :to-be-truthy)
+    (expect (cl-cc/vm:vm-dst move) :to-be :out)
+    (expect (cl-cc/vm:vm-src move) :to-be :tail)))
 
 (it-sequential "cons-slot-forward-source-overwrite-kills-fact"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons  :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-const :dst :head :value 99)
                         (make-vm-car   :dst :out  :src :cell)))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-car)) result) :to-be-truthy)
     (expect (some (lambda (i)
-                          (and (typep i 'cl-cc/vm::vm-move)
-                               (eq :out (cl-cc/vm::vm-dst i))))
+                          (and (typep i 'cl-cc/vm:vm-move)
+                               (eq :out (cl-cc/vm:vm-dst i))))
                         result) :to-be-falsy)))
 
 (it-sequential "cons-slot-forward-rplaca-kills-fact"
@@ -279,13 +279,13 @@
                   (list (make-vm-cons   :dst :cell :car-src :head :cdr-src :tail)
                         (make-vm-rplaca :cons :cell :val :new-head)
                         (make-vm-car    :dst :out :src :cell)))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result) :to-be-truthy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-car)) result) :to-be-truthy)))
 
 (it-sequential "cons-slot-forward-cons-overwriting-source-is-conservative"
   (let* ((result (cl-cc/optimize::opt-pass-cons-slot-forward
                   (list (make-vm-cons :dst :head :car-src :head :cdr-src :tail)
                         (make-vm-car  :dst :out  :src :head)))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-car)) result) :to-be-truthy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-car)) result) :to-be-truthy)))
 
 ;;; ─── mem-pass-state struct helpers ──────────────────────────────────────────
 
@@ -400,10 +400,10 @@
                   :pass-pipeline '(:fold :dce)))
          (even-inst (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-evenp)) result)))
     (expect even-inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-dst even-inst) :to-be :pred)
-    (expect (cl-cc/vm::vm-src even-inst) :to-be :x)
-    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-logand)) result) :to-be-falsy)
-    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-num-eq)) result) :to-be-falsy)))
+    (expect (cl-cc/vm:vm-dst even-inst) :to-be :pred)
+    (expect (cl-cc/vm:vm-src even-inst) :to-be :x)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-logand)) result) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-num-eq)) result) :to-be-falsy)))
 
 (it-sequential "overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add"
   (let* ((result (cl-cc/optimize:optimize-instructions
@@ -416,12 +416,12 @@
                         (make-vm-ret :reg :sum))
                   :max-iterations 1
                   :pass-pipeline '(:overflow-check-elim)))
-         (unchecked (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-integer-add)) result)))
+         (unchecked (find-if (lambda (inst) (typep inst 'cl-cc/vm:vm-integer-add)) result)))
     (expect unchecked :to-be-truthy)
-    (expect (cl-cc/vm::vm-dst unchecked) :to-be :sum)
-    (expect (cl-cc/vm::vm-lhs unchecked) :to-be :x8)
-    (expect (cl-cc/vm::vm-rhs unchecked) :to-be :y8)
-    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-add-checked)) result) :to-be-falsy)))
+    (expect (cl-cc/vm:vm-dst unchecked) :to-be :sum)
+    (expect (cl-cc/vm:vm-lhs unchecked) :to-be :x8)
+    (expect (cl-cc/vm:vm-rhs unchecked) :to-be :y8)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-add-checked)) result) :to-be-falsy)))
 
 ;;; ─── %mps-pending-uses-reg-p ─────────────────────────────────────────────
 

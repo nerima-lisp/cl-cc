@@ -73,7 +73,7 @@
     (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
 
 (it-sequential "binary-fold-table-arithmetic-ops-registered vm-cl-div"
-  (destructuring-bind (type-sym) (list 'cl-cc/vm::vm-cl-div)
+  (destructuring-bind (type-sym) (list 'cl-cc/vm:vm-cl-div)
     (expect (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*) :to-be-truthy)))
 
 (it-sequential "binary-fold-table-arithmetic-ops-registered vm-gcd"
@@ -105,7 +105,7 @@
     (expect (= expected (funcall fn a b)) :to-be-truthy))))
 
 (it-sequential "binary-fold-table-function-evaluation-cases div-rational"
-  (destructuring-bind (type-sym a b expected) (list 'cl-cc/vm::vm-cl-div 3 4 3/4)
+  (destructuring-bind (type-sym a b expected) (list 'cl-cc/vm:vm-cl-div 3 4 3/4)
     (let ((fn (gethash type-sym cl-cc/optimize::*opt-binary-fold-table*)))
     (expect (= expected (funcall fn a b)) :to-be-truthy))))
 
@@ -381,8 +381,8 @@
      env
      (lambda (i) (push i emitted)))
     (expect (= 1 (length emitted)) :to-be-truthy)
-    (expect (typep (first emitted) 'cl-cc/vm::vm-jump) :to-be-truthy)
-    (expect (cl-cc/vm::vm-label-name (first emitted)) :to-equal "target")))
+    (expect (typep (first emitted) 'cl-cc/vm:vm-jump) :to-be-truthy)
+    (expect (cl-cc/vm:vm-label-name (first emitted)) :to-equal "target")))
 
 (it-sequential "fold-vm-jump-zero-known-true-eliminates-branch"
   (let ((env (make-hash-table :test #'eq))
@@ -402,7 +402,7 @@
      env
      (lambda (i) (push i emitted)))
     (expect (= 1 (length emitted)) :to-be-truthy)
-    (expect (typep (first emitted) 'cl-cc/vm::vm-jump-zero) :to-be-truthy)))
+    (expect (typep (first emitted) 'cl-cc/vm:vm-jump-zero) :to-be-truthy)))
 
 ;;; ─── %opt-known-constant-p ───────────────────────────────────────────────
 
@@ -446,25 +446,25 @@
 
 (it-sequential "opt-apply-algebraic-action-move-lhs"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action :move-lhs :r2 :r0 :r1)))
-    (expect (typep result 'cl-cc/vm::vm-move) :to-be-truthy)
+    (expect (typep result 'cl-cc/vm:vm-move) :to-be-truthy)
     (expect (vm-dst result) :to-be :r2)
     (expect (vm-src result) :to-be :r0)))
 
 (it-sequential "opt-apply-algebraic-action-move-rhs"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action :move-rhs :r2 :r0 :r1)))
-    (expect (typep result 'cl-cc/vm::vm-move) :to-be-truthy)
+    (expect (typep result 'cl-cc/vm:vm-move) :to-be-truthy)
     (expect (vm-dst result) :to-be :r2)
     (expect (vm-src result) :to-be :r1)))
 
 (it-sequential "opt-apply-algebraic-action-const"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action '(:const 0) :r2 :r0 :r1)))
-    (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep result 'cl-cc/vm:vm-const) :to-be-truthy)
     (expect (vm-dst result) :to-be :r2)
     (expect (= 0 (vm-value result)) :to-be-truthy)))
 
 (it-sequential "opt-apply-algebraic-action-neg-lhs"
   (let ((result (cl-cc/optimize::%opt-apply-algebraic-action '(:neg :lhs) :r2 :r0 :r1)))
-    (expect (typep result 'cl-cc/vm::vm-neg) :to-be-truthy)
+    (expect (typep result 'cl-cc/vm:vm-neg) :to-be-truthy)
     (expect (vm-dst result) :to-be :r2)
     (expect (vm-src result) :to-be :r0)))
 

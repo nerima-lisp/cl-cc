@@ -171,7 +171,7 @@
     (expect (typep (fourth scheduled) 'vm-halt) :to-be-truthy)))
 
 (it-sequential "post-ra-scheduler-integrates-with-native-backends"
-  (let ((program (cl-cc/vm::make-vm-program
+  (let ((program (cl-cc/vm:make-vm-program
                   :instructions (list (make-vm-const :dst :r0 :value 1)
                                       (make-vm-const :dst :r1 :value 2)
                                       (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
@@ -414,7 +414,7 @@
     (setf (gethash :r3 spill-map) 3)
     (let* ((out (cl-cc/regalloc::insert-spill-code (list inst) assignment spill-map *x86-64-target*))
            (rewritten (find-if (lambda (item)
-                                 (typep item 'cl-cc/vm::vm-integer-mul-high-u))
+                                 (typep item 'cl-cc/vm:vm-integer-mul-high-u))
                                out)))
       (expect (null rewritten) :to-be-falsy)
       (expect (eq (vm-lhs rewritten) :r11) :to-be-falsy)

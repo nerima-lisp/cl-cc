@@ -293,9 +293,9 @@
                            (make-vm-const :dst :r1 :value 2)
                            (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                            (make-vm-ret   :reg :r2)))) ; r2 is used here
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-add))
                         (cl-cc/optimize::opt-pass-dce dead-insts)) :to-be-falsy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-add))
                         (cl-cc/optimize::opt-pass-dce used-insts)) :to-be-truthy)))
 
 ;;; ─── effect-row->effect-kind bridge ─────────────────────────────────────

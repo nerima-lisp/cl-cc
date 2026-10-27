@@ -53,7 +53,7 @@
 (it-sequential "ssa-round-trip-cases preserves-types"
   (destructuring-bind (insts assert-fn) (list (list (make-vm-const :dst :r0 :value 42)
                  (make-vm-ret   :reg :r0)) (lambda (result)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ret)) result) :to-be-truthy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ret)) result) :to-be-truthy)))
     (let ((result (cl-cc/optimize:ssa-round-trip insts)))
     (funcall assert-fn result))))
 
@@ -68,7 +68,7 @@
                  (make-vm-const    :dst :r0 :value 2)
                  (make-vm-label    :name "L1")
                  (make-vm-ret      :reg :r0)) (lambda (result)
-             (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-truthy)))
+             (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-label)) result) :to-be-truthy)))
     (let ((result (cl-cc/optimize:ssa-round-trip insts)))
     (funcall assert-fn result))))
 
@@ -260,8 +260,8 @@
         (cl-cc/optimize:ssa-eliminate-trivial-phis phi-map renamed)
       (declare (ignore new-phi-map))
       (let ((rewritten (first (gethash join new-renamed-map))))
-        (expect (cl-cc/vm::vm-lhs rewritten) :to-be :r2)
-        (expect (cl-cc/vm::vm-rhs rewritten) :to-be :r4)))))
+        (expect (cl-cc/vm:vm-lhs rewritten) :to-be :r2)
+        (expect (cl-cc/vm:vm-rhs rewritten) :to-be :r4)))))
 
 (it-sequential "ssa-trivial-phi-elimination-shortcuts-phi-of-phi-chain"
   (let* ((pred-a (make-ssa-test-block 1))
@@ -330,8 +330,8 @@
                    (incf total-phis (length phis)))
                  new-phi-map)
         (expect (= 0 total-phis) :to-be-truthy)
-        (expect (cl-cc/vm::vm-lhs rewritten) :to-be :x.0)
-        (expect (cl-cc/vm::vm-rhs rewritten) :to-be :v.0)))))
+        (expect (cl-cc/vm:vm-lhs rewritten) :to-be :x.0)
+        (expect (cl-cc/vm:vm-rhs rewritten) :to-be :v.0)))))
 
 ;;; ─── Targeted Trivial Phi Elimination Tests ─────────────────────────────
 
@@ -357,8 +357,8 @@
         (maphash (lambda (_b phis) (incf total-phis (length phis))) new-phi-map)
         (expect (= 0 total-phis) :to-be-truthy)
         (let ((rewritten (first (gethash join new-renamed-map))))
-          (expect (cl-cc/vm::vm-lhs rewritten) :to-be :r0)
-          (expect (cl-cc/vm::vm-rhs rewritten) :to-be :r5))))))
+          (expect (cl-cc/vm:vm-lhs rewritten) :to-be :r0)
+          (expect (cl-cc/vm:vm-rhs rewritten) :to-be :r5))))))
 
 (it-sequential "ssa-phi-elim-phi-of-phi-chain-deep"
   (let* ((pred-a (make-ssa-test-block 1))
@@ -420,7 +420,7 @@
         (expect (= 0 total-phis) :to-be-truthy)
         ;; Verify the renamed instruction is untouched
         (let ((original (first (gethash join renamed))))
-          (expect (cl-cc/vm::vm-reg original) :to-be :r0))))))
+          (expect (cl-cc/vm:vm-reg original) :to-be :r0))))))
 
 (it-sequential "ssa-phi-elim-idempotent"
   (let* ((pred-a (make-ssa-test-block 1))
@@ -450,8 +450,8 @@
         ;; Same instruction content (first pass should have eliminated phi-b (same-arg :x.0))
         (let ((inst-1 (first (gethash join first-renamed)))
               (inst-2 (first (gethash join second-renamed))))
-          (expect (cl-cc/vm::vm-lhs inst-2) :to-be (cl-cc/vm::vm-lhs inst-1))
-          (expect (cl-cc/vm::vm-rhs inst-2) :to-be (cl-cc/vm::vm-rhs inst-1)))
+          (expect (cl-cc/vm:vm-lhs inst-2) :to-be (cl-cc/vm:vm-lhs inst-1))
+          (expect (cl-cc/vm:vm-rhs inst-2) :to-be (cl-cc/vm:vm-rhs inst-1)))
         ;; Verify phi-b was eliminated and phi-a remains
         (let ((phi-b-1 (find-if (lambda (p) (eq (cl-cc:phi-dst p) :b.0))
                                 (gethash join first-phi)))
@@ -467,33 +467,33 @@
   (expect (cl-cc/optimize:ssa-sequentialize-copies nil) :to-be-null)
   (let* ((result (cl-cc/optimize:ssa-sequentialize-copies '((:r0 . :r1) (:r2 . :r3)))))
     (expect (= 2 (length result)) :to-be-truthy)
-    (expect (every (lambda (i) (typep i 'cl-cc/vm::vm-move)) result) :to-be-truthy))
+    (expect (every (lambda (i) (typep i 'cl-cc/vm:vm-move)) result) :to-be-truthy))
   (let* ((result (cl-cc/optimize:ssa-sequentialize-copies '((:r0 . :r1) (:r1 . :r0)))))
     (expect (= 3 (length result)) :to-be-truthy)
-    (expect (every (lambda (i) (typep i 'cl-cc/vm::vm-logxor)) result) :to-be-truthy)))
+    (expect (every (lambda (i) (typep i 'cl-cc/vm:vm-logxor)) result) :to-be-truthy)))
 
 (it-sequential "ssa-seq-copies-xor-swap-shape"
   (let ((result (cl-cc/optimize:ssa-sequentialize-copies '((:r0 . :r1) (:r1 . :r0)))))
     (expect (= 3 (length result)) :to-be-truthy)
     (destructuring-bind (first second third) result
-      (expect (cl-cc/vm::vm-dst first) :to-be :r0)
-      (expect (cl-cc/vm::vm-lhs first) :to-be :r0)
-      (expect (cl-cc/vm::vm-rhs first) :to-be :r1)
-      (expect (cl-cc/vm::vm-dst second) :to-be :r1)
-      (expect (cl-cc/vm::vm-lhs second) :to-be :r0)
-      (expect (cl-cc/vm::vm-rhs second) :to-be :r1)
-      (expect (cl-cc/vm::vm-dst third) :to-be :r0)
-      (expect (cl-cc/vm::vm-lhs third) :to-be :r0)
-      (expect (cl-cc/vm::vm-rhs third) :to-be :r1))))
+      (expect (cl-cc/vm:vm-dst first) :to-be :r0)
+      (expect (cl-cc/vm:vm-lhs first) :to-be :r0)
+      (expect (cl-cc/vm:vm-rhs first) :to-be :r1)
+      (expect (cl-cc/vm:vm-dst second) :to-be :r1)
+      (expect (cl-cc/vm:vm-lhs second) :to-be :r0)
+      (expect (cl-cc/vm:vm-rhs second) :to-be :r1)
+      (expect (cl-cc/vm:vm-dst third) :to-be :r0)
+      (expect (cl-cc/vm:vm-lhs third) :to-be :r0)
+      (expect (cl-cc/vm:vm-rhs third) :to-be :r1))))
 
 (it-sequential "ssa-seq-copies-three-cycle-still-uses-temp"
   (let* ((result (cl-cc/optimize:ssa-sequentialize-copies
                   '((:r0 . :r1) (:r1 . :r2) (:r2 . :r0))))
-         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move)) result)))
+         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-move)) result)))
     (expect (= 4 (length result)) :to-be-truthy)
     (expect (= 4 (length moves)) :to-be-truthy)
     (expect (some (lambda (i)
-                         (let ((dst (cl-cc/vm::vm-dst i)))
+                         (let ((dst (cl-cc/vm:vm-dst i)))
                            (and (keywordp dst)
                                 (search "SSATMP" (symbol-name dst)))))
                        moves) :to-be-truthy)))
@@ -502,15 +502,15 @@
   (let ((result (cl-cc/optimize:ssa-sequentialize-copies
                  '((:r0 . :r1) (:r1 . :r2) (:r3 . :r1)))))
     (expect (= 3 (length result)) :to-be-truthy)
-    (expect (every (lambda (i) (typep i 'cl-cc/vm::vm-move)) result) :to-be-truthy)
+    (expect (every (lambda (i) (typep i 'cl-cc/vm:vm-move)) result) :to-be-truthy)
     (expect (some (lambda (i)
-                          (search "SSATMP" (symbol-name (cl-cc/vm::vm-dst i))))
+                          (search "SSATMP" (symbol-name (cl-cc/vm:vm-dst i))))
                         result) :to-be-falsy)
     ;; :r0 and :r3 both read the old :r1, so they must precede :r1 <- :r2.
-    (let ((r1-write-pos (position-if (lambda (i) (eq :r1 (cl-cc/vm::vm-dst i))) result)))
+    (let ((r1-write-pos (position-if (lambda (i) (eq :r1 (cl-cc/vm:vm-dst i))) result)))
       (expect r1-write-pos :to-be-truthy)
       (expect (every (lambda (i)
-                            (or (eq :r1 (cl-cc/vm::vm-dst i))
+                            (or (eq :r1 (cl-cc/vm:vm-dst i))
                                 (< (position i result) r1-write-pos)))
                           result) :to-be-truthy))))
 
@@ -532,8 +532,8 @@
           (gethash pred renamed) (list (make-vm-jump :label "join"))
           (gethash join renamed) (list (make-vm-ret :reg :r2)))
     (let* ((out (cl-cc/optimize:ssa-destroy cfg phi-map renamed))
-           (move-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-move)) out))
-           (jump-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-jump)) out)))
+           (move-pos (position-if (lambda (i) (typep i 'cl-cc/vm:vm-move)) out))
+           (jump-pos (position-if (lambda (i) (typep i 'cl-cc/vm:vm-jump)) out)))
       (expect move-pos :to-be-truthy)
       (expect jump-pos :to-be-truthy)
       (expect (< move-pos jump-pos) :to-be-truthy))))
@@ -558,22 +558,22 @@
           (gethash pred renamed) (list (make-vm-jump-zero :reg :cond :label "join"))
           (gethash join renamed) (list (make-vm-ret :reg :r2)))
     (let* ((out (cl-cc/optimize:ssa-destroy cfg phi-map renamed))
-           (jump-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out))
+           (jump-pos (position-if (lambda (i) (typep i 'cl-cc/vm:vm-jump-zero)) out))
            (jump-inst (nth jump-pos out))
-           (pad-name (cl-cc/vm::vm-label-name jump-inst))
+           (pad-name (cl-cc/vm:vm-label-name jump-inst))
            (pad-pos (position-if (lambda (i)
-                                   (and (typep i 'cl-cc/vm::vm-label)
-                                        (string= pad-name (cl-cc/vm::vm-name i))))
+                                   (and (typep i 'cl-cc/vm:vm-label)
+                                        (string= pad-name (cl-cc/vm:vm-name i))))
                                  out))
-           (move-pos (position-if (lambda (i) (typep i 'cl-cc/vm::vm-move)) out)))
+           (move-pos (position-if (lambda (i) (typep i 'cl-cc/vm:vm-move)) out)))
       (expect jump-pos :to-be-truthy)
       (expect (string= "join" pad-name) :to-be-falsy)
       (expect pad-pos :to-be-truthy)
       (expect move-pos :to-be-truthy)
       (expect (< jump-pos move-pos) :to-be-truthy)
       (expect (< pad-pos move-pos) :to-be-truthy)
-      (expect (cl-cc/vm::vm-dst (nth (1+ pad-pos) out)) :to-be :r2)
-      (expect (cl-cc/vm::vm-src (nth (1+ pad-pos) out)) :to-be :r1))))
+      (expect (cl-cc/vm:vm-dst (nth (1+ pad-pos) out)) :to-be :r2)
+      (expect (cl-cc/vm:vm-src (nth (1+ pad-pos) out)) :to-be :r1))))
 
 ;;; ─── %ssa-resolve-reg ────────────────────────────────────────────────────
 
@@ -610,9 +610,9 @@
 (it-sequential "ssa-rewrite-dst-changes-destination"
   (let* ((inst   (make-vm-const :dst :r0 :value 42))
          (result (cl-cc/optimize::ssa-rewrite-dst inst :r0 :r9)))
-    (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
-    (expect (cl-cc/vm::vm-dst result) :to-be :r9)
-    (expect (= 42 (cl-cc/vm::vm-value result)) :to-be-truthy)))
+    (expect (typep result 'cl-cc/vm:vm-const) :to-be-truthy)
+    (expect (cl-cc/vm:vm-dst result) :to-be :r9)
+    (expect (= 42 (cl-cc/vm:vm-value result)) :to-be-truthy)))
 
 (it-sequential "ssa-rewrite-dst-noop-when-no-match"
   (let* ((inst (make-vm-const :dst :r1 :value 7)))

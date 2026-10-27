@@ -182,7 +182,7 @@
                  (make-vm-call :dst :r1 :func :r0 :args '(:r2))) 1 "target")
     (let* ((result (cl-cc/optimize:opt-pass-devirtualize insts))
          (refs (remove-if-not (lambda (inst)
-                                (typep inst 'cl-cc/vm::vm-func-ref))
+                                (typep inst 'cl-cc/vm:vm-func-ref))
                               result)))
     (expect (= expected-count (length refs)) :to-be-truthy)
     (when expected-label
@@ -194,7 +194,7 @@
                  (make-vm-call :dst :r1 :func :r3 :args nil)) 1 "moved")
     (let* ((result (cl-cc/optimize:opt-pass-devirtualize insts))
          (refs (remove-if-not (lambda (inst)
-                                (typep inst 'cl-cc/vm::vm-func-ref))
+                                (typep inst 'cl-cc/vm:vm-func-ref))
                               result)))
     (expect (= expected-count (length refs)) :to-be-truthy)
     (when expected-label
@@ -206,7 +206,7 @@
                  (make-vm-call :dst :r1 :func :r0 :args nil)) 0 nil)
     (let* ((result (cl-cc/optimize:opt-pass-devirtualize insts))
          (refs (remove-if-not (lambda (inst)
-                                (typep inst 'cl-cc/vm::vm-func-ref))
+                                (typep inst 'cl-cc/vm:vm-func-ref))
                               result)))
     (expect (= expected-count (length refs)) :to-be-truthy)
     (when expected-label
@@ -218,10 +218,10 @@
          (once (cl-cc/optimize:opt-pass-devirtualize insts))
          (twice (cl-cc/optimize:opt-pass-devirtualize once)))
     (expect (= 1 (count-if (lambda (inst)
-                            (typep inst 'cl-cc/vm::vm-func-ref))
+                            (typep inst 'cl-cc/vm:vm-func-ref))
                           once)) :to-be-truthy)
     (expect (= 1 (count-if (lambda (inst)
-                             (typep inst 'cl-cc/vm::vm-func-ref))
+                             (typep inst 'cl-cc/vm:vm-func-ref))
                            twice)) :to-be-truthy)))
 
 (it-sequential "opt-pass-devirtualize-sealed-satiated-single-method-gf"
@@ -246,10 +246,10 @@
                  (cl-cc:make-vm-generic-call :dst :r7 :gf-reg :r2 :args '(:r6))))
          (out (cl-cc/optimize:opt-pass-devirtualize insts)))
     (expect (find-if (lambda (inst)
-                             (typep inst 'cl-cc/vm::vm-generic-call))
+                             (typep inst 'cl-cc/vm:vm-generic-call))
                            out) :to-be-falsy)
     (expect (find-if (lambda (inst)
-                            (and (typep inst 'cl-cc/vm::vm-func-ref)
+                            (and (typep inst 'cl-cc/vm:vm-func-ref)
                                  (equal "METHOD_SEALED_AREA_NODE"
                                         (cl-cc:vm-label-name inst))))
                           out) :to-be-truthy)
@@ -269,7 +269,7 @@
                  (cl-cc:make-vm-generic-call :dst :r7 :gf-reg :r2 :args '(:r6))))
          (out (cl-cc/optimize:opt-pass-devirtualize insts)))
     (expect (find-if (lambda (inst)
-                            (typep inst 'cl-cc/vm::vm-generic-call))
+                            (typep inst 'cl-cc/vm:vm-generic-call))
                           out) :to-be-truthy)))
 
 (it-sequential "opt-pass-call-site-splitting-duplicates-known-predecessor-call"
@@ -284,7 +284,7 @@
          (out (cl-cc/optimize:opt-pass-call-site-splitting insts))
          (calls (remove-if-not #'cl-cc:vm-call-p out))
          (after-jump (find-if (lambda (inst)
-                                (and (typep inst 'cl-cc/vm::vm-jump)
+                                (and (typep inst 'cl-cc/vm:vm-jump)
                                      (search "CALL-SITE-SPLIT-AFTER-"
                                              (cl-cc:vm-label-name inst))))
                               out))
@@ -292,11 +292,11 @@
     (expect (= 2 (length calls)) :to-be-truthy)
     (expect after-jump :to-be-truthy)
     (expect (find-if (lambda (inst)
-                            (and (typep inst 'cl-cc/vm::vm-label)
-                                 (equal after-label (cl-cc/vm::vm-name inst))))
+                            (and (typep inst 'cl-cc/vm:vm-label)
+                                 (equal after-label (cl-cc/vm:vm-name inst))))
                           out) :to-be-truthy)
     (expect (find-if (lambda (inst)
-                            (and (typep inst 'cl-cc/vm::vm-func-ref)
+                            (and (typep inst 'cl-cc/vm:vm-func-ref)
                                  (equal "then-fn" (cl-cc:vm-label-name inst))))
                           out) :to-be-truthy)))
 
@@ -344,7 +344,7 @@
                       (cl-cc:make-vm-apply :dst :out :func :fn :args '(:head :rest))
                       (make-vm-halt :reg :out)))
          (out (cl-cc/optimize:opt-pass-call-site-splitting insts))
-         (applies (remove-if-not (lambda (inst) (typep inst 'cl-cc/vm::vm-apply)) out)))
+         (applies (remove-if-not (lambda (inst) (typep inst 'cl-cc/vm:vm-apply)) out)))
     (expect (= 2 (length applies)) :to-be-truthy)))
 
 (it-sequential "opt-pass-call-site-splitting-handles-vm-tail-call"
@@ -355,19 +355,19 @@
                       (make-vm-halt :reg :out)))
          (out (cl-cc/optimize:opt-pass-call-site-splitting insts))
          (tail-calls (remove-if-not (lambda (inst)
-                                      (typep inst 'cl-cc/vm::vm-tail-call))
+                                      (typep inst 'cl-cc/vm:vm-tail-call))
                                     out))
          (after-jump (find-if (lambda (inst)
-                                (and (typep inst 'cl-cc/vm::vm-jump)
+                                (and (typep inst 'cl-cc/vm:vm-jump)
                                      (search "CALL-SITE-SPLIT-AFTER-"
                                              (cl-cc:vm-label-name inst))))
                               out)))
     (expect (= 2 (length tail-calls)) :to-be-truthy)
     (expect after-jump :to-be-truthy)
     (expect (find-if (lambda (inst)
-                            (and (typep inst 'cl-cc/vm::vm-label)
+                            (and (typep inst 'cl-cc/vm:vm-label)
                                  (equal (cl-cc:vm-label-name after-jump)
-                                        (cl-cc/vm::vm-name inst))))
+                                        (cl-cc/vm:vm-name inst))))
                           out) :to-be-truthy)))
 
 ;;; ─── opt-can-safely-rename-p ─────────────────────────────────────────────────

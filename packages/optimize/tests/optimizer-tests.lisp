@@ -90,9 +90,9 @@
   (destructuring-bind (expected-value producer predicate) (list 0 (make-vm-cons :dst :r1 :car-src :r0 :cdr-src :r0) (make-vm-null-p :dst :r2 :src :r1))
     (let ((out (cl-cc/optimize::opt-pass-fold (list producer predicate))))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq (cl-cc/vm::vm-dst i) :r2)
-                              (eql (cl-cc/vm::vm-value i) expected-value)))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq (cl-cc/vm:vm-dst i) :r2)
+                              (eql (cl-cc/vm:vm-value i) expected-value)))
                        out) :to-be-truthy)
      (expect (some (lambda (i) (typep i (type-of predicate))) out) :to-be-falsy))))
 
@@ -100,9 +100,9 @@
   (destructuring-bind (expected-value producer predicate) (list 1 (make-vm-cons :dst :r1 :car-src :r0 :cdr-src :r0) (make-vm-cons-p :dst :r2 :src :r1))
     (let ((out (cl-cc/optimize::opt-pass-fold (list producer predicate))))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq (cl-cc/vm::vm-dst i) :r2)
-                              (eql (cl-cc/vm::vm-value i) expected-value)))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq (cl-cc/vm:vm-dst i) :r2)
+                              (eql (cl-cc/vm:vm-value i) expected-value)))
                        out) :to-be-truthy)
      (expect (some (lambda (i) (typep i (type-of predicate))) out) :to-be-falsy))))
 
@@ -110,9 +110,9 @@
   (destructuring-bind (expected-value producer predicate) (list 1 (make-vm-cons :dst :r1 :car-src :r0 :cdr-src :r0) (make-vm-listp :dst :r2 :src :r1))
     (let ((out (cl-cc/optimize::opt-pass-fold (list producer predicate))))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq (cl-cc/vm::vm-dst i) :r2)
-                              (eql (cl-cc/vm::vm-value i) expected-value)))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq (cl-cc/vm:vm-dst i) :r2)
+                              (eql (cl-cc/vm:vm-value i) expected-value)))
                        out) :to-be-truthy)
      (expect (some (lambda (i) (typep i (type-of predicate))) out) :to-be-falsy))))
 
@@ -120,9 +120,9 @@
   (destructuring-bind (expected-value producer predicate) (list 1 (make-vm-concatenate :dst :r1 :str1 :r0 :str2 :r0) (make-vm-stringp :dst :r2 :src :r1))
     (let ((out (cl-cc/optimize::opt-pass-fold (list producer predicate))))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq (cl-cc/vm::vm-dst i) :r2)
-                              (eql (cl-cc/vm::vm-value i) expected-value)))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq (cl-cc/vm:vm-dst i) :r2)
+                              (eql (cl-cc/vm:vm-value i) expected-value)))
                        out) :to-be-truthy)
      (expect (some (lambda (i) (typep i (type-of predicate))) out) :to-be-falsy))))
 
@@ -130,9 +130,9 @@
   (destructuring-bind (expected-value producer predicate) (list 1 (make-vm-coerce-to-vector :dst :r1 :src :r0) (make-vm-vectorp :dst :r2 :src :r1))
     (let ((out (cl-cc/optimize::opt-pass-fold (list producer predicate))))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq (cl-cc/vm::vm-dst i) :r2)
-                              (eql (cl-cc/vm::vm-value i) expected-value)))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq (cl-cc/vm:vm-dst i) :r2)
+                              (eql (cl-cc/vm:vm-value i) expected-value)))
                        out) :to-be-truthy)
      (expect (some (lambda (i) (typep i (type-of predicate))) out) :to-be-falsy))))
 
@@ -208,8 +208,8 @@
          (_loop (cl-cc/optimize:cfg-compute-loop-depths cfg))
          (out   (cl-cc/optimize:cfg-flatten-hot-cold cfg))
          (labels (loop for inst in out
-                        when (typep inst 'cl-cc/vm::vm-label)
-                        collect (cl-cc/vm::vm-name inst))))
+                        when (typep inst 'cl-cc/vm:vm-label)
+                        collect (cl-cc/vm:vm-name inst))))
     (declare (ignore _idom _loop))
     (expect (member "hot" labels :test #'equal) :to-be-truthy)
     (expect (member "cold" labels :test #'equal) :to-be-truthy)
@@ -228,7 +228,7 @@
 ;;; ── Dominated Predicate Elimination ─────────────────────────────────────
 
 (it-sequential "optimizer-dominated-check-elim null-p via dominated-type-check-elim"
-  (destructuring-bind (pass-fn p1 p2 instr-type) (list #'cl-cc/optimize:opt-pass-dominated-type-check-elim (make-vm-null-p :dst :r1 :src :r0) (make-vm-null-p :dst :r2 :src :r0) 'cl-cc/vm::vm-null-p)
+  (destructuring-bind (pass-fn p1 p2 instr-type) (list #'cl-cc/optimize:opt-pass-dominated-type-check-elim (make-vm-null-p :dst :r1 :src :r0) (make-vm-null-p :dst :r2 :src :r0) 'cl-cc/vm:vm-null-p)
     (let* ((c    (make-vm-const :dst :r0 :value nil))
          (br   (make-vm-jump-zero :reg :r1 :label "else"))
          (then (make-vm-label :name "then"))
@@ -237,10 +237,10 @@
          (ret0 (make-vm-ret :reg :r1))
          (out  (funcall pass-fn (list c p1 br then p2 ret1 else ret0))))
     (expect (count-if (lambda (i) (typep i instr-type)) out) :to-equal 1)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move)) out) :to-be-truthy))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-move)) out) :to-be-truthy))))
 
 (it-sequential "optimizer-dominated-check-elim not via dominated-type-check-elim"
-  (destructuring-bind (pass-fn p1 p2 instr-type) (list #'cl-cc/optimize:opt-pass-dominated-type-check-elim (make-vm-not :dst :r1 :src :r0) (make-vm-not :dst :r2 :src :r0) 'cl-cc/vm::vm-not)
+  (destructuring-bind (pass-fn p1 p2 instr-type) (list #'cl-cc/optimize:opt-pass-dominated-type-check-elim (make-vm-not :dst :r1 :src :r0) (make-vm-not :dst :r2 :src :r0) 'cl-cc/vm:vm-not)
     (let* ((c    (make-vm-const :dst :r0 :value nil))
          (br   (make-vm-jump-zero :reg :r1 :label "else"))
          (then (make-vm-label :name "then"))
@@ -249,10 +249,10 @@
          (ret0 (make-vm-ret :reg :r1))
          (out  (funcall pass-fn (list c p1 br then p2 ret1 else ret0))))
     (expect (count-if (lambda (i) (typep i instr-type)) out) :to-equal 1)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move)) out) :to-be-truthy))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-move)) out) :to-be-truthy))))
 
 (it-sequential "optimizer-dominated-check-elim not via nil-check-elim"
-  (destructuring-bind (pass-fn p1 p2 instr-type) (list #'cl-cc/optimize:opt-pass-dominated-type-check-elim (make-vm-not :dst :r1 :src :r0) (make-vm-not :dst :r2 :src :r0) 'cl-cc/vm::vm-not)
+  (destructuring-bind (pass-fn p1 p2 instr-type) (list #'cl-cc/optimize:opt-pass-dominated-type-check-elim (make-vm-not :dst :r1 :src :r0) (make-vm-not :dst :r2 :src :r0) 'cl-cc/vm:vm-not)
     (let* ((c    (make-vm-const :dst :r0 :value nil))
          (br   (make-vm-jump-zero :reg :r1 :label "else"))
          (then (make-vm-label :name "then"))
@@ -261,7 +261,7 @@
          (ret0 (make-vm-ret :reg :r1))
          (out  (funcall pass-fn (list c p1 br then p2 ret1 else ret0))))
     (expect (count-if (lambda (i) (typep i instr-type)) out) :to-equal 1)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move)) out) :to-be-truthy))))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-move)) out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const branch-correlation-true-edge"
   (destructuring-bind (make-out expected-dst expected-value) (list (lambda ()
@@ -277,9 +277,9 @@
                 (list c p1 br then p2 ret1 else ret0)))) :r2 1)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const branch-correlation-false-edge"
@@ -296,9 +296,9 @@
                  (list c p1 br then ret1 else p2 ret0)))) :r2 0)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const branch-correlation-join-agrees"
@@ -318,9 +318,9 @@
                 (list pred-a p1 br-a pred-b p2 br-b then ret2 join p3 ret3)))) :r3 0)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const fold-rational-unary"
@@ -331,9 +331,9 @@
                (cl-cc/optimize::opt-pass-fold (list c1 u1 ret)))) :r1 3)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const fold-car-constant-cons"
@@ -344,9 +344,9 @@
                (cl-cc/optimize::opt-pass-fold (list c1 u1 ret)))) :r1 11)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const fold-cdr-constant-cons"
@@ -357,9 +357,9 @@
                (cl-cc/optimize::opt-pass-fold (list c1 u1 ret)))) :r1 12)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const fold-rational-binary"
@@ -371,23 +371,23 @@
                (cl-cc/optimize::opt-pass-fold (list c1 c2 g ret)))) :r2 4)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const fold-rational-cl-div"
   (destructuring-bind (make-out expected-dst expected-value) (list (lambda ()
              (let* ((c1  (make-vm-const :dst :r0 :value 3))
                     (c2  (make-vm-const :dst :r1 :value 4))
-                    (d   (cl-cc/vm::make-vm-cl-div :dst :r2 :lhs :r0 :rhs :r1))
+                    (d   (cl-cc/vm:make-vm-cl-div :dst :r2 :lhs :r0 :rhs :r1))
                     (ret (make-vm-ret :reg :r2)))
                (cl-cc/optimize::opt-pass-fold (list c1 c2 d ret)))) :r2 3/4)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-pass-produces-const fold-floor-div"
@@ -399,9 +399,9 @@
                (cl-cc/optimize::opt-pass-fold (list c1 c2 d ret)))) :r2 -4)
     (let ((out (funcall make-out)))
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-const)
-                              (eq expected-dst (cl-cc/vm::vm-dst i))
-                              (eql expected-value (cl-cc/vm::vm-value i))))
+                         (and (typep i 'cl-cc/vm:vm-const)
+                              (eq expected-dst (cl-cc/vm:vm-dst i))
+                              (eql expected-value (cl-cc/vm:vm-value i))))
                        out) :to-be-truthy))))
 
 (it-sequential "optimizer-branch-correlation-join-disagrees"
@@ -419,8 +419,8 @@
          (out    (cl-cc/optimize::opt-pass-branch-correlation
                   (list pred-a p1 br-a pred-b p2 br-b join p3 ret3 other ret2))))
     (expect (some (lambda (i)
-                          (and (typep i 'cl-cc/vm::vm-const)
-                               (eq :r3 (cl-cc/vm::vm-dst i))))
+                          (and (typep i 'cl-cc/vm:vm-const)
+                               (eq :r3 (cl-cc/vm:vm-dst i))))
                         out) :to-be-falsy)))
 
 ;;; ── Data-Table Coverage Tests ──────────────────────────────────────────────

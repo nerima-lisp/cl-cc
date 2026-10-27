@@ -10,7 +10,7 @@
          (out (cl-cc/optimize::opt-pass-cse (list i1 i2 i3 i4))))
     (expect (cl-cc:vm-add-p (third out)) :to-be-truthy)
     (expect (cl-cc:vm-move-p (fourth out)) :to-be-truthy)
-    (expect (cl-cc/vm::vm-src (fourth out)) :to-equal :R2))))
+    (expect (cl-cc/vm:vm-src (fourth out)) :to-equal :R2))))
 
 (it-sequential "cse-dedup swapped-order"
   (destructuring-bind (i4) (list (cl-cc:make-vm-add :dst :R3 :lhs :R1 :rhs :R0))
@@ -20,7 +20,7 @@
          (out (cl-cc/optimize::opt-pass-cse (list i1 i2 i3 i4))))
     (expect (cl-cc:vm-add-p (third out)) :to-be-truthy)
     (expect (cl-cc:vm-move-p (fourth out)) :to-be-truthy)
-    (expect (cl-cc/vm::vm-src (fourth out)) :to-equal :R2))))
+    (expect (cl-cc/vm:vm-src (fourth out)) :to-equal :R2))))
 
 (it-sequential "cse-label-flushes"
   (let* ((i1 (cl-cc:make-vm-const :dst :R0 :value 10))
@@ -52,7 +52,7 @@
          (out (cl-cc/optimize::opt-pass-cse (list i1 i2 i3))))
     (expect (cl-cc:vm-neg-p (second out)) :to-be-truthy)
     (expect (cl-cc:vm-move-p (third out)) :to-be-truthy)
-    (expect (cl-cc/vm::vm-src (third out)) :to-equal :R1)))
+    (expect (cl-cc/vm:vm-src (third out)) :to-equal :R1)))
 
 (it-sequential "cse-const-no-move"
   (let* ((i1 (cl-cc:make-vm-const :dst :R0 :value 42))
@@ -95,8 +95,8 @@
          (i4 (cl-cc:make-vm-add :dst :R3 :lhs :R0 :rhs :R1))
          (r  (cl-cc:make-vm-ret :reg :R3))
          (out (cl-cc/optimize::opt-pass-gvn (list i1 i2 i3 j l i4 r))))
-    (expect (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out) :to-equal 1)
+    (expect (count-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) out) :to-equal 1)
      (expect (some (lambda (i)
-                          (and (typep i 'cl-cc/vm::vm-move)
-                               (eq :R3 (cl-cc/vm::vm-dst i))))
+                          (and (typep i 'cl-cc/vm:vm-move)
+                               (eq :R3 (cl-cc/vm:vm-dst i))))
                         out) :to-be-truthy)))

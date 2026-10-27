@@ -42,7 +42,7 @@
                   (cl-cc/codegen::emit-vm-select
                    (cl-cc:make-vm-select :dst :R0 :cond-reg :R1 :then-reg :R2 :else-reg :R3)
                    s)))))
-    (expect (gethash 'cl-cc/vm::vm-select cl-cc/codegen::*x86-64-emitter-table*) :to-be #'cl-cc/codegen::emit-vm-select)
+    (expect (gethash 'cl-cc/vm:vm-select cl-cc/codegen::*x86-64-emitter-table*) :to-be #'cl-cc/codegen::emit-vm-select)
     (expect (= 10 (length bytes)) :to-be-truthy)
     (expect (= #x48 (nth 0 bytes)) :to-be-truthy)
     (expect (= #x89 (nth 1 bytes)) :to-be-truthy)
@@ -200,7 +200,7 @@
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-signal :condition-reg :R0)
+                     (cl-cc/vm:make-vm-signal :condition-reg :R0)
                      s
                      0
                      (make-hash-table :test #'equal)))))))
@@ -212,7 +212,7 @@
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-establish-catch
+                     (cl-cc/vm:make-vm-establish-catch
                       :tag-reg :R0 :handler-label "Lc" :result-reg :R1)
                      s
                      0
@@ -221,7 +221,7 @@
     (expect bytes :to-equal '(#xF3 #x0F #x01 #xEA #x66 #x90))))
 
 (it-sequential "x86-64-shadow-stack-control-inst-covers-vm-handler-ops remove-handler"
-  (destructuring-bind (make-fn expected-bytes) (list #'cl-cc/vm::make-vm-remove-handler '(#xF3 #x0F #x01 #x28 #x66 #x90))
+  (destructuring-bind (make-fn expected-bytes) (list #'cl-cc/vm:make-vm-remove-handler '(#xF3 #x0F #x01 #x28 #x66 #x90))
     (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -234,7 +234,7 @@
     (expect bytes :to-equal expected-bytes))))
 
 (it-sequential "x86-64-shadow-stack-control-inst-covers-vm-handler-ops sync-handler-regs"
-  (destructuring-bind (make-fn expected-bytes) (list #'cl-cc/vm::make-vm-sync-handler-regs '(#xF3 #x48 #x0F #xAE #xE8 #x90))
+  (destructuring-bind (make-fn expected-bytes) (list #'cl-cc/vm:make-vm-sync-handler-regs '(#xF3 #x48 #x0F #xAE #xE8 #x90))
     (let ((bytes (let ((cl-cc/codegen::*x86-64-shadow-stack-enabled* t))
                  (%x86-collect-bytes
                   (lambda (s)
@@ -251,7 +251,7 @@
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-throw :tag-reg :R0 :value-reg :R1)
+                     (cl-cc/vm:make-vm-throw :tag-reg :R0 :value-reg :R1)
                      s
                      0
                      (make-hash-table :test #'equal)))))))

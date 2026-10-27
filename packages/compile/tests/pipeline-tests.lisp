@@ -14,7 +14,7 @@
          (asm    (compilation-result-assembly result))
          (cps    (compilation-result-cps result)))
     (expect (typep result 'cl-cc/compile:compilation-result) :to-be-truthy)
-    (expect (typep prog 'cl-cc/vm::vm-program) :to-be-truthy)
+    (expect (typep prog 'cl-cc/vm:vm-program) :to-be-truthy)
     (expect (> (length instrs) 0) :to-be-truthy)
     (expect (stringp asm) :to-be-truthy)
     (expect (or (null cps) (consp cps)) :to-be-truthy)))
@@ -24,7 +24,7 @@
             (instrs (vm-program-instructions (compilation-result-program result)))
             (cps (compilation-result-cps result)))
       (declare (ignore cps))
-      (expect (typep (car (last instrs)) 'cl-cc/vm::vm-halt) :to-be-truthy)))
+      (expect (typep (car (last instrs)) 'cl-cc/vm:vm-halt) :to-be-truthy)))
 
 (it-sequential "pipeline-policy-data-tables-are-populated"
   (expect (member 'cl-cc/ast:ast-defun cl-cc::*cps-host-eval-unsafe-ast-types*) :to-be-truthy)
@@ -318,7 +318,7 @@ asserting the new path reproduces it has to still hold the old one."
       (when entry
         (let* ((symbol (car entry))
                (function (cdr entry))
-               (table cl-cc/vm::*vm-host-bridge-functions*))
+               (table cl-cc/vm:*vm-host-bridge-functions*))
           (multiple-value-bind (previous present-p) (gethash symbol table)
             (unwind-protect
                  (progn

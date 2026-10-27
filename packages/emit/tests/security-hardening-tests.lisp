@@ -18,14 +18,14 @@
     (nreverse bytes)))
 
 (defun %security-indirect-call-program ()
-  (cl-cc/vm::make-vm-program
+  (cl-cc/vm:make-vm-program
    :instructions (list (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil)
                        (cl-cc:make-vm-halt :reg :R0))
    :result-register :R0
    :leaf-p nil))
 
 (defun %security-stack-buffer-program ()
-  (cl-cc/vm::make-vm-program
+  (cl-cc/vm:make-vm-program
    :instructions (list (cl-cc:make-vm-const :dst :R0 :value 4)
                        (cl-cc:make-vm-halt :reg :R0))
    :result-register :R0
@@ -86,7 +86,7 @@
   (let ((x86 (%security-byte-list
               (let ((cl-cc/codegen::*x86-64-safe-stack-enabled* t))
                 (cl-cc/codegen::compile-to-x86-64-bytes
-                 (cl-cc/vm::make-vm-program
+                 (cl-cc/vm:make-vm-program
                   :instructions (list (cl-cc:make-vm-const :dst :R0 :value 7)
                                       (cl-cc:make-vm-halt :reg :R0))
                   :result-register :R0
@@ -96,7 +96,7 @@
   (let ((a64 (%security-byte-list
               (let ((cl-cc/codegen::*aarch64-safe-stack-enabled* t))
                 (cl-cc/codegen::compile-to-aarch64-bytes
-                 (cl-cc/vm::make-vm-program
+                 (cl-cc/vm:make-vm-program
                   :instructions (list (cl-cc:make-vm-const :dst :R0 :value 7)
                                       (cl-cc:make-vm-halt :reg :R0))
                   :result-register :R0

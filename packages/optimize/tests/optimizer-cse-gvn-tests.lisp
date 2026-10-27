@@ -29,9 +29,9 @@
                       (make-vm-ret   :reg :r3)))
          (result (cl-cc/optimize::opt-pass-cse insts)))
     ;; The second vm-add should be eliminated → replaced by vm-move
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-move)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-move)) result) :to-be-truthy)
     ;; Only one vm-add should remain
-    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) result)) :to-be-truthy)))
+    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) result)) :to-be-truthy)))
 
 (it-sequential "cse-label-flushes-knowledge"
   (let* ((insts (list (make-vm-const :dst :r0 :value 1)
@@ -44,7 +44,7 @@
                       (make-vm-ret   :reg :r3)))
          (result (cl-cc/optimize::opt-pass-cse insts)))
     ;; After flushing at the label, both adds should remain
-    (expect (>= (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) result) 1) :to-be-truthy)))
+    (expect (>= (count-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) result) 1) :to-be-truthy)))
 
 (it-sequential "cse-keeps-vm-const-not-replaced-by-move"
   (let* ((insts (list (make-vm-const :dst :r0 :value 42)
@@ -52,7 +52,7 @@
                       (make-vm-ret   :reg :r1)))
          (result (cl-cc/optimize::opt-pass-cse insts)))
     ;; Both vm-const should remain (not merged via vm-move)
-    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-const)) result)) :to-be-truthy)))
+    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-const)) result)) :to-be-truthy)))
 
 ;;; ─── opt-pass-gvn ────────────────────────────────────────────────────────
 
@@ -77,9 +77,9 @@
                       (make-vm-add :dst :r3 :lhs :r0 :rhs :r1)
                       (make-vm-ret :reg :r3)))
          (result (cl-cc/optimize::opt-pass-gvn insts)))
-    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) result)) :to-be-truthy)
+    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) result)) :to-be-truthy)
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
+             (and (typep i 'cl-cc/vm:vm-move)
                   (eq :r3 (vm-dst i))
                   (eq :r2 (vm-src i))))
            result) :to-be-truthy)))
@@ -95,14 +95,14 @@
                       (make-vm-add :dst :r5 :lhs :r1 :rhs :r2)
                       (make-vm-ret :reg :r5)))
          (result (cl-cc/optimize::opt-pass-gvn insts)))
-    (expect (= 3 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) result)) :to-be-truthy)
+    (expect (= 3 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) result)) :to-be-truthy)
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
+             (and (typep i 'cl-cc/vm:vm-move)
                   (eq :r1 (vm-dst i))
                   (eq :r4 (vm-src i))))
            result) :to-be-truthy)
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
+             (and (typep i 'cl-cc/vm:vm-move)
                   (eq :r5 (vm-dst i))))
            result) :to-be-falsy)))
 
@@ -116,9 +116,9 @@
                       (make-vm-car :dst :r3 :src :r0)
                       (make-vm-ret :reg :r3)))
          (result (cl-cc/optimize::opt-pass-gvn insts)))
-    (expect (= 3 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-car)) result)) :to-be-truthy)
+    (expect (= 3 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-car)) result)) :to-be-truthy)
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
+             (and (typep i 'cl-cc/vm:vm-move)
                   (eq :r3 (vm-dst i))))
            result) :to-be-falsy)))
 
@@ -136,7 +136,7 @@
                   :max-iterations 1
                   :pass-pipeline '(:gvn))))
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-move)
+             (and (typep i 'cl-cc/vm:vm-move)
                   (eq :r3 (vm-dst i))
                   (eq :r2 (vm-src i))))
            result) :to-be-truthy)))
@@ -149,8 +149,8 @@
                  (make-vm-ret   :reg :r0)) nil)
     (let ((result (cl-cc/optimize::opt-pass-dead-labels insts)))
     (if expect-label-p
-        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-truthy)
-        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-falsy)))))
+        (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-label)) result) :to-be-truthy)
+        (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-label)) result) :to-be-falsy)))))
 
 (it-sequential "dead-labels-label-presence referenced-kept"
   (destructuring-bind (insts expect-label-p) (list (list (make-vm-jump  :label "target")
@@ -158,8 +158,8 @@
                  (make-vm-ret   :reg :r0)) t)
     (let ((result (cl-cc/optimize::opt-pass-dead-labels insts)))
     (if expect-label-p
-        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-truthy)
-        (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-label)) result) :to-be-falsy)))))
+        (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-label)) result) :to-be-truthy)
+        (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-label)) result) :to-be-falsy)))))
 
 (it-sequential "dead-labels-empty-input"
   (expect (cl-cc/optimize::opt-pass-dead-labels nil) :to-be-null))
@@ -313,7 +313,7 @@
                (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                gen val-env constant-ids)))
     (expect (consp key) :to-be-truthy)
-    (expect (car key) :to-be (quote cl-cc/vm::vm-add))))
+    (expect (car key) :to-be (quote cl-cc/vm:vm-add))))
 
 ;;; ─── %gvn-maybe-replace ──────────────────────────────────────────────────
 
@@ -324,7 +324,7 @@
          (inst    (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
          (result  (cl-cc/optimize::%gvn-maybe-replace inst :r2 nil gen val-env memo nil)))
     (expect (= 1 (length result)) :to-be-truthy)
-    (expect (typep (car result) 'cl-cc/vm::vm-add) :to-be-truthy)
+    (expect (typep (car result) 'cl-cc/vm:vm-add) :to-be-truthy)
     (expect (= 0 (hash-table-count memo)) :to-be-truthy)))
 
 (it-sequential "gvn-maybe-replace-new-key-records-and-emits-inst"
@@ -332,10 +332,10 @@
          (val-env (make-hash-table :test #'eq))
          (memo    (make-hash-table :test #'equal))
          (inst    (make-vm-add :dst :r2 :lhs :r0 :rhs :r1))
-         (key     '(cl-cc/vm::vm-add (:r0 . 0) (:r1 . 0)))
+         (key     '(cl-cc/vm:vm-add (:r0 . 0) (:r1 . 0)))
          (result  (cl-cc/optimize::%gvn-maybe-replace inst :r2 key gen val-env memo nil)))
     (expect (= 1 (length result)) :to-be-truthy)
-    (expect (typep (car result) 'cl-cc/vm::vm-add) :to-be-truthy)
+    (expect (typep (car result) 'cl-cc/vm:vm-add) :to-be-truthy)
     (expect (gethash key memo) :to-be :r2)))
 
 (it-sequential "gvn-maybe-replace-existing-key-produces-vm-move"
@@ -343,11 +343,11 @@
          (val-env (make-hash-table :test #'eq))
          (memo    (make-hash-table :test #'equal))
          (inst    (make-vm-add :dst :r3 :lhs :r0 :rhs :r1))
-         (key     '(cl-cc/vm::vm-add (:r0 . 0) (:r1 . 0))))
+         (key     '(cl-cc/vm:vm-add (:r0 . 0) (:r1 . 0))))
     (setf (gethash key memo) :r2)
     (let ((result (cl-cc/optimize::%gvn-maybe-replace inst :r3 key gen val-env memo nil)))
       (expect (= 1 (length result)) :to-be-truthy)
-      (expect (typep (car result) 'cl-cc/vm::vm-move) :to-be-truthy)
+      (expect (typep (car result) 'cl-cc/vm:vm-move) :to-be-truthy)
       (expect (vm-dst (car result)) :to-be :r3)
       (expect (vm-src (car result)) :to-be :r2))))
 
@@ -359,7 +359,7 @@
          (key    '(vm-add (:r0 . 0) (:r1 . 0)))
          (result (cl-cc/optimize::%cse-emit-or-cse inst :r2 key state nil)))
     (expect (= 1 (length result)) :to-be-truthy)
-    (expect (typep (car result) 'cl-cc/vm::vm-add) :to-be-truthy)))
+    (expect (typep (car result) 'cl-cc/vm:vm-add) :to-be-truthy)))
 
 (it-sequential "cse-emit-or-cse-replaces-duplicate-with-vm-move"
   (let* ((state  (cl-cc/optimize::make-cse-state))
@@ -372,6 +372,6 @@
     ;; Second occurrence should produce a vm-move
     (let ((result (cl-cc/optimize::%cse-emit-or-cse inst2 :r3 key state nil)))
       (expect (= 1 (length result)) :to-be-truthy)
-      (expect (typep (car result) 'cl-cc/vm::vm-move) :to-be-truthy)
+      (expect (typep (car result) 'cl-cc/vm:vm-move) :to-be-truthy)
       (expect (vm-dst (car result)) :to-be :r3)
       (expect (vm-src (car result)) :to-be :r2))))

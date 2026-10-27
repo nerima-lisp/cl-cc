@@ -65,7 +65,7 @@ stable, isolated context."
   (destructuring-bind (n) (list 42)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-int :value n) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (= n (cl-cc::vm-const-value inst)) :to-be-truthy)))))
 
@@ -73,7 +73,7 @@ stable, isolated context."
   (destructuring-bind (n) (list 0)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-int :value n) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (= n (cl-cc::vm-const-value inst)) :to-be-truthy)))))
 
@@ -81,7 +81,7 @@ stable, isolated context."
   (destructuring-bind (n) (list -1)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-int :value n) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (= n (cl-cc::vm-const-value inst)) :to-be-truthy)))))
 
@@ -91,7 +91,7 @@ stable, isolated context."
   (destructuring-bind (name) (list t)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-var :name name) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal name)))))
 
@@ -99,7 +99,7 @@ stable, isolated context."
   (destructuring-bind (name) (list nil)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-var :name name) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal name)))))
 
@@ -107,7 +107,7 @@ stable, isolated context."
   (destructuring-bind (name) (list :foo)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-var :name name) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal name)))))
 
@@ -118,7 +118,7 @@ stable, isolated context."
   (destructuring-bind (datum) (list 'hello)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
@@ -126,7 +126,7 @@ stable, isolated context."
   (destructuring-bind (datum) (list '(1 2 3))
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
@@ -134,7 +134,7 @@ stable, isolated context."
   (destructuring-bind (datum) (list nil)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
@@ -142,7 +142,7 @@ stable, isolated context."
   (destructuring-bind (datum) (list "hello")
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
@@ -150,7 +150,7 @@ stable, isolated context."
   (destructuring-bind (datum) (list "")
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
@@ -158,7 +158,7 @@ stable, isolated context."
   (destructuring-bind (datum) (list #\a)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-quote :value datum) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-const-value inst) :to-equal datum)))))
 
@@ -171,7 +171,7 @@ stable, isolated context."
             (second-reg (compile-ast (make-ast-quote :value second-literal) ctx)))
         (expect second-reg :to-be first-reg)
         (let ((consts (remove-if-not (lambda (inst)
-                                       (typep inst 'cl-cc/vm::vm-const))
+                                       (typep inst 'cl-cc/vm:vm-const))
                                      (codegen-instructions ctx))))
           (expect (= 1 (length consts)) :to-be-truthy)
           (expect (cl-cc::vm-const-value (first consts)) :to-equal "shared"))))))
@@ -182,14 +182,14 @@ stable, isolated context."
       (compile-ast (make-ast-quote :value 'same-symbol) ctx)
       (compile-ast (make-ast-quote :value 'same-symbol) ctx)
       (let ((consts (remove-if-not (lambda (inst)
-                                     (typep inst 'cl-cc/vm::vm-const))
+                                     (typep inst 'cl-cc/vm:vm-const))
                                    (codegen-instructions ctx))))
         (expect (= 1 (length consts)) :to-be-truthy)))))
 
 ;;; ─── compile-ast: ast-binop ─────────────────────────────────────────────
 
 (it-sequential "codegen-binop-emits-correct-instruction add"
-  (destructuring-bind (op inst-type) (list '+ 'cl-cc/vm::vm-add)
+  (destructuring-bind (op inst-type) (list '+ 'cl-cc/vm:vm-add)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
@@ -198,7 +198,7 @@ stable, isolated context."
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
 
 (it-sequential "codegen-binop-emits-correct-instruction sub"
-  (destructuring-bind (op inst-type) (list '- 'cl-cc/vm::vm-sub)
+  (destructuring-bind (op inst-type) (list '- 'cl-cc/vm:vm-sub)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
@@ -207,7 +207,7 @@ stable, isolated context."
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
 
 (it-sequential "codegen-binop-emits-correct-instruction mul"
-  (destructuring-bind (op inst-type) (list '* 'cl-cc/vm::vm-mul)
+  (destructuring-bind (op inst-type) (list '* 'cl-cc/vm:vm-mul)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
@@ -216,7 +216,7 @@ stable, isolated context."
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
 
 (it-sequential "codegen-binop-emits-correct-instruction lt"
-  (destructuring-bind (op inst-type) (list '< 'cl-cc/vm::vm-lt)
+  (destructuring-bind (op inst-type) (list '< 'cl-cc/vm:vm-lt)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
@@ -225,7 +225,7 @@ stable, isolated context."
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
 
 (it-sequential "codegen-binop-emits-correct-instruction gt"
-  (destructuring-bind (op inst-type) (list '> 'cl-cc/vm::vm-gt)
+  (destructuring-bind (op inst-type) (list '> 'cl-cc/vm:vm-gt)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
@@ -234,7 +234,7 @@ stable, isolated context."
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy))))
 
 (it-sequential "codegen-binop-emits-correct-instruction eq"
-  (destructuring-bind (op inst-type) (list '= 'cl-cc/vm::vm-num-eq)
+  (destructuring-bind (op inst-type) (list '= 'cl-cc/vm:vm-num-eq)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-binop :op op
                                   :lhs (make-ast-int :value 1)
@@ -307,7 +307,7 @@ stable, isolated context."
 ;;; ─── compile-ast: ast-call fast paths ────────────────────────────────────
 
 (it-sequential "codegen-call-higher-order-fast-path funcall"
-  (destructuring-bind (fn-sym inst-type) (list 'funcall 'cl-cc/vm::vm-call)
+  (destructuring-bind (fn-sym inst-type) (list 'funcall 'cl-cc/vm:vm-call)
     (let* ((ctx (make-codegen-ctx))
          (fn-reg (cl-cc/compile:make-register ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'fn fn-reg)))
@@ -316,10 +316,10 @@ stable, isolated context."
                                             (make-ast-int :value 1)))
                  ctx)
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-null))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-generic-call) :to-be-null))))
 
 (it-sequential "codegen-call-higher-order-fast-path apply"
-  (destructuring-bind (fn-sym inst-type) (list 'apply 'cl-cc/vm::vm-apply)
+  (destructuring-bind (fn-sym inst-type) (list 'apply 'cl-cc/vm:vm-apply)
     (let* ((ctx (make-codegen-ctx))
          (fn-reg (cl-cc/compile:make-register ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'fn fn-reg)))
@@ -328,7 +328,7 @@ stable, isolated context."
                                             (make-ast-int :value 1)))
                  ctx)
     (expect (codegen-find-inst ctx inst-type) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-null))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-generic-call) :to-be-null))))
 
 (it-sequential "codegen-call-noescape-array-length-emits-const"
   (let* ((ctx (make-codegen-ctx))
@@ -340,23 +340,23 @@ stable, isolated context."
     (compile-ast (make-ast-call :func 'array-length
                                 :args (list (make-ast-var :name 'arr)))
                  ctx)
-    (let ((const-inst (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+    (let ((const-inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
       (expect const-inst :to-be-truthy)
       (expect (= 3 (cl-cc::vm-const-value const-inst)) :to-be-truthy))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))
 
 (it-sequential "codegen-continuation-forms-emit-dedicated-instructions call/cc"
-  (destructuring-bind (expression expected-inst) (list '(call/cc (lambda (k) (funcall k 42))) 'cl-cc/vm::vm-call/cc)
+  (destructuring-bind (expression expected-inst) (list '(call/cc (lambda (k) (funcall k 42))) 'cl-cc/vm:vm-call/cc)
     (let ((instructions (%compile-expression-vm-instructions expression)))
     (expect (%vm-instruction-present-p instructions expected-inst) :to-be-truthy))))
 
 (it-sequential "codegen-continuation-forms-emit-dedicated-instructions call-with-continuation-prompt"
-  (destructuring-bind (expression expected-inst) (list '(call-with-continuation-prompt (lambda () 1) 'reset) 'cl-cc/vm::vm-call-with-prompt)
+  (destructuring-bind (expression expected-inst) (list '(call-with-continuation-prompt (lambda () 1) 'reset) 'cl-cc/vm:vm-call-with-prompt)
     (let ((instructions (%compile-expression-vm-instructions expression)))
     (expect (%vm-instruction-present-p instructions expected-inst) :to-be-truthy))))
 
 (it-sequential "codegen-continuation-forms-emit-dedicated-instructions abort-to-prompt"
-  (destructuring-bind (expression expected-inst) (list '(abort-to-prompt 'reset 42) 'cl-cc/vm::vm-abort-to-prompt)
+  (destructuring-bind (expression expected-inst) (list '(abort-to-prompt 'reset 42) 'cl-cc/vm:vm-abort-to-prompt)
     (let ((instructions (%compile-expression-vm-instructions expression)))
     (expect (%vm-instruction-present-p instructions expected-inst) :to-be-truthy))))
 
@@ -367,8 +367,8 @@ stable, isolated context."
                                             :name nil
                                             :value (make-ast-int :value 5))))))
     (compile-ast node ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call/cc) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-jump) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call/cc) :to-be-null)))
 
 ;;; ─── optimize-ast / %loc macro ───────────────────────────────────────────
 
@@ -515,8 +515,8 @@ stable, isolated context."
                                            :forms (list (make-ast-int :value 10)
                                                         (make-ast-int :value 20)))))))
     (compile-ast node ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-nth-value) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-nth-value) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values-to-list) :to-be-falsy)))
 
 (it-sequential "codegen-load-time-value-records-cell"
   (let ((ctx (make-codegen-ctx))
@@ -530,18 +530,18 @@ stable, isolated context."
       (compile-ast node ctx)
       (compile-ast node ctx)
       (expect (= 1 (length cl-cc/compile::*load-time-value-cells*)) :to-be-truthy))
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-load-time-value)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-load-time-value)))
       (expect inst :to-be-truthy)
       (expect (= 0 (cl-cc/vm::vm-load-time-value-inst-cell-id inst)) :to-be-truthy)
       (progn
-        (expect (cl-cc/vm::vm-load-time-value-cell-form
+        (expect (cl-cc/vm:vm-load-time-value-cell-form
                  (first cl-cc/compile::*load-time-value-cells*))
                 :to-equal '(+ 1 2))
         (let* ((cell-id (cl-cc/compile::%record-load-time-value-cell '(quote (1 2 3)) t))
                (cell (find cell-id cl-cc/compile::*load-time-value-cells*
-                           :key #'cl-cc/vm::vm-load-time-value-cell-id)))
-          (expect (cl-cc/vm::vm-load-time-value-cell-resolved-p cell) :to-be-truthy)
-          (expect (cl-cc/vm::vm-load-time-value-cell-value cell) :to-equal '(1 2 3))))))
+                           :key #'cl-cc/vm:vm-load-time-value-cell-id)))
+          (expect (cl-cc/vm:vm-load-time-value-cell-resolved-p cell) :to-be-truthy)
+          (expect (cl-cc/vm:vm-load-time-value-cell-value cell) :to-equal '(1 2 3))))))
   (let ((*load-time-value-hit* 0))
     (let* ((result (cl-cc/compile:compile-toplevel-forms
                     (quote ((load-time-value

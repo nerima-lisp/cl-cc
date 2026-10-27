@@ -9,56 +9,56 @@
                        (cl-cc:make-vm-label :name "join")
                         (cl-cc:make-vm-inc :dst :R1 :src :R0)))
          (out (cl-cc/optimize::opt-pass-fold instrs)))
-    (expect (find-if (lambda (i) (typep i 'cl-cc/vm::vm-inc)) out) :to-be-truthy))
+    (expect (find-if (lambda (i) (typep i 'cl-cc/vm:vm-inc)) out) :to-be-truthy))
   (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value 42)
                        (cl-cc:make-vm-label :name "join")
                        (cl-cc:make-vm-inc :dst :R1 :src :R0)))
          (out (cl-cc/optimize::opt-pass-fold instrs))
          (r1-const (find-if (lambda (i) (and (cl-cc:vm-const-p i)
-                                             (eq (cl-cc/vm::vm-dst i) :R1)))
+                                             (eq (cl-cc/vm:vm-dst i) :R1)))
                             out)))
     (expect r1-const :to-be-truthy)
-    (expect (cl-cc/vm::vm-value r1-const) :to-equal 43)))
+    (expect (cl-cc/vm:vm-value r1-const) :to-equal 43)))
 
 (it-sequential "fold-type-pred number-p"
   (destructuring-bind (const-val pred-inst expected) (list 42 (cl-cc:make-vm-number-p :dst :R1 :src :R0) 1)
     (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val) pred-inst))
          (out (cl-cc/optimize::opt-pass-fold instrs))
          (r1-const (find-if (lambda (i) (and (cl-cc:vm-const-p i)
-                                             (eq (cl-cc/vm::vm-dst i) :R1)))
+                                             (eq (cl-cc/vm:vm-dst i) :R1)))
                             out)))
     (expect r1-const :to-be-truthy)
-    (expect (cl-cc/vm::vm-value r1-const) :to-equal expected))))
+    (expect (cl-cc/vm:vm-value r1-const) :to-equal expected))))
 
 (it-sequential "fold-type-pred symbol-p"
   (destructuring-bind (const-val pred-inst expected) (list 42 (cl-cc:make-vm-symbol-p :dst :R1 :src :R0) 0)
     (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val) pred-inst))
          (out (cl-cc/optimize::opt-pass-fold instrs))
          (r1-const (find-if (lambda (i) (and (cl-cc:vm-const-p i)
-                                             (eq (cl-cc/vm::vm-dst i) :R1)))
+                                             (eq (cl-cc/vm:vm-dst i) :R1)))
                             out)))
     (expect r1-const :to-be-truthy)
-    (expect (cl-cc/vm::vm-value r1-const) :to-equal expected))))
+    (expect (cl-cc/vm:vm-value r1-const) :to-equal expected))))
 
 (it-sequential "fold-type-pred not-nil"
   (destructuring-bind (const-val pred-inst expected) (list nil (cl-cc:make-vm-not       :dst :R1 :src :R0) t)
     (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val) pred-inst))
          (out (cl-cc/optimize::opt-pass-fold instrs))
          (r1-const (find-if (lambda (i) (and (cl-cc:vm-const-p i)
-                                             (eq (cl-cc/vm::vm-dst i) :R1)))
+                                             (eq (cl-cc/vm:vm-dst i) :R1)))
                             out)))
     (expect r1-const :to-be-truthy)
-    (expect (cl-cc/vm::vm-value r1-const) :to-equal expected))))
+    (expect (cl-cc/vm:vm-value r1-const) :to-equal expected))))
 
 (it-sequential "fold-type-pred not-zero"
   (destructuring-bind (const-val pred-inst expected) (list 0 (cl-cc:make-vm-not       :dst :R1 :src :R0) t)
     (let* ((instrs (list (cl-cc:make-vm-const :dst :R0 :value const-val) pred-inst))
          (out (cl-cc/optimize::opt-pass-fold instrs))
          (r1-const (find-if (lambda (i) (and (cl-cc:vm-const-p i)
-                                             (eq (cl-cc/vm::vm-dst i) :R1)))
+                                             (eq (cl-cc/vm:vm-dst i) :R1)))
                             out)))
     (expect r1-const :to-be-truthy)
-    (expect (cl-cc/vm::vm-value r1-const) :to-equal expected))))
+    (expect (cl-cc/vm:vm-value r1-const) :to-equal expected))))
 
 (it-sequential "fold-branch-known known-true-no-branch"
   (destructuring-bind (const-val verify) (list 1 (lambda (out)
@@ -67,7 +67,7 @@
                        (cl-cc:make-vm-jump-zero :reg :R0 :label "target")))
           (out (cl-cc/optimize::opt-pass-fold instrs)))
     (funcall verify out)
-    (expect (find-if (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out) :to-be-falsy))))
+    (expect (find-if (lambda (i) (typep i 'cl-cc/vm:vm-jump-zero)) out) :to-be-falsy))))
 
 (it-sequential "fold-branch-known known-false-jump"
   (destructuring-bind (const-val verify) (list nil (lambda (out)
@@ -76,7 +76,7 @@
                        (cl-cc:make-vm-jump-zero :reg :R0 :label "target")))
           (out (cl-cc/optimize::opt-pass-fold instrs)))
     (funcall verify out)
-    (expect (find-if (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out) :to-be-falsy))))
+    (expect (find-if (lambda (i) (typep i 'cl-cc/vm:vm-jump-zero)) out) :to-be-falsy))))
 
 ;;; ── Direct opt-pass-copy-prop Tests ────────────────────────────────────
 
@@ -85,27 +85,27 @@
                  (cl-cc:make-vm-move :dst :R2 :src :R1)
                  (cl-cc:make-vm-add :dst :R3 :lhs :R2 :rhs :R2)) :R0)
     (let* ((out (cl-cc/optimize::opt-pass-copy-prop instrs))
-         (add-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out)))
+         (add-inst (find-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) out)))
     (expect add-inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-lhs add-inst) :to-equal expected-lhs))))
+    (expect (cl-cc/vm:vm-lhs add-inst) :to-equal expected-lhs))))
 
 (it-sequential "copy-prop-operand-resolution fallthrough-label-preserves-copies"
   (destructuring-bind (instrs expected-lhs) (list (list (cl-cc:make-vm-move :dst :R1 :src :R0)
                  (cl-cc:make-vm-label :name "join")
                  (cl-cc:make-vm-add :dst :R2 :lhs :R1 :rhs :R1)) :R0)
     (let* ((out (cl-cc/optimize::opt-pass-copy-prop instrs))
-         (add-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out)))
+         (add-inst (find-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) out)))
     (expect add-inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-lhs add-inst) :to-equal expected-lhs))))
+    (expect (cl-cc/vm:vm-lhs add-inst) :to-equal expected-lhs))))
 
 (it-sequential "copy-prop-operand-resolution overwrite-kills-alias"
   (destructuring-bind (instrs expected-lhs) (list (list (cl-cc:make-vm-move :dst :R1 :src :R0)
                  (cl-cc:make-vm-const :dst :R0 :value 99)
                  (cl-cc:make-vm-add :dst :R2 :lhs :R1 :rhs :R1)) :R1)
     (let* ((out (cl-cc/optimize::opt-pass-copy-prop instrs))
-         (add-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out)))
+         (add-inst (find-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) out)))
     (expect add-inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-lhs add-inst) :to-equal expected-lhs))))
+    (expect (cl-cc/vm:vm-lhs add-inst) :to-equal expected-lhs))))
 
 (it-sequential "copy-prop-kill-and-elim-cases"
   (let* ((copies (make-hash-table :test #'eq))
@@ -121,7 +121,7 @@
   (let* ((instrs (list (cl-cc:make-vm-move :dst :R1 :src :R0)
                        (cl-cc:make-vm-move :dst :R0 :src :R1)))
          (out (cl-cc/optimize::opt-pass-copy-prop instrs))
-         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move)) out)))
+         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-move)) out)))
     (expect (length moves) :to-equal 1)))
 
 (it-sequential "copy-prop-join-point"
@@ -135,10 +135,10 @@
                        (cl-cc:make-vm-label :name "join")
                        (cl-cc:make-vm-add :dst :R2 :lhs :R1 :rhs :R1)))
          (out (cl-cc/optimize::opt-pass-copy-prop instrs)))
-    (let ((add-inst (find-if (lambda (i) (typep i 'cl-cc/vm::vm-add)) out)))
+    (let ((add-inst (find-if (lambda (i) (typep i 'cl-cc/vm:vm-add)) out)))
       (expect add-inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-lhs add-inst) :to-equal :R0)
-      (expect (cl-cc/vm::vm-rhs add-inst) :to-equal :R0))))
+      (expect (cl-cc/vm:vm-lhs add-inst) :to-equal :R0)
+      (expect (cl-cc/vm:vm-rhs add-inst) :to-equal :R0))))
 
 (it-sequential "heap-alias-integration-cases"
   (let* ((alloc (make-vm-cons :dst :r0 :car-src :r1 :cdr-src :r2))

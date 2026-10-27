@@ -20,11 +20,11 @@
     (expect guard-pos :to-be-truthy)
     (expect exit-pos :to-be-truthy)
     (expect (< body-pos guard-pos exit-pos) :to-be-truthy)
-    (expect (typep (third out) 'cl-cc/vm::vm-jump) :to-be-truthy)
-    (expect (cl-cc/vm::vm-label-name (third out)) :to-equal "loop_guard")
+    (expect (typep (third out) 'cl-cc/vm:vm-jump) :to-be-truthy)
+    (expect (cl-cc/vm:vm-label-name (third out)) :to-equal "loop_guard")
     (expect (some (lambda (inst)
-             (and (typep inst 'cl-cc/vm::vm-jump)
-                  (equal (cl-cc/vm::vm-label-name inst) "loop_body")))
+             (and (typep inst 'cl-cc/vm:vm-jump)
+                  (equal (cl-cc/vm:vm-label-name inst) "loop_body")))
            out) :to-be-truthy)))
 
 (it-sequential "loop-rotate-fr683-skips-multiple-backedges"
@@ -38,4 +38,4 @@
                       (make-vm-label :name "exit")
                       (make-vm-ret :reg :i)))
          (out (cl-cc/optimize::opt-pass-loop-rotate insts)))
-    (expect (mapcar #'cl-cc/vm::instruction->sexp out) :to-equal (mapcar #'cl-cc/vm::instruction->sexp insts))))
+    (expect (mapcar #'cl-cc/vm:instruction->sexp out) :to-equal (mapcar #'cl-cc/vm:instruction->sexp insts))))

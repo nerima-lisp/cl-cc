@@ -433,15 +433,15 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
   (let* ((opts (cl-cc/cli::make-compile-opts :flamegraph-path "/tmp/cl-cc-test.svg"))
          (vm-state (cl-cc/cli::%maybe-make-profiled-vm-state opts)))
     (expect vm-state :to-be-truthy)
-      (expect (cl-cc/vm::vm-profile-enabled-p vm-state) :to-be-truthy)
-      (expect (cl-cc/vm::vm-profile-call-stack vm-state) :to-equal '("<toplevel>"))))
+      (expect (cl-cc/vm:vm-profile-enabled-p vm-state) :to-be-truthy)
+      (expect (cl-cc/vm:vm-profile-call-stack vm-state) :to-equal '("<toplevel>"))))
 
 (it-sequential "cli-maybe-make-profiled-vm-state-enabled-for-pgo-generate"
   (let* ((opts (cl-cc/cli::make-compile-opts :pgo-generate-path "/tmp/cl-cc-test-pgo.sexp"))
          (vm-state (cl-cc/cli::%maybe-make-profiled-vm-state opts)))
     (expect vm-state :to-be-truthy)
-    (expect (cl-cc/vm::vm-profile-enabled-p vm-state) :to-be-truthy)
-    (expect (cl-cc/vm::vm-profile-call-stack vm-state) :to-equal '("<toplevel>"))))
+    (expect (cl-cc/vm:vm-profile-enabled-p vm-state) :to-be-truthy)
+    (expect (cl-cc/vm:vm-profile-call-stack vm-state) :to-equal '("<toplevel>"))))
 
 (it-sequential "cli-parse-compile-opts-includes-pgo-flags"
   (let* ((parsed (cl-cc/cli:parse-args '("run" "foo.lisp"
@@ -547,7 +547,7 @@ execute BODY, then delete the file.  The file is written as UTF-8 text."
 
 (it-sequential "cli-run-compiled-result-executes-program"
   (let* ((result (cl-cc::compile-string "(+ 1 1)" :target :vm))
-         (vm-state (cl-cc/vm::make-vm-state :output-stream *standard-output*))
+         (vm-state (cl-cc/vm:make-vm-state :output-stream *standard-output*))
          (opts (cl-cc/cli::make-compile-opts))
          (val (cl-cc/cli::%run-compiled-result result vm-state opts)))
     (expect (= 2 val) :to-be-truthy)))

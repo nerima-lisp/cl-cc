@@ -20,7 +20,7 @@
                                           :value (make-var :end2))
                             (make-int 4))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-subseq) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-subseq) :to-be-truthy)
     (expect (codegen-find-inst ctx 'cl-cc::vm-string=) :to-be-truthy)))
 
 (it-sequential "codegen-string-case-keywords-reconstruct-string"
@@ -34,6 +34,6 @@
                                           :value (make-var :end))
                             (make-int 4))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-subseq) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-concatenate) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-string-upcase) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-subseq) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-concatenate) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-string-upcase) :to-be-truthy)))

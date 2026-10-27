@@ -77,7 +77,7 @@
   "Return T when SYMBOL-NAME resolved via :cl-cc (as the VM does) is in the bridge table.
 The VM looks up function names via (find-symbol name :cl-cc), so this mirrors that path."
   (let ((sym (find-symbol symbol-name :cl-cc)))
-    (and sym (gethash sym cl-cc/vm::*vm-host-bridge-functions*))))
+    (and sym (gethash sym cl-cc/vm:*vm-host-bridge-functions*))))
 
 (it-sequential "bridge-cross-package-symbols-registered run-string"
   (destructuring-bind (expected symbol-name) (list t "RUN-STRING")
@@ -116,5 +116,5 @@ The VM looks up function names via (find-symbol name :cl-cc), so this mirrors th
     (expect (not (null (%bridge-registered-p symbol-name))) :to-equal expected)))
 
 (it-sequential "vm-eval-hooks-wired-after-load"
-  (expect cl-cc/vm::*vm-eval-hook* :to-be-truthy)
-  (expect cl-cc/vm::*vm-compile-string-hook* :to-be-truthy))
+  (expect cl-cc/vm:*vm-eval-hook* :to-be-truthy)
+  (expect cl-cc/vm:*vm-compile-string-hook* :to-be-truthy))

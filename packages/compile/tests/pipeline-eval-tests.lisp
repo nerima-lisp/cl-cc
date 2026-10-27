@@ -21,61 +21,61 @@
   (expect (run-string "(multiple-value-bind (a b) (the (values fixnum string) (values 1 \"ok\")) (list a b))") :to-equal '(1 "ok")))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types add"
-  (destructuring-bind (code expected-type) (list "(defun typed-add ((x fixnum) (y fixnum)) fixnum (+ x y))" 'cl-cc/vm::vm-integer-add)
+  (destructuring-bind (code expected-type) (list "(defun typed-add ((x fixnum) (y fixnum)) fixnum (+ x y))" 'cl-cc/vm:vm-integer-add)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types sub"
-  (destructuring-bind (code expected-type) (list "(defun typed-sub ((x fixnum) (y fixnum)) fixnum (- x y))" 'cl-cc/vm::vm-integer-sub)
+  (destructuring-bind (code expected-type) (list "(defun typed-sub ((x fixnum) (y fixnum)) fixnum (- x y))" 'cl-cc/vm:vm-integer-sub)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types mul"
-  (destructuring-bind (code expected-type) (list "(defun typed-mul ((x fixnum) (y fixnum)) fixnum (* x y))" 'cl-cc/vm::vm-integer-mul)
+  (destructuring-bind (code expected-type) (list "(defun typed-mul ((x fixnum) (y fixnum)) fixnum (* x y))" 'cl-cc/vm:vm-integer-mul)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types lt"
-  (destructuring-bind (code expected-type) (list "(defun typed-lt  ((x fixnum) (y fixnum)) fixnum (< x y))" 'cl-cc/vm::vm-lt)
+  (destructuring-bind (code expected-type) (list "(defun typed-lt  ((x fixnum) (y fixnum)) fixnum (< x y))" 'cl-cc/vm:vm-lt)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types gt"
-  (destructuring-bind (code expected-type) (list "(defun typed-gt  ((x fixnum) (y fixnum)) fixnum (> x y))" 'cl-cc/vm::vm-gt)
+  (destructuring-bind (code expected-type) (list "(defun typed-gt  ((x fixnum) (y fixnum)) fixnum (> x y))" 'cl-cc/vm:vm-gt)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types eq"
-  (destructuring-bind (code expected-type) (list "(defun typed-eq  ((x fixnum) (y fixnum)) fixnum (= x y))" 'cl-cc/vm::vm-num-eq)
+  (destructuring-bind (code expected-type) (list "(defun typed-eq  ((x fixnum) (y fixnum)) fixnum (= x y))" 'cl-cc/vm:vm-num-eq)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types eq-fixnum"
-  (destructuring-bind (code expected-type) (list "(defun typed-eq-pred ((x fixnum) (y fixnum)) fixnum (eq x y))" 'cl-cc/vm::vm-num-eq)
+  (destructuring-bind (code expected-type) (list "(defun typed-eq-pred ((x fixnum) (y fixnum)) fixnum (eq x y))" 'cl-cc/vm:vm-num-eq)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types eql-fixnum"
-  (destructuring-bind (code expected-type) (list "(defun typed-eql-pred ((x fixnum) (y fixnum)) fixnum (eql x y))" 'cl-cc/vm::vm-num-eq)
+  (destructuring-bind (code expected-type) (list "(defun typed-eql-pred ((x fixnum) (y fixnum)) fixnum (eql x y))" 'cl-cc/vm:vm-num-eq)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types equal-fixnum"
-  (destructuring-bind (code expected-type) (list "(defun typed-equal-pred ((x fixnum) (y fixnum)) fixnum (equal x y))" 'cl-cc/vm::vm-num-eq)
+  (destructuring-bind (code expected-type) (list "(defun typed-equal-pred ((x fixnum) (y fixnum)) fixnum (equal x y))" 'cl-cc/vm:vm-num-eq)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
 
 (it-sequential "pipeline-typed-fixnum-instruction-types equal-symbol"
-  (destructuring-bind (code expected-type) (list "(defun typed-equal-symbol ((x symbol) (y symbol)) fixnum (equal x y))" 'cl-cc/vm::vm-eq)
+  (destructuring-bind (code expected-type) (list "(defun typed-equal-symbol ((x symbol) (y symbol)) fixnum (equal x y))" 'cl-cc/vm:vm-eq)
     (let ((instrs (vm-program-instructions
                  (compilation-result-program (compile-string code :target :vm)))))
     (expect (some (lambda (i) (typep i expected-type)) instrs) :to-be-truthy))))
@@ -89,7 +89,7 @@
           (vm-program-instructions
            (compilation-result-program
             (compile-string "(defun generic-equal-pred (x y) (equal x y))" :target :vm)))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-num-eq)) typed-instrs) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-num-eq)) typed-instrs) :to-be-truthy)
     (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) typed-instrs) :to-be-falsy)
     (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) generic-instrs) :to-be-truthy)))
 

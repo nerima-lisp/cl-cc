@@ -61,17 +61,17 @@
          (polled (cl-cc/optimize:opt-pass-safepoint-polling instructions)))
     (expect (> (length polled) (length instructions)) :to-be-truthy)
     (expect (some (lambda (inst)
-                         (and (typep inst 'cl-cc/vm::vm-get-global)
-                              (eq (cl-cc/vm::vm-global-name inst)
+                         (and (typep inst 'cl-cc/vm:vm-get-global)
+                              (eq (cl-cc/vm:vm-global-name inst)
                                   cl-cc/optimize::*opt-safepoint-flag-name*)))
                        polled) :to-be-truthy)
     (expect (some (lambda (inst)
-                         (and (typep inst 'cl-cc/vm::vm-call)
-                              (= 1 (length (cl-cc/vm::vm-args inst)))))
+                         (and (typep inst 'cl-cc/vm:vm-call)
+                              (= 1 (length (cl-cc/vm:vm-args inst)))))
                        polled) :to-be-truthy)
     (expect (some (lambda (inst)
-                         (and (typep inst 'cl-cc/vm::vm-label)
-                              (string= (cl-cc/vm::vm-name inst)
+                         (and (typep inst 'cl-cc/vm:vm-label)
+                              (string= (cl-cc/vm:vm-name inst)
                                        cl-cc/optimize::*opt-safepoint-label*)))
                        polled) :to-be-truthy)))
 
@@ -129,7 +129,7 @@
     (expect (search "\"mappings\":" json) :to-be-truthy)))
 
 (it-sequential "fr-554-sanitizer-flag-emits-ubsan-instrumentation"
-  (let* ((program (cl-cc/vm::make-vm-program
+  (let* ((program (cl-cc/vm:make-vm-program
                    :instructions (list (cl-cc:make-vm-const :dst :r0 :value 1)
                                        (cl-cc:make-vm-const :dst :r1 :value 2)
                                        (cl-cc:make-vm-integer-add :dst :r2 :lhs :r0 :rhs :r1)
@@ -172,7 +172,7 @@
     (expect (plusp (cl-cc/binary::dwarf-eh-fde-address-range (first fdes))) :to-be-truthy)))
 
 (it-sequential "fr-560-integrated-x86-64-eh-appends-non-ud2-landing-pad"
-  (let* ((program (cl-cc/vm::make-vm-program
+  (let* ((program (cl-cc/vm:make-vm-program
                    :instructions (list (cl-cc:make-vm-label :name "entry")
                                        (cl-cc:make-vm-establish-handler
                                         :handler-label "handler" :result-reg :r0 :error-type 'error)

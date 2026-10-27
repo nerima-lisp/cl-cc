@@ -21,12 +21,12 @@
     (expect (= 2 (length instructions)) :to-be-truthy)
     (let ((first (first instructions))
           (second (second instructions)))
-      (expect (typep first 'cl-cc/vm::vm-const) :to-be-truthy)
-      (expect (typep second 'cl-cc/vm::vm-const) :to-be-truthy)
+      (expect (typep first 'cl-cc/vm:vm-const) :to-be-truthy)
+      (expect (typep second 'cl-cc/vm:vm-const) :to-be-truthy)
       (expect (= 10 (cl-cc::vm-const-value first)) :to-be-truthy)
       (expect (= 20 (cl-cc::vm-const-value second)) :to-be-truthy)
-      (expect (first regs) :to-be (cl-cc/vm::vm-dst first))
-      (expect (second regs) :to-be (cl-cc/vm::vm-dst second)))))
+      (expect (first regs) :to-be (cl-cc/vm:vm-dst first))
+      (expect (second regs) :to-be (cl-cc/vm:vm-dst second)))))
 
 (it-sequential "emit-call-like-instruction-selects-call-variant"
   (let* ((ctx (make-codegen-ctx))
@@ -34,15 +34,15 @@
          (arg-reg (cl-cc/compile:make-register ctx))
          (result-reg (cl-cc/compile:make-register ctx)))
     (expect (cl-cc/compile::%emit-call-like-instruction nil result-reg func-reg (list arg-reg) ctx) :to-be result-reg)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-null))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call) :to-be-null))
   (let* ((ctx (make-codegen-ctx))
          (func-reg (cl-cc/compile:make-register ctx))
          (arg-reg (cl-cc/compile:make-register ctx))
          (result-reg (cl-cc/compile:make-register ctx)))
     (expect (cl-cc/compile::%emit-call-like-instruction t result-reg func-reg (list arg-reg) ctx) :to-be result-reg)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))
 
 ;;; ─── %try-compile-funcall ─────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@
                 (list (make-ast-var :name 'fn) (make-ast-int :value 1))
                 result-reg nil ctx)))
       (expect ret :to-be result-reg)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-truthy))))
 
 (it-sequential "try-compile-funcall-tail-position-emits-tail-call"
   (let* ((ctx (make-codegen-ctx))
@@ -94,8 +94,8 @@
      'funcall
      (list (make-ast-var :name 'fn) (make-ast-int :value 99))
      result-reg t ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))
 
 ;;; ─── %try-compile-apply ──────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@
                  (list (make-ast-var :name 'f) (make-ast-int :value 1))
                  result-reg nil ctx)))
       (expect ret :to-be result-reg)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-truthy))))
 
 (it-sequential "try-compile-apply-quoted-function-symbol-uses-function-designator-helper"
   (let* ((ctx (make-codegen-ctx))
@@ -140,7 +140,7 @@
                 (list (make-ast-quote :value 'f) (make-ast-int :value 1))
                 result-reg nil ctx)))
       (expect ret :to-be result-reg)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-truthy))))
 
 (it-sequential "try-compile-apply-list-call-spread-emits-vm-call"
   (let* ((ctx (make-codegen-ctx))
@@ -156,10 +156,10 @@
                                                  (make-ast-int :value 3))))
                 result-reg nil ctx)))
       (expect ret :to-be result-reg)
-      (let ((call-inst (codegen-find-inst ctx 'cl-cc/vm::vm-call)))
+      (let ((call-inst (codegen-find-inst ctx 'cl-cc/vm:vm-call)))
         (expect call-inst :to-be-truthy)
-        (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-null)
-        (expect (= 3 (length (cl-cc/vm::vm-args call-inst))) :to-be-truthy)))))
+        (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-null)
+        (expect (= 3 (length (cl-cc/vm:vm-args call-inst))) :to-be-truthy)))))
 
 (it-sequential "try-compile-apply-list-call-spread-tail-emits-vm-tail-call"
   (let* ((ctx (make-codegen-ctx))
@@ -175,11 +175,11 @@
                                                  (make-ast-int :value 3))))
                 result-reg t ctx)))
       (expect ret :to-be result-reg)
-      (let ((tail-call-inst (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call)))
+      (let ((tail-call-inst (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call)))
         (expect tail-call-inst :to-be-truthy)
-        (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)
-        (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-null)
-        (expect (= 3 (length (cl-cc/vm::vm-args tail-call-inst))) :to-be-truthy)))))
+        (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)
+        (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-null)
+        (expect (= 3 (length (cl-cc/vm:vm-args tail-call-inst))) :to-be-truthy)))))
 
 (it-sequential "try-compile-apply-local-list-call-spread-keeps-vm-apply"
   (let* ((ctx (make-codegen-ctx))
@@ -195,7 +195,7 @@
                                                  (make-ast-int :value 3))))
                 result-reg nil ctx)))
       (expect ret :to-be result-reg)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-truthy))))
 
 (it-sequential "try-compile-apply-tail-position-marks-vm-apply-tail-p"
   (let* ((ctx (make-codegen-ctx))
@@ -208,9 +208,9 @@
                  (list (make-ast-var :name 'f) (make-ast-var :name 'xs))
                 result-reg t ctx)))
       (expect ret :to-be result-reg)
-      (let ((apply-inst (codegen-find-inst ctx 'cl-cc/vm::vm-apply)))
+      (let ((apply-inst (codegen-find-inst ctx 'cl-cc/vm:vm-apply)))
         (expect apply-inst :to-be-truthy)
-        (expect (cl-cc/vm::vm-tail-p apply-inst) :to-be-truthy)))))
+        (expect (cl-cc/vm:vm-tail-p apply-inst) :to-be-truthy)))))
 
 ;;; ─── %try-compile-noescape-cons ──────────────────────────────────────────
 
@@ -226,9 +226,9 @@
                 (list (make-ast-var :name 'p))
                 result-reg ctx)))
       (expect ret :to-be result-reg)
-      (let ((move (codegen-find-inst ctx 'cl-cc/vm::vm-move)))
+      (let ((move (codegen-find-inst ctx 'cl-cc/vm:vm-move)))
         (expect move :to-be-truthy)
-        (expect (cl-cc/vm::vm-src move) :to-be car-reg)))))
+        (expect (cl-cc/vm:vm-src move) :to-be car-reg)))))
 
 (it-sequential "try-compile-noescape-cons-cdr-emits-vm-move-from-cdr-reg"
   (let* ((ctx (make-codegen-ctx))
@@ -239,9 +239,9 @@
           (list (cons 'p (cons car-reg cdr-reg))))
     (cl-cc/compile::%try-compile-noescape-cons
      'cdr (list (make-ast-var :name 'p)) result-reg ctx)
-    (let ((move (codegen-find-inst ctx 'cl-cc/vm::vm-move)))
+    (let ((move (codegen-find-inst ctx 'cl-cc/vm:vm-move)))
       (expect move :to-be-truthy)
-      (expect (cl-cc/vm::vm-src move) :to-be cdr-reg))))
+      (expect (cl-cc/vm:vm-src move) :to-be cdr-reg))))
 
 (it-sequential "try-compile-noescape-cons-unregistered-binding-returns-nil"
   (let* ((ctx (make-codegen-ctx))
@@ -275,7 +275,7 @@
                 (list (make-ast-var :name 'arr))
                 result-reg ctx)))
       (expect ret :to-be result-reg)
-      (let ((const (codegen-find-inst ctx 'cl-cc/vm::vm-const)))
+      (let ((const (codegen-find-inst ctx 'cl-cc/vm:vm-const)))
         (expect const :to-be-truthy)
         (expect (= 2 (cl-cc::vm-const-value const)) :to-be-truthy)))))
 
@@ -292,9 +292,9 @@
                 (list (make-ast-var :name 'arr) (make-ast-int :value 1))
                 result-reg ctx)))
       (expect ret :to-be result-reg)
-      (let ((move (codegen-find-inst ctx 'cl-cc/vm::vm-move)))
+      (let ((move (codegen-find-inst ctx 'cl-cc/vm:vm-move)))
         (expect move :to-be-truthy)
-        (expect (cl-cc/vm::vm-src move) :to-be r1)))))
+        (expect (cl-cc/vm:vm-src move) :to-be r1)))))
 
 ;;; ─── %compile-normal-call ─────────────────────────────────────────────────
 
@@ -305,15 +305,15 @@
     (setf (gethash 'my-gf (cl-cc/compile:ctx-global-generics ctx)) gf-reg)
     (cl-cc/compile::%compile-normal-call
      'my-gf 'my-gf (list (make-ast-int :value 1)) result-reg nil ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-generic-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))
 
 (it-sequential "compile-normal-call-ordinary-fn-emits-vm-call"
   (let* ((ctx (make-codegen-ctx))
          (result-reg (cl-cc/compile:make-register ctx)))
     (cl-cc/compile::%compile-normal-call
      'ordinary-fn 'ordinary-fn (list (make-ast-int :value 1)) result-reg nil ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-truthy)))
 
 ;;; ─── compile-ast(ast-call) — dispatch integration ────────────────────────
 
@@ -326,8 +326,8 @@
                                 :args (list (make-ast-var :name 'fn)
                                             (make-ast-int :value 1)))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-tail-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-tail-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))
 
 
 (it-sequential "codegen-call-dispatch-gf-emits-generic-call"
@@ -337,7 +337,7 @@
     (compile-ast (make-ast-call :func 'my-speak
                                 :args (list (make-ast-int :value 1)))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-generic-call) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-generic-call) :to-be-truthy)))
 
 (it-sequential "codegen-call-ast-function-float-add-emits-vm-float-add"
   (let ((ctx (make-codegen-ctx)))
@@ -345,8 +345,8 @@
                                 :args (list (make-ast-quote :value 1.0)
                                             (make-ast-quote :value 2.0)))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-float-add) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-float-add) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))
 (it-sequential "codegen-call-quoted-function-designator-float-add-emits-vm-float-add"
   (let* ((ctx (make-codegen-ctx))
          (floats (list (make-ast-quote :value 1.0)
@@ -354,5 +354,5 @@
     (compile-ast (make-ast-call :func (make-ast-quote :value '+)
                                 :args floats)
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-float-add) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-float-add) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-null)))

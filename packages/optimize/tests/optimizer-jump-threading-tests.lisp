@@ -143,9 +143,9 @@
     (cl-cc/optimize::%opt-jump-rewrite-block-with-fact block fact)
     (let ((insts (cl-cc/optimize::bb-instructions block)))
       (expect (some (lambda (i)
-               (and (typep i 'cl-cc/vm::vm-const)
-                    (eq  (cl-cc/vm::vm-dst   i) :c2)
-                    (eql (cl-cc/vm::vm-value i) 1)))
+               (and (typep i 'cl-cc/vm:vm-const)
+                    (eq  (cl-cc/vm:vm-dst   i) :c2)
+                    (eql (cl-cc/vm:vm-value i) 1)))
              insts) :to-be-truthy))))
 
 (it-sequential "jump-rewrite-block-propagates-move-from-known-constant"
@@ -156,9 +156,9 @@
     (cl-cc/optimize::%opt-jump-rewrite-block-with-fact block fact)
     (let ((insts (cl-cc/optimize::bb-instructions block)))
       (expect (some (lambda (i)
-               (and (typep i 'cl-cc/vm::vm-const)
-                    (eq  (cl-cc/vm::vm-dst   i) :r1)
-                    (eql (cl-cc/vm::vm-value i) 42)))
+               (and (typep i 'cl-cc/vm:vm-const)
+                    (eq  (cl-cc/vm:vm-dst   i) :r1)
+                    (eql (cl-cc/vm:vm-value i) 42)))
              insts) :to-be-truthy))))
 
 (it-sequential "jump-rewrite-block-kills-fact-on-operand-redefinition"
@@ -170,7 +170,7 @@
     (cl-cc/optimize::%opt-jump-rewrite-block-with-fact block fact)
     (let ((insts (cl-cc/optimize::bb-instructions block)))
       ;; The rewrite should NOT have folded :c2 since :x was redefined.
-      (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-lt)) insts) :to-be-truthy))))
+      (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-lt)) insts) :to-be-truthy))))
 
 (it-sequential "jump-rewrite-block-preserves-vm-const-instructions"
   (let* ((block (cl-cc/optimize::make-basic-block
@@ -180,8 +180,8 @@
     (cl-cc/optimize::%opt-jump-rewrite-block-with-fact block fact)
     (let ((insts (cl-cc/optimize::bb-instructions block)))
       (expect (some (lambda (i)
-               (and (typep i 'cl-cc/vm::vm-const)
-                    (eq (cl-cc/vm::vm-dst i) :r0)))
+               (and (typep i 'cl-cc/vm:vm-const)
+                    (eq (cl-cc/vm:vm-dst i) :r0)))
              insts) :to-be-truthy))))
 
 ;;; ─── %opt-pass-jump-propagate-edge-values integration smoke ──────────────
@@ -198,9 +198,9 @@
                       (make-vm-ret       :reg :c)))
          (out (cl-cc/optimize::%opt-pass-jump-propagate-edge-values insts)))
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-const)
-                  (eq  (cl-cc/vm::vm-dst   i) :c2)
-                  (eql (cl-cc/vm::vm-value i) 1)))
+             (and (typep i 'cl-cc/vm:vm-const)
+                  (eq  (cl-cc/vm:vm-dst   i) :c2)
+                  (eql (cl-cc/vm:vm-value i) 1)))
            out) :to-be-truthy)))
 
 (it-sequential "jump-propagate-edge-values-handles-empty-input"
@@ -224,14 +224,14 @@
          (out (cl-cc/optimize::opt-pass-jump-threading-with-propagation insts)))
     ;; The jump-zero should now point directly at "false" (chain threaded).
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-jump-zero)
-                  (equal (cl-cc/vm::vm-label-name i) "false")))
+             (and (typep i 'cl-cc/vm:vm-jump-zero)
+                  (equal (cl-cc/vm:vm-label-name i) "false")))
            out) :to-be-truthy)
     ;; The redundant lt in "true" block should be folded to const 1.
     (expect (some (lambda (i)
-             (and (typep i 'cl-cc/vm::vm-const)
-                  (eq  (cl-cc/vm::vm-dst   i) :c2)
-                  (eql (cl-cc/vm::vm-value i) 1)))
+             (and (typep i 'cl-cc/vm:vm-const)
+                  (eq  (cl-cc/vm:vm-dst   i) :c2)
+                  (eql (cl-cc/vm:vm-value i) 1)))
            out) :to-be-truthy)))
 
 (it-sequential "jump-threading-with-propagation-is-identity-on-straight-line"

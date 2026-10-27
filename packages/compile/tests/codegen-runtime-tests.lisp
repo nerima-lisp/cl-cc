@@ -9,7 +9,7 @@
                                            (make-ast-int :value 3)
                                            (make-ast-int :value 4)))
                             ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values) :to-be-truthy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-single-value-compilation-skips-mv-instructions"
@@ -17,8 +17,8 @@
          (reg (compile-ast (cl-cc/ast:make-ast-values
                              :forms (list (make-ast-int :value 42)))
                            ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values) :to-be-falsy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-regs) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values-regs) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-values-run multi-values"
@@ -38,8 +38,8 @@
                                                          (make-ast-int :value 2)))
                               :body (list (make-ast-var :name 'a)))
                             ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values) :to-be-falsy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-mv-bind) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy))
   (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast (cl-cc/ast:make-ast-multiple-value-bind
@@ -49,7 +49,7 @@
                                                                      (make-ast-int :value 5)))
                              :body (list (make-ast-var :name 'a)))
                            ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-mv-bind) :to-be-truthy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-single-var-mvb-skips-mv-bind"
@@ -61,8 +61,8 @@
                                                                      (make-ast-int :value 5)))
                              :body (list (make-ast-var :name 'a)))
                            ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-falsy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-mv-bind) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-mv-bind-regs) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-mvb-run sum-values"
@@ -81,9 +81,9 @@
                                        (make-ast-int :value 2))))))
     (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast ast ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-falsy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values-to-list) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy))))
 
 (it-sequential "codegen-mv-call-direct-path no-args"
@@ -92,9 +92,9 @@
              :args nil))
     (let* ((ctx (make-codegen-ctx))
          (reg (compile-ast ast ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-falsy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values-to-list) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy))))
 
 (it-sequential "codegen-mv-call-mixed-args-still-uses-apply-path"
@@ -108,7 +108,7 @@
                                                         :args (list (make-ast-int :value 17)
                                                                     (make-ast-int :value 5)))))
                            ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-truthy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-mv-call-the-wrapped-function-keeps-direct-call"
@@ -119,9 +119,9 @@
                                     :value (make-ast-function :name 'list))
                              :args nil)
                            ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-call) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-apply) :to-be-falsy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-values-to-list) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-call) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-apply) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-values-to-list) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-mv-call-run-cases"
@@ -136,7 +136,7 @@
                                 :forms (list (make-ast-int :value 2)
                                              (make-ast-int :value 3)))
                               ctx))
-         (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const))
+         (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-const))
                                 (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
     (expect (>= (length consts) 3) :to-be-truthy)))
@@ -154,7 +154,7 @@
                    :protected (make-ast-int :value 42)
                    :cleanup (list (make-ast-int :value 0)))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-establish-handler) :to-be-truthy)))
 
 (it-sequential "codegen-handler-case-records-an-exception-table-entry"
   (let ((ctx (make-codegen-ctx))
@@ -163,7 +163,7 @@
                    :form (make-ast-int :value 42)
                    :clauses (list (list 'error 'e (make-ast-int :value 0))))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-establish-handler) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-establish-handler) :to-be-falsy)
     (expect (plusp (length cl-cc/compile::*pending-exception-table-entries*)) :to-be-truthy)))
 
 (it-sequential "codegen-exception-form-returns-register unwind-protect"
