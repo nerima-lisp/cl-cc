@@ -50392,8 +50392,7 @@
     "Zend/tests/oom_range_002.phpt"
     "Zend/tests/oom_range_003.phpt"
     "Zend/tests/oom_range_004.phpt"
-    "Zend/tests/oom_soft_limit_exceeded.phpt"
-   ) :classification :unimplemented
+    ) :classification :unimplemented
       :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
       :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
       :stage :runtime)
@@ -51898,12 +51897,20 @@
    :reason "intermittent 60s compile timeout; observed in CI runs #40324445201; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
    :stage :compile
-   :allow-pass t)
+   :allow-pass t
+   :alternates ((:classification :bug
+      :reason "var_export() omits the nested-array line break after =>; output mismatch observed in run #40428473938; tracked in #17."
+      :match "^EXPECT mismatch at byte "
+      :stage :output)))
 ("ext/standard/tests/strings/vprintf_variation10.phpt" :classification :bug
    :reason "intermittent 60s compile timeout; observed in CI runs #40324445201; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
    :stage :compile
-   :allow-pass t)
+   :allow-pass t
+   :alternates ((:classification :bug
+      :reason "vprintf() passes a negative %c value to code-char without PHP byte conversion; runtime failure observed in run #40428473938; tracked in #17."
+      :match "^runtime error: The value"
+      :stage :runtime)))
 ("ext/hash/tests/fnv1a32.phpt" :classification :bug
    :reason "intermittent 60s compile timeout; observed in CI runs #40332818348, #40348619616, #40369314762; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
@@ -51933,15 +51940,35 @@
    :reason "intermittent 60s compile timeout; observed in CI runs #40348619616; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
    :stage :compile
-   :allow-pass t)
+   :allow-pass t
+   :alternates ((:classification :unimplemented
+      :reason "crypt() is not registered; runtime failure observed in run #40428473938; tracked in #17."
+      :match "^runtime error: The function CL-CC/PHP::CRYPT is undefined\\."
+      :stage :runtime)))
 ("ext/hash/tests/hash_serialize_003.phpt" :classification :bug
    :reason "intermittent 60s compile timeout; observed in CI runs #40348619616; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
    :stage :compile
-   :allow-pass t)
+   :allow-pass t
+   :alternates ((:classification :unimplemented
+      :reason "hash() and the HashContext API are not registered; runtime failure observed in run #40428473938; tracked in #17."
+      :match "^runtime error: The function CL-CC/PHP::HASH is undefined\\."
+      :stage :runtime)))
 ("ext/standard/tests/mail/mail_basic6.phpt" :classification :bug
    :reason "intermittent 60s compile timeout; observed in CI runs #40348619616; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
    :stage :compile
-   :allow-pass t)
+   :allow-pass t
+   :alternates ((:classification :unimplemented
+      :reason "mail() does not invoke sendmail or write configured output; output mismatch observed in run #40428473938; tracked in #17."
+      :match "^EXPECTF did not match output"
+      :stage :output)))
+("Zend/tests/oom_soft_limit_exceeded.phpt" :classification :unimplemented
+   :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
+   :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
+   :stage :runtime
+   :alternates ((:classification :unimplemented
+      :reason "memory_limit is not enforced; output mismatch observed in run #40428473938; tracked in #17."
+      :match "^EXPECTF did not match output"
+      :stage :output)))
 )

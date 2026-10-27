@@ -198,6 +198,37 @@ class PhptRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(run.HarnessError, ":allow-pass requires"):
                 run.load_expected_failures(manifest)
 
+    def test_manifest_loads_individual_alternate_outcomes_with_issue_and_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "expected-failures.sexp"
+            manifest.write_text(
+                '(("ext/example.phpt" :classification :bug '
+                ':reason "intermittent 60s compile timeout; tracked in #82; observed in run #40369314762" '
+                ':match "^main child timed out during compile stage after 60 seconds$" '
+                ':stage :compile :allow-pass t '
+                ':alternates ((:classification :unimplemented '
+                ':reason "observed in run #40428473938; tracked in #17" '
+                ':match "^main child exited with 1:" :stage :runtime))))\n',
+                encoding="utf-8",
+            )
+            expected = run.load_expected_failures(manifest)
+            alternate, = expected["ext/example.phpt"].alternates
+            self.assertEqual(alternate.classification, "unimplemented")
+            self.assertEqual(alternate.stage, "runtime")
+            self.assertTrue(alternate.pattern.search("main child exited with 1: runtime error"))
+
+            manifest.write_text(
+                '(("ext/example.phpt" :classification :bug '
+                ':reason "intermittent 60s compile timeout; tracked in #82; observed in run #40369314762" '
+                ':match "timeout" :stage :compile :allow-pass t '
+                ':alternates ((:classification :unimplemented '
+                ':reason "run lacks issue reference #40428473938" '
+                ':match "^main child exited with 1:" :stage :runtime))))\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(run.HarnessError, "alternate reason requires"):
+                run.load_expected_failures(manifest)
+
     def test_intermittent_compile_timeout_entry_accepts_only_exact_timeout_or_pass(self):
         with tempfile.TemporaryDirectory() as directory:
             php_src = Path(directory)
@@ -217,6 +248,14 @@ class PhptRunnerTests(unittest.TestCase):
                     ),
                     "compile",
                     True,
+                    (
+                        run.ExpectedFailureOutcome(
+                            "unimplemented",
+                            "observed in run #40428473938; tracked in #17",
+                            re.compile("^runtime error: The function CL-CC/PHP::HASH is undefined\\."),
+                            "runtime",
+                        ),
+                    ),
                 )
             }
             observed = (
@@ -239,9 +278,39 @@ class PhptRunnerTests(unittest.TestCase):
                     1,
                     "expected-failure stage mismatch",
                 ),
+                (
+                    "recorded alternate runtime result",
+                    {
+                        "main": run.Outcome(
+                            "runtime",
+                            detail="runtime error: The function CL-CC/PHP::HASH is undefined.",
+                        )
+                    },
+                    0,
+                    "expected-failures=1",
+                ),
+                (
+                    "unrecorded runtime result",
+                    {"main": run.Outcome("runtime", detail="different runtime condition")},
+                    1,
+                    "expected-failure stage mismatch",
+                ),
             )
             for name, phases, expected_status, expected_output in observed:
                 with self.subTest(name=name):
+                    if name == "recorded alternate runtime result":
+                        accepted, message = run.apply_expected_failures(
+                            case_id,
+                            "runtime",
+                            "runtime error: The function CL-CC/PHP::HASH is undefined.",
+                            expected,
+                            set(),
+                        )
+                        self.assertTrue(accepted)
+                        self.assertEqual(
+                            message,
+                            "expected unimplemented: observed in run #40428473938; tracked in #17",
+                        )
                     stdout = StringIO()
                     stderr = StringIO()
                     with (

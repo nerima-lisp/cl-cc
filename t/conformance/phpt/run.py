@@ -116,6 +116,14 @@ class PhptCase:
 
 
 @dataclasses.dataclass(frozen=True)
+class ExpectedFailureOutcome:
+    classification: str
+    reason: str
+    pattern: re.Pattern[str]
+    stage: str
+
+
+@dataclasses.dataclass(frozen=True)
 class ExpectedFailure:
     case_id: str
     classification: str
@@ -123,6 +131,7 @@ class ExpectedFailure:
     pattern: re.Pattern[str]
     stage: str
     allow_pass: bool = False
+    alternates: tuple[ExpectedFailureOutcome, ...] = ()
 
 
 @dataclasses.dataclass
@@ -358,8 +367,72 @@ def load_expected_failures(path: Path = EXPECTED_FAILURES) -> dict[str, Expected
             if len(raw_case_ids) != len(set(raw_case_ids)):
                 raise HarnessError(f"duplicate case id in expected-failure group {entry!r}")
             case_ids = raw_case_ids
-        elif set(fields) not in (required_fields, required_fields | {"allow-pass"}):
+        elif not required_fields <= set(fields) or set(fields) - required_fields - {
+            "allow-pass",
+            "alternates",
+        }:
             raise HarnessError(f"expected-failure fields are incomplete for {case_ids[0]!r}")
+        raw_alternates = fields.get("alternates", [])
+        if not isinstance(raw_alternates, list):
+            raise HarnessError(f"invalid :alternates value for {case_ids[0]!r}")
+        if grouped and raw_alternates:
+            raise HarnessError(f":alternates requires an individual entry for {case_ids[0]!r}")
+        alternates: list[ExpectedFailureOutcome] = []
+        for raw_alternate in raw_alternates:
+            if not isinstance(raw_alternate, list) or len(raw_alternate) % 2:
+                raise HarnessError(f"malformed alternate outcome for {case_ids[0]!r}")
+            alternate_fields: dict[str, Any] = {}
+            for key, value in zip(raw_alternate[::2], raw_alternate[1::2]):
+                if not isinstance(key, Symbol) or not key.startswith(":"):
+                    raise HarnessError(f"invalid alternate outcome key for {case_ids[0]!r}")
+                key_name = key[1:]
+                if key_name in alternate_fields:
+                    raise HarnessError(f"duplicate {key} in alternate outcome for {case_ids[0]!r}")
+                alternate_fields[key_name] = value
+            if set(alternate_fields) != required_fields:
+                raise HarnessError(f"alternate outcome fields are incomplete for {case_ids[0]!r}")
+            alternate_classification = alternate_fields["classification"]
+            alternate_reason = alternate_fields["reason"]
+            alternate_match = alternate_fields["match"]
+            alternate_stage = alternate_fields["stage"]
+            if (
+                not isinstance(alternate_classification, Symbol)
+                or not alternate_classification.startswith(":")
+                or alternate_classification[1:] not in ALLOWED_CLASSIFICATIONS
+            ):
+                raise HarnessError(f"invalid alternate classification for {case_ids[0]!r}")
+            if (
+                not isinstance(alternate_stage, Symbol)
+                or not alternate_stage.startswith(":")
+                or alternate_stage[1:] not in {"compile", "runtime", "output"}
+            ):
+                raise HarnessError(f"invalid alternate stage for {case_ids[0]!r}")
+            if not isinstance(alternate_reason, str) or not alternate_reason.strip():
+                raise HarnessError(f"empty alternate reason for {case_ids[0]!r}")
+            run_match = re.search(r"\brun #?(\d{11})\b", alternate_reason)
+            issue_refs = re.findall(r"#(\d+)\b", alternate_reason)
+            if run_match is None or not any(
+                issue_ref != run_match.group(1) for issue_ref in issue_refs
+            ):
+                raise HarnessError(
+                    f"alternate reason requires an issue and observed run ID for {case_ids[0]!r}"
+                )
+            if not isinstance(alternate_match, str) or not alternate_match:
+                raise HarnessError(f"empty alternate match expression for {case_ids[0]!r}")
+            try:
+                alternate_pattern = re.compile(alternate_match)
+            except re.error as error:
+                raise HarnessError(
+                    f"invalid alternate match expression for {case_ids[0]!r}: {error}"
+                ) from error
+            alternates.append(
+                ExpectedFailureOutcome(
+                    alternate_classification[1:],
+                    alternate_reason,
+                    alternate_pattern,
+                    alternate_stage[1:],
+                )
+            )
         raw_allow_pass = fields.get("allow-pass")
         allow_pass = raw_allow_pass is not None
         if allow_pass and (not isinstance(raw_allow_pass, Symbol) or raw_allow_pass != "t"):
@@ -403,7 +476,13 @@ def load_expected_failures(path: Path = EXPECTED_FAILURES) -> dict[str, Expected
             if case_id in expected:
                 raise HarnessError(f"duplicate expected-failure test {case_id!r}")
             expected[case_id] = ExpectedFailure(
-                case_id, classification, reason, pattern, stage[1:], allow_pass
+                case_id,
+                classification,
+                reason,
+                pattern,
+                stage[1:],
+                allow_pass,
+                tuple(alternates),
             )
     return expected
 
@@ -1161,11 +1240,29 @@ def apply_expected_failures(
         consumed.add(case_id)
         return True, "allowed pass for intermittent compile-timeout bug"
     if entry.stage != stage:
-        return False, f"expected-failure stage mismatch: manifest={entry.stage}, observed={stage}"
-    if not entry.pattern.search(detail):
+        if not any(
+            alternate.stage == stage and alternate.pattern.search(detail)
+            for alternate in entry.alternates
+        ):
+            return False, (
+                f"expected-failure stage mismatch: manifest={entry.stage}, observed={stage}; "
+                f"detail={detail!r}"
+            )
+    elif entry.pattern.search(detail):
+        consumed.add(case_id)
+        return True, f"expected {entry.classification}: {entry.reason}"
+    matching_alternate = next(
+        (
+            alternate
+            for alternate in entry.alternates
+            if alternate.stage == stage and alternate.pattern.search(detail)
+        ),
+        None,
+    )
+    if matching_alternate is None:
         return False, f"expected-failure evidence did not match: {detail}"
     consumed.add(case_id)
-    return True, f"expected {entry.classification}: {entry.reason}"
+    return True, f"expected {matching_alternate.classification}: {matching_alternate.reason}"
 
 
 def _capture_mode(case: PhptCase) -> str:
