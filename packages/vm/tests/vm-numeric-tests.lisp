@@ -38,6 +38,8 @@
 
 (it-sequential "kahan-sum-basic"
   (expect (= 6.0d0 (cl-cc/vm::kahan-sum '(1.0d0 2.0d0 3.0d0))) :to-be-truthy))
+(it-sequential "kahan-sum-empty"
+  (expect (= 0.0d0 (cl-cc/vm::kahan-sum (quote ()))) :to-be-truthy))
 
 (it-sequential "kahan-sum-vector"
   (expect (= 6.0d0 (cl-cc/vm::kahan-sum #(1.0d0 2.0d0 3.0d0))) :to-be-truthy))
