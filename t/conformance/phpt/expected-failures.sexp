@@ -51882,12 +51882,7 @@
       :reason "The test depends on stream polling and socket-pair constants/classes that are not implemented by the pinned runtime."
       :match "^compile error: Compilation failed:"
       :stage :compile)
-  (:cases (
-    "Zend/tests/oom_soft_limit_exceeded_fcall.phpt"
-   ) :classification :unimplemented
-      :reason "The PHPT expects the configured 10 MiB memory limit to stop the infinite allocation loop; the pinned runtime does not enforce memory_limit."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("Zend/tests/oom_soft_limit_exceeded_fcall.phpt" :classification :unimplemented :reason "The PHPT expects the configured 10 MiB memory limit to stop the infinite allocation loop; memory_limit enforcement is missing. Output mismatch observed in CI run #40369314762; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :unimplemented :reason "memory_limit is not enforced; runtime-stage 60-second timeout observed in CI run #40447108268; tracked in nerima-lisp/cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime)))
 ("ext/standard/tests/general_functions/var_export_basic5.phpt" :classification :bug
    :reason "intermittent 60s compile timeout; observed in CI runs #40324445201; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
