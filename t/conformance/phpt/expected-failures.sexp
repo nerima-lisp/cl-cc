@@ -51256,7 +51256,7 @@
       :reason "The PHPT reaches a dynamic property assignment under #[AllowDynamicProperties] and fails with a missing DYNAMIC slot; the pinned source has no AllowDynamicProperties runtime handling, and object properties are not serialized by the JSON encoder, whose supported aggregate branch is hash-table-only (runtime-builtins-string-json.lisp:13-52)."
       :match "^runtime\\ error:\\ The\\ slot\\ CL\\-CC/PHP::DYNAMIC\\ is\\ missing\\ from\\ the\\ object\\ of\\ class\\ CL\\-CC/PHP::MYCLASS$"
       :stage :runtime)
-  ("ext/json/tests/json_encode_oom_pretty_print.phpt" :classification :unimplemented :reason "The PHPT sets memory_limit=8M and expects the runtime to stop JSON allocation with a memory-exhausted fatal; allocation-time enforcement is missing. A runtime timeout was observed in local retry-20261026; tracked in cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime :alternates ((:classification :unimplemented :reason "Missing memory_limit enforcement caused the expected memory-exhausted fatal to be absent; output mismatch observed in CI run #40439870065; tracked in cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output)))
+  ("ext/json/tests/json_encode_oom_pretty_print.phpt" :classification :unimplemented :reason "The PHPT sets memory_limit=8M and expects the runtime to stop JSON allocation with a memory-exhausted fatal; allocation-time enforcement is missing. A runtime timeout was observed in local retry-20261026; tracked in nerima-lisp/cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime :alternates ((:classification :unimplemented :reason "Missing memory_limit enforcement caused the expected memory-exhausted fatal to be absent; output mismatch observed in CI run #40439870065; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output)))
   (:cases (
     "ext/reflection/tests/001.phpt"
    ) :classification :unimplemented
@@ -51894,7 +51894,7 @@
    :stage :compile
    :allow-pass t
    :alternates ((:classification :bug
-      :reason "var_export() omits the nested-array line break after =>; output mismatch observed in run #40428473938; tracked in #17."
+      :reason "var_export() omits the nested-array line break after =>; output mismatch observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#17."
       :match "^EXPECT mismatch at byte "
       :stage :output)))
 ("ext/standard/tests/strings/vprintf_variation10.phpt" :classification :bug
@@ -51903,7 +51903,7 @@
    :stage :compile
    :allow-pass t
    :alternates ((:classification :bug
-      :reason "vprintf() passes a negative %c value to code-char without PHP byte conversion; runtime failure observed in run #40428473938; tracked in #17."
+      :reason "vprintf() passes a negative %c value to code-char without PHP byte conversion; runtime failure observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#17."
       :match "^runtime error: The value"
       :stage :runtime)))
 ("ext/hash/tests/fnv1a32.phpt" :classification :bug
@@ -51937,7 +51937,7 @@
    :stage :compile
    :allow-pass t
    :alternates ((:classification :unimplemented
-      :reason "crypt() is not registered; runtime failure observed in run #40428473938; tracked in #17."
+      :reason "crypt() is not registered; runtime failure observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#17."
       :match "^runtime error: The function CL-CC/PHP::CRYPT is undefined\\."
       :stage :runtime)))
 ("ext/hash/tests/hash_serialize_003.phpt" :classification :bug
@@ -51946,7 +51946,7 @@
    :stage :compile
    :allow-pass t
    :alternates ((:classification :unimplemented
-      :reason "hash() and the HashContext API are not registered; runtime failure observed in run #40428473938; tracked in #17."
+      :reason "hash() and the HashContext API are not registered; runtime failure observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#17."
       :match "^runtime error: The function CL-CC/PHP::HASH is undefined\\."
       :stage :runtime)))
 ("ext/standard/tests/mail/mail_basic6.phpt" :classification :bug
@@ -51955,7 +51955,7 @@
    :stage :compile
    :allow-pass t
    :alternates ((:classification :unimplemented
-      :reason "mail() does not invoke sendmail or write configured output; output mismatch observed in run #40428473938; tracked in #17."
+      :reason "mail() does not invoke sendmail or write configured output; output mismatch observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#17."
       :match "^EXPECTF did not match output"
       :stage :output)))
 ("Zend/tests/oom_soft_limit_exceeded.phpt" :classification :unimplemented
@@ -51963,7 +51963,7 @@
    :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
    :stage :runtime
    :alternates ((:classification :unimplemented
-      :reason "memory_limit is not enforced; output mismatch observed in run #40428473938; tracked in #17."
+      :reason "memory_limit is not enforced; output mismatch observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#18."
       :match "^EXPECTF did not match output"
       :stage :output)))
 )
