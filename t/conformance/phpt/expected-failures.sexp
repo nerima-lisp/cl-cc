@@ -51256,12 +51256,7 @@
       :reason "The PHPT reaches a dynamic property assignment under #[AllowDynamicProperties] and fails with a missing DYNAMIC slot; the pinned source has no AllowDynamicProperties runtime handling, and object properties are not serialized by the JSON encoder, whose supported aggregate branch is hash-table-only (runtime-builtins-string-json.lisp:13-52)."
       :match "^runtime\\ error:\\ The\\ slot\\ CL\\-CC/PHP::DYNAMIC\\ is\\ missing\\ from\\ the\\ object\\ of\\ class\\ CL\\-CC/PHP::MYCLASS$"
       :stage :runtime)
-  (:cases (
-    "ext/json/tests/json_encode_oom_pretty_print.phpt"
-   ) :classification :unimplemented
-      :reason "The PHPT sets memory_limit=8M and the implementation runs beyond the fresh 60-second timeout. The harness does pass INI settings to %php-ini-set (t/conformance/phpt/run.py:709-758; driver.lisp:138-145), but the pinned runtime only stores the setting and has no allocation-time memory_limit enforcement (runtime-builtins-io-ini.lisp:90-100; source search found no allocator checks). JSON pretty-print recursively builds a complete intermediate list/string output (runtime-builtins-string-json.lisp:24-51). This supports missing memory_limit enforcement, not a JSON encoding mismatch."
-      :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
-      :stage :runtime)
+  ("ext/json/tests/json_encode_oom_pretty_print.phpt" :classification :unimplemented :reason "The PHPT sets memory_limit=8M and expects the runtime to stop JSON allocation with a memory-exhausted fatal; allocation-time enforcement is missing. A runtime timeout was observed in local retry-20261026; tracked in cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime :alternates ((:classification :unimplemented :reason "Missing memory_limit enforcement caused the expected memory-exhausted fatal to be absent; output mismatch observed in CI run #40439870065; tracked in cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output)))
   (:cases (
     "ext/reflection/tests/001.phpt"
    ) :classification :unimplemented
