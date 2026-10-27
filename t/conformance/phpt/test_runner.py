@@ -229,7 +229,7 @@ class PhptRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(run.HarnessError, "alternate reason requires"):
                 run.load_expected_failures(manifest)
 
-    def test_intermittent_compile_timeout_entry_accepts_only_exact_timeout_or_pass(self):
+    def test_intermittent_compile_timeout_entry_accepts_only_recorded_outcomes(self):
         with tempfile.TemporaryDirectory() as directory:
             php_src = Path(directory)
             case_path = php_src / "Zend" / "example.phpt"
