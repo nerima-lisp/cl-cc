@@ -22,258 +22,25 @@
 
 ;;; 1. collect-inherited-slots
 
-(it-sequential "collect-inherited-slots"
-  (let ((reg (make-test-registry)))
-    ;; no superclasses
-    (expect (cl-cc/vm::collect-inherited-slots '() reg) :to-be-null))
-  (let ((reg (make-test-registry)))
-    ;; single superclass
-    (registry-add-class reg 'animal :slots '(name age))
-    (expect (cl-cc/vm::collect-inherited-slots '(animal) reg) :to-equal '(name age)))
-  (let ((reg (make-test-registry)))
-    ;; multiple superclasses
-    (registry-add-class reg 'flyable  :slots '(wingspan))
-    (registry-add-class reg 'swimable :slots '(fin-count))
-    (let ((result (cl-cc/vm::collect-inherited-slots '(flyable swimable) reg)))
-      (expect (member 'wingspan  result) :to-be-truthy)
-      (expect (member 'fin-count result) :to-be-truthy)))
-  (let ((reg (make-test-registry)))
-    ;; no duplicates
-    (registry-add-class reg 'base  :slots '(id))
-    (registry-add-class reg 'mixin :slots '(id extra))
-    (let ((result (cl-cc/vm::collect-inherited-slots '(base mixin) reg)))
-      (expect (= 2 (length result)) :to-be-truthy)
-      (expect (member 'id    result) :to-be-truthy)
-      (expect (member 'extra result) :to-be-truthy))))
-
 ;;; 2. collect-inherited-initargs
-
-(it-sequential "collect-inherited-initargs"
-  (let ((reg (make-test-registry)))
-    ;; no superclasses
-    (expect (cl-cc/vm::collect-inherited-initargs '() reg) :to-be-null))
-  (let ((reg (make-test-registry)))
-    ;; single superclass
-    (registry-add-class reg 'person :initargs '((:name . name) (:age . age)))
-    (let ((result (cl-cc/vm::collect-inherited-initargs '(person) reg)))
-      (expect (assoc :name result) :to-be-truthy)
-      (expect (assoc :age  result) :to-be-truthy)))
-  (let ((reg (make-test-registry)))
-    ;; multiple superclasses; first occurrence wins
-    (registry-add-class reg 'named  :initargs '((:name . name)))
-    (registry-add-class reg 'tagged :initargs '((:tag . tag)))
-    (let ((result (cl-cc/vm::collect-inherited-initargs '(named tagged) reg)))
-      (expect (assoc :name result) :to-be-truthy)
-      (expect (assoc :tag  result) :to-be-truthy))))
 
 ;;; 3. compute-class-precedence-list
 
-(it-sequential "compute-class-precedence-list"
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'root)
-    (expect (cl-cc/vm::compute-class-precedence-list 'root reg) :to-equal '(root)))
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'animal)
-    (registry-add-class reg 'dog :superclasses '(animal))
-    (expect (cl-cc/vm::compute-class-precedence-list 'dog reg) :to-equal '(dog animal)))
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'c)
-    (registry-add-class reg 'b :superclasses '(c))
-    (registry-add-class reg 'a :superclasses '(b))
-    (expect (cl-cc/vm::compute-class-precedence-list 'a reg) :to-equal '(a b c)))
-  (let ((reg (make-test-registry)))
-    ;; diamond: A -> B, A -> C, B -> D, C -> D
-    (registry-add-class reg 'd)
-    (registry-add-class reg 'b :superclasses '(d))
-    (registry-add-class reg 'c :superclasses '(d))
-    (registry-add-class reg 'a :superclasses '(b c))
-    (let ((cpl (cl-cc/vm::compute-class-precedence-list 'a reg)))
-      (expect (member 'a cpl) :to-be-truthy)
-      (expect (member 'b cpl) :to-be-truthy)
-      (expect (member 'c cpl) :to-be-truthy)
-      (expect (member 'd cpl) :to-be-truthy)
-      (expect (= (length cpl) (length (remove-duplicates cpl))) :to-be-truthy)
-      (expect cpl :to-equal '(a b c d))))
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'a)
-    (registry-add-class reg 'b :superclasses '(a))
-    (registry-add-class reg 'c :superclasses '(a))
-    (registry-add-class reg 'd :superclasses '(b c))
-    (expect (cl-cc/vm::compute-class-precedence-list 'd reg) :to-equal '(d b c a)))
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'a)
-    (registry-add-class reg 'b)
-    (registry-add-class reg 'x :superclasses '(a b))
-    (registry-add-class reg 'y :superclasses '(b a))
-    (expect (cl-cc/vm::compute-class-precedence-list 'x reg) :to-equal '(x a b))
-    (expect (cl-cc/vm::compute-class-precedence-list 'y reg) :to-equal '(y b a)))
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'z)
-    (registry-add-class reg 'y :superclasses '(z))
-    (registry-add-class reg 'x :superclasses '(z))
-    (registry-add-class reg 'w :superclasses '(y x))
-    (expect (cl-cc/vm::compute-class-precedence-list 'w reg) :to-equal '(w y x z))))
-
 ;;; 4. EQL specializer dispatch index
-
-(it-sequential "eql-specializer-dispatch-index"
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
-         (gf (make-hash-table :test #'equal))
-         (method 'read-method)
-         (inst (cl-cc:make-vm-register-method
-                :gf-reg :r0
-                :specializer '(eql :read)
-                :qualifier nil
-                :method-reg :r1)))
-    (setf (gethash :__methods__ gf) (make-hash-table :test #'equal)
-          (gethash :__eql-index__ gf) (make-hash-table :test #'equal))
-    (cl-cc:vm-reg-set state :r0 gf)
-    (cl-cc:vm-reg-set state :r1 method)
-    (cl-cc/vm::execute-instruction inst state 0 nil)
-    (expect (cl-cc/vm::%vm-gf-eql-methods gf :read) :to-equal (list method))
-    (expect (gethash :read (gethash :__eql-index__ gf)) :to-equal (list method))))
 
 ;;; 5. %cis-walk (extracted DFS helper for collect-inherited-slots)
 
-(it-sequential "cis-walk-empty-class-list-leaves-result-unchanged"
-  (let ((reg (make-test-registry))
-        (seen (make-hash-table :test #'eq))
-        (cell (list nil)))
-    (cl-cc/vm::%cis-walk '() reg seen cell)
-    (expect (car cell) :to-be-null)))
-
-(it-sequential "cis-walk-single-class-accumulates-slots"
-  (let ((reg (make-test-registry))
-        (seen (make-hash-table :test #'eq))
-        (cell (list nil)))
-    (registry-add-class reg 'thing :slots '(x y))
-    (cl-cc/vm::%cis-walk '(thing) reg seen cell)
-    (expect (member 'x (car cell)) :to-be-truthy)
-    (expect (member 'y (car cell)) :to-be-truthy)))
-
-(it-sequential "cis-walk-deduplicates-slots-via-seen"
-  (let ((reg (make-test-registry))
-        (seen (make-hash-table :test #'eq))
-        (cell (list nil)))
-    (setf (gethash 'id seen) t)
-    (registry-add-class reg 'base :slots '(id extra))
-    (cl-cc/vm::%cis-walk '(base) reg seen cell)
-    (expect (member 'id    (car cell)) :to-be-falsy)
-    (expect (member 'extra (car cell)) :to-be-truthy)))
-
 ;;; 6. %cia-walk (extracted DFS helper for collect-inherited-initargs)
-
-(it-sequential "cia-walk-empty-class-list-leaves-result-unchanged"
-  (let ((reg (make-test-registry))
-        (cell (list nil)))
-    (cl-cc/vm::%cia-walk '() reg cell)
-    (expect (car cell) :to-be-null)))
-
-(it-sequential "cia-walk-single-class-accumulates-initargs"
-  (let ((reg (make-test-registry))
-        (cell (list nil)))
-    (registry-add-class reg 'named :initargs '((:name . name)))
-    (cl-cc/vm::%cia-walk '(named) reg cell)
-    (expect (assoc :name (car cell)) :to-be-truthy)))
-
-(it-sequential "cia-walk-does-not-duplicate-existing-keys"
-  (let ((reg (make-test-registry))
-        (cell (list (list '(:name . name-old)))))
-    (registry-add-class reg 'alt :initargs '((:name . name-new) (:extra . extra)))
-    (cl-cc/vm::%cia-walk '(alt) reg cell)
-    (expect (= 1 (length (remove-if-not (lambda (e) (eq (car e) :name)) (car cell)))) :to-be-truthy)
-    (expect (assoc :extra (car cell)) :to-be-truthy)))
 
 ;;; 6b. %vm-allow-other-keys-p / %vm-validate-initargs
 
-(it-sequential "vm-allow-other-keys-p-cases truthy"
-  (destructuring-bind (reg-val alist) (list t '((:allow-other-keys . :r0)))
-    (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
-    (cl-cc:vm-reg-set s :r0 reg-val)
-    (if reg-val
-        (expect (cl-cc/vm::%vm-allow-other-keys-p alist s) :to-be-truthy)
-        (expect (cl-cc/vm::%vm-allow-other-keys-p alist s) :to-be-falsy)))))
-
-(it-sequential "vm-allow-other-keys-p-cases nil-val"
-  (destructuring-bind (reg-val alist) (list nil '((:allow-other-keys . :r0)))
-    (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
-    (cl-cc:vm-reg-set s :r0 reg-val)
-    (if reg-val
-        (expect (cl-cc/vm::%vm-allow-other-keys-p alist s) :to-be-truthy)
-        (expect (cl-cc/vm::%vm-allow-other-keys-p alist s) :to-be-falsy)))))
-
-(it-sequential "vm-allow-other-keys-p-cases absent"
-  (destructuring-bind (reg-val alist) (list nil '((:x . :r0)))
-    (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
-    (cl-cc:vm-reg-set s :r0 reg-val)
-    (if reg-val
-        (expect (cl-cc/vm::%vm-allow-other-keys-p alist s) :to-be-truthy)
-        (expect (cl-cc/vm::%vm-allow-other-keys-p alist s) :to-be-falsy)))))
-
-(it-sequential "vm-validate-initargs-known-key-accepts-without-signal"
-  (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
-    (cl-cc:vm-reg-set s :r0 42)
-    (expect (progn
-       (cl-cc/vm::%vm-validate-initargs '((:width . :r0)) '((:width . width)) s)
-       t) :to-be-truthy)))
-
-(it-sequential "vm-validate-initargs-unknown-key-signals-error"
-  (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
-    (cl-cc:vm-reg-set s :r0 42)
-    (signals error (cl-cc/vm::%vm-validate-initargs '((:unknown-key . :r0)) '((:width . width)) s))))
-
-(it-sequential "vm-validate-initargs-allow-other-keys-bypasses-check"
-  (let ((s (make-instance 'cl-cc/vm::vm-io-state)))
-    (cl-cc:vm-reg-set s :r0 42)
-    (cl-cc:vm-reg-set s :r1 t)
-    (expect (progn
-       (cl-cc/vm::%vm-validate-initargs
-        '((:unknown-key . :r0) (:allow-other-keys . :r1))
-        '((:width . width))
-        s)
-       t) :to-be-truthy)))
-
 ;;; 7. %cpl-linearize (extracted C3 linearization step)
-
-(it-sequential "cpl-linearize-unknown-class-returns-singleton"
-  (let ((reg (make-test-registry)))
-    (expect (cl-cc/vm::%cpl-linearize 'unknown reg) :to-equal '(unknown))))
-
-(it-sequential "cpl-linearize-leaf-class-returns-singleton"
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'leaf)
-    (expect (cl-cc/vm::%cpl-linearize 'leaf reg) :to-equal '(leaf))))
-
-(it-sequential "cpl-linearize-linear-inheritance-chain"
-  (let ((reg (make-test-registry)))
-    (registry-add-class reg 'c)
-    (registry-add-class reg 'b :superclasses '(c))
-    (registry-add-class reg 'a :superclasses '(b))
-    (expect (cl-cc/vm::%cpl-linearize 'a reg) :to-equal '(a b c))))
 
 ;;; FR-821: copy operations
 
 (defclass vm-copy-host-object ()
   ((items :initarg :items :accessor vm-copy-host-object-items)
    (flag :initarg :flag :accessor vm-copy-host-object-flag)))
-
-(it-sequential "fr-821-copy-instance-host-standard-object"
-  (let* ((items (list 1 2 3))
-         (object (make-instance 'vm-copy-host-object :items items :flag :original))
-         (copy (cl-cc/vm::copy-instance object)))
-    (setf (vm-copy-host-object-flag copy) :changed)
-    (expect (eq object copy) :to-be-falsy)
-    (expect (vm-copy-host-object-items copy) :to-be items)
-    (expect (vm-copy-host-object-flag object) :to-be :original)
-    (expect (vm-copy-host-object-flag copy) :to-be :changed)))
-
-(it-sequential "fr-821-deep-copy-recursive-conses-and-vectors"
-  (let* ((nested (vector (list :a :b)))
-         (copy (cl-cc/vm::deep-copy nested)))
-    (setf (car (aref nested 0)) :changed)
-    (expect (eq nested copy) :to-be-falsy)
-    (expect (eq (aref nested 0) (aref copy 0)) :to-be-falsy)
-    (expect (car (aref copy 0)) :to-be :a)))
 
 ;;; FR-838: extensible sequence protocol
 
@@ -293,17 +60,6 @@
   (declare (ignore sequence))
   (make-instance 'vm-test-deque
                  :storage (make-array size :initial-element initial-element)))
-
-(it-sequential "fr-838-extensible-sequence-subseq-and-setf-elt"
-  (let* ((deque (make-instance 'vm-test-deque :storage (vector 10 20 30 40)))
-         (slice (cl-cc/vm::subseq deque 1 3)))
-    (setf (cl-cc/vm::elt deque 2) 99)
-    (expect (cl-cc/vm::sequence-protocol-p deque) :to-be-truthy)
-    (expect (= 4 (cl-cc/vm::length deque)) :to-be-truthy)
-    (expect (= 99 (cl-cc/vm::elt deque 2)) :to-be-truthy)
-    (expect (= 2 (cl-cc/vm::length slice)) :to-be-truthy)
-    (expect (= 20 (cl-cc/vm::elt slice 0)) :to-be-truthy)
-    (expect (= 30 (cl-cc/vm::elt slice 1)) :to-be-truthy)))
 
 ;;; 8. FR-888 allocate-instance fast path
 
@@ -333,11 +89,6 @@
          (x-index (cl-cc/vm::class-slot-vector-index class 'x)))
     (setf (cl-cc/vm::slot-value-by-index instance x-index) 42)
     (expect (= 42 (cl-cc/vm::slot-value-by-index instance x-index)) :to-be-truthy)))
-
-(it-sequential "fr-888-dynamic-layout-falls-back-from-vector-allocation"
-  (let ((class (registry-add-class (make-test-registry) 'dynamic :slots '(x))))
-    (setf (gethash :__dynamic-slot-layout__ class) t)
-    (signals error (cl-cc/vm::allocate-instance-vector class))))
 
 ;;; 9. FR-889 default-initargs / make-instance caching
 

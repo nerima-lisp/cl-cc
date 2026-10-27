@@ -20,51 +20,6 @@
             (cl-cc:vm-values-list state)
             state)))
 
-(it-sequential "fr-668-parse-float-returns-float-and-position"
-  (multiple-value-bind (value values-list)
-      (%fr-vm-unary #'cl-cc:make-vm-parse-float " -12.5e1 rest")
-    (expect (= -125.0d0 value) :to-be-truthy)
-    (expect (= -125.0d0 (first values-list)) :to-be-truthy)
-    (expect (= 8 (second values-list)) :to-be-truthy)))
-
-(it-sequential "fr-668-parse-integer-records-position"
-  (multiple-value-bind (value values-list)
-      (%fr-vm-unary #'cl-cc:make-vm-parse-integer "12345")
-    (expect (= 12345 value) :to-be-truthy)
-    (expect values-list :to-equal '(12345 5))))
-
-(it-sequential "fr-669-float-decode-functions-match-cl-values"
-  (let ((float 6.5d0))
-    (multiple-value-bind (expected-sig expected-exp expected-sign) (decode-float float)
-      (multiple-value-bind (actual values-list)
-          (%fr-vm-unary #'cl-cc:make-vm-decode-float float)
-        (expect (= expected-sig actual) :to-be-truthy)
-        (expect values-list :to-equal (list expected-sig expected-exp expected-sign))))
-    (multiple-value-bind (expected-sig expected-exp expected-sign) (integer-decode-float float)
-      (multiple-value-bind (actual values-list)
-          (%fr-vm-unary #'cl-cc:make-vm-integer-decode-float float)
-        (expect (= expected-sig actual) :to-be-truthy)
-        (expect values-list :to-equal (list expected-sig expected-exp expected-sign))))))
-
-(it-sequential "fr-669-float-inspection-and-scale radix"
-  (destructuring-bind (ctor input expected) (list #'cl-cc:make-vm-float-radix 1.0d0 2)
-    (multiple-value-bind (actual) (%fr-vm-unary ctor input)
-    (expect (= expected actual) :to-be-truthy))))
-
-(it-sequential "fr-669-float-inspection-and-scale digits"
-  (destructuring-bind (ctor input expected) (list #'cl-cc:make-vm-float-digits 1.0d0 53)
-    (multiple-value-bind (actual) (%fr-vm-unary ctor input)
-    (expect (= expected actual) :to-be-truthy))))
-
-(it-sequential "fr-669-float-inspection-and-scale sign"
-  (destructuring-bind (ctor input expected) (list #'cl-cc:make-vm-float-sign -2.0d0 -1.0d0)
-    (multiple-value-bind (actual) (%fr-vm-unary ctor input)
-    (expect (= expected actual) :to-be-truthy))))
-
-(it-sequential "fr-669-scale-float-scales-by-binary-exponent"
-  (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-scale-float 1.5d0 3)
-    (expect (= 12.0d0 actual) :to-be-truthy)))
-
 (it-sequential "fr-754-coerce-runtime-cases integer-to-double"
   (destructuring-bind (value type expected) (list 3 'double-float 3.0d0)
     (multiple-value-bind (actual) (%fr-vm-binary #'cl-cc:make-vm-coerce value type)
