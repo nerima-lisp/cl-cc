@@ -23,7 +23,7 @@
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-defclass-constant-slot-initform-compilation"
-  (cl-cc/expand::compiler-macroexpand-all '(defconstant +codegen-defclass-slot-constant+ 41))
+  (cl-cc/expand:compiler-macroexpand-all '(defconstant +codegen-defclass-slot-constant+ 41))
   (let* ((ctx (make-codegen-ctx))
          (node (cl-cc/compile:optimize-ast
                 (cl-cc/ast:make-ast-defclass
@@ -41,7 +41,7 @@
     (expect const-inst :to-be-truthy)
     (expect (cl-cc::vm-const-value const-inst) :to-equal 42)
     (expect class-inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-slot-initform-regs class-inst) :to-equal (list (cons 'value (cl-cc/vm:vm-dst const-inst))))
+    (expect (seventh (cl-cc/vm:instruction->sexp class-inst)) :to-equal (list (cons 'value (cl-cc/vm:vm-dst const-inst))))
     (expect (keywordp reg) :to-be-truthy)))
 
 ;;; ─── compile-ast: ast-defgeneric ─────────────────────────────────────────────

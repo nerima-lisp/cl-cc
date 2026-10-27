@@ -48,8 +48,8 @@
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-open-file)))
       (expect inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-open-file-external-format inst) :to-be :utf-16)
-      (expect (cl-cc/vm::vm-open-file-external-format-reg inst) :to-be-null))))
+      (expect (seventh (cl-cc/vm/protocols:instruction->sexp inst)) :to-be :utf-16)
+      (expect (eighth (cl-cc/vm:instruction->sexp inst)) :to-be-null))))
 
 ;;; ─── Section 11: PEEK-CHAR ──────────────────────────────────────────────────
 

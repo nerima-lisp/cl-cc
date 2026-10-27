@@ -15,8 +15,8 @@
 ;;; ─── vm-register-host-bridge ─────────────────────────────────────────────
 
 (it-sequential "vm-bridge-registers-php-current-closure"
-  (expect (functionp (cl-cc/vm::vm-bridge-callable 'cl-cc/php::%php-current-closure)) :to-be-truthy)
-  (expect (functionp (gethash "PHP-CURRENT-CLOSURE" cl-cc/vm::*vm-runtime-callables*)) :to-be-truthy))
+  (expect (functionp (cl-cc/vm/protocols:vm-lookup-bridge-callable (quote cl-cc/php::%php-current-closure))) :to-be-truthy)
+  (expect (functionp (gethash "PHP-CURRENT-CLOSURE" cl-cc/vm/protocols::*vm-runtime-callables*)) :to-be-truthy))
 
 ;;; ─── slot-definition-name ────────────────────────────────────────────────
 

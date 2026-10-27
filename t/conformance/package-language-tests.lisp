@@ -40,7 +40,7 @@ return the printed representation of the primary result."
 ;;; ──────────────────────────────────────────────────────────────────────
 
 (it-sequential "pkg-gensym-self-host"
-  (let ((cl-cc/vm::*vm-self-host-mode* t))
+  (let ((cl-cc/vm/protocols:*vm-self-host-mode* t))
     (let ((g1 (cl-cc/vm::vm-gensym-inst "G" nil))
           (g2 (cl-cc/vm::vm-gensym-inst "G" nil)))
       (expect g1 :to-be-truthy)

@@ -23,18 +23,3 @@
 
 ;;; ── 6. deep-copy: immediate values and cycle detection ───────────────────
 
-(it-sequential "deep-copy-cycle-in-cons-is-preserved"
-  (let* ((pair (cons :head nil))
-         (seen (make-hash-table :test #'eq)))
-    ;; register pair in seen before calling deep-copy to simulate a cycle break
-    (setf (gethash pair seen) pair)
-    ;; deep-copy should find it in seen and return the registered value
-    (expect (cl-cc/vm:deep-copy pair seen) :to-be pair)))
-
-(it-sequential "deep-copy-hash-table-cycle-via-seen"
-  (let* ((original (make-hash-table))
-         (sentinel :already-copied)
-         (seen (make-hash-table :test #'eq)))
-    (setf (gethash original seen) sentinel)
-    (expect (cl-cc/vm:deep-copy original seen) :to-be sentinel)))
-

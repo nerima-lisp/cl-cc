@@ -18,38 +18,20 @@
   '(("optimize" . 0)
     ("codegen"  . 0)
     ("compile"  . 3)
-    ("pipeline" . 5)
-    ("expand"   . 7)
+    ("pipeline" . 2)
+    ("expand"   . 0)
     ("regalloc" . 0)
     ("emit"     . 0)
     ("mir"      . 0)
     ("parse"    . 0))
   "Per-package ceiling on distinct CL-CC/VM internal symbols referenced.
 
-§5-2 is satisfied for the two Phase C extraction candidates: optimize and
-codegen are both at zero, down from 16 and 34. Neither names a cl-cc/vm internal
-any more, which is the property an out-of-tree pass needs -- a separate
-repository cannot reach one.
+optimize and codegen have zero references. compile has 3, pipeline has 2,
+and every other listed package has zero. Pipeline retains two references:
+%vm-managed-cons-pointer-p and %vm-managed-tree-materialize.
 
-Getting there took three passes. 37 of the original 106 already named an
-exported symbol and were written with `::` out of habit. cl-cc/vm then exported
-the IR contract §5-2 called for: instruction types, slot accessors, the
-exception-table record, atomics and fences. What was left in optimize was not
-IR at all but two mistakes -- a pass reading VM-BINOP slots that do not exist,
-and a slot compared as a package-qualified literal where its name would do.
-
-The rest is deliberately not IR, and each package's residue is a different thing:
-
-  compile    %REGISTER-DOCUMENTATION and the CLOS emulation internals
-             (CLASS-DIRECT-SLOTS, METHOD-SPECIALIZERS).
-  pipeline   %VM-CALL-CLOSURE-SYNC / %VM-CLOSURE-OBJECT-P and friends, which the
-             backend-protocol VM integration is built from, plus one tuning
-             constant. Core reaching into core.
-  expand     The package-lock and sequence-protocol emulation.
-
-None of the three is an extraction candidate, so none blocks anything. They stay
-non-zero on purpose: a ceiling of 0 everywhere would be a claim this file cannot
-back.")
+expand has no umbrella source directory to scan, so its zero records the move
+out of this repository.")
 
 (defun %vm-internal-references (package-name)
   "Return the distinct CL-CC/VM internal symbol names referenced under packages/NAME/src."

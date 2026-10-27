@@ -394,7 +394,7 @@ stable, isolated context."
     (expect (= 5 (cl-cc/ast:ast-int-value (first (cl-cc/ast:ast-progn-forms result)))) :to-be-truthy)))
 
 (it-sequential "optimize-ast-folds-defconstant-backed-binop"
-  (cl-cc/expand::compiler-macroexpand-all '(defconstant +optimize-ast-inline-constant+ 41))
+  (cl-cc/expand:compiler-macroexpand-all '(defconstant +optimize-ast-inline-constant+ 41))
   (let* ((node (make-ast-binop :op '+
                                :lhs (make-ast-var :name '+optimize-ast-inline-constant+)
                                :rhs (make-ast-int :value 1)))
@@ -407,7 +407,7 @@ stable, isolated context."
                                                (make-ast-int :value 2)))
                          :declarations nil
                          :body (list (make-ast-var :name 'optimize-shadowed-constant))) #'cl-cc/ast:ast-let-body)
-    (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
+    (cl-cc/expand:compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
          (body-form (first (funcall body-reader result))))
     (expect (typep body-form 'cl-cc::ast-var) :to-be-truthy)
     (expect (cl-cc/ast:ast-var-name body-form) :to-be 'optimize-shadowed-constant))))
@@ -419,7 +419,7 @@ stable, isolated context."
                             :key-params (list (list 'optimize-shadowed-constant nil nil nil))
                             :declarations nil
                             :body (list (make-ast-var :name 'optimize-shadowed-constant))) #'cl-cc/ast:ast-lambda-body)
-    (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
+    (cl-cc/expand:compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
          (body-form (first (funcall body-reader result))))
     (expect (typep body-form 'cl-cc::ast-var) :to-be-truthy)
     (expect (cl-cc/ast:ast-var-name body-form) :to-be 'optimize-shadowed-constant))))
@@ -433,7 +433,7 @@ stable, isolated context."
                                      :declarations nil
                                      :documentation nil
                                      :body (list (make-ast-var :name 'optimize-shadowed-constant))) #'cl-cc/ast:ast-defun-body)
-    (cl-cc/expand::compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
+    (cl-cc/expand:compiler-macroexpand-all '(defconstant optimize-shadowed-constant 99)) (let* ((result (cl-cc/compile:optimize-ast node))
          (body-form (first (funcall body-reader result))))
     (expect (typep body-form 'cl-cc::ast-var) :to-be-truthy)
     (expect (cl-cc/ast:ast-var-name body-form) :to-be 'optimize-shadowed-constant))))
@@ -532,7 +532,7 @@ stable, isolated context."
       (expect (= 1 (length cl-cc/compile::*load-time-value-cells*)) :to-be-truthy))
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-load-time-value)))
       (expect inst :to-be-truthy)
-      (expect (= 0 (cl-cc/vm::vm-load-time-value-inst-cell-id inst)) :to-be-truthy)
+      (expect (= 0 (third (cl-cc/vm:instruction->sexp inst))) :to-be-truthy)
       (progn
         (expect (cl-cc/vm:vm-load-time-value-cell-form
                  (first cl-cc/compile::*load-time-value-cells*))

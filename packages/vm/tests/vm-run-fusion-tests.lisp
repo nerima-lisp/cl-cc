@@ -26,8 +26,8 @@
                                cl-cc:+op2-const+ 0 99  nil
                                cl-cc:+op2-halt2+ 0 nil nil)))
       (cl-cc/vm::run-vm code s)
-      (expect (= 10 (cl-cc/vm::vm2-reg-get s 1)) :to-be-truthy)
-      (expect (= 20 (cl-cc/vm::vm2-reg-get s 2)) :to-be-truthy))))
+      (expect (= 10 (cl-cc/vm/protocols:vm-reg-get s 1)) :to-be-truthy)
+      (expect (= 20 (cl-cc/vm/protocols:vm-reg-get s 2)) :to-be-truthy))))
 
 (it-sequential "vm2-top-candidates-sorts-by-frequency"
   (let* ((code (make-bytecode cl-cc:+op2-const+ 1 3 nil
@@ -48,9 +48,9 @@
   (let* ((code (make-bytecode cl-cc:+op2-const+ 2 4 nil
                               cl-cc:+op2-add2+  0 1 2
                               cl-cc:+op2-halt2+ 0 nil nil))
-         (fused (cl-cc/vm::vm2-fuse-immediate-superinstructions code))
+         (fused (cl-cc/vm/execution::vm2-fuse-immediate-superinstructions code))
          (s (cl-cc:make-vm2-state)))
-    (cl-cc/vm::vm2-reg-set s 1 3)
+    (cl-cc/vm/protocols:vm-reg-set s 1 3)
     (expect (= 7 (cl-cc/vm::run-vm code s)) :to-be-truthy)
     (expect (= 8 (length fused)) :to-be-truthy)))
 
@@ -87,8 +87,8 @@
 
 (it-sequential "run-vm-make-instance-opcode"
   (let ((s (cl-cc:make-vm2-state)))
-    (cl-cc/vm::vm2-reg-set s 0 :x)
-    (cl-cc/vm::vm2-reg-set s 1 42)
+    (cl-cc/vm/protocols:vm-reg-set s 0 :x)
+    (cl-cc/vm/protocols:vm-reg-set s 1 42)
     (let ((result (cl-cc/vm::run-vm (make-bytecode cl-cc:+op2-make-instance+ 2 'vm2-test-instance 2
                                                 cl-cc:+op2-halt2+ 2 nil nil)
                                  s)))

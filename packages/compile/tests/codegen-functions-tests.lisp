@@ -235,7 +235,7 @@
     (expect (codegen-find-inst ctx 'cl-cc/vm:vm-const) :to-be-truthy)))
 
 (it-sequential "codegen-defconstant-inlines-symbol-reference"
-  (cl-cc/expand::compiler-macroexpand-all '(defconstant codegen-inline-constant 123))
+  (cl-cc/expand:compiler-macroexpand-all '(defconstant codegen-inline-constant 123))
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-var :name 'codegen-inline-constant) ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-const)))

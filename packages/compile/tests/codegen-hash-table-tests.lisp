@@ -69,7 +69,7 @@
                  ctx)
     (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-make-hash-table)))
       (expect inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-hash-size inst) :to-be-truthy))))
+      (expect (second (member :size (cl-cc/vm/protocols:instruction->sexp inst))) :to-be-truthy))))
 
 (it-sequential "codegen-gethash-emits-default-register"
   (let ((ctx (make-codegen-ctx)))

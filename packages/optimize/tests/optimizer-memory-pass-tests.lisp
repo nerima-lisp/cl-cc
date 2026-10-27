@@ -398,7 +398,7 @@
                         (make-vm-ret :reg :pred))
                   :max-iterations 1
                   :pass-pipeline '(:fold :dce)))
-         (even-inst (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-evenp)) result)))
+         (even-inst (find-if (lambda (inst) (eq :evenp (car (cl-cc/vm:instruction->sexp inst)))) result)))
     (expect even-inst :to-be-truthy)
     (expect (cl-cc/vm:vm-dst even-inst) :to-be :pred)
     (expect (cl-cc/vm:vm-src even-inst) :to-be :x)
@@ -505,7 +505,7 @@
                         (cl-cc:make-vm-slot-read :dst :v :obj-reg :arr :slot-name 'x)
                         (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r3)
                         (make-vm-ret :reg :v)))))
-    (expect (= 1 (%count-insts-of-type result #'cl-cc/vm::vm-slot-write-p)) :to-be-truthy)))
+    (expect (= 1 (%count-insts-of-type result (lambda (inst) (typep inst 'cl-cc/vm/clos:vm-slot-write)))) :to-be-truthy)))
 
 (it-sequential "dead-store-elim-unknown-alias-read-observes-slot-store"
   (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
@@ -513,4 +513,4 @@
                         (cl-cc:make-vm-slot-read :dst :v :obj-reg :b :slot-name 'x)
                         (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r2)
                         (make-vm-ret :reg :v)))))
-    (expect (= 2 (%count-insts-of-type result #'cl-cc/vm::vm-slot-write-p)) :to-be-truthy)))
+    (expect (= 2 (%count-insts-of-type result (lambda (inst) (typep inst 'cl-cc/vm/clos:vm-slot-write)))) :to-be-truthy)))

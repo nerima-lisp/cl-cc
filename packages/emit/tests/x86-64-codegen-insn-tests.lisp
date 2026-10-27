@@ -163,8 +163,7 @@
                (%x86-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-vm-instruction-with-labels
-                   (cl-cc/vm::make-vm-push-handler
-                    :handler-type :error :handler-label "Lh" :result-reg :R0)
+                   (cl-cc/vm:sexp->instruction (quote (:push-handler :error "Lh" :R0)))
                    s
                    0
                    (make-hash-table :test (function equal)))))))))
@@ -176,7 +175,7 @@
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-push-handler :handler-type :error :handler-label "Lh" :result-reg :R0)
+                     (cl-cc/vm:sexp->instruction (quote (:push-handler :error "Lh" :R0)))
                      s
                      0
                      (make-hash-table :test #'equal)))))))
@@ -188,7 +187,7 @@
                  (%x86-collect-bytes
                   (lambda (s)
                     (cl-cc/codegen::emit-vm-instruction-with-labels
-                     (cl-cc/vm::make-vm-pop-handler)
+                     (cl-cc/vm:sexp->instruction (quote (:pop-handler)))
                      s
                      0
                      (make-hash-table :test #'equal)))))))

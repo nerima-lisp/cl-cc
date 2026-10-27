@@ -44,20 +44,20 @@
 
 ;;; FR-838: extensible sequence protocol
 
-(defclass vm-test-deque (cl-cc/vm::sequence)
+(defclass vm-test-deque (cl-cc/vm/data:sequence)
   ((storage :initarg :storage :accessor vm-test-deque-storage)))
 
-(defmethod cl-cc/vm::length ((sequence vm-test-deque))
-  (length (vm-test-deque-storage sequence)))
+(defmethod cl-cc/vm/data:length ((cl-cc/vm/data:sequence vm-test-deque))
+  (cl-cc/vm/data:length (vm-test-deque-storage cl-cc/vm/data:sequence)))
 
-(defmethod cl-cc/vm::elt ((sequence vm-test-deque) index)
-  (aref (vm-test-deque-storage sequence) index))
+(defmethod cl-cc/vm/data:elt ((cl-cc/vm/data:sequence vm-test-deque) index)
+  (aref (vm-test-deque-storage cl-cc/vm/data:sequence) index))
 
-(defmethod (setf cl-cc/vm::elt) (value (sequence vm-test-deque) index)
-  (setf (aref (vm-test-deque-storage sequence) index) value))
+(defmethod (setf cl-cc/vm/data:elt) (value (cl-cc/vm/data:sequence vm-test-deque) index)
+  (setf (aref (vm-test-deque-storage cl-cc/vm/data:sequence) index) value))
 
-(defmethod cl-cc/vm::make-sequence-like ((sequence vm-test-deque) size &key initial-element)
-  (declare (ignore sequence))
+(defmethod cl-cc/vm/data:make-sequence-like ((cl-cc/vm/data:sequence vm-test-deque) size &key initial-element)
+  (declare (ignore cl-cc/vm/data:sequence))
   (make-instance 'vm-test-deque
                  :storage (make-array size :initial-element initial-element)))
 

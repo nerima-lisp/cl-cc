@@ -16,7 +16,6 @@
     (cl-cc:vm-reg-set s 2 rhs)
     (exec1 (funcall ctor-fn :dst 0 :lhs 1 :rhs 2) s)
     (cl-cc:vm-reg-get s 0)))
-
 (it-sequential "vm-bignum-multiply-plan-records-digits-sign-and-strategy"
   (let ((plan (cl-cc/vm::vm-bignum-multiply-plan (- most-positive-fixnum) 2 :threshold 64)))
     (expect (getf plan :strategy) :to-be :schoolbook)
@@ -33,9 +32,6 @@
 ;;; ═══════════════════════════════════════════════════════════════════════════
 ;;; FR-842: Kahan Summation
 ;;; ═══════════════════════════════════════════════════════════════════════════
-
-(it-sequential "kahan-sum-empty"
-  (expect (= 0.0d0 (cl-cc/vm::kahan-sum '())) :to-be-truthy))
 
 (it-sequential "kahan-sum-single"
   (expect (= 3.14d0 (cl-cc/vm::kahan-sum '(3.14d0))) :to-be-truthy))

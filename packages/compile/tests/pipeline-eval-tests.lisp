@@ -90,8 +90,8 @@
            (compilation-result-program
             (compile-string "(defun generic-equal-pred (x y) (equal x y))" :target :vm)))))
     (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-num-eq)) typed-instrs) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) typed-instrs) :to-be-falsy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-equal)) generic-instrs) :to-be-truthy)))
+    (expect (some (lambda (i) (eq :equal (car (cl-cc/vm/protocols:instruction->sexp i)))) typed-instrs) :to-be-falsy)
+    (expect (some (lambda (i) (eq :equal (car (cl-cc/vm/protocols:instruction->sexp i)))) generic-instrs) :to-be-truthy)))
 
 ;;; ─── compile-string / run-string ─────────────────────────────────────────
 
