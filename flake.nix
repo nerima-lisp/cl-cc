@@ -1045,252 +1045,257 @@
       # docs reported separately? That is what these three names are for. Adding
       # a second job to ci.yml instead would re-implement the same scheduling
       # and lose cache sharing between the pieces.
-      checks = forAllSystems (system: {
-        # The SBCL test suite, run through ./run-tests.lisp.
-        default = perSystem.${system}.testSuite;
-        tests-unit = perSystem.${system}.testSuites.unit;
-        tests-integration = perSystem.${system}.testSuites.integration;
-        tests-e2e = perSystem.${system}.testSuites.e2e;
-        tests-conformance = perSystem.${system}.testSuites.conformance;
+      checks = forAllSystems (
+        system:
+        {
+          # The SBCL test suite, run through ./run-tests.lisp.
+          default = perSystem.${system}.testSuite;
+          tests-unit = perSystem.${system}.testSuites.unit;
+          tests-integration = perSystem.${system}.testSuites.integration;
+          tests-e2e = perSystem.${system}.testSuites.e2e;
+          tests-conformance = perSystem.${system}.testSuites.conformance;
 
-        # Fails `nix flake check` when any tracked Nix file is unformatted,
-        # which is what makes the formatter a gate rather than a suggestion.
-        formatting = treefmtEval.${system}.config.build.check self;
+          # Fails `nix flake check` when any tracked Nix file is unformatted,
+          # which is what makes the formatter a gate rather than a suggestion.
+          formatting = treefmtEval.${system}.config.build.check self;
 
-        # `packages.docs` runs `mkdocs build --strict`, so a broken link or a
-        # page missing from the nav fails right here. Without this the docs are
-        # only ever built by docs.yml, which runs after the merge to main —
-        # a break would surface as a failed deploy rather than a failed pull
-        # request.
-        docs = perSystem.${system}.packages.docs;
+          # `packages.docs` runs `mkdocs build --strict`, so a broken link or a
+          # page missing from the nav fails right here. Without this the docs are
+          # only ever built by docs.yml, which runs after the merge to main —
+          # a break would surface as a failed deploy rather than a failed pull
+          # request.
+          docs = perSystem.${system}.packages.docs;
 
-        # The standalone binary has to keep linking, not just the library.
-        build = perSystem.${system}.packages.default;
+          # The standalone binary has to keep linking, not just the library.
+          build = perSystem.${system}.packages.default;
 
-        # packages/prolog-tools has its own cl-weave suite, driven by
-        # `asdf:test-system` rather than by cl-cc's runner.
-        cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
+          # packages/prolog-tools has its own cl-weave suite, driven by
+          # `asdf:test-system` rather than by cl-cc's runner.
+          cl-cc-prolog-tools-tests = perSystem.${system}.prologToolsTests;
 
-        cross-repo-internal-refs = perSystem.${system}.crossRepoInternalRefs;
+          cross-repo-internal-refs = perSystem.${system}.crossRepoInternalRefs;
 
-        context-map = perSystem.${system}.contextMap;
+          context-map = perSystem.${system}.contextMap;
 
-        # The JIT write-barrier suite is a secondary ASDF system and must be
-        # exercised explicitly; building its FASLs alone does not run tests.
-        cl-cc-jit-tests = perSystem.${system}.jitTests;
+          # The JIT write-barrier suite is a secondary ASDF system and must be
+          # exercised explicitly; building its FASLs alone does not run tests.
+          cl-cc-jit-tests = perSystem.${system}.jitTests;
 
-        parity-x86-64 =
-          with nixpkgs.legacyPackages.${system};
-          runCommand "parity-x86-64"
-            {
-              nativeBuildInputs = [ python3 ] ++ perSystem.${system}.devShells.default.nativeBuildInputs;
-            }
-            ''
-              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
-              bash ${self}/t/parity/run-parity.sh x86-64
-              cp "$PARITY_OUTPUT" "$out"
-            '';
+          parity-x86-64 =
+            with nixpkgs.legacyPackages.${system};
+            runCommand "parity-x86-64"
+              {
+                nativeBuildInputs = [ python3 ] ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+              }
+              ''
+                export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+                bash ${self}/t/parity/run-parity.sh x86-64
+                cp "$PARITY_OUTPUT" "$out"
+              '';
 
-        parity-wasm =
-          with nixpkgs.legacyPackages.${system};
-          runCommand "parity-wasm"
-            {
-              nativeBuildInputs = [
-                python3
-                wasmtime
-              ]
-              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
-            }
-            ''
-              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
-              bash ${self}/t/parity/run-parity.sh wasm
-              cp "$PARITY_OUTPUT" "$out"
-            '';
+          parity-wasm =
+            with nixpkgs.legacyPackages.${system};
+            runCommand "parity-wasm"
+              {
+                nativeBuildInputs = [
+                  python3
+                  wasmtime
+                ]
+                ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+              }
+              ''
+                export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+                bash ${self}/t/parity/run-parity.sh wasm
+                cp "$PARITY_OUTPUT" "$out"
+              '';
 
-        parity-aarch64 =
-          with nixpkgs.legacyPackages.${system};
-          runCommand "parity-aarch64"
-            {
-              nativeBuildInputs = [
-                python3
-                qemu-user
-              ]
-              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
-            }
-            ''
-              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
-              bash ${self}/t/parity/run-parity.sh aarch64
-              cp "$PARITY_OUTPUT" "$out"
-            '';
+          parity-aarch64 =
+            with nixpkgs.legacyPackages.${system};
+            runCommand "parity-aarch64"
+              {
+                nativeBuildInputs = [
+                  python3
+                  qemu-user
+                ]
+                ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+              }
+              ''
+                export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+                bash ${self}/t/parity/run-parity.sh aarch64
+                cp "$PARITY_OUTPUT" "$out"
+              '';
 
-        parity-riscv64 =
-          with nixpkgs.legacyPackages.${system};
-          runCommand "parity-riscv64"
-            {
-              nativeBuildInputs = [
-                python3
-                qemu-user
-              ]
-              ++ perSystem.${system}.devShells.default.nativeBuildInputs;
-            }
-            ''
-              export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
-              bash ${self}/t/parity/run-parity.sh riscv64
-              cp "$PARITY_OUTPUT" "$out"
-            '';
+          parity-riscv64 =
+            with nixpkgs.legacyPackages.${system};
+            runCommand "parity-riscv64"
+              {
+                nativeBuildInputs = [
+                  python3
+                  qemu-user
+                ]
+                ++ perSystem.${system}.devShells.default.nativeBuildInputs;
+              }
+              ''
+                export PARITY_OUTPUT="$TMPDIR/parity-matrix.tsv"
+                bash ${self}/t/parity/run-parity.sh riscv64
+                cp "$PARITY_OUTPUT" "$out"
+              '';
 
-        toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
-        lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
-        orphan-tests = inputs.cl-nix-forge.lib.${system}.mkOrphanTestCheck {
-          src = ./.;
-          testRoots = [
-            "packages/binary/tests"
-            "packages/cli/tests"
-            "packages/compile/tests"
-            "packages/debug/tests"
-            "packages/docgen/tests"
-            "packages/emit/tests"
-            "packages/formatter/tests"
-            "packages/optimize/tests"
-            "packages/pipeline/tests"
-            "packages/prolog-tools/tests"
-            "packages/testing-framework/tests"
-            "packages/tools/tests"
-            "packages/vm/tests"
-            "src/jit/tests"
-            "t"
-          ];
-          testSystems = [
-            "cl-cc/test"
-            "cl-cc/test/e2e"
-            "cl-cc-debug/tests"
-            "cl-cc-docgen/test"
-            "cl-cc-jit/tests"
-            "cl-cc-prolog-tools/tests"
-            "cl-cc-tools/tests"
-          ];
-          allowlist =
-            nixpkgs.lib.filter (path: path != "") (
-              nixpkgs.lib.splitString "\n" (builtins.readFile ./t/orphan-allowlist.txt)
-            )
-            ++ [
-              # These files are inputs to standalone Nix checks, not ASDF-registered test files.
-              "t/selfhost/determinism-input.lisp"
-              "t/selfhost/determinism-worker.lisp"
-              "t/selfhost/determinism.lisp"
-              "t/selfhost/harness-support.lisp"
-              "t/selfhost/stage2-fixpoint.lisp"
-              # These files are inputs to standalone parity Nix checks, not ASDF-registered test files.
-              "t/parity/worker.lisp"
-              "t/parity/programs/bignum-add.lisp"
-              "t/parity/programs/bignum-multiply.lisp"
-              "t/parity/programs/ffi-abs.lisp"
-              "t/parity/programs/ffi-strlen.lisp"
-              "t/parity/programs/file-stream-position.lisp"
-              "t/parity/programs/file-stream-roundtrip.lisp"
-              "t/parity/programs/format-a.lisp"
-              "t/parity/programs/format-newline.lisp"
-              "t/parity/programs/heap-cons.lisp"
-              "t/parity/programs/heap-vector.lisp"
-              "t/parity/programs/integer-add.lisp"
-              "t/parity/programs/integer-subtract.lisp"
-              "t/parity/programs/load-continuation.lisp"
-              "t/parity/programs/load-value.lisp"
-              "t/parity/programs/ratio-add.lisp"
-              "t/parity/programs/ratio-divide.lisp"
-              "t/parity/programs/string-stream-input.lisp"
-              "t/parity/programs/string-stream-output.lisp"
-              "t/parity/programs/wasm-atomic-rmw-xchg.lisp"
-              "t/parity/programs/wasm-float-add.lisp"
-              "t/parity/programs/wasm-float-arithmetic.lisp"
-              "t/parity/support/loaded-continuation.lisp"
-              "t/parity/support/loaded-value.lisp"
+          toolkit-pin-consistency = perSystem.${system}.toolkitPinConsistency;
+          lisplibs-consistency = perSystem.${system}.lisplibsConsistency;
+          orphan-tests = inputs.cl-nix-forge.lib.${system}.mkOrphanTestCheck {
+            src = ./.;
+            testRoots = [
+              "packages/binary/tests"
+              "packages/cli/tests"
+              "packages/compile/tests"
+              "packages/debug/tests"
+              "packages/docgen/tests"
+              "packages/emit/tests"
+              "packages/formatter/tests"
+              "packages/optimize/tests"
+              "packages/pipeline/tests"
+              "packages/prolog-tools/tests"
+              "packages/testing-framework/tests"
+              "packages/tools/tests"
+              "packages/vm/tests"
+              "src/jit/tests"
+              "t"
             ];
-          name = "orphan-tests";
-        };
-        determinism =
-          let
-            pkgs = nixpkgs.legacyPackages.${system};
-            lib = nixpkgs.lib;
-            selfhostSource = builtins.path {
-              name = "cl-cc-selfhost-source";
-              path = ./.;
-              filter =
-                path: type:
-                let
-                  absolutePath = toString path;
-                  repositoryRoot = toString ./.;
-                  relativePath = lib.removePrefix "${repositoryRoot}/" absolutePath;
-                  under = directory: relativePath == directory || lib.hasPrefix "${directory}/" relativePath;
-                in
-                absolutePath == repositoryRoot
-                || relativePath == "cl-cc.asd"
-                || under "packages"
-                || (relativePath == "src" && type == "directory")
-                || relativePath == "src/package.lisp"
-                || (relativePath == "src/ffi" && type == "directory")
-                || relativePath == "src/ffi/dynlib.lisp"
-                || (relativePath == "t" && type == "directory")
-                || under "t/selfhost";
-            };
-          in
-          pkgs.stdenvNoCC.mkDerivation {
-            pname = "cl-cc-selfhost-determinism";
-            version = "1";
-            src = selfhostSource;
-            buildPhase = ''
-              runHook preBuild
-              export HOME="$TMPDIR"
-              cat > run-tests.lisp <<'EOF'
-              (load "t/selfhost/determinism.lisp")
-              EOF
-              ${perSystem.${system}.apps.test.program}
-              runHook postBuild
-            '';
-            installPhase = "mkdir -p $out && touch $out/passed";
+            testSystems = [
+              "cl-cc/test"
+              "cl-cc/test/e2e"
+              "cl-cc-debug/tests"
+              "cl-cc-docgen/test"
+              "cl-cc-jit/tests"
+              "cl-cc-prolog-tools/tests"
+              "cl-cc-tools/tests"
+            ];
+            allowlist =
+              nixpkgs.lib.filter (path: path != "") (
+                nixpkgs.lib.splitString "\n" (builtins.readFile ./t/orphan-allowlist.txt)
+              )
+              ++ [
+                # These files are inputs to standalone Nix checks, not ASDF-registered test files.
+                "t/conformance/phpt/driver.lisp"
+                "t/selfhost/determinism-input.lisp"
+                "t/selfhost/determinism-worker.lisp"
+                "t/selfhost/determinism.lisp"
+                "t/selfhost/harness-support.lisp"
+                "t/selfhost/stage2-fixpoint.lisp"
+                # These files are inputs to standalone parity Nix checks, not ASDF-registered test files.
+                "t/parity/worker.lisp"
+                "t/parity/programs/bignum-add.lisp"
+                "t/parity/programs/bignum-multiply.lisp"
+                "t/parity/programs/ffi-abs.lisp"
+                "t/parity/programs/ffi-strlen.lisp"
+                "t/parity/programs/file-stream-position.lisp"
+                "t/parity/programs/file-stream-roundtrip.lisp"
+                "t/parity/programs/format-a.lisp"
+                "t/parity/programs/format-newline.lisp"
+                "t/parity/programs/heap-cons.lisp"
+                "t/parity/programs/heap-vector.lisp"
+                "t/parity/programs/integer-add.lisp"
+                "t/parity/programs/integer-subtract.lisp"
+                "t/parity/programs/load-continuation.lisp"
+                "t/parity/programs/load-value.lisp"
+                "t/parity/programs/ratio-add.lisp"
+                "t/parity/programs/ratio-divide.lisp"
+                "t/parity/programs/string-stream-input.lisp"
+                "t/parity/programs/string-stream-output.lisp"
+                "t/parity/programs/wasm-atomic-rmw-xchg.lisp"
+                "t/parity/programs/wasm-float-add.lisp"
+                "t/parity/programs/wasm-float-arithmetic.lisp"
+                "t/parity/support/loaded-continuation.lisp"
+                "t/parity/support/loaded-value.lisp"
+              ];
+            name = "orphan-tests";
           };
-        stage2-fixpoint =
-          let
-            pkgs = nixpkgs.legacyPackages.${system};
-            lib = nixpkgs.lib;
-            selfhostSource = builtins.path {
-              name = "cl-cc-selfhost-source";
-              path = ./.;
-              filter =
-                path: type:
-                let
-                  absolutePath = toString path;
-                  repositoryRoot = toString ./.;
-                  relativePath = lib.removePrefix "${repositoryRoot}/" absolutePath;
-                  under = directory: relativePath == directory || lib.hasPrefix "${directory}/" relativePath;
-                in
-                absolutePath == repositoryRoot
-                || relativePath == "cl-cc.asd"
-                || under "packages"
-                || (relativePath == "src" && type == "directory")
-                || relativePath == "src/package.lisp"
-                || (relativePath == "src/ffi" && type == "directory")
-                || relativePath == "src/ffi/dynlib.lisp"
-                || (relativePath == "t" && type == "directory")
-                || under "t/selfhost";
+          determinism =
+            let
+              pkgs = nixpkgs.legacyPackages.${system};
+              lib = nixpkgs.lib;
+              selfhostSource = builtins.path {
+                name = "cl-cc-selfhost-source";
+                path = ./.;
+                filter =
+                  path: type:
+                  let
+                    absolutePath = toString path;
+                    repositoryRoot = toString ./.;
+                    relativePath = lib.removePrefix "${repositoryRoot}/" absolutePath;
+                    under = directory: relativePath == directory || lib.hasPrefix "${directory}/" relativePath;
+                  in
+                  absolutePath == repositoryRoot
+                  || relativePath == "cl-cc.asd"
+                  || under "packages"
+                  || (relativePath == "src" && type == "directory")
+                  || relativePath == "src/package.lisp"
+                  || (relativePath == "src/ffi" && type == "directory")
+                  || relativePath == "src/ffi/dynlib.lisp"
+                  || (relativePath == "t" && type == "directory")
+                  || under "t/selfhost";
+              };
+            in
+            pkgs.stdenvNoCC.mkDerivation {
+              pname = "cl-cc-selfhost-determinism";
+              version = "1";
+              src = selfhostSource;
+              buildPhase = ''
+                runHook preBuild
+                export HOME="$TMPDIR"
+                cat > run-tests.lisp <<'EOF'
+                (load "t/selfhost/determinism.lisp")
+                EOF
+                ${perSystem.${system}.apps.test.program}
+                runHook postBuild
+              '';
+              installPhase = "mkdir -p $out && touch $out/passed";
             };
-          in
-          pkgs.stdenvNoCC.mkDerivation {
-            pname = "cl-cc-selfhost-stage2-fixpoint";
-            version = "1";
-            src = selfhostSource;
-            buildPhase = ''
-              runHook preBuild
-              export HOME="$TMPDIR"
-              cat > run-tests.lisp <<'EOF'
-              (load "t/selfhost/stage2-fixpoint.lisp")
-              EOF
-              ${perSystem.${system}.apps.test.program}
-              runHook postBuild
-            '';
-            installPhase = "mkdir -p $out && touch $out/passed";
-          };
-      } // perSystem.${system}.phptChecks);
+          stage2-fixpoint =
+            let
+              pkgs = nixpkgs.legacyPackages.${system};
+              lib = nixpkgs.lib;
+              selfhostSource = builtins.path {
+                name = "cl-cc-selfhost-source";
+                path = ./.;
+                filter =
+                  path: type:
+                  let
+                    absolutePath = toString path;
+                    repositoryRoot = toString ./.;
+                    relativePath = lib.removePrefix "${repositoryRoot}/" absolutePath;
+                    under = directory: relativePath == directory || lib.hasPrefix "${directory}/" relativePath;
+                  in
+                  absolutePath == repositoryRoot
+                  || relativePath == "cl-cc.asd"
+                  || under "packages"
+                  || (relativePath == "src" && type == "directory")
+                  || relativePath == "src/package.lisp"
+                  || (relativePath == "src/ffi" && type == "directory")
+                  || relativePath == "src/ffi/dynlib.lisp"
+                  || (relativePath == "t" && type == "directory")
+                  || under "t/selfhost";
+              };
+            in
+            pkgs.stdenvNoCC.mkDerivation {
+              pname = "cl-cc-selfhost-stage2-fixpoint";
+              version = "1";
+              src = selfhostSource;
+              buildPhase = ''
+                runHook preBuild
+                export HOME="$TMPDIR"
+                cat > run-tests.lisp <<'EOF'
+                (load "t/selfhost/stage2-fixpoint.lisp")
+                EOF
+                ${perSystem.${system}.apps.test.program}
+                runHook postBuild
+              '';
+              installPhase = "mkdir -p $out && touch $out/passed";
+            };
+        }
+        // perSystem.${system}.phptChecks
+      );
 
       apps = forAllSystems (system: perSystem.${system}.apps);
 

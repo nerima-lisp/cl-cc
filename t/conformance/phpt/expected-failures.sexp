@@ -4,6 +4,7 @@
 ;;;;
 ;;;; Each entry is (:cases ("path/to/test.phpt" ...) :classification :bug|:unimplemented|
 ;;;;   :implementation-defined :reason "evidence" :match "observed diagnostic regex" :stage :compile|:runtime|:output).
+;;;; Individual :bug compile-timeout entries may use :allow-pass t only with an issue and observed run IDs.
 (
   (:cases (
     "ext/date/tests/strtotime-mysql-64bit.phpt"
@@ -1415,7 +1416,6 @@
       :reason "Pinned php-src PHPT standard/tests/general_functions/bug32647.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `unbound PHP variable(s): |obj|`; the observed failure is in cl-cc behavior."
       :match "^compile\\ error:\\ Compilation\\ failed:"
       :stage :compile)
-  
   (:cases (
     "ext/standard/tests/general_functions/bug66094.phpt"
    ) :classification :bug
@@ -3251,9 +3251,9 @@
   (:cases (
     "ext/standard/tests/strings/str_pad_variation1.phpt"
    ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^runtime error:"
-      :stage :runtime)
+      :reason "Execution reached the PHPT EXPECTF comparator and mismatched output; spec.md §2.3 classifies this implemented behavior defect as :bug."
+      :match "^EXPECTF\\ did\\ not\\ match\\ output"
+      :stage :output)
   (:cases (
     "ext/standard/tests/file/stream_rfc2397_002.phpt"
    ) :classification :bug
@@ -3402,12 +3402,6 @@
       :stage :output)
   (:cases (
     "ext/uri/tests/whatwg/parsing/host_success_ipv4_fullwidth.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/mail/mail_basic6.phpt"
    ) :classification :bug
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
@@ -6328,7 +6322,6 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  
   (:cases (
     "ext/spl/tests/SplMinHeap_serialize_complex.phpt"
    ) :classification :bug
@@ -8173,12 +8166,6 @@
       :stage :output)
   (:cases (
     "ext/standard/tests/strings/strip_tags_variation10.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECT\\ mismatch\\ at\\ byte"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/general_functions/var_export_basic5.phpt"
    ) :classification :bug
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
@@ -17755,7 +17742,6 @@
       :reason "PHPT output comparison failed after compile/runtime completed, showing an incorrect result for the exercised implemented behavior."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  
   (:cases (
     "tests/basic/precision.phpt"
    ) :classification :bug
@@ -20657,12 +20643,6 @@
       :match "^runtime\\ error:\\ The\\ value"
       :stage :runtime)
   (:cases (
-    "ext/standard/tests/strings/vprintf_variation10.phpt"
-   ) :classification :bug
-      :reason "Pinned php-src PHPT standard/tests/strings/vprintf_variation10.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value -65 is not of type (MOD 1114112)`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value"
-      :stage :runtime)
-  (:cases (
     "ext/standard/tests/strings/vprintf_variation15_64bit.phpt"
    ) :classification :bug
       :reason "Pinned php-src PHPT standard/tests/strings/vprintf_variation15_64bit.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value \"1234000\" is not of type REAL`; the observed failure is in cl-cc behavior."
@@ -20973,28 +20953,22 @@
       :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
       :stage :runtime)
   (:cases (
-    "ext/standard/tests/serialize/bug62373.phpt"
-   ) :classification :bug
-      :reason "The fixture repeats ordinary serialize/unserialize of two distinct user objects for a finite 65,000-iteration loop. Both builtins and object serialization are implemented in the pinned runtime; the observed timeout is a performance/termination defect on that supported path."
-      :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
-      :stage :runtime)
-  (:cases (
     "ext/standard/tests/serialize/bug74614.phpt"
    ) :classification :bug
-      :reason "The fixture supplies a huge malformed serialized array count and expects unserialize() to reject it at the short input boundary. The pinned %php-unserialize-at trusts the count and enters dotimes without checking input progress or remaining bytes."
-      :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
+      :reason "The malformed array count must be rejected at the short input boundary. The pinned cl-cc-php runtime exhausts the SBCL heap before returning the warning and false required by this PHPT; tracked in issue #83."
+      :match "(?s)^main child exited with 1:.*Heap exhausted during allocation:"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/serialize/bug74101.phpt"
    ) :classification :bug
-      :reason "The fixture supplies a huge malformed serialized object-property count and expects unserialize() to reject it at the short input boundary. The pinned %php-unserialize-at trusts the count and enters dotimes without checking input progress or remaining bytes."
-      :match "^main child timed out during runtime stage after 60 seconds"
+      :reason "The malformed object-property count must be rejected at the short input boundary. The pinned cl-cc-php runtime exhausts the SBCL heap before returning the warning and false required by this PHPT; tracked in issue #83."
+      :match "(?s)^main child exited with 1:.*Heap exhausted during allocation:"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/serialize/unserialize_large.phpt"
    ) :classification :bug
-      :reason "The fixture supplies billion-element counts with only a few serialized bytes and expects immediate malformed-input warnings. The pinned %php-unserialize-at trusts array/object counts and loops without checking remaining input."
-      :match "^main child timed out during runtime stage after 60 seconds"
+      :reason "The malformed billion-element counts must be rejected against the short input. The pinned cl-cc-php runtime exhausts the SBCL heap before returning the warnings and false required by this PHPT; tracked in issue #83."
+      :match "(?s)^main child exited with 1:.*Heap exhausted during allocation:"
       :stage :runtime)
   (:cases (
     "ext/spl/tests/heap_001.phpt"
@@ -42476,7 +42450,6 @@
       :reason "Pinned php-src PHPT standard/tests/general_functions/proc_nice_basic.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^SKIPIF\\ compile\\ failure:\\ compile\\ error:\\ Compilation\\ failed:$`; this parser/compiler path is unimplemented."
       :match "^SKIPIF\\ compile\\ failure:\\ compile\\ error:"
       :stage :compile)
-  
   (:cases (
     "ext/standard/tests/general_functions/var_dump_ints_64bit.phpt"
    ) :classification :unimplemented
@@ -46682,7 +46655,6 @@
     "ext/standard/tests/strings/bug54721.phpt"
     "ext/standard/tests/strings/bug62443.phpt"
     "ext/standard/tests/strings/bug73058.phpt"
-    "ext/standard/tests/strings/crypt_blowfish.phpt"
     "ext/standard/tests/strings/crypt_blowfish_variation1.phpt"
     "ext/standard/tests/strings/crypt_blowfish_variation2.phpt"
     "ext/standard/tests/strings/crypt_chars.phpt"
@@ -47141,8 +47113,6 @@
       :reason "PHP builtin getrandmax is absent from both pinned builtin name tables and is not declared in this PHPT; runtime reports its symbol undefined (runtime-builtins-register.lisp:67-78)."
       :match "^runtime\\ error:\\ The\\ function\\ CL\\-CC/PHP::GETRANDMAX\\ is\\ undefined\\.$"
       :stage :runtime)
-  
-  
   (:cases (
     "ext/date/tests/bug35143.phpt"
     "ext/date/tests/gettimeofday_basic.phpt"
@@ -47171,7 +47141,6 @@
     "ext/hash/tests/crc32.phpt"
     "ext/hash/tests/gost.phpt"
     "ext/hash/tests/hash_error.phpt"
-    "ext/hash/tests/hash_serialize_003.phpt"
     "ext/hash/tests/haval.phpt"
     "ext/hash/tests/joaat.phpt"
     "ext/hash/tests/md2.phpt"
@@ -50406,12 +50375,6 @@
       :match "^runtime\\ error:\\ The\\ slot\\ CL\\-CC/PHP::REWIND\\ is\\ missing\\ from\\ non\\-object"
       :stage :runtime)
   (:cases (
-    "Zend/tests/magic_methods/bug71818.phpt"
-   ) :classification :unimplemented
-      :reason "PHPT enables cyclic GC and creates 100000 self-cycles; pinned runtime-builtins-core.lisp explicitly says cyclic GC is not modeled."
-      :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
-      :stage :runtime)
-  (:cases (
     "Zend/tests/fibers/out-of-memory-in-fiber.phpt"
     "Zend/tests/fibers/out-of-memory-in-nested-fiber.phpt"
     "Zend/tests/oom_array_fill_001.phpt"
@@ -50430,12 +50393,11 @@
     "Zend/tests/oom_range_003.phpt"
     "Zend/tests/oom_range_004.phpt"
     "Zend/tests/oom_soft_limit_exceeded.phpt"
-    "Zend/tests/oom_soft_limit_exceeded_fcall.phpt"
    ) :classification :unimplemented
       :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
       :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
       :stage :runtime)
-(:cases (
+  (:cases (
     "Zend/tests/oom_str_repeat.phpt"
    ) :classification :unimplemented
       :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
@@ -50483,7 +50445,6 @@
       :reason "Pinned php-src PHPT standard/tests/general_functions/003.phpt uses PHP syntax rejected by the fresh compiler diagnostic `^runtime\\ error:\\ Unbound\\ global\\ variable:\\ CL\\-CC/PHP::\\|result\\|$`; this parser/compiler path is unimplemented."
       :match "^runtime\\ error:\\ Unbound\\ global\\ variable:\\ CL\\-CC/PHP::\\|result\\|$"
       :stage :runtime)
-  
   (:cases (
     "ext/standard/tests/streams/bug77664.phpt"
    ) :classification :unimplemented
@@ -51837,95 +51798,150 @@
       :reason "preg_split(); calls preg_split with flags, but implementation accepts only optional limit and omits PREG_SPLIT flag behavior (runtime-builtins-regex-preg.lisp:421-452)."
       :match "^runtime\\ error:\\ invalid\\ number\\ of\\ arguments:\\ 4$"
       :stage :runtime)
-
-(:cases (
+  (:cases (
     "Zend/tests/bug67111.phpt"
    ) :classification :bug
       :reason "Nested continue levels are supported PHP control flow, but this case continues running until the harness runtime limit; the pinned implementation mishandles the loop target."
       :match "^main child timed out during runtime stage after 60 seconds"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/random/tests/01_functions/lcg_value_basic.phpt"
    ) :classification :bug
       :reason "lcg_value() is implemented; compilation leaves the test variable $i unbound after its loop, indicating a compiler variable-binding defect."
       :match "^compile error: Compilation failed:"
       :stage :compile)
-(:cases (
+  (:cases (
     "ext/standard/tests/array/array_unshift_variation3.phpt"
    ) :classification :bug
       :reason "array_unshift() reindexes string keys in this case, while the pinned PHP reference preserves them; the supported builtin returns the wrong result."
       :match "^EXPECT mismatch at byte"
       :stage :output)
-(:cases (
+  (:cases (
     "ext/random/tests/01_functions/mt_rand_value.phpt"
    ) :classification :unimplemented
       :reason "The test uses the MT_RAND_PHP constant, which is not defined by the pinned implementation."
       :match "^compile error: Compilation failed:"
       :stage :compile)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionClass_isIterateable_basic.phpt"
    ) :classification :unimplemented
       :reason "The test requires ReflectionClass, which is not registered by the pinned implementation."
       :match "^compile error: Compilation failed:"
       :stage :compile)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_basic2.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_getModifiers.001.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_getModifiers_basic.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_getValue_error.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_isDefault_basic.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_isDynamic_basic.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/property_hooks/ReflectionProperty_getHooks.phpt"
    ) :classification :unimplemented
       :reason "The test calls ReflectionProperty methods absent from the pinned method registry; only getMangledName is registered."
       :match "^runtime error: The function COMMON-LISP:NIL is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/reflection/tests/ReflectionProperty_getMangledName_instance.phpt"
    ) :classification :unimplemented
       :reason "The case fails on a dynamic property before reaching getMangledName; dynamic properties are not implemented by the pinned runtime."
       :match "^runtime error: The slot CL-CC/PHP::DYNAMIC is missing from the object of class CL-CC/PHP::TESTCLASS"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/standard/tests/network/gh24308.phpt"
    ) :classification :unimplemented
       :reason "Its SKIPIF requires stream_socket_client(), which is not implemented by the pinned runtime."
       :match "^SKIPIF runtime failure: runtime error: The function CL-CC/PHP::STREAM_SOCKET_CLIENT is undefined\\.$"
       :stage :runtime)
-(:cases (
+  (:cases (
     "ext/standard/tests/poll/poll_stream_handle_fd_release.phpt"
    ) :classification :unimplemented
       :reason "The test depends on stream polling and socket-pair constants/classes that are not implemented by the pinned runtime."
       :match "^compile error: Compilation failed:"
       :stage :compile)
+  (:cases (
+    "Zend/tests/oom_soft_limit_exceeded_fcall.phpt"
+   ) :classification :unimplemented
+      :reason "The PHPT expects the configured 10 MiB memory limit to stop the infinite allocation loop; the pinned runtime does not enforce memory_limit."
+      :match "^EXPECTF\\ did\\ not\\ match\\ output"
+      :stage :output)
+("ext/standard/tests/general_functions/var_export_basic5.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40324445201; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/standard/tests/strings/vprintf_variation10.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40324445201; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/hash/tests/fnv1a32.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40332818348, #40348619616, #40369314762; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/hash/tests/fnv132.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40342935105, #40348619616, #40369314762; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/standard/tests/strings/html_entity_decode_html5.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40342935105, #40348619616, #40369314762; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/hash/tests/fnv164.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40348619616, #40369314762; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/hash/tests/fnv1a64.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40348619616, #40369314762; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/standard/tests/strings/crypt_blowfish.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40348619616; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/hash/tests/hash_serialize_003.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40348619616; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
+("ext/standard/tests/mail/mail_basic6.phpt" :classification :bug
+   :reason "intermittent 60s compile timeout; observed in CI runs #40348619616; tracked in #82."
+   :match "^main child timed out during compile stage after 60 seconds$"
+   :stage :compile
+   :allow-pass t)
 )

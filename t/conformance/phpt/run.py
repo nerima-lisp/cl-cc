@@ -26,6 +26,7 @@ SPLITS = ("Zend", "tests", "ext", "sapi")
 EXPECTED_FAILURES = Path(__file__).with_name("expected-failures.sexp")
 DRIVER = Path(__file__).with_name("driver.lisp")
 TIMEOUT_SECONDS = 60
+INTERMITTENT_COMPILE_TIMEOUT = "main child timed out during compile stage after 60 seconds"
 DEFAULT_WORKERS = 4
 MAX_WORKERS = 4
 ARGS_SKIP_REASON = "PHP CLI ARGS unavailable in driver"
@@ -121,6 +122,7 @@ class ExpectedFailure:
     reason: str
     pattern: re.Pattern[str]
     stage: str
+    allow_pass: bool = False
 
 
 @dataclasses.dataclass
@@ -356,8 +358,12 @@ def load_expected_failures(path: Path = EXPECTED_FAILURES) -> dict[str, Expected
             if len(raw_case_ids) != len(set(raw_case_ids)):
                 raise HarnessError(f"duplicate case id in expected-failure group {entry!r}")
             case_ids = raw_case_ids
-        elif set(fields) != required_fields:
+        elif set(fields) not in (required_fields, required_fields | {"allow-pass"}):
             raise HarnessError(f"expected-failure fields are incomplete for {case_ids[0]!r}")
+        raw_allow_pass = fields.get("allow-pass")
+        allow_pass = raw_allow_pass is not None
+        if allow_pass and (not isinstance(raw_allow_pass, Symbol) or raw_allow_pass != "t"):
+            raise HarnessError(f"invalid :allow-pass value for {case_ids[0]!r}")
         classification = fields["classification"]
         stage = fields["stage"]
         reason = fields["reason"]
@@ -377,6 +383,18 @@ def load_expected_failures(path: Path = EXPECTED_FAILURES) -> dict[str, Expected
             raise HarnessError(f"empty reason for {case_ids[0]!r}")
         if not isinstance(pattern_text, str) or not pattern_text:
             raise HarnessError(f"empty match expression for {case_ids[0]!r}")
+        if allow_pass and (
+            grouped
+            or classification != "bug"
+            or stage != ":compile"
+            or pattern_text != "^main child timed out during compile stage after 60 seconds$"
+            or "intermittent 60s compile timeout" not in reason
+            or not re.search(r"#\d+", reason)
+            or not re.search(r"\b\d{11}\b", reason)
+        ):
+            raise HarnessError(
+                f":allow-pass requires an individual :bug compile-timeout entry, issue, and run ID for {case_ids[0]!r}"
+            )
         try:
             pattern = re.compile(pattern_text)
         except re.error as error:
@@ -385,7 +403,7 @@ def load_expected_failures(path: Path = EXPECTED_FAILURES) -> dict[str, Expected
             if case_id in expected:
                 raise HarnessError(f"duplicate expected-failure test {case_id!r}")
             expected[case_id] = ExpectedFailure(
-                case_id, classification, reason, pattern, stage[1:]
+                case_id, classification, reason, pattern, stage[1:], allow_pass
             )
     return expected
 
@@ -1016,6 +1034,9 @@ def _run_phase(
         detail = f"{phase} child exited with {child.returncode}"
         if child_stderr:
             detail += f": {child_stderr}"
+        stage = _timeout_stage(progress_path, phase)
+        if phase == "main" and stage in {"compile", "runtime"}:
+            return Outcome(stage, detail=detail, stderr=child_stderr)
         return Outcome("invalid", detail=detail, stderr=child_stderr)
     try:
         return _read_phase_result(
@@ -1136,6 +1157,9 @@ def apply_expected_failures(
     entry = expected.get(case_id)
     if entry is None:
         return False, f"unclassified {stage} failure: {detail}"
+    if entry.allow_pass and stage == "passed" and not detail:
+        consumed.add(case_id)
+        return True, "allowed pass for intermittent compile-timeout bug"
     if entry.stage != stage:
         return False, f"expected-failure stage mismatch: manifest={entry.stage}, observed={stage}"
     if not entry.pattern.search(detail):
@@ -1705,6 +1729,16 @@ def run_shard(
                             detail="test passed on retry attempt",
                             stdout=outcome.stdout,
                         )
+                entry = expected.get(plan.case.case_id)
+                main = phases.get("main")
+                if (
+                    entry is not None
+                    and entry.allow_pass
+                    and main is not None
+                    and main.status == "invalid"
+                    and main.detail == INTERMITTENT_COMPILE_TIMEOUT
+                ):
+                    return Outcome("compile", detail=INTERMITTENT_COMPILE_TIMEOUT)
                 return outcome
 
             for plan, outcome in zip(plans, _execute_plans(plans, jobs, execute_plan)):
@@ -1714,6 +1748,27 @@ def run_shard(
         outcome = outcomes.get(case_id)
         if outcome is None:
             outcome = Outcome("harness_error", detail="runner produced no outcome")
+        entry = expected.get(case_id)
+        if entry is not None and entry.allow_pass:
+            if outcome.status == "passed":
+                accepted, message = apply_expected_failures(
+                    case_id, "passed", "", expected, consumed
+                )
+                if accepted:
+                    counts["passed"] += 1
+                    continue
+                counts["failed"] += 1
+                details.append((case_id, message))
+                continue
+            if outcome.status in {"warning", "xfailed", "skipped"}:
+                counts["failed"] += 1
+                details.append(
+                    (
+                        case_id,
+                        f"intermittent compile-timeout entry accepts only pass or its exact timeout; observed {outcome.status}: {outcome.detail}",
+                    )
+                )
+                continue
         if outcome.status in {"passed", "warning", "xfailed"}:
             if case_id in expected:
                 if outcome.status == "xfailed":

@@ -19,12 +19,12 @@ jobs:
   phpt:
     name: PHPT group ${{ matrix.group }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 25
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: 8
       matrix:
-        group: [0, 1, 2, 3, 4, 5]
+        group: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       # persist-credentials: false — this job runs untrusted PR code via Nix
       # builds, and never needs the token, so don't leave it in
@@ -52,9 +52,37 @@ jobs:
 
           group = int(os.environ["PHPT_MATRIX_GROUP"])
           names = sorted(name for name in json.load(sys.stdin) if name.startswith("phpt-"))
-          selected = [name for index, name in enumerate(names) if index % 6 == group]
-          if len(names) != 61 or not selected:
-              raise SystemExit(f"expected 61 PHPT shards and a nonempty group; found {len(names)} shards and {len(selected)} in group {group}")
+          # Greedy LPT grouping from measured shard durations in CI run 40369314762.
+          assignments = [
+              {"Zend": [5], "tests": [], "ext": [0, 12, 14, 26, 27, 30, 36], "sapi": []},
+              {"Zend": [7], "tests": [], "ext": [3, 4, 8, 10, 21, 23, 33], "sapi": []},
+              {"Zend": [11], "tests": [2], "ext": [16, 25, 28, 34, 37, 41], "sapi": []},
+              {"Zend": [6], "tests": [], "ext": [7, 9, 13, 20, 24, 40], "sapi": []},
+              {"Zend": [9, 10], "tests": [], "ext": [1, 17, 31, 32, 38], "sapi": []},
+              {"Zend": [3, 8, 14], "tests": [1], "ext": [6, 15, 18], "sapi": []},
+              {"Zend": [1, 13], "tests": [0], "ext": [5, 19, 22, 29, 39], "sapi": []},
+              {"Zend": [0, 2, 4, 12], "tests": [], "ext": [2, 11, 35], "sapi": [0]},
+          ]
+          shard_counts = {"Zend": 15, "tests": 3, "ext": 42, "sapi": 1}
+          if len(names) != 61 or group not in range(len(assignments)):
+              raise SystemExit(f"expected 61 PHPT shards and a matrix group 0-7; found {len(names)} shards and group {group}")
+          assignment_names = [
+              f"phpt-{split}-{index:02d}-of-{shard_counts[split]}"
+              for assignment in assignments
+              for split, indices in assignment.items()
+              for index in indices
+          ]
+          if len(assignment_names) != 61 or set(assignment_names) != set(names):
+              raise SystemExit("the measured PHPT matrix assignment must cover each shard exactly once")
+          group_names = {
+              f"phpt-{split}-{index:02d}-of-{shard_counts[split]}"
+              for split, indices in assignments[group].items()
+              for index in indices
+          }
+          selected_names = group_names
+          if not selected_names or not selected_names.issubset(names):
+              raise SystemExit(f"matrix group {group} has missing or empty PHPT shard assignments: {sorted(selected_names - set(names))}")
+          selected = [name for name in names if name in selected_names]
           for name in selected:
               print(f".#checks.x86_64-linux.{name}")
           '

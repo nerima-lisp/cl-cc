@@ -168,6 +168,125 @@ class PhptRunnerTests(unittest.TestCase):
             self.assertTrue(accepted)
         self.assertEqual(consumed, set(expected))
 
+    def test_manifest_timeout_allow_pass_requires_bug_issue_and_observed_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "expected-failures.sexp"
+            manifest.write_text(
+                '(("ext/example.phpt" :classification :bug '
+                ':reason "intermittent 60s compile timeout; tracked in #82; observed in run 40369314762" '
+                ':match "^main child timed out during compile stage after 60 seconds$" '
+                ':stage :compile :allow-pass t))\n',
+                encoding="utf-8",
+            )
+            expected = run.load_expected_failures(manifest)
+
+            self.assertTrue(expected["ext/example.phpt"].allow_pass)
+            consumed = set()
+            self.assertTrue(
+                run.apply_expected_failures(
+                    "ext/example.phpt", "passed", "", expected, consumed
+                )[0]
+            )
+            self.assertEqual(consumed, {"ext/example.phpt"})
+
+            manifest.write_text(
+                '(("ext/example.phpt" :classification :bug '
+                ':reason "intermittent 60s compile timeout; observed in run 40369314762" '
+                ':match "compile timeout" :stage :compile :allow-pass t))\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(run.HarnessError, ":allow-pass requires"):
+                run.load_expected_failures(manifest)
+
+    def test_intermittent_compile_timeout_entry_accepts_only_exact_timeout_or_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            php_src = Path(directory)
+            case_path = php_src / "Zend" / "example.phpt"
+            case_path.parent.mkdir(parents=True)
+            case_path.write_bytes(
+                b"--TEST--\nexample\n--FILE--\n<?php echo 'ok'; ?>\n--EXPECT--\nok\n"
+            )
+            case_id = "Zend/example.phpt"
+            expected = {
+                case_id: run.ExpectedFailure(
+                    case_id,
+                    "bug",
+                    "intermittent 60s compile timeout; tracked in #82, run 40369314762",
+                    re.compile(
+                        "^main child timed out during compile stage after 60 seconds$"
+                    ),
+                    "compile",
+                    True,
+                )
+            }
+            observed = (
+                (
+                    "timeout",
+                    {"main": run.Outcome("invalid", detail=run.INTERMITTENT_COMPILE_TIMEOUT)},
+                    0,
+                    "expected-failures=1",
+                ),
+                ("pass", {"main": run.Outcome("passed", stdout=b"ok\n")}, 0, "passed=1"),
+                (
+                    "different compile diagnostic",
+                    {"main": run.Outcome("compile", detail="compile error: changed")},
+                    1,
+                    "expected-failure evidence did not match",
+                ),
+                (
+                    "output mismatch",
+                    {"main": run.Outcome("passed", stdout=b"wrong\n")},
+                    1,
+                    "expected-failure stage mismatch",
+                ),
+            )
+            for name, phases, expected_status, expected_output in observed:
+                with self.subTest(name=name):
+                    stdout = StringIO()
+                    stderr = StringIO()
+                    with (
+                        mock.patch.object(run.shutil, "which", return_value="sbcl-test"),
+                        mock.patch.object(run, "load_expected_failures", return_value=expected),
+                        mock.patch.object(run, "prepare_core"),
+                        mock.patch.object(run, "run_case", return_value=phases),
+                        redirect_stdout(stdout),
+                        redirect_stderr(stderr),
+                    ):
+                        status = run.run_shard(php_src, "Zend")
+                    self.assertEqual(status, expected_status)
+                    output = stdout.getvalue() + stderr.getvalue()
+                    self.assertIn(expected_output, output)
+                    if expected_status == 0:
+                        self.assertNotIn("stale expected-failure", output)
+
+    def test_main_nonzero_child_exit_uses_the_recorded_runtime_stage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = self._plan(root)
+            def failed_runtime_child(command, cwd, environment, deadline):
+                request = json.loads(Path(command[-2]).read_text(encoding="utf-8"))
+                Path(request["progress_path"]).write_text("main-runtime\n", encoding="utf-8")
+                return run.ChildResult(
+                    1, b"", b"Heap exhausted during allocation: request", False
+                )
+
+            with mock.patch.object(
+                run, "run_child", side_effect=failed_runtime_child
+            ):
+                outcome = run._run_phase(
+                    plan,
+                    "main",
+                    plan.source,
+                    None,
+                    plan.capture,
+                    root,
+                    root / "cl-cc.core",
+                    "sbcl-test",
+                    run.time.monotonic() + 10,
+                )
+            self.assertEqual(outcome.status, "runtime")
+            self.assertIn("main child exited with 1", outcome.detail)
+
     def test_manifest_rejects_duplicate_case_ids_across_groups(self):
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / "expected-failures.sexp"
