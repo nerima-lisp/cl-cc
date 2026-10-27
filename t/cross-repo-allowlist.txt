@@ -3268,6 +3268,13 @@ umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-package-name 4
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-symbol-name 2
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-unuse-package 1
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-use-package 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::%php-ini-set 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-default-timezone* 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-error-handler-stack* 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-error-reporting-level* 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-exception-handler-stack* 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-file-locks* 1
+umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-ini-settings* 1
 umbrella/t/native-advanced-evidence-tests.lisp cl-cc/runtime/os::%rt-parse-cpulist 1
 umbrella/t/native-advanced-evidence-tests.lisp cl-cc/runtime/os::%rt-topology-memory-bytes 1
 umbrella/t/native-advanced-evidence-tests.lisp cl-cc/runtime/os::*rt-detected-cpu-cores* 4
