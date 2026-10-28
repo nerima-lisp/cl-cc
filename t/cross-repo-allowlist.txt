@@ -2011,6 +2011,8 @@ umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-package-name 4
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-symbol-name 2
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-unuse-package 1
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-use-package 1
+# W3.4.cc.④ umbrella/t/conformance/package-language-tests.lisp cl-cc/vm/data::vm-gensym-inst: The self-host conformance test needs the VM's private helper. Remove after VM provides a public API.
+umbrella/t/conformance/package-language-tests.lisp cl-cc/vm/data::vm-gensym-inst 2
 umbrella/t/conformance/phpt/driver.lisp cl-cc/php::%php-ini-set 1
 umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-default-timezone* 1
 umbrella/t/conformance/phpt/driver.lisp cl-cc/php::*php-error-handler-stack* 1
