@@ -2455,12 +2455,15 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/array/gh23111.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF did not match output"
-      :stage :output)
+  ("ext/standard/tests/array/gh23111.phpt"
+   :classification :bug
+   :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
+   :match "^EXPECTF did not match output"
+   :stage :output
+   :alternates ((:classification :bug
+      :reason "Runtime-stage stack exhaustion was observed in CI run #40783370203 while recursively walking the 30,000-level input. The same PHPT shard passed under this output-stage expectation in baseline main run #40464186796 and PR run #40774680776. The pinned cl-cc-php runtime uses recursive LABELS in %php-array-walk-recursive; stack-depth handling is tracked for W5C in nerima-lisp/cl-cc-php#22."
+      :match "^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::%PHP-ARRAY-WALK-RECURSIVE"
+      :stage :runtime)))
   (:cases (
     "ext/standard/tests/serialize/bug28325.phpt"
    ) :classification :bug
