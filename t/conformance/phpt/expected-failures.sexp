@@ -20123,8 +20123,8 @@
   (:cases (
     "ext/standard/tests/general_functions/closures_002.phpt"
    ) :classification :bug
-      :reason "Pinned php-src PHPT standard/tests/general_functions/closures_002.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: Invalid function designator: 0`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ Invalid\\ function\\ designator:\\ 0$"
+      :reason "The pinned PHP builtin tables do not include register_tick_function. The main expected-failure record described Invalid function designator: 0; the current run reports that CL-CC/PHP::REGISTER_TICK_FUNCTION is undefined. The PHPT still misses expected output; retain :bug classification."
+      :match "^runtime\\ error:\\ The\\ function\\ CL\\-CC/PHP::REGISTER_TICK_FUNCTION\\ is\\ undefined\\.$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/general_functions/getenv.phpt"
@@ -20633,8 +20633,8 @@
   (:cases (
     "ext/standard/tests/strings/vfprintf_basic.phpt"
    ) :classification :bug
-      :reason "Pinned php-src PHPT standard/tests/strings/vfprintf_basic.phpt reaches a PHP feature but the fresh run fails with engine/runtime diagnostic `runtime error: The value #<HASH-TABLE :TEST EQUAL :COUNT 6 {700D3BD013}> is not of type REAL`; the observed failure is in cl-cc behavior."
-      :match "^runtime\\ error:\\ The\\ value"
+      :reason "The main expected-failure record described a hash-table value failing the REAL type check; the current run reports Division by zero. The PHPT still misses expected output; the cause of the diagnostic change is unconfirmed, so retain :bug classification."
+      :match "^runtime\\ error:\\ Division\\ by\\ zero$"
       :stage :runtime)
   (:cases (
     "ext/standard/tests/strings/vprintf_basic4.phpt"
