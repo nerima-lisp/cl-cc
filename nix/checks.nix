@@ -499,7 +499,7 @@ let
       "cl-cc-binary"
     ])
     (contextMapEdgesFrom "cl-cc-binary" [ "cl-log-kit" ])
-    (contextMapEdgesFrom "cl-cc-vm" [ "cl-cc-runtime" ])
+    (contextMapEdgesFrom "cl-cc-vm" [ "cl-cc-runtime" "cl-json-kit" ])
     (contextMapEdgesFrom "cl-cc-runtime" [
       "cl-log-kit"
       "cl-process-kit"
