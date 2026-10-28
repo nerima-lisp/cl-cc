@@ -17,7 +17,7 @@
 (defparameter *vm-internal-reference-budget*
   '(("optimize" . 0)
     ("codegen"  . 0)
-    ("compile"  . 3)
+    ("compile" . 2)
     ("pipeline" . 2)
     ("expand"   . 0)
     ("regalloc" . 0)
@@ -26,7 +26,7 @@
     ("parse"    . 0))
   "Per-package ceiling on distinct CL-CC/VM internal symbols referenced.
 
-optimize and codegen have zero references. compile has 3, pipeline has 2,
+optimize and codegen have zero references. compile has 2, pipeline has 2,
 and every other listed package has zero. Pipeline retains two references:
 %vm-managed-cons-pointer-p and %vm-managed-tree-materialize.
 
