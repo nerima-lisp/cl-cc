@@ -79,7 +79,7 @@
 (it-sequential "rewrite-inst-regs-substitutes-source-registers"
   (let* ((copies (make-hash-table :test #'eq)))
     (setf (gethash :r0 copies) :r5)
-    (let ((inst (cl-cc/optimize/analysis:opt-rewrite-inst-regs (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) copies)))
+    (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs (make-vm-add :dst :r2 :lhs :r0 :rhs :r1) copies)))
       (expect (cl-cc/vm:vm-dst inst) :to-be :r2)
       (expect (cl-cc/vm:vm-lhs inst) :to-be :r5))))
 
@@ -87,7 +87,7 @@
   (let ((copies (make-hash-table :test #'eq)))
     (setf (gethash :i copies) :i.1
           (gethash :one copies) :one.0)
-    (let ((inst (cl-cc/optimize/analysis:opt-rewrite-inst-regs
+    (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
                  (make-vm-add :dst :i.3 :lhs :i :rhs :one)
                  copies)))
       (expect (cl-cc/vm:vm-dst inst) :to-be :i.3)
@@ -97,11 +97,11 @@
 (it-sequential "rewrite-inst-regs-never-rewrites-dst"
   (let* ((copies (make-hash-table :test #'eq)))
     (setf (gethash :r0 copies) :r99)
-    (let ((inst (cl-cc/optimize/analysis:opt-rewrite-inst-regs (make-vm-add :dst :r0 :lhs :r1 :rhs :r2) copies)))
+    (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs (make-vm-add :dst :r0 :lhs :r1 :rhs :r2) copies)))
       (expect (cl-cc/vm:vm-dst inst) :to-be :r0))))
 
 (it-sequential "rewrite-inst-regs-no-op-on-empty-copy-map"
-  (let ((inst (cl-cc/optimize/analysis:opt-rewrite-inst-regs
+  (let ((inst (cl-cc/optimize::opt-rewrite-inst-regs
                (make-vm-move :dst :r0 :src :r1)
                (make-hash-table :test #'eq))))
     (expect (cl-cc/vm:vm-src inst) :to-be :r1)))
