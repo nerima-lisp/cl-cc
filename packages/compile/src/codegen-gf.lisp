@@ -109,18 +109,25 @@ existing generic function in the same compilation unit."
           (closure-reg (make-register ctx))
           (param-regs nil))
       (%register-defmethod-structural-methods name specializers)
-      (let ((keys (loop for spec in specializers
-                        collect (if (and spec (consp spec))
-                                    (let ((raw (cdr spec)))
-                                      (if (and (consp raw) (eq (car raw) 'eql))
-                                          (let ((val (second raw)))
-                                            (list 'eql
-                                                  (if (and (consp val) (eq (car val) 'quote))
-                                                      (second val)
-                                                      val)))
-                                          raw))
-                                    (or spec t)))))
-        (setq dispatch-key (if (= (length keys) 1) (first keys) keys)))
+      (let* ((required-count
+                (or (position-if
+                     (lambda (param)
+                       (member param lambda-list-keywords))
+                     params)
+                    (length specializers)))
+               (keys
+                 (loop for spec in (subseq specializers 0 required-count)
+                       collect (if (and spec (consp spec))
+                                   (let ((raw (cdr spec)))
+                                     (if (and (consp raw) (eq (car raw) 'eql))
+                                         (let ((val (second raw)))
+                                           (list 'eql
+                                                 (if (and (consp val) (eq (car val) 'quote))
+                                                     (second val)
+                                                     val)))
+                                         raw))
+                                   (or spec t)))))
+          (setq dispatch-key (if (= (length keys) 1) (first keys) keys)))
       (setq qual-str (if qualifier (format nil "_~A" qualifier) ""))
       (setq label-suffix
             (format nil "~{~A~^_~}"
