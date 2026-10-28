@@ -47,6 +47,7 @@
 
 (in-package :cl-cc)
 (setf cl-cc/vm:*vm-guest-function-package* :cl-cc)
+(cl-cc/vm:vm-register-host-bridge (intern "VM-COPY-INSTANCE" :cl-cc) (function cl-cc/vm:copy-instance))
 
 (defun gc-stats (&optional heap)
   "Return CL-CC runtime GC statistics as a plist.
