@@ -20,4 +20,3 @@
 ;;; ─── %resolve-combination-operator ──────────────────────────────────────
 
 ;;; ─── %vm-dispatch-key-collect (extracted combination generator) ──────────
-

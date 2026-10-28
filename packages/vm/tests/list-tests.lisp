@@ -47,4 +47,3 @@
   (declare (ignore cl-cc/vm/data:sequence))
   (make-instance 'vm-protocol-backed-sequence
                  :payload (make-array size :initial-element initial-element)))
-

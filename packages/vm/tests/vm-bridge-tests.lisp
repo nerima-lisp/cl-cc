@@ -37,4 +37,3 @@
 ;;; ─── generic-function-methods ────────────────────────────────────────────
 
 ;;; ─── generic-function-method-combination ─────────────────────────────────
-

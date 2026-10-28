@@ -4,6 +4,3 @@
 ;;;; and save-crash-dump diagnostic pipeline functions.
 
 (in-package :cl-cc/test)
-
-
-

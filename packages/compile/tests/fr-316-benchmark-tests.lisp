@@ -77,4 +77,3 @@
       (expect (plusp (hash-table-count counts)) :to-be-truthy)
       (expect (= 1 (gethash 'cl-cc:vm-const counts 0)) :to-be-truthy)
       (expect (= 1 (gethash 'cl-cc:vm-halt counts 0)) :to-be-truthy))))
-

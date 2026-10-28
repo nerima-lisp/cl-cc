@@ -53,4 +53,3 @@ EQL-PLIST is a list of (eql-value . method-fn) pairs."
 ;;; ─── vm-try-dispatch-sub ─────────────────────────────────────────────────
 
 ;;; ─── vm-resolve-gf-method (integration) ──────────────────────────────────
-

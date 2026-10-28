@@ -22,4 +22,3 @@
 ;;; ── 5. copy-structure dispatch branches ──────────────────────────────────
 
 ;;; ── 6. deep-copy: immediate values and cycle detection ───────────────────
-

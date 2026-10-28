@@ -16,4 +16,3 @@
     (cl-cc:vm-reg-set s 2 rhs)
     (exec1 (funcall ctor-fn :dst 0 :lhs 1 :rhs 2) s)
     (cl-cc:vm-reg-get s 0)))
-

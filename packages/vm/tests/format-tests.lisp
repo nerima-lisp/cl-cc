@@ -37,4 +37,3 @@
 ;;; ─── ~T tabulation after rendered directives ──────────────────────────────
 
 ;;; ─── ~{ ~} iteration with ~^ separator (ANSI) ──────────────────────────────
-

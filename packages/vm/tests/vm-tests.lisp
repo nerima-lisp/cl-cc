@@ -6,4 +6,3 @@
 
 ;; SKIP (Nix sandbox): *features* initialization differs in sandbox
 ;;; ─── vm runtime objects and heap helpers ────────────────────────────────────
-

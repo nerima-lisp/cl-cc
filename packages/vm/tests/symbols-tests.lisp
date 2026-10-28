@@ -115,4 +115,3 @@
       (%str-delete-package-if-exists :fr896-lock-test-c))))
 
 ;;; ─── Self-Host Mode (FR-626) ──────────────────────────────────────────────
-

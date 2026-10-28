@@ -3,4 +3,3 @@
 (in-package :cl-cc/test)
 
 ;;; ─── Coercion instructions ─────────────────────────────────────────────────
-

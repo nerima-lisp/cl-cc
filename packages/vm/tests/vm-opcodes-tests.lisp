@@ -31,4 +31,3 @@
 ;;; ─── vm2-fuse-immediate-superinstructions ────────────────────────────────────
 
 ;;; ─── %vm2-emit4 (extracted helper) ───────────────────────────────────────
-

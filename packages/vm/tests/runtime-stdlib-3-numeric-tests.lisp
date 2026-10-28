@@ -14,4 +14,3 @@
     (expect (cl-cc/vm::vm-complex-p result) :to-be-truthy)
     (expect (< (abs (+ 1 (cl-cc/vm::vm-realpart result))) 1.0d-12) :to-be-truthy)
     (expect (< (abs (cl-cc/vm::vm-imagpart result)) 1.0d-12) :to-be-truthy)))
-
