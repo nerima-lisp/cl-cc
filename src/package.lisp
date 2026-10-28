@@ -83,9 +83,11 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
   ;; Re-export compile symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/compile)
     (export s :cl-cc))
-  ;; Re-export VM symbols from :cl-cc.
+  ;; EXPAND owns the umbrella's DEFINE-SYNTAX symbol; do not re-export the
+  ;; VM's distinct symbol with the same name.
   (do-external-symbols (s :cl-cc/vm)
-    (export s :cl-cc))
+    (unless (string= (symbol-name s) "DEFINE-SYNTAX")
+      (export s :cl-cc)))
   ;; Re-export stdlib symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/stdlib)
     (export s :cl-cc))
