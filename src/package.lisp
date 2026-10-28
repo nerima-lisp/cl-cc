@@ -46,6 +46,7 @@
 ))
 
 (in-package :cl-cc)
+(setf cl-cc/vm:*vm-guest-function-package* :cl-cc)
 
 (defun gc-stats (&optional heap)
   "Return CL-CC runtime GC statistics as a plist.
@@ -82,13 +83,6 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
   ;; Re-export compile symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/compile)
     (export s :cl-cc))
-  ;; DEFINE-SYNTAX exists as a stub in :cl-cc/vm and as the real implementation in
-  ;; :cl-cc/expand. Unintern the vm stub so (use-package :cl-cc :cl-cc/vm) succeeds;
-  ;; the expand version (already re-exported above) remains in :cl-cc.
-  (let ((vm-ds (find-symbol "DEFINE-SYNTAX" :cl-cc/vm)))
-    (when vm-ds (unintern vm-ds :cl-cc/vm)))
-  ;; Wire VM source files into the umbrella package.
-  (use-package :cl-cc :cl-cc/vm)
   ;; Re-export VM symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/vm)
     (export s :cl-cc))
