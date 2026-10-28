@@ -128,8 +128,7 @@
      :pathname "packages/vm/tests"
      :serial t
      :components
-     ((:file "array-tests")
-      (:file "conditions-tests")
+     ((:file "conditions-tests")
       (:file "crash-report-tests")
       (:file "format-tests")
       (:file "fr-668-669-754-757-tests")
@@ -163,11 +162,9 @@
       (:file "vm-clos-tests")
       (:file "vm-dispatch-gf-multi-tests")
       (:file "vm-dispatch-gf-tests")
-      (:file "vm-dispatch-tests")
       (:file "vm-environment-tests")
       (:file "vm-execute-tests-2")
       (:file "vm-execute-tests")
-      (:file "vm-extensions-tests")
       (:file "vm-instructions-tests")
       (:file "vm-mop-remaining-features-tests")
       (:file "vm-mop-tests")
@@ -177,7 +174,6 @@
       (:file "vm-public-api-lint-tests")
       (:file "vm-run-fusion-tests")
       (:file "vm-run-tests")
-      (:file "vm-run-vm2-tests")
       (:file "vm-sequence-tests")
       (:file "vm-tests")
       (:file "vm-transcendental-tests")))

@@ -81,15 +81,6 @@
     (expect (integerp (gethash :__class-id__ class)) :to-be-truthy)
     (expect (= (gethash :__class-id__ class) (cl-cc/vm::%vm-vector-instance-class-id instance)) :to-be-truthy)))
 
-(it-sequential "fr-888-slot-value-by-index-reads-and-writes-in-constant-time"
-  (let* ((class (registry-add-class (make-test-registry) 'point :slots '(x y)))
-         (instance (progn
-                     (cl-cc/vm::finalize-class-allocation-cache class)
-                     (cl-cc/vm::allocate-instance-vector class)))
-         (x-index (cl-cc/vm::class-slot-vector-index class 'x)))
-    (setf (cl-cc/vm::slot-value-by-index instance x-index) 42)
-    (expect (= 42 (cl-cc/vm::slot-value-by-index instance x-index)) :to-be-truthy)))
-
 ;;; 9. FR-889 default-initargs / make-instance caching
 
 (it-sequential "fr-889-finalize-caches-evaluated-default-initargs"

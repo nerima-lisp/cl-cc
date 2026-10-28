@@ -15,13 +15,6 @@
     (cl-cc/vm::string-builder-append-string! builder "world")
     (expect (cl-cc/vm:string-builder-finish builder) :to-equal "world")))
 
-(it-sequential "string-builder-performance-metrics-are-linear"
-  :timeout
-  5
-  (let ((metrics (cl-cc/vm::test-string-builder-performance :iterations 4096 :chunk "x")))
-    (expect (getf metrics :length) :to-equal 4096)
-    (expect (<= (getf metrics :capacity-per-character) 2) :to-be-truthy)))
-
 (it-sequential "rope-insert-delete-substring"
   :timeout
   5

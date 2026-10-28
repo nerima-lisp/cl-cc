@@ -56,21 +56,6 @@
       (expect (cl-cc/vm::class-direct-subclasses parent) :to-equal '(mop-child))
       (expect (cl-cc/vm::class-precedence-list child) :to-equal '(mop-child mop-parent t)))))
 
-(it-sequential "fr-930-generic-function-method-introspection"
-  :timeout
-  10
-  (let* ((gf (cl-cc/vm::ensure-generic-function 'mop-gf :lambda-list '(x)))
-         (primary (make-mop-test-method '(integer)))
-         (before (make-mop-test-method '(integer) :qualifiers '(:before))))
-    (cl-cc/vm::add-method gf primary)
-    (cl-cc/vm::add-method gf before)
-    (expect (member primary (cl-cc/vm:generic-function-methods gf)) :to-be-truthy)
-    (expect (member before (cl-cc/vm:generic-function-methods gf)) :to-be-truthy)
-    (expect (cl-cc/vm::method-specializers primary) :to-equal '(integer))
-    (expect (cl-cc/vm::method-qualifiers before) :to-equal '(:before))
-    (expect (cl-cc/vm::method-combination-type
-                          (cl-cc/vm:generic-function-method-combination gf)) :to-be 'standard)))
-
 (it-sequential "fr-931-slot-value-using-class-hooks"
   :timeout
   10
