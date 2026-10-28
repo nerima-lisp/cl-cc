@@ -312,7 +312,7 @@ VM optimizer, loop optimization, control flow, range analysis, interprocedural o
   - LLVM `LoopIdiomRecognizePass` に相当
 - **難易度**: Medium
 
-- **関連実装**: ✅（基本実装済み、完全版は将来拡張）外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/array.lisp` に `vm-fill` を追加し、外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-recognition.lisp` に `opt-pass-fill-recognition` を追加済み。`array-length` に基づくゼロ開始・1増分・private label の単純な `vm-aset` full-vector fill ループを `vm-fill` へ置換し、copy/copy-seq 系 idiom も memcpy 相当へ接続するための認識層を持つ。`packages/optimize/tests/optimizer-strength-tests.lisp` が canonical fill loop の認識と外部target付きexitのno-opを検証し、`packages/vm/tests/array-tests.lisp` が `vm-fill` 実行を検証する。部分範囲fill、多次元配列、一般CFG上のloop idiom recognitionは将来拡張。
+- **関連実装**: ✅（基本実装済み、完全版は将来拡張）外部リポジトリ `nerima-lisp/cl-cc-vm` の `src/data/array.lisp` に `vm-fill` を追加し、外部リポジトリ `nerima-lisp/cl-cc-optimize` の `src/optimizer-recognition.lisp` に `opt-pass-fill-recognition` を追加済み。`array-length` に基づくゼロ開始・1増分・private label の単純な `vm-aset` full-vector fill ループを `vm-fill` へ置換し、copy/copy-seq 系 idiom も memcpy 相当へ接続するための認識層を持つ。`packages/optimize/tests/optimizer-strength-tests.lisp` が canonical fill loop の認識と外部target付きexitのno-opを検証し、外部リポジトリ `nerima-lisp/cl-cc-vm` の `t/data/array-tests.lisp` が `vm-fill` 実行を検証する。部分範囲fill、多次元配列、一般CFG上のloop idiom recognitionは将来拡張。
 
 #### FR-056: Worker/Wrapper Transformation (部分適用) ✅
 

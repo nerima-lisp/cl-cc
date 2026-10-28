@@ -2001,7 +2001,6 @@ umbrella/packages/vm/tests/vm-opcodes-defs-tests.lisp cl-cc/vm::run-vm-with-opco
 umbrella/packages/vm/tests/vm-opcodes-tests.lisp cl-cc/vm::vm2-top-superoperator-candidates 2
 umbrella/packages/vm/tests/vm-run-fusion-tests.lisp cl-cc/vm::run-vm-with-opcode-bigrams 1
 umbrella/packages/vm/tests/vm-run-fusion-tests.lisp cl-cc/vm::vm2-top-superoperator-candidates 1
-umbrella/t/conformance/package-language-tests.lisp cl-cc/vm::vm-gensym-inst 2
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-export 4
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-find-package 10
 umbrella/t/conformance/package-smoke-tests.lisp cl-cc/runtime::rt-find-symbol 4
