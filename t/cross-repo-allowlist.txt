@@ -156,7 +156,9 @@ umbrella/packages/cli/src/handlers-wasm.lisp cl-cc/codegen::*wasm-table64-enable
 umbrella/packages/cli/src/handlers-wasm.lisp cl-cc/codegen::*wasm-type-reflection-js-api-enabled* 2
 umbrella/packages/cli/tests/cli-tests.lisp cl-cc/codegen::*a64-omit-frame-pointer* 4
 umbrella/packages/cli/tests/cli-tests.lisp cl-cc/codegen::*x86-64-omit-frame-pointer* 4
-umbrella/packages/compile/src/codegen-functions-emit.lisp cl-cc/vm::%register-documentation 1
+# W3.4.cc.④ umbrella/packages/stdlib/src/stdlib-source.lisp cl-cc/vm/interop::%foreign-funcall: Generated code calls the VM's private interop function. Remove after VM provides a public API.
+# W3.4.cc.④ umbrella/packages/compile/src/codegen-functions-emit.lisp cl-cc/vm/interop::%register-documentation: Generated code calls the VM's private interop function. Remove after VM provides a public API.
+umbrella/packages/compile/src/codegen-functions-emit.lisp cl-cc/vm/interop::%register-documentation 1
 umbrella/packages/compile/src/codegen.lisp cl-cc/expand::*expander-head-table* 2
 umbrella/packages/compile/src/reflection.lisp cl-cc/vm::class-direct-slots 1
 umbrella/packages/compile/src/reflection.lisp cl-cc/vm::method-specializers 1

@@ -50,10 +50,10 @@
 
     ;; FR-580: CFFI-compatible host-backed FFI shim.
     "(defun foreign-funcall (name &rest arguments)
-   (apply #'cl-cc/vm/interop:%foreign-funcall name arguments))"
+   (apply #'cl-cc/vm/interop::%foreign-funcall name arguments))"
 
     "(defun cffi:foreign-funcall (name &rest arguments)
-   (apply #'cl-cc/vm/interop:%foreign-funcall name arguments))"
+   (apply #'cl-cc/vm/interop::%foreign-funcall name arguments))"
 
     ;; FR-586: set (obsolete but ANSI) — dynamic symbol-value assignment
     "(defun set (sym val) (setf (symbol-value sym) val) val)"
