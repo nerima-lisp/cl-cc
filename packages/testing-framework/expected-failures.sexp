@@ -93,7 +93,115 @@
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > fr-889-make-instance-cache-specializes-by-initarg-signature" :expected-status :error :condition-class "UNDEFINED-FUNCTION" :condition-message "The function CL-CC/VM::FINALIZE-CLASS-ALLOCATION-CACHE is undefined."  :owner-repository "nerima-lisp/cl-cc-vm"  :work-order "https://github.com/nerima-lisp/cl-cc-vm/issues/40")
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > fr-889-zero-arg-template-copy-produces-fresh-vector" :expected-status :error :condition-class "UNDEFINED-FUNCTION" :condition-message "The function CL-CC/VM::FINALIZE-CLASS-ALLOCATION-CACHE is undefined."  :owner-repository "nerima-lisp/cl-cc-vm"  :work-order "https://github.com/nerima-lisp/cl-cc-vm/issues/40")
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > fr-930-class-slot-and-class-introspection" :expected-status :error :condition-class "UNDEFINED-FUNCTION" :condition-message "The function CL-CC/VM::CLASS-DIRECT-SUPERCLASSES is undefined."  :owner-repository "nerima-lisp/cl-cc-vm"  :work-order "https://github.com/nerima-lisp/cl-cc-vm/issues/41")
-(:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > mop-sealed-classes-define-sealed-type-macro" :expected-status :fail :condition-class "CL-WEAVE:ASSERTION-FAILURE" :condition-message "Test assertion failed: (CL-WEAVE:FAIL)" :owner-repository "nerima-lisp/cl-cc-vm" :work-order "https://github.com/nerima-lisp/cl-cc-vm/issues/42")
+(:PATH "CL-CC-SUITE > CL-CC-UNIT-SUITE > vm-copy-instance-hash-table-backed-preserves-unbound-slot" :EXPECTED-STATUS :FAIL :CONDITION-CLASS "CL-WEAVE:ASSERTION-FAILURE" :CONDITION-MESSAGE NIL :ASSERTION-FORM "(CL-WEAVE:FAIL)" :MATCHER ":FAIL" :ACTUAL "\"assert-evaluates-to: \\\"(progn
+      (defclass vm-copy-hash-unbound-meta (standard-class) ())
+      (defclass vm-copy-hash-unbound ()
+        ((x :initarg :x) (y :initarg :y))
+        (:metaclass vm-copy-hash-unbound-meta))
+      (let ((obj (make-instance 'vm-copy-hash-unbound :x 10 :y 20)))
+        (slot-makunbound obj 'y)
+        (let ((copy (copy-instance obj)))
+          (if (and (slot-boundp copy 'x)
+                   (= (slot-value copy 'x) 10)
+                   (not (slot-boundp copy 'y)))
+              :ok
+              :bad))))\\\" evaluated to :BAD, expected :OK (expected :OK) (got :BAD) [form: (CL-CC/TEST:ASSERT-EVALUATES-TO
+                                                                                          \\\"(progn
+      (defclass vm-copy-hash-unbound-meta (standard-class) ())
+      (defclass vm-copy-hash-unbound ()
+        ((x :initarg :x) (y :initarg :y))
+        (:metaclass vm-copy-hash-unbound-meta))
+      (let ((obj (make-instance 'vm-copy-hash-unbound :x 10 :y 20)))
+        (slot-makunbound obj 'y)
+        (let ((copy (copy-instance obj)))
+          (if (and (slot-boundp copy 'x)
+                   (= (slot-value copy 'x) 10)
+                   (not (slot-boundp copy 'y)))
+              :ok
+              :bad))))\\\"
+                                                                                          :OK
+                                                                                          :STDLIB
+                                                                                          T)]\"" :EXPECTED "(:NO-EXPLICIT-FAILURE)" :NEGATED "NIL" :CLASSIFICATION "不具合" :OWNER-REPOSITORY "nerima-lisp/cl-cc-vm" :WORK-ORDER "https://github.com/nerima-lisp/cl-cc-vm/issues/50")
+(:PATH "CL-CC-SUITE > CL-CC-UNIT-SUITE > mop-metaclass-hooks-slot-access-protocol" :EXPECTED-STATUS :FAIL :CONDITION-CLASS "CL-WEAVE:ASSERTION-FAILURE" :CONDITION-MESSAGE NIL :ASSERTION-FORM "(CL-WEAVE:FAIL)" :MATCHER ":FAIL" :ACTUAL "\"assert-evaluates-to: \\\"(progn
+      (defclass mop-hook-meta (standard-class) ())
+      (defclass mop-hook-target () ((x :initarg :x)) (:metaclass mop-hook-meta))
+      (defmethod slot-value-using-class ((class mop-hook-meta) object slot-name)
+        (declare (ignore object slot-name))
+        :hook-read)
+      (defmethod (setf slot-value-using-class) (new-value (class mop-hook-meta) object slot-name)
+        (declare (ignore class slot-name))
+        (setf (gethash :hook-write object) new-value))
+      (defmethod slot-boundp-using-class ((class mop-hook-meta) object slot-name)
+        (declare (ignore class object slot-name))
+        :hook-boundp)
+      (defmethod slot-makunbound-using-class ((class mop-hook-meta) object slot-name)
+        (declare (ignore class slot-name))
+        (setf (gethash :hook-makunbound object) t)
+        object)
+      (let ((obj (make-instance 'mop-hook-target :x :initial)))
+        (setf (slot-value obj 'x) :written)
+        (let ((read-result (slot-value obj 'x))
+              (boundp-result (slot-boundp obj 'x)))
+          (slot-makunbound obj 'x)
+          (if (and (eq read-result :hook-read)
+                   (eq boundp-result :hook-boundp)
+                   (eq (gethash :hook-write obj) :written)
+                   (gethash :hook-makunbound obj))
+              :ok
+              :bad))))\\\" evaluated to :BAD, expected :OK (expected :OK) (got :BAD) [form: (CL-CC/TEST:ASSERT-EVALUATES-TO
+                                                                                          \\\"(progn
+      (defclass mop-hook-meta (standard-class) ())
+      (defclass mop-hook-target () ((x :initarg :x)) (:metaclass mop-hook-meta))
+      (defmethod slot-value-using-class ((class mop-hook-meta) object slot-name)
+        (declare (ignore object slot-name))
+        :hook-read)
+      (defmethod (setf slot-value-using-class) (new-value (class mop-hook-meta) object slot-name)
+        (declare (ignore class slot-name))
+        (setf (gethash :hook-write object) new-value))
+      (defmethod slot-boundp-using-class ((class mop-hook-meta) object slot-name)
+        (declare (ignore class object slot-name))
+        :hook-boundp)
+      (defmethod slot-makunbound-using-class ((class mop-hook-meta) object slot-name)
+        (declare (ignore class slot-name))
+        (setf (gethash :hook-makunbound object) t)
+        object)
+      (let ((obj (make-instance 'mop-hook-target :x :initial)))
+        (setf (slot-value obj 'x) :written)
+        (let ((read-result (slot-value obj 'x))
+              (boundp-result (slot-boundp obj 'x)))
+          (slot-makunbound obj 'x)
+          (if (and (eq read-result :hook-read)
+                   (eq boundp-result :hook-boundp)
+                   (eq (gethash :hook-write obj) :written)
+                   (gethash :hook-makunbound obj))
+              :ok
+              :bad))))\\\"
+                                                                                          :OK
+                                                                                          :STDLIB
+                                                                                          T)]\"" :EXPECTED "(:NO-EXPLICIT-FAILURE)" :NEGATED "NIL" :CLASSIFICATION "不具合" :OWNER-REPOSITORY "nerima-lisp/cl-cc-vm" :WORK-ORDER "https://github.com/nerima-lisp/cl-cc-vm/issues/49")
+(:PATH "CL-CC-SUITE > CL-CC-UNIT-SUITE > mop-metaclass-hooks-allocate-instance" :EXPECTED-STATUS :FAIL :CONDITION-CLASS "CL-WEAVE:ASSERTION-FAILURE" :CONDITION-MESSAGE NIL :ASSERTION-FORM "(CL-WEAVE:FAIL)" :MATCHER ":FAIL" :ACTUAL "\"assert-evaluates-to: \\\"(progn
+      (defclass mop-alloc-meta (standard-class) ())
+      (defclass mop-alloc-target () ((x :initarg :x)) (:metaclass mop-alloc-meta))
+      (defmethod allocate-instance ((class mop-alloc-meta) &rest initargs)
+        (declare (ignore initargs))
+        (let ((obj (call-next-method)))
+          (setf (slot-value obj 'x) :allocated)
+          obj))
+      (let ((obj (make-instance 'mop-alloc-target)))
+        (if (eq (slot-value obj 'x) :allocated) :ok :bad)))\\\" evaluated to :BAD, expected :OK (expected :OK) (got :BAD) [form: (CL-CC/TEST:ASSERT-EVALUATES-TO
+                                                                                                                               \\\"(progn
+      (defclass mop-alloc-meta (standard-class) ())
+      (defclass mop-alloc-target () ((x :initarg :x)) (:metaclass mop-alloc-meta))
+      (defmethod allocate-instance ((class mop-alloc-meta) &rest initargs)
+        (declare (ignore initargs))
+        (let ((obj (call-next-method)))
+          (setf (slot-value obj 'x) :allocated)
+          obj))
+      (let ((obj (make-instance 'mop-alloc-target)))
+        (if (eq (slot-value obj 'x) :allocated) :ok :bad)))\\\"
+                                                                                                                               :OK
+                                                                                                                               :STDLIB
+                                                                                                                               T)]\"" :EXPECTED "(:NO-EXPLICIT-FAILURE)" :NEGATED "NIL" :CLASSIFICATION "不具合" :OWNER-REPOSITORY "nerima-lisp/cl-cc-vm" :WORK-ORDER "https://github.com/nerima-lisp/cl-cc-vm/issues/48")
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > rewrite-inst-regs-substitutes-source-registers" :expected-status :fail :condition-class "CL-WEAVE:ASSERTION-FAILURE" :condition-message nil :assertion-form "(CL-WEAVE:EXPECT (CL-CC/VM/PROTOCOLS:VM-LHS CL-CC/TEST::INST) :TO-BE :R5)" :matcher ":TO-BE" :actual ":R0" :expected "(:R5)" :negated "NIL" :classification "不具合" :owner-repository "nerima-lisp/cl-cc-optimize" :work-order "https://github.com/nerima-lisp/cl-cc/issues/86")
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > rewrite-inst-regs-substitutes-ssa-keyword-registers" :expected-status :fail :condition-class "CL-WEAVE:ASSERTION-FAILURE" :condition-message nil :assertion-form "(CL-WEAVE:EXPECT (CL-CC/VM/PROTOCOLS:VM-LHS CL-CC/TEST::INST) :TO-BE :I.1)" :matcher ":TO-BE" :actual ":I" :expected "(:I.1)" :negated "NIL" :classification "不具合" :owner-repository "nerima-lisp/cl-cc-optimize" :work-order "https://github.com/nerima-lisp/cl-cc/issues/86")
 (:path "CL-CC-SUITE > CL-CC-UNIT-SUITE > ssa-phi-placement-keeps-live-in-join-phi" :expected-status :fail :condition-class "CL-WEAVE:ASSERTION-FAILURE" :condition-message nil :assertion-form "(CL-WEAVE:EXPECT (FIND-IF (LAMBDA #1=(CL-CC/TEST::P) (EQ (CL-CC/OPTIMIZE:PHI-REG . #1#) :R1)) (GETHASH CL-CC/TEST::JOIN CL-CC/TEST::PHI-MAP)) :TO-BE-TRUTHY)" :matcher ":TO-BE-TRUTHY" :actual "NIL" :expected "NIL" :negated "NIL" :classification "不具合" :owner-repository "nerima-lisp/cl-cc-optimize" :work-order "https://github.com/nerima-lisp/cl-cc/issues/86")
