@@ -300,76 +300,76 @@
   (count-if (lambda (inst) (typep inst type)) insts))
 
 (it-sequential "fr-099-fma-recognition-cases mul-plus-accumulator"
-  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 1 0 0)
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm:make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (cl-cc/vm:make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 1 0 0)
     (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm:vm-fma out)) :to-be-truthy)
     ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
     ;; single typep against the parent already counts both float and integer
     ;; multiplies/adds. Counting the parent type is the correct total — summing
     ;; parent + child would double-count every float instruction.
     (when expected-float-mul-or-mul
-      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm:vm-mul out)) :to-be-truthy))
     (when expected-float-add-or-add
-      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm:vm-add out)) :to-be-truthy)))))
 
 (it-sequential "fr-099-fma-recognition-cases commuted-add"
-  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r2 :rhs :r3)) 1 0 0)
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm:make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (cl-cc/vm:make-vm-float-add :dst :r4 :lhs :r2 :rhs :r3)) 1 0 0)
     (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm:vm-fma out)) :to-be-truthy)
     ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
     ;; single typep against the parent already counts both float and integer
     ;; multiplies/adds. Counting the parent type is the correct total — summing
     ;; parent + child would double-count every float instruction.
     (when expected-float-mul-or-mul
-      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm:vm-mul out)) :to-be-truthy))
     (when expected-float-add-or-add
-      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm:vm-add out)) :to-be-truthy)))))
 
 (it-sequential "fr-099-fma-recognition-cases multiple-consumers-no-fuse"
-  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)
-                 (cl-cc/vm::make-vm-float-add :dst :r5 :lhs :r3 :rhs :r6)) 0 1 2)
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm:make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+                 (cl-cc/vm:make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)
+                 (cl-cc/vm:make-vm-float-add :dst :r5 :lhs :r3 :rhs :r6)) 0 1 2)
     (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm:vm-fma out)) :to-be-truthy)
     ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
     ;; single typep against the parent already counts both float and integer
     ;; multiplies/adds. Counting the parent type is the correct total — summing
     ;; parent + child would double-count every float instruction.
     (when expected-float-mul-or-mul
-      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm:vm-mul out)) :to-be-truthy))
     (when expected-float-add-or-add
-      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm:vm-add out)) :to-be-truthy)))))
 
 (it-sequential "fr-099-fma-recognition-cases integer-arithmetic-no-fuse"
   (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (make-vm-mul :dst :r3 :lhs :r0 :rhs :r1)
                  (make-vm-add :dst :r4 :lhs :r3 :rhs :r2)) 0 nil nil)
     (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm:vm-fma out)) :to-be-truthy)
     ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
     ;; single typep against the parent already counts both float and integer
     ;; multiplies/adds. Counting the parent type is the correct total — summing
     ;; parent + child would double-count every float instruction.
     (when expected-float-mul-or-mul
-      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm:vm-mul out)) :to-be-truthy))
     (when expected-float-add-or-add
-      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm:vm-add out)) :to-be-truthy)))))
 
 (it-sequential "fr-099-fma-recognition-cases cross-block-boundary-no-fuse"
-  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm::make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
+  (destructuring-bind (insts expected-fma expected-float-mul-or-mul expected-float-add-or-add) (list (list (cl-cc/vm:make-vm-float-mul :dst :r3 :lhs :r0 :rhs :r1)
                  (make-vm-label :name "next")
-                 (cl-cc/vm::make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 0 1 1)
+                 (cl-cc/vm:make-vm-float-add :dst :r4 :lhs :r3 :rhs :r2)) 0 1 1)
     (let ((out (cl-cc/optimize::opt-pass-fma-recognition insts)))
-    (expect (= expected-fma (%test-count-type 'cl-cc/vm::vm-fma out)) :to-be-truthy)
+    (expect (= expected-fma (%test-count-type 'cl-cc/vm:vm-fma out)) :to-be-truthy)
     ;; vm-float-mul inherits vm-mul (and vm-float-add inherits vm-add), so a
     ;; single typep against the parent already counts both float and integer
     ;; multiplies/adds. Counting the parent type is the correct total — summing
     ;; parent + child would double-count every float instruction.
     (when expected-float-mul-or-mul
-      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm::vm-mul out)) :to-be-truthy))
+      (expect (= expected-float-mul-or-mul (%test-count-type 'cl-cc/vm:vm-mul out)) :to-be-truthy))
     (when expected-float-add-or-add
-      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm::vm-add out)) :to-be-truthy)))))
+      (expect (= expected-float-add-or-add (%test-count-type 'cl-cc/vm:vm-add out)) :to-be-truthy)))))
 
 ;;; ─── *verify-optimizer-instructions* integration ──────────────────────────
 
@@ -399,11 +399,11 @@
                      insts
                      :max-iterations 1
                      :pass-pipeline '(:pure-call-optimization))))
-    (expect (= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) optimized)) :to-be-truthy)
+    (expect (= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm:vm-call)) optimized)) :to-be-truthy)
     (expect (some (lambda (inst)
-             (and (typep inst 'cl-cc/vm::vm-move)
-                  (eq (cl-cc/vm::vm-dst inst) :r4)
-                  (eq (cl-cc/vm::vm-src inst) :r3)))
+             (and (typep inst 'cl-cc/vm:vm-move)
+                  (eq (cl-cc/vm:vm-dst inst) :r4)
+                  (eq (cl-cc/vm:vm-src inst) :r3)))
            optimized) :to-be-falsy)))
 
 (it-sequential "optimize-policy-config-speed-threshold"
@@ -426,8 +426,8 @@
                 insts :max-iterations 1 :speed 2 :pass-pipeline '(:pure-call-optimization)))
          (fast (cl-cc/optimize:optimize-instructions
                 insts :max-iterations 1 :speed 3 :pass-pipeline '(:pure-call-optimization))))
-    (expect (= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) slow)) :to-be-truthy)
-    (expect (= 1 (count-if (lambda (inst) (typep inst 'cl-cc/vm::vm-call)) fast)) :to-be-truthy)))
+    (expect (= 2 (count-if (lambda (inst) (typep inst 'cl-cc/vm:vm-call)) slow)) :to-be-truthy)
+    (expect (= 1 (count-if (lambda (inst) (typep inst 'cl-cc/vm:vm-call)) fast)) :to-be-truthy)))
 
 ;;; ─── Prolog rewrite stage ──────────────────────────────────────────────────
 
@@ -991,13 +991,13 @@
                      (append (list closure) body caller)))
          (has-specialized-label
            (some (lambda (inst)
-                   (and (typep inst 'cl-cc/vm::vm-label)
-                        (search "__spec__" (cl-cc/vm::vm-name inst))))
+                   (and (typep inst 'cl-cc/vm:vm-label)
+                        (search "__spec__" (cl-cc/vm:vm-name inst))))
                  optimized))
          (rewritten-call
            (find-if (lambda (inst)
-                      (and (typep inst 'cl-cc/vm::vm-call)
-                           (equal (cl-cc/vm::vm-args inst) '(:r4))))
+                      (and (typep inst 'cl-cc/vm:vm-call)
+                           (equal (cl-cc/vm:vm-args inst) '(:r4))))
                     optimized)))
     (expect has-specialized-label :to-be-truthy)
     (expect rewritten-call :to-be-truthy)))
@@ -1030,7 +1030,7 @@
 (defun %opt-loop-label-count (label instructions)
   (count-if (lambda (inst)
               (and (typep inst 'vm-label)
-                   (eq (cl-cc/vm::vm-name inst) label)))
+                   (eq (cl-cc/vm:vm-name inst) label)))
             instructions))
 
 (defun %opt-assert-sortable-loop-pass-reorders (pass)
@@ -1042,7 +1042,7 @@
 
 (defun %opt-loop-split-marker-p (instruction)
   (and (typep instruction 'vm-label)
-       (search "__SPLIT" (string (cl-cc/vm::vm-name instruction)))))
+       (search "__SPLIT" (string (cl-cc/vm:vm-name instruction)))))
 
 (defun %opt-adjacent-loop-program (&key (first-init 0)
                                         (second-init 0)

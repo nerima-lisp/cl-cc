@@ -146,7 +146,7 @@
 ;; every test lives in cl-weave's root suite rather than the framework's
 ;; cl-cc-suite. They keep the same cross-test cache isolation.
 (before-each
-  (cl-cc/vm::vm-clear-hash-cons-table))
+  (cl-cc/vm:vm-clear-hash-cons-table))
 
 (before-each
   (when (boundp 'cl-cc/expand::*macroexpand-step-cache*)

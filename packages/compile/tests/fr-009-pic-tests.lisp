@@ -74,13 +74,13 @@
 
 ;; VM-level PIC profiling tests -- cache hit/miss counters and type-feedback
 (it-sequential "fr-009-pic-cache-transitions-and-profiling"
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+  (let* ((state (make-instance 'cl-cc/vm:vm-io-state))
          (generic-caches (make-hash-table :test #'equal))
-         (method-a (make-instance 'cl-cc/vm::vm-closure-object
+         (method-a (make-instance 'cl-cc/vm:vm-closure-object
                                   :entry-label 'prof-method-a :params '(:x)))
-         (method-b (make-instance 'cl-cc/vm::vm-closure-object
+         (method-b (make-instance 'cl-cc/vm:vm-closure-object
                                   :entry-label 'prof-method-b :params '(:x))))
-    (setf (cl-cc/vm::vm-profile-enabled-p state) t)
+    (setf (cl-cc/vm:vm-profile-enabled-p state) t)
     (let ((ht (gethash 'prof-gf-fn generic-caches)))
       (unless ht
         (setf ht (make-hash-table :test #'eq))
@@ -101,11 +101,11 @@
         (expect (= 1 (cdr entry-b)) :to-be-truthy)))))
 
 (it-sequential "fr-009-pic-invalidation-on-method-registration"
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+  (let* ((state (make-instance 'cl-cc/vm:vm-io-state))
          (cache (make-hash-table :test #'eq))
-         (method-1 (make-instance 'cl-cc/vm::vm-closure-object
+         (method-1 (make-instance 'cl-cc/vm:vm-closure-object
                                   :entry-label 'inv-method-1 :params '(:x)))
-         (method-2 (make-instance 'cl-cc/vm::vm-closure-object
+         (method-2 (make-instance 'cl-cc/vm:vm-closure-object
                                   :entry-label 'inv-method-2 :params '(:x))))
     (setf (gethash 'inv-class-a cache) (cons method-1 5))
     (setf (gethash 'inv-class-b cache) (cons method-2 3))

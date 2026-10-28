@@ -274,7 +274,7 @@
               :assignment assignment
               :spill-count 0
               :instructions nil))
-          (prog (cl-cc/vm::make-vm-program
+          (prog (cl-cc/vm:make-vm-program
                  :instructions (list (cl-cc:make-vm-halt :reg :R0))
                  :result-register :R0
                  :leaf-p nil))
@@ -446,22 +446,22 @@
 (it-sequential "x86-vm-program-output"
   (let* ((non-empty-insts (list (cl-cc:make-vm-halt :reg :R0)
                                 (cl-cc:make-vm-ret :reg :R0)))
-         (full-prog (cl-cc/vm::make-vm-program :instructions non-empty-insts :result-register :R0))
+         (full-prog (cl-cc/vm:make-vm-program :instructions non-empty-insts :result-register :R0))
          (full-bytes (cl-cc/codegen::compile-to-x86-64-bytes full-prog))
-         (empty-prog (cl-cc/vm::make-vm-program :instructions nil :result-register :R0))
+         (empty-prog (cl-cc/vm:make-vm-program :instructions nil :result-register :R0))
          (empty-bytes (cl-cc/codegen::compile-to-x86-64-bytes empty-prog)))
     (expect (> (length full-bytes) 0) :to-be-truthy)
     (expect (> (length empty-bytes) 0) :to-be-truthy)))
 
 (it-sequential "x86-vm-program-leaf-red-zone-spills-skip-rbp-frame"
-  (let* ((prog (cl-cc/vm::make-vm-program
+  (let* ((prog (cl-cc/vm:make-vm-program
                 :instructions (list (cl-cc:make-vm-spill-store :src-reg :rax :slot 1)
                                     (cl-cc:make-vm-spill-load :dst-reg :rbx :slot 1))
                 :result-register :R0
                 :leaf-p t))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                            :spill-count 1
-                                           :instructions (cl-cc/vm::vm-program-instructions prog)))
+                                           :instructions (cl-cc/vm:vm-program-instructions prog)))
          (bytes (let ((cl-cc/codegen::*current-regalloc* ra))
                    (%x86-collect-bytes (lambda (s) (cl-cc/codegen::emit-vm-program prog s))))))
     (expect (= #x55 (first bytes)) :to-be-falsy)
@@ -470,14 +470,14 @@
     (expect (car (last bytes)) :to-equal #xC3)))
 
 (it-sequential "x86-vm-program-default-fpe-allocates-rsp-spill-frame"
-  (let* ((prog (cl-cc/vm::make-vm-program
+  (let* ((prog (cl-cc/vm:make-vm-program
                 :instructions (list (cl-cc:make-vm-spill-store :src-reg :rax :slot 1)
                                     (cl-cc:make-vm-spill-load :dst-reg :rbx :slot 1))
                 :result-register :R0
                 :leaf-p nil))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                                    :spill-count 1
-                                                   :instructions (cl-cc/vm::vm-program-instructions prog)))
+                                                   :instructions (cl-cc/vm:vm-program-instructions prog)))
          (bytes (let ((cl-cc/codegen::*current-regalloc* ra))
                   (%x86-collect-bytes (lambda (s) (cl-cc/codegen::emit-vm-program prog s))))))
     (expect (= #x55 (first bytes)) :to-be-falsy)
@@ -488,14 +488,14 @@
     (expect (nth 22 bytes) :to-equal #xC3)))
 
 (it-sequential "x86-vm-program-debug-opt-out-keeps-rbp-spills"
-  (let* ((prog (cl-cc/vm::make-vm-program
+  (let* ((prog (cl-cc/vm:make-vm-program
                 :instructions (list (cl-cc:make-vm-spill-store :src-reg :rax :slot 1)
                                     (cl-cc:make-vm-spill-load :dst-reg :rbx :slot 1))
                 :result-register :R0
                 :leaf-p nil))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                                    :spill-count 1
-                                                   :instructions (cl-cc/vm::vm-program-instructions prog)))
+                                                   :instructions (cl-cc/vm:vm-program-instructions prog)))
          (bytes (let ((cl-cc/codegen::*current-regalloc* ra)
                       (cl-cc/codegen::*x86-64-omit-frame-pointer* nil))
                   (%x86-collect-bytes (lambda (s) (cl-cc/codegen::emit-vm-program prog s))))))
@@ -525,7 +525,7 @@
     (expect bytes :to-equal '(#x48 #x83 #x8C #x24 #x00 #xF0 #xFF #xFF #x00))))
 
 (it-sequential "x86-large-spill-frame-inserts-stack-probe-before-rsp-allocation"
-  (let* ((prog (cl-cc/vm::make-vm-program
+  (let* ((prog (cl-cc/vm:make-vm-program
                 :instructions nil
                 :result-register :R0
                 :leaf-p t))

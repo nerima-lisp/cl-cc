@@ -10,7 +10,7 @@
                                             :body (list (make-ast-int :value 42)))
                            ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-label) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-label) :to-be-truthy)))
 
 (it-sequential "codegen-tagbody-compilation"
   (let* ((ctx  (make-codegen-ctx))
@@ -18,7 +18,7 @@
                               :tags (list (cons 'tag1 (list (make-ast-int :value 1)))
                                           (cons 'tag2 (list (make-ast-int :value 2)))))
                             ctx))
-         (labels (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-label))
+         (labels (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-label))
                                 (codegen-instructions ctx))))
     (expect (>= (length labels) 2) :to-be-truthy)
     (expect (keywordp reg) :to-be-truthy)))
@@ -29,8 +29,8 @@
                              :tag  (make-ast-quote :value 'my-tag)
                              :body (list (make-ast-int :value 42)))
                            ctx)))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-establish-catch) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-label) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-establish-catch) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-label) :to-be-truthy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-throw-compiles-tag-and-value"
@@ -39,9 +39,9 @@
                    :tag (make-ast-quote :value 'my-tag)
                    :value (make-ast-int :value 42))
                   ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-throw) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-throw) :to-be-truthy)
     (let* ((insts (codegen-instructions ctx))
-           (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const)) insts)))
+           (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-const)) insts)))
       (expect (>= (length consts) 2) :to-be-truthy))))
 
 ;;; ─── lookup-block ────────────────────────────────────────────────────────────
@@ -153,8 +153,8 @@
     (compile-ast (make-ast-return-from :name 'outer
                                        :value (make-ast-int :value 99))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-jump) :to-be-truthy)))
 
 (it-sequential "codegen-return-from-inside-block-exits-at-correct-label"
   (let* ((ctx (make-codegen-ctx))
@@ -165,7 +165,7 @@
                                                    :value (make-ast-int :value 42))))
                ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (let ((jumps (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-jump))
+    (let ((jumps (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-jump))
                                 (codegen-instructions ctx))))
       (expect (>= (length jumps) 1) :to-be-truthy))))
 
@@ -176,7 +176,7 @@
     (setf (cl-cc/compile:ctx-tagbody-env ctx)
           (list (cons 'loop-start "tag_loop_start_0")))
     (compile-ast (make-ast-go :tag 'loop-start) ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-jump) :to-be-truthy)))
 
 (it-sequential "codegen-go-inside-tagbody-emits-multiple-jumps"
   (let* ((ctx (make-codegen-ctx))
@@ -186,7 +186,7 @@
                             (cons 'end   (list (make-ast-int :value 0)))))
                ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (let ((jumps (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-jump))
+    (let ((jumps (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-jump))
                                 (codegen-instructions ctx))))
       (expect (>= (length jumps) 2) :to-be-truthy))))
 
@@ -215,7 +215,7 @@
   (let* ((ctx (make-codegen-ctx))  ; ctx-safety defaults to 1
          (value-reg (cl-cc/compile:make-register ctx)))
     (cl-cc/compile::%emit-the-runtime-assertion ctx value-reg 'integer)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-truthy)))
 
 (it-sequential "emit-the-runtime-assertion-skip-cases t-type"
   (destructuring-bind (ty safety-override) (list 't nil)
@@ -223,7 +223,7 @@
          (value-reg (cl-cc/compile:make-register ctx)))
     (when safety-override (setf (cl-cc/compile:ctx-safety ctx) safety-override))
     (cl-cc/compile::%emit-the-runtime-assertion ctx value-reg ty)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-null))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-null))))
 
 (it-sequential "emit-the-runtime-assertion-skip-cases nil-type"
   (destructuring-bind (ty safety-override) (list nil nil)
@@ -231,7 +231,7 @@
          (value-reg (cl-cc/compile:make-register ctx)))
     (when safety-override (setf (cl-cc/compile:ctx-safety ctx) safety-override))
     (cl-cc/compile::%emit-the-runtime-assertion ctx value-reg ty)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-null))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-null))))
 
 (it-sequential "emit-the-runtime-assertion-skip-cases safety-zero"
   (destructuring-bind (ty safety-override) (list 'integer 0)
@@ -239,30 +239,30 @@
          (value-reg (cl-cc/compile:make-register ctx)))
     (when safety-override (setf (cl-cc/compile:ctx-safety ctx) safety-override))
     (cl-cc/compile::%emit-the-runtime-assertion ctx value-reg ty)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-null))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-null))))
 
 (it-sequential "emit-the-runtime-assertion-no-failure-p-emits-typep-only"
   (let* ((ctx (make-codegen-ctx))
          (value-reg (cl-cc/compile:make-register ctx)))
     (cl-cc/compile::%emit-the-runtime-assertion ctx value-reg 'string :emit-failure-p nil)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-type-error-condition) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-signal-error) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-type-error-condition) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-signal-error) :to-be-null)))
 
 (it-sequential "emit-the-runtime-assertion-failure-p-emits-type-error-condition-and-signal-error"
   (let* ((ctx (make-codegen-ctx))
          (value-reg (cl-cc/compile:make-register ctx)))
     (cl-cc/compile::%emit-the-runtime-assertion ctx value-reg 'integer :emit-failure-p t)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-type-error-condition) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-signal-error) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-type-error-condition) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-signal-error) :to-be-truthy)))
 
 ;;; ─── compile-ast: ast-the ────────────────────────────────────────────────────
 
 (it-sequential "codegen-the-with-declared-integer-type-emits-typep"
   (let* ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc:make-ast-the :type 'integer :value (make-ast-int :value 42)) ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-truthy)))
 
 (it-sequential "codegen-the-nested-transparent-value-emits-no-extra-typep"
   (let* ((ctx (make-codegen-ctx))
@@ -280,7 +280,7 @@
                           :value (make-ast-var :name 'x)))
                  ctx)
     (expect (= 0 (length (remove-if-not (lambda (inst)
-                                       (typep inst 'cl-cc/vm::vm-typep))
+                                       (typep inst 'cl-cc/vm:vm-typep))
                                      (codegen-instructions ctx)))) :to-be-truthy)))
 
 (it-sequential "codegen-the-with-local-defun-safety-zero-skips-typep"
@@ -291,7 +291,7 @@
                                  :body (list (make-ast-the :type 'integer
                                                            :value (make-ast-int :value 42))))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-null)))
 
 (it-sequential "codegen-the-with-local-let-safety-zero-skips-typep"
   (let ((ctx (make-codegen-ctx)))
@@ -300,7 +300,7 @@
                                :body (list (make-ast-the :type 'integer
                                                          :value (make-ast-int :value 42))))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-typep) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-typep) :to-be-null)))
 
 (it-sequential "codegen-let-optimize-inline-policy-propagates-to-lambda-closure speed-three"
   (destructuring-bind (declarations expected-policy) (list '((optimize (speed 3))) :inline)
@@ -311,8 +311,8 @@
                :declarations declarations
                :body (list (make-ast-var :name 'f)))))
     (compile-ast ast ctx)
-    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
-                    (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
+    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm:vm-closure)
+                    (codegen-find-inst ctx 'cl-cc/vm:vm-func-ref))))
       (expect inst :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy inst) :to-be expected-policy)))))
 
@@ -325,8 +325,8 @@
                :declarations declarations
                :body (list (make-ast-var :name 'f)))))
     (compile-ast ast ctx)
-    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
-                    (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
+    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm:vm-closure)
+                    (codegen-find-inst ctx 'cl-cc/vm:vm-func-ref))))
       (expect inst :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy inst) :to-be expected-policy)))))
 
@@ -339,7 +339,7 @@
                :declarations declarations
                :body (list (make-ast-var :name 'f)))))
     (compile-ast ast ctx)
-    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm::vm-closure)
-                    (codegen-find-inst ctx 'cl-cc/vm::vm-func-ref))))
+    (let ((inst (or (codegen-find-inst ctx 'cl-cc/vm:vm-closure)
+                    (codegen-find-inst ctx 'cl-cc/vm:vm-func-ref))))
       (expect inst :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy inst) :to-be expected-policy)))))

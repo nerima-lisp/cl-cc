@@ -69,7 +69,7 @@
          (out  (cl-cc/optimize::opt-pass-jump (list j1 lbl1 j2 lbl2 ret))))
     (let ((j1-out (find-if #'cl-cc:vm-jump-p out)))
       (when j1-out
-        (expect "end" :to-equal (cl-cc/vm::vm-label-name j1-out))))))
+        (expect "end" :to-equal (cl-cc/vm:vm-label-name j1-out))))))
 
 (it-sequential "jump-threading-follows-long-acyclic-chain"
   (let ((instructions nil))
@@ -80,7 +80,7 @@
     (let* ((out (cl-cc/optimize::opt-pass-jump (nreverse instructions)))
            (j0  (find-if #'cl-cc:vm-jump-p out)))
       (expect j0 :to-be-truthy)
-      (expect "L25" :to-equal (cl-cc/vm::vm-label-name j0)))))
+      (expect "L25" :to-equal (cl-cc/vm:vm-label-name j0)))))
 
 (it-sequential "jump-zero-threading-updates-label"
   (let* ((c   (make-vm-const     :dst :r0 :value 0))
@@ -91,6 +91,6 @@
          (ret (make-vm-ret       :reg :r0))
          (out (cl-cc/optimize::opt-pass-jump (list c jz lbl j2 end ret))))
     ;; The jump-zero should now target "end" directly
-    (let ((jz-out (find-if (lambda (i) (typep i 'cl-cc/vm::vm-jump-zero)) out)))
+    (let ((jz-out (find-if (lambda (i) (typep i 'cl-cc/vm:vm-jump-zero)) out)))
       (when jz-out
-        (expect "end" :to-equal (cl-cc/vm::vm-label-name jz-out))))))
+        (expect "end" :to-equal (cl-cc/vm:vm-label-name jz-out))))))

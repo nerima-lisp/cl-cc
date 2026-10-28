@@ -217,7 +217,7 @@
                 (list (cons '(:generic-call 0 :integer) 99)
                       (cons '(:generic-call 0 :string)   1)))))
     (cl-cc/pipeline::%pgo-apply-type-feedback-to-instructions insts profile-data)
-    (expect (cl-cc/vm::vm-pgo-specializer gc-inst) :to-equal :integer)))
+    (expect (cl-cc/vm:vm-pgo-specializer gc-inst) :to-equal :integer)))
 
 (it-sequential "pgo-apply-type-feedback-to-instructions-non-generic-call-unchanged"
   (let* ((const-inst (cl-cc:make-vm-const :dst :r0 :value 42))
@@ -238,7 +238,7 @@
                 (list (cons '(:generic-call 0 :integer) 5)
                       (cons '(:generic-call 0 :string)  5)))))
     (cl-cc/pipeline::%pgo-apply-type-feedback-to-instructions insts profile-data)
-    (expect (null (cl-cc/vm::vm-pgo-specializer gc-inst)) :to-be-truthy)))
+    (expect (null (cl-cc/vm:vm-pgo-specializer gc-inst)) :to-be-truthy)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────
 ;;; %pgo-apply-type-feedback-to-result
@@ -266,6 +266,6 @@
                       (cons '(:generic-call 0 :string)   1))))
          (opts (cl-cc/pipeline::%make-pipeline-opts :pgo-profile-data profile-data)))
     (cl-cc/pipeline::%pgo-apply-type-feedback-to-result result opts)
-    (expect (cl-cc/vm::vm-pgo-specializer gc-vm) :to-equal :integer)
-    (expect (cl-cc/vm::vm-pgo-specializer gc-opt) :to-equal :integer)
-    (expect (cl-cc/vm::vm-pgo-specializer gc-prg) :to-equal :integer)))
+    (expect (cl-cc/vm:vm-pgo-specializer gc-vm) :to-equal :integer)
+    (expect (cl-cc/vm:vm-pgo-specializer gc-opt) :to-equal :integer)
+    (expect (cl-cc/vm:vm-pgo-specializer gc-prg) :to-equal :integer)))

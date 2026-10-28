@@ -27,7 +27,7 @@
     (expect (not (inline-has-call-p out)) :to-be-truthy)
     (expect (some (lambda (i)
                          (and (cl-cc:vm-move-p i)
-                              (eq :R6 (cl-cc/vm::vm-dst i))))
+                              (eq :R6 (cl-cc/vm:vm-dst i))))
                        out) :to-be-truthy)))
 
 (it-sequential "inline-skip-large-function"
@@ -190,7 +190,7 @@
     ;; and before the halt — at least one must be > :R12 index
     (let ((inlined-dsts (loop for i in out
                               when (and (cl-cc:vm-move-p i)
-                                        (eq :R6 (cl-cc/vm::vm-dst i)))
+                                        (eq :R6 (cl-cc/vm:vm-dst i)))
                               collect i)))
       ;; The final vm-move into :R6 must exist (proof of inlining)
       (expect (not (null inlined-dsts)) :to-be-truthy))))
@@ -214,6 +214,6 @@
     (expect (not (inline-has-call-p out)) :to-be-truthy)
     (expect (count-if (lambda (i)
                               (and (cl-cc:vm-const-p i)
-                                   (eql 4 (cl-cc/vm::vm-value i))))
+                                   (eql 4 (cl-cc/vm:vm-value i))))
                             out) :to-equal 2)))
 

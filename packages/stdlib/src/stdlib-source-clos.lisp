@@ -351,26 +351,7 @@
 
 ;;; ── copy-instance (shallow copy) ────────────────────────────────────────
 
-    "(defun copy-instance (instance)
-       (cond
-         ((hash-table-p instance)
-          (let ((class (gethash :__class__ instance))
-                (copy (make-hash-table :test 'eq)))
-            (unless class
-              (error \"copy-instance: ~A is not a CLOS instance\" instance))
-            (maphash (lambda (key value)
-                       (setf (gethash key copy) value))
-                     instance)
-            copy))
-         ((and (vectorp instance)
-               (> (length instance) 0)
-               (hash-table-p (aref instance 0)))
-          (let ((copy (make-array (length instance))))
-            (dotimes (i (length instance))
-              (setf (aref copy i) (aref instance i)))
-            copy))
-         (t
-          (error \"copy-instance: ~A is not a CLOS instance\" instance))))"
+    "(defun copy-instance (instance) (vm-copy-instance instance))"
 
 ;;; ── ANSI Condition Type Hierarchy (FR-424) ─────────────────────────────
 

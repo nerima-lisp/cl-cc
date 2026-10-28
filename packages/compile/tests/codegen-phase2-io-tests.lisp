@@ -15,7 +15,7 @@
     (compile-ast (make-ast-call :func 'make-string-input-stream
                                 :args (list (make-ast-quote :value "hello")))
                  ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-make-string-stream)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-make-string-stream)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-make-string-stream-direction inst) :to-be :input))))
 
@@ -25,7 +25,7 @@
   (destructuring-bind (args expected-dir) (list (list (make-ast-quote :value "/tmp/in.txt")) :input)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'open :args args) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-open-file)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-open-file)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-open-file-direction inst) :to-be expected-dir)))))
 
@@ -35,7 +35,7 @@
                  (make-ast-var :name :output)) :output)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-ast-call :func 'open :args args) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-open-file)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-open-file)))
       (expect inst :to-be-truthy)
       (expect (cl-cc::vm-open-file-direction inst) :to-be expected-dir)))))
 
@@ -46,10 +46,10 @@
                                             (make-ast-var :name :external-format)
                                             (make-ast-var :name :utf-16)))
                  ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-open-file)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-open-file)))
       (expect inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-open-file-external-format inst) :to-be :utf-16)
-      (expect (cl-cc/vm::vm-open-file-external-format-reg inst) :to-be-null))))
+      (expect (seventh (cl-cc/vm/protocols:instruction->sexp inst)) :to-be :utf-16)
+      (expect (eighth (cl-cc/vm:instruction->sexp inst)) :to-be-null))))
 
 ;;; ─── Section 11: PEEK-CHAR ──────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@
     (let ((ctx (make-codegen-ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'handle reg)))
     (compile-ast (make-ast-call :func 'peek-char :args args) ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-peek-char) :to-be-truthy))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-peek-char) :to-be-truthy))))
 
 (it-sequential "codegen-phase2-peek-char-emits-vm-peek-char two-args"
   (destructuring-bind (reg args) (list :R11 (list (make-ast-var :name nil)
@@ -66,12 +66,12 @@
     (let ((ctx (make-codegen-ctx)))
     (setf (cl-cc/compile:ctx-env ctx) (list (cons 'handle reg)))
     (compile-ast (make-ast-call :func 'peek-char :args args) ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-peek-char) :to-be-truthy))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-peek-char) :to-be-truthy))))
 
 ;;; ─── Section 12: WRITE-STRING ───────────────────────────────────────────────
 
 (it-sequential "codegen-phase2-write-string-arg-dispatch one-arg"
-  (destructuring-bind (env args inst-type) (list nil (list (make-ast-quote :value "hello")) 'cl-cc/vm::vm-princ)
+  (destructuring-bind (env args inst-type) (list nil (list (make-ast-quote :value "hello")) 'cl-cc/vm:vm-princ)
     (let ((ctx (make-codegen-ctx)))
     (when env
       (setf (cl-cc/compile:ctx-env ctx) env))
@@ -80,7 +80,7 @@
 
 (it-sequential "codegen-phase2-write-string-arg-dispatch two-args"
   (destructuring-bind (env args inst-type) (list (list (cons 'out :R20)) (list (make-ast-quote :value "hello")
-                 (make-ast-var :name 'out)) 'cl-cc/vm::vm-stream-write-string-inst)
+                 (make-ast-var :name 'out)) 'cl-cc/vm:vm-stream-write-string-inst)
     (let ((ctx (make-codegen-ctx)))
     (when env
       (setf (cl-cc/compile:ctx-env ctx) env))

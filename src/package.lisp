@@ -46,6 +46,8 @@
 ))
 
 (in-package :cl-cc)
+(setf cl-cc/vm:*vm-guest-function-package* :cl-cc)
+(cl-cc/vm:vm-register-host-bridge (intern "VM-COPY-INSTANCE" :cl-cc) (function cl-cc/vm:copy-instance))
 
 (defun gc-stats (&optional heap)
   "Return CL-CC runtime GC statistics as a plist.
@@ -54,19 +56,9 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
 :TOTAL-COLLECTED-BYTES, and :PAUSE-MS-P99."
   (cl-cc/runtime:gc-stats heap))
 
-(let ((vm-symbol (find-symbol "CLASS-SLOTS" :cl-cc/vm))
-      (expand-symbol (find-symbol "CLASS-SLOTS" :cl-cc/expand)))
-  (when (and vm-symbol expand-symbol (not (eq vm-symbol expand-symbol)))
-    (let ((macro-fn (cl-cc/expand:lookup-macro expand-symbol)))
-      (when macro-fn
-        (cl-cc/expand:register-macro vm-symbol macro-fn)))
-    (unintern expand-symbol :cl-cc/expand))
-  (shadowing-import vm-symbol :cl-cc)
-  (export (list 'gc-stats vm-symbol) :cl-cc))
+(export 'gc-stats :cl-cc)
 
-;; Re-export all child-package symbols from :cl-cc umbrella, then wire
-;; use-package bridges so expand/compile source files can see each other's
-;; exports without qualification (Phase 3c/3d: now real ASDF systems).
+;; Re-export child-package symbols from the :cl-cc umbrella facade.
 #-cl-cc-self-hosting
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Re-export bootstrap symbols (our-eval, binop, make-cst-token, etc.)
@@ -77,8 +69,7 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
   ;; in downstream packages (e.g. :cl-cc/cli, tests, compile/).
   (do-external-symbols (s :cl-cc/ast)
     (export s :cl-cc))
-  ;; Re-export optimize symbols BEFORE use-package bridges, so child
-  ;; packages can see optimize exports through the umbrella bridge.
+  ;; Re-export optimize symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/optimize)
     (export s :cl-cc))
   ;; Re-export emit symbols from :cl-cc.
@@ -93,16 +84,11 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
   ;; Re-export compile symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/compile)
     (export s :cl-cc))
-  ;; DEFINE-SYNTAX exists as a stub in :cl-cc/vm and as the real implementation in
-  ;; :cl-cc/expand. Unintern the vm stub so (use-package :cl-cc :cl-cc/vm) succeeds;
-  ;; the expand version (already re-exported above) remains in :cl-cc.
-  (let ((vm-ds (find-symbol "DEFINE-SYNTAX" :cl-cc/vm)))
-    (when vm-ds (unintern vm-ds :cl-cc/vm)))
-  ;; Wire VM source files into the umbrella package
-  (use-package :cl-cc :cl-cc/vm)
-  ;; Re-export VM symbols from :cl-cc.
+  ;; EXPAND owns the umbrella's DEFINE-SYNTAX symbol; do not re-export the
+  ;; VM's distinct symbol with the same name.
   (do-external-symbols (s :cl-cc/vm)
-    (export s :cl-cc))
+    (unless (string= (symbol-name s) "DEFINE-SYNTAX")
+      (export s :cl-cc)))
   ;; Re-export stdlib symbols from :cl-cc.
   (do-external-symbols (s :cl-cc/stdlib)
     (export s :cl-cc))
@@ -112,38 +98,4 @@ Stable public keys include :MINOR-GCS, :MAJOR-GCS,
   (do-external-symbols (s :cl-cc/selfhost)
     (export s :cl-cc))
   (do-external-symbols (s :cl-cc/repl)
-    (export s :cl-cc))
-  ;; Before bridging expand, resolve symbols that expand defines via our-defmacro
-  ;; but vm also owns as accessors/variables. We need to:
-  ;;  1. Move macro registrations to the vm symbol (so lookups find the macro)
-  ;;  2. Unintern the expand-specific symbol so use-package doesn't conflict.
-  ;; The conflicting names are known (discovered at Phase 3c migration).
-  (let ((conflict-names '("GENERIC-FUNCTION-METHOD-COMBINATION" "GENERIC-FUNCTION-METHODS"
-                          "%PACKAGE-EXTERNAL-SYMBOLS" "*DOCUMENTATION-TABLE*"
-                          "HASH-TABLE-VALUES" "BSWAP" "%CLASS-SLOT-DEFINITIONS"
-                          "%PACKAGE-SYMBOLS" "%ALL-SYMBOLS"
-                          "STRING-BUILDER")))
-    (dolist (name conflict-names)
-      (let* ((vm-sym (find-symbol name :cl-cc/vm))
-             (exp-sym (find-symbol name :cl-cc/expand)))
-        (when (and vm-sym exp-sym (not (eq vm-sym exp-sym)))
-          ;; Transfer macro registration from exp-sym to vm-sym if present
-          (let ((macro-fn (cl-cc/expand:lookup-macro exp-sym)))
-            (when macro-fn
-              (cl-cc/expand:register-macro vm-sym macro-fn)))
-          ;; Unintern exp-sym so use-package won't conflict
-          (unintern exp-sym :cl-cc/expand)))))
-  ;; Shadow-import VM symbols into parse/expand before use-package bridges.
-  ;; cl-cc/parse and cl-cc/expand use :cl but not :cl-cc/vm, so they have
-  ;; CL:RANDOM etc. accessible.  When (use-package :cl-cc ...) below brings
-  ;; in the re-exported CL-CC/VM:RANDOM etc., SBCL signals a name-conflict
-  ;; unless those symbols are already in the target package's shadow list.
-  (do-external-symbols (s :cl-cc/vm)
-    (when (find-symbol (symbol-name s) :cl)
-      (shadowing-import (list s) :cl-cc/parse)
-      (shadowing-import (list s) :cl-cc/expand)))
-  ;; NOW establish use-package bridges so child packages can see
-  ;; ALL re-exported symbols from the umbrella (including cross-package deps).
-  (use-package :cl-cc :cl-cc/parse)
-  (use-package :cl-cc :cl-cc/expand)
-  (use-package :cl-cc :cl-cc/compile))
+    (export s :cl-cc)))

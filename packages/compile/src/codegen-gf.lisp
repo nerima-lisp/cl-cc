@@ -98,7 +98,7 @@ existing generic function in the same compilation unit."
     (let ((name (ast-defmethod-name node))
           (qualifier (ast-defmethod-qualifier node))
           (specializers (ast-defmethod-specializers node))
-          (params (ast-defmethod-params node))
+          (raw-params (ast-defmethod-params node))
           (body (ast-defmethod-body node))
           (gf-reg (make-register ctx))
           (dispatch-key nil)
@@ -107,19 +107,39 @@ existing generic function in the same compilation unit."
           (func-label nil)
           (end-label nil)
           (closure-reg (make-register ctx))
-          (param-regs nil))
+          (lambda-list-marker-index nil)
+          (params nil)
+          (rest-param nil)
+          (param-regs nil)
+          (rest-reg nil))
       (%register-defmethod-structural-methods name specializers)
-      (let ((keys (loop for spec in specializers
-                        collect (if (and spec (consp spec))
-                                    (let ((raw (cdr spec)))
-                                      (if (and (consp raw) (eq (car raw) 'eql))
-                                          (let ((val (second raw)))
-                                            (list 'eql
-                                                  (if (and (consp val) (eq (car val) 'quote))
-                                                      (second val)
-                                                      val)))
-                                          raw))
-                                    (or spec t)))))
+      (setq lambda-list-marker-index
+            (position-if (lambda (param)
+                           (member param lambda-list-keywords))
+                         raw-params))
+      (setq params
+            (subseq raw-params 0
+                    (or lambda-list-marker-index (length raw-params))))
+      (when (and lambda-list-marker-index
+                 (eq (nth lambda-list-marker-index raw-params) '&rest))
+        (setq rest-param (nth (1+ lambda-list-marker-index) raw-params)))
+      (setq param-regs (loop for _ in params collect (make-register ctx)))
+      (when rest-param
+        (setq rest-reg (make-register ctx)))
+      (let* ((required-count
+               (or lambda-list-marker-index (length specializers)))
+             (keys
+               (loop for spec in (subseq specializers 0 required-count)
+                     collect (if (and spec (consp spec))
+                                 (let ((raw (cdr spec)))
+                                   (if (and (consp raw) (eq (car raw) 'eql))
+                                       (let ((val (second raw)))
+                                         (list 'eql
+                                               (if (and (consp val) (eq (car val) 'quote))
+                                                   (second val)
+                                                   val)))
+                                       raw))
+                                 (or spec t)))))
         (setq dispatch-key (if (= (length keys) 1) (first keys) keys)))
       (setq qual-str (if qualifier (format nil "_~A" qualifier) ""))
       (setq label-suffix
@@ -133,11 +153,10 @@ existing generic function in the same compilation unit."
             (make-label ctx
                         (format nil "METHOD_~A~A_~A_END" name qual-str
                                 label-suffix)))
-      (setq param-regs (loop for _ in params collect (make-register ctx)))
       (setq gf-reg (%ensure-generic-function ctx name))
       (emit ctx (make-vm-closure
                  :dst closure-reg :label func-label
-                 :params param-regs :captured nil))
+                 :params param-regs :rest-param rest-reg :captured nil))
       (emit ctx (make-vm-register-method
                  :gf-reg gf-reg :specializer dispatch-key
                  :qualifier qualifier :method-reg closure-reg))
@@ -147,7 +166,10 @@ existing generic function in the same compilation unit."
         (unwind-protect
              (progn
                (setf (ctx-env ctx)
-                     (append (loop for p in params for r in param-regs collect (cons p r))
+                     (append (loop for p in params for r in param-regs
+                                   collect (cons p r))
+                             (when rest-param
+                               (list (cons rest-param rest-reg)))
                              (ctx-env ctx)))
                (%compile-body-with-tail-ret body t ctx))
           (setf (ctx-env ctx) old-env)))

@@ -48,7 +48,7 @@
                       instructions counts :function-id :test-fn :hot-threshold 5)))
       (expect (some (lambda (inst)
                            (and (cl-cc/vm:vm-label-p inst)
-                                (search "BL_SUPER_0" (cl-cc/vm::vm-name inst))))
+                                (search "BL_SUPER_0" (cl-cc/vm:vm-name inst))))
                          versioned) :to-be-truthy))))
 
 (it-sequential "fr-582-autotune-simd-produces-valid-tile-sizes-and-retunes-lanes"
@@ -82,15 +82,15 @@
          (second-load (cl-cc:make-vm-aref :dst :r2 :array-reg :a :index-reg 1))
          (result (cl-cc/optimize:opt-pass-load-widening-store-coalescing
                   (list first-load second-load))))
-    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-aref)) result)) :to-be-truthy)
-    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-logand)) result)) :to-be-truthy)
+    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-aref)) result)) :to-be-truthy)
+    (expect (= 2 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-logand)) result)) :to-be-truthy)
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-logand)
-                              (eq :r1 (cl-cc/vm::vm-dst i))))
+                         (and (typep i 'cl-cc/vm:vm-logand)
+                              (eq :r1 (cl-cc/vm:vm-dst i))))
                        result) :to-be-truthy)
     (expect (some (lambda (i)
-                         (and (typep i 'cl-cc/vm::vm-logand)
-                              (eq :r2 (cl-cc/vm::vm-dst i))))
+                         (and (typep i 'cl-cc/vm:vm-logand)
+                              (eq :r2 (cl-cc/vm:vm-dst i))))
                        result) :to-be-truthy)))
 
 (it-sequential "fr-723-store-coalescing-packs-adjacent-byte-stores"
@@ -98,12 +98,12 @@
          (second-store (cl-cc:make-vm-aset :array-reg :a :index-reg 1 :val-reg :v2))
          (result (cl-cc/optimize:opt-pass-load-widening-store-coalescing
                   (list first-store second-store))))
-    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result)) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-ash)) result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logior)) result) :to-be-truthy)
-    (let ((store (find-if (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result)))
-      (expect (cl-cc/vm::vm-array-reg store) :to-be :a)
-      (expect (= 0 (cl-cc/vm::vm-index-reg store)) :to-be-truthy))))
+    (expect (= 1 (count-if (lambda (i) (typep i 'cl-cc/vm:vm-aset)) result)) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-ash)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-logior)) result) :to-be-truthy)
+    (let ((store (find-if (lambda (i) (typep i 'cl-cc/vm:vm-aset)) result)))
+      (expect (cl-cc/vm:vm-array-reg store) :to-be :a)
+      (expect (= 0 (cl-cc/vm:vm-index-reg store)) :to-be-truthy))))
 
 (it-sequential "fr-723-load-store-coalescing-respects-natural-alignment"
   (let* ((first-load (cl-cc:make-vm-aref :dst :r1 :array-reg :a :index-reg 1))

@@ -62,25 +62,25 @@
 
 (it-sequential "fr-684-memset-recognition-collapses-zero-fill-loop"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-zero-fill-loop))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-fill)) result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-fill)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-aset)) result) :to-be-falsy)))
 
 (it-sequential "fr-684-memcpy-recognition-collapses-unit-stride-copy-loop"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-copy-loop))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-copy-vector)) result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-copy-vector)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-aset)) result) :to-be-falsy)))
 
 (it-sequential "fr-684-memcpy-recognition-skips-strided-copy-loop"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-copy-loop :strided-p t))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-copy-vector)) result) :to-be-falsy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-aset)) result) :to-be-truthy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-copy-vector)) result) :to-be-falsy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-aset)) result) :to-be-truthy)))
 
 (it-sequential "fr-684-popcount-recognition-emits-logcount"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-popcount-loop))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logcount)) result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-logand)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-logcount)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-logand)) result) :to-be-falsy)))
 
 (it-sequential "fr-684-strlen-recognition-emits-string-length"
   (let ((result (cl-cc/optimize:opt-pass-idiom-recognition (idiom-strlen-loop))))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-string-length)) result) :to-be-truthy)
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-char)) result) :to-be-falsy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-string-length)) result) :to-be-truthy)
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-char)) result) :to-be-falsy)))

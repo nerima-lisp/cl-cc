@@ -60,9 +60,9 @@ binding in particular runs inside whichever state is current at call time."
            (let ((state cl-cc/vm:*vm-state*))
              (and state (cl-cc/vm:vm-global-vars state)))))
     (cl-cc/backend-protocol:make-vm-integration
-     :closure-p (lambda (value) (cl-cc/vm::%vm-closure-object-p value))
+     :closure-p (lambda (value) (cl-cc/vm:%vm-closure-object-p value))
      :call-closure (lambda (closure args)
-                     (cl-cc/vm::%vm-call-closure-sync closure cl-cc/vm:*vm-state* args))
+                     (cl-cc/vm:%vm-call-closure-sync closure cl-cc/vm:*vm-state* args))
      :global-bound-p (lambda (symbol)
                        (let ((gv (globals)))
                          (and gv (nth-value 1 (gethash symbol gv)))))

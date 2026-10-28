@@ -86,8 +86,8 @@
          (env  (make-hash-table :test #'eq)))
     (setf (gethash :r0 env) 77)
     (let ((result (cl-cc/optimize::%sccp-fold-inst inst env)))
-      (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
-      (expect (= 77 (cl-cc/vm::vm-value result)) :to-be-truthy))))
+      (expect (typep result 'cl-cc/vm:vm-const) :to-be-truthy)
+      (expect (= 77 (cl-cc/vm:vm-value result)) :to-be-truthy))))
 
 (it-sequential "sccp-fold-inst-unknown-passthrough-cases move"
   (destructuring-bind (inst) (list (make-vm-move :dst :r1 :src :r0))
@@ -103,8 +103,8 @@
     (setf (gethash :r0 env) 3
           (gethash :r1 env) 4)
     (let ((result (cl-cc/optimize::%sccp-fold-inst inst env)))
-      (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
-      (expect (= 7 (cl-cc/vm::vm-value result)) :to-be-truthy))))
+      (expect (typep result 'cl-cc/vm:vm-const) :to-be-truthy)
+      (expect (= 7 (cl-cc/vm:vm-value result)) :to-be-truthy))))
 
 ;;; ─── %sccp-redirect-successors ──────────────────────────────────────────
 
@@ -134,8 +134,8 @@
     (setf (gethash :r0 env) 3 (gethash :r1 env) 4)
     (let ((out-env (cl-cc/optimize::%sccp-process-block entry env)))
       (let ((folded (first (cl-cc:bb-instructions entry))))
-        (expect (typep folded 'cl-cc/vm::vm-const) :to-be-truthy)
-        (expect (= 7 (cl-cc/vm::vm-value folded)) :to-be-truthy))
+        (expect (typep folded 'cl-cc/vm:vm-const) :to-be-truthy)
+        (expect (= 7 (cl-cc/vm:vm-value folded)) :to-be-truthy))
       (expect (= 7 (gethash :r2 out-env)) :to-be-truthy))))
 
 ;;; ─── opt-pass-sccp ───────────────────────────────────────────────────────
@@ -150,12 +150,12 @@
                       (make-vm-add   :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret   :reg :r2)))
          (result (cl-cc/optimize::opt-pass-sccp insts)))
-    (let ((consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const)) result)))
-      (expect (some (lambda (c) (= 30 (cl-cc/vm::vm-value c))) consts) :to-be-truthy)))
+    (let ((consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-const)) result)))
+      (expect (some (lambda (c) (= 30 (cl-cc/vm:vm-value c))) consts) :to-be-truthy)))
   (let* ((insts (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r1)
                       (make-vm-ret  :reg :r2)))
          (result (cl-cc/optimize::opt-pass-sccp insts)))
-    (expect (some (lambda (i) (typep i 'cl-cc/vm::vm-add)) result) :to-be-truthy)))
+    (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-add)) result) :to-be-truthy)))
 
 ;;; ─── %sccp-update-env-for-inst ───────────────────────────────────────────
 
@@ -190,8 +190,8 @@
          (env  (make-hash-table :test #'eq)))
     (setf (gethash :r0 env) 0)
     (let ((result (cl-cc/optimize::%sccp-fold-inst inst env)))
-      (expect (typep result 'cl-cc/vm::vm-jump) :to-be-truthy)
-      (expect (cl-cc/vm::vm-label-name result) :to-equal "done"))))
+      (expect (typep result 'cl-cc/vm:vm-jump) :to-be-truthy)
+      (expect (cl-cc/vm:vm-label-name result) :to-equal "done"))))
 
 (it-sequential "sccp-fold-inst-jump-zero-true-eliminates-branch"
   (let* ((inst (make-vm-jump-zero :reg :r0 :label "done"))
@@ -245,8 +245,8 @@
          (result (cl-cc/optimize:opt-compute-available-expressions cfg))
          (join-in (gethash join (cl-cc/optimize:opt-dataflow-result-in result)))
          (keys (mapcar #'cl-cc/optimize::%available-expression-entry-key join-in)))
-    (expect (member '(cl-cc/vm::vm-add :r0 :r1) keys :test #'equal) :to-be-truthy)
-    (expect (member '(cl-cc/vm::vm-sub :r0 :r1) keys :test #'equal) :to-be-falsy)))
+    (expect (member '(cl-cc/vm:vm-add :r0 :r1) keys :test #'equal) :to-be-truthy)
+    (expect (member '(cl-cc/vm:vm-sub :r0 :r1) keys :test #'equal) :to-be-falsy)))
 
 ;;; ─── Reaching definitions ────────────────────────────────────────────────
 

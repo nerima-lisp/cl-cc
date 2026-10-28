@@ -101,7 +101,7 @@ Compilation errors propagate to the test runner."
     (expect bytes :to-equal '(#x5F #x24 #x03 #xD5))))
 
 (it-sequential "aarch64-program-with-indirect-call-starts-with-bti-c"
-  (let* ((program (cl-cc/vm::make-vm-program
+  (let* ((program (cl-cc/vm:make-vm-program
                    :instructions (list (cl-cc:make-vm-call :dst :R0 :func :R1 :args nil)
                                        (cl-cc:make-vm-halt :reg :R0))
                    :result-register :R0
@@ -180,7 +180,7 @@ Compilation errors propagate to the test runner."
     (expect smulh-bytes :to-equal '(#x20 #x7C #x42 #x9B))))
 
 (it-sequential "aarch64-mul-high-size-and-dispatch-registered"
-  (dolist (tp '(cl-cc/vm::vm-integer-mul-high-u cl-cc/vm::vm-integer-mul-high-s))
+  (dolist (tp '(cl-cc/vm:vm-integer-mul-high-u cl-cc/vm:vm-integer-mul-high-s))
     (expect (= 4 (gethash tp cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)
     (expect (functionp (gethash tp cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
@@ -192,55 +192,55 @@ Compilation errors propagate to the test runner."
     (expect bytes :to-equal '(#x20 #xC0 #x61 #x1E))))
 
 (it-sequential "aarch64-sqrt-size-and-dispatch-registered"
-  (expect (= 4 (gethash 'cl-cc/vm::vm-sqrt cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)
-  (expect (functionp (gethash 'cl-cc/vm::vm-sqrt cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy))
+  (expect (= 4 (gethash 'cl-cc/vm:vm-sqrt cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)
+  (expect (functionp (gethash 'cl-cc/vm:vm-sqrt cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy))
 
 ;;; ─── Libm call emitters (sin/cos/exp/log/tan/asin/acos/atan — FR-286) ─────
 
 (it-sequential "aarch64-libm-unary-emitter-size sin"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-sin (cl-cc/vm::make-vm-sin-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-sin (cl-cc/vm:make-vm-sin-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size cos"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-cos (cl-cc/vm::make-vm-cos-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-cos (cl-cc/vm:make-vm-cos-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size exp"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-exp (cl-cc/vm::make-vm-exp-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-exp (cl-cc/vm:make-vm-exp-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size log"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-log (cl-cc/vm::make-vm-log-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-log (cl-cc/vm:make-vm-log-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size tan"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-tan (cl-cc/vm::make-vm-tan-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-tan (cl-cc/vm:make-vm-tan-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size asin"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-asin (cl-cc/vm::make-vm-asin-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-asin (cl-cc/vm:make-vm-asin-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size acos"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-acos (cl-cc/vm::make-vm-acos-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-acos (cl-cc/vm:make-vm-acos-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))
 
 (it-sequential "aarch64-libm-unary-emitter-size atan"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-atan (cl-cc/vm::make-vm-atan-inst :dst :R0 :src :R1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-a64-vm-atan (cl-cc/vm:make-vm-atan-inst :dst :R0 :src :R1))
     (let ((bytes (%a64-collect-bytes (lambda (s) (funcall emit-fn inst s)))))
     (expect (>= (length bytes) 24) :to-be-truthy)       ; at least FMOV+STP+1MOVZ+BLR+LDP+FMOV
     (expect (= 0 (mod (length bytes) 4)) :to-be-truthy))))      ; AArch64 = 4-byte aligned
@@ -249,84 +249,84 @@ Compilation errors propagate to the test runner."
   (let ((bytes (%a64-collect-bytes
                 (lambda (s)
                   (cl-cc/codegen::emit-a64-vm-sin
-                   (cl-cc/vm::make-vm-sin-inst :dst :R0 :src :R1) s)))))
+                   (cl-cc/vm:make-vm-sin-inst :dst :R0 :src :R1) s)))))
     ;; FMOV D0, D1 = encode-fmov-dd(0, 1) = 0x1E604000 | (1<<5) | 0 = 0x1E604020
     (expect (subseq bytes 0 4) :to-equal '(#x20 #x40 #x60 #x1E))))
 
 (it-sequential "aarch64-instruction-size-table-entries bswap"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-bswap)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-bswap)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries tail-call"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-tail-call)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-tail-call)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries min"
-  (destructuring-bind (expected instr-type) (list 8 'cl-cc/vm::vm-min)
+  (destructuring-bind (expected instr-type) (list 8 'cl-cc/vm:vm-min)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries max"
-  (destructuring-bind (expected instr-type) (list 8 'cl-cc/vm::vm-max)
+  (destructuring-bind (expected instr-type) (list 8 'cl-cc/vm:vm-max)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries select"
-  (destructuring-bind (expected instr-type) (list 12 'cl-cc/vm::vm-select)
+  (destructuring-bind (expected instr-type) (list 12 'cl-cc/vm:vm-select)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries integer-add"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-integer-add)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-integer-add)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries integer-sub"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-integer-sub)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-integer-sub)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries integer-mul"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-integer-mul)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-integer-mul)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries integer-mul-high-u"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-integer-mul-high-u)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-integer-mul-high-u)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries integer-mul-high-s"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-integer-mul-high-s)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-integer-mul-high-s)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries sqrt"
-  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm::vm-sqrt)
+  (destructuring-bind (expected instr-type) (list 4 'cl-cc/vm:vm-sqrt)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries sin-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-sin-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-sin-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries cos-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-cos-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-cos-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries exp-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-exp-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-exp-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries log-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-log-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-log-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries tan-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-tan-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-tan-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries asin-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-asin-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-asin-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries acos-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-acos-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-acos-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-instruction-size-table-entries atan-inst"
-  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm::vm-atan-inst)
+  (destructuring-bind (expected instr-type) (list 36 'cl-cc/vm:vm-atan-inst)
     (expect (= expected (gethash instr-type cl-cc/codegen::*a64-instruction-sizes*)) :to-be-truthy)))
 
 (it-sequential "aarch64-vm-move-self-elision-emits-no-bytes"
@@ -348,67 +348,67 @@ Compilation errors propagate to the test runner."
     (expect brk :to-equal '(0 0 32 212))))
 
 (it-sequential "aarch64-emitter-table-entries min"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-min)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-min)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries max"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-max)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-max)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries integer-add"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-integer-add)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-integer-add)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries integer-sub"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-integer-sub)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-integer-sub)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries integer-mul"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-integer-mul)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-integer-mul)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries integer-mul-high-u"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-integer-mul-high-u)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-integer-mul-high-u)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries integer-mul-high-s"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-integer-mul-high-s)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-integer-mul-high-s)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries sqrt"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-sqrt)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-sqrt)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries sin-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-sin-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-sin-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries cos-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-cos-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-cos-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries exp-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-exp-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-exp-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries log-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-log-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-log-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries tan-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-tan-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-tan-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries asin-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-asin-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-asin-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries acos-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-acos-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-acos-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-emitter-table-entries atan-inst"
-  (destructuring-bind (instr-type) (list 'cl-cc/vm::vm-atan-inst)
+  (destructuring-bind (instr-type) (list 'cl-cc/vm:vm-atan-inst)
     (expect (functionp (gethash instr-type cl-cc/codegen::*a64-emitter-table*)) :to-be-truthy)))
 
 (it-sequential "aarch64-tail-call-emitter-encoding"
@@ -598,7 +598,7 @@ Compilation errors propagate to the test runner."
                   (cl-cc/codegen::emit-a64-vm-select
                    (cl-cc:make-vm-select :dst :R0 :cond-reg :R1 :then-reg :R2 :else-reg :R3)
                    s)))))
-    (expect (gethash 'cl-cc/vm::vm-select cl-cc/codegen::*a64-emitter-table*) :to-be #'cl-cc/codegen::emit-a64-vm-select)
+    (expect (gethash 'cl-cc/vm:vm-select cl-cc/codegen::*a64-emitter-table*) :to-be #'cl-cc/codegen::emit-a64-vm-select)
     (expect (= 12 (length bytes)) :to-be-truthy)
     ;; First instruction is MOV X0, X3; second is CMP X1, XZR; third is CSEL
     (expect (= #xE0 (nth 0 bytes)) :to-be-truthy)
@@ -625,17 +625,17 @@ Compilation errors propagate to the test runner."
 (it-sequential "aarch64-leaf-and-nonleaf-without-spills-share-fpe-layout"
   (let* ((result (compile-string "(+ 1 2)" :target :aarch64))
          (program (compilation-result-program result))
-         (base (cl-cc/vm::make-vm-program :instructions (cl-cc/vm::vm-program-instructions program)
-                                        :result-register (cl-cc/vm::vm-program-result-register program)
+         (base (cl-cc/vm:make-vm-program :instructions (cl-cc/vm:vm-program-instructions program)
+                                        :result-register (cl-cc/vm:vm-program-result-register program)
                                         :leaf-p nil))
          (leaf-bytes (compile-to-aarch64-bytes program))
          (nonleaf-bytes (compile-to-aarch64-bytes base)))
-    (expect (cl-cc/vm::vm-program-leaf-p program) :to-be-truthy)
+    (expect (cl-cc/vm:vm-program-leaf-p program) :to-be-truthy)
     (expect (= (length leaf-bytes) (length nonleaf-bytes)) :to-be-truthy)
     (expect (equalp leaf-bytes nonleaf-bytes) :to-be-truthy)))
 
 (it-sequential "aarch64-empty-program-default-fpe-emits-24-bytes-with-shadow-call-stack"
-  (let* ((program (cl-cc/vm::make-vm-program :instructions nil :result-register :R0))
+  (let* ((program (cl-cc/vm:make-vm-program :instructions nil :result-register :R0))
          (bytes (compile-to-aarch64-bytes program)))
     (expect (= 24 (length bytes)) :to-be-truthy)
     ;; Prologue begins with STR LR, [X18], #8
@@ -661,13 +661,13 @@ Compilation errors propagate to the test runner."
 (it-sequential "aarch64-default-fpe-uses-sp-relative-spill-frame"
   (let* ((store-inst (cl-cc:make-vm-spill-store :src-reg :x19 :slot 1))
          (load-inst (cl-cc:make-vm-spill-load :dst-reg :x20 :slot 1))
-         (program (cl-cc/vm::make-vm-program
+         (program (cl-cc/vm:make-vm-program
                    :instructions (list store-inst load-inst)
                    :result-register :R0
                    :leaf-p t))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                                    :spill-count 1
-                                                   :instructions (cl-cc/vm::vm-program-instructions program)))
+                                                   :instructions (cl-cc/vm:vm-program-instructions program)))
          (alloc-bytes (%a64-collect-bytes
                        (lambda (s)
                          (cl-cc/codegen::emit-a64-instr
@@ -700,13 +700,13 @@ Compilation errors propagate to the test runner."
 (it-sequential "aarch64-debug-opt-out-keeps-fp-lr-pair-and-fp-spills"
   (let* ((store-inst (cl-cc:make-vm-spill-store :src-reg :x19 :slot 1))
          (load-inst (cl-cc:make-vm-spill-load :dst-reg :x20 :slot 1))
-         (program (cl-cc/vm::make-vm-program
+         (program (cl-cc/vm:make-vm-program
                    :instructions (list store-inst load-inst)
                    :result-register :R0
                    :leaf-p t))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                                    :spill-count 1
-                                                   :instructions (cl-cc/vm::vm-program-instructions program)))
+                                                   :instructions (cl-cc/vm:vm-program-instructions program)))
          (save-pair (%a64-collect-bytes
                      (lambda (s)
                        (cl-cc/codegen::emit-a64-instr
@@ -741,7 +741,7 @@ Compilation errors propagate to the test runner."
     (expect bytes :to-equal '(#xF0 #x07 #x40 #xD1 #x1F #x02 #x40 #xF8))))
 
 (it-sequential "aarch64-default-fpe-large-spill-frame-signals-unsupported-adjust"
-  (let* ((program (cl-cc/vm::make-vm-program :instructions nil :result-register :R0 :leaf-p t))
+  (let* ((program (cl-cc/vm:make-vm-program :instructions nil :result-register :R0 :leaf-p t))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                                    :spill-count 512
                                                    :instructions nil)))
@@ -749,7 +749,7 @@ Compilation errors propagate to the test runner."
         (%a64-collect-bytes (lambda (s) (cl-cc/codegen::emit-a64-program program s)))))))
 
 (it-sequential "aarch64-large-spill-frame-inserts-stack-probe-before-prologue-when-fpe-disabled"
-  (let* ((program (cl-cc/vm::make-vm-program :instructions nil :result-register :R0 :leaf-p t))
+  (let* ((program (cl-cc/vm:make-vm-program :instructions nil :result-register :R0 :leaf-p t))
          (ra (cl-cc/regalloc::make-regalloc-result :assignment (make-hash-table :test #'eq)
                                                     :spill-count 512
                                                     :instructions nil))

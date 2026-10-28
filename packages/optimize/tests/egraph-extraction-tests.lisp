@@ -64,7 +64,7 @@
          (out (cl-cc/optimize:optimize-with-egraph insts))
          (r1  (egraph-find-dst-inst out :r1)))
     (expect (cl-cc:vm-const-p r1) :to-be-truthy)
-    (expect (cl-cc/vm::vm-value r1) :to-equal 0)))
+    (expect (cl-cc/vm:vm-value r1) :to-equal 0)))
 
 (it-sequential "optimize-with-egraph-lowers-alias"
   (let* ((insts (list (cl-cc:make-vm-const :dst :r0 :value 0)
@@ -75,7 +75,7 @@
          (out (cl-cc/optimize:optimize-with-egraph insts))
          (r3  (egraph-find-dst-inst out :r3)))
     (expect (cl-cc:vm-move-p r3) :to-be-truthy)
-    (expect (cl-cc/vm::vm-src r3) :to-equal :r2)))
+    (expect (cl-cc/vm:vm-src r3) :to-equal :r2)))
 
 ;;; ─── Cost Model ──────────────────────────────────────────────────────────
 
@@ -289,7 +289,7 @@
                    move class-id eg class->representative 0 nil)))
       (expect (cl-cc:vm-const-p result) :to-be-truthy)
       (expect (cl-cc:vm-dst result) :to-be :r1)
-      (expect (cl-cc/vm::vm-value result) :to-equal 42))))
+      (expect (cl-cc/vm:vm-value result) :to-equal 42))))
 
 (it-sequential "egraph-rewrite-inst-dst-with-alias-becomes-vm-move"
   (let* ((eg (make-test-egraph))
@@ -304,4 +304,4 @@
                    add-inst class-id eg class->representative 1 #(0 0))))
       (expect (cl-cc:vm-move-p result) :to-be-truthy)
       (expect (cl-cc:vm-dst result) :to-be :r2)
-      (expect (cl-cc/vm::vm-src result) :to-be :r3))))
+      (expect (cl-cc/vm:vm-src result) :to-be :r3))))

@@ -349,7 +349,7 @@
                        (make-vm-ret   :reg :r0)))
          (result (cl-cc/optimize::opt-pass-copy-prop instrs))
          (labels (loop for i in result
-                       when (typep i 'cl-cc/vm::vm-label)
+                       when (typep i 'cl-cc/vm:vm-label)
                        collect (cl-cc:vm-lbl-name i))))
     (expect (member "start" labels :test #'equal) :to-be-truthy)))
 
@@ -427,8 +427,8 @@
     (setf (gethash :r0 copies) :r5)
     (let* ((inst   (make-vm-add :dst :r2 :lhs :r0 :rhs :r0))
            (result (cl-cc/optimize::%opt-copy-prop-rewrite-inst inst copies)))
-      (expect (cl-cc/vm::vm-lhs result) :to-be :r5)
-      (expect (cl-cc/vm::vm-rhs result) :to-be :r5))))
+      (expect (cl-cc/vm:vm-lhs result) :to-be :r5)
+      (expect (cl-cc/vm:vm-rhs result) :to-be :r5))))
 
 (it-sequential "copyprop-rewrite-inst-identity-when-no-copy"
   (let ((copies (make-hash-table :test #'eq))
@@ -445,4 +445,4 @@
           (list (make-vm-add :dst :r2 :lhs :r0 :rhs :r0)))
     (let ((result (cl-cc/optimize::%opt-copy-prop-rewrite-block blk in-env)))
       (expect (= 1 (length result)) :to-be-truthy)
-      (expect (cl-cc/vm::vm-lhs (first result)) :to-be :r5))))
+      (expect (cl-cc/vm:vm-lhs (first result)) :to-be :r5))))

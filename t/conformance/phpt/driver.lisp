@@ -165,7 +165,6 @@
                   (when (and input-path-p (streamp input-stream))
                     (close input-stream))
                   (phpt-driver-write-progress progress-path phase "cleanup")
-                  (phpt-driver-restore-environment environment-snapshot "base")
                   (phpt-driver-write-progress progress-path phase "done"))
               (error (condition)
                 (values "invalid" "" ""

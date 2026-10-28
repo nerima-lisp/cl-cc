@@ -67,7 +67,7 @@
     (let ((key (cl-cc/optimize::%opt-pre-expression-key inst (make-hash-table :test 'eql))))
     (ecase shape
       (:const  (expect key :to-equal expected))
-      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
+      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm:vm-add))
       (:null   (expect key :to-be-null))))))
 
 (it-sequential "pre-expression-key-cases impure"
@@ -75,7 +75,7 @@
     (let ((key (cl-cc/optimize::%opt-pre-expression-key inst (make-hash-table :test 'eql))))
     (ecase shape
       (:const  (expect key :to-equal expected))
-      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm::vm-add))
+      (:binary (expect (consp key) :to-be-truthy) (expect (car key) :to-be 'cl-cc/vm:vm-add))
       (:null   (expect key :to-be-null))))))
 
 (it-sequential "pre-expression-key-commutative"
@@ -86,19 +86,19 @@
 ;;; ─── %opt-pre-splice-before-terminator ───────────────────────────────────
 
 (it-sequential "pre-splice-inserts-before-terminator before-jump"
-  (destructuring-bind (insts term-type) (list (list (make-vm-const :dst :r0 :value 1) (make-vm-jump :label "end")) 'cl-cc/vm::vm-jump)
+  (destructuring-bind (insts term-type) (list (list (make-vm-const :dst :r0 :value 1) (make-vm-jump :label "end")) 'cl-cc/vm:vm-jump)
     (let* ((extra  (make-vm-const :dst :r9 :value 0))
          (result (cl-cc/optimize::%opt-pre-splice-before-terminator insts (list extra))))
     (expect (= 3 (length result)) :to-be-truthy)
-    (expect (typep (second result) 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm:vm-const) :to-be-truthy)
     (expect (typep (third  result) term-type) :to-be-truthy))))
 
 (it-sequential "pre-splice-inserts-before-terminator before-ret"
-  (destructuring-bind (insts term-type) (list (list (make-vm-move  :dst :r0 :src :r1) (make-vm-ret  :reg  :r0)) 'cl-cc/vm::vm-ret)
+  (destructuring-bind (insts term-type) (list (list (make-vm-move  :dst :r0 :src :r1) (make-vm-ret  :reg  :r0)) 'cl-cc/vm:vm-ret)
     (let* ((extra  (make-vm-const :dst :r9 :value 0))
          (result (cl-cc/optimize::%opt-pre-splice-before-terminator insts (list extra))))
     (expect (= 3 (length result)) :to-be-truthy)
-    (expect (typep (second result) 'cl-cc/vm::vm-const) :to-be-truthy)
+    (expect (typep (second result) 'cl-cc/vm:vm-const) :to-be-truthy)
     (expect (typep (third  result) term-type) :to-be-truthy))))
 
 (it-sequential "pre-splice-appends-when-no-terminator"
@@ -108,7 +108,7 @@
                   (list const)
                   (list extra))))
     (expect (= 2 (length result)) :to-be-truthy)
-    (expect (typep (second result) 'cl-cc/vm::vm-const) :to-be-truthy)))
+    (expect (typep (second result) 'cl-cc/vm:vm-const) :to-be-truthy)))
 
 ;;; ─── %opt-pre-env-evict-dst ──────────────────────────────────────────────
 
@@ -163,13 +163,13 @@
 (it-sequential "pre-reconstruct-inst-round-trips-vm-const"
   (let* ((inst   (make-vm-const :dst :r0 :value 42))
          (result (cl-cc/optimize::%opt-pre-reconstruct-inst inst)))
-    (expect (typep result 'cl-cc/vm::vm-const) :to-be-truthy)
-    (expect (cl-cc/vm::vm-value result) :to-equal 42)))
+    (expect (typep result 'cl-cc/vm:vm-const) :to-be-truthy)
+    (expect (cl-cc/vm:vm-value result) :to-equal 42)))
 
 (it-sequential "pre-reconstruct-inst-passthrough-for-unrecognized"
   (let* ((inst   (make-vm-halt :reg :r0))
          (result (cl-cc/optimize::%opt-pre-reconstruct-inst inst)))
-    (expect (typep result 'cl-cc/vm::vm-halt) :to-be-truthy)))
+    (expect (typep result 'cl-cc/vm:vm-halt) :to-be-truthy)))
 
 ;;; ─── %opt-pre-available-in-any-p ────────────────────────────────────────
 
@@ -258,7 +258,7 @@
 ;;; ─── %opt-rewrite-block-terminator (shared helper via licm) ─────────────
 
 (it-sequential "opt-rewrite-block-terminator-cases jump-match"
-  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump      :label "old") "old" "new" 'cl-cc/vm::vm-jump)
+  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump      :label "old") "old" "new" 'cl-cc/vm:vm-jump)
     (let ((b (make-instance 'cl-cc/optimize:basic-block)))
     (setf (cl-cc/optimize:bb-instructions b) (list term-inst))
     (cl-cc/optimize::%opt-rewrite-block-terminator b old new)
@@ -266,11 +266,11 @@
       (if expected-type
           (progn
           (expect (typep result expected-type) :to-be-truthy)
-          (expect (cl-cc/vm::vm-label-name result) :to-equal new))
-          (expect (equal new (cl-cc/vm::vm-label-name result)) :to-be-falsy))))))
+          (expect (cl-cc/vm:vm-label-name result) :to-equal new))
+          (expect (equal new (cl-cc/vm:vm-label-name result)) :to-be-falsy))))))
 
 (it-sequential "opt-rewrite-block-terminator-cases jump-zero-match"
-  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump-zero :reg :r0 :label "old") "old" "new" 'cl-cc/vm::vm-jump-zero)
+  (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump-zero :reg :r0 :label "old") "old" "new" 'cl-cc/vm:vm-jump-zero)
     (let ((b (make-instance 'cl-cc/optimize:basic-block)))
     (setf (cl-cc/optimize:bb-instructions b) (list term-inst))
     (cl-cc/optimize::%opt-rewrite-block-terminator b old new)
@@ -278,8 +278,8 @@
       (if expected-type
           (progn
           (expect (typep result expected-type) :to-be-truthy)
-          (expect (cl-cc/vm::vm-label-name result) :to-equal new))
-          (expect (equal new (cl-cc/vm::vm-label-name result)) :to-be-falsy))))))
+          (expect (cl-cc/vm:vm-label-name result) :to-equal new))
+          (expect (equal new (cl-cc/vm:vm-label-name result)) :to-be-falsy))))))
 
 (it-sequential "opt-rewrite-block-terminator-cases no-match"
   (destructuring-bind (term-inst old new expected-type) (list (make-vm-jump      :label "other") "old" "new" nil)
@@ -290,8 +290,8 @@
       (if expected-type
           (progn
           (expect (typep result expected-type) :to-be-truthy)
-          (expect (cl-cc/vm::vm-label-name result) :to-equal new))
-          (expect (equal new (cl-cc/vm::vm-label-name result)) :to-be-falsy))))))
+          (expect (cl-cc/vm:vm-label-name result) :to-equal new))
+          (expect (equal new (cl-cc/vm:vm-label-name result)) :to-be-falsy))))))
 
 ;;; ─── %licm-redirect-successor ────────────────────────────────────────────
 
@@ -435,9 +435,9 @@
   (multiple-value-bind (pair inst table pred) (%make-pre-compensate-state :r1)
     (cl-cc/optimize::%opt-pre-emit-compensating pair :k :r0 inst table)
     (let ((emitted (first (gethash pred table))))
-      (expect (cl-cc/vm::vm-move-p emitted) :to-be-truthy)
-      (expect (cl-cc/vm::vm-move-dst emitted) :to-be :r0)
-      (expect (cl-cc/vm::vm-move-src emitted) :to-be :r1))))
+      (expect (cl-cc/vm:vm-move-p emitted) :to-be-truthy)
+      (expect (cl-cc/vm:vm-move-dst emitted) :to-be :r0)
+      (expect (cl-cc/vm:vm-move-src emitted) :to-be :r1))))
 
 (it-sequential "pre-emit-compensating-same-src-noop"
   (multiple-value-bind (pair inst table pred) (%make-pre-compensate-state :r0)

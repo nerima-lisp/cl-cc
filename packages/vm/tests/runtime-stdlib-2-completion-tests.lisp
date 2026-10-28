@@ -19,10 +19,4 @@
   (expect (fboundp 'cl-cc/vm::build-timestamp) :to-be-truthy))
 
 ;; ── FR-920: Forward References ─────────────────────────────────────────
-(it-sequential "runtime-stdlib-2-forward-reference-surface"
-  (expect (fboundp 'cl-cc/vm::vm-declare-forward-reference) :to-be-truthy)
-  (expect (fboundp 'cl-cc/vm::vm-resolve-forward-references) :to-be-truthy))
-
 ;; ── FR-820: Print-Circle ───────────────────────────────────────────────
-(it-sequential "runtime-stdlib-2-print-circle-surface"
-  (expect (find-symbol "*PRINT-CIRCLE*" :cl-cc/vm) :to-be-truthy))

@@ -16,14 +16,14 @@
                              :slots (list (make-test-slot 'w :initarg :w)
                                           (make-test-slot 'h :initarg :h)))
                            ctx))
-         (inst (codegen-find-inst ctx 'cl-cc/vm::vm-class-def)))
+         (inst (codegen-find-inst ctx 'cl-cc/vm:vm-class-def)))
     (expect inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-slot-names inst) :to-equal '(w h))
+    (expect (cl-cc/vm:vm-slot-names inst) :to-equal '(w h))
     (expect (gethash 'my-rect (cl-cc/compile:ctx-global-classes ctx)) :to-be-truthy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "codegen-defclass-constant-slot-initform-compilation"
-  (cl-cc/expand::compiler-macroexpand-all '(defconstant +codegen-defclass-slot-constant+ 41))
+  (cl-cc/expand:compiler-macroexpand-all '(defconstant +codegen-defclass-slot-constant+ 41))
   (let* ((ctx (make-codegen-ctx))
          (node (cl-cc/compile:optimize-ast
                 (cl-cc/ast:make-ast-defclass
@@ -36,12 +36,12 @@
                                                          :lhs (make-ast-var :name '+codegen-defclass-slot-constant+)
                                                          :rhs (make-ast-int :value 1)))))))
          (reg (compile-ast node ctx))
-         (const-inst (codegen-find-inst ctx 'cl-cc/vm::vm-const))
-         (class-inst (codegen-find-inst ctx 'cl-cc/vm::vm-class-def)))
+         (const-inst (codegen-find-inst ctx 'cl-cc/vm:vm-const))
+         (class-inst (codegen-find-inst ctx 'cl-cc/vm:vm-class-def)))
     (expect const-inst :to-be-truthy)
     (expect (cl-cc::vm-const-value const-inst) :to-equal 42)
     (expect class-inst :to-be-truthy)
-    (expect (cl-cc/vm::vm-slot-initform-regs class-inst) :to-equal (list (cons 'value (cl-cc/vm::vm-dst const-inst))))
+    (expect (seventh (cl-cc/vm:instruction->sexp class-inst)) :to-equal (list (cons 'value (cl-cc/vm:vm-dst const-inst))))
     (expect (keywordp reg) :to-be-truthy)))
 
 ;;; ─── compile-ast: ast-defgeneric ─────────────────────────────────────────────
@@ -50,7 +50,7 @@
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (cl-cc/ast:make-ast-defgeneric :name 'my-speak :params '(animal))
                  ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-class-def) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-class-def) :to-be-truthy)
     (expect (gethash 'my-speak (cl-cc/compile:ctx-global-generics ctx)) :to-be-truthy)))
 
 (it-sequential "codegen-defgeneric-idempotent"
@@ -70,10 +70,10 @@
                   :params '(obj)
                   :body (list (cl-cc/ast:make-ast-int :value 99)))
                  ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-register-method)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-register-method)))
       (expect inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-method-specializer inst) :to-equal 'dog))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-truthy)))
+      (expect (cl-cc/vm:vm-method-specializer inst) :to-equal 'dog))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-closure) :to-be-truthy)))
 
 ;;; ─── compile-ast: ast-make-instance ─────────────────────────────────────────
 
@@ -84,7 +84,7 @@
     (let ((ctx (make-codegen-ctx)))
     (when env-setup (setf (cl-cc/compile:ctx-env ctx) env-setup))
     (compile-ast ast ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-truthy))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-truthy))))
 
 (it-sequential "codegen-make-instance-emits-vm-make-obj dynamic"
   (destructuring-bind (ast env-setup) (list (cl-cc/ast:make-ast-make-instance
@@ -93,7 +93,7 @@
     (let ((ctx (make-codegen-ctx)))
     (when env-setup (setf (cl-cc/compile:ctx-env ctx) env-setup))
     (compile-ast ast ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-truthy))))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-truthy))))
 
 (it-sequential "codegen-make-instance-static-loads-class-globally"
   (let ((ctx (make-codegen-ctx)))
@@ -103,6 +103,6 @@
                           :value (cl-cc/ast:make-ast-quote :value 'my-cat))
                   :initargs nil)
                  ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-get-global)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-get-global)))
       (expect inst :to-be-truthy)
       (expect (cl-cc/vm:vm-global-name inst) :to-be 'my-cat))))

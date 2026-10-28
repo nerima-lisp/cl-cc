@@ -16,7 +16,7 @@
 
 (defun egraph-find-dst-inst (instructions dst)
   "Return the first instruction in INSTRUCTIONS whose :dst register equals DST."
-  (find dst instructions :key #'cl-cc/vm::vm-dst))
+  (find dst instructions :key #'cl-cc/vm:vm-dst))
 
 ;;; ─── Union-Find ──────────────────────────────────────────────────────────
 

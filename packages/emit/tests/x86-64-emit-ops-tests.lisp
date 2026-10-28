@@ -105,41 +105,41 @@
 ;;; ─── Libm call emitters (sin/cos/exp/log/tan/asin/acos/atan) ───────────────
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes sin"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-sin (cl-cc/vm::make-vm-sin-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-sin (cl-cc/vm:make-vm-sin-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes cos"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-cos (cl-cc/vm::make-vm-cos-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-cos (cl-cc/vm:make-vm-cos-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes exp"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-exp (cl-cc/vm::make-vm-exp-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-exp (cl-cc/vm:make-vm-exp-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes log"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-log (cl-cc/vm::make-vm-log-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-log (cl-cc/vm:make-vm-log-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes tan"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-tan (cl-cc/vm::make-vm-tan-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-tan (cl-cc/vm:make-vm-tan-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes asin"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-asin (cl-cc/vm::make-vm-asin-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-asin (cl-cc/vm:make-vm-asin-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes acos"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-acos (cl-cc/vm::make-vm-acos-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-acos (cl-cc/vm:make-vm-acos-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-unary-emits-21-bytes atan"
-  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-atan (cl-cc/vm::make-vm-atan-inst :dst :r0 :src :r1))
+  (destructuring-bind (emit-fn inst) (list #'cl-cc/codegen::emit-vm-atan (cl-cc/vm:make-vm-atan-inst :dst :r0 :src :r1))
     (expect (= 21 (length (%collect-emit-ops-bytes emit-fn inst))) :to-be-truthy)))
 
 (it-sequential "x86-emit-libm-sin-starts-with-movsd"
   (let ((bytes (%collect-emit-ops-bytes
                 #'cl-cc/codegen::emit-vm-sin
-                (cl-cc/vm::make-vm-sin-inst :dst :r0 :src :r1))))
+                (cl-cc/vm:make-vm-sin-inst :dst :r0 :src :r1))))
     (expect (subseq bytes 0 4) :to-equal '(#xF2 #x0F #x10 #xC1))))
 
 ;;; ─── Truncate / Rem ──────────────────────────────────────────────────────

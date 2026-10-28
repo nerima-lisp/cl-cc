@@ -19,7 +19,7 @@
 
 (it-sequential "fr-671-slot-vector-layout-and-direct-ref"
   (let* ((class (make-hash-table :test #'eq))
-         (object (make-array 3 :initial-element cl-cc/vm::*unbound-slot-marker*)))
+         (object (make-array 3 :initial-element cl-cc/vm:*unbound-slot-marker*)))
     (setf (gethash :__name__ class) 'point
           (gethash :__slots__ class) '(x y)
           (aref object 0) class)
@@ -34,7 +34,7 @@
 (it-sequential "fr-671-change-class-remaps-shared-slots"
   (let* ((old-class (make-hash-table :test #'eq))
          (new-class (make-hash-table :test #'eq))
-         (object (make-array 3 :initial-element cl-cc/vm::*unbound-slot-marker*)))
+         (object (make-array 3 :initial-element cl-cc/vm:*unbound-slot-marker*)))
     (setf (gethash :__slots__ old-class) '(x y)
           (gethash :__slots__ new-class) '(y z x)
           (aref object 0) old-class)
@@ -47,19 +47,19 @@
       (expect (cl-cc/vm::vm-slot-ref remapped 2) :to-equal :x-value))))
 
 (it-sequential "fr-672-vtable-single-dispatch-rebuilds-lazily"
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+  (let* ((state (make-instance 'cl-cc/vm:vm-io-state))
          (class (make-hash-table :test #'eq))
          (gf (make-hash-table :test #'equal))
          (methods (make-hash-table :test #'equal))
-         (method-a (make-instance 'cl-cc/vm::vm-closure-object
+         (method-a (make-instance 'cl-cc/vm:vm-closure-object
                                   :entry-label "A" :params nil))
-         (method-b (make-instance 'cl-cc/vm::vm-closure-object
+         (method-b (make-instance 'cl-cc/vm:vm-closure-object
                                   :entry-label "B" :params nil)))
     (setf (gethash :__name__ class) 'thing
           (gethash :__cpl__ class) '(thing t)
           (gethash :__methods__ gf) methods
           (gethash 'thing methods) method-a)
-    (setf (gethash 'thing (cl-cc/vm::vm-class-registry state)) class)
+    (setf (gethash 'thing (cl-cc/vm:vm-class-registry state)) class)
     (cl-cc/vm::vm-mark-vtables-dirty gf)
     (expect (cl-cc/vm::vm-vtable-method class gf state) :to-be method-a)
     (setf (gethash 'thing methods) method-b)
@@ -67,7 +67,7 @@
     (expect (cl-cc/vm::vm-vtable-method class gf state) :to-be method-b)))
 
 (it-sequential "fr-672-two-dimensional-dispatch-table"
-  (let* ((state (make-instance 'cl-cc/vm::vm-io-state))
+  (let* ((state (make-instance 'cl-cc/vm:vm-io-state))
          (gf (make-hash-table :test #'equal))
          (methods (make-hash-table :test #'equal))
          (method :method-ab))

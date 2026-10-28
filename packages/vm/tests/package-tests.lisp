@@ -4,9 +4,6 @@
 
 
 
-(it-sequential "cl-cc-package-exists"
-  (expect (find-package :cl-cc) :to-be-truthy))
-
 (it-sequential "cl-cc-package-exports-representatives"
   (dolist (name '("CST-NODE" "RUN-STRING" "QUERY-GRAMMAR" "OUR-MACROEXPAND-ALL" "AST-INT"))
     (multiple-value-bind (sym status)

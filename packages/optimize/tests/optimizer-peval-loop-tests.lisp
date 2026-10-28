@@ -170,13 +170,13 @@
                      (append (list closure) body caller)))
          (has-specialized-label
            (some (lambda (inst)
-                   (and (typep inst 'cl-cc/vm::vm-label)
-                        (search "__spec__" (cl-cc/vm::vm-name inst))))
+                   (and (typep inst 'cl-cc/vm:vm-label)
+                        (search "__spec__" (cl-cc/vm:vm-name inst))))
                  optimized))
          (rewritten-call
            (find-if (lambda (inst)
-                      (and (typep inst 'cl-cc/vm::vm-call)
-                           (equal (cl-cc/vm::vm-args inst) '(:r4))))
+                      (and (typep inst 'cl-cc/vm:vm-call)
+                           (equal (cl-cc/vm:vm-args inst) '(:r4))))
                     optimized)))
     (expect has-specialized-label :to-be-truthy)
     (expect rewritten-call :to-be-truthy)))
@@ -356,11 +356,11 @@
                          (mapcar #'instruction->sexp program)) :to-be-falsy)
     (expect (= 1 (count-if (lambda (inst)
                             (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :la)))
+                                 (eq (cl-cc/vm:vm-name inst) :la)))
                           optimized)) :to-be-truthy)
     (expect (= 0 (count-if (lambda (inst)
                             (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :lb)))
+                                 (eq (cl-cc/vm:vm-name inst) :lb)))
                           optimized)) :to-be-truthy)))
 
 (it-sequential "optimize-pass-loop-fusion-fission-skips-unsafe-fusion"
@@ -403,5 +403,5 @@
                          (mapcar #'instruction->sexp program)) :to-be-falsy)
     (expect (some (lambda (inst)
                          (and (typep inst 'vm-label)
-                              (search "__SPLIT" (string (cl-cc/vm::vm-name inst)))))
+                              (search "__SPLIT" (string (cl-cc/vm:vm-name inst)))))
                        optimized) :to-be-truthy)))

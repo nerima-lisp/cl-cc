@@ -11,8 +11,8 @@
                                           :else (make-ast-int :value 2))
                              ctx)))
       (expect (keywordp reg) :to-be-truthy)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero) :to-be-truthy)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-jump-zero) :to-be-truthy)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-jump) :to-be-truthy))))
 
 (it-sequential "codegen-progn-compilation"
   (let* ((ctx (make-codegen-ctx))
@@ -21,7 +21,7 @@
                                           (make-ast-int :value 2)
                                           (make-ast-int :value 3)))
                            ctx))
-         (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-const))
+         (consts (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-const))
                                 (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
     (expect (= 3 (length consts)) :to-be-truthy)))
@@ -40,8 +40,8 @@
                                                         (make-ast-int :value 5)))
                               :body (list (make-ast-var :name 'a)))
                              ctx))))
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind-regs) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-mv-bind) :to-be-falsy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-mv-bind-regs) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-mv-bind) :to-be-falsy)
     (expect (keywordp reg) :to-be-truthy)))
 
 (it-sequential "ast-constant-folding-before-codegen arithmetic"
@@ -71,8 +71,8 @@
                               :body (list (make-ast-var :name 'x)))
                             ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-const) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy)))
 
 (it-sequential "codegen-let-binding-declaration-controls-own-move ignore"
   (destructuring-bind (declarations expected-moves) (list '((ignore x)) 0)
@@ -82,7 +82,7 @@
                              :declarations declarations
                              :body (list (make-ast-int :value 0)))
                            ctx))
-         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move))
+         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-move))
                                (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
     (expect (= expected-moves (length moves)) :to-be-truthy))))
@@ -95,7 +95,7 @@
                              :declarations declarations
                              :body (list (make-ast-int :value 0)))
                            ctx))
-         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move))
+         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-move))
                                (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
     (expect (= expected-moves (length moves)) :to-be-truthy))))
@@ -112,7 +112,7 @@
          (optimized (cl-cc/optimize::opt-pass-dce instructions))
          (const-values (mapcar #'cl-cc::vm-const-value
                                (remove-if-not (lambda (i)
-                                                (typep i 'cl-cc/vm::vm-const))
+                                                (typep i 'cl-cc/vm:vm-const))
                                               optimized))))
     (expect (member 42 const-values :test #'eql) :to-be-falsy)
     (expect (member 0 const-values :test #'eql) :to-be-truthy)))
@@ -127,12 +127,12 @@
                              :body (list (make-ast-call :func 'car
                                                         :args (list (make-ast-var :name 'p)))))
                            ctx))
-         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-car))
+         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-car))
                               (codegen-instructions ctx)))
-         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-move))
+         (moves (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-move))
                                (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-null)
     (expect (= 0 (length cars)) :to-be-truthy)
     (expect (> (length moves) 0) :to-be-truthy)))
 
@@ -148,11 +148,11 @@
                              :body (list (make-ast-call :func 'car
                                                         :args (list (make-ast-var :name 'p)))))
                            ctx))
-         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-car))
+         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-car))
                               (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-car) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-car) :to-be-null)
     (expect (= 0 (length cars)) :to-be-truthy)))
 
 (it-sequential "codegen-let-dynamic-extent-cons-declaration-controls-noescape no-declaration"
@@ -178,12 +178,12 @@
     (expect (keywordp reg) :to-be-truthy)
     (if noescape-p
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cdr) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-truthy))))))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cdr) :to-be-truthy))))))
 
 (it-sequential "codegen-let-dynamic-extent-cons-declaration-controls-noescape with-dynamic-extent"
   (destructuring-bind (declarations noescape-p) (list '((dynamic-extent p)) t)
@@ -208,12 +208,12 @@
     (expect (keywordp reg) :to-be-truthy)
     (if noescape-p
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cdr) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cdr) :to-be-truthy))))))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cdr) :to-be-truthy))))))
 
 (it-sequential "codegen-let-dynamic-extent-cons-unsafe-nested-consumer-falls-back"
   (let* ((ctx (make-codegen-ctx))
@@ -238,8 +238,8 @@
                                                          :args nil)))))
                 ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-car) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-car) :to-be-truthy)))
 
 (it-sequential "codegen-let-dynamic-extent-closure-the-wrapped-call-keeps-noescape"
   (let* ((ctx (make-codegen-ctx))
@@ -257,7 +257,7 @@
                              :args (list (make-ast-int :value 1)))))
                ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-closure) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-closure) :to-be-null)))
 
 (it-sequential "codegen-let-escaped-cons-car-falls-back-to-vm-car"
   (let* ((ctx (make-codegen-ctx))
@@ -270,10 +270,10 @@
                 :body (list (make-ast-lambda :params '() :body (list (make-ast-var :name 'p)))
                             (make-ast-call :func 'car :args (list (make-ast-var :name 'p)))))
                ctx))
-         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm::vm-car))
+         (cars (remove-if-not (lambda (i) (typep i 'cl-cc/vm:vm-car))
                               (codegen-instructions ctx))))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-truthy)
     (expect (> (length cars) 0) :to-be-truthy)))
 
 (it-sequential "codegen-let-branch-local-cons-sinks-allocation simple-cond"
@@ -291,8 +291,8 @@
     (let* ((ctx   (make-codegen-ctx))
          (reg   (compile-ast ast ctx))
          (insts (codegen-instructions ctx))
-         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts))
-         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts)))
+         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) insts))
+         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-cons)) insts)))
     (expect (keywordp reg) :to-be-truthy)
     (expect jump-pos :to-be-truthy)
     (expect cons-pos :to-be-truthy)
@@ -314,8 +314,8 @@
     (let* ((ctx   (make-codegen-ctx))
          (reg   (compile-ast ast ctx))
          (insts (codegen-instructions ctx))
-         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts))
-         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts)))
+         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) insts))
+         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-cons)) insts)))
     (expect (keywordp reg) :to-be-truthy)
     (expect jump-pos :to-be-truthy)
     (expect cons-pos :to-be-truthy)
@@ -332,9 +332,9 @@
                                                                     (make-ast-int :value 1)))))
                            ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy)))
 
 (it-sequential "codegen-let-noescape-array-length-bypasses-vm-make-array"
   (let* ((ctx (make-codegen-ctx))
@@ -346,8 +346,8 @@
                                                         :args (list (make-ast-var :name 'arr)))))
                            ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-const) :to-be-truthy)))
 
 (it-sequential "codegen-let-noescape-array-length-through-ast-the-bypasses-vm-make-array"
   (let* ((ctx (make-codegen-ctx))
@@ -362,8 +362,8 @@
                                           :args (list (make-ast-var :name 'arr)))))
                            ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-const) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-const) :to-be-truthy)))
 
 (it-sequential "codegen-let-noescape-array-variable-aref-bypasses-vm-aref"
   (let* ((ctx (make-codegen-ctx))
@@ -378,10 +378,10 @@
                                                        (make-ast-var :name 'i)))))
                ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-num-eq) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-jump-zero) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-num-eq) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-jump-zero) :to-be-truthy)))
 
 (it-sequential "codegen-let-escaped-array-aref-falls-back-to-vm-aref"
   (let* ((ctx (make-codegen-ctx))
@@ -396,8 +396,8 @@
                                                        (make-ast-int :value 0)))))
                ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-truthy)))
 
 (it-sequential "codegen-let-noescape-array-aset-bypasses-vm-make-array-and-vm-aset"
   (let* ((ctx (make-codegen-ctx))
@@ -415,10 +415,10 @@
                                                        (make-ast-int :value 1)))))
                ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aset) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aset) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy)))
 
 (it-sequential "codegen-let-dynamic-extent-array-declaration-controls-noescape no-declaration"
   (destructuring-bind (declarations noescape-p) (list nil nil)
@@ -443,12 +443,12 @@
     (expect (keywordp reg) :to-be-truthy)
     (if noescape-p
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy))))))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-truthy))))))
 
 (it-sequential "codegen-let-dynamic-extent-array-declaration-controls-noescape with-dynamic-extent"
   (destructuring-bind (declarations noescape-p) (list '((dynamic-extent arr)) t)
@@ -473,12 +473,12 @@
     (expect (keywordp reg) :to-be-truthy)
     (if noescape-p
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-null)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-null)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))
         (progn
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
-          (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy))))))
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-truthy)
+          (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-truthy))))))
 
 (it-sequential "codegen-let-dynamic-extent-array-unsafe-operand-falls-back"
   (let* ((ctx (make-codegen-ctx))
@@ -502,8 +502,8 @@
                                                          :args nil)))))
                 ctx)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-array) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-aref) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-array) :to-be-truthy)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-aref) :to-be-truthy)))
 
 (it-sequential "codegen-result-vm-instructions-without-halt-strips-terminal-halt"
   (let* ((move (cl-cc:make-vm-move :dst :R1 :src :R0))
@@ -563,11 +563,11 @@
           (instructions (cl-cc/compile:compilation-result-vm-instructions result))
           (const-values (mapcar #'cl-cc/vm:vm-const-value
                                 (remove-if-not (lambda (inst)
-                                                 (typep inst 'cl-cc/vm::vm-const))
+                                                 (typep inst 'cl-cc/vm:vm-const))
                                                instructions))))
     (expect (= 1 (length (cl-cc/compile:compilation-result-errors result))) :to-be-truthy)
     (expect (= 1 (length (cl-cc/compile:compilation-result-ast result))) :to-be-truthy)
-    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) instructions) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) instructions) :to-be-falsy)
     (expect (member 1 const-values :test #'eql) :to-be-falsy)
     (expect (member 5 const-values :test #'eql) :to-be-truthy)))
 
@@ -577,5 +577,5 @@
          (instructions (cl-cc/compile:compilation-result-vm-instructions result)))
     (expect (= 1 (length (cl-cc/compile:compilation-result-errors result))) :to-be-truthy)
     (expect (= 1 (length (cl-cc/compile:compilation-result-ast result))) :to-be-truthy)
-    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-boundp)) instructions) :to-be-falsy)
-    (expect (some (lambda (inst) (typep inst 'cl-cc/vm::vm-set-global)) instructions) :to-be-falsy)))
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-boundp)) instructions) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-set-global)) instructions) :to-be-falsy)))

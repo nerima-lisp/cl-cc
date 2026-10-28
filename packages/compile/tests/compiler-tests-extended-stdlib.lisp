@@ -312,8 +312,8 @@
                       (defun later-safe (x) (the integer x)))
                     :target :vm))
            (insts (cl-cc/compile:compilation-result-vm-instructions result)))
-      (expect (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref))) insts) :to-be-truthy)
-      (expect (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-typep)) insts) :to-be-null))))
+      (expect (find-if (lambda (inst) (typep inst '(or cl-cc/vm:vm-closure cl-cc/vm:vm-func-ref))) insts) :to-be-truthy)
+      (expect (find-if (lambda (inst) (typep inst 'cl-cc/vm:vm-typep)) insts) :to-be-null))))
 
 (it-sequential "compile-declaim-safety-zero-suppresses-top-level-the-type-assertion"
   (let ((cl-cc/expand:*declaim-optimize-registry* (make-hash-table :test #'eq)))
@@ -322,7 +322,7 @@
                       (the integer 42))
                     :target :vm))
            (insts (cl-cc/compile:compilation-result-vm-instructions result)))
-      (expect (find-if (lambda (inst) (typep inst 'cl-cc/vm::vm-typep)) insts) :to-be-null))))
+      (expect (find-if (lambda (inst) (typep inst 'cl-cc/vm:vm-typep)) insts) :to-be-null))))
 
 (it-sequential "compile-declaim-optimize-inline-policy-applies-globally-across-compilations speed-three"
   (destructuring-bind (declaim-form expected-policy) (list '(declaim (optimize (speed 3))) :inline)
@@ -332,7 +332,7 @@
                     '((defun mapped-inline-policy (x) (+ x 1)))
                     :target :vm
                     :pass-pipeline '(:inline)))
-            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm:vm-closure cl-cc/vm:vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
       (expect closure :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be expected-policy)))))
@@ -345,7 +345,7 @@
                     '((defun mapped-inline-policy (x) (+ x 1)))
                     :target :vm
                     :pass-pipeline '(:inline)))
-            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm:vm-closure cl-cc/vm:vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
       (expect closure :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be expected-policy)))))
@@ -358,7 +358,7 @@
                     '((defun mapped-inline-policy (x) (+ x 1)))
                     :target :vm
                     :pass-pipeline '(:inline)))
-            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm:vm-closure cl-cc/vm:vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
       (expect closure :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be expected-policy)))))
@@ -370,7 +370,7 @@
                     (list `(defun big (x) ,(%fr-361-large-body-form)))
                     :target :vm
                     :pass-pipeline '(:inline)))
-            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm:vm-closure cl-cc/vm:vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
       (expect closure :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be :inline))))
@@ -384,7 +384,7 @@
                     '((defun inc (x) (+ x 1)))
                     :target :vm
                     :pass-pipeline '(:inline)))
-            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm::vm-closure cl-cc/vm::vm-func-ref)))
+            (closure (find-if (lambda (inst) (typep inst '(or cl-cc/vm:vm-closure cl-cc/vm:vm-func-ref)))
                               (cl-cc/compile:compilation-result-vm-instructions result))))
       (expect closure :to-be-truthy)
       (expect (cl-cc/vm:vm-closure-inline-policy closure) :to-be :notinline))))

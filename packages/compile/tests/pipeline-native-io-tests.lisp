@@ -125,7 +125,7 @@
 (it-sequential "pipeline-native-typeclass-macros-registered-as-expanders deftype-class"
   (destructuring-bind (macro-name) (list 'cl-cc::deftype-class)
     (let ((expander (gethash macro-name
-                            (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*))))
+                            (cl-cc/expand:macro-env-table cl-cc/expand:*macro-environment*))))
     (expect expander :to-be-truthy)
     (expect (or (functionp expander)
                      (eq (getf expander :kind) :macro-expander)
@@ -134,32 +134,22 @@
 (it-sequential "pipeline-native-typeclass-macros-registered-as-expanders deftype-instance"
   (destructuring-bind (macro-name) (list 'cl-cc::deftype-instance)
     (let ((expander (gethash macro-name
-                            (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*))))
+                            (cl-cc/expand:macro-env-table cl-cc/expand:*macro-environment*))))
     (expect expander :to-be-truthy)
     (expect (or (functionp expander)
                      (eq (getf expander :kind) :macro-expander)
                      (eq (getf expander :kind) :register-macro-expander)) :to-be-truthy))))
 
 (it-sequential "pipeline-native-typeclass-class-expander-builds-register-form"
-  (let* ((expander (gethash 'cl-cc::deftype-class
-                            (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
-         (expanded (cl-cc/expand::invoke-registered-expander
-                    expander
-                    '(deftype-class eq-like (a)
-                       (equals (-> a a bool)))
-                    nil)))
+  (let ((expanded
+         (cl-cc/expand:our-macroexpand-1 (list 'cl-cc:deftype-class 'eq-like '(a) '(equals (-> a a bool))) nil)))
     (expect (car expanded) :to-be 'progn)
     (expect (search "REGISTER-TYPECLASS" (prin1-to-string expanded)) :to-be-truthy)
     (expect (search "MAKE-TYPECLASS-DEF" (prin1-to-string expanded)) :to-be-truthy)))
 
 (it-sequential "pipeline-native-typeclass-instance-expander-builds-register-form"
-  (let* ((expander (gethash 'cl-cc::deftype-instance
-                            (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
-         (expanded (cl-cc/expand::invoke-registered-expander
-                    expander
-                    '(deftype-instance eq-like integer
-                       (equals (lambda (x y) (= x y))))
-                    nil)))
+  (let ((expanded
+         (cl-cc/expand:our-macroexpand-1 (list 'cl-cc:deftype-instance 'eq-like 'integer '(equals (lambda (x y) (= x y)))) nil)))
     (expect (car expanded) :to-be 'progn)
     (expect (search "REGISTER-TYPECLASS-INSTANCE" (prin1-to-string expanded)) :to-be-truthy)
     (expect (search "DEFVAR" (prin1-to-string expanded)) :to-be-truthy)))

@@ -237,7 +237,7 @@
         (cl-cc/codegen::x86-64-shrink-wrap-instructions
          insts (list cl-cc/codegen::+rbx+) assignment)
       (declare (ignore entry-regs final-regs))
-      (let ((early-halt (position-if (lambda (x) (typep x 'cl-cc/vm::vm-halt)) annotated))
+      (let ((early-halt (position-if (lambda (x) (typep x 'cl-cc/vm:vm-halt)) annotated))
             (save (position-if (lambda (x) (typep x 'cl-cc/codegen::x86-64-shrink-save))
                                annotated)))
         (expect (< early-halt save) :to-be-truthy)))))

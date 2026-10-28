@@ -209,7 +209,7 @@ uses the default :X86_64 target — its assembly backend raises on instructions 
 has no emitter for, and the helper's IGNORE-ERRORS then reports every instruction
 as absent."
   (mapcar #'type-of
-          (cl-cc/vm::vm-program-instructions
+          (cl-cc/vm:vm-program-instructions
            (cl-cc/compile:compilation-result-program
             (cl-cc/compile:compile-string source :target :vm)))))
 

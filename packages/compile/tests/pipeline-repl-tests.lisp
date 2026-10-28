@@ -75,14 +75,13 @@
          (macro-name (intern "PIPELINE-REPL-TEMP-DEFMACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
                        "(defmacro pipeline-repl-temp-defmacro (&body body) `(progn ,@body))")))
-         (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
+         (table (cl-cc/expand:macro-env-table cl-cc/expand:*macro-environment*)))
     (unwind-protect
          (progn
            (expect (cl-cc::run-form-repl form) :to-be macro-name)
             (let ((expander (gethash macro-name table)))
                (expect expander :to-be-truthy)
-               (expect (cl-cc/expand::invoke-registered-expander
-                             expander '(pipeline-repl-temp-defmacro (print 1)) nil) :to-equal '(progn (print 1)))))
+               (expect (cl-cc/expand:our-macroexpand-1 (list macro-name '(print 1)) nil) :to-equal '(progn (print 1)))))
       (remhash macro-name table))))
 
 (it-sequential "pipeline-run-form-repl-registers-destructuring-defmacro"
@@ -90,16 +89,13 @@
          (macro-name (intern "PIPELINE-REPL-TEMP-DESTRUCTURING-DEFMACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
                        "(defmacro pipeline-repl-temp-destructuring-defmacro (name (parent) &body body) `(list ',name ',parent ',body))")))
-         (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
+         (table (cl-cc/expand:macro-env-table cl-cc/expand:*macro-environment*)))
     (unwind-protect
          (progn
            (expect (cl-cc::run-form-repl form) :to-be macro-name)
              (let ((expander (gethash macro-name table)))
                (expect expander :to-be-truthy)
-                (expect (cl-cc/expand::invoke-registered-expander
-                             expander
-                             '(pipeline-repl-temp-destructuring-defmacro foo (bar) baz quux)
-                             nil) :to-equal '(list 'foo 'bar '(baz quux)))))
+                (expect (cl-cc/expand:our-macroexpand-1 (list macro-name 'foo '(bar) 'baz 'quux) nil) :to-equal '(list 'foo 'bar '(baz quux)))))
       (remhash macro-name table))))
 
 (it-sequential "pipeline-repl-defun-not-host-only"
@@ -113,14 +109,13 @@
          (macro-name (intern "PIPELINE-REPL-TEMP-REGISTER-MACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
                        "(register-macro 'pipeline-repl-temp-register-macro (lambda (form env) (declare (ignore env)) (let ((x (second form))) `(progn ,x))))")))
-         (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*)))
+         (table (cl-cc/expand:macro-env-table cl-cc/expand:*macro-environment*)))
     (unwind-protect
          (progn
            (expect (cl-cc::run-form-repl form) :to-be macro-name)
              (let ((expander (gethash macro-name table)))
                (expect expander :to-be-truthy)
-                (expect (cl-cc/expand::invoke-registered-expander
-                             expander '(pipeline-repl-temp-register-macro 42) nil) :to-equal '(progn 42))))
+                (expect (cl-cc/expand:our-macroexpand-1 (list macro-name 42) nil) :to-equal '(progn 42))))
       (remhash macro-name table))))
 
 (it-sequential "pipeline-run-form-repl-register-macro-without-host-compile"
@@ -128,7 +123,7 @@
          (macro-name (intern "PIPELINE-REPL-NO-COMPILE-REGISTER-MACRO" *package*))
          (form (first (cl-cc/parse:parse-all-forms
                        "(register-macro 'pipeline-repl-no-compile-register-macro (lambda (form env) (declare (ignore env)) (second form)))")))
-         (table (cl-cc/expand::macro-env-table cl-cc/expand::*macro-environment*))
+         (table (cl-cc/expand:macro-env-table cl-cc/expand:*macro-environment*))
          (orig (symbol-function 'compile)))
     (unwind-protect
          (progn
@@ -140,8 +135,7 @@
              (expect (cl-cc::run-form-repl form) :to-be macro-name)
              (let ((expander (gethash macro-name table)))
                (expect expander :to-be-truthy)
-               (expect (cl-cc/expand::invoke-registered-expander
-                              expander '(pipeline-repl-no-compile-register-macro 42) nil) :to-equal 42)))
+               (expect (cl-cc/expand:our-macroexpand-1 (list macro-name 42) nil) :to-equal 42)))
        (sb-ext:without-package-locks
          (setf (symbol-function 'compile) orig))
        (remhash macro-name table))))

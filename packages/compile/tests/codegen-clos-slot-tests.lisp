@@ -11,9 +11,9 @@
                                 :object (cl-cc/ast:make-ast-var :name 'obj)
                                 :slot 'radius)
                                ctx))
-           (inst (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read)))
+           (inst (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read)))
       (expect inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-slot-name-sym inst) :to-be 'radius)
+      (expect (cl-cc/vm:vm-slot-name-sym inst) :to-be 'radius)
       (expect (keywordp reg) :to-be-truthy))))
 
 (it-sequential "codegen-noescape-make-instance-slot-value-bypasses-heap-object"
@@ -28,9 +28,9 @@
                               :slot 'name)))
                 ctx)))
       (expect (keywordp reg) :to-be-truthy)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))))
 
 (it-sequential "codegen-noescape-make-instance-slot-value-bypasses-heap-object-through-ast-the"
   (let ((ctx (make-codegen-ctx)))
@@ -46,9 +46,9 @@
                               :slot 'name)))
                 ctx)))
       (expect (keywordp reg) :to-be-truthy)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))))
 
 (it-sequential "codegen-escaped-make-instance-slot-value-falls-back"
   (let ((ctx (make-codegen-ctx)))
@@ -63,8 +63,8 @@
                               :slot 'name)))
                 ctx)))
        (expect (keywordp reg) :to-be-truthy)
-       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-truthy)
-       (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-truthy))))
+       (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-truthy)
+       (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-truthy))))
 
 (it-sequential "codegen-branch-local-make-instance-sinks-initarg-evaluation"
   (let* ((ctx (make-codegen-ctx))
@@ -96,11 +96,11 @@
 
     (setf reg (compile-ast ast ctx))
     (setf insts (codegen-instructions ctx)
-          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts)
-          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts))
+          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) insts)
+          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-cons)) insts))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
     (expect jump-pos :to-be-truthy)
     (expect cons-pos :to-be-truthy)
     (expect (> cons-pos jump-pos) :to-be-truthy)))
@@ -137,11 +137,11 @@
 
     (setf reg (compile-ast ast ctx))
     (setf insts (codegen-instructions ctx)
-          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts)
-          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts))
+          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) insts)
+          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-cons)) insts))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
     (expect jump-pos :to-be-truthy)
     (expect cons-pos :to-be-truthy)
     (expect (> cons-pos jump-pos) :to-be-truthy)))
@@ -166,11 +166,11 @@
                             :else (cl-cc/ast:make-ast-int :value 0)))))
          (reg (compile-ast ast ctx))
          (insts (codegen-instructions ctx))
-         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts))
-         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts)))
+         (jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) insts))
+         (cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-cons)) insts)))
     (expect (keywordp reg) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
     (expect jump-pos :to-be-truthy)
     (expect cons-pos :to-be-truthy)
     (expect (> cons-pos jump-pos) :to-be-truthy)))
@@ -210,14 +210,14 @@
 
     (setf reg (compile-ast ast ctx))
     (setf insts (codegen-instructions ctx)
-          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-jump-zero)) insts)
-          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm::vm-cons)) insts))
+          jump-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-jump-zero)) insts)
+          cons-pos (position-if (lambda (inst) (typep inst 'cl-cc/vm:vm-cons)) insts))
     (expect (keywordp reg) :to-be-truthy)
     (expect jump-pos :to-be-truthy)
     (expect cons-pos :to-be-truthy)
     (expect (< cons-pos jump-pos) :to-be-truthy)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)))
 
 ;;; ─── compile-ast: ast-set-slot-value ─────────────────────────────────────────
 
@@ -229,9 +229,9 @@
                                 :slot 'weight
                                 :value (cl-cc/ast:make-ast-int :value 42))
                                ctx))
-           (inst (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write)))
+           (inst (codegen-find-inst ctx 'cl-cc/vm:vm-slot-write)))
       (expect inst :to-be-truthy)
-      (expect (cl-cc/vm::vm-slot-name-sym inst) :to-be 'weight)
+      (expect (cl-cc/vm:vm-slot-name-sym inst) :to-be 'weight)
       (expect (keywordp reg) :to-be-truthy))))
 
 (it-sequential "codegen-noescape-make-instance-set-slot-value-bypasses-slot-write"
@@ -250,10 +250,10 @@
                               :slot 'weight)))
                 ctx)))
       (expect (keywordp reg) :to-be-truthy)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-write) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))))
 
 (it-sequential "codegen-noescape-make-instance-set-slot-value-bypasses-slot-write-through-ast-the"
   (let ((ctx (make-codegen-ctx)))
@@ -273,27 +273,27 @@
                               :slot 'weight)))
                 ctx)))
       (expect (keywordp reg) :to-be-truthy)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-make-obj) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-write) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-slot-read) :to-be-null)
-      (expect (codegen-find-inst ctx 'cl-cc/vm::vm-move) :to-be-truthy))))
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-make-obj) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-write) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-slot-read) :to-be-null)
+      (expect (codegen-find-inst ctx 'cl-cc/vm:vm-move) :to-be-truthy))))
 
 ;;; ─── phase2 CLOS helpers ─────────────────────────────────────────────────────
 
 (it-sequential "phase2-slot-ops-emit-instruction slot-boundp"
-  (destructuring-bind (fn-name vm-type) (list 'slot-boundp 'cl-cc/vm::vm-slot-boundp)
+  (destructuring-bind (fn-name vm-type) (list 'slot-boundp 'cl-cc/vm:vm-slot-boundp)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call fn-name (make-int 0) (make-quoted 'name)) ctx)
     (expect (codegen-find-inst ctx vm-type) :to-be-truthy))))
 
 (it-sequential "phase2-slot-ops-emit-instruction slot-exists-p"
-  (destructuring-bind (fn-name vm-type) (list 'slot-exists-p 'cl-cc/vm::vm-slot-exists-p)
+  (destructuring-bind (fn-name vm-type) (list 'slot-exists-p 'cl-cc/vm:vm-slot-exists-p)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call fn-name (make-int 0) (make-quoted 'name)) ctx)
     (expect (codegen-find-inst ctx vm-type) :to-be-truthy))))
 
 (it-sequential "phase2-slot-ops-emit-instruction slot-makunbound"
-  (destructuring-bind (fn-name vm-type) (list 'slot-makunbound 'cl-cc/vm::vm-slot-makunbound)
+  (destructuring-bind (fn-name vm-type) (list 'slot-makunbound 'cl-cc/vm:vm-slot-makunbound)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call fn-name (make-int 0) (make-quoted 'name)) ctx)
     (expect (codegen-find-inst ctx vm-type) :to-be-truthy))))
@@ -301,14 +301,14 @@
 (it-sequential "phase2-slot-boundp-stores-slot-name"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'slot-boundp (make-int 0) (make-quoted 'foo)) ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-slot-boundp)))
-      (expect (cl-cc/vm::vm-slot-name-sym inst) :to-be 'foo))))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-slot-boundp)))
+      (expect (cl-cc/vm:vm-slot-name-sym inst) :to-be 'foo))))
 
 (it-sequential "phase2-call-next-method-args-reg no-args"
   (destructuring-bind (ast args-reg-truthy-p) (list (make-call 'call-next-method) nil)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast ast ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-call-next-method)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-call-next-method)))
       (expect inst :to-be-truthy)
       (if args-reg-truthy-p
           (expect (cl-cc::vm-call-next-method-args-reg inst) :to-be-truthy)
@@ -318,7 +318,7 @@
   (destructuring-bind (ast args-reg-truthy-p) (list (make-call 'call-next-method (make-int 42)) t)
     (let ((ctx (make-codegen-ctx)))
     (compile-ast ast ctx)
-    (let ((inst (codegen-find-inst ctx 'cl-cc/vm::vm-call-next-method)))
+    (let ((inst (codegen-find-inst ctx 'cl-cc/vm:vm-call-next-method)))
       (expect inst :to-be-truthy)
       (if args-reg-truthy-p
           (expect (cl-cc::vm-call-next-method-args-reg inst) :to-be-truthy)
@@ -327,4 +327,4 @@
 (it-sequential "phase2-call-next-method-args-is-cons-list"
   (let ((ctx (make-codegen-ctx)))
     (compile-ast (make-call 'call-next-method (make-int 1) (make-int 2)) ctx)
-    (expect (codegen-find-inst ctx 'cl-cc/vm::vm-cons) :to-be-truthy)))
+    (expect (codegen-find-inst ctx 'cl-cc/vm:vm-cons) :to-be-truthy)))

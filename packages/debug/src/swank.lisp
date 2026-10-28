@@ -188,7 +188,7 @@ line, returning one printed plist per line."
   `(let ((*step-mode* :into))
     ,@body))
 
-(defmethod cl-cc/vm::execute-instruction :before (instruction state pc labels)
+(defmethod cl-cc/vm:execute-instruction :before (instruction state pc labels)
   (declare (ignore labels))
   (when (or (eq *step-mode* :into) (gethash pc *step-breakpoints*))
     (signal

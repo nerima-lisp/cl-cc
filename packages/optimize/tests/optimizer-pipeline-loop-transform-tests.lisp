@@ -168,11 +168,11 @@
                          (mapcar #'instruction->sexp program)) :to-be-falsy)
     (expect (= 1 (count-if (lambda (inst)
                             (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :la)))
+                                 (eq (cl-cc/vm:vm-name inst) :la)))
                           optimized)) :to-be-truthy)
     (expect (= 0 (count-if (lambda (inst)
                             (and (typep inst 'vm-label)
-                                 (eq (cl-cc/vm::vm-name inst) :lb)))
+                                 (eq (cl-cc/vm:vm-name inst) :lb)))
                           optimized)) :to-be-truthy)))
 
 (it-sequential "optimize-pass-loop-fusion-fission-skips-unsafe-fusion"
@@ -215,7 +215,7 @@
                          (mapcar #'instruction->sexp program)) :to-be-falsy)
     (expect (some (lambda (inst)
                          (and (typep inst 'vm-label)
-                              (search "__SPLIT" (string (cl-cc/vm::vm-name inst)))))
+                              (search "__SPLIT" (string (cl-cc/vm:vm-name inst)))))
                        optimized) :to-be-truthy)))
 
 ;;; ─── FR-527 ML inline scoring ────────────────────────────────────────────────
