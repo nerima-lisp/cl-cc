@@ -57,13 +57,22 @@ cl-weave suites can't be re-parented after creation."
                         (cl-weave::root-suite))))
               (cl-weave::register-suite (string name) (lambda ()))))))
 
-(defmacro defsuite (name &key description parent)
+(defmacro defsuite (name &rest options)
   "Define a test suite as a cl-weave suite object, parented under PARENT's
 suite (or the cl-weave root suite when PARENT is NIL). A no-op beyond
 returning the existing object when NAME was already auto-vivified by an
 earlier IN-SUITE (see %ENSURE-SUITE-OBJECT)."
-  (declare (ignore description))
-  `(%ensure-suite-object ',name ',parent))
+  (let ((option-count
+          (handler-case (list-length options)
+            (type-error () nil))))
+    (unless (and option-count
+                 (evenp option-count)
+                 (loop for tail on options by #'cddr
+                       always (member (car tail) '(:description :parent)
+                                      :test #'eq)))
+      (error 'cl:program-error)))
+  (let ((parent (getf options :parent)))
+    `(%ensure-suite-object ',name ',parent)))
 
 (progn
   (defvar *source-suite-assignments* (make-hash-table :test (function equal)))
