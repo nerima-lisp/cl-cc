@@ -142,7 +142,7 @@
                                                  (ast-defun-rest-param node)))))
       (when (ast-defun-documentation node)
         (compile-ast
-         (make-ast-call :func 'cl-cc/vm::%register-documentation
+         (make-ast-call :func 'cl-cc/vm/interop:%register-documentation
                         :args (list (make-ast-quote :value name)
                                     (make-ast-quote :value 'function)
                                     (make-ast-quote :value (ast-defun-documentation node))))
