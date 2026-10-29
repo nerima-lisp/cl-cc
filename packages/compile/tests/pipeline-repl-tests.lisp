@@ -324,3 +324,25 @@
           (remhash load-pathname-symbol globals)
           (remhash load-truename-symbol globals)
           (remhash observed-symbol globals))))))
+(it-sequential "pipeline-run-form-repl-sets-logical-pathname-translations"
+  (let* ((host (format nil "CL-CC-REPL-SETF-~A" (get-universal-time)))
+         (previous
+           (handler-case
+               (cl:logical-pathname-translations host)
+             (type-error () :unregistered)))
+         (translations
+           (list
+             (list "AUX;*.*.*"
+                   (format nil "~A*.*"
+                           (namestring (uiop:temporary-directory)))))))
+    (unwind-protect
+         (progn
+           (cl-cc/repl:with-fresh-repl-state
+             (cl-cc::run-form-repl
+              `(setf (cl:logical-pathname-translations ,host)
+                     (list (list "AUX;*.*.*" ,(second (first translations)))))))
+           (expect (cl:logical-pathname-translations host) :to-equal translations))
+      (setf (cl:logical-pathname-translations host)
+            (if (eq previous :unregistered)
+                nil
+                previous)))))
