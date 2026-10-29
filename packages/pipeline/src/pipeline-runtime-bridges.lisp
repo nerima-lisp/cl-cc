@@ -43,7 +43,14 @@ against: the set has to be identical to what the old package scan produced."
    (lambda (host translations)
      (setf (cl:logical-pathname-translations host) translations)
      translations)))
-
+(eval-when (:load-toplevel :execute)
+  (setf (gethash (quote cl:logical-pathname-translations)
+                 *setf-compound-place-handlers*)
+        (lambda (place value)
+          (compiler-macroexpand-all
+           (cons (intern "%SET-LOGICAL-PATHNAME-TRANSLATIONS" :cl-cc)
+                 (append (cdr place) (list value))))))
+  (%register-logical-pathname-runtime-bridges))
 (defun %register-backend-runtime-bridges ()
   "Register pathname and loaded backend runtime bridges.
 
