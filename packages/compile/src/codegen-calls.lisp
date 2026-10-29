@@ -430,6 +430,31 @@ same call through a register answered 0."
       (let ((handler (gethash sname *phase2-builtin-handlers*)))
         (when handler
           (funcall handler args result-reg ctx))))))
+(defun %call-preserves-global-var-cache-p (func-sym args ctx)
+  "Return true only when a direct call cannot rebind a cached guest global."
+  (and func-sym
+       (not (%ast-var-function-value-p func-sym ctx))
+       (let* ((properties
+               (and (eq (symbol-package func-sym) (find-package :cl))
+                    (known-function-properties func-sym)))
+              (package (symbol-package func-sym))
+              (php-runtime-call-p
+                (and package (string= (package-name package) "CL-CC/PHP")))
+              (name (symbol-name func-sym))
+              (arity (length args)))
+         (or (member :pure properties)
+             (member :read-only properties)
+             (and php-runtime-call-p
+                  (or (member name
+                              '("%PHP-ADD" "%PHP-CONCAT" "%PHP-ARRAY"
+                                "%PHP-LT" "%PHP-GT" "%PHP-LE"
+                                "%PHP-TRUTHY" "%PHP-OUTPUT-WRITE")
+                              :test #'string=)
+                      (and (string= name "%PHP-PREG-MATCH") (= arity 2))
+                      (and (string= name "%PHP-PREG-REPLACE") (= arity 3))
+                      (and (string= name "%PHP-PREG-SPLIT")
+                           (<= 2 arity 3))))))))
+
 
 (defun %if-condition-unary-predicate-entry (cond-ast ctx)
   "Return the :UNARY-PREDICATE registry entry when COND-AST is a one-argument
@@ -596,7 +621,8 @@ the numeric type-driven instruction selection without changing generic calls."
                            callable-expr func-sym args result-reg tail ctx)
                           (%compile-normal-call
                            callable-expr func-sym args result-reg tail ctx))))))
-         (unless tail
+         (unless (or tail
+                     (%call-preserves-global-var-cache-p func-sym args ctx))
            (setf (ctx-global-var-cache ctx) nil))
          result)))))
 
