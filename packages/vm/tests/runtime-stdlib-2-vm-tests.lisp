@@ -13,8 +13,8 @@
 (it-sequential "fr-804-syntax-rules-exists"
   :timeout
   5
-  (expect (fboundp 'cl-cc/expand::define-syntax) :to-be-truthy)
-  (expect (fboundp 'cl-cc/expand::with-gensyms) :to-be-truthy))
+  (expect (fboundp 'cl-cc/expand:define-syntax) :to-be-truthy)
+  (expect (fboundp 'cl-cc/expand:with-gensyms) :to-be-truthy))
 
 ;;; ─── Package existence ───────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@
 ;;; ─── Single-function fboundp checks ─────────────────────────────────────────
 
 (it-sequential "fr-function-exists fr-805-once-only"
-  (destructuring-bind (sym) (list 'cl-cc/expand::once-only)
+  (destructuring-bind (sym) (list 'cl-cc/expand:once-only)
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-808-shebang"
@@ -45,7 +45,7 @@
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-839-iterator"
-  (destructuring-bind (sym) (list 'cl-cc/expand::make-iterator)
+  (destructuring-bind (sym) (list 'cl-cc/expand:make-iterator)
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-842-kahan"
@@ -53,11 +53,11 @@
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-856-delay"
-  (destructuring-bind (sym) (list 'cl-cc/expand::delay)
+  (destructuring-bind (sym) (list 'cl-cc/expand:delay)
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-857-memoize"
-  (destructuring-bind (sym) (list 'cl-cc/expand::memoize)
+  (destructuring-bind (sym) (list 'cl-cc/expand:memoize)
     (expect (fboundp sym) :to-be-truthy)))
 
 (it-sequential "fr-function-exists fr-880-custom-hash"
