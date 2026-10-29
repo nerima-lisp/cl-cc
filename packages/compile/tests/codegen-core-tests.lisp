@@ -109,7 +109,7 @@
                            ctx))
          (instructions (append (codegen-instructions ctx)
                                (list (cl-cc:make-vm-ret :reg reg))))
-         (optimized (cl-cc/optimize/control-flow:opt-pass-dce instructions))
+         (optimized (cl-cc/optimize::opt-pass-dce instructions))
          (const-values (mapcar #'cl-cc::vm-const-value
                                (remove-if-not (lambda (i)
                                                 (typep i 'cl-cc/vm:vm-const))

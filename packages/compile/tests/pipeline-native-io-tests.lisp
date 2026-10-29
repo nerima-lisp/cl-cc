@@ -502,7 +502,7 @@
          (weighted (first result)))
     (expect (type-of weighted)
             :to-be
-            (type-of (cl-cc/optimize:make-vm-branch-weighted-jump-zero
+            (type-of (cl-cc/optimize::make-vm-branch-weighted-jump-zero
                       :reg :r0 :label :target :branch-weight :likely-taken)))
     (expect (cl-cc/optimize:opt-branch-weight weighted) :to-be :likely-taken)))
 (it-sequential "autofdo-branch-from-line-perf-and-dtrace-rows"
