@@ -430,46 +430,15 @@ same call through a register answered 0."
       (let ((handler (gethash sname *phase2-builtin-handlers*)))
         (when handler
           (funcall handler args result-reg ctx))))))
-(defun %call-preserves-global-var-cache-p (func-sym args ctx)
-  "Return true only when a direct call cannot rebind a cached guest global."
+(defun %call-preserves-global-var-cache-p (func-sym ctx)
+  "Return true only when a direct call has a registered non-writing effect."
   (and func-sym
        (not (%ast-var-function-value-p func-sym ctx))
-       (let* ((package (symbol-package func-sym))
-              (name (symbol-name func-sym))
-              (arity (length args))
-              (no-global-definition-p
-                (and (not (gethash func-sym (ctx-global-functions ctx)))
-                     (not (gethash func-sym (ctx-global-generics ctx)))))
-              (properties
-                (and no-global-definition-p
-                     (eq package (find-package :cl))
-                     (known-function-properties func-sym)))
-              (entry (and properties (gethash name *builtin-registry*)))
-              (arity-bounds
-                (and entry (%lookup-convention-arity (be-convention entry))))
-              (php-runtime-call-p
-                (and no-global-definition-p
-                     package
-                     (string= (package-name package) "CL-CC/PHP"))))
-         (or (and arity-bounds
-                  (<= (car arity-bounds) arity (cdr arity-bounds))
-                  (or (member :pure properties)
-                      (member :read-only properties)))
-             (and php-runtime-call-p
-                  (or ;; A literal integer rules out %PHP-ADD's array-union warning path.
-                      (and (string= name "%PHP-ADD")
-                           (= arity 2)
-                           (some (lambda (arg) (typep arg 'ast-int)) args))
-                      (string= name "%PHP-CONCAT")
-                      (and (member name '("%PHP-LT" "%PHP-GT" "%PHP-LE")
-                                   :test #'string=)
-                           (= arity 2))
-                      (and (string= name "%PHP-TRUTHY") (= arity 1))
-                      (and (string= name "%PHP-OUTPUT-WRITE") (= arity 1))
-                      (and (string= name "%PHP-PREG-MATCH") (= arity 2))
-                      (and (string= name "%PHP-PREG-REPLACE") (= arity 3))
-                      (and (string= name "%PHP-PREG-SPLIT")
-                           (<= 2 arity 3))))))))
+       (not (gethash func-sym (ctx-global-functions ctx)))
+       (not (gethash func-sym (ctx-global-generics ctx)))
+       (let ((properties (known-function-properties func-sym)))
+         (or (member :pure properties)
+             (member :read-only properties)))))
 
 
 (defun %if-condition-unary-predicate-entry (cond-ast ctx)
@@ -638,7 +607,7 @@ the numeric type-driven instruction selection without changing generic calls."
                           (%compile-normal-call
                            callable-expr func-sym args result-reg tail ctx))))))
          (unless (or tail
-                     (%call-preserves-global-var-cache-p func-sym args ctx))
+                     (%call-preserves-global-var-cache-p func-sym ctx))
            (setf (ctx-global-var-cache ctx) nil))
          result)))))
 
