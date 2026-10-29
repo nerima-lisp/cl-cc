@@ -458,7 +458,6 @@ same call through a register answered 0."
              (and php-runtime-call-p
                   (or (and (string= name "%PHP-ADD") (= arity 2))
                       (string= name "%PHP-CONCAT")
-                      (string= name "%PHP-ARRAY")
                       (and (member name '("%PHP-LT" "%PHP-GT" "%PHP-LE")
                                    :test #'string=)
                            (= arity 2))
