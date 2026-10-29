@@ -34,13 +34,36 @@ against: the set has to be identical to what the old package scan produced."
                    (not (special-operator-p sym)))
           (cl-cc/vm:vm-register-host-bridge sym (fdefinition sym))
           (push sym registered))))))
-
+(defun %register-logical-pathname-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:logical-pathname-translations)
+   (function cl:logical-pathname-translations))
+  (cl-cc/vm:vm-register-host-bridge
+   (intern "%SET-LOGICAL-PATHNAME-TRANSLATIONS" :cl-cc)
+   (lambda (host translations)
+     (setf (cl:logical-pathname-translations host) translations)
+     translations)))
+(defun %register-package-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:make-package)
+   (function cl-cc/runtime:rt-make-package)))
+(eval-when (:load-toplevel :execute)
+  (setf (gethash (quote cl:logical-pathname-translations)
+                 *setf-compound-place-handlers*)
+        (lambda (place value)
+          (compiler-macroexpand-all
+           (cons (intern "%SET-LOGICAL-PATHNAME-TRANSLATIONS" :cl-cc)
+                 (append (cdr place) (list value))))))
+  (%register-logical-pathname-runtime-bridges)
+  (%register-package-runtime-bridges))
 (defun %register-backend-runtime-bridges ()
-  "Register every loaded backend runtime bridge at pipeline start-up.
+  "Register pathname and loaded backend runtime bridges.
 
-This compatibility boundary is called unconditionally by both source compilation
-entry points. Bridge discovery belongs to the backend registries, so the pipeline
-must not name or scan an external backend package here."
+Called by both source compilation entry points. Backend bridge discovery
+belongs to backend registries; Common Lisp pathname functions are registered
+directly."
+  (%register-logical-pathname-runtime-bridges)
+  (%register-package-runtime-bridges)
   (%register-backend-protocol-bridges))
 
 (defun %register-php-runtime-bridges ()

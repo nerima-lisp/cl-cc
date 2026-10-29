@@ -280,3 +280,88 @@
         (expect line :to-equal "FR312-TAB-ONLY-CANDIDATE")
         (expect candidates :to-equal '("FR312-TAB-ONLY-CANDIDATE"))
         (expect edited-p :to-be-truthy)))))
+
+(it-sequential "pipeline-our-load-binds-and-restores-pathname-globals"
+  (cl-cc/repl:with-fresh-repl-state
+    (uiop:with-temporary-file (:pathname source :type "lisp")
+      (let* ((globals (progn
+                        (cl-cc::%ensure-repl-state)
+                        (cl-cc/vm:vm-global-vars cl-cc::*repl-vm-state*)))
+             (load-pathname-symbol 'cl:*load-pathname*)
+             (load-truename-symbol 'cl:*load-truename*)
+             (observed-symbol 'cl-user::*load-pathname-test-observed*)
+             (previous-load-pathname :previous-load-pathname)
+             (previous-load-truename :previous-load-truename))
+        (unwind-protect
+             (progn
+               (remhash load-pathname-symbol globals)
+               (remhash load-truename-symbol globals)
+               (remhash observed-symbol globals)
+               (with-open-file (stream source :direction :output :if-exists :supersede)
+                 (write-string
+                  "(setf *load-pathname-test-observed* (list *load-pathname* *load-truename*))"
+                  stream))
+               (let ((*package* (find-package :cl-user)))
+                 (cl-cc/repl::our-load source))
+               (expect (gethash observed-symbol globals)
+                       :to-equal (list (pathname source) (truename source)))
+               (expect (nth-value 1 (gethash load-pathname-symbol globals)) :to-be-falsy)
+               (expect (nth-value 1 (gethash load-truename-symbol globals)) :to-be-falsy)
+               (setf (gethash load-pathname-symbol globals) previous-load-pathname
+                     (gethash load-truename-symbol globals) previous-load-truename)
+               (let ((*package* (find-package :cl-user)))
+                 (cl-cc/repl::our-load source))
+               (expect (gethash observed-symbol globals)
+                       :to-equal (list (pathname source) (truename source)))
+               (expect (gethash load-pathname-symbol globals) :to-be previous-load-pathname)
+               (expect (gethash load-truename-symbol globals) :to-be previous-load-truename)
+               (with-open-file (stream source :direction :output :if-exists :supersede)
+                 (write-string "(error \"load failed\")" stream))
+               (let ((*package* (find-package :cl-user)))
+                 (signals error (cl-cc/repl::our-load source)))
+               (expect (gethash load-pathname-symbol globals) :to-be previous-load-pathname)
+               (expect (gethash load-truename-symbol globals) :to-be previous-load-truename))
+          (remhash load-pathname-symbol globals)
+          (remhash load-truename-symbol globals)
+          (remhash observed-symbol globals))))))
+(it-sequential "pipeline-run-form-repl-sets-logical-pathname-translations"
+  (let* ((host (format nil "CL-CC-REPL-SETF-~A" (get-universal-time)))
+         (previous
+           (handler-case
+               (cl:logical-pathname-translations host)
+             (type-error () :unregistered)))
+         (translations
+           (list
+             (list "AUX;*.*.*"
+                   (format nil "~A*.*"
+                           (namestring (uiop:temporary-directory)))))))
+    (unwind-protect
+         (progn
+           (cl-cc/repl:with-fresh-repl-state
+             (cl-cc::run-form-repl
+              `(setf (cl:logical-pathname-translations ,host)
+                     (list (list "AUX;*.*.*" ,(second (first translations)))))))
+           (expect (cl:logical-pathname-translations host) :to-equal translations))
+      (setf (cl:logical-pathname-translations host)
+            (if (eq previous :unregistered)
+                nil
+                previous)))))
+(it-sequential "pipeline-run-form-repl-make-package"
+  (let ((name (format nil "CL-CC-REPL-PACKAGE-~A" (get-universal-time))))
+    (unwind-protect
+         (progn
+           (cl-cc/repl:with-fresh-repl-state
+             (cl-cc::run-form-repl `(make-package ,name :use nil)))
+           (expect (cl-cc/runtime:rt-find-package name) :to-be-truthy))
+      (remhash name cl-cc/runtime:*rt-package-registry*))))
+(it-sequential "pipeline-run-form-repl-uses-current-package-for-package-operations"
+  (let ((name (format nil "CL-CC-REPL-PACKAGE-~A" (get-universal-time))))
+    (unwind-protect
+         (progn
+           (cl-cc/repl:with-fresh-repl-state
+             (cl-cc::run-form-repl
+              `(let ((*package* (make-package ,name :use nil)))
+                 (export (list (intern "W4-02-CURRENT-PACKAGE"))))))
+           (expect (gethash :exports (cl-cc/runtime:rt-find-package name))
+                   :to-be-truthy))
+      (remhash name cl-cc/runtime:*rt-package-registry*))))
