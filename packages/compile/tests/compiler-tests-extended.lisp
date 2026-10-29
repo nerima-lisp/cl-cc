@@ -373,5 +373,17 @@
             (if (eq previous :unregistered)
                 nil
                 previous)))))
+(it-sequential "compile-global-cache-refreshes-after-call"
+  (let ((result
+          (run-string
+           "(defvar *global-cache-call-probe* 1)
+            (defun mutate-global-cache-probe ()
+              (setq *global-cache-call-probe* 2))
+            (defun read-global-cache-after-call ()
+              (mutate-global-cache-probe)
+              *global-cache-call-probe*)
+            (read-global-cache-after-call)"
+           :stdlib t)))
+    (expect result :to-equal 2)))
 
 ;;; Extended stdlib/keyword integration tests are in compiler-tests-extended-stdlib.lisp.

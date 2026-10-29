@@ -566,26 +566,39 @@ the numeric type-driven instruction selection without changing generic calls."
        (let* ((func-expr (ast-call-func node))
               (callable-expr (%callable-designator-node func-expr))
               (func-sym
-               (cond ((symbolp callable-expr) callable-expr)
-      ((typep callable-expr 'ast-function)
-       (ast-function-name callable-expr))
-      ((and (typep callable-expr 'ast-quote)
-            (symbolp (ast-quote-value callable-expr)))
-       (ast-quote-value callable-expr))
-      ((and (typep callable-expr 'ast-var)
-            (not (%ast-var-function-value-p
-                  (ast-var-name callable-expr) ctx)))
-       (ast-var-name callable-expr))
-      (t nil)))
-              (args (ast-call-args node)))
-         (if (and (= (length args) 2)
-                  (and func-sym (member (symbol-name func-sym) (quote ("+" "-" "*" "/")) :test (function string=)))
-                  (every #'%float-constant-node-p args))
-             (compile-ast (make-ast-binop :op (find-symbol (symbol-name func-sym) :cl) :lhs (first args) :rhs (second args))
-                          ctx)
-             (let ((result-reg (make-register ctx)))
-               (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
-                   (%compile-normal-call callable-expr func-sym args result-reg tail ctx)))))))))
+                (cond ((symbolp callable-expr) callable-expr)
+                      ((typep callable-expr 'ast-function)
+                       (ast-function-name callable-expr))
+                      ((and (typep callable-expr 'ast-quote)
+                            (symbolp (ast-quote-value callable-expr)))
+                       (ast-quote-value callable-expr))
+                      ((and (typep callable-expr 'ast-var)
+                            (not (%ast-var-function-value-p
+                                  (ast-var-name callable-expr) ctx)))
+                       (ast-var-name callable-expr))
+                      (t nil)))
+              (args (ast-call-args node))
+              (result
+                (if (and (= (length args) 2)
+                         (and func-sym
+                              (member (symbol-name func-sym)
+                                      '("+" "-" "*" "/")
+                                      :test #'string=))
+                         (every #'%float-constant-node-p args))
+                    (compile-ast
+                     (make-ast-binop
+                      :op (find-symbol (symbol-name func-sym) :cl)
+                      :lhs (first args)
+                      :rhs (second args))
+                     ctx)
+                    (let ((result-reg (make-register ctx)))
+                      (or (%try-compile-call-fast-paths
+                           callable-expr func-sym args result-reg tail ctx)
+                          (%compile-normal-call
+                           callable-expr func-sym args result-reg tail ctx))))))
+         (unless tail
+           (setf (ctx-global-var-cache ctx) nil))
+         result)))))
 
 (defmethod compile-ast ((node ast-list) ctx)
   "Compile a runtime list-construction AST node through the normal LIST call path."
