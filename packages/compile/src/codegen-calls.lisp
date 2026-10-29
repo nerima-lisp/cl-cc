@@ -434,22 +434,36 @@ same call through a register answered 0."
   "Return true only when a direct call cannot rebind a cached guest global."
   (and func-sym
        (not (%ast-var-function-value-p func-sym ctx))
-       (let* ((properties
-               (and (eq (symbol-package func-sym) (find-package :cl))
-                    (known-function-properties func-sym)))
-              (package (symbol-package func-sym))
-              (php-runtime-call-p
-                (and package (string= (package-name package) "CL-CC/PHP")))
+       (let* ((package (symbol-package func-sym))
               (name (symbol-name func-sym))
-              (arity (length args)))
-         (or (member :pure properties)
-             (member :read-only properties)
+              (arity (length args))
+              (no-global-definition-p
+                (and (not (gethash func-sym (ctx-global-functions ctx)))
+                     (not (gethash func-sym (ctx-global-generics ctx)))))
+              (properties
+                (and no-global-definition-p
+                     (eq package (find-package :cl))
+                     (known-function-properties func-sym)))
+              (entry (and properties (gethash name *builtin-registry*)))
+              (arity-bounds
+                (and entry (%lookup-convention-arity (be-convention entry))))
+              (php-runtime-call-p
+                (and no-global-definition-p
+                     package
+                     (string= (package-name package) "CL-CC/PHP"))))
+         (or (and arity-bounds
+                  (<= (car arity-bounds) arity (cdr arity-bounds))
+                  (or (member :pure properties)
+                      (member :read-only properties)))
              (and php-runtime-call-p
-                  (or (member name
-                              '("%PHP-ADD" "%PHP-CONCAT" "%PHP-ARRAY"
-                                "%PHP-LT" "%PHP-GT" "%PHP-LE"
-                                "%PHP-TRUTHY" "%PHP-OUTPUT-WRITE")
-                              :test #'string=)
+                  (or (and (string= name "%PHP-ADD") (= arity 2))
+                      (string= name "%PHP-CONCAT")
+                      (string= name "%PHP-ARRAY")
+                      (and (member name '("%PHP-LT" "%PHP-GT" "%PHP-LE")
+                                   :test #'string=)
+                           (= arity 2))
+                      (and (string= name "%PHP-TRUTHY") (= arity 1))
+                      (and (string= name "%PHP-OUTPUT-WRITE") (= arity 1))
                       (and (string= name "%PHP-PREG-MATCH") (= arity 2))
                       (and (string= name "%PHP-PREG-REPLACE") (= arity 3))
                       (and (string= name "%PHP-PREG-SPLIT")
