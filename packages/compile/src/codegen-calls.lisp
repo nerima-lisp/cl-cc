@@ -456,7 +456,11 @@ same call through a register answered 0."
                   (or (member :pure properties)
                       (member :read-only properties)))
              (and php-runtime-call-p
-                  (or (string= name "%PHP-CONCAT")
+                  (or ;; A literal integer rules out %PHP-ADD's array-union warning path.
+                      (and (string= name "%PHP-ADD")
+                           (= arity 2)
+                           (some (lambda (arg) (typep arg 'ast-int)) args))
+                      (string= name "%PHP-CONCAT")
                       (and (member name '("%PHP-LT" "%PHP-GT" "%PHP-LE")
                                    :test #'string=)
                            (= arity 2))
