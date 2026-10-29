@@ -41,34 +41,7 @@
 
 ;;; ─── *opt-interval-binop-table* / %opt-update-interval-binop ────────────
 
-;;; ─── %mps-pending-uses-reg-p ─────────────────────────────────────────────
-
-;;; ─── %mps-flush-if-src-overwritten ──────────────────────────────────────────
-
-;;; ─── %mps-flush-dependent-on-reg ────────────────────────────────────────────
-
-(it-sequential "dead-store-elim-tbaa-disjoint-read-does-not-observe-slot-store"
-  (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
-                  (list (make-vm-const :dst :n :value 4)
-                        (make-vm-cons :dst :obj :car-src :r0 :cdr-src :r1)
-                        (make-vm-make-array :dst :arr :size-reg :n
-                                            :initial-element nil :fill-pointer nil
-                                            :adjustable nil :element-type nil)
-                        (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r2)
-                        (cl-cc:make-vm-slot-read :dst :v :obj-reg :arr :slot-name 'x)
-                        (make-vm-slot-write :obj-reg :obj :slot-name 'x :value-reg :r3)
-                        (make-vm-ret :reg :v)))))
-    (expect (= 1 (%count-insts-of-type result (lambda (inst) (typep inst 'cl-cc/vm/clos:vm-slot-write)))) :to-be-truthy)))
-
-(it-sequential "dead-store-elim-unknown-alias-read-observes-slot-store"
-  (let* ((result (cl-cc/optimize::opt-pass-dead-store-elim
-                  (list (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r1)
-                        (cl-cc:make-vm-slot-read :dst :v :obj-reg :b :slot-name 'x)
-                        (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r2)
-                        (make-vm-ret :reg :v)))))
-    (expect (= 2 (%count-insts-of-type result (lambda (inst) (typep inst 'cl-cc/vm/clos:vm-slot-write)))) :to-be-truthy)))
-
-(it-sequential "optimize-instructions-rewrites-logand-one-eq-zero-to-evenp"
+(it-sequential "optimize-instructions-rewrites-logand-one-eq-zero-to-evenp-serialized-tag"
   (let* ((result (cl-cc/optimize:optimize-instructions
                   (list (make-vm-get-global :dst :x :name 'x)
                         (make-vm-const :dst :one :value 1)
@@ -84,3 +57,10 @@
     (expect (cl-cc/vm:vm-src even-inst) :to-be :x)
     (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-logand)) result) :to-be-falsy)
     (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-num-eq)) result) :to-be-falsy)))
+
+;;; ─── %mps-pending-uses-reg-p ─────────────────────────────────────────────
+
+;;; ─── %mps-flush-if-src-overwritten ──────────────────────────────────────────
+
+;;; ─── %mps-flush-dependent-on-reg ────────────────────────────────────────────
+

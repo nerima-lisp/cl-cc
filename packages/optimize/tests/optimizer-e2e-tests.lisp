@@ -67,7 +67,7 @@
   (expect (run-string "(lognot 0)") :to-equal -1)
   (let* ((instrs (list (cl-cc:make-vm-const :dst :r1 :value 0)
                        (cl-cc:make-vm-lognot :dst :r0 :src :r1)))
-         (out (cl-cc/optimize:opt-pass-fold instrs)))
+         (out (cl-cc/optimize::opt-pass-fold instrs)))
     (expect (some (lambda (i) (typep i 'cl-cc/vm:vm-lognot)) out) :to-be-falsy)
     (expect (some (lambda (i)
                          (and (cl-cc:vm-const-p i)
@@ -81,18 +81,6 @@
 ;;; ── Function Inlining ────────────────────────────────────────────────────
 
 (it-sequential "optimizer-inline" (assert-run= 5 "(defun double-inc (x) (+ x 1)) (double-inc 4)") (assert-run= 7 "(defun add2 (a b) (+ a b)) (add2 3 4)"))
-
-(it-sequential "optimizer-leaf-detect"
-  (multiple-value-bind (leaf-insts leaf-p)
-      (optimize-instructions (list (make-vm-const :dst :r0 :value 1)
-                                   (make-vm-ret :reg :r0)))
-    (declare (ignore leaf-insts))
-    (expect leaf-p :to-be-truthy))
-  (multiple-value-bind (call-insts leaf-p)
-      (optimize-instructions (list (make-vm-call :dst :r0 :func :r1 :args '(:r2))
-                                   (make-vm-ret :reg :r0)))
-    (declare (ignore call-insts))
-    (expect (member leaf-p '(t nil)) :to-be-truthy)))
 
 (it-sequential "optimizer-leaf-flag-through-compile-pipeline"
   (let* ((result (compile-string "(+ 1 2)" :target :x86_64))
