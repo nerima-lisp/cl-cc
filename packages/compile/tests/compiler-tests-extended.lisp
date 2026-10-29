@@ -332,5 +332,46 @@
               "(let ((s (make-string-output-stream)))
                  (close s :abort t))")))
     (expect r :to-be-truthy)))
+(it-sequential "compile-logical-pathname-translations-setf-bridge"
+  (let* ((host (format nil "CL-CC-LOGICAL-SETF-~A" (get-universal-time)))
+         (previous
+           (handler-case
+               (cl:logical-pathname-translations host)
+             (type-error () :unregistered)))
+         (translations
+           (list
+             (list "AUX;*.*.*"
+                   (format nil "~A*.*"
+                           (namestring (uiop:temporary-directory))))))
+         (source
+           (format nil
+                   "(let ((host-evaluations 0)
+                         (translation-evaluations 0)
+                         (order 0))
+                      (let ((assigned
+                              (setf (cl:logical-pathname-translations
+                                      (progn
+                                        (setq host-evaluations (1+ host-evaluations))
+                                        (setq order (+ (* order 10) 1))
+                                        ~S))
+                                    (progn
+                                      (setq translation-evaluations (1+ translation-evaluations))
+                                      (setq order (+ (* order 10) 2))
+                                      '~S))))
+                        (list assigned host-evaluations translation-evaluations order
+                              (cl:logical-pathname-translations ~S))))"
+                   host translations host)))
+    (unwind-protect
+         (let ((result (run-string source :stdlib t)))
+           (expect (first result) :to-equal translations)
+           (expect (second result) :to-equal 1)
+           (expect (third result) :to-equal 1)
+           (expect (fourth result) :to-equal 12)
+           (expect (fifth result)
+                   :to-equal (cl:logical-pathname-translations host)))
+      (setf (cl:logical-pathname-translations host)
+            (if (eq previous :unregistered)
+                nil
+                previous)))))
 
 ;;; Extended stdlib/keyword integration tests are in compiler-tests-extended-stdlib.lisp.
