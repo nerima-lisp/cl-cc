@@ -15,11 +15,11 @@
 
 (defun %make-test-buffer ()
   "Return a fresh byte buffer for testing."
-  (cl-cc/binary::make-byte-buffer 64))
+  (cl-cc/binary:make-byte-buffer 64))
 
 (defun %buffer-bytes (buf)
   "Extract bytes from BUF as a list."
-  (coerce (cl-cc/binary::buffer-get-bytes buf) 'list))
+  (coerce (cl-cc/binary:buffer-get-bytes buf) 'list))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Section 1: wasm-binary-value-type-byte — all 9 known types + error path

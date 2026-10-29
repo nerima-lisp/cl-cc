@@ -33,21 +33,21 @@
 
 (it-sequential "vm-inst-to-enode-op-strips-vm-prefix const"
   (destructuring-bind (expected-op-prefix inst) (list 'vm-const (cl-cc:make-vm-const :dst :r0 :value 1))
-    (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
+    (let ((op (cl-cc/optimize/rewriting:vm-inst-to-enode-op inst)))
     (expect (symbolp op) :to-be-truthy)
     ;; The result op should NOT start with VM-
     (expect (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))) :to-be-falsy))))
 
 (it-sequential "vm-inst-to-enode-op-strips-vm-prefix move"
   (destructuring-bind (expected-op-prefix inst) (list 'vm-move (cl-cc:make-vm-move  :dst :r0 :src :r1))
-    (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
+    (let ((op (cl-cc/optimize/rewriting:vm-inst-to-enode-op inst)))
     (expect (symbolp op) :to-be-truthy)
     ;; The result op should NOT start with VM-
     (expect (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))) :to-be-falsy))))
 
 (it-sequential "vm-inst-to-enode-op-strips-vm-prefix add"
   (destructuring-bind (expected-op-prefix inst) (list 'vm-add (cl-cc:make-vm-add   :dst :r0 :lhs :r1 :rhs :r2))
-    (let ((op (cl-cc/optimize::vm-inst-to-enode-op inst)))
+    (let ((op (cl-cc/optimize/rewriting:vm-inst-to-enode-op inst)))
     (expect (symbolp op) :to-be-truthy)
     ;; The result op should NOT start with VM-
     (expect (string= "VM-" (subseq (symbol-name op) 0 (min 3 (length (symbol-name op))))) :to-be-falsy))))

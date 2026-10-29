@@ -67,3 +67,20 @@
                         (make-vm-slot-write :obj-reg :a :slot-name 'x :value-reg :r2)
                         (make-vm-ret :reg :v)))))
     (expect (= 2 (%count-insts-of-type result (lambda (inst) (typep inst 'cl-cc/vm/clos:vm-slot-write)))) :to-be-truthy)))
+
+(it-sequential "optimize-instructions-rewrites-logand-one-eq-zero-to-evenp"
+  (let* ((result (cl-cc/optimize:optimize-instructions
+                  (list (make-vm-get-global :dst :x :name 'x)
+                        (make-vm-const :dst :one :value 1)
+                        (make-vm-logand :dst :bit :lhs :x :rhs :one)
+                        (make-vm-const :dst :zero :value 0)
+                        (make-vm-num-eq :dst :pred :lhs :bit :rhs :zero)
+                        (make-vm-ret :reg :pred))
+                  :max-iterations 1
+                  :pass-pipeline '(:fold :dce)))
+         (even-inst (find-if (lambda (inst) (eq :evenp (car (cl-cc/vm:instruction->sexp inst)))) result)))
+    (expect even-inst :to-be-truthy)
+    (expect (cl-cc/vm:vm-dst even-inst) :to-be :pred)
+    (expect (cl-cc/vm:vm-src even-inst) :to-be :x)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-logand)) result) :to-be-falsy)
+    (expect (some (lambda (inst) (typep inst 'cl-cc/vm:vm-num-eq)) result) :to-be-falsy)))

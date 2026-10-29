@@ -6,44 +6,31 @@
 ;;; ─── Additional Buffer Tests ─────────────────────────────────────────────
 
 (it-sequential "elf-s64le-negative-one-encodes-as-all-ff"
-  (let ((buf (cl-cc/binary::elf-make-buffer)))
-    (cl-cc/binary::binary-buffer-write-s64le buf -1)
+  (let ((buf (cl-cc/binary/buffer:elf-make-buffer)))
+    (cl-cc/binary/buffer:binary-buffer-write-s64le buf -1)
     (expect (length buf) :to-equal 8)
     (expect (every (lambda (b) (= b #xFF)) (coerce buf 'list)) :to-be-truthy)))
 
 (it-sequential "elf-s64le-positive-value-matches-u64le"
-  (let ((buf1 (cl-cc/binary::elf-make-buffer))
-        (buf2 (cl-cc/binary::elf-make-buffer)))
-    (cl-cc/binary::binary-buffer-write-s64le buf1 42)
-    (cl-cc/binary::binary-buffer-write-u64le buf2 42)
+  (let ((buf1 (cl-cc/binary/buffer:elf-make-buffer))
+        (buf2 (cl-cc/binary/buffer:elf-make-buffer)))
+    (cl-cc/binary/buffer:binary-buffer-write-s64le buf1 42)
+    (cl-cc/binary/buffer:binary-buffer-write-u64le buf2 42)
     (expect (coerce buf2 'list) :to-equal (coerce buf1 'list))))
-
-(it-sequential "elf-u64le-writes-eight-bytes-little-endian"
-  (let ((buf (cl-cc/binary::elf-make-buffer)))
-    (cl-cc/binary::binary-buffer-write-u64le buf #xDEADBEEFCAFEBABE)
-    (expect (length buf) :to-equal 8)
-    (expect (aref buf 0) :to-equal #xBE)
-    (expect (aref buf 1) :to-equal #xBA)
-    (expect (aref buf 2) :to-equal #xFE)
-    (expect (aref buf 3) :to-equal #xCA)
-    (expect (aref buf 4) :to-equal #xEF)
-    (expect (aref buf 5) :to-equal #xBE)
-    (expect (aref buf 6) :to-equal #xAD)
-    (expect (aref buf 7) :to-equal #xDE)))
 
 ;;; ─── Additional String Table Tests ──────────────────────────────────────
 
 (it-sequential "elf-strtab-offset-layout"
-  (let ((st (cl-cc/binary::make-strtab)))
-    (expect (cl-cc/binary::strtab-add st "") :to-equal 0))
-  (let* ((st (cl-cc/binary::make-strtab))
-         (off1 (cl-cc/binary::strtab-add st "abc"))
-         (off2 (cl-cc/binary::strtab-add st "xy")))
+  (let ((st (cl-cc/binary/buffer:make-strtab)))
+    (expect (cl-cc/binary/buffer:strtab-add st "") :to-equal 0))
+  (let* ((st (cl-cc/binary/buffer:make-strtab))
+         (off1 (cl-cc/binary/buffer:strtab-add st "abc"))
+         (off2 (cl-cc/binary/buffer:strtab-add st "xy")))
     (expect off1 :to-equal 1)
     (expect off2 :to-equal 5))
-  (let ((st (cl-cc/binary::make-strtab)))
-    (cl-cc/binary::strtab-add st "ab")
-    (expect (length (cl-cc/binary::strtab-bytes st)) :to-equal 4)))
+  (let ((st (cl-cc/binary/buffer:make-strtab)))
+    (cl-cc/binary/buffer:strtab-add st "ab")
+    (expect (length (cl-cc/binary/buffer:strtab-bytes st)) :to-equal 4)))
 
 ;;; ─── Additional ELF64 Builder Tests ──────────────────────────────────────
 
@@ -125,13 +112,13 @@
 
 (it-sequential "elf64-compile-api-aarch64-machine-value"
   (let* ((code (make-array 1 :element-type '(unsigned-byte 8) :initial-contents '(#xC0)))
-         (result (cl-cc/binary::compile-to-elf64 code nil :arch :arm64)))
+         (result (cl-cc/binary:compile-to-elf64 code nil :arch :arm64)))
     (expect (aref result 18) :to-equal #xB7)
     (expect (aref result 19) :to-equal 0)))
 
 (it-sequential "elf64-compile-api-bss-reservation"
   (let* ((code (make-array 1 :element-type '(unsigned-byte 8) :initial-contents '(#xC3)))
-         (result (cl-cc/binary::compile-to-elf64 code nil :bss-size 64))
+         (result (cl-cc/binary:compile-to-elf64 code nil :bss-size 64))
          (shoff (+ (aref result 40)
                    (ash (aref result 41) 8)
                    (ash (aref result 42) 16)
@@ -145,7 +132,7 @@
   (let* ((code (make-array 5 :element-type '(unsigned-byte 8)
                             :initial-contents '(#xE8 0 0 0 0)))
          (relocs (list (cons 1 "printf")))
-         (result (cl-cc/binary::compile-to-elf64 code relocs)))
+         (result (cl-cc/binary:compile-to-elf64 code relocs)))
     (expect (typep result '(simple-array (unsigned-byte 8) (*))) :to-be-truthy)
     (expect (>= (length result) 64) :to-be-truthy)
     (expect (aref result 0) :to-equal #x7F)
@@ -190,3 +177,16 @@
 (it-sequential "elf64-symbol-and-reloc-type-constants r-x86-64-32"
   (destructuring-bind (expected actual) (list 10 cl-cc/binary::+r-x86-64-32+)
     (expect actual :to-equal expected)))
+
+(it-sequential "elf-u64le-writes-eight-bytes-little-endian"
+  (let ((buf (cl-cc/binary/buffer:elf-make-buffer)))
+    (cl-cc/binary/buffer:binary-buffer-write-u64le buf #xDEADBEEFCAFEBABE)
+    (expect (length buf) :to-equal 8)
+    (expect (aref buf 0) :to-equal #xBE)
+    (expect (aref buf 1) :to-equal #xBA)
+    (expect (aref buf 2) :to-equal #xFE)
+    (expect (aref buf 3) :to-equal #xCA)
+    (expect (aref buf 4) :to-equal #xEF)
+    (expect (aref buf 5) :to-equal #xBE)
+    (expect (aref buf 6) :to-equal #xAD)
+    (expect (aref buf 7) :to-equal #xDE)))

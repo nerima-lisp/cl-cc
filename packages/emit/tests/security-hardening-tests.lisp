@@ -72,9 +72,9 @@
 
 (it-sequential "fr-651-elf-got-plt-relocation-entries-are-materialized"
   (let ((builder (cl-cc/binary::make-elf64-object)))
-    (expect (cl-cc/binary::elf64-add-got-entry builder "puts") :to-equal 0)
-    (expect (cl-cc/binary::elf64-add-plt-stub builder "puts") :to-equal 0)
-    (expect (%security-byte-list (cl-cc/binary::binary-buffer-to-array
+    (expect (cl-cc/binary:elf64-add-got-entry builder "puts") :to-equal 0)
+    (expect (cl-cc/binary:elf64-add-plt-stub builder "puts") :to-equal 0)
+    (expect (%security-byte-list (cl-cc/binary/buffer:binary-buffer-to-array
                                         (cl-cc/binary::elf64-text-buf builder))) :to-equal '(#xFF #x25 #x00 #x00 #x00 #x00 #x0F #x1F #x40 #x00))
     (let ((reloc (first (cl-cc/binary::elf64-rela-entries builder))))
       (expect (first reloc) :to-equal 2)

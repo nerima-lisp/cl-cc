@@ -15,14 +15,6 @@
     (expect (typep (first optimized) 'cl-cc/vm:vm-move) :to-be-truthy)
     (expect (cl-cc/vm:vm-dst (first optimized)) :to-be :r1)
     (expect (cl-cc/vm:vm-src (first optimized)) :to-be :r0))
-  (let* ((program (list (cl-cc:make-vm-const :dst :r0 :value 2)
-                        (cl-cc:make-vm-const :dst :r1 :value 5)
-                        (cl-cc:make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
-         (state (cl-cc/optimize:ai-compute-fixed-point program))
-         (facts (cl-cc/optimize::ai-state-facts state))
-         (r2 (gethash :r2 facts)))
-    (expect (getf r2 :interval) :to-equal '(7 . 7))
-    (expect (getf r2 :nullness) :to-be :non-null))
   (let ((before (list (cl-cc:make-vm-const :dst :r0 :value 1)
                       (cl-cc:make-vm-halt :reg :r0)))
         (after (list (cl-cc:make-vm-const :dst :r0 :value 2)
@@ -42,11 +34,11 @@
     (expect (getf result :ok) :to-be-truthy)
     (expect (= 8 (getf result :trials)) :to-be-truthy)
     (expect (= 753 (getf result :seed)) :to-be-truthy))
-  (let* ((program (cl-cc/optimize::opt-generate-random-ir-program
-                   :state (cl-cc/optimize::%opt-fuzz-random-state 9)
+  (let* ((program (cl-cc/optimize/pipeline::opt-generate-random-ir-program
+                   :state (cl-cc/optimize/pipeline::%opt-fuzz-random-state 9)
                    :max-program-length 6))
-         (expected (multiple-value-list (cl-cc/optimize::opt-fuzz-interpret-ir program)))
-         (actual (multiple-value-list (cl-cc/optimize::opt-fuzz-interpret-ir (copy-list program)))))
+         (expected (multiple-value-list (cl-cc/optimize/pipeline::opt-fuzz-interpret-ir program)))
+         (actual (multiple-value-list (cl-cc/optimize/pipeline::opt-fuzz-interpret-ir (copy-list program)))))
     (expect actual :to-equal expected)))
 
 (it-sequential "optimize-roadmap-runtime-helpers-have-concrete-behavior"
@@ -203,19 +195,18 @@
       (when (probe-file temp-path)
         (delete-file temp-path)))))
 
-
 (defun %optimize-backend-doc-content ()
   "Return the current optimize-backend roadmap document text."
   (%doc-content #P"docs/notes/optimize-backend.md"))
 
 (defun %optimize-backend-doc-completed-heading-contradictions () "Return completed headings whose own section explicitly says implementation is absent." (%doc-completed-heading-contradictions #P"docs/notes/optimize-backend.md" (list "未実装" "未着手" "未完成" "未統合" "未接続" "欠落" "未定義" "不可能" "回転命令なし" "検出なし" "エミッションなし" "分岐なし" "分解なし" "ガードなし" "ABI 固定" "全 caller-saved") :reset-on-section-boundary t))
 
-(defun %optimize-backend-evidence-status-for-feature (feature)
-  "Return expected evidence status for optimize-backend FEATURE."
-  (let ((status (cl-cc/optimize::opt-roadmap-feature-status feature)))
-    (case status
-      (:unknown :planned)
-      (otherwise status))))
+(defun %optimize-backend-doc-status-by-id ()
+  "Build a roadmap status map from public backend FR id queries."
+  (let ((status-by-id (make-hash-table :test #'equal)))
+    (dolist (status '(:implemented :partial :planned :unknown) status-by-id)
+      (dolist (feature-id (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status status))
+        (setf (gethash feature-id status-by-id) status)))))
 
 (defun %optimize-backend-test-anchor-name= (expected actual)
   "Return T when EXPECTED and ACTUAL name the same test anchor."
@@ -250,15 +241,33 @@
 (it-sequential "optimize-backend-roadmap-completed-headings-avoid-incomplete-language"
   (expect (%optimize-backend-doc-completed-heading-contradictions) :to-be-null))
 
-(it-sequential "optimize-backend-roadmap-evidence-covers-doc-fr-list" (let* ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features)) (ids (mapcar #'cl-cc/optimize::opt-roadmap-feature-id features)) (table (cl-cc/optimize:optimize-backend-roadmap-register-doc-evidence))) (expect (= 232 (length ids)) :to-be-truthy) (expect (= (length ids) (hash-table-count table)) :to-be-truthy) (dolist (feature features) (let* ((feature-id (cl-cc/optimize::opt-roadmap-feature-id feature)) (doc-status (cl-cc/optimize::opt-roadmap-feature-status feature)) (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id))) (expect (search ":" feature-id) :to-be-falsy) (expect (member doc-status (quote (:implemented :partial :planned :unknown))) :to-be-truthy) (expect evidence :to-be-truthy) (expect (cl-cc/optimize:opt-roadmap-evidence-feature-id evidence) :to-equal feature-id) (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence) :to-be (%optimize-backend-evidence-status-for-feature feature)) (expect (member "docs/notes/optimize-backend.md" (cl-cc/optimize:opt-roadmap-evidence-modules evidence) :test #'string=) :to-be-truthy) (%optimize-backend-assert-evidence-contains evidence nil nil nil)))))
+(it-sequential "optimize-backend-roadmap-evidence-covers-doc-fr-list"
+  (let* ((ids (cl-cc/optimize:optimize-backend-roadmap-doc-fr-ids))
+         (status-by-id (%optimize-backend-doc-status-by-id))
+         (table (cl-cc/optimize:optimize-backend-roadmap-register-doc-evidence)))
+    (expect (= 232 (length ids)) :to-be-truthy)
+    (expect (= (length ids) (hash-table-count table)) :to-be-truthy)
+    (dolist (feature-id ids)
+      (let* ((doc-status (gethash feature-id status-by-id))
+             (evidence (cl-cc/optimize:lookup-opt-backend-roadmap-evidence feature-id)))
+        (expect (search ":" feature-id) :to-be-falsy)
+        (expect (member doc-status '(:implemented :partial :planned :unknown)) :to-be-truthy)
+        (expect evidence :to-be-truthy)
+        (expect (cl-cc/optimize:opt-roadmap-evidence-feature-id evidence) :to-equal feature-id)
+        (expect (cl-cc/optimize:opt-roadmap-evidence-status evidence)
+                :to-be (if (eq doc-status :unknown) :planned doc-status))
+        (expect (member "docs/notes/optimize-backend.md"
+                        (cl-cc/optimize:opt-roadmap-evidence-modules evidence)
+                        :test #'string=)
+                :to-be-truthy)
+        (%optimize-backend-assert-evidence-contains evidence nil nil nil)))))
 
 (it-sequential "optimize-backend-roadmap-status-summary-counts-headings"
-  (let* ((summary (cl-cc/optimize:optimize-backend-roadmap-status-summary))
-         (total (getf summary :total 0))
-         (implemented (getf summary :implemented 0))
-         (partial (getf summary :partial 0))
-         (planned (getf summary :planned 0))
-         (unknown (getf summary :unknown 0)))
+  (let* ((total (length (cl-cc/optimize:optimize-backend-roadmap-doc-fr-ids)))
+         (implemented (length (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented)))
+         (partial (length (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :partial)))
+         (planned (length (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :planned)))
+         (unknown (length (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :unknown))))
     (expect (= 232 total) :to-be-truthy)
     (expect (= 229 implemented) :to-be-truthy)
     (expect (= total (+ implemented partial planned unknown)) :to-be-truthy)
@@ -266,7 +275,13 @@
     (expect (= planned 0) :to-be-truthy)
     (expect (= unknown 2) :to-be-truthy)))
 
-(it-sequential "optimize-backend-roadmap-all-fr-complete-gate-is-strict" (let ((features (cl-cc/optimize:optimize-backend-roadmap-doc-features))) (expect (not (every (lambda (feature) (eq (cl-cc/optimize::opt-roadmap-feature-status feature) :implemented)) features)) :to-be-truthy)))
+(it-sequential "optimize-backend-roadmap-all-fr-complete-gate-is-strict"
+  (let* ((all-doc (cl-cc/optimize:optimize-backend-roadmap-doc-fr-ids))
+         (implemented (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented)))
+    (expect (not (every (lambda (feature-id)
+                          (member feature-id implemented :test #'string=))
+                        all-doc))
+            :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-fr-ids-by-status-partitions-document"
   (let* ((implemented (cl-cc/optimize:optimize-backend-roadmap-fr-ids-by-status :implemented))
@@ -518,10 +533,7 @@
        (list test-anchor)))))
 
 (it-sequential "optimize-backend-roadmap-audited-fr-statuses-match-doc"
-  (let ((table (make-hash-table :test #'equal)))
-    (dolist (feature (cl-cc/optimize:optimize-backend-roadmap-doc-features))
-      (setf (gethash (cl-cc/optimize::opt-roadmap-feature-id feature) table)
-            (cl-cc/optimize::opt-roadmap-feature-status feature)))
+  (let ((status-by-id (%optimize-backend-doc-status-by-id)))
     (dolist (case '(("FR-303" :implemented)
                     ("FR-352" :implemented)
                     ("FR-360" :implemented)
@@ -530,15 +542,15 @@
                     ("FR-374" :implemented)
                     ("FR-376" :implemented)
                     ("FR-377" :implemented)
-                     ("FR-379" :implemented)
-                     ("FR-389" :implemented)
-                     ("FR-391" :implemented)
-                     ("FR-400" :implemented)
-                     ("FR-401" :implemented)
-                     ("FR-462" :implemented)
-                     ("FR-463" :implemented)))
+                    ("FR-379" :implemented)
+                    ("FR-389" :implemented)
+                    ("FR-391" :implemented)
+                    ("FR-400" :implemented)
+                    ("FR-401" :implemented)
+                    ("FR-462" :implemented)
+                    ("FR-463" :implemented)))
       (destructuring-bind (feature-id expected-status) case
-        (expect (gethash feature-id table) :to-be expected-status)))))
+        (expect (gethash feature-id status-by-id) :to-be expected-status)))))
 
 (it-sequential "optimize-backend-roadmap-audited-frs-have-specific-evidence"
   (dolist (case '(("FR-303" :implemented

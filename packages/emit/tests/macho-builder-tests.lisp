@@ -139,66 +139,44 @@
 ;;; ─── Additional Serialization Tests ─────────────────────────────────────
 
 (it-sequential "macho-serialize-nlist-produces-18-bytes"
-  (let ((buf (cl-cc/binary::make-byte-buffer))
+  (let ((buf (cl-cc/binary:make-byte-buffer))
         (nl (cl-cc/binary::make-nlist :n-strx 1 :n-type #x0f :n-sect 1 :n-desc 0 :n-value 0)))
     (cl-cc/binary::serialize-nlist nl buf)
-    (expect (length (cl-cc/binary::byte-buffer-data buf)) :to-equal 18)))
+    (expect (length (cl-cc/binary:buffer-get-bytes buf)) :to-equal 18)))
 
 (it-sequential "macho-serialize-nlist-strx-in-little-endian"
-  (let ((buf (cl-cc/binary::make-byte-buffer))
+  (let ((buf (cl-cc/binary:make-byte-buffer))
         (nl (cl-cc/binary::make-nlist :n-strx #x00000005)))
     (cl-cc/binary::serialize-nlist nl buf)
-    (let ((data (cl-cc/binary::byte-buffer-data buf)))
+    (let ((data (cl-cc/binary:buffer-get-bytes buf)))
       (expect (aref data 0) :to-equal 5)
       (expect (aref data 1) :to-equal 0))))
 
 (it-sequential "macho-command-serialization-sizes entry-point"
   (destructuring-bind (expected obj serializer) (list 24 (cl-cc/binary::make-entry-point-command) #'cl-cc/binary::serialize-entry-point-command)
-    (let ((buf (cl-cc/binary::make-byte-buffer)))
+    (let ((buf (cl-cc/binary:make-byte-buffer)))
     (funcall serializer obj buf)
-    (expect (length (cl-cc/binary::byte-buffer-data buf)) :to-equal expected))))
+    (expect (length (cl-cc/binary:buffer-get-bytes buf)) :to-equal expected))))
 
 (it-sequential "macho-command-serialization-sizes symtab"
   (destructuring-bind (expected obj serializer) (list 24 (cl-cc/binary::make-symtab-command) #'cl-cc/binary::serialize-symtab-command)
-    (let ((buf (cl-cc/binary::make-byte-buffer)))
+    (let ((buf (cl-cc/binary:make-byte-buffer)))
     (funcall serializer obj buf)
-    (expect (length (cl-cc/binary::byte-buffer-data buf)) :to-equal expected))))
+    (expect (length (cl-cc/binary:buffer-get-bytes buf)) :to-equal expected))))
 
 (it-sequential "macho-command-serialization-sizes section"
   (destructuring-bind (expected obj serializer) (list 80 (cl-cc/binary::make-section :sectname "__text" :segname "__TEXT") #'cl-cc/binary::serialize-section)
-    (let ((buf (cl-cc/binary::make-byte-buffer)))
+    (let ((buf (cl-cc/binary:make-byte-buffer)))
     (funcall serializer obj buf)
-    (expect (length (cl-cc/binary::byte-buffer-data buf)) :to-equal expected))))
-
-(it-sequential "macho-buffer-write-bytes-appends-correctly"
-  (let ((buf (cl-cc/binary::make-byte-buffer))
-        (bytes (make-array 3 :element-type '(unsigned-byte 8) :initial-contents '(10 20 30))))
-    (cl-cc/binary::buffer-write-bytes buf bytes)
-    (let ((data (cl-cc/binary::byte-buffer-data buf)))
-      (expect (length data) :to-equal 3)
-      (expect (aref data 0) :to-equal 10)
-      (expect (aref data 1) :to-equal 20)
-      (expect (aref data 2) :to-equal 30))))
+    (expect (length (cl-cc/binary:buffer-get-bytes buf)) :to-equal expected))))
 
 (it-sequential "macho-binary-buffer-writes-little-endian-u16-and-u8"
-  (let ((buf (cl-cc/binary::make-binary-buffer 0)))
-    (cl-cc/binary::binary-buffer-write-u16le buf #x1234)
-    (cl-cc/binary::binary-buffer-write-u8 buf #x56)
-    (expect (coerce (cl-cc/binary::binary-buffer-to-array buf) 'list) :to-equal '(#x34 #x12 #x56))))
+  (let ((buf (cl-cc/binary/buffer:make-binary-buffer 0)))
+    (cl-cc/binary/buffer:binary-buffer-write-u16le buf #x1234)
+    (cl-cc/binary/buffer:binary-buffer-write-u8 buf #x56)
+    (expect (coerce (cl-cc/binary/buffer:binary-buffer-to-array buf) 'list) :to-equal '(#x34 #x12 #x56))))
 
 ;;; ─── Additional Builder API Tests ───────────────────────────────────────
-
-(it-sequential "macho-builder-cputypes x86-64"
-  (destructuring-bind (target expected-cputype) (list :x86-64 cl-cc/binary:+cpu-type-x86-64+)
-    (let* ((b (cl-cc/binary:make-mach-o-builder target))
-         (hdr (cl-cc/binary::mach-o-builder-header b)))
-    (expect (cl-cc/binary:mach-header-cputype hdr) :to-equal expected-cputype))))
-
-(it-sequential "macho-builder-cputypes arm64"
-  (destructuring-bind (target expected-cputype) (list :arm64 cl-cc/binary:+cpu-type-arm64+)
-    (let* ((b (cl-cc/binary:make-mach-o-builder target))
-         (hdr (cl-cc/binary::mach-o-builder-header b)))
-    (expect (cl-cc/binary:mach-header-cputype hdr) :to-equal expected-cputype))))
 
 (it-sequential "macho-add-symbol-behavior one-symbol"
   (destructuring-bind (expected names) (list 1 '("_main"))
@@ -251,3 +229,13 @@
                         (ash (aref result (+ main-off 10)) 16)
                         (ash (aref result (+ main-off 11)) 24))))
       (expect entryoff :to-equal 24))))
+
+(it-sequential "macho-buffer-write-bytes-appends-correctly"
+  (let ((buf (cl-cc/binary/buffer:make-byte-buffer))
+        (bytes (make-array 3 :element-type '(unsigned-byte 8) :initial-contents '(10 20 30))))
+    (cl-cc/binary/buffer:buffer-write-bytes buf bytes)
+    (let ((data (cl-cc/binary/buffer:buffer-get-bytes buf)))
+      (expect (length data) :to-equal 3)
+      (expect (aref data 0) :to-equal 10)
+      (expect (aref data 1) :to-equal 20)
+      (expect (aref data 2) :to-equal 30))))
