@@ -346,3 +346,11 @@
             (if (eq previous :unregistered)
                 nil
                 previous)))))
+(it-sequential "pipeline-run-form-repl-make-package"
+  (let ((name (format nil "CL-CC-REPL-PACKAGE-~A" (get-universal-time))))
+    (unwind-protect
+         (progn
+           (cl-cc/repl:with-fresh-repl-state
+             (cl-cc::run-form-repl `(make-package ,name :use nil)))
+           (expect (cl-cc/runtime:rt-find-package name) :to-be-truthy))
+      (remhash name cl-cc/runtime:*rt-package-registry*))))
