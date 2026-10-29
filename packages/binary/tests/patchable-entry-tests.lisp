@@ -13,8 +13,8 @@
 
 (defun %nop-bytes (count)
   "Return emitted NOP bytes for COUNT as a list."
-  (coerce (cl-cc/binary::with-output-to-vector (stream)
-            (cl-cc/binary::emit-nop-sequence stream count))
+  (coerce (cl-cc/binary/buffer:with-output-to-vector (stream)
+            (cl-cc/binary/linking::emit-nop-sequence stream count))
           'list))
 
 ;;; ------------------------------------------------------------

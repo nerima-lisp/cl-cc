@@ -10,47 +10,47 @@
 ;;; ─── ELF Constants ──────────────────────────────────────────────────────
 
 (it-sequential "elf-constants magic-0"
-  (destructuring-bind (expected actual) (list #x7f cl-cc/binary::+elf-magic-0+)
+  (destructuring-bind (expected actual) (list #x7f cl-cc/binary/elf::+elf-magic-0+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-constants magic-1"
-  (destructuring-bind (expected actual) (list (char-code #\E) cl-cc/binary::+elf-magic-1+)
+  (destructuring-bind (expected actual) (list (char-code #\E) cl-cc/binary/elf::+elf-magic-1+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-constants magic-2"
-  (destructuring-bind (expected actual) (list (char-code #\L) cl-cc/binary::+elf-magic-2+)
+  (destructuring-bind (expected actual) (list (char-code #\L) cl-cc/binary/elf::+elf-magic-2+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-constants magic-3"
-  (destructuring-bind (expected actual) (list (char-code #\F) cl-cc/binary::+elf-magic-3+)
+  (destructuring-bind (expected actual) (list (char-code #\F) cl-cc/binary/elf::+elf-magic-3+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-constants class-64"
-  (destructuring-bind (expected actual) (list 2 cl-cc/binary::+elf-class-64+)
+  (destructuring-bind (expected actual) (list 2 cl-cc/binary/elf::+elf-class-64+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-constants machine-x86"
-  (destructuring-bind (expected actual) (list #x3E cl-cc/binary::+elf-machine-x86-64+)
+  (destructuring-bind (expected actual) (list #x3E cl-cc/binary/elf::+elf-machine-x86-64+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-constants machine-arm64"
-  (destructuring-bind (expected actual) (list #xB7 cl-cc/binary::+elf-machine-aarch64+)
+  (destructuring-bind (expected actual) (list #xB7 cl-cc/binary/elf::+elf-machine-aarch64+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-structure-sizes ehdr"
-  (destructuring-bind (expected actual) (list 64 cl-cc/binary::+elf64-ehdr-size+)
+  (destructuring-bind (expected actual) (list 64 cl-cc/binary/elf::+elf64-ehdr-size+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-structure-sizes shdr"
-  (destructuring-bind (expected actual) (list 64 cl-cc/binary::+elf64-shdr-size+)
+  (destructuring-bind (expected actual) (list 64 cl-cc/binary/elf::+elf64-shdr-size+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-structure-sizes sym"
-  (destructuring-bind (expected actual) (list 24 cl-cc/binary::+elf64-sym-size+)
+  (destructuring-bind (expected actual) (list 24 cl-cc/binary/elf::+elf64-sym-size+)
     (expect actual :to-equal expected)))
 
 (it-sequential "elf-structure-sizes rela"
-  (destructuring-bind (expected actual) (list 24 cl-cc/binary::+elf64-rela-size+)
+  (destructuring-bind (expected actual) (list 24 cl-cc/binary/elf::+elf64-rela-size+)
     (expect actual :to-equal expected)))
 
 ;;; ─── Buffer Helpers ─────────────────────────────────────────────────────
@@ -98,45 +98,45 @@
 ;;; ─── ELF64 Builder ──────────────────────────────────────────────────────
 
 (it-sequential "elf64-builder-fresh"
-  (let ((b (cl-cc/binary::make-elf64-object)))
-    (expect (cl-cc/binary::elf64-text-size b) :to-equal 0)
-    (expect (cl-cc/binary::elf64-bss-size b) :to-equal 0)
-    (expect (cl-cc/binary::elf64-symbols b) :to-be-null)
-    (expect (cl-cc/binary::elf64-rela-entries b) :to-be-null)))
+  (let ((b (cl-cc/binary/elf::make-elf64-object)))
+    (expect (cl-cc/binary/elf::elf64-text-size b) :to-equal 0)
+    (expect (cl-cc/binary/elf::elf64-bss-size b) :to-equal 0)
+    (expect (cl-cc/binary/elf::elf64-symbols b) :to-be-null)
+    (expect (cl-cc/binary/elf::elf64-rela-entries b) :to-be-null)))
 
 (it-sequential "elf64-add-bss"
-  (let ((b (cl-cc/binary::make-elf64-object)))
-    (cl-cc/binary::elf64-add-bss b 16)
-    (cl-cc/binary::elf64-add-bss b 8)
-    (expect (cl-cc/binary::elf64-bss-size b) :to-equal 24)))
+  (let ((b (cl-cc/binary/elf::make-elf64-object)))
+    (cl-cc/binary/elf::elf64-add-bss b 16)
+    (cl-cc/binary/elf::elf64-add-bss b 8)
+    (expect (cl-cc/binary/elf::elf64-bss-size b) :to-equal 24)))
 
 (it-sequential "elf64-builder-list-accumulation symbol"
-  (destructuring-bind (add-fn accessor-fn) (list (lambda (b) (cl-cc/binary::elf64-add-global-symbol b "_main" :section-idx 1 :value 0 :size 10)) #'cl-cc/binary::elf64-symbols)
-    (let ((b (cl-cc/binary::make-elf64-object)))
+  (destructuring-bind (add-fn accessor-fn) (list (lambda (b) (cl-cc/binary/elf::elf64-add-global-symbol b "_main" :section-idx 1 :value 0 :size 10)) #'cl-cc/binary/elf::elf64-symbols)
+    (let ((b (cl-cc/binary/elf::make-elf64-object)))
     (funcall add-fn b)
     (expect (length (funcall accessor-fn b)) :to-equal 1))))
 
 (it-sequential "elf64-builder-list-accumulation reloc"
-  (destructuring-bind (add-fn accessor-fn) (list (lambda (b) (cl-cc/binary::elf64-add-reloc b 4 "printf")) #'cl-cc/binary::elf64-rela-entries)
-    (let ((b (cl-cc/binary::make-elf64-object)))
+  (destructuring-bind (add-fn accessor-fn) (list (lambda (b) (cl-cc/binary/elf::elf64-add-reloc b 4 "printf")) #'cl-cc/binary/elf::elf64-rela-entries)
+    (let ((b (cl-cc/binary/elf::make-elf64-object)))
     (funcall add-fn b)
     (expect (length (funcall accessor-fn b)) :to-equal 1))))
 
 (it-sequential "elf64-finalize-produces-bytes"
-  (let ((b (cl-cc/binary::make-elf64-object))
+  (let ((b (cl-cc/binary/elf::make-elf64-object))
         (code (make-array 4 :element-type '(unsigned-byte 8) :initial-contents '(#xC3 0 0 0))))
-    (cl-cc/binary::elf64-add-text-bytes b code)
-    (cl-cc/binary::elf64-add-global-symbol b "_start" :section-idx 1 :value 0 :size 4)
-    (let ((result (cl-cc/binary::elf64-finalize b)))
+    (cl-cc/binary/elf::elf64-add-text-bytes b code)
+    (cl-cc/binary/elf::elf64-add-global-symbol b "_start" :section-idx 1 :value 0 :size 4)
+    (let ((result (cl-cc/binary/elf::elf64-finalize b)))
       (expect (> (length result) 0) :to-be-truthy)
       (expect (typep result '(simple-array (unsigned-byte 8) (*))) :to-be-truthy))))
 
 (it-sequential "elf64-finalize-header-prefix"
-  (let* ((b (cl-cc/binary::make-elf64-object))
+  (let* ((b (cl-cc/binary/elf::make-elf64-object))
          (code (make-array 1 :element-type '(unsigned-byte 8) :initial-contents '(#xC3))))
-    (cl-cc/binary::elf64-add-text-bytes b code)
-    (cl-cc/binary::elf64-add-global-symbol b "_start" :section-idx 1 :value 0 :size 1)
-    (let ((result (cl-cc/binary::elf64-finalize b)))
+    (cl-cc/binary/elf::elf64-add-text-bytes b code)
+    (cl-cc/binary/elf::elf64-add-global-symbol b "_start" :section-idx 1 :value 0 :size 1)
+    (let ((result (cl-cc/binary/elf::elf64-finalize b)))
       (expect (aref result 0) :to-equal #x7F)
       (expect (aref result 1) :to-equal (char-code #\E))
       (expect (aref result 2) :to-equal (char-code #\L))

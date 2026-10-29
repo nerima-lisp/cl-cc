@@ -20,17 +20,17 @@
 ;;; ─── Structure Defaults ─────────────────────────────────────────────────
 
 (it-sequential "macho-header-defaults"
-  (let ((hdr (cl-cc/binary::make-mach-header)))
+  (let ((hdr (cl-cc/binary/macho::make-mach-header)))
     (expect (cl-cc/binary:mach-header-magic hdr) :to-equal #xFEEDFACF)
     (expect (cl-cc/binary:mach-header-cputype hdr) :to-equal #x01000007)
     (expect (cl-cc/binary:mach-header-filetype hdr) :to-equal 2)
     (expect (cl-cc/binary:mach-header-ncmds hdr) :to-equal 0)))
 
 (it-sequential "macho-command-defaults"
-  (let ((seg (cl-cc/binary::make-segment-command)))
+  (let ((seg (cl-cc/binary/macho::make-segment-command)))
     (expect (cl-cc/binary:segment-command-cmd seg) :to-equal #x19)
     (expect (cl-cc/binary:segment-command-segname seg) :to-equal ""))
-  (let ((ep (cl-cc/binary::make-entry-point-command)))
+  (let ((ep (cl-cc/binary/macho::make-entry-point-command)))
     (expect (cl-cc/binary:entry-point-command-cmd ep) :to-equal cl-cc/binary:+lc-main+)
     (expect (cl-cc/binary:entry-point-command-entryoff ep) :to-equal 0)))
 
@@ -76,8 +76,8 @@
 
 (it-sequential "macho-serialize-mach-header"
   (let ((buf (cl-cc/binary:make-byte-buffer))
-        (hdr (cl-cc/binary::make-mach-header)))
-    (cl-cc/binary::serialize-mach-header hdr buf)
+        (hdr (cl-cc/binary/macho::make-mach-header)))
+    (cl-cc/binary/macho::serialize-mach-header hdr buf)
     (let ((data (cl-cc/binary:buffer-get-bytes buf)))
       (expect (length data) :to-equal 32)
       (expect (aref data 0) :to-equal #xCF)
