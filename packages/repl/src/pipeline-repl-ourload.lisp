@@ -48,63 +48,83 @@
       (let* ((pkg-name (%prescan-in-package source))
              (pkg (when pkg-name (find-package (string-upcase pkg-name))))
              (*package* (or pkg *package*))
-             (*our-load-host-definition-mode* (%project-source-load-p path)))
-        (let ((forms (parse-all-forms source))
-              (last-result nil))
-          (dolist (form forms last-result)
-            (let* ((package-form-p (and (consp form)
-                                        (symbolp (car form))
-                                        (string= (symbol-name (car form)) "IN-PACKAGE")))
-                    (whitespace-symbol-p (%whitespace-symbol-p form))
-                    (unsupported-p (and (consp form)
-                                        (symbolp (car form))
-                                        (let ((host-only-names
-                                                '("DEFTYPE"
-                                                  "DEFOPCODE"
-                                                  "DEFOPCODE-LOAD-LITERAL"
-                                                  "DEFOPCODE-UNARY-FN"
-                                                  "DEFOPCODE-UNARY-TYPE-PRED"
-                                                  "DEFOPCODE-UNARY-PRED"
-                                                  "DEFOPCODE-BINARY-FN"
-                                                  "DEFOPCODE-BINARY-PRED"
-                                                  "DEFOPCODE-BINARY-FN-IMM"
-                                                  "DEFOPCODE-BINARY-PRED-IMM"
-                                                  "DEFINE-VM-INSTRUCTION"
-                                                  "DEFINE-VM-UNARY-INSTRUCTION"
-                                                  "DEFINE-VM-BINARY-INSTRUCTION"
-                                                  "DEFINE-VM-CHAR-COMPARISON"
-                                                  "DEFINE-SIMPLE-INSTRUCTION"
-                                                  "DEFINE-VM-DIVISION-EXECUTORS"
-                                                  "DEFINE-VM-FLOAT-ROUNDING-EXECUTORS"
-                                                  "DEFINE-VM-HASH-PROPERTY-EXECUTORS"
-                                                  "DEFINE-VM-STRING-COMPARISON"
-                                                  "DEFINE-VM-STRING-TRIM-INSTRUCTION"
-                                                  "DEFINE-VM-STRING-TRIM-EXECUTOR"
-                                                  "DEFINE-STREAM-PREDICATE-INSTRUCTION"
-                                                  "DEFINE-STREAM-CONTROL-INSTRUCTION"
-                                                  "%DEFINE-GENERIC-BINOP-TABLE"
-                                                  "%DEFINE-NULLARY-ENV-QUERY")))
-                                          (or (member (symbol-name (car form))
-                                                      host-only-names
-                                                      :test #'string=)
-                                              (and (string= (symbol-name (car form)) "DEFMACRO")
-                                                   (symbolp (second form))
-                                                   (member (symbol-name (second form))
-                                                           host-only-names
-                                                           :test #'string=)))))))
-              (cond
-                (package-form-p
-                 (let ((pkg (find-package (second form))))
-                     (unless pkg
-                       (error "Unknown package: ~S" (second form)))
-                   (setf *package* pkg)
-                   (setf last-result (second form))))
-                 ((or whitespace-symbol-p unsupported-p)
-                  nil)
-                 (t
-                   (setf last-result (run-form-repl form))
-                   (when print
-                    (format *standard-output* "~S~%" last-result)))))))))))
+             (*our-load-host-definition-mode* (%project-source-load-p path))
+             (load-pathname-symbol (intern "*LOAD-PATHNAME*" *package*))
+             (load-truename-symbol (intern "*LOAD-TRUENAME*" *package*))
+             (vm-globals (progn
+              (%ensure-repl-state)
+              (vm-global-vars *repl-vm-state*)))
+             (load-pathname-value (pathname pathname))
+             (load-truename-value (truename pathname)))
+        (multiple-value-bind (previous-load-pathname load-pathname-bound-p)
+            (gethash load-pathname-symbol vm-globals)
+          (multiple-value-bind (previous-load-truename load-truename-bound-p)
+              (gethash load-truename-symbol vm-globals)
+            (setf (gethash load-pathname-symbol vm-globals) load-pathname-value
+                  (gethash load-truename-symbol vm-globals) load-truename-value)
+            (unwind-protect
+                 (let ((forms (parse-all-forms source))
+                       (last-result nil))
+                   (dolist (form forms last-result)
+                     (let* ((package-form-p (and (consp form)
+                                                 (symbolp (car form))
+                                                 (string= (symbol-name (car form)) "IN-PACKAGE")))
+                            (whitespace-symbol-p (%whitespace-symbol-p form))
+                            (unsupported-p (and (consp form)
+                                                (symbolp (car form))
+                                                (let ((host-only-names
+                                                        '("DEFTYPE"
+                                                          "DEFOPCODE"
+                                                          "DEFOPCODE-LOAD-LITERAL"
+                                                          "DEFOPCODE-UNARY-FN"
+                                                          "DEFOPCODE-UNARY-TYPE-PRED"
+                                                          "DEFOPCODE-UNARY-PRED"
+                                                          "DEFOPCODE-BINARY-FN"
+                                                          "DEFOPCODE-BINARY-PRED"
+                                                          "DEFOPCODE-BINARY-FN-IMM"
+                                                          "DEFOPCODE-BINARY-PRED-IMM"
+                                                          "DEFINE-VM-INSTRUCTION"
+                                                          "DEFINE-VM-UNARY-INSTRUCTION"
+                                                          "DEFINE-VM-BINARY-INSTRUCTION"
+                                                          "DEFINE-VM-CHAR-COMPARISON"
+                                                          "DEFINE-SIMPLE-INSTRUCTION"
+                                                          "DEFINE-VM-DIVISION-EXECUTORS"
+                                                          "DEFINE-VM-FLOAT-ROUNDING-EXECUTORS"
+                                                          "DEFINE-VM-HASH-PROPERTY-EXECUTORS"
+                                                          "DEFINE-VM-STRING-COMPARISON"
+                                                          "DEFINE-VM-STRING-TRIM-INSTRUCTION"
+                                                          "DEFINE-VM-STRING-TRIM-EXECUTOR"
+                                                          "DEFINE-STREAM-PREDICATE-INSTRUCTION"
+                                                          "DEFINE-STREAM-CONTROL-INSTRUCTION"
+                                                          "%DEFINE-GENERIC-BINOP-TABLE"
+                                                          "%DEFINE-NULLARY-ENV-QUERY")))
+                                                  (or (member (symbol-name (car form))
+                                                              host-only-names
+                                                              :test #'string=)
+                                                      (and (string= (symbol-name (car form)) "DEFMACRO")
+                                                           (symbolp (second form))
+                                                           (member (symbol-name (second form))
+                                                                   host-only-names
+                                                                   :test #'string=)))))))
+                       (cond
+                         (package-form-p
+                          (let ((pkg (find-package (second form))))
+                            (unless pkg
+                              (error "Unknown package: ~S" (second form)))
+                            (setf *package* pkg)
+                            (setf last-result (second form))))
+                         ((or whitespace-symbol-p unsupported-p)
+                          nil)
+                         (t
+                          (setf last-result (run-form-repl form))
+                          (when print
+                            (format *standard-output* "~S~%" last-result))))))
+              (if load-pathname-bound-p
+                  (setf (gethash load-pathname-symbol vm-globals) previous-load-pathname)
+                  (remhash load-pathname-symbol vm-globals))
+              (if load-truename-bound-p
+                  (setf (gethash load-truename-symbol vm-globals) previous-load-truename)
+                  (remhash load-truename-symbol vm-globals))))))))))
 
 (defun %sync-repl-globals-into-vm-state (target-state)
   "Copy globals defined in the persistent REPL state into TARGET-STATE, but only
