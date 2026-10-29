@@ -2220,12 +2220,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/chunk_split_variation3.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("ext/standard/tests/strings/chunk_split_variation3.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/standard/tests/strings/bug21453.phpt"
    ) :classification :bug
@@ -2262,50 +2257,13 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/oom_setcookie_value.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/oom_levenshtein.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/oom_nl2br.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/oom_str_ireplace.phpt"
-    "ext/standard/tests/strings/oom_str_replace.phpt"
-    "ext/standard/tests/strings/oom_strtr.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/oom_substr_replace.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/oom_implode.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/wordwrap_memory_limit_004.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("ext/standard/tests/strings/oom_setcookie_value.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/standard/tests/strings/oom_levenshtein.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/standard/tests/strings/oom_nl2br.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/standard/tests/strings/oom_str_ireplace.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/standard/tests/strings/oom_str_replace.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/standard/tests/strings/oom_strtr.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/standard/tests/strings/oom_substr_replace.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/standard/tests/strings/oom_implode.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/standard/tests/strings/wordwrap_memory_limit_004.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/standard/tests/strings/bug48709.phpt"
    ) :classification :bug
@@ -2318,13 +2276,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/wordwrap_memory_limit_002.phpt"
-    "ext/standard/tests/strings/wordwrap_memory_limit_003.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("ext/standard/tests/strings/wordwrap_memory_limit_002.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/standard/tests/strings/wordwrap_memory_limit_003.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/opcache/tests/jit/gh12812.phpt"
    ) :classification :bug
@@ -2337,22 +2289,8 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/json/tests/json_encode_oom_escape.phpt"
-    "ext/pcre/tests/oom_preg_replace.phpt"
-    "ext/pcre/tests/oom_preg_replace_callback.phpt"
-    "ext/pcre/tests/oom_preg_replace_callback_array.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "ext/json/tests/json_encode_oom_string_prealloc.phpt"
-    "ext/standard/tests/strings/wordwrap_memory_limit.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("ext/json/tests/json_encode_oom_escape.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/pcre/tests/oom_preg_replace.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/pcre/tests/oom_preg_replace_callback.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/pcre/tests/oom_preg_replace_callback_array.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("ext/json/tests/json_encode_oom_string_prealloc.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime))) ("ext/standard/tests/strings/wordwrap_memory_limit.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/standard/tests/general_functions/is_float_alias.phpt"
    ) :classification :bug
@@ -2371,12 +2309,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/pcre/tests/oom_preg_match_captures.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF did not match output"
-      :stage :output)
+  ("ext/pcre/tests/oom_preg_match_captures.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/standard/tests/serialize/bug35895.phpt"
    ) :classification :bug
@@ -2455,15 +2388,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  ("ext/standard/tests/array/gh23111.phpt"
-   :classification :bug
-   :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-   :match "^EXPECTF did not match output"
-   :stage :output
-   :alternates ((:classification :bug
-      :reason "Runtime-stage stack exhaustion was observed in CI run #40783370203 while recursively walking the 30,000-level input. The same PHPT shard passed under this output-stage expectation in baseline main run #40464186796 and PR run #40774680776. The pinned cl-cc-php runtime uses recursive LABELS in %php-array-walk-recursive; stack-depth handling is tracked for W5C in nerima-lisp/cl-cc-php#22."
-      :match "^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::%PHP-ARRAY-WALK-RECURSIVE"
-      :stage :runtime)))
+  ("ext/standard/tests/array/gh23111.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :bug :reason "Runtime-stage stack exhaustion was observed in CI run #40783370203 while recursively walking the 30,000-level input. The same PHPT shard passed under this output-stage expectation in baseline main run #40464186796 and PR run #40774680776. The pinned cl-cc-php runtime uses recursive LABELS in %php-array-walk-recursive; stack-depth handling is tracked for W5C in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::%PHP-ARRAY-WALK-RECURSIVE" :stage :runtime)))
   (:cases (
     "ext/standard/tests/serialize/bug28325.phpt"
    ) :classification :bug
@@ -3221,12 +3146,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/array/gh23115.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("ext/standard/tests/array/gh23115.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::" :stage :runtime)))
   (:cases (
     "ext/standard/tests/serialize/bug71311.phpt"
    ) :classification :bug
@@ -3251,12 +3171,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/strings/str_pad_variation1.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECTF comparator and mismatched output; spec.md §2.3 classifies this implemented behavior defect as :bug."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("ext/standard/tests/strings/str_pad_variation1.phpt" :classification :bug :reason "Execution reached the PHPT EXPECTF comparator and mismatched output; spec.md §2.3 classifies this implemented behavior defect as :bug." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/standard/tests/file/stream_rfc2397_002.phpt"
    ) :classification :bug
@@ -4661,12 +4576,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  (:cases (
-    "ext/standard/tests/http/http_build_query/gh20583.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECT\\ mismatch\\ at\\ byte"
-      :stage :output)
+  ("ext/standard/tests/http/http_build_query/gh20583.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECT\\ mismatch\\ at\\ byte" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::" :stage :runtime)))
   (:cases (
     "ext/standard/tests/array/bug71220.phpt"
    ) :classification :bug
@@ -5199,12 +5109,7 @@
       :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  (:cases (
-    "ext/pcre/tests/errors05.phpt"
-   ) :classification :bug
-      :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)."
-      :match "^EXPECT mismatch at byte"
-      :stage :output)
+  ("ext/pcre/tests/errors05.phpt" :classification :bug :reason "Execution reached the PHPT EXPECT/EXPECTF/EXPECTREGEX comparator and mismatched output (t/conformance/phpt/run.py:273-299; spec.md §2.3 lines 67-74)." :match "^EXPECT mismatch at byte" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::" :stage :runtime)))
   (:cases (
     "ext/standard/tests/serialize/bug37947.phpt"
    ) :classification :bug
@@ -10048,12 +9953,7 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #40757 (get_object_vars() get nothing in child class)', so observed PHP behavior is wrong."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  (:cases (
-    "Zend/tests/bug40770.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #40770 (Apache child exits when PHP memory limit reached)', so observed PHP behavior is wrong."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("Zend/tests/bug40770.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #40770 (Apache child exits when PHP memory limit reached)', so observed PHP behavior is wrong." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "Zend/tests/this-reserved/bug41117_1.phpt"
    ) :classification :bug
@@ -10163,12 +10063,7 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #52940 (call_user_func_array still allows call-time pass-by-reference)', so observed PHP behavior is wrong."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  (:cases (
-    "Zend/tests/class_alias/bug54268.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #54268 (Double free when destroy_zend_class fails)', so observed PHP behavior is wrong."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("Zend/tests/class_alias/bug54268.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #54268 (Double free when destroy_zend_class fails)', so observed PHP behavior is wrong." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "Zend/tests/traits/bug54441.phpt"
    ) :classification :bug
@@ -10391,12 +10286,7 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #64555: Array key within interned string gets wrong hash value', so observed PHP behavior is wrong."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  (:cases (
-    "Zend/tests/bug64660.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #64660 (Segfault on memory exhaustion within function definition)', so observed PHP behavior is wrong."
-      :match "^EXPECTF did not match output"
-      :stage :output)
+  ("Zend/tests/bug64660.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #64660 (Segfault on memory exhaustion within function definition)', so observed PHP behavior is wrong." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "Zend/tests/bug64988.phpt"
    ) :classification :bug
@@ -10848,12 +10738,7 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #79836 (Segfault in concat_function)', so observed PHP behavior is wrong."
       :match "^EXPECT\\ mismatch\\ at\\ byte"
       :stage :output)
-  (:cases (
-    "Zend/tests/concat/bug79836_4.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #79836 (use-after-free in concat_function)', so observed PHP behavior is wrong."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("Zend/tests/concat/bug79836_4.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Bug #79836 (use-after-free in concat_function)', so observed PHP behavior is wrong." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "Zend/tests/inheritance/bug79862.phpt"
    ) :classification :bug
@@ -12664,12 +12549,7 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'GH-22257 (Type confusion / OOB read unserializing an Exception with a non-array trace)', so observed PHP behavior is wrong."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "Zend/tests/gh23088.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'GH-23088 (Stack overflow when comparing deeply nested arrays)', so observed PHP behavior is wrong."
-      :match "^EXPECT\\ mismatch\\ at\\ byte"
-      :stage :output)
+  ("Zend/tests/gh23088.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'GH-23088 (Stack overflow when comparing deeply nested arrays)', so observed PHP behavior is wrong." :match "^EXPECT\\ mismatch\\ at\\ byte" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*CL-CC/PHP::" :stage :runtime)))
   (:cases (
     "Zend/tests/gh23232.phpt"
    ) :classification :bug
@@ -13385,24 +13265,9 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Nullsafe operator does not support BP_VAR_W', so observed PHP behavior is wrong."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "Zend/tests/oom_unserialize_009.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'OOM unserialize() Serializable', so observed PHP behavior is wrong."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "Zend/tests/oom_unserialize_015.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'OOM unserialize() object __unserialize (2)', so observed PHP behavior is wrong."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
-  (:cases (
-    "Zend/tests/oom_unserialize_013.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'OOM unserialize() object __wakeup', so observed PHP behavior is wrong."
-      :match "^EXPECTF\\ did\\ not\\ match\\ output"
-      :stage :output)
+  ("Zend/tests/oom_unserialize_009.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'OOM unserialize() Serializable', so observed PHP behavior is wrong." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("Zend/tests/oom_unserialize_015.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'OOM unserialize() object __unserialize (2)', so observed PHP behavior is wrong." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
+  ("Zend/tests/oom_unserialize_013.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'OOM unserialize() object __wakeup', so observed PHP behavior is wrong." :match "^EXPECTF\\ did\\ not\\ match\\ output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "Zend/tests/self_or.phpt"
    ) :classification :bug
@@ -13553,12 +13418,7 @@
       :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Optional param before required should be treated as required for named args as well', so observed PHP behavior is wrong."
       :match "^EXPECTF\\ did\\ not\\ match\\ output"
       :stage :output)
-  (:cases (
-    "Zend/tests/fibers/out-of-memory-in-recursive-fiber.phpt"
-   ) :classification :bug
-      :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Out of Memory from recursive fiber creation', so observed PHP behavior is wrong."
-      :match "^EXPECTF did not match output"
-      :stage :output)
+  ("Zend/tests/fibers/out-of-memory-in-recursive-fiber.phpt" :classification :bug :reason "FILE executed; EXPECT comparison differed for --TEST-- 'Out of Memory from recursive fiber creation', so observed PHP behavior is wrong." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :bug :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "Zend/tests/output_started_at_eval.phpt"
    ) :classification :bug
@@ -50399,12 +50259,7 @@
       :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
       :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
       :stage :runtime)
-  (:cases (
-    "Zend/tests/oom_str_repeat.phpt"
-   ) :classification :unimplemented
-      :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
-      :match "^EXPECT"
-      :stage :output)
+  ("Zend/tests/oom_str_repeat.phpt" :classification :unimplemented :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement." :match "^EXPECT" :stage :output :alternates ((:classification :unimplemented :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/random/tests/01_functions/mt_srand_unknown_mode.phpt"
    ) :classification :unimplemented
@@ -51259,7 +51114,7 @@
       :reason "The PHPT reaches a dynamic property assignment under #[AllowDynamicProperties] and fails with a missing DYNAMIC slot; the pinned source has no AllowDynamicProperties runtime handling, and object properties are not serialized by the JSON encoder, whose supported aggregate branch is hash-table-only (runtime-builtins-string-json.lisp:13-52)."
       :match "^runtime\\ error:\\ The\\ slot\\ CL\\-CC/PHP::DYNAMIC\\ is\\ missing\\ from\\ the\\ object\\ of\\ class\\ CL\\-CC/PHP::MYCLASS$"
       :stage :runtime)
-  ("ext/json/tests/json_encode_oom_pretty_print.phpt" :classification :unimplemented :reason "The PHPT sets memory_limit=8M and expects the runtime to stop JSON allocation with a memory-exhausted fatal; allocation-time enforcement is missing. A runtime timeout was observed in local retry-20261026; tracked in nerima-lisp/cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime :alternates ((:classification :unimplemented :reason "Missing memory_limit enforcement caused the expected memory-exhausted fatal to be absent; output mismatch observed in CI run #40439870065; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output)))
+  ("ext/json/tests/json_encode_oom_pretty_print.phpt" :classification :unimplemented :reason "The PHPT sets memory_limit=8M and expects the runtime to stop JSON allocation with a memory-exhausted fatal; allocation-time enforcement is missing. A runtime timeout was observed in local retry-20261026; tracked in nerima-lisp/cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime :alternates ((:classification :unimplemented :reason "Missing memory_limit enforcement caused the expected memory-exhausted fatal to be absent; output mismatch observed in CI run #40439870065; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output) (:classification :unimplemented :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
   (:cases (
     "ext/reflection/tests/001.phpt"
    ) :classification :unimplemented
@@ -51885,7 +51740,7 @@
       :reason "The test depends on stream polling and socket-pair constants/classes that are not implemented by the pinned runtime."
       :match "^compile error: Compilation failed:"
       :stage :compile)
-  ("Zend/tests/oom_soft_limit_exceeded_fcall.phpt" :classification :unimplemented :reason "The PHPT expects the configured 10 MiB memory limit to stop the infinite allocation loop; memory_limit enforcement is missing. Output mismatch observed in CI run #40369314762; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :unimplemented :reason "memory_limit is not enforced; runtime-stage 60-second timeout observed in CI run #40447108268; tracked in nerima-lisp/cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime)))
+  ("Zend/tests/oom_soft_limit_exceeded_fcall.phpt" :classification :unimplemented :reason "The PHPT expects the configured 10 MiB memory limit to stop the infinite allocation loop; memory_limit enforcement is missing. Output mismatch observed in CI run #40369314762; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output :alternates ((:classification :unimplemented :reason "memory_limit is not enforced; runtime-stage 60-second timeout observed in CI run #40447108268; tracked in nerima-lisp/cl-cc-php#18." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$" :stage :runtime) (:classification :unimplemented :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
 ("ext/standard/tests/general_functions/var_export_basic5.phpt" :classification :bug
    :reason "intermittent 60s compile timeout; observed in CI runs #40324445201; tracked in #82."
    :match "^main child timed out during compile stage after 60 seconds$"
@@ -51956,12 +51811,5 @@
       :reason "mail() does not invoke sendmail or write configured output; output mismatch observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#17."
       :match "^EXPECTF did not match output"
       :stage :output)))
-("Zend/tests/oom_soft_limit_exceeded.phpt" :classification :unimplemented
-   :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement."
-   :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds"
-   :stage :runtime
-   :alternates ((:classification :unimplemented
-      :reason "memory_limit is not enforced; output mismatch observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#18."
-      :match "^EXPECTF did not match output"
-      :stage :output)))
+("Zend/tests/oom_soft_limit_exceeded.phpt" :classification :unimplemented :reason "PHPT expects an OOM/memory-limit result; pinned runtime only parses/stores memory_limit, with no allocation enforcement." :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds" :stage :runtime :alternates ((:classification :unimplemented :reason "memory_limit is not enforced; output mismatch observed in run #40428473938; tracked in nerima-lisp/cl-cc-php#18." :match "^EXPECTF did not match output" :stage :output) (:classification :unimplemented :reason "Host resource exhaustion can terminate this resource-boundary PHPT in the runtime child before PHP reports its configured memory or stack limit. The runtime exit was observed for Zend/tests/oom_soft_limit_exceeded_fcall.phpt in CI run #40792033232. PHP resource-limit semantics are tracked in nerima-lisp/cl-cc-php#22." :match "(?s)^main\\ child\\ exited\\ with\\ 1: .*(?:SB-VM::ALLOC-TRAMP|CL-CC/PHP::)" :stage :runtime)))
 )
