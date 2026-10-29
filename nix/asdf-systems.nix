@@ -352,7 +352,7 @@ let
       '';
 
       postInstall = ''
-        find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \\;
+        find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
       '';
 
       lispLibs = [
