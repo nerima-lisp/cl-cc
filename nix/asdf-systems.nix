@@ -339,6 +339,27 @@ let
   # Keep self-hosting E2E tests available as an explicit system; the canonical
   # fast test app does not auto-load it.
   testAsdfSystems = {
+    "cl-cc-optimize/test" = buildAsdfSystem {
+      pname = "cl-cc-optimize-test";
+      version = "0.2.0";
+      src = clCcOptimize.asdfMetadata.src;
+      systems = [ "cl-cc-optimize/test" ];
+
+      # This test system is secondary to the pinned child .asd. Resolve that
+      # source from this writable derivation before the production package.
+      preBuild = ''
+        export CL_SOURCE_REGISTRY="$src//''${CL_SOURCE_REGISTRY:+:$CL_SOURCE_REGISTRY}"
+      '';
+
+      postInstall = ''
+        find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
+      '';
+
+      lispLibs = [
+        clCcOptimize
+        clWeave
+      ];
+    };
     "cl-cc-jit/tests" = buildAsdfSystem {
       pname = "cl-cc-jit-tests";
       version = "0.2.0";
@@ -390,14 +411,17 @@ let
         find . -name '*.asd' -exec install -Dm444 {} "$out/{}" \;
       '';
 
-      lispLibs = with productionAsdfSystems; [
+      lispLibs = [
+        testAsdfSystems."cl-cc-optimize/test"
+      ]
+      ++ (with productionAsdfSystems; [
         clRegexKit
         cl-cc
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
         cl-cc-formatter
-      ];
+      ]);
     };
     "cl-cc-javascript-test" = buildAsdfSystem {
       pname = "cl-cc-javascript-test";
@@ -426,13 +450,16 @@ let
       version = "0.2.0";
       src = pkgSrc testSrc;
       systems = [ "cl-cc/test/e2e" ];
-      lispLibs = with productionAsdfSystems; [
+      lispLibs = [
+        testAsdfSystems."cl-cc-optimize/test"
+      ]
+      ++ (with productionAsdfSystems; [
         cl-cc
         cl-cc-cli
         cl-cc-testing-framework
         cl-cc-tools
         cl-cc-formatter
-      ];
+      ]);
     };
   };
 

@@ -15,11 +15,8 @@
 ;;; FR-247: Unwind Tables / .eh_frame Generation
 ;;; ------------------------------------------------------------
 
-(it-sequential "fr-247-binary-package-loaded"
-  (expect (find-package "CL-CC/BINARY") :to-be-truthy))
-
 (it-sequential "fr-247-elf-section-constants-defined"
-  (let ((pkg (find-package "CL-CC/BINARY")))
+  (let ((pkg (find-package "CL-CC/BINARY/ELF")))
     (expect pkg :to-be-truthy)
     (let* ((progbits (find-symbol "+SHT-PROGBITS+" pkg))
            (has-const (or progbits
@@ -35,22 +32,6 @@
                         (find-symbol "EMIT-INSTRUCTION" pkg))))
       (expect has-emit :to-be-truthy))))
 
-(it-sequential "fr-247-binary-elf-emit-symbols"
-  (let ((pkg (find-package "CL-CC/BINARY")))
-    (expect pkg :to-be-truthy)
-    (let ((has-elf (or (find-symbol "WRITE-ELF64-FILE" pkg)
-                       (find-symbol "COMPILE-TO-ELF64" pkg)
-                       (find-symbol "MAKE-ELF64-EXECUTABLE" pkg))))
-      (expect has-elf :to-be-truthy))))
-
-(it-sequential "fr-247-binary-macho-emit-symbols"
-  (let ((pkg (find-package "CL-CC/BINARY")))
-    (expect pkg :to-be-truthy)
-    (let ((has-macho (or (find-symbol "WRITE-MACH-O-FILE" pkg)
-                          (find-symbol "BUILD-MACH-O" pkg)
-                          (find-symbol "MAKE-MACH-O-BUILDER" pkg))))
-      (expect has-macho :to-be-truthy))))
-
 (defun %fr-byte-list (bytes)
   (coerce bytes 'list))
 
@@ -63,7 +44,7 @@
     (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm:vm-get-global)
                               (eq (cl-cc/vm:vm-global-name inst)
-                                  cl-cc/optimize::*opt-safepoint-flag-name*)))
+                                  cl-cc/optimize/inlining::*opt-safepoint-flag-name*)))
                        polled) :to-be-truthy)
     (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm:vm-call)
@@ -72,7 +53,7 @@
     (expect (some (lambda (inst)
                          (and (typep inst 'cl-cc/vm:vm-label)
                               (string= (cl-cc/vm:vm-name inst)
-                                       cl-cc/optimize::*opt-safepoint-label*)))
+                                       cl-cc/optimize/inlining::*opt-safepoint-label*)))
                        polled) :to-be-truthy)))
 
 (it-sequential "fr-541-stack-map-records-follow-safepoints"
@@ -89,27 +70,27 @@
     (expect (getf (rest record) :pc-offset) :to-be-truthy)))
 
 (it-sequential "fr-550-dwarf5-debug-sections-have-byte-level-headers"
-  (let* ((cu (cl-cc/binary::make-dwarf-compile-unit
+  (let* ((cu (cl-cc/binary:make-dwarf-compile-unit
               :name "fr550.lisp"
               :producer "cl-cc-test"
               :low-pc #x1000
               :high-pc #x1020
               :lines '((0 1) (4 2))
               :subprograms
-              (list (cl-cc/binary::make-dwarf-subprogram
+              (list (cl-cc/binary:make-dwarf-subprogram
                      :name "main"
                      :low-pc #x1000
                      :high-pc #x1020
                      :parameters
-                     (list (cl-cc/binary::make-dwarf-variable-location
+                     (list (cl-cc/binary:make-dwarf-variable-location
                             :name "x" :kind :register :register 0))))))
          (sections (cl-cc/binary:build-dwarf-debug-sections cu))
-         (info (%fr-byte-list (cl-cc/binary::dwarf-debug-sections-info sections)))
-         (line (%fr-byte-list (cl-cc/binary::dwarf-debug-sections-line sections)))
-         (abbrev (%fr-byte-list (cl-cc/binary::dwarf-debug-sections-abbrev sections))))
-    (expect (cl-cc/binary::dwarf-debug-sections-info sections) :to-be-truthy)
-    (expect (cl-cc/binary::dwarf-debug-sections-line sections) :to-be-truthy)
-    (expect (cl-cc/binary::dwarf-debug-sections-abbrev sections) :to-be-truthy)
+         (info (%fr-byte-list (cl-cc/binary:dwarf-debug-sections-info sections)))
+         (line (%fr-byte-list (cl-cc/binary:dwarf-debug-sections-line sections)))
+         (abbrev (%fr-byte-list (cl-cc/binary:dwarf-debug-sections-abbrev sections))))
+    (expect (cl-cc/binary:dwarf-debug-sections-info sections) :to-be-truthy)
+    (expect (cl-cc/binary:dwarf-debug-sections-line sections) :to-be-truthy)
+    (expect (cl-cc/binary:dwarf-debug-sections-abbrev sections) :to-be-truthy)
     ;; .debug_info: unit_length:u32, version:u16=5, unit_type=compile, addr_size=8.
     (expect (subseq info 4 8) :to-equal '(5 0 1 8))
     ;; .debug_line: unit_length:u32, version:u16=5, addr_size=8, segment_selector=0.
@@ -169,7 +150,7 @@
     (expect (= 1 (length pads)) :to-be-truthy)
     (expect (= 1 (length fdes)) :to-be-truthy)
     (expect (plusp (cl-cc/codegen::x86-64-landing-pad-handler-address (first pads))) :to-be-truthy)
-    (expect (plusp (cl-cc/binary::dwarf-eh-fde-address-range (first fdes))) :to-be-truthy)))
+    (expect (plusp (cl-cc/binary/dwarf::dwarf-eh-fde-address-range (first fdes))) :to-be-truthy)))
 
 (it-sequential "fr-560-integrated-x86-64-eh-appends-non-ud2-landing-pad"
   (let* ((program (cl-cc/vm:make-vm-program
@@ -189,3 +170,22 @@
     (expect (search '(#x49 #xBB) bytes :test #'eql) :to-be-truthy)
     (expect (search '(#x41 #xFF #xE3) bytes :test #'eql) :to-be-truthy)
     (expect (search '(#x0F #x0B) bytes :test #'eql) :to-be-falsy)))
+
+(it-sequential "fr-247-binary-package-loaded"
+  (expect (find-package "CL-CC/BINARY") :to-be-truthy))
+
+(it-sequential "fr-247-binary-elf-emit-symbols"
+  (let ((pkg (find-package "CL-CC/BINARY")))
+    (expect pkg :to-be-truthy)
+    (let ((has-elf (or (find-symbol "WRITE-ELF64-FILE" pkg)
+                       (find-symbol "COMPILE-TO-ELF64" pkg)
+                       (find-symbol "MAKE-ELF64-EXECUTABLE" pkg))))
+      (expect has-elf :to-be-truthy))))
+
+(it-sequential "fr-247-binary-macho-emit-symbols"
+  (let ((pkg (find-package "CL-CC/BINARY")))
+    (expect pkg :to-be-truthy)
+    (let ((has-macho (or (find-symbol "WRITE-MACH-O-FILE" pkg)
+                         (find-symbol "BUILD-MACH-O" pkg)
+                         (find-symbol "MAKE-MACH-O-BUILDER" pkg))))
+      (expect has-macho :to-be-truthy))))

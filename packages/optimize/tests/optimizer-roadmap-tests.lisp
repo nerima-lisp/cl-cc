@@ -210,8 +210,8 @@ build as a Nix store path, not a sibling directory."
                  :store-to-load-forward
                  :dead-store-elim
                  :tail-duplication))
-    (expect (member key cl-cc/optimize::*opt-default-convergence-pass-keys*) :to-be-truthy)
-    (expect (gethash key cl-cc/optimize::*opt-pass-registry*) :to-be-truthy)))
+    (expect (member key cl-cc/optimize/pipeline::*opt-default-convergence-pass-keys*) :to-be-truthy)
+    (expect (gethash key cl-cc/optimize/pipeline::*opt-pass-registry*) :to-be-truthy)))
 
 (it-sequential "optimizer-roadmap-code-motion-evidence" (let ((tail-dup-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-167")) (implemented-evidence (cl-cc/optimize::lookup-opt-roadmap-evidence "FR-164"))) (expect (cl-cc/optimize::opt-roadmap-evidence-status tail-dup-evidence) :to-be :implemented) (expect (cl-cc/optimize::opt-roadmap-evidence-status implemented-evidence) :to-be :implemented) (dolist (api-symbol (append (cl-cc/optimize::opt-roadmap-evidence-api-symbols tail-dup-evidence) (cl-cc/optimize::opt-roadmap-evidence-api-symbols implemented-evidence))) (expect (cl-cc/optimize::%opt-roadmap-api-entry-fbound-p api-symbol) :to-be-truthy))))
 

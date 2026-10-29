@@ -96,87 +96,9 @@
 ;;; current pattern-matcher constant-pattern branch.  We test that the rules
 ;;; are correctly registered.
 
-(it-sequential "egraph-fold-rules-registered fold-add"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-add)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-sub"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-sub)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-mul"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-mul)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-neg"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-neg)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-not"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-not)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-lt"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-lt)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-gt"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-gt)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-le"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-le)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
-(it-sequential "egraph-fold-rules-registered fold-ge"
-  (destructuring-bind (rule-name) (list 'cl-cc/optimize::fold-ge)
-    (expect (eg-rule-registered-p rule-name) :to-be-truthy)))
-
 ;;; ─── Algebraic Identity: bidirectional identity rules ───────────────────
 ;;; Pattern: (op ?x (const N)) → ?x   and   (op (const N) ?x) → ?x
 ;;; Both arg orders must merge the result class with x.
-
-(it-sequential "egraph-bidirectional-identity-fires add-zero"
-  (destructuring-bind (op identity-val) (list 'cl-cc/optimize::add 0)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg identity-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg identity-val))
-         (id (cl-cc/optimize:egraph-add eg op c x)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy))))
-
-(it-sequential "egraph-bidirectional-identity-fires mul-one"
-  (destructuring-bind (op identity-val) (list 'cl-cc/optimize::mul 1)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg identity-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg identity-val))
-         (id (cl-cc/optimize:egraph-add eg op c x)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy))))
-
-(it-sequential "egraph-bidirectional-identity-fires logand-neg1"
-  (destructuring-bind (op identity-val) (list 'cl-cc/optimize::logand -1)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg identity-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg identity-val))
-         (id (cl-cc/optimize:egraph-add eg op c x)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy))))
 
 ;;; ─── Algebraic Identity: bidirectional annihilator rules ────────────────
 ;;; RHS is (const 0). egraph-build-rhs for the template (const 0) creates a
@@ -185,112 +107,10 @@
 ;;;
 ;;; Covered: mul-zero, logand-zero (both share the same structural test).
 
-(it-sequential "egraph-bidirectional-annihilator-fires mul-zero"
-  (destructuring-bind (op annihilator-val) (list 'cl-cc/optimize::mul 0)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg annihilator-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg annihilator-val))
-         (id (cl-cc/optimize:egraph-add eg op c x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
-(it-sequential "egraph-bidirectional-annihilator-fires logand-zero"
-  (destructuring-bind (op annihilator-val) (list 'cl-cc/optimize::logand 0)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg annihilator-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy)) (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg annihilator-val))
-         (id (cl-cc/optimize:egraph-add eg op c x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
 ;;; ─── Algebraic Identity: single-sided zero/one identities ───────────────
-
-(it-sequential "egraph-single-sided-identity-rules-fire sub-zero"
-  (destructuring-bind (op const-val) (list 'cl-cc/optimize::sub 0)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg const-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy))))
-
-(it-sequential "egraph-single-sided-identity-rules-fire div-one"
-  (destructuring-bind (op const-val) (list 'cl-cc/optimize::div 1)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg const-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy))))
-
-(it-sequential "egraph-single-sided-identity-rules-fire ash-zero"
-  (destructuring-bind (op const-val) (list 'cl-cc/optimize::ash 0)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (c  (make-eg-const eg const-val))
-         (id (cl-cc/optimize:egraph-add eg op x c)))
-    (eg-saturate eg)
-    (expect (eg-merged-p eg id x) :to-be-truthy))))
 
 ;;; ─── Self-Reference Rules ────────────────────────────────────────────────
 ;;; sub-self: (sub ?x ?x) → (const 0).
 ;;; Both args are the same class (memoized var).  RHS (const 0) creates a
 ;;; const-with-child zombie class.  Use eg-class-contains-op-p.
 
-(it-sequential "egraph-self-reference-rules-fire sub-self"
-  (destructuring-bind (op) (list 'cl-cc/optimize::sub)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (id (cl-cc/optimize:egraph-add eg op x x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
-(it-sequential "egraph-self-reference-rules-fire eq-self"
-  (destructuring-bind (op) (list 'cl-cc/optimize::num-eq)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (id (cl-cc/optimize:egraph-add eg op x x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
-(it-sequential "egraph-self-reference-rules-fire lt-self"
-  (destructuring-bind (op) (list 'cl-cc/optimize::lt)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (id (cl-cc/optimize:egraph-add eg op x x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
-(it-sequential "egraph-self-reference-rules-fire gt-self"
-  (destructuring-bind (op) (list 'cl-cc/optimize::gt)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (id (cl-cc/optimize:egraph-add eg op x x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
-(it-sequential "egraph-self-reference-rules-fire le-self"
-  (destructuring-bind (op) (list 'cl-cc/optimize::le)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (id (cl-cc/optimize:egraph-add eg op x x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))
-
-(it-sequential "egraph-self-reference-rules-fire ge-self"
-  (destructuring-bind (op) (list 'cl-cc/optimize::ge)
-    (let* ((eg (cl-cc/optimize:make-e-graph))
-         (x  (cl-cc/optimize:egraph-add eg 'cl-cc/optimize::var))
-         (id (cl-cc/optimize:egraph-add eg op x x)))
-    (eg-saturate eg)
-    (expect (eg-class-contains-op-p eg id 'cl-cc/optimize::const) :to-be-truthy))))

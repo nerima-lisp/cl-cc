@@ -7,32 +7,6 @@
 
 (in-package :cl-cc/test)
 
-(it-sequential "optimize-formal-tooling-superopt-abstract-and-translation-validation"
-  (let* ((window (list (cl-cc:make-vm-move :dst :r1 :src :r0)
-                       (cl-cc:make-vm-move :dst :r1 :src :r0)))
-         (optimized (cl-cc/optimize:opt-pass-superopt window)))
-    (expect (= 1 (length optimized)) :to-be-truthy)
-    (expect (typep (first optimized) 'cl-cc/vm:vm-move) :to-be-truthy)
-    (expect (cl-cc/vm:vm-dst (first optimized)) :to-be :r1)
-    (expect (cl-cc/vm:vm-src (first optimized)) :to-be :r0))
-  (let* ((program (list (cl-cc:make-vm-const :dst :r0 :value 2)
-                        (cl-cc:make-vm-const :dst :r1 :value 5)
-                        (cl-cc:make-vm-add :dst :r2 :lhs :r0 :rhs :r1)))
-         (state (cl-cc/optimize:ai-compute-fixed-point program))
-         (facts (cl-cc/optimize::ai-state-facts state))
-         (r2 (gethash :r2 facts)))
-    (expect (getf r2 :interval) :to-equal '(7 . 7))
-    (expect (getf r2 :nullness) :to-be :non-null))
-  (let ((before (list (cl-cc:make-vm-const :dst :r0 :value 1)
-                      (cl-cc:make-vm-halt :reg :r0)))
-        (after (list (cl-cc:make-vm-const :dst :r0 :value 2)
-                     (cl-cc:make-vm-halt :reg :r0))))
-    (expect (cl-cc/optimize::translation-validation-equivalent-p before before) :to-be-truthy)
-    (expect (cl-cc/optimize::translation-validation-equivalent-p before after) :to-be-falsy)
-    (let ((cl-cc/optimize:*translation-validation-enabled* t))
-      (expect (handler-bind ((warning #'muffle-warning))
-                         (cl-cc/optimize:validate-optimizer-translation :unit before after)) :to-be after))))
-
 (it-sequential "optimize-differential-fuzzing-deterministic-smoke"
   (let* ((result (cl-cc/optimize:opt-run-compiler-fuzz
                   :trials 8
@@ -42,11 +16,11 @@
     (expect (getf result :ok) :to-be-truthy)
     (expect (= 8 (getf result :trials)) :to-be-truthy)
     (expect (= 753 (getf result :seed)) :to-be-truthy))
-  (let* ((program (cl-cc/optimize::opt-generate-random-ir-program
-                   :state (cl-cc/optimize::%opt-fuzz-random-state 9)
+  (let* ((program (cl-cc/optimize/pipeline::opt-generate-random-ir-program
+                   :state (cl-cc/optimize/pipeline::%opt-fuzz-random-state 9)
                    :max-program-length 6))
-         (expected (multiple-value-list (cl-cc/optimize::opt-fuzz-interpret-ir program)))
-         (actual (multiple-value-list (cl-cc/optimize::opt-fuzz-interpret-ir (copy-list program)))))
+         (expected (multiple-value-list (cl-cc/optimize/pipeline::opt-fuzz-interpret-ir program)))
+         (actual (multiple-value-list (cl-cc/optimize/pipeline::opt-fuzz-interpret-ir (copy-list program)))))
     (expect actual :to-equal expected)))
 
 (it-sequential "optimize-roadmap-runtime-helpers-have-concrete-behavior"
@@ -89,120 +63,6 @@
              :warmup-p t
              :cache-pressure 0.7
              :failures 1)) :to-be-truthy))
-
-(it-sequential "optimize-roadmap-support-helpers-have-conservative-behavior"
-  (let* ((bottom (cl-cc/optimize::opt-lattice-bottom))
-         (seven-a (cl-cc/optimize::opt-lattice-constant 7))
-         (seven-b (cl-cc/optimize::opt-lattice-constant 7))
-         (eight (cl-cc/optimize::opt-lattice-constant 8))
-         (overdefined (cl-cc/optimize::opt-lattice-overdefined)))
-    (expect (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet bottom seven-a)) :to-be :constant)
-    (expect (= 7 (cl-cc/optimize::opt-lattice-value-value
-               (cl-cc/optimize::opt-lattice-meet seven-a seven-b))) :to-be-truthy)
-    (expect (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet seven-a eight)) :to-be :overdefined)
-    (expect (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet seven-a overdefined)) :to-be :overdefined))
-  (let ((pure-summary (cl-cc/optimize::make-opt-function-summary
-                       :name 'pure-helper
-                       :pure-p t
-                       :effects nil))
-        (effectful-summary (cl-cc/optimize::make-opt-function-summary
-                            :name 'effectful-helper
-                            :pure-p t
-                            :effects '(:heap-write))))
-    (expect (cl-cc/optimize::opt-function-summary-safe-to-inline-p pure-summary) :to-be-truthy)
-    (expect (cl-cc/optimize::opt-function-summary-safe-to-inline-p effectful-summary) :to-be-falsy))
-  (let* ((pool (cl-cc/optimize::make-opt-slab-pool :object-size 2))
-         (first-object (cl-cc/optimize::opt-slab-allocate pool)))
-    (expect first-object :to-equal '(:slab-object 2 1))
-    (cl-cc/optimize::opt-slab-free pool first-object)
-    (expect (cl-cc/optimize::opt-slab-allocate pool) :to-be first-object))
-  (let ((region (cl-cc/optimize::make-opt-bump-region :limit 8)))
-    (expect (= 0 (cl-cc/optimize::opt-bump-allocate region 3)) :to-be-truthy)
-    (expect (= 3 (cl-cc/optimize::opt-bump-mark region)) :to-be-truthy)
-    (expect (= 4 (cl-cc/optimize::opt-bump-allocate region 2 :alignment 4)) :to-be-truthy)
-    (expect (cl-cc/optimize::opt-bump-allocate region 4) :to-be-null)
-    (cl-cc/optimize::opt-bump-reset region)
-    (expect (= 3 (cl-cc/optimize::opt-bump-region-cursor region)) :to-be-truthy))
-  (let ((stack-map (cl-cc/optimize::make-opt-stack-map :pc 42 :roots '(:r0 :r2))))
-    (expect (cl-cc/optimize::opt-stack-map-live-root-p stack-map :r0) :to-be-truthy)
-    (expect (cl-cc/optimize::opt-stack-map-live-root-p stack-map :r1) :to-be-falsy))
-  (let ((guard (cl-cc/optimize::make-opt-guard-state :executions 9)))
-    (expect (cl-cc/optimize::opt-guard-record guard t) :to-be :tag-bit-test)
-    (expect (cl-cc/optimize::opt-guard-record guard nil) :to-be :full-type-check))
-  (let* ((cold (cl-cc/optimize::make-opt-jit-cache-entry :id :cold :size 8 :warmth 1))
-         (warm (cl-cc/optimize::make-opt-jit-cache-entry :id :warm :size 8 :warmth 9))
-         (evicted (cl-cc/optimize::opt-jit-cache-select-eviction
-                   (list warm cold)
-                   :current-size 90
-                   :max-size 100)))
-    (expect evicted :to-be cold))
-  (let ((summary (cl-cc/optimize::opt-merge-module-summaries
-                  (list (cl-cc/optimize::make-opt-module-summary
-                         :module :a
-                         :exports '(foo)
-                         :function-count 2)
-                        (cl-cc/optimize::make-opt-module-summary
-                         :module :b
-                         :exports '(foo bar)
-                         :function-count 3)))))
-    (expect (getf summary :modules) :to-equal '(:a :b))
-    (expect (= 5 (getf summary :function-count)) :to-be-truthy)
-    (expect (member 'foo (getf summary :exports)) :to-be-truthy)
-    (expect (member 'bar (getf summary :exports)) :to-be-truthy))
-  (expect (cl-cc/optimize::opt-sea-node-schedulable-p
-    (cl-cc/optimize::make-opt-sea-node :id :n1 :op :add :controls '(:entry))) :to-be-truthy)
-  (expect (cl-cc/optimize::opt-sea-node-schedulable-p
-      (cl-cc/optimize::make-opt-sea-node :id :n2 :controls '(:entry))) :to-be-falsy))
-
-(it-sequential "optimizer-roadmap-value-profiling-top-k-and-range-behavior"
-  (let ((profile (cl-cc/optimize:make-opt-profile-data :value-limit 2)))
-    (expect (= 2 (cl-cc/optimize:opt-profile-record-value profile :site 10 2)) :to-be-truthy)
-    (expect (= 3 (cl-cc/optimize:opt-profile-record-value profile :site 20 3)) :to-be-truthy)
-    (expect (= 1 (cl-cc/optimize:opt-profile-record-value profile :site 30 1)) :to-be-truthy)
-    (expect (cl-cc/optimize:opt-profile-top-values profile :site) :to-equal '((20 . 3) (10 . 2)))
-    (expect (cl-cc/optimize:opt-profile-top-values profile :site 1) :to-equal '((20 . 3)))
-    (expect (cl-cc/optimize:opt-profile-value-range profile :site) :to-equal '(10 . 30))))
-
-(it-sequential "optimizer-roadmap-speculation-log-gating-and-persistence-behavior"
-  (let* ((cl-cc/optimize:*opt-speculation-log*
-           (cl-cc/optimize:make-opt-speculation-log :threshold 2))
-         (temp-path (merge-pathnames
-                     (make-pathname :name (format nil "opt-spec-log-~D-~D"
-                                                  (get-universal-time)
-                                                  (random 1000000))
-                                    :type "prof")
-                     (uiop:temporary-directory))))
-    (unwind-protect
-         (progn
-           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-truthy)
-           (expect (= 1 (cl-cc/optimize:opt-record-speculation-failure
-                      cl-cc/optimize:*opt-speculation-log*
-                      :site
-                      :guard)) :to-be-truthy)
-           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-truthy)
-           (expect (= 2 (cl-cc/optimize:opt-record-speculation-failure
-                      cl-cc/optimize:*opt-speculation-log*
-                      :site
-                      :guard)) :to-be-truthy)
-           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-falsy)
-           (cl-cc/optimize:opt-save-speculation-log temp-path)
-           (expect (cl-cc/optimize:opt-clear-speculation-log) :to-be cl-cc/optimize:*opt-speculation-log*)
-           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-truthy)
-           (setf (cl-cc/optimize::opt-spec-log-threshold cl-cc/optimize:*opt-speculation-log*) 99)
-           (cl-cc/optimize:opt-load-speculation-log temp-path)
-           (expect (= 2 (cl-cc/optimize::opt-spec-log-threshold
-                      cl-cc/optimize:*opt-speculation-log*)) :to-be-truthy)
-           (expect (cl-cc/optimize:opt-speculation-failed-p
-             cl-cc/optimize:*opt-speculation-log*
-             :site
-             :guard) :to-be-truthy)
-           (expect (cl-cc/optimize:opt-speculation-allowed-p :site :guard) :to-be-falsy))
-      (when (probe-file temp-path)
-        (delete-file temp-path)))))
-
 
 (defun %optimize-backend-doc-content ()
   "Return the current optimize-backend roadmap document text."
@@ -539,7 +399,6 @@
                      ("FR-463" :implemented)))
       (destructuring-bind (feature-id expected-status) case
         (expect (gethash feature-id table) :to-be expected-status)))))
-
 (it-sequential "optimize-backend-roadmap-audited-frs-have-specific-evidence"
   (dolist (case '(("FR-303" :implemented
                    "packages/codegen/src/x86-64-emit-ops.lisp"
@@ -547,7 +406,7 @@
                    x86-emit-add-checked-emits-14-bytes)
                   ("FR-352" :implemented
                    "packages/optimize/src/optimizer-memory-alias.lisp"
-                   cl-cc/optimize::opt-interval-logand
+                   cl-cc/optimize:opt-interval-logand
                    overflow-check-elim-rewrites-proven-8-bit-add-to-unchecked-integer-add)
                   ("FR-360" :implemented
                     "packages/compile/src/codegen-core-control.lisp"
@@ -609,26 +468,6 @@
        (list module)
        (list api-symbol)
        (list test-anchor)))))
-
-(it-sequential "optimize-backend-roadmap-support-evidence-has-behavior"
-  (let* ((bottom (cl-cc/optimize::opt-lattice-bottom))
-         (const-a (cl-cc/optimize::opt-lattice-constant :a))
-         (const-b (cl-cc/optimize::opt-lattice-constant :b)))
-    (expect (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet bottom const-a)) :to-be :constant)
-    (expect (cl-cc/optimize::opt-lattice-value-kind
-                (cl-cc/optimize::opt-lattice-meet const-a const-b)) :to-be :overdefined))
-  (let ((profile (cl-cc/optimize::make-opt-profile-data)))
-    (expect (= 5 (cl-cc/optimize::opt-profile-record-edge profile :a :b 5)) :to-be-truthy)
-    (expect (= 2 (cl-cc/optimize::opt-profile-record-call-chain profile '(:a :b) 2)) :to-be-truthy)
-    (expect (cl-cc/optimize::opt-profile-record-allocation profile :site 32 3) :to-equal (cons 3 32)))
-  (let ((region (cl-cc/optimize::make-opt-bump-region :limit 16)))
-    (expect (= 0 (cl-cc/optimize::opt-bump-allocate region 4)) :to-be-truthy)
-    (expect (= 8 (cl-cc/optimize::opt-bump-allocate region 4 :alignment 8)) :to-be-truthy))
-  (let ((guard (cl-cc/optimize::make-opt-guard-state :executions 10)))
-    (expect (cl-cc/optimize::opt-guard-record guard t) :to-be :tag-bit-test))
-  (let ((shape (cl-cc/optimize::make-opt-shape-descriptor-for-slots 1 '(:x :y :z))))
-    (expect (= 2 (cl-cc/optimize::opt-shape-slot-offset shape :z)) :to-be-truthy)))
 
 (it-sequential "optimize-backend-roadmap-fr-463-has-specific-evidence"
   (%optimize-backend-assert-evidence-case
