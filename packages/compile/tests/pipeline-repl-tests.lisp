@@ -354,3 +354,14 @@
              (cl-cc::run-form-repl `(make-package ,name :use nil)))
            (expect (cl-cc/runtime:rt-find-package name) :to-be-truthy))
       (remhash name cl-cc/runtime:*rt-package-registry*))))
+(it-sequential "pipeline-run-form-repl-uses-current-package-for-package-operations"
+  (let ((name (format nil "CL-CC-REPL-PACKAGE-~A" (get-universal-time))))
+    (unwind-protect
+         (progn
+           (cl-cc/repl:with-fresh-repl-state
+             (cl-cc::run-form-repl
+              `(let ((*package* (make-package ,name :use nil)))
+                 (export (list (intern "W4-02-CURRENT-PACKAGE"))))))
+           (expect (gethash :exports (cl-cc/runtime:rt-find-package name))
+                   :to-be-truthy))
+      (remhash name cl-cc/runtime:*rt-package-registry*))))
