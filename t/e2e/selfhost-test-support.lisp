@@ -103,7 +103,7 @@ long-lived CL-CC/TEST package during canonical full-suite runs."
                        file-path)))
           '("packages/parse/src/cst/cst.lisp"
             "packages/parse/src/reader/lexer.lisp"
-            "packages/optimize/src/optimizer.lisp"
+            "packages/optimize/src/scalar/fold-pass.lisp"
             "packages/type/src/package.lisp"
             "packages/type/src/type-model/kind.lisp"
             "packages/type/src/quantities/multiplicity.lisp"
