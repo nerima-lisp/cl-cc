@@ -47371,13 +47371,20 @@
       :stage :runtime)
   (:cases (
     "ext/pcre/tests/bug44925.phpt"
-    "ext/pcre/tests/bug69864.phpt"
     "ext/pcre/tests/bug75089.phpt"
     "ext/pcre/tests/pcre_reentrancy.phpt"
    ) :classification :unimplemented
       :reason "PHP builtin preg_grep is absent from both pinned builtin name tables and is not declared in this PHPT; runtime reports its symbol undefined (runtime-builtins-register.lisp:67-78)."
       :match "^runtime\\ error:\\ The\\ function\\ CL\\-CC/PHP::PREG_GREP\\ is\\ undefined\\.$"
       :stage :runtime)
+  ("ext/pcre/tests/bug69864.phpt" :classification :unimplemented
+      :reason "PHP builtin preg_grep is absent from both pinned builtin name tables and is not declared in this PHPT; runtime reports its symbol undefined (runtime-builtins-register.lisp:67-78)."
+      :match "^runtime\\ error:\\ The\\ function\\ CL\\-CC/PHP::PREG_GREP\\ is\\ undefined\\.$"
+      :stage :runtime
+      :alternates ((:classification :bug
+                    :reason "PR #90 still timed out this PHPT in the main runtime stage during CI run #40915099912; the local macOS SBCL effect-based probe also exceeded the unchanged 60-second timeout. Performance recovery is tracked in issue #91."
+                    :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$"
+                    :stage :runtime)))
   (:cases (
     "ext/pcre/tests/bug77827.phpt"
     "ext/pcre/tests/invalid_utf8.phpt"
@@ -51424,6 +51431,10 @@
    ) :classification :unimplemented
       :reason "The pinned runtime does not register PHP builtin REGISTER_SHUTDOWN_FUNCTION; the observed call fails as undefined."
       :match "^runtime\\ error:\\ The\\ function\\ CL\\-CC/PHP::REGISTER_SHUTDOWN_FUNCTION\\ is\\ undefined\\.$"
+      :stage :runtime)
+  ("tests/func/003.phpt" :classification :bug
+      :reason "PR #90 at head a76b35ec timed out this implemented PHPT in CI run #40915099912; the local macOS SBCL effect-based probe also timed out at 60 seconds. Performance recovery is tracked in issue #91."
+      :match "^main\\ child\\ timed\\ out\\ during\\ runtime\\ stage\\ after\\ 60\\ seconds$"
       :stage :runtime)
   (:cases (
     "tests/basic/timeout_variation_0.phpt"
