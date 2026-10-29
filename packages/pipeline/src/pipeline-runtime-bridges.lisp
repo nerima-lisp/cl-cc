@@ -43,6 +43,10 @@ against: the set has to be identical to what the old package scan produced."
    (lambda (host translations)
      (setf (cl:logical-pathname-translations host) translations)
      translations)))
+(defun %register-package-runtime-bridges ()
+  (cl-cc/vm:vm-register-host-bridge
+   (quote cl:make-package)
+   (function cl-cc/runtime:rt-make-package)))
 (eval-when (:load-toplevel :execute)
   (setf (gethash (quote cl:logical-pathname-translations)
                  *setf-compound-place-handlers*)
@@ -50,7 +54,8 @@ against: the set has to be identical to what the old package scan produced."
           (compiler-macroexpand-all
            (cons (intern "%SET-LOGICAL-PATHNAME-TRANSLATIONS" :cl-cc)
                  (append (cdr place) (list value))))))
-  (%register-logical-pathname-runtime-bridges))
+  (%register-logical-pathname-runtime-bridges)
+  (%register-package-runtime-bridges))
 (defun %register-backend-runtime-bridges ()
   "Register pathname and loaded backend runtime bridges.
 
@@ -58,6 +63,7 @@ Called by both source compilation entry points. Backend bridge discovery
 belongs to backend registries; Common Lisp pathname functions are registered
 directly."
   (%register-logical-pathname-runtime-bridges)
+  (%register-package-runtime-bridges)
   (%register-backend-protocol-bridges))
 
 (defun %register-php-runtime-bridges ()
