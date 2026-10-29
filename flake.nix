@@ -159,7 +159,7 @@
       flake = false;
     };
     cl-cc-php = {
-      url = "github:nerima-lisp/cl-cc-php/d59cdbf72bffacf77a276dfb3492f2be35e8a363";
+      url = "github:nerima-lisp/cl-cc-php/63e77b68fc3f6f6cd1cc3494bdf43af957015ab6";
       flake = false;
     };
     php-src = {

@@ -430,6 +430,16 @@ same call through a register answered 0."
       (let ((handler (gethash sname *phase2-builtin-handlers*)))
         (when handler
           (funcall handler args result-reg ctx))))))
+(defun %call-preserves-global-var-cache-p (func-sym ctx)
+  "Return true only when a direct call has a registered non-writing effect."
+  (and func-sym
+       (not (%ast-var-function-value-p func-sym ctx))
+       (not (gethash func-sym (ctx-global-functions ctx)))
+       (not (gethash func-sym (ctx-global-generics ctx)))
+       (let ((properties (known-function-properties func-sym)))
+         (or (member :pure properties)
+             (member :read-only properties)))))
+
 
 (defun %if-condition-unary-predicate-entry (cond-ast ctx)
   "Return the :UNARY-PREDICATE registry entry when COND-AST is a one-argument
@@ -566,26 +576,40 @@ the numeric type-driven instruction selection without changing generic calls."
        (let* ((func-expr (ast-call-func node))
               (callable-expr (%callable-designator-node func-expr))
               (func-sym
-               (cond ((symbolp callable-expr) callable-expr)
-      ((typep callable-expr 'ast-function)
-       (ast-function-name callable-expr))
-      ((and (typep callable-expr 'ast-quote)
-            (symbolp (ast-quote-value callable-expr)))
-       (ast-quote-value callable-expr))
-      ((and (typep callable-expr 'ast-var)
-            (not (%ast-var-function-value-p
-                  (ast-var-name callable-expr) ctx)))
-       (ast-var-name callable-expr))
-      (t nil)))
-              (args (ast-call-args node)))
-         (if (and (= (length args) 2)
-                  (and func-sym (member (symbol-name func-sym) (quote ("+" "-" "*" "/")) :test (function string=)))
-                  (every #'%float-constant-node-p args))
-             (compile-ast (make-ast-binop :op (find-symbol (symbol-name func-sym) :cl) :lhs (first args) :rhs (second args))
-                          ctx)
-             (let ((result-reg (make-register ctx)))
-               (or (%try-compile-call-fast-paths callable-expr func-sym args result-reg tail ctx)
-                   (%compile-normal-call callable-expr func-sym args result-reg tail ctx)))))))))
+                (cond ((symbolp callable-expr) callable-expr)
+                      ((typep callable-expr 'ast-function)
+                       (ast-function-name callable-expr))
+                      ((and (typep callable-expr 'ast-quote)
+                            (symbolp (ast-quote-value callable-expr)))
+                       (ast-quote-value callable-expr))
+                      ((and (typep callable-expr 'ast-var)
+                            (not (%ast-var-function-value-p
+                                  (ast-var-name callable-expr) ctx)))
+                       (ast-var-name callable-expr))
+                      (t nil)))
+              (args (ast-call-args node))
+              (result
+                (if (and (= (length args) 2)
+                         (and func-sym
+                              (member (symbol-name func-sym)
+                                      '("+" "-" "*" "/")
+                                      :test #'string=))
+                         (every #'%float-constant-node-p args))
+                    (compile-ast
+                     (make-ast-binop
+                      :op (find-symbol (symbol-name func-sym) :cl)
+                      :lhs (first args)
+                      :rhs (second args))
+                     ctx)
+                    (let ((result-reg (make-register ctx)))
+                      (or (%try-compile-call-fast-paths
+                           callable-expr func-sym args result-reg tail ctx)
+                          (%compile-normal-call
+                           callable-expr func-sym args result-reg tail ctx))))))
+         (unless (or tail
+                     (%call-preserves-global-var-cache-p func-sym ctx))
+           (setf (ctx-global-var-cache ctx) nil))
+         result)))))
 
 (defmethod compile-ast ((node ast-list) ctx)
   "Compile a runtime list-construction AST node through the normal LIST call path."

@@ -190,17 +190,17 @@
     "cl-cc-php": {
       "flake": false,
       "locked": {
-        "lastModified": 1792837192,
-        "narHash": "sha256-WvcVv3jCSA3Fsqlf9Gr3prmdHQKvkKvl4EcNCAinWSs=",
+        "lastModified": 1793300026,
+        "narHash": "sha256-LSOlpbv+GAzotFwusf2pDQTgKInjbhN0mk2LYhGhtXI=",
         "owner": "nerima-lisp",
         "repo": "cl-cc-php",
-        "rev": "d59cdbf72bffacf77a276dfb3492f2be35e8a363",
+        "rev": "63e77b68fc3f6f6cd1cc3494bdf43af957015ab6",
         "type": "github"
       },
       "original": {
         "owner": "nerima-lisp",
         "repo": "cl-cc-php",
-        "rev": "d59cdbf72bffacf77a276dfb3492f2be35e8a363",
+        "rev": "63e77b68fc3f6f6cd1cc3494bdf43af957015ab6",
         "type": "github"
       }
     },
